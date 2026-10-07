@@ -1,0 +1,85 @@
+@import '@fontsource/ibm-plex-sans-arabic/400.css';
+@import '@fontsource/ibm-plex-sans-arabic/500.css';
+@import '@fontsource/ibm-plex-sans-arabic/600.css';
+@import '@fontsource/ibm-plex-sans-arabic/700.css';
+@import '@fontsource/playfair-display/500.css';
+@import '@fontsource/playfair-display/600.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Platform default tokens (marketplace). Stores & dashboard override these via the Theme Engine. */
+:root {
+  --c-background: 250 248 244;
+  --c-surface: 244 241 235;
+  --c-elevated: 255 255 255;
+  --c-text: 20 20 20;
+  --c-muted: 102 98 92;
+  --c-border: 230 226 218;
+  --c-border-strong: 205 199 189;
+  --c-primary: 23 72 59;
+  --c-on-primary: 255 255 255;
+  --c-primary-ink: 23 72 59;
+  --c-secondary: 236 243 239;
+  --c-on-secondary: 20 20 20;
+  --c-accent: 180 83 42;
+  --c-on-accent: 255 255 255;
+  --c-button: 20 20 20;
+  --c-on-button: 255 255 255;
+  --c-button-outline: 20 20 20;
+  --c-header: 250 248 244;
+  --c-on-header: 20 20 20;
+  --c-footer: 17 17 17;
+  --c-on-footer: 255 255 255;
+  --c-footer-muted: 168 168 168;
+  --c-sale: 198 40 40;
+  --c-success: 21 128 61;
+  --c-ring: 23 72 59;
+
+  --header-h: 64px;
+  --bottom-nav-h: 64px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@layer base {
+  html { @apply bg-canvas text-fg antialiased; text-rendering: optimizeLegibility; scroll-behavior: smooth; }
+  body { @apply font-sans text-[15px] leading-relaxed bg-canvas text-fg; font-feature-settings: 'ss01'; min-height: 100dvh; }
+  :lang(ar) body { letter-spacing: 0; }
+  h1, h2, h3, h4 { @apply text-fg; text-wrap: balance; }
+  p { text-wrap: pretty; }
+  img { -webkit-user-drag: none; }
+  ::selection { background: rgb(var(--c-primary) / 0.18); }
+  :focus-visible { outline: 2px solid rgb(var(--c-ring)); outline-offset: 2px; border-radius: 6px; }
+  input, textarea, select, button { font: inherit; }
+  [dir='rtl'] .flip-rtl { transform: scaleX(-1); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+  }
+}
+
+@layer components {
+  .skeleton { @apply relative overflow-hidden bg-fg/[0.06] rounded-lg; }
+  .skeleton::after {
+    content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
+    animation: shimmer 1.6s infinite;
+  }
+  [dir='rtl'] .skeleton::after { transform: translateX(100%); animation-name: shimmer-rtl; }
+  .eyebrow { @apply text-2xs font-semibold uppercase tracking-[0.18em] text-muted; }
+  :lang(ar) .eyebrow { @apply tracking-normal text-xs; }
+  .scroll-x { @apply flex overflow-x-auto snap-x snap-mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+  .scroll-x::-webkit-scrollbar { display: none; }
+  .no-scrollbar { scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .tap { @apply min-h-[44px] min-w-[44px]; }
+  .card { @apply bg-elevated rounded-2xl border border-line; }
+  .pb-safe { padding-bottom: calc(var(--safe-b)); }
+  .tabular { font-variant-numeric: tabular-nums; }
+  .link-underline { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size .35s cubic-bezier(.22,1,.36,1); }
+  .link-underline:hover { background-size: 100% 1px; }
+  [dir='rtl'] .link-underline { background-position: 100% 100%; }
+}
+
+@keyframes shimmer-rtl { 100% { transform: translateX(-100%); } }

@@ -1,0 +1,9 @@
+node_modules/
+web/dist/
+server/data/
+.cache-fonts/
+*.log
+.env
+souqna.zip
+Claude outputs/
+deploy.bat
