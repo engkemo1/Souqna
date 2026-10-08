@@ -96,8 +96,8 @@ function BannerForm({ open, banner, onClose, onSaved, categories }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={`${t('banners.eyebrow')} (AR)`}><Input dir="rtl" value={f.eyebrow_ar} onChange={set('eyebrow_ar')} /></Field>
           <Field label={`${t('banners.eyebrow')} (EN)`}><Input dir="ltr" value={f.eyebrow_en} onChange={set('eyebrow_en')} /></Field>
-          <Field label={`${t('banners.titleField')} (AR)`} error={errors.title_ar}><Input dir="rtl" value={f.title_ar} onChange={set('title_ar')} /></Field>
-          <Field label={`${t('banners.titleField')} (EN)`} error={errors.title_en}><Input dir="ltr" value={f.title_en} onChange={set('title_en')} /></Field>
+          <Field optional={t('common.optional')} label={`${t('banners.titleField')} (AR)`} hint={t('banners.textOptional')} error={errors.title_ar}><Input dir="rtl" value={f.title_ar} onChange={set('title_ar')} /></Field>
+          <Field optional={t('common.optional')} label={`${t('banners.titleField')} (EN)`} error={errors.title_en}><Input dir="ltr" value={f.title_en} onChange={set('title_en')} /></Field>
           <Field label={`${t('banners.subtitle')} (AR)`}><Input dir="rtl" value={f.subtitle_ar} onChange={set('subtitle_ar')} /></Field>
           <Field label={`${t('banners.subtitle')} (EN)`}><Input dir="ltr" value={f.subtitle_en} onChange={set('subtitle_en')} /></Field>
           <Field label={`${t('banners.cta')} (AR)`}><Input dir="rtl" value={f.cta_ar} onChange={set('cta_ar')} /></Field>
@@ -173,7 +173,7 @@ export default function Banners() {
 
   return (
     <PageTransition>
-      <PageHeader title={t('banners.title')} actions={<Button icon={Plus} onClick={() => setForm({ open: true, banner: null })}>{t('banners.new')}</Button>} />
+      <PageHeader title={t('banners.title')} subtitle={t('banners.modes')} actions={<Button icon={Plus} onClick={() => setForm({ open: true, banner: null })}>{t('banners.new')}</Button>} />
       {error ? <ErrorState error={error} onRetry={reload} /> : !data ? <ListSkeleton rows={3} /> : !items.length ? (
         <EmptyState icon={Images} title={t('banners.empty')} body={t('banners.emptyBody')} action={<Button icon={Plus} onClick={() => setForm({ open: true, banner: null })}>{t('banners.new')}</Button>} />
       ) : (

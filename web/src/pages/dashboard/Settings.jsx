@@ -15,7 +15,45 @@ import { ErrorState, errorMessage, fieldErrors } from '../../components/ui/State
 import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'category', 'phone', 'whatsapp', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'category', 'phone', 'whatsapp', 'map_url', 'hero_mode', 'opens_at', 'closes_at', 'day_off', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en'];
+
+function HeroModePicker({ value, onChange }) {
+  const { t } = useI18n();
+  const opts = [['cover', t('settings.heroCover'), t('settings.heroCoverHint')], ['slider', t('settings.heroSlider'), t('settings.heroSliderHint')], ['auto', t('settings.heroAuto'), t('settings.heroAutoHint')]];
+  return (
+    <fieldset className="mt-5">
+      <legend className="mb-2 text-sm font-medium">{t('settings.heroMode')}</legend>
+      <div className="grid gap-2">
+        {opts.map(([v, label, hint]) => (
+          <label key={v} className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 ring-1 transition ${value === v ? 'bg-fg/[0.04] ring-fg' : 'ring-line hover:bg-fg/[0.02]'}`}>
+            <input type="radio" name="hero_mode" value={v} checked={value === v} onChange={() => onChange(v)} className="mt-1" />
+            <span><span className="block text-sm font-semibold">{label}</span><span className="block text-[13px] text-muted">{hint}</span></span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function AutoCover({ onDone }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const r = await api('/owner/store/cover/auto', { method: 'POST' });
+      onDone(r.media);
+      toast({ title: 'اتعمل cover جديد لمتجرك ✨' });
+    } catch (e) { toast({ tone: 'error', title: e.message || 'حصلت مشكلة' }); }
+    setBusy(false);
+  };
+  return (
+    <button type="button" onClick={run} disabled={busy}
+      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-l from-[#F3DFA2] via-[#C9A24D] to-[#8E6A24] px-4 py-2.5 text-sm font-bold text-[#111] disabled:opacity-60">
+      {busy ? 'بنصمم الـ cover…' : '✨ صمّملي cover فخم من منتجاتي'}
+    </button>
+  );
+}
 
 function ImageSlot({ label, media, slot, ratio, onUploaded, round }) {
   const { t } = useI18n();
@@ -63,7 +101,7 @@ export default function Settings() {
     const s = data.store;
     const x = ({
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
-      address_ar: s.address.ar, address_en: s.address.en, category: s.category, phone: s.phone || '', whatsapp: s.whatsapp || '', instagram: s.instagram || '', facebook: s.facebook || '',
+      address_ar: s.address.ar, address_en: s.address.en, category: s.category, phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', hero_mode: s.heroMode || 'auto', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
       shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
     });
     setF(x);
@@ -122,6 +160,15 @@ export default function Settings() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('settings.phone')}><Input dir="ltr" inputMode="tel" value={f.phone} onChange={set('phone')} className="text-start" /></Field>
               <Field label={t('settings.whatsapp')}><Input dir="ltr" inputMode="tel" value={f.whatsapp} onChange={set('whatsapp')} className="text-start" /></Field>
+              <Field label={t('settings.mapUrl')} hint={t('settings.mapUrlHint')} error={errors.map_url}><Input dir="ltr" inputMode="url" placeholder="https://maps.app.goo.gl/..." value={f.map_url} onChange={set('map_url')} className="text-start" /></Field>
+              <Field label={t('settings.opensAt')} error={errors.opens_at}><Input type="time" dir="ltr" value={f.opens_at} onChange={set('opens_at')} /></Field>
+              <Field label={t('settings.closesAt')} error={errors.closes_at}><Input type="time" dir="ltr" value={f.closes_at} onChange={set('closes_at')} /></Field>
+              <Field label={t('settings.dayOff')}>
+                <select className="h-11 w-full rounded-xl border border-line bg-surface px-3" value={f.day_off} onChange={set('day_off')}>
+                  <option value="">{t('settings.noDayOff')}</option>
+                  {t('analytics.weekdays').split(',').map((d, i) => <option key={d} value={i}>{d}</option>)}
+                </select>
+              </Field>
               <Field label={t('settings.instagram')}><Input dir="ltr" prefix="@" value={f.instagram} onChange={set('instagram')} /></Field>
               <Field label={t('settings.facebook')}><Input dir="ltr" value={f.facebook} onChange={set('facebook')} className="text-start" /></Field>
               <Field label={t('settings.addressAr')}><Input dir="rtl" value={f.address_ar} onChange={set('address_ar')} /></Field>
@@ -141,7 +188,11 @@ export default function Settings() {
           <Panel title={t('settings.brand')}>
             <div className="space-y-5">
               <ImageSlot label={t('settings.logo')} media={data.store.logo} slot="logo" ratio="1 / 1" round onUploaded={onImage('logo')} />
-              <ImageSlot label={t('settings.cover')} media={data.store.cover} slot="cover" ratio="16 / 10" onUploaded={onImage('cover')} />
+<div>
+                <ImageSlot label={t('settings.cover')} media={data.store.cover} slot="cover" ratio="16 / 10" onUploaded={onImage('cover')} />
+                <AutoCover onDone={onImage('cover')} />
+                <HeroModePicker value={f.hero_mode} onChange={(v) => setF({ ...f, hero_mode: v })} />
+              </div>
             </div>
           </Panel>
           <Link to="/dashboard/theme" className="group flex items-center gap-4 rounded-2xl border border-line bg-elevated p-4 transition hover:border-line-strong">

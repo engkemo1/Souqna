@@ -83,3 +83,5 @@
 }
 
 @keyframes shimmer-rtl { 100% { transform: translateX(-100%); } }
+
+@keyframes shine { to { background-position: 200% center; } }

@@ -1,5 +1,5 @@
 /**
- * Souqna Storefront Theme Engine
+ * BanhaLook Storefront Theme Engine
  * ------------------------------------------------------------
  * Store owners choose colors. The engine turns those choices into
  * a full, accessible token set. Spacing, typography, radii, shadows

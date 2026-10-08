@@ -4299,6 +4299,253 @@
      "products/denim-house/dc11/0.webp"
     ]
    }
+  ],
+  "town-style": [
+   {
+    "code": "dt01",
+    "type": "tee",
+    "name_ar": "تيشيرت أوفر سايز أسود",
+    "name_en": "Oversized Heavyweight Tee — Black",
+    "description_ar": "تيشيرت قطن 100% تقيل (220 جرام) بقصّة أوفر سايز عصرية. خامة مصرية ممتازة وألوان ثابتة.",
+    "description_en": "A 100% heavyweight cotton tee (220 gsm) with a modern oversized cut. Premium Egyptian cotton with long-lasting colour.",
+    "price": 459,
+    "colors": [
+     {
+      "hex": "#1C1C1E",
+      "name_ar": "أسود",
+      "name_en": "Black"
+     }
+    ],
+    "images": [
+     "products/denim-house/dt01/0.webp",
+     "products/denim-house/dt01/1.webp",
+     "products/denim-house/dt01/2.webp",
+     "products/denim-house/dt01/3.webp"
+    ]
+   },
+   {
+    "code": "dt04",
+    "type": "tee",
+    "name_ar": "تيشيرت كحلي كلاسيك",
+    "name_en": "Classic Navy Tee",
+    "description_ar": "تيشيرت قطن 100% تقيل (220 جرام) بقصّة أوفر سايز عصرية. خامة مصرية ممتازة وألوان ثابتة.",
+    "description_en": "A 100% heavyweight cotton tee (220 gsm) with a modern oversized cut. Premium Egyptian cotton with long-lasting colour.",
+    "price": 449,
+    "colors": [
+     {
+      "hex": "#1F2B4D",
+      "name_ar": "كحلي",
+      "name_en": "Navy"
+     }
+    ],
+    "images": [
+     "products/denim-house/dt04/0.webp"
+    ]
+   },
+   {
+    "code": "dt07",
+    "type": "tee",
+    "name_ar": "تيشيرت نبيتي",
+    "name_en": "Burgundy Boxy Tee",
+    "description_ar": "تيشيرت قطن 100% تقيل (220 جرام) بقصّة أوفر سايز عصرية. خامة مصرية ممتازة وألوان ثابتة.",
+    "description_en": "A 100% heavyweight cotton tee (220 gsm) with a modern oversized cut. Premium Egyptian cotton with long-lasting colour.",
+    "price": 349,
+    "colors": [
+     {
+      "hex": "#6E2433",
+      "name_ar": "نبيتي",
+      "name_en": "Burgundy"
+     }
+    ],
+    "images": [
+     "products/denim-house/dt07/0.webp",
+     "products/denim-house/dt07/1.webp"
+    ]
+   },
+   {
+    "code": "dt10",
+    "type": "tee",
+    "name_ar": "تيشيرت فحمي",
+    "name_en": "Charcoal Everyday Tee",
+    "description_ar": "تيشيرت قطن 100% تقيل (220 جرام) بقصّة أوفر سايز عصرية. خامة مصرية ممتازة وألوان ثابتة.",
+    "description_en": "A 100% heavyweight cotton tee (220 gsm) with a modern oversized cut. Premium Egyptian cotton with long-lasting colour.",
+    "price": 389,
+    "colors": [
+     {
+      "hex": "#36383D",
+      "name_ar": "فحمي",
+      "name_en": "Charcoal"
+     }
+    ],
+    "images": [
+     "products/denim-house/dt10/0.webp",
+     "products/denim-house/dt10/1.webp"
+    ]
+   },
+   {
+    "code": "dj04",
+    "type": "jeans",
+    "name_ar": "جينز مستقيم فاتح",
+    "name_en": "Straight Leg Jeans — Light",
+    "description_ar": "جينز بقصّة مستقيمة وخامة دنيم قطن مع نسبة بسيطة من الليكرا للراحة. غسلة عصرية وتفاصيل خياطة متقنة.",
+    "description_en": "Straight-cut jeans in cotton denim with a touch of stretch for comfort. Modern wash and refined stitching.",
+    "price": 1039,
+    "colors": [
+     {
+      "hex": "#A9BED6",
+      "name_ar": "جينز فاتح",
+      "name_en": "Light wash"
+     }
+    ],
+    "images": [
+     "products/denim-house/dj04/0.webp",
+     "products/denim-house/dj04/1.webp",
+     "products/denim-house/dj04/2.webp"
+    ]
+   },
+   {
+    "code": "dj06",
+    "type": "jeans",
+    "name_ar": "بنطلون شينو أسود",
+    "name_en": "Black Tapered Chinos",
+    "description_ar": "جينز بقصّة مستقيمة وخامة دنيم قطن مع نسبة بسيطة من الليكرا للراحة. غسلة عصرية وتفاصيل خياطة متقنة.",
+    "description_en": "Straight-cut jeans in cotton denim with a touch of stretch for comfort. Modern wash and refined stitching.",
+    "price": 1139,
+    "colors": [
+     {
+      "hex": "#1C1C1E",
+      "name_ar": "أسود",
+      "name_en": "Black"
+     }
+    ],
+    "images": [
+     "products/denim-house/dj06/0.webp",
+     "products/denim-house/dj06/1.webp",
+     "products/denim-house/dj06/2.webp"
+    ]
+   },
+   {
+    "code": "dj10",
+    "type": "jeans",
+    "name_ar": "جينز ريلاكس فيت",
+    "name_en": "Relaxed Fit Jeans",
+    "description_ar": "جينز بقصّة مستقيمة وخامة دنيم قطن مع نسبة بسيطة من الليكرا للراحة. غسلة عصرية وتفاصيل خياطة متقنة.",
+    "description_en": "Straight-cut jeans in cotton denim with a touch of stretch for comfort. Modern wash and refined stitching.",
+    "price": 1159,
+    "colors": [
+     {
+      "hex": "#5F7FA8",
+      "name_ar": "جينز متوسط",
+      "name_en": "Mid wash"
+     }
+    ],
+    "images": [
+     "products/denim-house/dj10/0.webp",
+     "products/denim-house/dj10/1.webp",
+     "products/denim-house/dj10/2.webp"
+    ]
+   },
+   {
+    "code": "dj01",
+    "type": "shorts",
+    "name_ar": "شورت جينز فاتح",
+    "name_en": "Light Wash Denim Shorts",
+    "description_ar": "شورت جينز بقصّة مريحة للصيف، بحواف نظيفة وغسلة فاتحة.",
+    "description_en": "Relaxed denim shorts for summer with clean hems and a light wash.",
+    "price": 469,
+    "colors": [
+     {
+      "hex": "#A9BED6",
+      "name_ar": "جينز فاتح",
+      "name_en": "Light wash"
+     }
+    ],
+    "images": [
+     "products/denim-house/dj01/0.webp",
+     "products/denim-house/dj01/1.webp",
+     "products/denim-house/dj01/2.webp"
+    ]
+   },
+   {
+    "code": "dj09",
+    "type": "shorts",
+    "name_ar": "شورت جينز برمودا",
+    "name_en": "Bermuda Denim Shorts",
+    "description_ar": "شورت جينز بقصّة مريحة للصيف، بحواف نظيفة وغسلة فاتحة.",
+    "description_en": "Relaxed denim shorts for summer with clean hems and a light wash.",
+    "price": 639,
+    "colors": [
+     {
+      "hex": "#5F7FA8",
+      "name_ar": "جينز متوسط",
+      "name_en": "Mid wash"
+     }
+    ],
+    "images": [
+     "products/denim-house/dj09/0.webp",
+     "products/denim-house/dj09/1.webp",
+     "products/denim-house/dj09/2.webp"
+    ]
+   },
+   {
+    "code": "dc01",
+    "type": "cap",
+    "name_ar": "طاقية تريكو نبيتي بومبوم",
+    "name_en": "Burgundy Pom Beanie",
+    "description_ar": "طاقية تريكو دافية بخامة أكريليك ناعمة، مقاس واحد يناسب الجميع.",
+    "description_en": "A warm knit beanie in soft acrylic yarn. One size fits most.",
+    "price": 229,
+    "colors": [
+     {
+      "hex": "#6E2433",
+      "name_ar": "نبيتي",
+      "name_en": "Burgundy"
+     }
+    ],
+    "images": [
+     "products/denim-house/dc01/0.webp"
+    ]
+   },
+   {
+    "code": "dc03",
+    "type": "cap",
+    "name_ar": "طاقية كريمي بومبوم",
+    "name_en": "Cream Cable Pom Beanie",
+    "description_ar": "طاقية تريكو دافية بخامة أكريليك ناعمة، مقاس واحد يناسب الجميع.",
+    "description_en": "A warm knit beanie in soft acrylic yarn. One size fits most.",
+    "price": 209,
+    "colors": [
+     {
+      "hex": "#EDE6D6",
+      "name_ar": "كريمي",
+      "name_en": "Cream"
+     }
+    ],
+    "images": [
+     "products/denim-house/dc03/0.webp"
+    ]
+   },
+   {
+    "code": "dc05",
+    "type": "cap",
+    "name_ar": "طاقية سوداء كلاسيك",
+    "name_en": "Classic Black Beanie",
+    "description_ar": "طاقية تريكو دافية بخامة أكريليك ناعمة، مقاس واحد يناسب الجميع.",
+    "description_en": "A warm knit beanie in soft acrylic yarn. One size fits most.",
+    "price": 269,
+    "colors": [
+     {
+      "hex": "#1C1C1E",
+      "name_ar": "أسود",
+      "name_en": "Black"
+     }
+    ],
+    "images": [
+     "products/denim-house/dc05/0.webp",
+     "products/denim-house/dc05/1.webp",
+     "products/denim-house/dc05/2.webp"
+    ]
+   }
   ]
  },
  "banners": {

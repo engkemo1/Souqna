@@ -71,11 +71,12 @@ export default function HeroSlider({ banners, slug }) {
   const PrevIcon = isRtl ? ChevronRight : ChevronLeft;
   const NextIcon = isRtl ? ChevronLeft : ChevronRight;
   const link = b.link?.startsWith('/') ? `/s/${slug}${b.link}` : b.link || `/s/${slug}/shop`;
+  const hasText = Boolean(tr(b.title) || tr(b.subtitle) || tr(b.cta) || tr(b.eyebrow));
 
   return (
     <section
       aria-roledescription="carousel"
-      aria-label={tr(b.title)}
+      aria-label={tr(b.title) || 'banner'}
       className="group/hero relative isolate overflow-hidden bg-surface"
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
@@ -104,9 +105,10 @@ export default function HeroSlider({ banners, slug }) {
             <motion.div className="absolute inset-0" initial={{ scale: 1.06 }} animate={{ scale: 1 }} transition={{ duration: 7, ease: 'easeOut' }}>
               <BannerPicture banner={b} priority={index === 0} isRtl={isRtl} />
             </motion.div>
-            {!light && <div className={cx('absolute inset-0', center ? 'bg-gradient-to-t from-black/70 via-black/20 to-black/10' : 'bg-gradient-to-t from-black/65 via-black/10 to-transparent sm:bg-gradient-to-r sm:from-black/60 sm:via-black/20 sm:to-transparent rtl:sm:bg-gradient-to-l')} />}
+            {!hasText && <Link to={link} className="absolute inset-0 z-[1]" aria-label={t('store.shopAll')} />}
+            {!light && hasText && <div className={cx('absolute inset-0', center ? 'bg-gradient-to-t from-black/70 via-black/20 to-black/10' : 'bg-gradient-to-t from-black/65 via-black/10 to-transparent sm:bg-gradient-to-r sm:from-black/60 sm:via-black/20 sm:to-transparent rtl:sm:bg-gradient-to-l')} />}
 
-            <div className={cx('absolute inset-0 flex',
+            <div className={cx('absolute inset-0 flex', !hasText && 'hidden',
               light ? 'items-start pt-10 sm:items-center sm:pt-0' : center ? 'items-end pb-16 sm:pb-20 lg:pb-24' : 'items-end pb-16 sm:items-center sm:pb-0',
               center ? 'justify-center text-center' : 'justify-center text-center sm:justify-start sm:text-start')}>
               <div className={cx('container', !center && 'sm:flex')}>

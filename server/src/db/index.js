@@ -8,6 +8,21 @@ fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
 export const db = new DatabaseSync(config.dbFile);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;');
 db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
+// Lightweight migrations for databases created by earlier versions.
+{
+  const cols = db.prepare('PRAGMA table_info(stores)').all().map((c) => c.name);
+  if (!cols.includes('auto_whatsapp')) db.exec('ALTER TABLE stores ADD COLUMN auto_whatsapp INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('sort_order')) db.exec('ALTER TABLE stores ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('hidden')) db.exec('ALTER TABLE stores ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('map_url')) db.exec('ALTER TABLE stores ADD COLUMN map_url TEXT');
+  if (!cols.includes('opens_at')) db.exec('ALTER TABLE stores ADD COLUMN opens_at TEXT');
+  if (!cols.includes('closes_at')) db.exec('ALTER TABLE stores ADD COLUMN closes_at TEXT');
+  if (!cols.includes('day_off')) db.exec('ALTER TABLE stores ADD COLUMN day_off INTEGER');
+  if (!cols.includes('hero_mode')) db.exec("ALTER TABLE stores ADD COLUMN hero_mode TEXT NOT NULL DEFAULT 'auto'");
+  const ucols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  if (!ucols.includes('setup_token_hash')) db.exec('ALTER TABLE users ADD COLUMN setup_token_hash TEXT');
+  if (!ucols.includes('setup_expires')) db.exec('ALTER TABLE users ADD COLUMN setup_expires TEXT');
+}
 
 const cache = new Map();
 const stmt = (sql) => {

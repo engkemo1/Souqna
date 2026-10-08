@@ -31,8 +31,8 @@ function MarketHeader() {
             <Button size="sm" variant="primary" to="/dashboard" icon={LayoutDashboard}>{t('dash.overview')}</Button>
           ) : (
             <>
-              <Button size="sm" variant="ghost" to="/login" className="hidden sm:inline-flex">{t('auth.login')}</Button>
-              <Button size="sm" variant="primary" to="/register">{t('market.openStore')}</Button>
+              <Button size="sm" variant="ghost" to="/login" className="hidden sm:inline-flex">{t('market.ownerCta')}</Button>
+              
             </>
           )}
         </nav>
@@ -126,7 +126,7 @@ export default function MarketHome() {
           <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-5 text-[17px] leading-relaxed text-muted">{t('market.heroBody')}</motion.p>
           <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="mt-8 flex flex-wrap gap-3">
             <Button size="lg" href="#stores" iconEnd={ArrowRight}>{t('market.exploreStores')}</Button>
-            <Button size="lg" variant="outline" to="/register">{t('market.openStore')}</Button>
+            <Button size="lg" variant="outline" to="/join">{t('market.openStore')}</Button>
           </motion.div>
           <motion.dl initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }} className="mt-10 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6">
             {[[formatNumber(base?.stats.stores || 0, lang), t('market.stat.stores')], [formatNumber(base?.stats.products || 0, lang), t('market.stat.products')], [t('market.stat.deliveryValue'), t('market.stat.delivery')]].map(([v, l]) => (
@@ -202,7 +202,7 @@ export default function MarketHome() {
             <h2 className="font-display text-display-sm font-medium text-white">{t('market.ownerTitle')}</h2>
             <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-white/75">{t('market.ownerBody')}</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" variant="white" to="/register">{t('market.ownerCta')}</Button>
+              <Button size="lg" variant="white" to="/join">{t('market.openStore')}</Button>
               <Button size="lg" to="/login?demo=1" className="!border-white/25 !bg-transparent !text-white hover:!bg-white/10" variant="outline">{t('market.ownerDemo')}</Button>
             </div>
           </div>

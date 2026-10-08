@@ -9,6 +9,8 @@ import './db/index.js';
 import publicRoutes from './routes/public.js';
 import ownerRoutes from './routes/owner.js';
 import authRoutes from './routes/auth.js';
+import adminRoutes from './routes/admin.js';
+import { ADMIN_HTML } from './lib/adminPage.js';
 import { errorHandler } from './lib/errors.js';
 
 const app = express();
@@ -24,6 +26,8 @@ app.use('/media', express.static(config.mediaDir, { immutable: true, maxAge: '36
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
+app.use('/api/admin', adminRoutes);
+app.get('/admin', (_req, res) => res.type('html').send(ADMIN_HTML));
 app.use('/api/owner', ownerRoutes);
 app.use('/api', publicRoutes);
 app.use('/api', (_req, res) => res.status(404).json({ error: { code: 'not_found', message: 'Not found' } }));
@@ -36,4 +40,4 @@ if (fs.existsSync(config.webDist)) {
 
 app.use(errorHandler);
 
-app.listen(config.port, () => console.log(`Souqna API ready on http://localhost:${config.port}`));
+app.listen(config.port, () => console.log(`BanhaLook API ready on http://localhost:${config.port}`));

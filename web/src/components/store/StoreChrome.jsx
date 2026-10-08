@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { mapsLinks } from './VisitCard.jsx';
+import { BrandMark } from '../market/Brand.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Heart, ShoppingBag, Home, LayoutGrid, ChevronLeft, ChevronRight, MapPin, Phone, Instagram, Facebook, Star, Truck, RefreshCcw, Banknote, Store } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -76,6 +78,8 @@ export function StoreHeader() {
             <button type="button" onClick={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate(sp(store.slug)))} aria-label={t('common.back')}
               className="-ms-2 grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-fg/[0.07] lg:hidden"><Back className="h-5 w-5" /></button>
           )}
+          <Link to="/" aria-label={t('store.backToMarket')} className="inline-flex shrink-0 items-center gap-1.5 rounded-full py-1 pe-2.5 ps-1 text-[12.5px] font-medium text-muted ring-1 ring-line transition hover:bg-fg/[0.06] hover:text-fg"><BrandMark className="h-7 w-7" /><span className="hidden sm:inline">{t('store.backToMarket')}</span></Link>
+          <span className="h-6 w-px shrink-0 bg-line" aria-hidden="true" />
           <Link to={sp(store.slug)} className="flex min-w-0 items-center gap-2.5 rounded-full py-1 pe-2">
             <StoreLogo store={store} size={36} className="h-9 w-9" />
             <span className="truncate font-display text-[17px] font-semibold tracking-tight lg:text-xl">{tr(store.name)}</span>
@@ -152,11 +156,11 @@ export function TrustStrip({ className }) {
     { icon: RefreshCcw, title: t('store.exchange'), body: t('market.why2b') },
   ];
   return (
-    <div className={cx('grid grid-cols-1 gap-3 sm:grid-cols-3', className)}>
+    <div className={cx('grid grid-cols-1 divide-y divide-line rounded-[24px] ring-1 ring-line sm:grid-cols-3 sm:divide-x sm:divide-y-0 rtl:sm:divide-x-reverse', className)}>
       {items.map((it) => (
-        <div key={it.title} className="flex items-center gap-3.5 rounded-2xl bg-secondary px-4 py-3.5 text-on-secondary">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-elevated text-brand shadow-sm"><it.icon className="h-5 w-5" strokeWidth={1.75} /></span>
-          <div className="min-w-0"><p className="text-sm font-semibold">{it.title}</p><p className="truncate text-[13px] opacity-75">{it.body}</p></div>
+        <div key={it.title} className="flex items-center gap-4 px-5 py-5 sm:justify-center">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-accent/40 text-accent"><it.icon className="h-5 w-5" strokeWidth={1.6} /></span>
+          <div className="min-w-0"><p className="font-display text-[15px] font-semibold tracking-tight">{it.title}</p><p className="truncate text-[13px] text-muted">{it.body}</p></div>
         </div>
       ))}
     </div>
@@ -188,7 +192,7 @@ export function StoreFooter() {
         <div>
           <h3 className="text-sm font-semibold text-on-footer">{t('store.contact')}</h3>
           <ul className="mt-4 space-y-3 text-sm text-footer-muted">
-            <li className="flex gap-2.5"><MapPin className="mt-0.5 h-4 w-4 shrink-0" />{tr(store.address)}</li>
+            <li><a className="flex gap-2.5 hover:text-on-footer" href={mapsLinks(store, tr(store.address)).open} target="_blank" rel="noreferrer"><MapPin className="mt-0.5 h-4 w-4 shrink-0" />{tr(store.address)}</a></li>
             {store.phone && <li><a className="flex gap-2.5 hover:text-on-footer" href={`tel:${store.phone}`} dir="ltr"><Phone className="h-4 w-4 shrink-0" />{store.phone}</a></li>}
             {store.instagram && <li><a className="flex gap-2.5 hover:text-on-footer" href={`https://instagram.com/${store.instagram}`} target="_blank" rel="noreferrer"><Instagram className="h-4 w-4 shrink-0" />@{store.instagram}</a></li>}
             {store.facebook && <li><a className="flex gap-2.5 hover:text-on-footer" href={`https://facebook.com/${store.facebook}`} target="_blank" rel="noreferrer"><Facebook className="h-4 w-4 shrink-0" />{store.facebook}</a></li>}

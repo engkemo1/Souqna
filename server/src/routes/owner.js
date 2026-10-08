@@ -31,6 +31,16 @@ const pct = (cur, prev) => (prev ? Math.round(((cur - prev) / prev) * 1000) / 10
 
 /* ---------------------------------------------------------- store */
 
+r.get('/notifications', h((req, res) => {
+  const since = typeof req.query.since === 'string' ? req.query.since : '1970-01-01T00:00:00.000Z';
+  const newOrders = q.all(
+    "SELECT number, customer_name, phone, city, total, created_at FROM orders WHERE store_id=? AND created_at > ? ORDER BY created_at DESC LIMIT 5",
+    [req.store.id, since],
+  );
+  const pending = q.val("SELECT COUNT(*) FROM orders WHERE store_id=? AND status='pending'", [req.store.id]);
+  res.json({ pending, newOrders, now: nowIso() });
+}));
+
 r.get('/store', h((req, res) => {
   const t = buildTheme(json(req.store.theme_json, {}));
   res.json({ store: serializeStore(req.store), user: req.user, themeReport: t.report, themeChecks: t.checks });
@@ -43,6 +53,11 @@ const storeSchema = z.object({
   address_ar: z.string().trim().max(160).optional(), address_en: z.string().trim().max(160).optional(),
   category: z.enum(['men', 'women', 'kids', 'mixed', 'denim', 'sports', 'accessories']).optional(),
   phone: z.string().trim().max(20).optional(), whatsapp: z.string().trim().max(20).optional(),
+  hero_mode: z.enum(['auto', 'cover', 'slider']).optional(),
+  opens_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
+  closes_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
+  day_off: z.union([z.literal(''), z.coerce.number().int().min(0).max(6)]).optional().nullable(),
+  map_url: z.union([z.literal(''), z.string().trim().url().max(400).refine((u) => /^https:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u), 'map_url_invalid')]).optional().nullable(),
   instagram: z.string().trim().max(60).optional(), facebook: z.string().trim().max(60).optional(),
   shipping_fee: z.coerce.number().int().min(0).max(1000).optional(),
   free_shipping_over: z.coerce.number().int().min(0).max(100000).optional(),
@@ -51,6 +66,7 @@ const storeSchema = z.object({
 
 r.put('/store', h((req, res) => {
   const body = storeSchema.parse(req.body);
+  for (const k of ['opens_at', 'closes_at', 'day_off', 'map_url']) if (body[k] === '') body[k] = null;
   update('stores', req.store.id, body);
   const s = q.get('SELECT * FROM stores WHERE id=?', [req.store.id]);
   res.json({ store: serializeStore(s) });
@@ -67,6 +83,50 @@ r.put('/store/theme', h((req, res) => {
 r.post('/store/theme/preview', h((req, res) => {
   const t = buildTheme(req.body || {});
   res.json({ theme: { input: t.input, cssVars: t.cssVars, dark: t.dark }, report: t.report, checks: t.checks });
+}));
+
+// Auto-designed luxury cover: dark gradient in the store's colour + its best product photos in gold-framed cards.
+r.post('/store/cover/auto', h(async (req, res) => {
+  const sharp = (await import('sharp')).default;
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const theme = json(req.store.theme_json, {});
+  const base = /^#?[0-9a-fA-F]{6}$/.test(theme.primary || '') ? `#${String(theme.primary).replace('#', '')}` : '#1B1B1B';
+  const W = 1600, H = 1000;
+  const bg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+    <defs>
+      <linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${base}"/><stop offset=".55" stop-color="#121214"/><stop offset="1" stop-color="#0B0B0C"/></linearGradient>
+      <radialGradient id="glow" cx=".78" cy=".2" r=".6"><stop offset="0" stop-color="#C9A24D" stop-opacity=".35"/><stop offset="1" stop-color="#C9A24D" stop-opacity="0"/></radialGradient>
+      <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3DFA2"/><stop offset=".5" stop-color="#C9A24D"/><stop offset="1" stop-color="#8E6A24"/></linearGradient>
+    </defs>
+    <rect width="${W}" height="${H}" fill="url(#g)"/><rect width="${W}" height="${H}" fill="url(#glow)"/>
+    <rect x="28" y="28" width="${W - 56}" height="${H - 56}" rx="28" fill="none" stroke="url(#gold)" stroke-width="2" opacity=".55"/>
+  </svg>`);
+  const ids = q.all(`SELECT pm.media_id AS id FROM product_media pm JOIN products p ON p.id=pm.product_id
+    WHERE p.store_id=? AND p.status='active' AND pm.is_primary=1 ORDER BY p.featured DESC, p.sold_count DESC LIMIT 3`, [req.store.id]).map((r) => r.id);
+  const cardW = 380, cardH = 560, gap = 36, top = Math.round((H - cardH) / 2);
+  const mask = Buffer.from(`<svg width="${cardW}" height="${cardH}"><rect width="${cardW}" height="${cardH}" rx="26" fill="#fff"/></svg>`);
+  const frame = Buffer.from(`<svg width="${cardW}" height="${cardH}"><defs><linearGradient id="gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F3DFA2"/><stop offset="1" stop-color="#8E6A24"/></linearGradient></defs><rect x="1.5" y="1.5" width="${cardW - 3}" height="${cardH - 3}" rx="25" fill="none" stroke="url(#gold)" stroke-width="3"/></svg>`);
+  const layers = [];
+  let i = 0;
+  for (const id of ids) {
+    const m = getMedia(id);
+    if (!m) continue;
+    const dir = path.join(config.mediaDir, String(m.store_id), m.key);
+    const file = ['lg.jpg', 'md.jpg', 'original.jpg'].map((f) => path.join(dir, f)).find((f) => fs.existsSync(f));
+    if (!file) continue;
+    const card = await sharp(file).resize(cardW, cardH, { fit: 'cover', position: 'attention' }).composite([{ input: mask, blend: 'dest-in' }, { input: frame }]).png().toBuffer();
+    const left = W - 96 - (i + 1) * cardW - i * gap;
+    layers.push({ input: card, left, top: top + (i === 1 ? -28 : 28) });
+    i++;
+  }
+  const buffer = await sharp(bg).composite(layers).jpeg({ quality: 92 }).toBuffer();
+  const m = await processImage(buffer, { storeId: req.store.id, kind: 'cover' });
+  const old = getMedia(req.store.cover_media_id);
+  q.run('UPDATE stores SET cover_media_id=? WHERE id=?', [m.id, req.store.id]);
+  q.run('UPDATE media SET attached=1 WHERE id=?', [m.id]);
+  if (old) await deleteMedia(old);
+  res.json({ media: serializeMedia(m) });
 }));
 
 r.post('/store/:slot(logo|cover)', upload.single('file'), h(async (req, res) => {
@@ -576,7 +636,7 @@ r.delete('/offers/:id', h((req, res) => {
 const bannerSchema = z.object({
   media_id: z.number().int(), mobile_media_id: z.number().int().nullable().optional(),
   eyebrow_ar: z.string().trim().max(40).optional().default(''), eyebrow_en: z.string().trim().max(40).optional().default(''),
-  title_ar: z.string().trim().min(1, 'required').max(80), title_en: z.string().trim().min(1, 'required').max(80),
+  title_ar: z.string().trim().max(80).optional().default(''), title_en: z.string().trim().max(80).optional().default(''),
   subtitle_ar: z.string().trim().max(160).optional().default(''), subtitle_en: z.string().trim().max(160).optional().default(''),
   cta_ar: z.string().trim().max(30).optional().default(''), cta_en: z.string().trim().max(30).optional().default(''),
   link: z.string().trim().max(200).optional().default('/shop'),

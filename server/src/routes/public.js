@@ -5,6 +5,7 @@ import { h, notFound, AppError } from '../lib/errors.js';
 import { clampInt, nowIso } from '../lib/util.js';
 import { mediaMap } from '../lib/media.js';
 import { quote } from '../lib/cart.js';
+import { sendNewOrderAlert } from '../lib/whatsapp.js';
 import {
   serializeStore, serializeCards, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi,
 } from '../lib/serialize.js';
@@ -26,7 +27,7 @@ function loadStore(slug) {
 
 r.get('/marketplace', h((req, res) => {
   const { q: term = '', category = '', sort = 'featured' } = req.query;
-  const where = ["s.status='active'"];
+  const where = ["s.status='active'", 's.hidden=0'];
   const params = [];
   if (category && category !== 'all') { where.push('s.category=?'); params.push(String(category)); }
   if (term) {
@@ -40,10 +41,10 @@ r.get('/marketplace', h((req, res) => {
     newest: 's.created_at DESC',
     products: 'product_count DESC',
   }[sort] || 's.featured DESC, s.rating DESC';
-  const rows = q.all(`SELECT ${STORE_COLS} FROM stores s WHERE ${where.join(' AND ')} ORDER BY ${order}`, params);
-  const categories = q.all("SELECT category AS id, COUNT(*) AS count FROM stores WHERE status='active' GROUP BY category ORDER BY count DESC");
+  const rows = q.all(`SELECT ${STORE_COLS} FROM stores s WHERE ${where.join(' AND ')} ORDER BY s.sort_order ASC, ${order}`, params);
+  const categories = q.all("SELECT category AS id, COUNT(*) AS count FROM stores WHERE status='active' AND hidden=0 GROUP BY category ORDER BY count DESC");
   const stats = {
-    stores: q.val("SELECT COUNT(*) FROM stores WHERE status='active'"),
+    stores: q.val("SELECT COUNT(*) FROM stores WHERE status='active' AND hidden=0"),
     products: q.val("SELECT COUNT(*) FROM products WHERE status='active'"),
   };
   // A few trending products across stores for the marketplace home
@@ -228,8 +229,14 @@ r.post('/stores/:slug/orders', h((req, res) => {
     }
     insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
     if (qt.coupon) q.run('UPDATE offers SET usage_count=usage_count+1 WHERE id=?', [qt.coupon.id]);
-    return { number, total: qt.total };
+    return { number, total: qt.total, orderId };
   });
+  if (s.auto_whatsapp) {
+    sendNewOrderAlert(s, result.orderId)
+      .then((r) => { if (r.sent) console.log(`[whatsapp] ${result.number} → ${r.to}`); else console.log(`[whatsapp] ${result.number} skipped: ${r.skipped}`); })
+      .catch((e) => console.error(`[whatsapp] ${result.number} failed: ${e.message}`));
+  }
+  delete result.orderId;
   res.status(201).json({ order: result });
 }));
 

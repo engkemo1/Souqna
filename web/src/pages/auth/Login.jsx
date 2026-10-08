@@ -30,7 +30,7 @@ export default function Login() {
       setBusy(false);
     }
   };
-  const demo = () => { const c = { email: 'ahmed@souqna.app', password: 'demo1234' }; setForm(c); submit(null, c); };
+  const demo = () => { const c = { email: 'ahmed@banhalook.app', password: 'demo1234' }; setForm(c); submit(null, c); };
 
   useEffect(() => { if (params.get('demo') === '1' && !user) demo(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (user && !busy) return <Navigate to="/dashboard" replace />;
@@ -60,7 +60,7 @@ export default function Login() {
         {error && !Object.keys(fe).length && <p role="alert" className="rounded-xl bg-sale/10 px-4 py-3 text-sm font-medium text-sale">{errorMessage(t, error)}</p>}
         <Button type="submit" full size="lg" loading={busy}>{t('auth.signIn')}</Button>
       </form>
-      <p className="mt-8 text-center text-sm text-muted">{t('auth.noAccount')} <Link to="/register" className="font-semibold text-brand hover:underline">{t('auth.register')}</Link></p>
+      <p className="mt-8 text-center text-sm text-muted">BanhaLook · بنها لوك</p>
     </AuthShell>
   );
 }

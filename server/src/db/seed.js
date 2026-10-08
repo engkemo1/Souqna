@@ -6,10 +6,11 @@
  *   npm run seed
  *
  * Demo logins (password: demo1234)
- *   ahmed@souqna.app  → Ahmed Fashion
- *   lamar@souqna.app  → Lamar Boutique
- *   sport@souqna.app  → Sport Zone
- *   denim@souqna.app  → Denim House
+ *   ahmed@banhalook.app  → Ahmed Fashion
+ *   lamar@banhalook.app  → Lamar Boutique
+ *   sport@banhalook.app  → Sport Zone
+ *   denim@banhalook.app  → Denim House
+ *   townstyle@banhalook.app → Town Style (password: TownStyle#2026)
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -56,7 +57,7 @@ const img = (rel, storeId, kind = 'product', alt = null) => processImage(fs.read
 
 const STORES = [
   {
-    slug: 'ahmed-fashion', code: 'AF', email: 'ahmed@souqna.app', owner: 'Ahmed Samir',
+    slug: 'ahmed-fashion', code: 'AF', email: 'ahmed@banhalook.app', owner: 'Ahmed Samir',
     name: ['أحمد فاشون', 'Ahmed Fashion'], tagline: ['ملابس رجالي عصرية في قلب بنها', 'Modern menswear in the heart of Banha'],
     description: ['من 2012 وإحنا بنلبّس شباب بنها. هوديز وجواكت وبناطيل بخامات ممتازة وأسعار مناسبة، مع توصيل لكل القليوبية.', 'Dressing Banha since 2012 — hoodies, jackets and pants in quality fabrics at fair prices, delivered across Qalyubia.'],
     address: ['شارع فريد ندا، بنها، القليوبية', 'Farid Nada St, Banha, Qalyubia'],
@@ -67,7 +68,7 @@ const STORES = [
     sizes: ['S', 'M', 'L', 'XL', 'XXL'], volume: 1.0,
   },
   {
-    slug: 'lamar-boutique', code: 'LB', email: 'lamar@souqna.app', owner: 'Lamar Hassan',
+    slug: 'lamar-boutique', code: 'LB', email: 'lamar@banhalook.app', owner: 'Lamar Hassan',
     name: ['لمار بوتيك', 'Lamar Boutique'], tagline: ['أزياء نسائية ناعمة ومريحة', 'Soft, comfortable womenswear'],
     description: ['بوتيك نسائي في بنها بيختار لك قطع عملية وأنيقة للبيت والشغل والجيم.', 'A Banha womenswear boutique curating practical, elegant pieces for home, work and the gym.'],
     address: ['شارع سعد زغلول، بنها، القليوبية', 'Saad Zaghloul St, Banha, Qalyubia'],
@@ -78,7 +79,7 @@ const STORES = [
     sizes: ['XS', 'S', 'M', 'L', 'XL'], volume: 0.7,
   },
   {
-    slug: 'sport-zone', code: 'SZ', email: 'sport@souqna.app', owner: 'Karim Adel',
+    slug: 'sport-zone', code: 'SZ', email: 'sport@banhalook.app', owner: 'Karim Adel',
     name: ['سبورت زون', 'Sport Zone'], tagline: ['كل اللي تحتاجه للجيم والجري', 'Everything you need to train'],
     description: ['ملابس رياضية رجالي وحريمي بخامات دراي فيت، أسعار جملة وقطاعي.', 'Dri-fit sportswear for men and women at great prices.'],
     address: ['ميدان الإشارة، بنها، القليوبية', 'El-Ishara Sq, Banha, Qalyubia'],
@@ -89,7 +90,7 @@ const STORES = [
     sizes: ['S', 'M', 'L', 'XL'], volume: 0.55,
   },
   {
-    slug: 'denim-house', code: 'DH', email: 'denim@souqna.app', owner: 'Omar Fathy',
+    slug: 'denim-house', code: 'DH', email: 'denim@banhalook.app', owner: 'Omar Fathy',
     name: ['دنيم هاوس', 'Denim House'], tagline: ['جينز وتيشيرتات قطن مصري', 'Denim & Egyptian cotton tees'],
     description: ['متخصصين في الجينز والتيشيرتات التقيلة. قصّات حديثة وغسلات مختارة بعناية.', 'Specialists in denim and heavyweight tees — modern cuts and carefully chosen washes.'],
     address: ['كورنيش النيل، بنها، القليوبية', 'Nile Corniche, Banha, Qalyubia'],
@@ -98,6 +99,17 @@ const STORES = [
     theme: { ...THEME_PRESETS.indigo, background: '#FBFAF7', secondary: '#EEF0F6', header: '#FBFAF7' },
     cats: { jeans: ['jeans', 'جينز', 'Jeans'], shorts: ['shorts', 'شورتات', 'Shorts'], tee: ['tees', 'تيشيرتات', 'Tees'], cap: ['beanies', 'طواقي', 'Beanies'] },
     sizes: ['S', 'M', 'L', 'XL'], volume: 0.8,
+  },
+  {
+    slug: 'town-style', code: 'TS', email: 'townstyle@banhalook.app', owner: 'Town Style Owner', password: 'TownStyle#2026',
+    name: ['تاون ستايل', 'Town Style'], tagline: ['تيشيرتات وجينز بخامات مريحة', 'Tees and denim in comfortable fabrics'],
+    description: ['متجر تيشيرتات وجينز وطواقي بخامات مريحة وتصميمات بسيطة للشارع والبيت.', 'Tees, denim and beanies in comfortable fabrics and simple everyday designs.'],
+    address: ['شارع البحر، بنها، القليوبية', 'Al-Bahr St, Banha, Qalyubia'],
+    category: 'mixed', rating: 4.7, ratingCount: 96, featured: 1, badge: ['شحن مجاني', 'FREE DELIVERY'],
+    phone: '01000000000', instagram: 'townstyle.eg', facebook: 'TownStyleEG',
+    theme: { primary: '#0E7C66', secondary: '#EAF6F2', accent: '#F2B705', background: '#FFFFFF', text: '#0F172A', button: '#0E7C66', header: '#FFFFFF', footer: '#0F172A' },
+    cats: { tee: ['tees', 'تيشيرتات', 'Tees'], jeans: ['jeans', 'جينز', 'Jeans'], shorts: ['shorts', 'شورتات', 'Shorts'], cap: ['beanies', 'طواقي', 'Beanies'] },
+    sizes: ['S', 'M', 'L', 'XL'], volume: 0.5,
   },
 ];
 
@@ -121,16 +133,17 @@ const phone = () => pickOne(['010', '011', '012', '015']) + String(ri(10000000, 
 /* ---------------------------------------------------------- run */
 
 console.time('seed');
-const hash = bcrypt.hashSync('demo1234', 10);
+
 
 for (const S of STORES) {
-  const uid = insert('users', { name: S.owner, email: S.email, password_hash: hash });
+  const uid = insert('users', { name: S.owner, email: S.email, password_hash: bcrypt.hashSync(S.password || 'demo1234', 10) });
   const sid = insert('stores', {
     owner_id: uid, slug: S.slug, code: S.code, name_ar: S.name[0], name_en: S.name[1], tagline_ar: S.tagline[0], tagline_en: S.tagline[1],
     description_ar: S.description[0], description_en: S.description[1], address_ar: S.address[0], address_en: S.address[1],
     category: S.category, city: 'Banha', phone: S.phone, whatsapp: S.phone, instagram: S.instagram, facebook: S.facebook,
     theme_json: JSON.stringify(S.theme), rating: S.rating, rating_count: S.ratingCount, featured: S.featured,
     offer_badge_ar: S.badge[0], offer_badge_en: S.badge[1], shipping_fee: 50, free_shipping_over: 1500,
+    opens_at: S.opens || '10:00', closes_at: S.closes || '23:00', day_off: S.dayOff ?? null,
     created_at: fmt(daysAgo(400)),
   });
 

@@ -1,4 +1,6 @@
 import { useEffect } from 'react';
+import { api } from '../../lib/api.js';
+import { useToast } from '../../components/ui/Toast.jsx';
 import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -164,6 +166,36 @@ export default function DashboardLayout() {
   const pending = counts?.counts?.pending || 0;
 
   useEffect(() => { document.title = `${t('dash.overview')} · ${t('app.name')}`; }, [t]);
+
+  // New-order alerts: poll the store's feed, beep and toast for orders that arrive after the page opened.
+  const toast = useToast();
+  useEffect(() => {
+    if (!user || !store) return undefined;
+    let since = null;
+    let alive = true;
+    const beep = () => {
+      try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const o = ctx.createOscillator(); const g = ctx.createGain();
+        o.frequency.value = 880; g.gain.value = 0.15; o.connect(g); g.connect(ctx.destination);
+        o.start(); o.stop(ctx.currentTime + 0.25);
+      } catch { /* audio may be blocked until the first click */ }
+    };
+    const tick = async () => {
+      try {
+        const d = await api(`/owner/notifications${since ? `?since=${encodeURIComponent(since)}` : ''}`);
+        if (!alive) return;
+        if (since && d.newOrders?.length) {
+          beep();
+          d.newOrders.slice(0, 3).forEach((o) => toast({ title: `طلب جديد ${o.number}`, description: `${o.customer_name} · ${o.city || ''} · ${o.total} ج.م`, duration: 6000 }));
+        }
+        since = d.now;
+      } catch { /* network hiccup: try again next tick */ }
+    };
+    tick();
+    const id = setInterval(tick, 20000);
+    return () => { alive = false; clearInterval(id); };
+  }, [user, store, toast]);
   useEffect(() => {
     document.documentElement.style.setProperty('--toast-offset', 'calc(var(--bottom-nav-h) + 16px)');
     return () => document.documentElement.style.removeProperty('--toast-offset');

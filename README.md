@@ -1,4 +1,4 @@
-# سوقنا · Souqna
+# بنها لوك · BanhaLook
 
 **منصة متاجر أزياء متعددة لمحلات بنها** — سوق مركزي، متجر أونلاين لكل محل بألوانه، ولوحة تحكم احترافية تشتغل من الموبايل.
 
@@ -25,10 +25,10 @@ npm run dev       # API on :4000, web on :5173 (proxied)
 
 | Store | Login | Storefront |
 |---|---|---|
-| أحمد فاشون · Ahmed Fashion (menswear) | `ahmed@souqna.app` | `/s/ahmed-fashion` |
-| لمار بوتيك · Lamar Boutique (womenswear) | `lamar@souqna.app` | `/s/lamar-boutique` |
-| سبورت زون · Sport Zone (sportswear) | `sport@souqna.app` | `/s/sport-zone` |
-| دنيم هاوس · Denim House (denim & tees) | `denim@souqna.app` | `/s/denim-house` |
+| أحمد فاشون · Ahmed Fashion (menswear) | `ahmed@banhalook.app` | `/s/ahmed-fashion` |
+| لمار بوتيك · Lamar Boutique (womenswear) | `lamar@banhalook.app` | `/s/lamar-boutique` |
+| سبورت زون · Sport Zone (sportswear) | `sport@banhalook.app` | `/s/sport-zone` |
+| دنيم هاوس · Denim House (denim & tees) | `denim@banhalook.app` | `/s/denim-house` |
 
 The login page has a one-tap **“Use demo account”** button, and `/login?demo=1` signs straight into Ahmed Fashion — handy when showing the dashboard to a store owner.
 
@@ -122,6 +122,6 @@ Demo photography: Magento 2 sample data (Luma, AFL-3.0) and Sylius fixtures (MIT
 3. First boot seeds the demo stores (~3 min). Your links will be:
    - Marketplace: `https://<your-app>.onrender.com/`
    - Stores: `/s/ahmed-fashion`, `/s/lamar-boutique`, `/s/sport-zone`, `/s/denim-house`
-   - Owner dashboard: `/login?demo=1` (or `ahmed@souqna.app` / `demo1234`)
+   - Owner dashboard: `/login?demo=1` (or `ahmed@banhalook.app` / `demo1234`)
 
 Free instances sleep after inactivity and reset their disk on redeploy (the demo data re-seeds automatically). For real stores, add a persistent disk and set `DB_FILE`/`MEDIA_DIR` to it.

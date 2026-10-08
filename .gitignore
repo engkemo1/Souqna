@@ -4,6 +4,6 @@ server/data/
 .cache-fonts/
 *.log
 .env
-souqna.zip
 Claude outputs/
+souqna.zip
 deploy.bat

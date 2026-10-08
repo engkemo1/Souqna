@@ -11,6 +11,8 @@ import NotFound from './pages/NotFound.jsx';
 const MarketHome = lazy(() => import('./pages/market/MarketHome.jsx'));
 const Login = lazy(() => import('./pages/auth/Login.jsx'));
 const Register = lazy(() => import('./pages/auth/Register.jsx'));
+const Setup = lazy(() => import('./pages/auth/Setup.jsx'));
+const Join = lazy(() => import('./pages/market/Join.jsx'));
 
 const StoreLayout = lazy(() => import('./pages/store/StoreLayout.jsx'));
 const StoreHome = lazy(() => import('./pages/store/StoreHome.jsx'));
@@ -55,6 +57,8 @@ const router = createBrowserRouter([
       { path: '/', element: <MarketHome /> },
       { path: '/login', element: <Login /> },
       { path: '/register', element: <Register /> },
+      { path: '/setup/:token', element: <Setup /> },
+      { path: '/join', element: <Join /> },
       {
         path: '/s/:slug',
         element: <StoreLayout />,

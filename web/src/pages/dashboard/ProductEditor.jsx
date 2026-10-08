@@ -334,7 +334,7 @@ export default function ProductEditor() {
         <Field label={t('editor.seoDesc')} hint={`${(f.seo_description || '').length}/170`}><Textarea rows={3} maxLength={170} value={f.seo_description} placeholder={tr({ ar: f.description_ar, en: f.description_en }).slice(0, 160)} onChange={(e) => set({ seo_description: e.target.value })} /></Field>
         <div className="rounded-xl border border-line p-4" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
           <p className="mb-2 text-xs font-semibold text-muted">{t('editor.seoPreview')}</p>
-          <p className="truncate text-xs text-emerald-800" dir="ltr">souqna.app › s › {store.slug} › p</p>
+          <p className="truncate text-xs text-emerald-800" dir="ltr">banhalook.app › s › {store.slug} › p</p>
           <p className="mt-0.5 truncate text-lg leading-snug text-[#1a0dab]">{f.seo_title || tr({ ar: f.name_ar, en: f.name_en }) || '—'} · {tr(store.name)}</p>
           <p className="mt-0.5 line-clamp-2 text-sm text-muted">{f.seo_description || tr({ ar: f.description_ar, en: f.description_en }) || '—'}</p>
         </div>

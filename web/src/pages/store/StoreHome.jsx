@@ -10,6 +10,8 @@ import HeroSlider from '../../components/store/HeroSlider.jsx';
 import ProductCard, { ProductCardSkeleton, ProductGrid } from '../../components/store/ProductCard.jsx';
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
 import { TrustStrip } from '../../components/store/StoreChrome.jsx';
+import VisitCard from '../../components/store/VisitCard.jsx';
+import StoreHero, { StoreIdentityBar } from '../../components/store/StoreHero.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import { ErrorState } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
@@ -124,16 +126,13 @@ export default function StoreHome() {
 
   return (
     <PageTransition>
-      {banners.length ? <HeroSlider banners={banners} slug={store.slug} /> : (
-        <section className="bg-secondary text-on-secondary">
-          <div className="container py-16 text-center sm:py-24">
-            <h1 className="font-display text-display font-medium">{tr(store.name)}</h1>
-            <p className="mx-auto mt-4 max-w-xl text-lg opacity-80">{tr(store.tagline)}</p>
-          </div>
-        </section>
-      )}
+      {(() => {
+        // The owner chooses: cover, slider, or auto (slider when there are active banners, cover otherwise).
+        const useSlider = store.heroMode === 'cover' ? false : banners.length > 0;
+        return useSlider ? (<><HeroSlider banners={banners} slug={store.slug} /><StoreIdentityBar /></>) : <StoreHero />;
+      })()}
 
-      <div className="container mt-6 sm:mt-10"><TrustStrip /></div>
+      <div className="container mt-8 sm:mt-12"><TrustStrip /></div>
 
       {error ? <div className="container"><ErrorState error={error} onRetry={reload} /></div> : (
         <>
@@ -164,6 +163,7 @@ export default function StoreHome() {
         </>
       )}
       <QuickAddSheet slug={store.slug} product={quick} onClose={() => setQuick(null)} />
+      <VisitCard />
     </PageTransition>
   );
 }
