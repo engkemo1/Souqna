@@ -15,11 +15,23 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Admin scope: while the platform admin manages a store, every `/owner/...` call is sent to
+ * `/admin/stores/<slug>/as/...` with the admin key instead of an owner token.
+ */
+let adminScope = null;
+export const setAdminScope = (scope) => { adminScope = scope; };
+function route(path, headers) {
+  if (adminScope && path.startsWith('/owner/')) return { path: `/admin/stores/${encodeURIComponent(adminScope.slug)}/as${path.slice(6)}`, headers: { ...headers, 'x-admin-key': adminScope.key(), 'x-admin-session': adminScope.session?.() || '' }, scoped: true };
+  return { path, headers, scoped: false };
+}
+
 let onUnauthorized = () => {};
 export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 
-export async function api(path, { method = 'GET', body, signal, headers = {} } = {}) {
-  const token = tokenStore.get();
+export async function api(rawPath, { method = 'GET', body, signal, headers: rawHeaders = {} } = {}) {
+  const { path, headers, scoped } = route(rawPath, rawHeaders);
+  const token = scoped ? null : tokenStore.get();
   let res;
   try {
     res = await fetch(`/api${path}`, {
@@ -41,19 +53,21 @@ export async function api(path, { method = 'GET', body, signal, headers = {} } =
   try { data = await res.json(); } catch { /* non-JSON */ }
   if (!res.ok) {
     const err = data?.error || {};
-    if (res.status === 401 && path.startsWith('/owner')) onUnauthorized();
+    if (res.status === 401 && path.startsWith('/owner') && !scoped) onUnauthorized();
     throw new ApiError(res.status, err.code || 'server_error', err.message || 'Request failed', err.fields);
   }
   return data;
 }
 
 /** Multipart upload with progress (fetch has no upload progress yet). */
-export function upload(path, formData, onProgress) {
+export function upload(rawPath, formData, onProgress) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    const { path, headers, scoped } = route(rawPath, {});
     xhr.open('POST', `/api${path}`);
-    const token = tokenStore.get();
+    const token = scoped ? null : tokenStore.get();
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+    for (const [k, v] of Object.entries(headers)) xhr.setRequestHeader(k, v);
     xhr.upload.onprogress = (e) => e.lengthComputable && onProgress?.(Math.round((e.loaded / e.total) * 100));
     xhr.onload = () => {
       let data = null;

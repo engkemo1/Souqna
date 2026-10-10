@@ -23,7 +23,7 @@ export function SectionHeader({ title, eyebrow, to, className = '' }) {
     <div className={`mb-6 flex items-end justify-between gap-4 sm:mb-8 ${className}`}>
       <div>
         {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-        <h2 className="font-display text-display-sm font-medium">{title}</h2>
+        <h2 className="font-display text-display-sm font-bold">{title}</h2>
       </div>
       {to && (
         <Link to={to} className="group inline-flex shrink-0 items-center gap-1.5 pb-1 text-sm font-semibold text-fg">
@@ -71,7 +71,7 @@ function CategoryTiles() {
               <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-transparent" />
               <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4 text-white sm:p-5">
                 <div>
-                  <p className="font-display text-xl font-medium sm:text-2xl">{tr(c.name)}</p>
+                  <p className="font-display text-xl font-bold sm:text-2xl">{tr(c.name)}</p>
                   <p className="mt-0.5 text-sm text-white/80">{t('categories.count', { n: c.count })}</p>
                 </div>
                 <span className="grid h-10 w-10 place-items-center rounded-full bg-white text-neutral-900 transition-transform duration-300 group-hover:scale-110">
@@ -105,7 +105,7 @@ function OfferBand() {
         <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <p className="text-sm font-semibold opacity-80">{tr(o.title)}</p>
-            <p className="mt-1 font-display text-4xl font-medium sm:text-5xl">{o.type === 'free_shipping' ? value : t('offers.off', { v: value })}</p>
+            <p className="mt-1 font-display text-4xl font-bold sm:text-5xl">{o.type === 'free_shipping' ? value : t('offers.off', { v: value })}</p>
             {o.minSubtotal > 0 && <p className="mt-2 text-sm opacity-80">{t('offers.minOrder', { v: formatMoney(o.minSubtotal, lang) })}</p>}
           </div>
           <button type="button" onClick={copy} className="group inline-flex h-14 items-center justify-between gap-4 rounded-2xl border-2 border-dashed border-on-primary/40 bg-on-primary/10 ps-5 pe-3 transition hover:bg-on-primary/15 active:scale-[.98] sm:min-w-[260px]">

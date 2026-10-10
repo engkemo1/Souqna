@@ -31,7 +31,7 @@ const base = 'w-full rounded-xl border bg-elevated text-fg placeholder:text-mute
 const border = (invalid) => (invalid ? 'border-sale focus:border-sale' : 'border-line-strong hover:border-fg/30');
 
 export const Input = forwardRef(function Input({ className, invalid, prefix, suffix, size = 'md', ...rest }, ref) {
-  const h = size === 'lg' ? 'h-[52px] text-base' : size === 'sm' ? 'h-10 text-sm' : 'h-12 text-[15px]';
+  const h = size === 'lg' ? 'h-[52px] text-base' : size === 'sm' ? 'h-10 text-sm' : 'h-12 text-base';
   if (prefix || suffix) {
     return (
       <div className={cx('relative flex items-center', className)}>
@@ -45,11 +45,11 @@ export const Input = forwardRef(function Input({ className, invalid, prefix, suf
 });
 
 export const Textarea = forwardRef(function Textarea({ className, invalid, rows = 4, ...rest }, ref) {
-  return <textarea ref={ref} rows={rows} className={cx(base, border(invalid), 'px-3.5 py-3 text-[15px] leading-relaxed', className)} {...rest} />;
+  return <textarea ref={ref} rows={rows} className={cx(base, border(invalid), 'px-3.5 py-3 text-base leading-relaxed', className)} {...rest} />;
 });
 
 export const Select = forwardRef(function Select({ className, invalid, children, size = 'md', ...rest }, ref) {
-  const h = size === 'sm' ? 'h-10 text-sm' : 'h-12 text-[15px]';
+  const h = size === 'sm' ? 'h-10 text-sm' : 'h-12 text-base';
   return (
     <div className={cx('relative', className)}>
       <select ref={ref} className={cx(base, border(invalid), h, 'appearance-none ps-3.5 pe-10')} {...rest}>{children}</select>
@@ -65,7 +65,7 @@ export function Switch({ checked, onChange, label, description, disabled, id }) 
     <label htmlFor={sid} className={cx('flex cursor-pointer items-start justify-between gap-4', disabled && 'opacity-50')}>
       {(label || description) && (
         <span className="min-w-0">
-          {label && <span className="block text-[15px] font-medium text-fg">{label}</span>}
+          {label && <span className="block text-base font-medium text-fg">{label}</span>}
           {description && <span className="mt-0.5 block text-[13px] text-muted">{description}</span>}
         </span>
       )}
@@ -80,7 +80,7 @@ export function Switch({ checked, onChange, label, description, disabled, id }) 
 
 export function Checkbox({ checked, onChange, label, className }) {
   return (
-    <label className={cx('inline-flex min-h-[44px] cursor-pointer items-center gap-3 text-[15px]', className)}>
+    <label className={cx('inline-flex min-h-[44px] cursor-pointer items-center gap-3 text-base', className)}>
       <input type="checkbox" checked={!!checked} onChange={(e) => onChange?.(e.target.checked)} className="h-5 w-5 rounded-md border-line-strong accent-[rgb(var(--c-primary))]" />
       {label}
     </label>

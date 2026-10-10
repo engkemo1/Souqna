@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Phone, MessageCircle, MapPin, StickyNote, Check, Banknote, Printer, User2, X, Package } from 'lucide-react';
+import { Phone, MessageCircle, MapPin, StickyNote, Check, Banknote, Printer, User2, X, Package, Truck } from 'lucide-react';
 import { useApi, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -38,8 +38,8 @@ function Stepper({ status, events, t, lang }) {
               </motion.span>
               <span className={cx('h-0.5 flex-1 rounded-full', i === FLOW.length - 1 ? 'opacity-0' : i < idx ? 'bg-primary' : 'bg-fg/10')} />
             </div>
-            <p className={cx('mt-2 text-[11px] font-medium leading-tight sm:text-xs', done ? 'text-fg' : 'text-muted')}>{t(`status.${s}`)}</p>
-            {at(s) && <p className="mt-0.5 hidden text-[11px] text-muted sm:block">{formatDate(at(s), lang, { day: 'numeric', month: 'short' })}</p>}
+            <p className={cx('mt-2 text-xs font-medium leading-tight sm:text-xs', done ? 'text-fg' : 'text-muted')}>{t(`status.${s}`)}</p>
+            {at(s) && <p className="mt-0.5 hidden text-xs text-muted sm:block">{formatDate(at(s), lang, { day: 'numeric', month: 'short' })}</p>}
           </li>
         );
       })}
@@ -53,10 +53,22 @@ export default function OrderDetail() {
   const toast = useToast();
   const { data, error, loading, reload, mutate } = useApi(`/owner/orders/${id}`);
   const [busy, setBusy] = useState(null);
+  const [handoffOpen, setHandoffOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [note, setNote] = useState('');
   const o = data?.order;
 
+  const handoff = async () => {
+    setBusy('handoff');
+    try {
+      const r = await api(`/owner/orders/${id}/handoff`, { method: 'POST', body: {} });
+      mutate((d) => ({ order: { ...d.order, deliveryBy: 'platform', next: r.next, events: [...d.order.events, { status: d.order.status, note: '@handoff', created_at: new Date().toISOString().slice(0, 19).replace('T', ' ') }] } }));
+      invalidate('/owner/orders');
+      setHandoffOpen(false);
+      toast({ title: t('orders.handoffDone') });
+    } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); }
+    setBusy('');
+  };
   const setStatus = async (status, n) => {
     setBusy(status);
     try {
@@ -82,6 +94,8 @@ export default function OrderDetail() {
   }
   if (!o) return null;
 
+  const byUs = o.deliveryBy === 'platform';
+  const canHandoff = !byUs && ['pending', 'confirmed', 'processing'].includes(o.status);
   const nextMain = o.next.find((s) => s !== 'cancelled');
   const canCancel = o.next.includes('cancelled');
   const wa = `https://wa.me/2${o.customer.phone}?text=${encodeURIComponent(lang === 'ar' ? `أهلاً ${o.customer.name}، بخصوص طلبك رقم ${o.number}` : `Hi ${o.customer.name}, about your order ${o.number}`)}`;
@@ -89,7 +103,7 @@ export default function OrderDetail() {
   const actions = (
     <>
       {canCancel && <Button variant="danger-ghost" icon={X} onClick={() => setCancelOpen(true)}>{t('status.action.cancelled')}</Button>}
-      {nextMain && <Button variant="brand" icon={Check} loading={busy === nextMain} onClick={() => setStatus(nextMain)}>{t(`status.action.${nextMain}`)}</Button>}
+      {nextMain && <Button variant="brand" icon={Check} loading={busy === nextMain} onClick={() => setStatus(nextMain)}>{byUs && nextMain === 'processing' ? t('orders.markReady') : t(`status.action.${nextMain}`)}</Button>}
     </>
   );
 
@@ -126,8 +140,9 @@ export default function OrderDetail() {
                 </li>
               ))}
             </ul>
-            <dl className="mt-5 space-y-2 border-t border-line pt-4 text-[15px]">
+            <dl className="mt-5 space-y-2 border-t border-line pt-4 text-base">
               <div className="flex justify-between"><dt className="text-muted">{t('cart.subtotal')}</dt><dd className="tabular">{formatMoney(o.subtotal, lang)}</dd></div>
+              {o.platformDiscount > 0 && <div className="rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900">{t('order.platformDiscount', { v: formatMoney(o.platformDiscount, lang) })}</div>}
               {o.discount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')} {o.coupon && <span className="rounded bg-success/10 px-1.5 py-0.5 font-mono text-xs" dir="ltr">{o.coupon}</span>}</dt><dd className="tabular">−{formatMoney(o.discount, lang)}</dd></div>}
               <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{o.shipping ? formatMoney(o.shipping, lang) : t('common.free')}</dd></div>
               <div className="flex justify-between pt-1 text-lg font-semibold"><dt>{t('cart.total')}</dt><dd className="tabular">{formatMoney(o.total, lang)}</dd></div>
@@ -142,7 +157,7 @@ export default function OrderDetail() {
                   <span className={cx('absolute -start-6 top-1 h-[15px] w-[15px] rounded-full border-[3px] border-elevated', i === 0 ? 'bg-primary' : 'bg-fg/20')} />
                   <p className="text-sm font-semibold">{t(`status.${e.status}`)}</p>
                   <p className="text-xs text-muted">{formatDate(e.created_at, lang, { day: 'numeric', month: 'short' })} · {formatTime(e.created_at, lang)}</p>
-                  {e.note && <p className="mt-1 text-sm text-muted">{e.note}</p>}
+                  {e.note && <p className="mt-1 text-sm text-muted">{e.note === '@handoff' ? t('orders.evHandoff') : e.note}</p>}
                 </li>
               ))}
             </ol>
@@ -155,18 +170,26 @@ export default function OrderDetail() {
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-secondary text-brand"><User2 className="h-5 w-5" /></span>
               <div className="min-w-0"><p className="truncate font-semibold">{o.customer.name}</p><p className="text-sm text-muted">{t('orders.previousOrders', { n: formatNumber(o.customer.ordersCount, lang) })} · {formatMoney(o.customer.totalSpent, lang)}</p></div>
             </div>
-            <p className="mt-4 font-mono text-[15px]" dir="ltr">{o.customer.phone}</p>
+            <p className="mt-4 font-mono text-base" dir="ltr">{o.customer.phone}</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button variant="outline" size="sm" icon={Phone} href={`tel:${o.customer.phone}`}>{t('orders.call')}</Button>
               <Button variant="outline" size="sm" icon={MessageCircle} href={wa} target="_blank" rel="noreferrer" className="!text-[#128C7E]">{t('orders.whatsapp')}</Button>
             </div>
           </Panel>
           <Panel title={t('orders.delivery')}>
-            <p className="flex gap-2.5 text-[15px] leading-relaxed"><MapPin className="mt-1 h-4 w-4 shrink-0 text-muted" /><span>{o.customer.address}<br /><span className="text-muted">{o.customer.city} — {t(`gov.${o.customer.governorate}`)}</span></span></p>
+            <p className="flex gap-2.5 text-base leading-relaxed"><MapPin className="mt-1 h-4 w-4 shrink-0 text-muted" /><span>{o.customer.address}<br /><span className="text-muted">{o.customer.city} — {t(`gov.${o.customer.governorate}`)}</span></span></p>
+            {byUs ? (
+              <div className="mt-4 flex items-start gap-3 rounded-xl bg-secondary p-3.5 text-sm"><Truck className="mt-0.5 h-5 w-5 shrink-0 text-brand" /><p><span className="font-semibold">{t('orders.byPlatform')}</span><br /><span className="text-muted">{o.status === 'processing' || o.status === 'shipped' || o.status === 'delivered' ? t('orders.byPlatformReady') : t('orders.byPlatformPrepare')}</span></p></div>
+            ) : o.status !== 'cancelled' && o.status !== 'delivered' && o.status !== 'shipped' && (
+              <div className="mt-4">
+                <Button variant="outline" size="sm" icon={Truck} onClick={() => setHandoffOpen(true)} className="w-full">{t('orders.handoff')}</Button>
+                <p className="mt-2 text-[13px] text-muted">{t('orders.handoffHint')}</p>
+              </div>
+            )}
           </Panel>
           {o.notes && (
             <Panel title={t('orders.notes')}>
-              <p className="flex gap-2.5 rounded-xl bg-amber-50 p-3.5 text-[15px] text-amber-900"><StickyNote className="mt-0.5 h-4 w-4 shrink-0" />{o.notes}</p>
+              <p className="flex gap-2.5 rounded-xl bg-amber-50 p-3.5 text-base text-amber-900"><StickyNote className="mt-0.5 h-4 w-4 shrink-0" />{o.notes}</p>
             </Panel>
           )}
         </div>
@@ -178,6 +201,9 @@ export default function OrderDetail() {
           <div className="flex gap-2 [&>*:last-child]:flex-1">{actions}</div>
         </div>
       )}
+
+      <ConfirmDialog open={handoffOpen} onClose={() => setHandoffOpen(false)} title={t('orders.handoff')} body={t('orders.handoffConfirm')}
+        confirmLabel={t('orders.handoffYes')} loading={busy === 'handoff'} onConfirm={handoff} />
 
       <ConfirmDialog open={cancelOpen} onClose={() => setCancelOpen(false)} danger title={t('status.action.cancelled')} body={t('orders.confirmCancel')}
         confirmLabel={t('status.action.cancelled')} loading={busy === 'cancelled'} onConfirm={() => setStatus('cancelled', note)}>

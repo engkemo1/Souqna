@@ -1,3 +1,4 @@
+import { useDepartments } from '../../lib/departments.js';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Star, MapPin, ArrowUpRight, BadgeCheck } from 'lucide-react';
@@ -9,6 +10,7 @@ import { cx } from '../ui/cx.js';
 
 export default function StoreCard({ store: s, index = 0, large }) {
   const { t, tr, lang } = useI18n();
+  const { label: deptLabel } = useDepartments();
   const brand = s.theme?.cssVars?.['--c-primary'];
   return (
     <motion.article
@@ -24,7 +26,7 @@ export default function StoreCard({ store: s, index = 0, large }) {
             imgClassName="duration-[1.1s] group-hover:scale-[1.04] [@media(hover:none)]:group-hover:scale-100" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
           <div className="absolute start-3 top-3 flex flex-wrap gap-1.5">
-            {s.featured && <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11.5px] font-semibold text-neutral-900 shadow-sm backdrop-blur"><BadgeCheck className="h-3.5 w-3.5 text-[#17483B]" />{t('market.featured')}</span>}
+            {s.featured && <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11.5px] font-semibold text-neutral-900 shadow-sm backdrop-blur"><BadgeCheck className="h-3.5 w-3.5 text-[#FF5A1F]" />{t('market.featured')}</span>}
             {s.offerBadge && <span className="rounded-full px-2.5 py-1 text-[11.5px] font-bold text-white shadow-sm" style={{ backgroundColor: brand ? `rgb(${brand})` : '#B4532A' }}>{tr(s.offerBadge)}</span>}
           </div>
           <span className="absolute bottom-3 end-3 hidden translate-y-2 items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-sm font-semibold text-neutral-900 opacity-0 shadow-soft transition duration-300 group-hover:translate-y-0 group-hover:opacity-100 [@media(hover:hover)]:inline-flex">
@@ -35,12 +37,19 @@ export default function StoreCard({ store: s, index = 0, large }) {
           <StoreLogo store={s} size={48} className="-mt-10 h-14 w-14 shadow-soft ring-4 ring-elevated" />
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
-              <h3 className={cx('truncate font-display font-semibold', large ? 'text-xl sm:text-2xl' : 'text-lg')}>{tr(s.name)}</h3>
+              <h3 className={cx('truncate font-display font-bold', large ? 'text-xl sm:text-2xl' : 'text-lg')}>{tr(s.name)}</h3>
               <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold"><Star className="h-4 w-4 fill-amber-400 text-amber-400" />{s.rating}<span className="font-normal text-muted">({s.ratingCount})</span></span>
             </div>
             <p className="mt-1 line-clamp-1 text-sm text-muted">{tr(s.tagline)}</p>
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
-              <span className="rounded-full bg-fg/[0.06] px-2.5 py-0.5 font-medium text-fg">{t(`cat.${s.category}`)}</span>
+              {(() => {
+                const d = s.departments?.length ? s.departments : [s.category];
+                const shown = d.length > 3 ? d.slice(0, 2) : d;
+                return (<>
+                  {shown.map((c) => <span key={c} className="rounded-full bg-fg/[0.06] px-2.5 py-0.5 font-medium text-fg">{deptLabel(c)}</span>)}
+                  {d.length > 3 && <span className="rounded-full bg-fg/[0.06] px-2.5 py-0.5 font-medium text-fg">+{d.length - 2}</span>}
+                </>);
+              })()}
               <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{s.city === 'Banha' && lang === 'ar' ? 'بنها' : s.city}</span>
               {s.productCount != null && <span>{t('market.products', { n: s.productCount })}</span>}
             </div>

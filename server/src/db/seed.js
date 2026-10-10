@@ -10,11 +10,12 @@
  *   lamar@banhalook.app  → Lamar Boutique
  *   sport@banhalook.app  → Sport Zone
  *   denim@banhalook.app  → Denim House
- *   townstyle@banhalook.app → Town Style (password: TownStyle#2026)
+ *   townstyle@banhalook.app → Town Style (random password, printed at the end of the seed; or set TOWNSTYLE_PASSWORD)
  */
 import fs from 'node:fs';
 import path from 'node:path';
 import bcrypt from 'bcryptjs';
+import crypto from 'node:crypto';
 import { config, ROOT } from '../config.js';
 
 for (const f of [config.dbFile, `${config.dbFile}-wal`, `${config.dbFile}-shm`]) fs.rmSync(f, { force: true });
@@ -101,12 +102,12 @@ const STORES = [
     sizes: ['S', 'M', 'L', 'XL'], volume: 0.8,
   },
   {
-    slug: 'town-style', code: 'TS', email: 'townstyle@banhalook.app', owner: 'Town Style Owner', password: 'TownStyle#2026',
+    slug: 'town-style', code: 'TS', email: 'townstyle@banhalook.app', owner: 'Town Style Owner', password: process.env.TOWNSTYLE_PASSWORD || crypto.randomBytes(9).toString('base64url'),
     name: ['تاون ستايل', 'Town Style'], tagline: ['تيشيرتات وجينز بخامات مريحة', 'Tees and denim in comfortable fabrics'],
     description: ['متجر تيشيرتات وجينز وطواقي بخامات مريحة وتصميمات بسيطة للشارع والبيت.', 'Tees, denim and beanies in comfortable fabrics and simple everyday designs.'],
     address: ['شارع البحر، بنها، القليوبية', 'Al-Bahr St, Banha, Qalyubia'],
     category: 'mixed', rating: 4.7, ratingCount: 96, featured: 1, badge: ['شحن مجاني', 'FREE DELIVERY'],
-    phone: '01000000000', instagram: 'townstyle.eg', facebook: 'TownStyleEG',
+    phone: process.env.TOWNSTYLE_PHONE || '01067378110', instagram: 'townstyle.eg', facebook: 'TownStyleEG',
     theme: { primary: '#0E7C66', secondary: '#EAF6F2', accent: '#F2B705', background: '#FFFFFF', text: '#0F172A', button: '#0E7C66', header: '#FFFFFF', footer: '#0F172A' },
     cats: { tee: ['tees', 'تيشيرتات', 'Tees'], jeans: ['jeans', 'جينز', 'Jeans'], shorts: ['shorts', 'شورتات', 'Shorts'], cap: ['beanies', 'طواقي', 'Beanies'] },
     sizes: ['S', 'M', 'L', 'XL'], volume: 0.5,
@@ -140,7 +141,7 @@ for (const S of STORES) {
   const sid = insert('stores', {
     owner_id: uid, slug: S.slug, code: S.code, name_ar: S.name[0], name_en: S.name[1], tagline_ar: S.tagline[0], tagline_en: S.tagline[1],
     description_ar: S.description[0], description_en: S.description[1], address_ar: S.address[0], address_en: S.address[1],
-    category: S.category, city: 'Banha', phone: S.phone, whatsapp: S.phone, instagram: S.instagram, facebook: S.facebook,
+    category: S.category, departments: S.category === 'mixed' ? ',women,men,kids,shoes,bags,' : `,${S.category},`, city: 'Banha', phone: S.phone, whatsapp: S.phone, instagram: S.instagram, facebook: S.facebook,
     theme_json: JSON.stringify(S.theme), rating: S.rating, rating_count: S.ratingCount, featured: S.featured,
     offer_badge_ar: S.badge[0], offer_badge_en: S.badge[1], shipping_fee: 50, free_shipping_over: 1500,
     opens_at: S.opens || '10:00', closes_at: S.closes || '23:00', day_off: S.dayOff ?? null,
@@ -323,5 +324,7 @@ for (const S of STORES) {
 }
 
 console.timeEnd('seed');
+const ts = STORES.find((x) => x.slug === 'town-style');
+if (ts) console.log(`Town Style login: ${ts.email} / ${ts.password}   (note it now; change anytime with: npm run set-password -w server -- ${ts.email})`);
 const bytes = q.val('SELECT SUM(bytes) FROM media');
 console.log(`media renditions: ${q.val('SELECT COUNT(*) FROM media')} images, ${(bytes / 1e6).toFixed(1)} MB`);

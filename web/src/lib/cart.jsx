@@ -46,14 +46,18 @@ export function useCart(slug) {
   const restore = useCallback((line) => set((list) => [line, ...list.filter((l) => l.key !== line.key)]), [set]);
   const clear = useCallback(() => set(() => []), [set]);
 
+  const { setDrawer } = ctx;
+  const open = useCallback(() => setDrawer({ open: true, slug }), [setDrawer, slug]);
+  const close = useCallback(() => setDrawer({ open: false, slug }), [setDrawer, slug]);
+
   const count = items.reduce((s, l) => s + l.qty, 0);
   const subtotal = items.reduce((s, l) => s + l.qty * l.price, 0);
 
   return {
     items, count, subtotal, add, updateQty, remove, restore, clear, bump: ctx.bump,
     isOpen: ctx.drawer.open && ctx.drawer.slug === slug,
-    open: () => ctx.setDrawer({ open: true, slug }),
-    close: () => ctx.setDrawer({ open: false, slug }),
+    open,
+    close,
   };
 }
 

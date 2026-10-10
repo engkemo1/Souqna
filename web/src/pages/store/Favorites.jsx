@@ -23,7 +23,7 @@ export default function Favorites() {
   return (
     <PageTransition className="container pt-6 sm:pt-10">
       <div className="mb-6 flex items-end justify-between sm:mb-8">
-        <h1 className="font-display text-display-sm font-medium">{t('fav.title')}</h1>
+        <h1 className="font-display text-display-sm font-bold">{t('fav.title')}</h1>
         {favs.count > 0 && <span className="text-sm text-muted">{t('common.items', { n: favs.count })}</span>}
       </div>
       {!ids ? (

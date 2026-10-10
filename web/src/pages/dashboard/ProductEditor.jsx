@@ -5,8 +5,10 @@ import { ChevronDown, Plus, X, Check, Eye, Info, Package } from 'lucide-react';
 import { onColor } from '@souqna/shared/theme';
 import { useApi, useIsDesktop, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
+import { useDepartments } from '../../lib/departments.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
+import { useDashBase } from '../../lib/dashBase.js';
 import { formatMoney } from '../../lib/format.js';
 import { PageHeader } from '../../components/dash/Kit.jsx';
 import MediaUploader from '../../components/dash/MediaUploader.jsx';
@@ -18,7 +20,14 @@ import { EmptyState, ErrorState, errorMessage, fieldErrors } from '../../compone
 import { useToast } from '../../components/ui/Toast.jsx';
 import { cx } from '../../components/ui/cx.js';
 
-const SIZE_SETS = [['XS', 'S', 'M', 'L', 'XL', 'XXL'], ['28', '30', '32', '34', '36', '38', '40'], ['One size']];
+const SIZE_SETS = [
+  ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
+  ['28', '30', '32', '34', '36', '38', '40', '42'],
+  ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45'], // shoes (EU)
+  ['0-3M', '3-6M', '6-12M', '1Y', '2Y', '3Y', '4Y', '6Y', '8Y', '10Y', '12Y', '14Y'], // kids
+  ['52', '54', '56', '58', '60'], // abaya / jalabiya length
+  ['Free size', 'One size'],
+];
 const PRESET_COLORS = [
   ['#1C1C1E', 'أسود', 'Black'], ['#F4F3EF', 'أبيض', 'White'], ['#8E9096', 'رمادي', 'Grey'], ['#1F2B4D', 'كحلي', 'Navy'], ['#30558F', 'أزرق', 'Blue'],
   ['#B3343A', 'أحمر', 'Red'], ['#6E2433', 'نبيتي', 'Burgundy'], ['#3F7A55', 'أخضر', 'Green'], ['#4E5A3A', 'زيتي', 'Olive'], ['#D9C6A5', 'بيج', 'Beige'],
@@ -27,7 +36,7 @@ const PRESET_COLORS = [
 
 const EMPTY = {
   name_ar: '', name_en: '', description_ar: '', description_en: '', price: '', compare_at_price: '', cost: '', sku: '',
-  category_id: '', status: 'active', featured: false, is_new: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
+  category_id: '', department: '', status: 'active', featured: false, is_new: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
   media: [], seo_title: '', seo_description: '',
 };
 
@@ -41,7 +50,7 @@ function fromProduct(p) {
     ...EMPTY,
     name_ar: p.name.ar, name_en: p.name.en, description_ar: p.description.ar || '', description_en: p.description.en || '',
     price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '',
-    category_id: p.categoryId ? String(p.categoryId) : '', status: p.status, featured: p.featured, is_new: p.isNewFlag,
+    category_id: p.categoryId ? String(p.categoryId) : '', department: p.department || '', status: p.status, featured: p.featured, is_new: p.isNewFlag,
     colors: p.colors, sizes: p.sizes, matrix, variantIds: ids, track_stock: p.trackStock, stock: p.stockCount, low_stock_at: p.lowStockAt,
     media: p.media, seo_title: p.seo.title || '', seo_description: p.seo.description || '',
   };
@@ -56,7 +65,7 @@ function toPayload(f) {
   return {
     name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en,
     price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, cost: f.cost ? Number(f.cost) : null,
-    sku: f.sku || null, category_id: f.category_id ? Number(f.category_id) : null, status: f.status, featured: f.featured, is_new: f.is_new,
+    sku: f.sku || null, category_id: f.category_id ? Number(f.category_id) : null, department: f.department || null, status: f.status, featured: f.featured, is_new: f.is_new,
     colors: f.colors, sizes: f.sizes, variants, track_stock: f.track_stock, stock: Number(f.stock || 0), low_stock_at: Number(f.low_stock_at || 0),
     media: f.media.map((m) => m.id), primary_media_id: f.media[0]?.id ?? null, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
   };
@@ -116,8 +125,25 @@ function ColorPicker({ open, onClose, onAdd, existing }) {
   );
 }
 
+/** Size rows come from the store's departments (managed by the platform team); legacy presets are the fallback. */
+function useSizeSets() {
+  const { store } = useAuth();
+  const { list, label } = useDepartments();
+  return useMemo(() => {
+    const mine = (store?.departments || []).map((s) => list.find((d) => d.slug === s)).filter((d) => d?.sizes?.length);
+    const rows = []; const seen = new Set();
+    for (const d of mine) {
+      const key = d.sizes.join('|');
+      if (seen.has(key)) { rows.find((r) => r.key === key).label += ` · ${label(d.slug)}`; continue; }
+      seen.add(key); rows.push({ key, label: label(d.slug), sizes: d.sizes });
+    }
+    return rows.length ? rows : SIZE_SETS.map((sizes, i) => ({ key: String(i), label: '', sizes }));
+  }, [store?.departments, list, label]);
+}
+
 function VariantsEditor({ f, set }) {
   const { t, tr } = useI18n();
+  const sizeSets = useSizeSets();
   const [picker, setPicker] = useState(false);
   const [customSize, setCustomSize] = useState('');
   const [fill, setFill] = useState('');
@@ -147,20 +173,23 @@ function VariantsEditor({ f, set }) {
       <div>
         <p className="mb-2.5 text-sm font-medium">{t('editor.sizes')}</p>
         <div className="space-y-2.5">
-          {SIZE_SETS.map((set_, i) => (
-            <div key={i} className="flex flex-wrap gap-2">
-              {set_.map((s) => {
+          {sizeSets.map((row) => (
+            <div key={row.key}>
+              {row.label && <p className="mb-1.5 text-[13px] font-medium text-muted">{row.label}</p>}
+              <div className="flex flex-wrap gap-2">
+              {row.sizes.map((s) => {
                 const on = f.sizes.includes(s);
                 return <button key={s} type="button" onClick={() => toggleSize(s)} aria-pressed={on} className={cx('h-10 min-w-[3rem] rounded-xl border px-3 text-sm font-semibold transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{s}</button>;
               })}
+              </div>
             </div>
           ))}
           <form className="flex max-w-xs gap-2" onSubmit={(e) => { e.preventDefault(); const s = customSize.trim(); if (s && !f.sizes.includes(s)) set({ sizes: [...f.sizes, s] }); setCustomSize(''); }}>
             <Input size="sm" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder={t('editor.customSize')} maxLength={12} />
             <Button type="submit" size="sm" variant="outline" icon={Plus} aria-label={t('common.add')} />
           </form>
-          {f.sizes.filter((s) => !SIZE_SETS.flat().includes(s)).length > 0 && (
-            <div className="flex flex-wrap gap-2">{f.sizes.filter((s) => !SIZE_SETS.flat().includes(s)).map((s) => (
+          {f.sizes.filter((s) => !sizeSets.some((r) => r.sizes.includes(s))).length > 0 && (
+            <div className="flex flex-wrap gap-2">{f.sizes.filter((s) => !sizeSets.some((r) => r.sizes.includes(s))).map((s) => (
               <button key={s} type="button" onClick={() => toggleSize(s)} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-fg bg-fg px-3 text-sm font-semibold text-canvas">{s}<X className="h-3.5 w-3.5" /></button>
             ))}</div>
           )}
@@ -209,10 +238,13 @@ function VariantsEditor({ f, set }) {
 /* --------------------------------------------------------------- page */
 
 export default function ProductEditor() {
+  const base = useDashBase();
   const { id } = useParams();
   const isNew = !id;
   const { t, tr, lang } = useI18n();
   const { store } = useAuth();
+  const depts = useDepartments();
+  const multiDept = (store?.departments?.length || 0) > 1;
   const toast = useToast();
   const navigate = useNavigate();
   const desktop = useIsDesktop();
@@ -240,6 +272,7 @@ export default function ProductEditor() {
     if (f.name_en.trim().length < 2) e.name_en = t('field.required');
     if (!Number(f.price)) e.price = t('field.price_required');
     if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
+    if (multiDept && !f.department) e.department = t('editor.departmentRequired');
     if (!f.media.length && f.status === 'active') e.media = t('editor.needImage');
     setErrors(e);
     return e;
@@ -248,7 +281,7 @@ export default function ProductEditor() {
   const save = async () => {
     const e = validate();
     if (Object.keys(e).length) {
-      const firstSection = e.media ? 'images' : e.price || e.compare_at_price ? 'pricing' : 'basic';
+      const firstSection = e.department && !e.name_ar && !e.name_en ? 'basic' : e.media ? 'images' : e.price || e.compare_at_price ? 'pricing' : 'basic';
       setOpen((o) => ({ ...o, [firstSection]: true }));
       if (!desktop && isNew) setStep(STEPS.findIndex((s) => s.id === firstSection));
       setTimeout(() => document.getElementById(firstSection)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
@@ -263,8 +296,8 @@ export default function ProductEditor() {
       invalidate(`/stores/${store.slug}`);
       setInitial(f);
       toast({ title: isNew ? t('editor.created') : t('editor.saved'), image: r.product.media?.[0] ? `${r.product.media[0].base}/thumb.webp` : undefined });
-      if (isNew) navigate(`/dashboard/products/${r.product.id}`, { replace: true });
-      else { const x = fromProduct({ ...data.product, ...r.product, cost: f.cost ? Number(f.cost) : null, status: f.status, featured: f.featured, isNewFlag: f.is_new, categoryId: f.category_id ? Number(f.category_id) : null }); setF(x); setInitial(x); }
+      if (isNew) navigate(`${base}/products/${r.product.id}`, { replace: true });
+      else { const x = fromProduct({ ...data.product, ...r.product, cost: f.cost ? Number(f.cost) : null, status: f.status, featured: f.featured, isNewFlag: f.is_new, categoryId: f.category_id ? Number(f.category_id) : null, department: f.department }); setF(x); setInitial(x); }
     } catch (err) {
       const fe = fieldErrors(t, err);
       setErrors(fe);
@@ -284,6 +317,14 @@ export default function ProductEditor() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label={t('editor.nameAr')} error={errors.name_ar}><Input dir="rtl" value={f.name_ar} onChange={(e) => set({ name_ar: e.target.value })} /></Field>
         <Field label={t('editor.nameEn')} error={errors.name_en}><Input dir="ltr" value={f.name_en} onChange={(e) => set({ name_en: e.target.value })} /></Field>
+        {multiDept && (
+          <Field label={t('editor.department')} hint={t('editor.departmentHint')} error={errors.department} className="sm:col-span-2">
+            <div className="flex flex-wrap gap-2" role="group">
+              {store.departments.map((d) => <button key={d} type="button" aria-pressed={f.department === d} onClick={() => set({ department: d })}
+                className={cx('h-10 rounded-full border px-4 text-sm font-medium transition active:scale-95', f.department === d ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{depts.label(d)}</button>)}
+            </div>
+          </Field>
+        )}
         <Field label={t('editor.descAr')} optional={t('common.optional')}><Textarea dir="rtl" rows={4} value={f.description_ar} onChange={(e) => set({ description_ar: e.target.value })} /></Field>
         <Field label={t('editor.descEn')} optional={t('common.optional')}><Textarea dir="ltr" rows={4} value={f.description_en} onChange={(e) => set({ description_en: e.target.value })} /></Field>
       </div>
@@ -352,7 +393,7 @@ export default function ProductEditor() {
   ];
   const doneMap = { images: f.media.length > 0, basic: f.name_ar && f.name_en, pricing: Number(f.price) > 0, variants: true, publishing: true, seo: !!(f.seo_title || f.seo_description) };
   const header = (
-    <PageHeader back="/dashboard/products" title={isNew ? t('editor.new') : tr({ ar: f.name_ar, en: f.name_en }) || t('editor.edit')}
+    <PageHeader back={`${base}/products`} title={isNew ? t('editor.new') : tr({ ar: f.name_ar, en: f.name_en }) || t('editor.edit')}
       subtitle={!isNew && dirty ? <span className="inline-flex items-center gap-1.5 text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-500" />{t('editor.unsaved')}</span> : null}
       actions={(
         <div className="hidden gap-2 md:flex">

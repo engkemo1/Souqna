@@ -71,8 +71,8 @@ export default function VisitCard() {
       className="container mt-10 sm:mt-14">
       <div className="grid overflow-hidden rounded-[28px] bg-footer text-on-footer shadow-[0_30px_80px_-40px_rgba(0,0,0,.6)] md:grid-cols-[1.15fr_1fr]">
         <div className="p-6 sm:p-9">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.25em] text-accent">{ar ? 'زورنا' : 'Visit us'}</p>
-          <h2 className="mt-2 font-display text-3xl font-medium sm:text-4xl">{ar ? `محل ${tr(store.name)}` : tr(store.name)}</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.25em] text-accent">{ar ? 'زورنا' : 'Visit us'}</p>
+          <h2 className="mt-2 font-display text-3xl font-bold sm:text-4xl">{ar ? `محل ${tr(store.name)}` : tr(store.name)}</h2>
           <div className="mt-7">
             {address && (
               <a href={maps.open} target="_blank" rel="noreferrer" className={`${row} group`}>
@@ -102,17 +102,17 @@ export default function VisitCard() {
           </div>
           <div className="mt-6 flex flex-wrap gap-2.5">
             {address && (
-              <a href={maps.open} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-[15px] font-bold text-on-accent transition hover:brightness-110">
+              <a href={maps.open} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-accent px-6 py-3 text-base font-bold text-on-accent transition hover:brightness-110">
                 <Navigation className="h-4 w-4" />{ar ? 'افتح اللوكيشن' : 'Open location'}
               </a>
             )}
             {store.phone && (
-              <a href={`tel:${store.phone}`} className="inline-flex items-center gap-2 rounded-full border border-on-footer/25 px-5 py-3 text-[15px] font-semibold transition hover:bg-on-footer/10">
+              <a href={`tel:${store.phone}`} className="inline-flex items-center gap-2 rounded-full border border-on-footer/25 px-5 py-3 text-base font-semibold transition hover:bg-on-footer/10">
                 <Phone className="h-4 w-4" />{ar ? 'اتصل' : 'Call'}
               </a>
             )}
             {store.whatsapp && (
-              <a href={`https://wa.me/${waNumber(store.whatsapp)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-on-footer/25 px-5 py-3 text-[15px] font-semibold transition hover:bg-on-footer/10">
+              <a href={`https://wa.me/${waNumber(store.whatsapp)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-on-footer/25 px-5 py-3 text-base font-semibold transition hover:bg-on-footer/10">
                 <MessageCircle className="h-4 w-4" />{ar ? 'واتساب' : 'WhatsApp'}
               </a>
             )}

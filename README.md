@@ -1,6 +1,6 @@
-# بنها لوك · BanhaLook
+# بنها أوتفيت · Banha Outfit
 
-**منصة متاجر أزياء متعددة لمحلات بنها** — سوق مركزي، متجر أونلاين لكل محل بألوانه، ولوحة تحكم احترافية تشتغل من الموبايل.
+**منصة متاجر متعددة لمحلات بنها (ملابس، كوتشيات، شنط، أطفال، طرح وعبايات وجلاليب، ملابس داخلية، فساتين وبدل أفراح) — كل محل يختار أقسامه** — سوق مركزي، متجر أونلاين لكل محل بألوانه، ولوحة تحكم احترافية تشتغل من الموبايل.
 
 A multi-store fashion e-commerce platform built for clothing stores in Banha: a central marketplace, a themed storefront per store, and a mobile-first owner dashboard. Arabic (RTL) + English, full-stack, production-minded.
 
@@ -125,3 +125,20 @@ Demo photography: Magento 2 sample data (Luma, AFL-3.0) and Sylius fixtures (MIT
    - Owner dashboard: `/login?demo=1` (or `ahmed@banhalook.app` / `demo1234`)
 
 Free instances sleep after inactivity and reset their disk on redeploy (the demo data re-seeds automatically). For real stores, add a persistent disk and set `DB_FILE`/`MEDIA_DIR` to it.
+
+## Sales contact
+Owners who want to join: **01067378110** (WhatsApp `201067378110`). Edit `web/src/config/contact.js` to change it.
+
+## Demo account
+`ahmed@banhalook.app` is promoted to a **read-only `demo` role** at server start (`DEMO_EMAIL` env to change): it can browse the whole dashboard but every write returns `demo_readonly`.
+
+## Store departments
+Each store picks one or many departments (women, men, kids, shoes, bags, hijab, abaya, jalabiya, underwear, wedding dresses, wedding suits, sports, denim, accessories) in Settings. The marketplace filter chips are built from them.
+
+## Pre-launch security & operations
+
+1. **Secrets**: set `JWT_SECRET` (32+ random chars), `ADMIN_KEY` (16+ chars) and `NODE_ENV=production`. The admin “النظام” page shows a live checklist.
+2. **Admin two-step confirmation**: run `npm run admin-totp -w server`, put the printed `ADMIN_TOTP_SECRET` in the host’s env, and add the same secret to an authenticator app (Google/Microsoft Authenticator). After that, admin sign-in = key + 6-digit code (12-hour session; codes can’t be replayed; wrong codes are rate-limited).
+3. **Backups**: set `BACKUP_DIR` to a folder on a persistent disk. The server then snapshots the database (consistent `VACUUM INTO`) and mirrors new photos every 24 h and keeps `BACKUP_KEEP_DAYS` daily DB copies. Run on demand with `npm run backup -w server`. The admin “النظام” page can also download the database. Keep an off-server copy as well. Restore: stop the server, copy `db/souqna-DATE.db` over `DB_FILE` and `media/` over `MEDIA_DIR`.
+4. **Demo passwords**: the seed now generates a random Town Style password (printed at the end of the seed). On an existing database run `npm run set-password -w server -- townstyle@banhalook.app` (prints a new random password). Set the store’s real phone from the admin Stores page.
+5. **Push notifications** need HTTPS (the PWA service worker does too). VAPID keys are created automatically on first run.

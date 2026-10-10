@@ -49,3 +49,58 @@ export async function sendNewOrderAlert(store, orderId) {
   }
   return { sent: true, to };
 }
+
+/**
+ * "Banha Outfit must deliver this order" alert to the platform team number (config.platformWa).
+ * Template variables: {{1}} store {{2}} order no. {{3}} store phone {{4}} store address
+ *                     {{5}} customer {{6}} customer phone {{7}} customer address {{8}} cash to collect (EGP)
+ */
+export async function sendPlatformDeliveryAlert(orderId) {
+  if (!isWhatsAppConfigured()) return { skipped: 'not_configured' };
+  const o = q.get('SELECT o.*, s.name_ar AS store_name, s.phone AS store_phone, s.address_ar AS store_address FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.id=?', [orderId]);
+  if (!o) return { skipped: 'no_order' };
+  const customerAddr = [o.address, o.city, o.governorate].filter(Boolean).join('، ');
+  const params = [o.store_name, o.number, o.store_phone, o.store_address, o.customer_name, o.phone, customerAddr, String(o.total)]
+    .map((text) => ({ type: 'text', text: String(text || '-').slice(0, 300) }));
+  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', to: config.platformWa, type: 'template',
+      template: { name: config.wa.platformTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }] } }),
+  });
+  if (!res.ok) throw new Error(`whatsapp ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
+  return { sent: true, to: config.platformWa };
+}
+
+/** Fire-and-forget wrapper: never blocks or breaks the request. */
+export function notifyPlatformDelivery(orderId, number) {
+  sendPlatformDeliveryAlert(orderId)
+    .then((r) => console.log(r.sent ? `[whatsapp] delivery request ${number} → team` : `[whatsapp] delivery request ${number} skipped: ${r.skipped}`))
+    .catch((e) => console.error(`[whatsapp] delivery request ${number} failed: ${e.message}`));
+}
+
+/**
+ * "A store asked for a service (professional photography)" alert to the platform team.
+ * Template variables: {{1}} store {{2}} plan {{3}} items {{4}} preferred date {{5}} phone {{6}} notes
+ */
+export async function sendPlatformServiceAlert(requestId) {
+  if (!isWhatsAppConfigured()) return { skipped: 'not_configured' };
+  const r = q.get('SELECT r.*, s.name_ar AS store_name, s.phone AS store_phone FROM service_requests r JOIN stores s ON s.id=r.store_id WHERE r.id=?', [requestId]);
+  if (!r) return { skipped: 'no_request' };
+  const planLabel = r.type === 'design_banner' ? 'تصميم بنر' : r.type === 'design_cover' ? 'تصميم غلاف' : r.plan === 'monthly' ? 'اشتراك شهري' : 'مرة واحدة';
+  const params = [r.store_name, planLabel, r.items_count ? String(r.items_count) : '-', r.preferred_date || 'أي وقت', r.phone || r.store_phone, r.notes || '-']
+    .map((text) => ({ type: 'text', text: String(text || '-').slice(0, 300) }));
+  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', to: config.platformWa, type: 'template',
+      template: { name: config.wa.serviceTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }] } }),
+  });
+  if (!res.ok) throw new Error(`whatsapp ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
+  return { sent: true, to: config.platformWa };
+}
+export function notifyPlatformService(requestId) {
+  sendPlatformServiceAlert(requestId)
+    .then((r) => console.log(r.sent ? `[whatsapp] service request ${requestId} → team` : `[whatsapp] service request ${requestId} skipped: ${r.skipped}`))
+    .catch((e) => console.error(`[whatsapp] service request ${requestId} failed: ${e.message}`));
+}

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import { api, tokenStore, setUnauthorizedHandler } from './api.js';
 import { invalidate } from './hooks.js';
 
-const AuthContext = createContext(null);
+export const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [state, setState] = useState({ user: null, store: null, ready: !tokenStore.get() });

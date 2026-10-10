@@ -5,6 +5,7 @@ import { useApi, invalidate } from '../../lib/hooks.js';
 import { api, upload } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
+import DesignHelp from '../../components/dash/DesignHelp.jsx';
 import { PageHeader, Panel } from '../../components/dash/Kit.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
@@ -13,9 +14,10 @@ import Button from '../../components/ui/Button.jsx';
 import { Field, Input, Textarea, Select } from '../../components/ui/Field.jsx';
 import { ErrorState, errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
+import { useDepartments } from '../../lib/departments.js';
 import PageTransition from '../../components/PageTransition.jsx';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'category', 'phone', 'whatsapp', 'map_url', 'hero_mode', 'opens_at', 'closes_at', 'day_off', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'hero_mode', 'delivery_mode', 'opens_at', 'closes_at', 'day_off', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en'];
 
 function HeroModePicker({ value, onChange }) {
   const { t } = useI18n();
@@ -49,7 +51,7 @@ function AutoCover({ onDone }) {
   };
   return (
     <button type="button" onClick={run} disabled={busy}
-      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-l from-[#F3DFA2] via-[#C9A24D] to-[#8E6A24] px-4 py-2.5 text-sm font-bold text-[#111] disabled:opacity-60">
+      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-l from-[#FF8A5C] via-[#FF5A1F] to-[#C2410C] px-4 py-2.5 text-sm font-bold text-[#111] disabled:opacity-60">
       {busy ? 'بنصمم الـ cover…' : '✨ صمّملي cover فخم من منتجاتي'}
     </button>
   );
@@ -90,6 +92,7 @@ export default function Settings() {
   const { t } = useI18n();
   const { setStore } = useAuth();
   const toast = useToast();
+  const depts = useDepartments();
   const { data, error, reload, mutate } = useApi('/owner/store');
   const [f, setF] = useState(null);
   const [errors, setErrors] = useState({});
@@ -101,7 +104,7 @@ export default function Settings() {
     const s = data.store;
     const x = ({
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
-      address_ar: s.address.ar, address_en: s.address.en, category: s.category, phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', hero_mode: s.heroMode || 'auto', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
+      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', hero_mode: s.heroMode || 'auto', delivery_mode: s.deliveryMode || 'store', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
       shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
     });
     setF(x);
@@ -151,10 +154,30 @@ export default function Settings() {
               <Field label={t('settings.taglineEn')}><Input dir="ltr" value={f.tagline_en} onChange={set('tagline_en')} /></Field>
               <Field label={t('settings.descAr')}><Textarea dir="rtl" rows={3} value={f.description_ar} onChange={set('description_ar')} /></Field>
               <Field label={t('settings.descEn')}><Textarea dir="ltr" rows={3} value={f.description_en} onChange={set('description_en')} /></Field>
-              <Field label={t('settings.category')}>
-                <Select value={f.category} onChange={set('category')}>{['men', 'women', 'kids', 'mixed', 'denim', 'sports', 'accessories'].map((c) => <option key={c} value={c}>{t(`cat.${c}`)}</option>)}</Select>
-              </Field>
+              <div className="sm:col-span-2">
+                <p className="mb-1 text-sm font-medium">{t('settings.departments')}</p>
+                <p className="mb-2 text-[13px] text-muted">{t('settings.departmentsHint')}</p>
+                <div className="flex flex-wrap gap-2" role="group" aria-label={t('settings.departments')}>
+                  {[...depts.list.map((x) => x.slug), ...f.departments.filter((x) => !depts.bySlug.has(x))].map((d) => {
+                    const on = f.departments.includes(d);
+                    return <button key={d} type="button" aria-pressed={on} onClick={() => setF({ ...f, departments: on ? f.departments.filter((x) => x !== d) : [...f.departments, d] })}
+                      className={`h-10 rounded-full border px-4 text-sm font-medium transition active:scale-95 ${on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg'}`}>{depts.label(d)}</button>;
+                  })}
+                </div>
+                {errors.departments && <p className="mt-1 text-sm text-sale">{errors.departments}</p>}
+              </div>
             </div>
+          </Panel>
+          <Panel title={t('settings.deliveryTitle')}>
+            <p className="mb-3 text-sm text-muted">{t('settings.deliveryHint')}</p>
+            <fieldset className="grid gap-2">
+              {[['store', t('settings.deliveryStore'), t('settings.deliveryStoreHint')], ['platform', t('settings.deliveryPlatform'), t('settings.deliveryPlatformHint')]].map(([v, label, hint]) => (
+                <label key={v} className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 ring-1 transition ${f.delivery_mode === v ? 'bg-fg/[0.04] ring-fg' : 'ring-line hover:bg-fg/[0.02]'}`}>
+                  <input type="radio" name="delivery_mode" value={v} checked={f.delivery_mode === v} onChange={() => setF({ ...f, delivery_mode: v })} className="mt-1" />
+                  <span><span className="block text-sm font-semibold">{label}</span><span className="block text-[13px] text-muted">{hint}</span></span>
+                </label>
+              ))}
+            </fieldset>
           </Panel>
           <Panel title={t('settings.contact')}>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -191,6 +214,7 @@ export default function Settings() {
 <div>
                 <ImageSlot label={t('settings.cover')} media={data.store.cover} slot="cover" ratio="16 / 10" onUploaded={onImage('cover')} />
                 <AutoCover onDone={onImage('cover')} />
+                <DesignHelp what="cover" className="mt-3" />
                 <HeroModePicker value={f.hero_mode} onChange={(v) => setF({ ...f, hero_mode: v })} />
               </div>
             </div>

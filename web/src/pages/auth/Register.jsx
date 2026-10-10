@@ -39,7 +39,7 @@ export default function Register() {
 
   return (
     <AuthShell>
-      <h1 className="font-display text-3xl font-medium">{t('auth.registerTitle')}</h1>
+      <h1 className="font-display text-3xl font-bold">{t('auth.registerTitle')}</h1>
       <p className="mt-2 text-muted">{t('auth.registerBody')}</p>
       <form onSubmit={submit} noValidate className="mt-8 space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">

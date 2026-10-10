@@ -2,40 +2,41 @@
 @import '@fontsource/ibm-plex-sans-arabic/500.css';
 @import '@fontsource/ibm-plex-sans-arabic/600.css';
 @import '@fontsource/ibm-plex-sans-arabic/700.css';
-@import '@fontsource/playfair-display/500.css';
-@import '@fontsource/playfair-display/600.css';
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Platform default tokens (marketplace). Stores & dashboard override these via the Theme Engine. */
+/* Banha Outfit brand tokens (marketplace + platform screens).
+   Orange is the brand colour but is NOT used as text on white (3.1:1) — buttons are orange with
+   near-black labels (6:1), and "brand ink" (#B23708, 6.1:1) is the orange used for text/links. */
 :root {
-  --c-background: 250 248 244;
-  --c-surface: 244 241 235;
+  --c-background: 255 255 255;
+  --c-surface: 247 243 237;
   --c-elevated: 255 255 255;
-  --c-text: 20 20 20;
-  --c-muted: 102 98 92;
-  --c-border: 230 226 218;
-  --c-border-strong: 205 199 189;
-  --c-primary: 23 72 59;
-  --c-on-primary: 255 255 255;
-  --c-primary-ink: 23 72 59;
-  --c-secondary: 236 243 239;
-  --c-on-secondary: 20 20 20;
-  --c-accent: 180 83 42;
-  --c-on-accent: 255 255 255;
-  --c-button: 20 20 20;
-  --c-on-button: 255 255 255;
-  --c-button-outline: 20 20 20;
-  --c-header: 250 248 244;
-  --c-on-header: 20 20 20;
+  --c-text: 17 17 17;
+  --c-muted: 85 85 85;
+  --c-border: 229 224 216;
+  --c-border-strong: 190 184 175;
+  --c-primary: 255 90 31;
+  --c-on-primary: 17 17 17;
+  --c-primary-ink: 178 55 8;
+  --c-secondary: 255 237 224;
+  --c-on-secondary: 17 17 17;
+  --c-accent: 255 90 31;
+  --c-on-accent: 17 17 17;
+  --c-button: 255 90 31;
+  --c-on-button: 17 17 17;
+  --c-button-outline: 214 66 12;
+  --c-header: 255 255 255;
+  --c-on-header: 17 17 17;
   --c-footer: 17 17 17;
-  --c-on-footer: 255 255 255;
-  --c-footer-muted: 168 168 168;
+  --c-on-footer: 255 246 236;
+  --c-footer-muted: 176 176 176;
   --c-sale: 198 40 40;
   --c-success: 21 128 61;
-  --c-ring: 23 72 59;
+  --c-ring: 255 90 31;
 
   --header-h: 64px;
   --bottom-nav-h: 64px;
@@ -45,9 +46,11 @@
 
 @layer base {
   html { @apply bg-canvas text-fg antialiased; text-rendering: optimizeLegibility; scroll-behavior: smooth; }
-  body { @apply font-sans text-[15px] leading-relaxed bg-canvas text-fg; font-feature-settings: 'ss01'; min-height: 100dvh; }
-  :lang(ar) body { letter-spacing: 0; }
-  h1, h2, h3, h4 { @apply text-fg; text-wrap: balance; }
+  body { @apply font-sans text-base leading-normal bg-canvas text-fg; min-height: 100dvh; }
+  /* Arabic must never be letter-spaced or fake-italicised: both break the joined letterforms. */
+  :lang(ar), :lang(ar) * { letter-spacing: 0 !important; }
+  :lang(ar) em, :lang(ar) i, :lang(ar) .italic { font-style: normal !important; }
+  h1, h2, h3, h4 { @apply text-fg font-bold leading-snug; text-wrap: balance; }
   p { text-wrap: pretty; }
   img { -webkit-user-drag: none; }
   ::selection { background: rgb(var(--c-primary) / 0.18); }

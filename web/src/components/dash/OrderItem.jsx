@@ -24,7 +24,7 @@ export function OrderCard({ o }) {
     <Link to={`/dashboard/orders/${o.id}`} className="block rounded-2xl border border-line bg-elevated p-4 transition active:scale-[.99] hover:border-line-strong">
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-sm font-semibold" dir="ltr">#{o.number}</span>
-        <StatusBadge status={o.status} t={t} />
+        <span className="flex items-center gap-1.5">{o.deliveryBy === 'platform' && <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-brand">{t('orders.byPlatformShort')}</span>}<StatusBadge status={o.status} t={t} /></span>
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="min-w-0">

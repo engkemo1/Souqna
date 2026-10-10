@@ -52,15 +52,15 @@ function LivePreview({ theme, store, products, device, lang }) {
       <div style={Object.fromEntries(Object.entries(theme.cssVars).filter(([k]) => k.startsWith('--')))} className="bg-canvas text-fg" dir={lang === 'ar' ? 'rtl' : 'ltr'} lang={lang}>
         <div className="bg-footer py-1.5 text-center text-[10px] font-medium text-on-footer">{t('store.freeShippingOver', { v: money(store.freeShippingOver) })}</div>
         <div className="flex items-center justify-between bg-header px-3.5 py-2.5 text-on-header">
-          <div className="flex items-center gap-2"><StoreLogo store={store} size={26} className="h-[26px] w-[26px]" /><span className="font-display text-sm font-semibold">{tr(store.name)}</span></div>
-          {!mobile && <div className="flex gap-3 text-[11px] font-medium opacity-80"><span>{t('store.home')}</span><span>{t('store.shopAll')}</span><span className="text-sale">{t('store.onSale')}</span></div>}
+          <div className="flex items-center gap-2"><StoreLogo store={store} size={26} className="h-[26px] w-[26px]" /><span className="font-display text-sm font-bold">{tr(store.name)}</span></div>
+          {!mobile && <div className="flex gap-3 text-xs font-medium opacity-80"><span>{t('store.home')}</span><span>{t('store.shopAll')}</span><span className="text-sale">{t('store.onSale')}</span></div>}
           <div className="flex items-center gap-2.5"><Search className="h-3.5 w-3.5" /><Heart className="h-3.5 w-3.5" /><span className="relative"><ShoppingBag className="h-3.5 w-3.5" /><span className="absolute -end-1.5 -top-1.5 grid h-3 min-w-3 place-items-center rounded-full bg-accent px-0.5 text-[7px] font-bold text-on-accent">2</span></span></div>
         </div>
         <div className="bg-secondary px-5 py-6 text-on-secondary">
           <p className="text-[9px] font-semibold tracking-[0.2em] opacity-70">{lang === 'ar' ? 'الموسم الجديد' : 'NEW SEASON'}</p>
-          <p className="mt-1 font-display text-xl font-medium leading-tight">{t('theme.previewHero')}</p>
-          <span className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-btn-outline bg-btn px-3 py-1.5 text-[11px] font-semibold text-on-btn">{t('store.shopAll')}<ArrowRight className="h-3 w-3 rtl:-scale-x-100" /></span>
-          <span className="ms-2 inline-flex rounded-lg border border-line-strong px-3 py-1.5 text-[11px] font-semibold text-brand">{t('store.newArrivals')}</span>
+          <p className="mt-1 font-display text-xl font-bold leading-tight">{t('theme.previewHero')}</p>
+          <span className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-btn-outline bg-btn px-3 py-1.5 text-xs font-semibold text-on-btn">{t('store.shopAll')}<ArrowRight className="h-3 w-3 rtl:-scale-x-100" /></span>
+          <span className="ms-2 inline-flex rounded-lg border border-line-strong px-3 py-1.5 text-xs font-semibold text-brand">{t('store.newArrivals')}</span>
         </div>
         <div className={cx('grid gap-3 p-3.5', mobile ? 'grid-cols-2' : 'grid-cols-3')}>
           {(products?.length ? products : [null, null, null]).slice(0, mobile ? 2 : 3).map((p, i) => (
@@ -70,19 +70,19 @@ function LivePreview({ theme, store, products, device, lang }) {
                 {i === 0 && <span className="absolute start-1.5 top-1.5 rounded-full bg-sale px-1.5 py-0.5 text-[8px] font-bold text-white">-20%</span>}
                 {i === 1 && <span className="absolute start-1.5 top-1.5 rounded-full bg-accent px-1.5 py-0.5 text-[8px] font-bold text-on-accent">{t('product.new')}</span>}
               </div>
-              <p className="mt-1.5 truncate text-[11px] font-medium">{p ? tr(p.name) : t('theme.previewProduct')}</p>
-              <p className="text-[11px] font-semibold"><span className={i === 0 ? 'text-sale' : ''}>{money(p?.price || 799)}</span>{i === 0 && <span className="ms-1 text-[9px] font-normal text-muted line-through">{money(Math.round((p?.price || 799) * 1.25))}</span>}</p>
+              <p className="mt-1.5 truncate text-xs font-medium">{p ? tr(p.name) : t('theme.previewProduct')}</p>
+              <p className="text-xs font-semibold"><span className={i === 0 ? 'text-sale' : ''}>{money(p?.price || 799)}</span>{i === 0 && <span className="ms-1 text-[9px] font-normal text-muted line-through">{money(Math.round((p?.price || 799) * 1.25))}</span>}</p>
             </div>
           ))}
         </div>
         <div className="px-3.5 pb-3.5">
           <div className="flex items-center justify-between rounded-xl border border-line bg-elevated p-2.5">
-            <span className="text-[11px] text-muted">{t('cart.total')}</span><span className="text-xs font-semibold">{money(1598)}</span>
+            <span className="text-xs text-muted">{t('cart.total')}</span><span className="text-xs font-semibold">{money(1598)}</span>
           </div>
-          <span className="mt-2 block rounded-lg border border-btn-outline bg-btn py-2 text-center text-[11px] font-semibold text-on-btn">{t('cart.checkout')}</span>
+          <span className="mt-2 block rounded-lg border border-btn-outline bg-btn py-2 text-center text-xs font-semibold text-on-btn">{t('cart.checkout')}</span>
         </div>
         <div className="bg-footer px-4 py-4 text-on-footer">
-          <p className="font-display text-sm font-semibold">{tr(store.name)}</p>
+          <p className="font-display text-sm font-bold">{tr(store.name)}</p>
           <p className="mt-1 text-[10px] text-footer-muted">{t('store.cod')} · {t('store.exchange')}</p>
         </div>
       </div>

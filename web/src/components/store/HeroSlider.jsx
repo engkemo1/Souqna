@@ -120,11 +120,11 @@ export default function HeroSlider({ banners, slug }) {
                   {tr(b.eyebrow) && (
                     <motion.p variants={item} className={cx('mb-3 text-xs font-semibold tracking-[0.2em] sm:mb-4 sm:text-[13px]', light ? 'text-neutral-600' : 'text-white/85')}>{tr(b.eyebrow)}</motion.p>
                   )}
-                  <motion.h2 variants={item} className={cx('font-display font-medium', center ? 'text-display-sm lg:text-[3.25rem] lg:leading-[1.05]' : 'text-display', light ? 'text-neutral-900' : 'text-white')}>{tr(b.title)}</motion.h2>
-                  {tr(b.subtitle) && <motion.p variants={item} className={cx('mt-3 text-[15px] leading-relaxed sm:mt-5 sm:text-lg', light ? 'text-neutral-700' : 'text-white/85')}>{tr(b.subtitle)}</motion.p>}
+                  <motion.h2 variants={item} className={cx('font-display font-bold', center ? 'text-display-sm lg:text-[3.25rem] lg:leading-[1.05]' : 'text-display', light ? 'text-neutral-900' : 'text-white')}>{tr(b.title)}</motion.h2>
+                  {tr(b.subtitle) && <motion.p variants={item} className={cx('mt-3 text-base leading-relaxed sm:mt-5 sm:text-lg', light ? 'text-neutral-700' : 'text-white/85')}>{tr(b.subtitle)}</motion.p>}
                   {tr(b.cta) && (
                     <motion.div variants={item} className="mt-6 sm:mt-8">
-                      <Link to={link} className={cx('group/cta inline-flex h-12 items-center gap-2.5 rounded-full px-7 text-[15px] font-semibold shadow-sm transition active:scale-[.97]',
+                      <Link to={link} className={cx('group/cta inline-flex h-12 items-center gap-2.5 rounded-full px-7 text-base font-semibold shadow-sm transition active:scale-[.97]',
                         light ? 'bg-neutral-900 text-white hover:bg-neutral-800' : 'bg-white text-neutral-900 hover:bg-white/90')}>
                         {tr(b.cta)}
                         <ArrowRight className="h-4 w-4 transition-transform group-hover/cta:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover/cta:-translate-x-0.5" />

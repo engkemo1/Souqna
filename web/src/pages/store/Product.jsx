@@ -25,14 +25,14 @@ function Accordion({ title, children, defaultOpen }) {
   const [open, setOpen] = useState(!!defaultOpen);
   return (
     <div className="border-b border-line">
-      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between py-4 text-start text-[15px] font-semibold">
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="flex w-full items-center justify-between py-4 text-start text-base font-semibold">
         {title}
         <ChevronDown className={cx('h-5 w-5 transition-transform duration-300', open && 'rotate-180')} />
       </button>
       <AnimatePresence initial={false}>
         {open && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="overflow-hidden">
-            <div className="pb-5 text-[15px] leading-relaxed text-muted">{children}</div>
+            <div className="pb-5 text-base leading-relaxed text-muted">{children}</div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -167,7 +167,7 @@ export default function Product() {
                 {p.isNew && <span className="rounded-full bg-fg px-2.5 py-0.5 text-xs font-semibold text-canvas">{t('product.new')}</span>}
                 {p.category && <Link to={sp(store.slug, `shop?category=${p.category.slug}`)} className="text-xs font-medium text-muted hover:text-fg">{tr(p.category.name)}</Link>}
               </div>
-              <h1 className="font-display text-[1.65rem] font-medium leading-tight sm:text-3xl xl:text-[2.1rem]">{tr(p.name)}</h1>
+              <h1 className="font-display text-[1.65rem] font-bold leading-tight sm:text-3xl xl:text-[2.1rem]">{tr(p.name)}</h1>
               <div className="mt-2.5 flex items-center gap-1.5 text-sm">
                 <span className="flex">{[1, 2, 3, 4, 5].map((i) => <Star key={i} className={cx('h-4 w-4', i <= Math.round(p.rating) ? 'fill-amber-400 text-amber-400' : 'text-line-strong')} />)}</span>
                 <span className="font-semibold">{p.rating}</span>

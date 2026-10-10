@@ -17,7 +17,7 @@ export function EmptyState({ icon: Icon = SearchX, title, body, action, classNam
         </div>
       )}
       <h3 className="text-lg font-semibold">{title}</h3>
-      {body && <p className="mt-2 text-[15px] leading-relaxed text-muted">{body}</p>}
+      {body && <p className="mt-2 text-base leading-relaxed text-muted">{body}</p>}
       {action && <div className="mt-6">{action}</div>}
     </motion.div>
   );

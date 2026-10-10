@@ -1,3 +1,4 @@
+import { decodeDepartments } from '@souqna/shared';
 import { buildTheme } from '@souqna/shared';
 import { q, json } from '../db/index.js';
 import { mediaMap, getMedia, serializeMedia } from './media.js';
@@ -15,6 +16,8 @@ export function serializeStore(s, { withTheme = true } = {}) {
     description: bi(s, 'description'),
     address: bi(s, 'address'),
     category: s.category,
+    departments: decodeDepartments(s.departments),
+    deliveryMode: s.delivery_mode === 'platform' ? 'platform' : 'store',
     city: s.city,
     phone: s.phone,
     whatsapp: s.whatsapp,

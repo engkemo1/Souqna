@@ -4,6 +4,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useNav } from './DashboardLayout.jsx';
 import { StoreLogo } from '../../components/store/StoreChrome.jsx';
+import AppAlertsCard from '../../components/dash/AppAlertsCard.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 
 export default function More() {
@@ -18,6 +19,7 @@ export default function More() {
         <div className="min-w-0 flex-1"><p className="truncate text-lg font-semibold">{tr(store.name)}</p><p className="truncate text-sm text-muted">{user.email}</p></div>
         <a href={`/s/${store.slug}`} target="_blank" rel="noreferrer" aria-label={t('dash.viewStore')} className="grid h-11 w-11 place-items-center rounded-full bg-secondary text-brand"><ExternalLink className="h-5 w-5" /></a>
       </div>
+      <AppAlertsCard className="mb-5" />
       {nav.map((g, i) => (
         <div key={i} className="mb-5">
           {g.group && <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted">{g.group}</p>}

@@ -1,7 +1,7 @@
 /** Platform admin page at /admin. Talks to /api/admin with the key typed in (kept in memory only). */
 export const ADMIN_HTML = `<!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="/favicon.svg"><title>BanhaLook · الإدارة</title>
+<link rel="icon" href="/favicon.svg"><title>Banha Outfit · الإدارة</title>
 <style>
 :root{--gold:#C9A24D;--ink:#141416}
 body{font-family:system-ui,Tahoma,sans-serif;background:#f4f2ee;margin:0;padding:20px;color:#1b1b1b}
@@ -18,7 +18,7 @@ button{padding:6px 11px;border-radius:8px;border:0;background:var(--ink);color:#
 .err{color:#b00020;margin-top:8px}.good{color:#0d6e55;margin-top:8px;word-break:break-all}
 .link{background:#f7f3e8;border:1px dashed var(--gold);border-radius:10px;padding:10px;margin-top:10px;word-break:break-all;font-size:13px}
 </style></head><body>
-<header><img src="/favicon.svg" alt=""><div><h1>BanhaLook · لوحة الإدارة</h1><div class="muted" id="status"></div></div></header>
+<header><img src="/favicon.svg" alt=""><div><h1>Banha Outfit · لوحة الإدارة</h1><div class="muted" id="status"></div></div></header>
 
 <div class="card">
   <label>مفتاح الإدارة <input id="key" type="password" autocomplete="off" style="max-width:320px"></label>
@@ -39,7 +39,7 @@ button{padding:6px 11px;border-radius:8px;border:0;background:var(--ink);color:#
     <label>لينك اللوكيشن (جوجل ماب)<input name="map_url" type="url" placeholder="https://maps.app.goo.gl/..."></label>
     <label>بيفتح الساعة<input name="opens_at" type="time" value="10:00"></label>
     <label>بيقفل الساعة<input name="closes_at" type="time" value="23:00"></label>
-    <label>نوع المحل<select name="category"><option value="mixed">متنوع</option><option value="men">رجالي</option><option value="women">حريمي</option><option value="kids">أطفال</option><option value="denim">جينز</option><option value="sports">رياضي</option><option value="accessories">إكسسوارات</option></select></label>
+    <fieldset style="border:0;padding:0;margin:0"><legend>أقسام المحل (اختار واحد أو أكتر)</legend><div style="display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:6px"><label class="chk"><input type="checkbox" name="dept" value="women"> حريمي</label><label class="chk"><input type="checkbox" name="dept" value="men"> رجالي</label><label class="chk"><input type="checkbox" name="dept" value="kids"> أطفال</label><label class="chk"><input type="checkbox" name="dept" value="shoes"> كوتشيات وأحذية</label><label class="chk"><input type="checkbox" name="dept" value="bags"> شنط</label><label class="chk"><input type="checkbox" name="dept" value="hijab"> طرح وحجاب</label><label class="chk"><input type="checkbox" name="dept" value="abaya"> عبايات</label><label class="chk"><input type="checkbox" name="dept" value="jalabiya"> جلاليب</label><label class="chk"><input type="checkbox" name="dept" value="underwear"> ملابس داخلية</label><label class="chk"><input type="checkbox" name="dept" value="wedding_dress"> فساتين أفراح</label><label class="chk"><input type="checkbox" name="dept" value="wedding_suit"> بدل أفراح</label><label class="chk"><input type="checkbox" name="dept" value="sports"> رياضي</label><label class="chk"><input type="checkbox" name="dept" value="denim"> جينز</label><label class="chk"><input type="checkbox" name="dept" value="accessories"> إكسسوارات</label></div></fieldset>
     <label style="align-content:end"><span><input type="checkbox" name="auto_whatsapp"> إشعار واتساب تلقائي</span></label>
     <div style="align-self:end"><button type="submit" class="gold">إنشاء المحل + لينك التفعيل</button></div>
   </form>
@@ -53,6 +53,13 @@ button{padding:6px 11px;border-radius:8px;border:0;background:var(--ink);color:#
     <thead><tr><th>ترتيب</th><th>المحل</th><th>الصاحب</th><th>منتجات</th><th>طلبات</th><th>في الرئيسية</th><th>مميز</th><th>واتساب تلقائي</th><th>إجراءات</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
+</div>
+
+<div class="card" id="delivBox" hidden>
+  <h2>🚚 طلبات التوصيل علينا</h2>
+  <div class="muted">الطلبات اللي المحل حوّلها لنا أو مفعّل "بنها أوتفيت توصّل". نستلم لما الحالة "جاهز"، وبعدها نسلّم للعميل ونحصّل المبلغ (كاش).</div>
+  <table><thead><tr><th>الطلب</th><th>المحل (الاستلام)</th><th>العميل (التسليم)</th><th>نحصّل</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="delivRows"></tbody></table>
+  <div class="muted" id="delivEmpty" hidden>مفيش طلبات توصيل دلوقتي.</div>
 </div>
 
 <div class="card" id="prodBox" hidden>
@@ -141,12 +148,32 @@ async function loadProducts(s) {
     $('prodBox').hidden = false; $('prodBox').scrollIntoView({ behavior: 'smooth' });
   } catch (e) { fail(e); }
 }
+const STATUS_AR = { pending: 'جديد (المحل لسه مأكدش)', confirmed: 'اتأكد — المحل بيجهزه', processing: 'جاهز للاستلام ✅', shipped: 'معانا في الطريق' };
+async function loadDeliveries() {
+  const { orders } = await call('/deliveries');
+  const tb = $('delivRows'); tb.innerHTML = '';
+  $('delivEmpty').hidden = orders.length > 0;
+  for (const o of orders) {
+    const tr = document.createElement('tr');
+    cell(tr, '#' + o.number);
+    cell(tr, o.store_name + ' · ' + (o.store_phone || '') + ' · ' + (o.store_address || ''));
+    cell(tr, o.customer_name + ' · ' + o.phone + ' · ' + [o.governorate, o.city, o.address].filter(Boolean).join('، '));
+    cell(tr, o.total + ' ج.م');
+    cell(tr, STATUS_AR[o.status] || o.status);
+    const td = cell(tr);
+    if (o.status === 'processing') td.appendChild(btn('استلمناه من المحل', 'gold', async () => { try { await call('/orders/' + o.id + '/status', { method: 'PATCH', body: { status: 'shipped' } }); await loadDeliveries(); } catch (e) { fail(e); } }));
+    if (o.status === 'shipped') td.appendChild(btn('تم التسليم للعميل', 'ok', async () => { try { await call('/orders/' + o.id + '/status', { method: 'PATCH', body: { status: 'delivered' } }); await loadDeliveries(); } catch (e) { fail(e); } }));
+    tb.appendChild(tr);
+  }
+  $('delivBox').hidden = false;
+}
 async function load() {
   $('err').textContent = '';
   const st = await call('/status');
   $('status').textContent = 'واتساب API: ' + (st.whatsappConfigured ? 'متوصل' : 'غير متوصل') + ' · قالب: ' + st.template + ' · التسجيل العام: ' + (st.registrationOpen ? 'مفتوح' : 'مقفول');
   paintRows((await call('/stores')).stores);
   $('createBox').hidden = false; $('listBox').hidden = false;
+  await loadDeliveries();
 }
 $('load').onclick = async () => {
   key = $('key').value.trim();
@@ -156,7 +183,9 @@ $('createForm').onsubmit = async (e) => {
   e.preventDefault();
   $('createErr').textContent = '';
   const f = new FormData(e.target);
-  const body = Object.fromEntries([...f.entries()].filter(([k, v]) => v !== '' && k !== 'auto_whatsapp'));
+  const body = Object.fromEntries([...f.entries()].filter(([k, v]) => v !== '' && k !== 'auto_whatsapp' && k !== 'dept'));
+  body.departments = f.getAll('dept');
+  if (!body.departments.length) { $('createErr').textContent = 'اختار قسم واحد على الأقل'; return; }
   body.auto_whatsapp = f.get('auto_whatsapp') === 'on';
   try {
     const r = await call('/stores', { method: 'POST', body });

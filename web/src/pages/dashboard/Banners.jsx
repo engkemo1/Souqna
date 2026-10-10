@@ -6,6 +6,7 @@ import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { PageHeader, ListSkeleton } from '../../components/dash/Kit.jsx';
+import DesignHelp from '../../components/dash/DesignHelp.jsx';
 import MediaUploader from '../../components/dash/MediaUploader.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -30,7 +31,7 @@ function Preview({ f, device, lang }) {
       <div className={cx('absolute inset-0 flex p-4', device === 'mobile' ? (light ? 'items-start justify-center text-center' : 'items-end justify-center text-center') : f.align === 'center' ? 'items-center justify-center text-center' : 'items-center')}>
         <div className={cx('max-w-[60%]', device === 'mobile' && 'max-w-full', light ? 'text-neutral-900' : 'text-white')}>
           {eyebrow && <p className="text-[9px] font-semibold tracking-widest opacity-80">{eyebrow}</p>}
-          <p className="font-display text-base font-medium leading-tight sm:text-lg">{title || '—'}</p>
+          <p className="font-display text-base font-bold leading-tight sm:text-lg">{title || '—'}</p>
           {cta && <span className={cx('mt-2 inline-block rounded-full px-3 py-1 text-[10px] font-semibold', light ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900')}>{cta}</span>}
         </div>
       </div>
@@ -93,6 +94,7 @@ function BannerForm({ open, banner, onClose, onSaved, categories }) {
             <MediaUploader value={f.mobile} onChange={(m) => setF((x) => ({ ...x, mobile: m.slice(-1) }))} kind="banner" max={1} />
           </Field>
         </div>
+        <DesignHelp what="banner" />
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={`${t('banners.eyebrow')} (AR)`}><Input dir="rtl" value={f.eyebrow_ar} onChange={set('eyebrow_ar')} /></Field>
           <Field label={`${t('banners.eyebrow')} (EN)`}><Input dir="ltr" value={f.eyebrow_en} onChange={set('eyebrow_en')} /></Field>

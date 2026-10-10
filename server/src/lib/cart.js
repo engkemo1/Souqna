@@ -15,11 +15,31 @@ export function findCoupon(storeId, code) {
   return { offer: o };
 }
 
+const dayOk = (o, d) => (o.starts_at && o.starts_at > d ? 'coupon_not_started' : o.ends_at && o.ends_at < d ? 'coupon_expired' : o.usage_limit && o.usage_count >= o.usage_limit ? 'coupon_used_up' : null);
+const normPhone = (v) => String(v || '').replace(/\D/g, '');
+
+/** Platform-wide coupon (funded by Banha Outfit). `phone` is optional while browsing; it is enforced when the order is placed. */
+export function findPlatformCoupon(code, phone) {
+  if (!code) return null;
+  const o = q.get('SELECT * FROM platform_coupons WHERE UPPER(code)=UPPER(?) AND active=1', [String(code).trim()]);
+  if (!o) return { error: 'coupon_invalid' };
+  const err = dayOk(o, today());
+  if (err) return { error: err };
+  const ph = normPhone(phone);
+  if (ph) {
+    const prior = q.val("SELECT COUNT(*) FROM orders WHERE phone=? AND status<>'cancelled'", [ph]);
+    if (o.first_order_only && prior > 0) return { error: 'coupon_first_order_only' };
+    const used = q.val("SELECT COUNT(*) FROM orders WHERE phone=? AND UPPER(coupon_code)=UPPER(?) AND status<>'cancelled'", [ph, o.code]);
+    if (used >= (o.per_phone_limit || 1)) return { error: 'coupon_already_used' };
+  }
+  return { offer: o, platform: true };
+}
+
 /**
  * Prices are always re-read from the database — the client only sends ids & quantities.
  * Returns a quote with per-line availability so the cart UI can explain problems.
  */
-export function quote(store, items = [], couponCode) {
+export function quote(store, items = [], couponCode, { phone } = {}) {
   if (!Array.isArray(items) || !items.length) throw badRequest('cart_empty', 'Your cart is empty.');
   const lines = [];
   for (const it of items.slice(0, 50)) {
@@ -53,16 +73,20 @@ export function quote(store, items = [], couponCode) {
   let freeShipping = subtotal >= store.free_shipping_over;
   let coupon = null;
   let couponError = null;
+  let platformDiscount = 0;
   if (couponCode) {
-    const r = findCoupon(store.id, couponCode);
+    let r = findCoupon(store.id, couponCode);
+    if (r.error === 'coupon_invalid') r = findPlatformCoupon(couponCode, phone); // not a store code → try a Banha Outfit code
     if (r.error) couponError = r.error;
     else if (subtotal < r.offer.min_subtotal) couponError = 'coupon_min_subtotal';
     else {
       const o = r.offer;
-      if (o.type === 'percentage') discount = Math.round((subtotal * o.value) / 100);
+      const alreadyFree = freeShipping;
+      if (o.type === 'percentage') { discount = Math.round((subtotal * o.value) / 100); if (o.max_discount) discount = Math.min(discount, o.max_discount); }
       if (o.type === 'fixed') discount = Math.min(subtotal, o.value);
       if (o.type === 'free_shipping') freeShipping = true;
-      coupon = { code: o.code, type: o.type, value: o.value, title: bi(o, 'title'), minSubtotal: o.min_subtotal, id: o.id };
+      coupon = { code: o.code, type: o.type, value: o.value, title: bi(o, 'title'), minSubtotal: o.min_subtotal, id: o.id, source: r.platform ? 'platform' : 'store' };
+      if (r.platform) platformDiscount = discount + (o.type === 'free_shipping' && !alreadyFree && subtotal > 0 ? store.shipping_fee : 0);
     }
   }
   const shipping = freeShipping || subtotal === 0 ? 0 : store.shipping_fee;
@@ -74,7 +98,8 @@ export function quote(store, items = [], couponCode) {
     total: Math.max(0, subtotal - discount + shipping),
     coupon,
     couponError,
-    couponMinSubtotal: couponError === 'coupon_min_subtotal' ? findCoupon(store.id, couponCode)?.offer?.min_subtotal : undefined,
+    platformDiscount,
+    couponMinSubtotal: couponError === 'coupon_min_subtotal' ? (findCoupon(store.id, couponCode)?.offer || findPlatformCoupon(couponCode, phone)?.offer)?.min_subtotal : undefined,
     freeShippingOver: store.free_shipping_over,
     hasErrors: lines.some((l) => l.error),
   };

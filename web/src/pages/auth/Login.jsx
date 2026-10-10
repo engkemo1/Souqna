@@ -38,7 +38,7 @@ export default function Login() {
 
   return (
     <AuthShell>
-      <h1 className="font-display text-3xl font-medium">{t('auth.loginTitle')}</h1>
+      <h1 className="font-display text-3xl font-bold">{t('auth.loginTitle')}</h1>
       <p className="mt-2 text-muted">{t('auth.loginBody')}</p>
 
       <button type="button" onClick={demo} disabled={busy}
@@ -60,7 +60,7 @@ export default function Login() {
         {error && !Object.keys(fe).length && <p role="alert" className="rounded-xl bg-sale/10 px-4 py-3 text-sm font-medium text-sale">{errorMessage(t, error)}</p>}
         <Button type="submit" full size="lg" loading={busy}>{t('auth.signIn')}</Button>
       </form>
-      <p className="mt-8 text-center text-sm text-muted">BanhaLook · بنها لوك</p>
+      <p className="mt-8 text-center text-sm text-muted">Banha Outfit · بنها أوتفيت</p>
     </AuthShell>
   );
 }

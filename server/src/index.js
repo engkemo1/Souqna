@@ -10,7 +10,6 @@ import publicRoutes from './routes/public.js';
 import ownerRoutes from './routes/owner.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
-import { ADMIN_HTML } from './lib/adminPage.js';
 import { errorHandler } from './lib/errors.js';
 
 const app = express();
@@ -27,17 +26,18 @@ app.use('/media', express.static(config.mediaDir, { immutable: true, maxAge: '36
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
-app.get('/admin', (_req, res) => res.type('html').send(ADMIN_HTML));
 app.use('/api/owner', ownerRoutes);
 app.use('/api', publicRoutes);
 app.use('/api', (_req, res) => res.status(404).json({ error: { code: 'not_found', message: 'Not found' } }));
 
 // Serve the built web app (single-origin deployment).
 if (fs.existsSync(config.webDist)) {
-  app.use(express.static(config.webDist, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); } }));
+  app.use(express.static(config.webDist, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); if (/\/(sw\.js|manifest\.webmanifest|offline\.html)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
   app.get('*', (_req, res) => res.sendFile(path.join(config.webDist, 'index.html')));
 }
 
 app.use(errorHandler);
 
-app.listen(config.port, () => console.log(`BanhaLook API ready on http://localhost:${config.port}`));
+import('./db/index.js').then(({ q }) => q.run("UPDATE users SET role='demo' WHERE email=? AND role='owner'", [config.demoEmail]));
+import('./lib/backup.js').then((m) => m.startBackupSchedule());
+app.listen(config.port, () => console.log(`Banha Outfit API ready on http://localhost:${config.port}`));

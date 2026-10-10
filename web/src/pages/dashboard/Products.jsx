@@ -5,6 +5,7 @@ import { useApi, useDebounced, useIsDesktop, invalidate } from '../../lib/hooks.
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
+import { useDashBase } from '../../lib/dashBase.js';
 import { formatMoney, formatNumber } from '../../lib/format.js';
 import { PageHeader, FilterTabs, Pagination, SearchInput, ListSkeleton } from '../../components/dash/Kit.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
@@ -33,6 +34,7 @@ function StatusPill({ status, t }) {
 
 /** Bottom-sheet quick edit: price, compare-at, status and stock per variant — built for phones. */
 function QuickEdit({ product, onClose, onSaved }) {
+  const base = useDashBase();
   const { t, tr, lang } = useI18n();
   const toast = useToast();
   const { data } = useApi(product ? `/owner/products/${product.id}` : null, { keepPrevious: false });
@@ -83,7 +85,7 @@ function QuickEdit({ product, onClose, onSaved }) {
 
   return (
     <Sheet open={!!product} onClose={onClose} title={t('products.quickEdit')} description={tr(product.name)} side="auto" desktop="end" size="md"
-      footer={<div className="flex gap-3"><Button variant="outline" to={`/dashboard/products/${product.id}`} icon={Pencil}>{t('common.edit')}</Button><Button full onClick={save} loading={busy}>{t('common.save')}</Button></div>}>
+      footer={<div className="flex gap-3"><Button variant="outline" to={`${base}/products/${product.id}`} icon={Pencil}>{t('common.edit')}</Button><Button full onClick={save} loading={busy}>{t('common.save')}</Button></div>}>
       <div className="space-y-5 py-4">
         <div className="flex items-center gap-3 rounded-2xl bg-surface p-3">
           <SmartImage media={product.image} ratio="1 / 1" sizes="56px" className="h-14 w-14 shrink-0 rounded-xl" />
@@ -122,6 +124,7 @@ function QuickEdit({ product, onClose, onSaved }) {
 }
 
 export default function Products() {
+  const base = useDashBase();
   const { t, tr, lang } = useI18n();
   const { store } = useAuth();
   const toast = useToast();
@@ -170,10 +173,10 @@ export default function Products() {
   return (
     <PageTransition>
       <PageHeader title={t('products.title')} subtitle={c ? `${formatNumber(c.all, lang)} ${t('dash.totalProducts')}` : ' '}
-        actions={<Button icon={Plus} to="/dashboard/products/new" className="hidden md:inline-flex">{t('products.add')}</Button>} />
+        actions={<Button icon={Plus} to={`${base}/products/new`} className="hidden md:inline-flex">{t('products.add')}</Button>} />
 
       {noProductsAtAll ? (
-        <EmptyState icon={Package} title={t('products.empty')} body={t('products.emptyBody')} action={<Button size="lg" icon={Plus} to="/dashboard/products/new">{t('products.add')}</Button>} />
+        <EmptyState icon={Package} title={t('products.empty')} body={t('products.emptyBody')} action={<Button size="lg" icon={Plus} to={`${base}/products/new`}>{t('products.add')}</Button>} />
       ) : (
         <>
           <FilterTabs value={tab} onChange={setTab} options={[
@@ -217,7 +220,7 @@ export default function Products() {
                       {data.items.map((p) => (
                         <tr key={p.id} className="group transition hover:bg-fg/[0.02]">
                           <td className="py-3 ps-5">
-                            <Link to={`/dashboard/products/${p.id}`} className="flex items-center gap-3.5">
+                            <Link to={`${base}/products/${p.id}`} className="flex items-center gap-3.5">
                               <SmartImage media={p.image} ratio="4 / 5" sizes="56px" className="w-12 shrink-0 rounded-lg" />
                               <span className="min-w-0"><span className="block max-w-[320px] truncate font-medium group-hover:text-brand">{tr(p.name)}</span>
                                 <span className="block text-[13px] text-muted">{p.category ? tr(p.category) : '—'}{p.variantCount ? ` · ${t('products.variants', { n: p.variantCount })}` : ''}</span></span>
@@ -230,7 +233,7 @@ export default function Products() {
                           <td className="py-3 pe-5">
                             <div className="flex justify-end gap-1 opacity-60 transition group-hover:opacity-100">
                               <IconButton size="sm" label={t('products.quickEdit')} icon={Zap} onClick={() => setQuick(p)} iconClass="h-[18px] w-[18px]" />
-                              <IconButton size="sm" label={t('common.edit')} icon={Pencil} to={`/dashboard/products/${p.id}`} iconClass="h-[18px] w-[18px]" />
+                              <IconButton size="sm" label={t('common.edit')} icon={Pencil} to={`${base}/products/${p.id}`} iconClass="h-[18px] w-[18px]" />
                               <IconButton size="sm" label={t('common.delete')} icon={Trash2} onClick={() => setDel(p)} iconClass="h-[18px] w-[18px] text-sale" />
                             </div>
                           </td>
@@ -243,7 +246,7 @@ export default function Products() {
                 <div className={cx('grid gap-3', desktop ? 'grid-cols-4 gap-5 xl:grid-cols-5' : 'sm:grid-cols-2')}>
                   {data.items.map((p) => desktop ? (
                     <div key={p.id} className="group overflow-hidden rounded-2xl border border-line bg-elevated">
-                      <Link to={`/dashboard/products/${p.id}`} className="relative block"><SmartImage media={p.image} ratio="4 / 5" sizes="20vw" imgClassName="group-hover:scale-[1.03]" />
+                      <Link to={`${base}/products/${p.id}`} className="relative block"><SmartImage media={p.image} ratio="4 / 5" sizes="20vw" imgClassName="group-hover:scale-[1.03]" />
                         <span className="absolute start-2.5 top-2.5"><StatusPill status={p.status} t={t} /></span></Link>
                       <div className="p-3.5">
                         <p className="truncate font-medium">{tr(p.name)}</p>
@@ -253,8 +256,8 @@ export default function Products() {
                     </div>
                   ) : (
                     <div key={p.id} className="flex items-center gap-3.5 rounded-2xl border border-line bg-elevated p-3">
-                      <Link to={`/dashboard/products/${p.id}`} className="shrink-0"><SmartImage media={p.image} ratio="4 / 5" sizes="80px" className="w-[68px] rounded-xl" /></Link>
-                      <Link to={`/dashboard/products/${p.id}`} className="min-w-0 flex-1">
+                      <Link to={`${base}/products/${p.id}`} className="shrink-0"><SmartImage media={p.image} ratio="4 / 5" sizes="80px" className="w-[68px] rounded-xl" /></Link>
+                      <Link to={`${base}/products/${p.id}`} className="min-w-0 flex-1">
                         <p className="truncate font-medium">{tr(p.name)}</p>
                         <p className="mt-0.5 font-semibold tabular">{formatMoney(p.price, lang)}{p.compareAt && <span className="ms-2 text-xs font-normal text-muted line-through">{formatMoney(p.compareAt, lang)}</span>}</p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">{p.status !== 'active' && <StatusPill status={p.status} t={t} />}<StockPill p={p} t={t} lang={lang} /></div>

@@ -4,8 +4,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Images, FolderTree, Palette, Settings, LogOut, ExternalLink, Plus, Menu,
-} from 'lucide-react';
+  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Images, FolderTree, Palette, Settings, LogOut, ExternalLink, Plus, Menu, Camera } from 'lucide-react';
 import { useAuth } from '../../lib/auth.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
@@ -30,6 +29,7 @@ export function useNav() {
       { to: '/dashboard/offers', icon: TicketPercent, label: t('dash.offers') },
       { to: '/dashboard/banners', icon: Images, label: t('dash.banners') },
       { to: '/dashboard/categories', icon: FolderTree, label: t('dash.categories') },
+      { to: '/dashboard/services', icon: Camera, label: t('dash.services') },
     ] },
     { group: t('dash.store'), items: [
       { to: '/dashboard/theme', icon: Palette, label: t('dash.theme') },
@@ -45,8 +45,8 @@ function Sidebar({ pending }) {
   return (
     <aside className="fixed inset-y-0 start-0 z-30 hidden w-[76px] flex-col border-e border-line bg-elevated md:flex lg:w-[264px]">
       <div className="flex h-[72px] items-center gap-2.5 px-5 lg:px-6">
-        <BrandMark className="h-9 w-9" />
-        <span className="hidden font-display text-xl font-semibold lg:block">{t('app.name')}</span>
+        <BrandMark className="h-8 w-auto" />
+        <span className="hidden font-display text-xl font-bold lg:block">{t('app.name')}</span>
       </div>
       <div className="mx-3 mb-3 hidden rounded-2xl border border-line bg-surface p-3 lg:block">
         <div className="flex items-center gap-3">
@@ -60,7 +60,7 @@ function Sidebar({ pending }) {
       <nav className="no-scrollbar flex-1 overflow-y-auto px-3 pb-4">
         {nav.map((g, gi) => (
           <div key={gi} className={cx(gi > 0 && 'mt-5')}>
-            {g.group && <p className="mb-1.5 hidden px-3 text-[11px] font-semibold uppercase tracking-wider text-muted lg:block">{g.group}</p>}
+            {g.group && <p className="mb-1.5 hidden px-3 text-xs font-semibold uppercase tracking-wider text-muted lg:block">{g.group}</p>}
             {gi > 0 && <div className="mx-3 mb-3 h-px bg-line lg:hidden" />}
             <ul className="space-y-0.5">
               {g.items.map((it) => (
@@ -74,7 +74,7 @@ function Sidebar({ pending }) {
                         <it.icon className="relative h-5 w-5 shrink-0" strokeWidth={isActive ? 2.1 : 1.75} />
                         <span className="relative hidden lg:block">{it.label}</span>
                         {it.badge === 'pending' && pending > 0 && (
-                          <span className="relative ms-auto hidden h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-[11px] font-bold text-on-accent lg:grid">{pending}</span>
+                          <span className="relative ms-auto hidden h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-xs font-bold text-on-accent lg:grid">{pending}</span>
                         )}
                         {it.badge === 'pending' && pending > 0 && <span className="absolute end-2.5 top-2.5 h-2 w-2 rounded-full bg-accent ring-2 ring-elevated lg:hidden" />}
                       </>
@@ -109,7 +109,7 @@ function MobileTop() {
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-line bg-elevated/90 px-4 backdrop-blur-md md:hidden">
       <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5">
         <StoreLogo store={store} size={32} className="h-8 w-8" />
-        <span className="truncate text-[15px] font-semibold">{tr(store.name)}</span>
+        <span className="truncate text-base font-semibold">{tr(store.name)}</span>
       </Link>
       <div className="flex items-center">
         <LangToggle compact />
@@ -139,7 +139,7 @@ function MobileNav({ pending }) {
           </li>
         ) : (
           <li key={i}>
-            <NavLink to={it.to} end={it.end} className={({ isActive }) => cx('relative flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium', isActive ? 'text-fg' : 'text-muted')}>
+            <NavLink to={it.to} end={it.end} className={({ isActive }) => cx('relative flex h-full flex-col items-center justify-center gap-1 text-xs font-medium', isActive ? 'text-fg' : 'text-muted')}>
               {({ isActive }) => (
                 <>
                   {isActive && <motion.span layoutId="dash-bn" className="absolute top-0 h-0.5 w-10 rounded-full bg-primary" />}
@@ -209,6 +209,9 @@ export default function DashboardLayout() {
       <Sidebar pending={pending} />
       <MobileTop />
       <div className="md:ps-[76px] lg:ps-[264px]">
+        {user.role === 'demo' && (
+          <div role="status" className="bg-btn px-4 py-2 text-center text-sm font-semibold text-on-btn">{t('dash.demoBanner')}</div>
+        )}
         <main className="mx-auto w-full max-w-[1400px] px-4 pb-[calc(96px+var(--safe-b))] pt-5 sm:px-6 md:pb-12 md:pt-8 lg:px-8 xl:px-10">
           <Outlet />
         </main>

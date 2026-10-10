@@ -11,7 +11,7 @@ export default function CartPage() {
   const { t } = useI18n();
   return (
     <PageTransition className="container pt-6 sm:pt-10">
-      <h1 className="mb-6 font-display text-display-sm font-medium">{t('cart.title')}{cart.count > 0 && <span className="ms-2 align-middle text-base font-normal text-muted">({cart.count})</span>}</h1>
+      <h1 className="mb-6 font-display text-display-sm font-bold">{t('cart.title')}{cart.count > 0 && <span className="ms-2 align-middle text-base font-normal text-muted">({cart.count})</span>}</h1>
       {!cart.items.length ? <CartEmpty slug={store.slug} /> : (
         <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-12">
           <div className="lg:col-span-7">

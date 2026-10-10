@@ -27,15 +27,15 @@ r.post('/login', h((req, res) => {
   throttle(`${req.ip}:${email}`);
   const user = q.get('SELECT * FROM users WHERE email=?', [email]);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) throw new AppError(401, 'invalid_credentials', 'Email or password is incorrect.');
-  if (user.role === 'disabled') throw new AppError(403, 'account_disabled', 'This account is disabled. Contact BanhaLook.');
+  if (user.role === 'disabled') throw new AppError(403, 'account_disabled', 'This account is disabled. Contact Banha Outfit.');
   const store = q.get('SELECT * FROM stores WHERE owner_id=? LIMIT 1', [user.id]);
-  res.json({ token: signToken(user), user: { id: user.id, name: user.name, email: user.email }, store: store ? serializeStore(store) : null });
+  res.json({ token: signToken(user), user: { id: user.id, name: user.name, email: user.email, role: user.role }, store: store ? serializeStore(store) : null });
 }));
 
 const hashToken = (t) => crypto.createHash('sha256').update(String(t)).digest('hex');
 function userByToken(token) {
   const u = q.get('SELECT id, name, email, setup_expires FROM users WHERE setup_token_hash=?', [hashToken(token)]);
-  if (!u || !u.setup_expires || new Date(u.setup_expires) < new Date()) throw new AppError(410, 'link_expired', 'This link has expired or was already used. Ask BanhaLook for a new one.');
+  if (!u || !u.setup_expires || new Date(u.setup_expires) < new Date()) throw new AppError(410, 'link_expired', 'This link has expired or was already used. Ask Banha Outfit for a new one.');
   return u;
 }
 
@@ -55,7 +55,7 @@ r.post('/setup/:token', h((req, res) => {
 }));
 
 r.post('/register', h((req, res) => {
-  if (!config.allowRegister) throw new AppError(403, 'registration_closed', 'Store accounts are created by the BanhaLook team. Contact us to open your store.');
+  if (!config.allowRegister) throw new AppError(403, 'registration_closed', 'Store accounts are created by the Banha Outfit team. Contact us to open your store.');
   const d = z.object({
     name: z.string().trim().min(2, 'required').max(60),
     email: z.string().trim().toLowerCase().email('email_invalid'),

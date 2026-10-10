@@ -161,7 +161,7 @@ export default function Shop() {
     <PageTransition className="container pt-6 sm:pt-10">
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3 sm:mb-8">
         <div>
-          <h1 className="font-display text-display-sm font-medium">{title}</h1>
+          <h1 className="font-display text-display-sm font-bold">{title}</h1>
           <p className="mt-1.5 text-sm text-muted" aria-live="polite">{data ? t('common.results', { n: formatNumber(data.total, lang) }) : ' '}</p>
         </div>
       </div>
@@ -182,7 +182,7 @@ export default function Shop() {
       {/* toolbar */}
       <div className="sticky top-0 z-20 -mx-4 mb-6 flex items-center gap-2 border-b border-line bg-canvas/90 px-4 py-2.5 backdrop-blur lg:static lg:mx-0 lg:mb-8 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">
         <Button variant="outline" size="sm" icon={SlidersHorizontal} onClick={() => { setDraft(current); setSheet(true); }} className="lg:hidden">
-          {t('common.filters')}{activeCount > 0 && <span className="ms-1 grid h-5 min-w-5 place-items-center rounded-full bg-fg px-1 text-[11px] text-canvas">{activeCount}</span>}
+          {t('common.filters')}{activeCount > 0 && <span className="ms-1 grid h-5 min-w-5 place-items-center rounded-full bg-fg px-1 text-xs text-canvas">{activeCount}</span>}
         </Button>
         <div className="hidden min-w-0 flex-1 flex-wrap gap-2 lg:flex">
           {chips.map((c) => (

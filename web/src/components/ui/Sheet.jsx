@@ -1,12 +1,18 @@
 import { useEffect, useId, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { AnimatePresence, motion, useDragControls } from 'framer-motion';
+import { AnimatePresence, motion, useDragControls, useIsPresent } from 'framer-motion';
 import { X } from 'lucide-react';
 import { useLockBody, useMediaQuery } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { cx } from './cx.js';
 
 const ease = [0.22, 1, 0.36, 1];
+
+/** While the overlay animates out it must not swallow taps meant for the page underneath (e.g. re-opening the cart). */
+function Layer({ className, children }) {
+  const present = useIsPresent();
+  return <div className={className} style={present ? undefined : { pointerEvents: 'none' }}>{children}</div>;
+}
 
 /**
  * One overlay primitive for the whole product:
@@ -24,13 +30,16 @@ export default function Sheet({ open, onClose, title, description, children, foo
   const titleId = useId();
   const drag = useDragControls();
   useLockBody(open);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  const close = () => closeRef.current?.();
 
   useEffect(() => {
     if (!open) return undefined;
     restoreRef.current = document.activeElement;
     const id = setTimeout(() => panelRef.current?.focus({ preventScroll: true }), 40);
     const onKey = (e) => {
-      if (e.key === 'Escape') onClose?.();
+      if (e.key === 'Escape') closeRef.current?.();
       if (e.key === 'Tab' && panelRef.current) {
         const els = panelRef.current.querySelectorAll('a[href],button:not([disabled]),input:not([disabled]),select,textarea,[tabindex]:not([tabindex="-1"])');
         if (!els.length) return;
@@ -41,7 +50,7 @@ export default function Sheet({ open, onClose, title, description, children, foo
     };
     document.addEventListener('keydown', onKey);
     return () => { clearTimeout(id); document.removeEventListener('keydown', onKey); restoreRef.current?.focus?.({ preventScroll: true }); };
-  }, [open, onClose]);
+  }, [open]);
 
   const widths = { sm: 'sm:max-w-sm', md: 'sm:max-w-lg', lg: 'sm:max-w-2xl', xl: 'sm:max-w-4xl' };
   const drawerW = { sm: 'w-[380px]', md: 'w-[440px]', lg: 'w-[560px]', xl: 'w-[720px]' };
@@ -61,8 +70,8 @@ export default function Sheet({ open, onClose, title, description, children, foo
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className={cx('fixed inset-0 z-[80]', resolved === 'center' && 'grid place-items-center p-4')}>
-          <motion.div className="absolute inset-0 bg-neutral-950/45 backdrop-blur-[2px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} onClick={onClose} />
+        <Layer className={cx('fixed inset-0 z-[80]', resolved === 'center' && 'grid place-items-center p-4')}>
+          <motion.div className="absolute inset-0 bg-neutral-950/45 backdrop-blur-[2px]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }} onClick={close} />
           <motion.div
             ref={panelRef}
             role="dialog"
@@ -76,7 +85,7 @@ export default function Sheet({ open, onClose, title, description, children, foo
             dragListener={false}
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={{ top: 0, bottom: 0.6 }}
-            onDragEnd={(_, info) => { if (info.offset.y > 110 || info.velocity.y > 600) onClose?.(); }}
+            onDragEnd={(_, info) => { if (info.offset.y > 110 || info.velocity.y > 600) close(); }}
             className={cx('flex flex-col overflow-hidden bg-elevated text-fg shadow-sheet outline-none', panelCls, className)}
           >
             {resolved === 'bottom' && (
@@ -91,7 +100,7 @@ export default function Sheet({ open, onClose, title, description, children, foo
                   {title && <h2 id={titleId} className="text-lg font-semibold leading-tight">{title}</h2>}
                   {description && <p className="mt-1 text-sm text-muted">{description}</p>}
                 </div>
-                <button type="button" onClick={onClose} aria-label={t('common.close')} className="-me-2 -mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted transition hover:bg-fg/[0.06] hover:text-fg">
+                <button type="button" onClick={close} aria-label={t('common.close')} className="-me-2 -mt-1 grid h-10 w-10 shrink-0 place-items-center rounded-full text-muted transition hover:bg-fg/[0.06] hover:text-fg">
                   <X className="h-5 w-5" />
                 </button>
               </div>
@@ -99,7 +108,7 @@ export default function Sheet({ open, onClose, title, description, children, foo
             <div className={cx('min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 sm:px-6', bodyClassName)}>{children}</div>
             {footer && <div className="border-t border-line bg-elevated px-5 py-4 sm:px-6">{footer}</div>}
           </motion.div>
-        </div>
+        </Layer>
       )}
     </AnimatePresence>,
     document.body,
@@ -118,7 +127,7 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, body, confirmLa
           </button>
         </div>
       )}>
-      <div className="pb-4 text-[15px] text-muted">{body}{children}</div>
+      <div className="pb-4 text-base text-muted">{body}{children}</div>
     </Sheet>
   );
 }

@@ -18,6 +18,8 @@ CREATE TABLE IF NOT EXISTS stores (
   tagline_ar TEXT, tagline_en TEXT,
   description_ar TEXT, description_en TEXT,
   category TEXT NOT NULL DEFAULT 'mixed',
+  departments TEXT NOT NULL DEFAULT '',
+  delivery_mode TEXT NOT NULL DEFAULT 'store',
   city TEXT NOT NULL DEFAULT 'Banha',
   address_ar TEXT, address_en TEXT,
   phone TEXT, whatsapp TEXT, instagram TEXT, facebook TEXT,
@@ -161,10 +163,14 @@ CREATE TABLE IF NOT EXISTS orders (
   customer_name TEXT NOT NULL, phone TEXT NOT NULL,
   governorate TEXT, city TEXT, address TEXT, notes TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
+  delivery_by TEXT NOT NULL DEFAULT 'store',
+  handoff_at TEXT,
   payment_method TEXT NOT NULL DEFAULT 'cod',
   subtotal INTEGER NOT NULL, discount INTEGER NOT NULL DEFAULT 0,
   shipping INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL,
   coupon_code TEXT,
+  platform_discount INTEGER NOT NULL DEFAULT 0,
+  track_token TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
@@ -194,4 +200,66 @@ CREATE TABLE IF NOT EXISTS store_visits (
   day TEXT NOT NULL,
   visits INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (store_id, day)
+);
+
+CREATE TABLE IF NOT EXISTS departments (
+  id INTEGER PRIMARY KEY,
+  slug TEXT NOT NULL UNIQUE,
+  name_ar TEXT NOT NULL, name_en TEXT NOT NULL,
+  sizes_json TEXT NOT NULL DEFAULT '[]',
+  sort INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE TABLE IF NOT EXISTS service_requests (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  type TEXT NOT NULL DEFAULT 'photoshoot',
+  plan TEXT NOT NULL DEFAULT 'once',
+  items_count INTEGER,
+  preferred_date TEXT,
+  phone TEXT,
+  notes TEXT,
+  status TEXT NOT NULL DEFAULT 'new',
+  admin_note TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_service_requests_status ON service_requests(status, created_at);
+
+CREATE TABLE IF NOT EXISTS app_settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INTEGER PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth TEXT NOT NULL,
+  user_agent TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_push_store ON push_subscriptions(store_id);
+
+-- Coupons funded by the platform (Banha Outfit), usable at any store. The discount is recorded per order
+-- (orders.platform_discount) so the platform can reimburse stores.
+CREATE TABLE IF NOT EXISTS platform_coupons (
+  id INTEGER PRIMARY KEY,
+  code TEXT NOT NULL UNIQUE,
+  type TEXT NOT NULL,                 -- percentage | fixed | free_shipping
+  value INTEGER NOT NULL DEFAULT 0,
+  max_discount INTEGER,               -- cap for percentage coupons
+  min_subtotal INTEGER NOT NULL DEFAULT 0,
+  first_order_only INTEGER NOT NULL DEFAULT 0,
+  per_phone_limit INTEGER NOT NULL DEFAULT 1,
+  title_ar TEXT NOT NULL, title_en TEXT NOT NULL,
+  starts_at TEXT, ends_at TEXT,
+  usage_limit INTEGER,
+  usage_count INTEGER NOT NULL DEFAULT 0,
+  promoted INTEGER NOT NULL DEFAULT 0,  -- show on the marketplace home
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

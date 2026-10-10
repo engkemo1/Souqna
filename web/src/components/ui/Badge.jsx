@@ -16,7 +16,7 @@ const TONES = {
 
 export default function Badge({ tone = 'neutral', className, children, dot, size = 'md' }) {
   return (
-    <span className={cx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-semibold', size === 'sm' ? 'h-5 px-2 text-[11px]' : 'h-6 px-2.5 text-xs', TONES[tone], className)}>
+    <span className={cx('inline-flex items-center gap-1.5 whitespace-nowrap rounded-full font-semibold', size === 'sm' ? 'h-5 px-2 text-xs' : 'h-6 px-2.5 text-xs', TONES[tone], className)}>
       {dot && <span className="h-1.5 w-1.5 rounded-full bg-current" />}
       {children}
     </span>

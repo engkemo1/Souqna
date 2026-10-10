@@ -51,7 +51,7 @@ export function CartLines({ slug, onNavigate, problems = {} }) {
                 </Link>
                 <div className="flex min-w-0 flex-1 flex-col">
                   <div className="flex items-start justify-between gap-2">
-                    <Link to={sp(slug, `p/${l.slug}`)} onClick={onNavigate} className="line-clamp-2 text-[15px] font-medium leading-snug hover:text-brand">{tr(l.name)}</Link>
+                    <Link to={sp(slug, `p/${l.slug}`)} onClick={onNavigate} className="line-clamp-2 text-base font-medium leading-snug hover:text-brand">{tr(l.name)}</Link>
                     <button type="button" onClick={() => remove(l.key)} aria-label={t('cart.remove')} className="-me-2 -mt-1.5 grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted transition hover:bg-fg/[0.06] hover:text-sale">
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -89,9 +89,9 @@ export function CartSummary({ slug, onNavigate, compact }) {
   const { t, lang } = useI18n();
   return (
     <div className="space-y-3">
-      <div className="flex justify-between text-[15px]"><span className="text-muted">{t('cart.subtotal')}</span><span className="font-semibold tabular">{formatMoney(cart.subtotal, lang)}</span></div>
+      <div className="flex justify-between text-base"><span className="text-muted">{t('cart.subtotal')}</span><span className="font-semibold tabular">{formatMoney(cart.subtotal, lang)}</span></div>
       {!compact && (
-        <div className="flex justify-between text-[15px]"><span className="text-muted">{t('cart.shipping')}</span>
+        <div className="flex justify-between text-base"><span className="text-muted">{t('cart.shipping')}</span>
           <span className="tabular">{cart.subtotal >= store.freeShippingOver ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(store.shippingFee, lang)}</span>
         </div>
       )}

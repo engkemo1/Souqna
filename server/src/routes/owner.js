@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import { ORDER_FLOW, buildTheme, THEME_FIELDS } from '@souqna/shared';
+import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartments } from '@souqna/shared';
 import { q, tx, insert, update, json } from '../db/index.js';
 import { config } from '../config.js';
+import { assertDepartments } from '../lib/departments.js';
+import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { requireOwner } from '../lib/auth.js';
+import { vapidPublicKey, sendTest } from '../lib/push.js';
 import { clampInt, nowIso, slugify } from '../lib/util.js';
 import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia } from '../lib/media.js';
 import {
@@ -13,7 +16,8 @@ import {
 } from '../lib/serialize.js';
 
 const r = Router();
-r.use(requireOwner);
+// Store-owner JWT, or — when mounted under /api/admin/stores/:slug/as — the platform admin acting on that store (key-checked upstream).
+r.use((req, res, next) => (req.adminStore ? next() : requireOwner(req, res, next)));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.maxUploadMb * 1024 * 1024, files: 12 } });
 const LOCAL_DAY = "date(created_at, '+3 hours')"; // Cairo
@@ -51,9 +55,10 @@ const storeSchema = z.object({
   tagline_ar: z.string().trim().max(120).optional(), tagline_en: z.string().trim().max(120).optional(),
   description_ar: z.string().trim().max(600).optional(), description_en: z.string().trim().max(600).optional(),
   address_ar: z.string().trim().max(160).optional(), address_en: z.string().trim().max(160).optional(),
-  category: z.enum(['men', 'women', 'kids', 'mixed', 'denim', 'sports', 'accessories']).optional(),
+  departments: z.array(z.string().max(31)).min(1, 'departments_required').max(40).optional(),
   phone: z.string().trim().max(20).optional(), whatsapp: z.string().trim().max(20).optional(),
   hero_mode: z.enum(['auto', 'cover', 'slider']).optional(),
+  delivery_mode: z.enum(['store', 'platform']).optional(),
   opens_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   closes_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   day_off: z.union([z.literal(''), z.coerce.number().int().min(0).max(6)]).optional().nullable(),
@@ -67,6 +72,7 @@ const storeSchema = z.object({
 r.put('/store', h((req, res) => {
   const body = storeSchema.parse(req.body);
   for (const k of ['opens_at', 'closes_at', 'day_off', 'map_url']) if (body[k] === '') body[k] = null;
+  if (body.departments) { assertDepartments(body.departments); const d = body.departments; body.departments = encodeDepartments(d); body.category = d.length === 1 ? d[0] : 'mixed'; }
   update('stores', req.store.id, body);
   const s = q.get('SELECT * FROM stores WHERE id=?', [req.store.id]);
   res.json({ store: serializeStore(s) });
@@ -167,7 +173,7 @@ function orderCards(rows) {
   return rows.map((o) => {
     const its = items.filter((i) => i.order_id === o.id);
     return {
-      id: o.id, number: o.number, status: o.status, customer: o.customer_name, phone: o.phone, city: o.city, governorate: o.governorate,
+      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, customer: o.customer_name, phone: o.phone, city: o.city, governorate: o.governorate,
       total: o.total, createdAt: o.created_at, itemsCount: its.reduce((s, i) => s + i.qty, 0),
       images: its.slice(0, 3).map((i) => media.get(i.media_id)).filter(Boolean),
     };
@@ -338,13 +344,20 @@ r.get('/products/:id', h((req, res) => {
   res.json({
     product: {
       ...serializeProductDetail(p),
-      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id,
+      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '',
       compareAt: p.compare_at_price, sold: p.sold_count, views: p.views,
     },
   });
 }));
 
 const colorSchema = z.object({ name_ar: z.string().trim().min(1).max(30), name_en: z.string().trim().min(1).max(30), hex: z.string().regex(/^#[0-9a-fA-F]{6}$/) });
+/** A product's department must be one the store sells in; single-department stores default to it. */
+function productDepartment(storeId, wanted) {
+  const mine = decodeDepartments(q.val('SELECT departments FROM stores WHERE id=?', [storeId]));
+  if (wanted) { if (!mine.includes(wanted)) throw badRequest('invalid_department', 'Pick one of your store departments.'); return wanted; }
+  return mine.length === 1 ? mine[0] : null;
+}
+
 const productSchema = z.object({
   name_ar: z.string().trim().min(2, 'required').max(120),
   name_en: z.string().trim().min(2, 'required').max(120),
@@ -355,16 +368,17 @@ const productSchema = z.object({
   cost: z.coerce.number().int().min(0).max(1_000_000).nullable().optional(),
   sku: z.string().trim().max(60).optional().nullable(),
   category_id: z.coerce.number().int().nullable().optional(),
+  department: z.string().max(31).nullable().optional(),
   status: z.enum(['active', 'draft', 'archived']).default('active'),
   featured: z.boolean().optional().default(false),
   is_new: z.boolean().optional().default(false),
   colors: z.array(colorSchema).max(12).default([]),
-  sizes: z.array(z.string().trim().min(1).max(12)).max(15).default([]),
+  sizes: z.array(z.string().trim().min(1).max(12)).max(30).default([]),
   variants: z.array(z.object({ id: z.number().int().optional().nullable(), color: z.string().nullable().optional(), size: z.string().nullable().optional(), stock: z.coerce.number().int().min(0).max(100000), sku: z.string().max(60).optional().nullable() })).max(200).default([]),
   track_stock: z.boolean().optional().default(true),
   stock: z.coerce.number().int().min(0).max(100000).optional().default(0),
   low_stock_at: z.coerce.number().int().min(0).max(1000).optional().default(5),
-  media: z.array(z.number().int()).max(15).default([]),
+  media: z.array(z.number().int()).max(30).default([]),
   primary_media_id: z.number().int().nullable().optional(),
   seo_title: z.string().trim().max(70).optional().nullable(),
   seo_description: z.string().trim().max(170).optional().nullable(),
@@ -386,7 +400,7 @@ function saveProduct(storeId, data, existing) {
     const row = {
       name_ar: data.name_ar, name_en: data.name_en, description_ar: data.description_ar, description_en: data.description_en,
       price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null,
-      category_id: data.category_id || null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
+      category_id: data.category_id || null, department: productDepartment(storeId, data.department), status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };
@@ -492,6 +506,10 @@ r.get('/orders', h((req, res) => {
   res.json({ items: orderCards(rows), total, page, pages: Math.max(1, Math.ceil(total / limit)), counts });
 }));
 
+/** Orders Banha Outfit delivers: the store prepares them (up to "processing" = ready for pickup); pickup and delivery are ours. */
+const PLATFORM_STATUSES = ['shipped', 'delivered'];
+const ownerNext = (o) => (ORDER_FLOW[o.status] || []).filter((s) => !(o.delivery_by === 'platform' && PLATFORM_STATUSES.includes(s)));
+
 r.get('/orders/:id', h((req, res) => {
   const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!o) throw notFound('Order');
@@ -500,9 +518,9 @@ r.get('/orders/:id', h((req, res) => {
   const customer = o.customer_id ? q.get('SELECT * FROM customers WHERE id=?', [o.customer_id]) : null;
   res.json({
     order: {
-      id: o.id, number: o.number, status: o.status, next: ORDER_FLOW[o.status] || [], createdAt: o.created_at, updatedAt: o.updated_at,
+      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, handoffAt: o.handoff_at, next: ownerNext(o), createdAt: o.created_at, updatedAt: o.updated_at,
       customer: { id: customer?.id, name: o.customer_name, phone: o.phone, governorate: o.governorate, city: o.city, address: o.address, ordersCount: customer?.orders_count || 1, totalSpent: customer?.total_spent || o.total },
-      notes: o.notes, payment: o.payment_method, coupon: o.coupon_code,
+      notes: o.notes, payment: o.payment_method, coupon: o.coupon_code, platformDiscount: o.platform_discount || 0,
       subtotal: o.subtotal, discount: o.discount, shipping: o.shipping, total: o.total,
       items: items.map((i) => ({ id: i.id, productId: i.product_id, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
       events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]),
@@ -514,6 +532,7 @@ r.patch('/orders/:id/status', h((req, res) => {
   const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!o) throw notFound('Order');
   const { status, note } = z.object({ status: z.enum(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']), note: z.string().trim().max(300).optional() }).parse(req.body);
+  if (o.delivery_by === 'platform' && PLATFORM_STATUSES.includes(status)) throw badRequest('platform_delivers', 'Banha Outfit handles pickup and delivery of this order.');
   if (!(ORDER_FLOW[o.status] || []).includes(status)) throw badRequest('invalid_transition', 'This status change is not allowed.');
   tx(() => {
     const now = nowIso();
@@ -528,8 +547,80 @@ r.patch('/orders/:id/status', h((req, res) => {
       if (o.customer_id) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [o.total, o.customer_id]);
     }
   });
-  res.json({ status, next: ORDER_FLOW[status] });
+  res.json({ status, next: ownerNext({ status, delivery_by: o.delivery_by }) });
 }));
+
+/** "No delivery person free right now" → hand this one order over to Banha Outfit. */
+r.post('/orders/:id/handoff', h((req, res) => {
+  const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
+  if (!o) throw notFound('Order');
+  if (o.delivery_by === 'platform') throw badRequest('already_handed_off', 'This order is already delivered by Banha Outfit.');
+  if (!['pending', 'confirmed', 'processing'].includes(o.status)) throw badRequest('invalid_transition', 'This order can no longer be handed over.');
+  const now = nowIso();
+  tx(() => {
+    q.run("UPDATE orders SET delivery_by='platform', handoff_at=?, updated_at=? WHERE id=?", [now, now, o.id]);
+    insert('order_events', { order_id: o.id, status: o.status, note: '@handoff', created_at: now });
+  });
+  notifyPlatformDelivery(o.id, o.number);
+  res.json({ deliveryBy: 'platform', handoffAt: now, next: ownerNext({ status: o.status, delivery_by: 'platform' }) });
+}));
+
+/* ---------------------------------------------------------- services (professional photography) */
+
+r.get('/services', h((req, res) => {
+  res.json({ items: q.all('SELECT id, type, plan, items_count, preferred_date, phone, notes, status, admin_note, created_at FROM service_requests WHERE store_id=? ORDER BY id DESC LIMIT 30', [req.store.id]) });
+}));
+
+r.post('/services', h((req, res) => {
+  const body = z.object({
+    plan: z.enum(['once', 'monthly']),
+    items_count: z.coerce.number().int().min(1).max(5000).optional(),
+    preferred_date: z.union([z.literal(''), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'date_invalid')]).optional().nullable(),
+    phone: z.union([z.literal(''), z.string().trim().regex(/^01[0125][0-9]{8}$/, 'phone_invalid')]).optional().nullable(),
+    notes: z.string().trim().max(500).optional().nullable(),
+  }).parse(req.body);
+  if (q.val("SELECT COUNT(*) FROM service_requests WHERE store_id=? AND status IN ('new','contacted','scheduled')", [req.store.id]) >= 3) {
+    throw badRequest('too_many_requests', 'You already have open requests. We will contact you soon.');
+  }
+  const now = nowIso();
+  const id = insert('service_requests', {
+    store_id: req.store.id, type: 'photoshoot', plan: body.plan, items_count: body.items_count ?? null, preferred_date: body.preferred_date || null,
+    phone: body.phone || req.store.phone || null, notes: body.notes || null, created_at: now, updated_at: now,
+  });
+  notifyPlatformService(id);
+  res.status(201).json({ id });
+}));
+
+r.post('/services/design', h((req, res) => {
+  const body = z.object({ what: z.enum(['banner', 'cover']), notes: z.string().trim().max(500).optional().nullable() }).parse(req.body);
+  const type = `design_${body.what}`;
+  if (q.val("SELECT COUNT(*) FROM service_requests WHERE store_id=? AND type=? AND status IN ('new','contacted','scheduled')", [req.store.id, type]) >= 1) {
+    throw badRequest('too_many_requests', 'You already have an open request for this. We will contact you soon.');
+  }
+  const now = nowIso();
+  const id = insert('service_requests', {
+    store_id: req.store.id, type, plan: 'once', phone: req.store.phone || null, notes: body.notes || null, created_at: now, updated_at: now,
+  });
+  notifyPlatformService(id);
+  res.status(201).json({ id });
+}));
+
+/* ---------------------------------------------------------- push notifications */
+
+r.get('/push/key', h((_req, res) => res.json({ key: vapidPublicKey() })));
+r.get('/push/status', h((req, res) => res.json({ devices: q.val('SELECT COUNT(*) FROM push_subscriptions WHERE store_id=?', [req.store.id]) })));
+r.post('/push/subscribe', h((req, res) => {
+  const body = z.object({ endpoint: z.string().url().max(1000), keys: z.object({ p256dh: z.string().max(300), auth: z.string().max(100) }) }).parse(req.body);
+  q.run('DELETE FROM push_subscriptions WHERE endpoint=?', [body.endpoint]);
+  insert('push_subscriptions', { user_id: req.user.id, store_id: req.store.id, endpoint: body.endpoint, p256dh: body.keys.p256dh, auth: body.keys.auth, user_agent: String(req.headers['user-agent'] || '').slice(0, 200) });
+  res.status(201).json({ ok: true });
+}));
+r.post('/push/unsubscribe', h((req, res) => {
+  const { endpoint } = z.object({ endpoint: z.string().max(1000) }).parse(req.body);
+  q.run('DELETE FROM push_subscriptions WHERE endpoint=? AND store_id=?', [endpoint, req.store.id]);
+  res.json({ ok: true });
+}));
+r.post('/push/test', h(async (req, res) => res.json(await sendTest(req.store.id))));
 
 /* ---------------------------------------------------------- customers */
 

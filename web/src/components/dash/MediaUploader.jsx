@@ -3,7 +3,9 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { DndContext, closestCenter, PointerSensor, TouchSensor, KeyboardSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, rectSortingStrategy, sortableKeyboardCoordinates, arrayMove } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ImagePlus, Camera, Images, Star, X, GripVertical, AlertCircle, RotateCw, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ImagePlus, Camera, Images, Star, X, GripVertical, AlertCircle, RotateCw, ChevronLeft, ChevronRight, Lightbulb } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { useDashBase } from '../../lib/dashBase.js';
 import { upload } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import SmartImage from '../ui/SmartImage.jsx';
@@ -26,6 +28,21 @@ async function compress(file) {
     const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.9));
     return blob && blob.size < file.size ? new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }) : file;
   } catch { return file; }
+}
+
+
+/** Photo guidelines shown with the product uploader so every store ends up with a clean, consistent catalogue. */
+function Tips({ t }) {
+  const base = useDashBase();
+  return (
+    <details className="mb-3 rounded-2xl border border-line bg-secondary/40 p-4 text-sm [&_summary::-webkit-details-marker]:hidden" open>
+      <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold"><Lightbulb className="h-4 w-4 text-brand" />{t('editor.tipsTitle')}</summary>
+      <ul className="mt-3 list-disc space-y-1.5 ps-5 text-[13.5px] leading-relaxed text-muted marker:text-brand">
+        {[1, 2, 3, 4, 5].map((n) => <li key={n}>{t(`editor.tip${n}`)}</li>)}
+      </ul>
+      {base === '/dashboard' && <Link to="/dashboard/services" className="mt-3 inline-block text-[13px] font-semibold text-brand hover:underline">{t('editor.tipsPhoto')}</Link>}
+    </details>
+  );
 }
 
 function Tile({ item, index, total, onRemove, onPrimary, onMove, onRetry, t }) {
@@ -66,7 +83,7 @@ function Tile({ item, index, total, onRemove, onPrimary, onMove, onRetry, t }) {
           </div>
         )}
 
-        {primary && <span className="pointer-events-none absolute start-2 top-2 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-[11px] font-semibold text-on-primary"><Star className="h-3 w-3 fill-current" />{t('editor.primary')}</span>}
+        {primary && <span className="pointer-events-none absolute start-2 top-2 inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-on-primary"><Star className="h-3 w-3 fill-current" />{t('editor.primary')}</span>}
         <button type="button" onClick={() => onRemove(item)} aria-label={t('editor.removeImage')} className="absolute end-1.5 top-1.5 grid h-8 w-8 place-items-center rounded-full bg-white/90 text-neutral-800 shadow-sm transition hover:bg-white hover:text-red-600 active:scale-90">
           <X className="h-4 w-4" />
         </button>
@@ -152,6 +169,7 @@ export default function MediaUploader({ value, onChange, kind = 'product', max =
   const full = all.length >= max;
   return (
     <div>
+      {kind === 'product' && <Tips t={t} />}
       <input ref={galleryRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
 
@@ -165,7 +183,7 @@ export default function MediaUploader({ value, onChange, kind = 'product', max =
             className={cx('hidden flex-col items-center justify-center rounded-2xl border-2 border-dashed px-6 py-9 text-center transition-colors [@media(hover:hover)]:flex',
               over ? 'border-primary bg-primary/[0.05]' : error ? 'border-sale/50' : 'border-line-strong hover:border-fg/30')}>
             <span className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary text-brand"><ImagePlus className="h-6 w-6" /></span>
-            <p className="mt-3 text-[15px] font-medium">{t('editor.drop')} <button type="button" onClick={() => galleryRef.current?.click()} className="font-semibold text-brand underline-offset-4 hover:underline">{t('editor.browse')}</button></p>
+            <p className="mt-3 text-base font-medium">{t('editor.drop')} <button type="button" onClick={() => galleryRef.current?.click()} className="font-semibold text-brand underline-offset-4 hover:underline">{t('editor.browse')}</button></p>
             <p className="mt-1.5 text-[13px] text-muted">{t('editor.imagesHint')}</p>
           </div>
           {/* touch: gallery + camera */}

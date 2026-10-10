@@ -1,0 +1,22 @@
+{
+  "name": "بنها أوتفيت",
+  "short_name": "بنها أوتفيت",
+  "description": "كل محلات الأزياء في بنها في مكان واحد",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFF6EC",
+  "theme_color": "#FF5A1F",
+  "icons": [
+    { "src": "/brand/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "لوحة المحل", "url": "/dashboard", "icons": [{ "src": "/brand/icon-192.png", "sizes": "192x192" }] },
+    { "name": "تتبّع طلبي", "url": "/track", "icons": [{ "src": "/brand/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

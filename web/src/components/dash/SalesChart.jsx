@@ -2,7 +2,7 @@ import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianG
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney, formatCompact, formatDate, formatNumber } from '../../lib/format.js';
 
-const BRAND = '#17483B';
+const BRAND = '#FF5A1F';
 const PREV = '#B9B5AC';
 
 function TooltipBox({ active, payload, label, lang, t, kind }) {

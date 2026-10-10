@@ -14,7 +14,7 @@ export default function Categories() {
   if (!categories.length) return <EmptyState icon={LayoutGrid} title={t('categories.empty')} />;
   return (
     <PageTransition className="container pt-6 sm:pt-10">
-      <h1 className="mb-6 font-display text-display-sm font-medium">{t('store.categories')}</h1>
+      <h1 className="mb-6 font-display text-display-sm font-bold">{t('store.categories')}</h1>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {categories.map((c, i) => (
           <motion.div key={c.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>

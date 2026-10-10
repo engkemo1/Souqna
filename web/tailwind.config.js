@@ -37,12 +37,12 @@ export default {
       },
       fontFamily: {
         sans: ['"IBM Plex Sans Arabic"', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
-        display: ['"Playfair Display"', '"IBM Plex Sans Arabic"', 'Georgia', 'serif'],
+        display: ['"IBM Plex Sans Arabic"', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
       },
       fontSize: {
-        '2xs': ['0.6875rem', { lineHeight: '1rem' }],
-        'display-sm': ['clamp(1.75rem, 1.2rem + 2.2vw, 2.5rem)', { lineHeight: '1.1', letterSpacing: '-0.01em' }],
-        'display': ['clamp(2.1rem, 1.3rem + 3.4vw, 4rem)', { lineHeight: '1.05', letterSpacing: '-0.02em' }],
+        '2xs': ['0.75rem', { lineHeight: '1rem' }],
+        'display-sm': ['clamp(1.5rem, 1.15rem + 1.4vw, 2.125rem)', { lineHeight: '1.25' }],
+        'display': ['clamp(2rem, 1.35rem + 2.6vw, 3.5rem)', { lineHeight: '1.2' }],
       },
       borderRadius: { '4xl': '2rem' },
       boxShadow: {

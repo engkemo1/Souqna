@@ -21,6 +21,13 @@ export default function StoreLayout() {
   const { data, error, reload } = useApi(`/stores/${slug}`);
   useTheme(data?.store?.theme?.cssVars);
 
+  // Warm the chunks of the pages a shopper reaches next, so tapping the cart/product never waits on (or fails to fetch) a lazy bundle.
+  useEffect(() => {
+    if (!data) return undefined;
+    const id = setTimeout(() => { import('./CartPage.jsx'); import('./Checkout.jsx'); import('./Product.jsx'); import('./Shop.jsx'); }, 800);
+    return () => clearTimeout(id);
+  }, [!!data]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!data) return;
     const key = `souqna.visit.${slug}`;

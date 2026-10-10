@@ -19,7 +19,7 @@ export default function StoreHero() {
   const Arrow = ar ? ArrowLeft : ArrowRight;
 
   return (
-    <section className="relative isolate overflow-hidden bg-[#0B0B0C] text-white">
+    <section className="relative isolate overflow-hidden bg-[#111111] text-white">
       {store.cover && (
         <motion.div className="absolute inset-0 -z-10" initial={{ scale: 1.12 }} animate={{ scale: 1 }} transition={{ duration: 6, ease: 'easeOut' }}>
           <SmartImage media={store.cover} priority sizes="100vw" className="h-full w-full" imgClassName="h-full w-full object-cover" />
@@ -52,14 +52,14 @@ export default function StoreHero() {
               )}
             </div>
           </div>
-          <h1 className="mt-5 font-display text-[44px] font-medium leading-[1.1] tracking-tight !text-white drop-shadow-[0_4px_24px_rgba(0,0,0,.5)] sm:text-[72px]">{tr(store.name)}</h1>
+          <h1 className="mt-5 font-display text-[44px] font-bold leading-[1.1] !text-white drop-shadow-[0_4px_24px_rgba(0,0,0,.5)] sm:text-[72px]">{tr(store.name)}</h1>
           {tr(store.tagline) && <p className="mt-3 max-w-xl text-lg text-white/80 sm:text-xl">{tr(store.tagline)}</p>}
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to={sp(store.slug, 'shop')} className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-[15px] font-semibold text-black transition hover:bg-white/90">
+            <Link to={sp(store.slug, 'shop')} className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-base font-semibold text-black transition hover:bg-white/90">
               {ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4 transition group-hover:-translate-x-0.5 rtl:group-hover:translate-x-0.5" />
             </Link>
             {tr(store.address) && (
-              <a href={maps.open} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3.5 text-[15px] font-semibold backdrop-blur transition hover:bg-white/20">
+              <a href={maps.open} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3.5 text-base font-semibold backdrop-blur transition hover:bg-white/20">
                 <Navigation className="h-4 w-4" />{ar ? 'افتح اللوكيشن' : 'Open location'}
               </a>
             )}
@@ -85,7 +85,7 @@ export function StoreIdentityBar() {
         <div className="flex min-w-0 items-center gap-4">
           <span className="shrink-0 rounded-full p-[3px] ring-2 ring-accent/70"><StoreLogo store={store} size={56} className="h-14 w-14" /></span>
           <div className="min-w-0">
-            <h1 className="truncate font-display text-2xl font-medium tracking-tight sm:text-3xl">{tr(store.name)}</h1>
+            <h1 className="truncate font-display text-2xl font-bold sm:text-3xl">{tr(store.name)}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
               {tr(store.tagline) && <span className="truncate">{tr(store.tagline)}</span>}
               {store.rating ? <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />{store.rating} ({store.ratingCount})</span> : null}

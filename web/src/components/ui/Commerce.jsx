@@ -6,7 +6,7 @@ import { cx } from './cx.js';
 
 export function Price({ value, compareAt, size = 'md', className, showSave }) {
   const { lang, t } = useI18n();
-  const s = { sm: 'text-sm', md: 'text-[15px]', lg: 'text-xl sm:text-2xl', xl: 'text-2xl sm:text-3xl' }[size];
+  const s = { sm: 'text-sm', md: 'text-base', lg: 'text-xl sm:text-2xl', xl: 'text-2xl sm:text-3xl' }[size];
   return (
     <div className={cx('flex flex-wrap items-baseline gap-x-2 gap-y-1', className)}>
       <span className={cx('font-semibold tabular', s, compareAt ? 'text-sale' : 'text-fg')}>{formatMoney(value, lang)}</span>

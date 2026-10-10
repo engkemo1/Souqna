@@ -46,7 +46,7 @@ export function AnnouncementBar() {
   const [i, setI] = useState(0);
   useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % items.length), 4200); return () => clearInterval(id); }, [items.length]);
   return (
-    <div className="relative h-9 overflow-hidden bg-footer text-center text-[12.5px] font-medium text-on-footer" aria-live="off">
+    <div className="relative h-9 overflow-hidden bg-footer text-center text-[13px] font-medium text-on-footer" aria-live="off">
       <AnimatePresence mode="wait" initial={false}>
         <motion.p key={i} initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -14, opacity: 0 }} transition={{ duration: 0.35 }} className="absolute inset-0 grid place-items-center truncate px-4">
           {items[i]}
@@ -78,11 +78,11 @@ export function StoreHeader() {
             <button type="button" onClick={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate(sp(store.slug)))} aria-label={t('common.back')}
               className="-ms-2 grid h-11 w-11 shrink-0 place-items-center rounded-full hover:bg-fg/[0.07] lg:hidden"><Back className="h-5 w-5" /></button>
           )}
-          <Link to="/" aria-label={t('store.backToMarket')} className="inline-flex shrink-0 items-center gap-1.5 rounded-full py-1 pe-2.5 ps-1 text-[12.5px] font-medium text-muted ring-1 ring-line transition hover:bg-fg/[0.06] hover:text-fg"><BrandMark className="h-7 w-7" /><span className="hidden sm:inline">{t('store.backToMarket')}</span></Link>
+          <Link to="/" aria-label={t('store.backToMarket')} className="inline-flex shrink-0 items-center gap-1.5 rounded-full py-1 pe-2.5 ps-1 text-[13px] font-medium text-muted ring-1 ring-line transition hover:bg-fg/[0.06] hover:text-fg"><BrandMark className="h-7 w-7" /><span className="hidden sm:inline">{t('store.backToMarket')}</span></Link>
           <span className="h-6 w-px shrink-0 bg-line" aria-hidden="true" />
           <Link to={sp(store.slug)} className="flex min-w-0 items-center gap-2.5 rounded-full py-1 pe-2">
             <StoreLogo store={store} size={36} className="h-9 w-9" />
-            <span className="truncate font-display text-[17px] font-semibold tracking-tight lg:text-xl">{tr(store.name)}</span>
+            <span className="truncate font-display text-[17px] font-bold lg:text-xl">{tr(store.name)}</span>
           </Link>
         </div>
 
@@ -128,7 +128,7 @@ export function BottomNav() {
       <ul className="mx-auto grid h-[var(--bottom-nav-h)] max-w-lg grid-cols-5">
         {items.map((it) => (
           <li key={it.to}>
-            <NavLink to={sp(store.slug, it.to)} end={it.end} className="group relative flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium">
+            <NavLink to={sp(store.slug, it.to)} end={it.end} className="group relative flex h-full flex-col items-center justify-center gap-1 text-xs font-medium">
               {({ isActive }) => (
                 <>
                   {isActive && <motion.span layoutId="bn-pill" className="absolute top-1.5 h-8 w-14 rounded-full bg-fg/[0.08]" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
@@ -160,7 +160,7 @@ export function TrustStrip({ className }) {
       {items.map((it) => (
         <div key={it.title} className="flex items-center gap-4 px-5 py-5 sm:justify-center">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full border border-accent/40 text-accent"><it.icon className="h-5 w-5" strokeWidth={1.6} /></span>
-          <div className="min-w-0"><p className="font-display text-[15px] font-semibold tracking-tight">{it.title}</p><p className="truncate text-[13px] text-muted">{it.body}</p></div>
+          <div className="min-w-0"><p className="font-display text-base font-bold">{it.title}</p><p className="truncate text-[13px] text-muted">{it.body}</p></div>
         </div>
       ))}
     </div>
@@ -176,7 +176,7 @@ export function StoreFooter() {
         <div className="sm:col-span-2 lg:col-span-1">
           <div className="flex items-center gap-3">
             <StoreLogo store={store} size={44} className="h-11 w-11" />
-            <p className="font-display text-xl font-semibold">{tr(store.name)}</p>
+            <p className="font-display text-xl font-bold">{tr(store.name)}</p>
           </div>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-footer-muted">{tr(store.description)}</p>
           <div className="mt-4 flex items-center gap-1.5 text-sm"><Star className="h-4 w-4 fill-current text-amber-400" /><span className="font-semibold">{store.rating}</span><span className="text-footer-muted">({store.ratingCount})</span></div>
@@ -187,6 +187,7 @@ export function StoreFooter() {
             <li><Link className="hover:text-on-footer" to={sp(store.slug, 'shop')}>{t('store.shopAll')}</Link></li>
             {categories.map((c) => <li key={c.id}><Link className="hover:text-on-footer" to={sp(store.slug, `shop?category=${c.slug}`)}>{tr(c.name)}</Link></li>)}
             <li><Link className="hover:text-on-footer" to={sp(store.slug, 'shop?sale=1')}>{t('store.onSale')}</Link></li>
+            <li><Link className="hover:text-on-footer" to="/track">{t('track.title')}</Link></li>
           </ul>
         </div>
         <div>

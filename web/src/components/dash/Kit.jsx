@@ -18,8 +18,8 @@ export function PageHeader({ title, subtitle, actions, back, className }) {
             <Back className="h-4 w-4" />{t('common.back')}
           </button>
         )}
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-[28px]">{title}</h1>
-        {subtitle && <p className="mt-1 text-[15px] text-muted">{subtitle}</p>}
+        <h1 className="text-2xl font-semibold sm:text-[28px]">{title}</h1>
+        {subtitle && <p className="mt-1 text-base text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -65,7 +65,7 @@ export function KpiCard({ label, value, format, delta, deltaSuffix, icon: Icon, 
         {Icon && <span className={cx('grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-9 sm:w-9 sm:rounded-xl', tones[tone])}><Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" /></span>}
       </div>
       {loading ? <Skeleton className="mt-3 h-7 w-24" /> : (
-        <p className="mt-2 truncate text-[22px] font-semibold tracking-tight sm:mt-3 sm:text-[26px]"><AnimatedNumber value={value} format={format} /></p>
+        <p className="mt-2 truncate text-[22px] font-semibold sm:mt-3 sm:text-[26px]"><AnimatedNumber value={value} format={format} /></p>
       )}
       <div className="mt-2 flex min-h-[22px] flex-wrap items-center gap-2">
         {loading ? <Skeleton className="h-4 w-14" /> : delta != null && <Delta value={delta} suffix={deltaSuffix} />}
@@ -115,7 +115,7 @@ export function SearchInput({ value, onChange, placeholder, className }) {
     <div className={cx('relative', className)}>
       <svg className="pointer-events-none absolute start-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-muted" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
       <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder}
-        className="h-11 w-full rounded-xl border border-line-strong bg-elevated ps-10 pe-3 text-[15px] outline-none transition placeholder:text-muted/70 focus:border-ring focus:shadow-ring" />
+        className="h-11 w-full rounded-xl border border-line-strong bg-elevated ps-10 pe-3 text-base outline-none transition placeholder:text-muted/70 focus:border-ring focus:shadow-ring" />
     </div>
   );
 }

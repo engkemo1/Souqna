@@ -6,6 +6,7 @@ import { GOVERNORATES } from '@souqna/shared';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useCart } from '../../lib/cart.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { rememberOrder } from '../../lib/recentOrders.js';
 import { api } from '../../lib/api.js';
 import { formatMoney } from '../../lib/format.js';
 import { useLocalState } from '../../lib/hooks.js';
@@ -34,7 +35,7 @@ function Summary({ quote, items, coupon, onApply, onRemove, couponError, applyin
             <li key={l.key} className="flex items-center gap-3.5">
               <div className="relative w-16 shrink-0">
                 <SmartImage media={l.image} ratio="4 / 5" sizes="64px" className="rounded-xl ring-1 ring-line" />
-                <span className="absolute -end-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-fg px-1 text-[11px] font-bold text-canvas">{l.qty}</span>
+                <span className="absolute -end-2 -top-2 grid h-5 min-w-5 place-items-center rounded-full bg-fg px-1 text-xs font-bold text-canvas">{l.qty}</span>
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{tr(l.name)}</p>
@@ -62,7 +63,7 @@ function Summary({ quote, items, coupon, onApply, onRemove, couponError, applyin
         {couponError && <p className="mt-2 text-[13px] font-medium text-sale" role="alert">{couponError}</p>}
       </div>
 
-      <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-[15px]">
+      <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-base">
         <div className="flex justify-between"><dt className="text-muted">{t('cart.subtotal')}</dt><dd className="tabular">{quote ? formatMoney(quote.subtotal, lang) : <Skeleton className="h-4 w-16" />}</dd></div>
         {quote?.discount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')}</dt><dd className="tabular">−{formatMoney(quote.discount, lang)}</dd></div>}
         <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{!quote ? <Skeleton className="h-4 w-12" /> : quote.shipping === 0 ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(quote.shipping, lang)}</dd></div>
@@ -93,7 +94,7 @@ export default function Checkout() {
   const payload = useMemo(() => cart.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), [cart.items]);
 
   const runQuote = async (code) => {
-    const q = await api(`/stores/${store.slug}/quote`, { method: 'POST', body: { items: payload, coupon: code || null } });
+    const q = await api(`/stores/${store.slug}/quote`, { method: 'POST', body: { items: payload, coupon: code || null, phone: PHONE.test(form.phone.trim()) ? form.phone.trim() : null } });
     setQuote(q);
     return q;
   };
@@ -113,6 +114,13 @@ export default function Checkout() {
     } catch (e) { setCouponError(errorMessage(t, e)); }
     setApplying(false);
   };
+  // Once the phone is known, re-check phone-bound codes (first-order-only / one use per phone) so the shown total is the real one.
+  useEffect(() => {
+    if (!coupon || !PHONE.test(form.phone.trim())) return;
+    runQuote(coupon.code).then((q) => {
+      if (q.couponError) { setCouponError(t(`checkout.${q.couponError}`, { v: formatMoney(q.couponMinSubtotal || 0, lang) })); setCoupon(null); runQuote(null).catch(() => {}); }
+    }).catch(() => {});
+  }, [form.phone]); // eslint-disable-line react-hooks/exhaustive-deps
   const removeCoupon = () => { setCoupon(null); runQuote(null).catch(() => {}); };
 
   const set = (k) => (e) => { setForm((f) => ({ ...f, [k]: e.target.value })); if (errors[k]) setErrors((x) => ({ ...x, [k]: undefined })); };
@@ -141,9 +149,16 @@ export default function Checkout() {
       const { order } = await api(`/stores/${store.slug}/orders`, { method: 'POST', body: { ...form, phone: form.phone.trim(), coupon: coupon?.code || null, items: payload } });
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
       cart.clear();
-      navigate(sp(store.slug, `order/${order.number}`), { replace: true, state: { name: form.name.split(' ')[0], phone: form.phone } });
+      rememberOrder({ number: order.number, token: order.trackToken, store: store.name });
+      navigate(sp(store.slug, `order/${order.number}?t=${order.trackToken}`), { replace: true, state: { name: form.name.split(' ')[0], phone: form.phone } });
     } catch (err) {
       setPlacing(false);
+      if (err.code?.startsWith('coupon_')) {
+        setCouponError(t(`checkout.${err.code}`, { v: '' })); setCoupon(null);
+        await runQuote(null).catch(() => {}); setSummaryOpen(true);
+        toast({ tone: 'error', title: t(`checkout.${err.code}`, { v: '' }) });
+        return;
+      }
       if (err.code === 'cart_changed') {
         await runQuote(coupon?.code).catch(() => {});
         setSummaryOpen(true);
@@ -176,7 +191,7 @@ export default function Checkout() {
 
       <div className="container pt-6 sm:pt-10 lg:grid lg:grid-cols-12 lg:items-start lg:gap-12">
         <form ref={formRef} onSubmit={place} noValidate className="lg:col-span-7">
-          <h1 className="font-display text-display-sm font-medium">{t('checkout.title')}</h1>
+          <h1 className="font-display text-display-sm font-bold">{t('checkout.title')}</h1>
 
           <section className="mt-8">
             <h2 className="mb-4 flex items-center gap-3 text-lg font-semibold"><span className="grid h-7 w-7 place-items-center rounded-full bg-fg text-xs text-canvas">1</span>{t('checkout.contact')}</h2>
