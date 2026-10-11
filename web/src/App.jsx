@@ -5,16 +5,22 @@ import { I18nProvider } from './lib/i18n.jsx';
 import { AuthProvider } from './lib/auth.jsx';
 import { CartProvider } from './lib/cart.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
+import { BuyerProvider } from './lib/buyer.jsx';
 import RouteFallback from './components/RouteFallback.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 const MarketHome = lazy(() => import('./pages/market/MarketHome.jsx'));
 const MarketSearch = lazy(() => import('./pages/market/MarketSearch.jsx'));
+const VisualSearch = lazy(() => import('./pages/market/VisualSearch.jsx'));
 const Login = lazy(() => import('./pages/auth/Login.jsx'));
 const Register = lazy(() => import('./pages/auth/Register.jsx'));
 const Setup = lazy(() => import('./pages/auth/Setup.jsx'));
 const Track = lazy(() => import('./pages/market/Track.jsx'));
 const Join = lazy(() => import('./pages/market/Join.jsx'));
+const Account = lazy(() => import('./pages/market/Account.jsx'));
+const LookShare = lazy(() => import('./pages/market/LookShare.jsx'));
+const Legal = lazy(() => import('./pages/market/Legal.jsx'));
+const Request = lazy(() => import('./pages/market/Request.jsx'));
 
 const StoreLayout = lazy(() => import('./pages/store/StoreLayout.jsx'));
 const StoreHome = lazy(() => import('./pages/store/StoreHome.jsx'));
@@ -40,6 +46,7 @@ const Customers = lazy(() => import('./pages/dashboard/Customers.jsx'));
 const Analytics = lazy(() => import('./pages/dashboard/Analytics.jsx'));
 const Settings = lazy(() => import('./pages/dashboard/Settings.jsx'));
 const Services = lazy(() => import('./pages/dashboard/Services.jsx'));
+const Reviews = lazy(() => import('./pages/dashboard/Reviews.jsx'));
 const ThemeEditor = lazy(() => import('./pages/dashboard/ThemeEditor.jsx'));
 const AdminApp = lazy(() => import('./pages/admin/AdminApp.jsx'));
 const AdminOverview = lazy(() => import('./pages/admin/Overview.jsx'));
@@ -48,6 +55,8 @@ const AdminDepartments = lazy(() => import('./pages/admin/Departments.jsx'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
 const AdminDeliveries = lazy(() => import('./pages/admin/Deliveries.jsx'));
 const AdminServices = lazy(() => import('./pages/admin/Services.jsx'));
+const AdminSourcing = lazy(() => import('./pages/admin/Sourcing.jsx'));
+const AdminBuyers = lazy(() => import('./pages/admin/Buyers.jsx'));
 const AdminReports = lazy(() => import('./pages/admin/Reports.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
 const StoreManage = lazy(() => import('./pages/admin/StoreManage.jsx'));
@@ -70,12 +79,19 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <MarketHome /> },
       { path: '/search', element: <MarketSearch /> },
+      { path: '/visual', element: <VisualSearch /> },
       { path: '/login', element: <Login /> },
       { path: '/register', element: <Register /> },
       { path: '/setup/:token', element: <Setup /> },
       { path: '/track', element: <Track /> },
       { path: '/track/:token', element: <Track /> },
       { path: '/join', element: <Join /> },
+      { path: '/account', element: <Account /> },
+      { path: '/look/:token', element: <LookShare /> },
+      { path: '/legal', element: <Legal /> },
+      { path: '/legal/:doc', element: <Legal /> },
+      { path: '/request', element: <Request /> },
+      { path: '/request/:token', element: <Request /> },
       {
         path: '/s/:slug',
         element: <StoreLayout />,
@@ -109,6 +125,7 @@ const router = createBrowserRouter([
           { path: 'analytics', element: <Analytics /> },
           { path: 'settings', element: <Settings /> },
           { path: 'services', element: <Services /> },
+          { path: 'reviews', element: <Reviews /> },
           { path: 'theme', element: <ThemeEditor /> },
           { path: 'more', element: <More /> },
           { path: '*', element: <Navigate to="/dashboard" replace /> },
@@ -124,6 +141,8 @@ const router = createBrowserRouter([
           { path: 'orders', element: <AdminOrders /> },
           { path: 'deliveries', element: <AdminDeliveries /> },
           { path: 'services', element: <AdminServices /> },
+          { path: 'sourcing', element: <AdminSourcing /> },
+          { path: 'buyers', element: <AdminBuyers /> },
           { path: 'coupons', element: <AdminCoupons /> },
           { path: 'reports', element: <AdminReports /> },
           { path: 'system', element: <AdminSystem /> },
@@ -150,11 +169,13 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <I18nProvider>
         <AuthProvider>
+          <BuyerProvider>
           <CartProvider>
             <ToastProvider>
               <RouterProvider router={router} />
             </ToastProvider>
           </CartProvider>
+          </BuyerProvider>
         </AuthProvider>
       </I18nProvider>
     </MotionConfig>

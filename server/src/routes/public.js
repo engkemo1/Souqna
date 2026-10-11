@@ -1,12 +1,20 @@
 import { decodeDepartments } from '@souqna/shared';
 import crypto from 'node:crypto';
 import { Router } from 'express';
+import multer from 'multer';
+import sharp from 'sharp';
 import { listDepartments } from '../lib/departments.js';
 import { z } from 'zod';
 import { q, tx, insert } from '../db/index.js';
-import { h, notFound, AppError } from '../lib/errors.js';
+import { randomBytes } from 'node:crypto';
+import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { clampInt, nowIso } from '../lib/util.js';
-import { mediaMap } from '../lib/media.js';
+import { mediaMap, processImage } from '../lib/media.js';
+import { sameDaySql } from '../lib/sameDay.js';
+import { buyerFromReq } from '../lib/buyers.js';
+import { recomputeRatings } from '../lib/reviews.js';
+import { searchByImage, visualSettings } from '../lib/visual.js';
+import { runStylist, stylistSettings, lookOfDay, cardsByIds } from '../lib/stylist.js';
 import { quote } from '../lib/cart.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert, notifyPlatformDelivery } from '../lib/whatsapp.js';
@@ -65,6 +73,7 @@ r.get('/search', h((req, res) => {
   if (isNew === '1') where.push("(p.is_new=1 OR p.created_at >= datetime('now','-30 days'))");
   if (inStock === '1') where.push('(p.track_stock=0 OR p.stock>0)');
   if (rating === '1') where.push('p.rating >= 4');
+  if (req.query.same_day === '1') { const sd = sameDaySql(); where.push(sd.sql); params.push(...sd.params); }
   // facets (counts per department / per store) are computed with every filter EXCEPT their own
   const baseWhere = [...where]; const baseParams = [...params];
   const deptSlug = String(department).replace(/[^a-z0-9_]/g, '');
@@ -88,6 +97,84 @@ r.get('/search', h((req, res) => {
   res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores } });
 }));
 
+/* ---------------------------------------------------------- visual search: "snap it, find it in Banha" */
+const photoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
+const hits = new Map(); // ip -> [timestamps] (simple per-IP limit: 40 photos / hour)
+r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
+  const vs = visualSettings();
+  if (!vs.enabled) throw new AppError(503, 'visual_disabled', 'Visual search is switched off.');
+  const ip = req.ip || 'x'; const now = Date.now();
+  const recent = (hits.get(ip) || []).filter((t) => now - t < 86400e3);
+  if (recent.length >= 120 || recent.filter((t) => now - t < 3600e3).length >= 40) throw new AppError(429, 'rate_limited', 'Too many searches, try again later.');
+  // free daily quota per visitor (0 = unlimited). Admin → النظام → البحث بالصورة.
+  if (vs.dailyFree && recent.filter((t) => t > new Date().setHours(0, 0, 0, 0)).length >= vs.dailyFree) throw new AppError(429, 'visual_quota', 'Daily free searches used up.');
+  hits.set(ip, [...recent, now]);
+  if (!req.file) throw new AppError(422, 'validation_failed', 'Pick a photo.', { file: 'required' });
+  const department = String(req.body?.department || '').replace(/[^a-z0-9_]/g, '');
+  let top;
+  try { top = await searchByImage(req.file.buffer, { department, limit: 24 }); } catch { throw new AppError(400, 'invalid_image', 'This file is not a supported image.'); }
+  if (!top.length) return res.json({ items: [], total: 0 });
+  const rows = q.all(
+    `SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id WHERE p.id IN (${top.map(() => '?').join(',')})`, top.map((t) => t.id));
+  const byId = new Map(rows.map((x) => [x.id, x]));
+  const ordered = top.map((t) => byId.get(t.id)).filter(Boolean);
+  const items = serializeCards(ordered).map((c, i) => ({ ...c, store: { slug: ordered[i].store_slug, name: bi(ordered[i], 'store_name') }, match: Math.round(Math.max(0, Math.min(1, top[i].score)) * 100) }));
+  res.json({ items, total: items.length });
+}));
+
+/* ---------------------------------------------------------- stylist chat ("مودة") */
+const chatHits = new Map();
+r.post('/stylist', h(async (req, res) => {
+  const st = stylistSettings();
+  if (!st.enabled) throw new AppError(503, 'stylist_disabled', 'The stylist is switched off.');
+  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(700) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string().max(100)).optional() }).parse(req.body);
+  if (body.messages[body.messages.length - 1].role !== 'user') throw new AppError(422, 'validation_failed', 'Last message must be from the shopper.');
+  const ip = req.ip || 'x'; const now = Date.now();
+  const recent = (chatHits.get(ip) || []).filter((t) => now - t < 86400e3);
+  if (recent.length >= 200 || recent.filter((t) => now - t < 3600e3).length >= 40) throw new AppError(429, 'rate_limited', 'Too many messages, try again later.');
+  if (st.dailyFree && recent.filter((t) => t > new Date().setHours(0, 0, 0, 0)).length >= st.dailyFree) throw new AppError(429, 'stylist_quota', 'Daily free messages used up.');
+  chatHits.set(ip, [...recent, now]);
+  // a signed-in shopper's wardrobe (what she/he really bought) lets Moda build looks around it
+  const me = buyerFromReq(req); let profile = body.profile;
+  if (me) {
+    const owned = q.all("SELECT oi.name_ar, oi.color FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.buyer_id=? AND o.status='delivered' ORDER BY o.id DESC LIMIT 8", [me.id]);
+    if (owned.length) profile = { ...(profile || {}), owns: owned.map((x) => [x.name_ar, x.color].filter(Boolean).join(' ')).join('، ').slice(0, 300), ...(me.name ? { name: me.name.split(' ')[0] } : {}) };
+  }
+  try { res.json(await runStylist(body.messages, { image: body.image, image2: body.image2, profile })); }
+  catch (e) { if (e.code === 'stylist_no_vision') throw new AppError(422, 'stylist_no_vision', 'Photos need the Anthropic provider.'); if (e.code === 'stylist_bad_image') throw new AppError(422, 'stylist_bad_image', 'Unsupported image.'); if (e.code === 'stylist_unavailable') throw new AppError(503, 'stylist_unavailable', 'The stylist is unavailable right now.'); throw e; }
+}));
+
+r.post('/look-share', h(async (req, res) => {
+  const b = z.object({ title: z.string().max(80).optional(), items: z.array(z.object({ id: z.number().int(), label: z.string().max(60).optional() })).min(1).max(12) }).parse(req.body);
+  const valid = new Set(cardsByIds(b.items.map((i) => i.id)).map((c) => c.id));
+  const items = b.items.filter((i) => valid.has(i.id));
+  if (!items.length) throw badRequest('No valid products.');
+  const token = randomBytes(6).toString('base64url');
+  q.run('INSERT INTO shared_looks(token,title,items_json) VALUES(?,?,?)', [token, (b.title || '').trim(), JSON.stringify(items)]);
+  res.status(201).json({ token, url: `/look/${token}` });
+}));
+
+export function loadSharedLook(token) {
+  const row = /^[\w-]{6,16}$/.test(token || '') ? q.get('SELECT * FROM shared_looks WHERE token=?', [token]) : null;
+  if (!row) return null;
+  let items = []; try { items = JSON.parse(row.items_json); } catch { /* empty */ }
+  const cards = new Map(cardsByIds(items.map((i) => i.id)).map((c) => [c.id, c]));
+  const pieces = items.map((i) => (cards.get(i.id) ? { label: i.label || '', ...cards.get(i.id) } : null)).filter(Boolean);
+  return { token, title: row.title, pieces, total: pieces.reduce((s, p) => s + p.price, 0) };
+}
+
+r.get('/look-share/:token', h(async (req, res) => {
+  const look = loadSharedLook(req.params.token);
+  if (!look) throw notFound('Look not found.');
+  res.json(look);
+}));
+
+r.get('/look-of-day', h(async (_req, res) => {
+  if (!stylistSettings().enabled) return res.json({ day: null, entries: [] });
+  res.set('Cache-Control', 'public, max-age=300');
+  res.json(await lookOfDay());
+}));
+
 r.get('/marketplace', h((req, res) => {
   const { q: term = '', category = '', sort = 'featured' } = req.query;
   const where = ["s.status='active'", 's.hidden=0'];
@@ -98,6 +185,7 @@ r.get('/marketplace', h((req, res) => {
     const like = `%${String(term).slice(0, 60)}%`;
     params.push(like, like, like, like);
   }
+  if (req.query.same_day === '1') { const sd = sameDaySql(); where.push(sd.sql); params.push(...sd.params); }
   const order = {
     featured: 's.featured DESC, s.rating DESC',
     rating: 's.rating DESC, s.rating_count DESC',
@@ -134,7 +222,7 @@ r.get('/marketplace', h((req, res) => {
   const deptRails = departments.filter((d) => d.products >= 3).sort((a, b) => b.products - a.products).slice(0, 4)
     .map((d) => ({ slug: d.slug, name: d.name, items: railRows('AND p.department=? ORDER BY p.sold_count DESC, p.id DESC LIMIT 10', [d.slug]) }));
   cache(res, 60);
-  res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails });
+  res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });
 }));
 
 /* ---------------------------------------------------------- storefront */
@@ -252,6 +340,54 @@ r.get('/stores/:slug/products/:pslug', h((req, res) => {
   res.json({ product: serializeProductDetail(p), related });
 }));
 
+/* ---------------------------------------------------------- reviews (verified buyers only, photos allowed) */
+const reviewPhotos = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 3 } });
+
+function reviewOut(rows) {
+  const media = mediaMap(rows.flatMap((x) => JSON.parse(x.media_ids || '[]')));
+  return rows.map((x) => ({ id: x.id, name: x.name, rating: x.rating, comment: x.comment || '', createdAt: x.created_at, photos: JSON.parse(x.media_ids || '[]').map((id) => media.get(id)).filter(Boolean) }));
+}
+
+r.get('/stores/:slug/products/:pslug/reviews', h((req, res) => {
+  const s = loadStore(req.params.slug);
+  const p = q.get("SELECT id FROM products WHERE store_id=? AND slug=? AND status='active'", [s.id, req.params.pslug]);
+  if (!p) throw notFound('Product');
+  const rows = q.all("SELECT * FROM reviews WHERE product_id=? AND status='published' ORDER BY (media_ids <> '[]') DESC, id DESC LIMIT 40", [p.id]);
+  const dist = [0, 0, 0, 0, 0];
+  for (const d of q.all("SELECT rating, COUNT(*) AS n FROM reviews WHERE product_id=? AND status='published' GROUP BY rating", [p.id])) dist[d.rating - 1] = d.n;
+  const count = dist.reduce((a, b) => a + b, 0);
+  const avg = count ? Math.round((dist.reduce((a, n, i) => a + n * (i + 1), 0) / count) * 10) / 10 : 0;
+  cache(res, 15);
+  res.json({ summary: { avg, count, dist }, items: reviewOut(rows) });
+}));
+
+const reviewHits = new Map();
+r.post('/track/:token/review', reviewPhotos.array('photos', 3), h(async (req, res) => {
+  const recent = trackGuard(req);
+  const o = /^[A-Za-z0-9_-]{10,40}$/.test(req.params.token) ? q.get('SELECT * FROM orders WHERE track_token=?', [req.params.token]) : null;
+  if (!o) trackMiss(req, recent);
+  if (o.status !== 'delivered') throw new AppError(409, 'review_not_delivered', 'You can review once the order is delivered.');
+  const b = z.object({ productId: z.coerce.number().int().positive(), rating: z.coerce.number().int().min(1).max(5), comment: z.string().trim().max(600).optional().default('') }).parse(req.body);
+  if (!q.get('SELECT 1 AS x FROM order_items WHERE order_id=? AND product_id=?', [o.id, b.productId])) throw notFound('Product');
+  if (q.get('SELECT 1 AS x FROM reviews WHERE order_id=? AND product_id=?', [o.id, b.productId])) throw new AppError(409, 'review_exists', 'You already reviewed this product.');
+  const hits = (reviewHits.get(req.ip) || []).filter((t) => Date.now() - t < 3600e3);
+  if (hits.length >= 20) throw new AppError(429, 'rate_limited', 'Too many reviews, try again later.');
+  reviewHits.set(req.ip, [...hits, Date.now()]);
+  const ids = [];
+  for (const f of req.files || []) {
+    const m = await processImage(f.buffer, { storeId: o.store_id, kind: 'review', alt: null });
+    q.run('UPDATE media SET attached=1 WHERE id=?', [m.id]);
+    ids.push(m.id);
+  }
+  const name = String(o.customer_name || '').trim().split(/\s+/)[0] || 'عميل';
+  tx(() => {
+    insert('reviews', { store_id: o.store_id, product_id: b.productId, order_id: o.id, name, rating: b.rating, comment: b.comment || null, media_ids: JSON.stringify(ids), status: 'published', created_at: nowIso() });
+    recomputeRatings(b.productId, o.store_id);
+  });
+  notifyStore(o.store_id, { title: `تقييم جديد ${'★'.repeat(b.rating)}`, body: b.comment || 'عميل قيّم منتجك', url: '/dashboard/reviews' });
+  res.status(201).json({ ok: true });
+}));
+
 r.post('/stores/:slug/visit', h((req, res) => {
   const s = loadStore(req.params.slug);
   const day = new Date().toISOString().slice(0, 10);
@@ -302,7 +438,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
       store_id: s.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
       governorate: body.governorate, city: body.city, address: body.address, notes: body.notes,
       status: 'pending', delivery_by: s.delivery_mode === 'platform' ? 'platform' : 'store', subtotal: qt.subtotal, discount: qt.discount, shipping: qt.shipping, total: qt.total,
-      coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, created_at: now, updated_at: now,
+      coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
     });
     for (const l of qt.lines) {
       insert('order_items', { order_id: orderId, product_id: l.productId, variant_id: l.variantId, name_ar: l.name.ar, name_en: l.name.en, media_id: l.mediaId, color: l.color, size: l.size, price: l.price, qty: l.qty });
@@ -358,7 +494,7 @@ function trackPayload(o) {
     city: o.city, governorate: o.governorate, phone: o.phone.replace(/^(\d{3})\d{5}/, '$1•••••'),
     subtotal: o.subtotal, discount: o.discount, shipping: o.shipping, total: o.total, payment: o.payment_method,
     store: { name: { ar: s?.name_ar, en: s?.name_en }, slug: s?.slug, phone: s?.phone || null },
-    items: items.map((i) => ({ name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
+    items: items.map((i) => ({ productId: i.product_id, reviewed: i.product_id ? !!q.get('SELECT 1 AS x FROM reviews WHERE order_id=? AND product_id=?', [o.id, i.product_id]) : true, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
     events,
   };
 }
@@ -376,6 +512,56 @@ r.post('/track/lookup', h((req, res) => {
   const o = q.get('SELECT * FROM orders WHERE UPPER(number)=UPPER(?)', [body.number]);
   if (!o || normPhone(o.phone) !== normPhone(body.phone)) trackMiss(req, recent);
   res.json({ order: trackPayload(o) });
+}));
+
+/* ---------------------------------------------------------- "not in Banha? we get it for you" (platform sourcing, inspection before handover) */
+const SOURCING_STATUSES = ['new', 'quoted', 'approved', 'ordered', 'arrived', 'delivered', 'cancelled'];
+const sourcingUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
+const sourcingHits = new Map();
+
+const sourcingOut = (x) => ({ number: x.number, token: x.track_token, title: x.title, details: x.details, status: x.status, quotePrice: x.quote_price, note: x.admin_note, createdAt: x.created_at, updatedAt: x.updated_at, photo: x.photo || null, firstName: String(x.name).split(' ')[0] });
+
+r.post('/sourcing', sourcingUpload.single('photo'), h(async (req, res) => {
+  const hits = (sourcingHits.get(req.ip) || []).filter((t) => Date.now() - t < 3600e3);
+  if (hits.length >= 6) throw new AppError(429, 'rate_limited', 'Too many requests, try again later.');
+  const clean = (v) => (v === undefined || v === '' ? undefined : v);
+  const b = z.object({
+    title: z.string().trim().min(3).max(120), details: z.string().trim().max(800).optional(), link: z.preprocess(clean, z.string().trim().url().max(400).optional()),
+    size: z.string().trim().max(30).optional(), color: z.string().trim().max(40).optional(), budget: z.preprocess(clean, z.coerce.number().int().min(0).max(1e6).optional()),
+    name: z.string().trim().min(2).max(60), phone: z.string().trim().min(8).max(20), governorate: z.string().trim().max(40).optional(), city: z.string().trim().max(60).optional(),
+    address: z.string().trim().min(6).max(200), source: z.string().trim().max(20).optional(),
+  }).parse(req.body);
+  if (!/^01[0-9]{9}$/.test(normPhone(b.phone))) throw new AppError(422, 'validation_failed', 'Enter a valid Egyptian mobile number.', { phone: 'phone_invalid' });
+  let photo = null;
+  if (req.file) {
+    try { photo = `data:image/jpeg;base64,${(await sharp(req.file.buffer).rotate().resize({ width: 900, height: 900, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 72, mozjpeg: true }).toBuffer()).toString('base64')}`; }
+    catch { throw new AppError(400, 'invalid_image', 'This file is not a supported image.'); }
+  }
+  sourcingHits.set(req.ip, [...hits, Date.now()]);
+  const number = `RQ-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${crypto.randomInt(1000, 9999)}`;
+  const track = crypto.randomBytes(12).toString('base64url');
+  const now = nowIso();
+  insert('sourcing_requests', { number, track_token: track, title: b.title, details: b.details || null, link: b.link || null, size: b.size || null, color: b.color || null, budget: b.budget ?? null, photo,
+    name: b.name, phone: normPhone(b.phone), governorate: b.governorate || null, city: b.city || null, address: b.address, source: b.source || null, created_at: now, updated_at: now });
+  res.status(201).json({ number, token: track });
+}));
+
+r.get('/sourcing/:token', h((req, res) => {
+  const recent = trackGuard(req);
+  const x = /^[A-Za-z0-9_-]{10,40}$/.test(req.params.token) ? q.get('SELECT * FROM sourcing_requests WHERE track_token=?', [req.params.token]) : null;
+  if (!x) trackMiss(req, recent);
+  res.json({ request: sourcingOut(x) });
+}));
+
+/** The customer accepts or declines the price we quoted. */
+r.post('/sourcing/:token/respond', h((req, res) => {
+  const recent = trackGuard(req);
+  const x = /^[A-Za-z0-9_-]{10,40}$/.test(req.params.token) ? q.get('SELECT * FROM sourcing_requests WHERE track_token=?', [req.params.token]) : null;
+  if (!x) trackMiss(req, recent);
+  const { accept } = z.object({ accept: z.boolean() }).parse(req.body);
+  if (x.status !== 'quoted') throw new AppError(409, 'sourcing_not_quoted', 'There is no price to answer yet.');
+  q.run('UPDATE sourcing_requests SET status=?, updated_at=? WHERE id=?', [accept ? 'approved' : 'cancelled', nowIso(), x.id]);
+  res.json({ ok: true });
 }));
 
 export default r;

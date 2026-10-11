@@ -13,12 +13,12 @@ const sha = (d) => crypto.createHash('sha256').update(d).digest('hex');
 const hmac = (k, d) => crypto.createHmac('sha256', k).update(d).digest();
 const enc = (key) => key.split('/').map(encodeURIComponent).join('/');
 
-async function request(method, key, body, contentType) {
+async function request(method, key, body, contentType, acct = { bucket: c.bucket, accessKeyId: c.accessKeyId, secretAccessKey: c.secretAccessKey }) {
   const payload = body || Buffer.alloc(0);
   const now = new Date();
   const amz = now.toISOString().replace(/[:-]|\.\d{3}/g, '');
   const day = amz.slice(0, 8);
-  const pathName = `/${c.bucket}/${enc(key)}`;
+  const pathName = `/${acct.bucket}/${enc(key)}`;
   const payloadHash = sha(payload);
   const headers = { host, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amz };
   if (contentType) headers['content-type'] = contentType;
@@ -26,9 +26,9 @@ async function request(method, key, body, contentType) {
   const canonical = [method, pathName, '', names.map((n) => `${n}:${headers[n]}\n`).join(''), names.join(';'), payloadHash].join('\n');
   const scope = `${day}/auto/s3/aws4_request`;
   const toSign = ['AWS4-HMAC-SHA256', amz, scope, sha(canonical)].join('\n');
-  const kSig = hmac(hmac(hmac(hmac(`AWS4${c.secretAccessKey}`, day), 'auto'), 's3'), 'aws4_request');
+  const kSig = hmac(hmac(hmac(hmac(`AWS4${acct.secretAccessKey}`, day), 'auto'), 's3'), 'aws4_request');
   const signature = crypto.createHmac('sha256', kSig).update(toSign).digest('hex');
-  headers.authorization = `AWS4-HMAC-SHA256 Credential=${c.accessKeyId}/${scope}, SignedHeaders=${names.join(';')}, Signature=${signature}`;
+  headers.authorization = `AWS4-HMAC-SHA256 Credential=${acct.accessKeyId}/${scope}, SignedHeaders=${names.join(';')}, Signature=${signature}`;
   delete headers.host;
   const res = await fetch(`${endpoint}${pathName}`, { method, headers, body: method === 'PUT' ? payload : undefined });
   if (!res.ok && !(method === 'DELETE' && res.status === 404)) {
@@ -41,3 +41,12 @@ const TYPES = { webp: 'image/webp', jpg: 'image/jpeg' };
 export const r2Put = (key, buf) => request('PUT', key, buf, TYPES[key.split('.').pop()] || 'application/octet-stream');
 export const r2Delete = (key) => request('DELETE', key);
 export async function r2Get(key) { const r = await request('GET', key); return Buffer.from(await r.arrayBuffer()); }
+
+/**
+ * Off-site database backups: a SEPARATE, PRIVATE R2 bucket (never the public photo bucket — a database copy must not be reachable by URL).
+ * BACKUP_R2_BUCKET is required; the keys default to the photo bucket's keys (the API token must be allowed on both buckets).
+ */
+const off = { bucket: process.env.BACKUP_R2_BUCKET || '', accessKeyId: process.env.BACKUP_R2_ACCESS_KEY_ID || c.accessKeyId, secretAccessKey: process.env.BACKUP_R2_SECRET_ACCESS_KEY || c.secretAccessKey };
+export const offsiteEnabled = Boolean(c.accountId && off.bucket && off.accessKeyId && off.secretAccessKey && off.bucket !== c.bucket);
+export const offsitePut = (key, buf) => request('PUT', key, buf, 'application/gzip', off);
+export const offsiteDelete = (key) => request('DELETE', key, undefined, undefined, off);

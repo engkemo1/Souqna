@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Banknote, ChevronDown, Lock, Tag, X, ShoppingBag } from 'lucide-react';
 import { GOVERNORATES } from '@souqna/shared';
@@ -19,6 +19,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
+import { useBuyer } from '../../lib/buyer.jsx';
 
 const PHONE = /^01[0125][0-9]{8}$/;
 
@@ -81,7 +82,8 @@ export default function Checkout() {
   const toast = useToast();
   const navigate = useNavigate();
   const [saved, setSaved] = useLocalState('souqna.customer', { name: '', phone: '', governorate: 'Qalyubia', city: lang === 'ar' ? 'بنها' : 'Banha', address: '' });
-  const [form, setForm] = useState({ ...saved, notes: '' });
+  const me = useBuyer();
+  const [form, setForm] = useState({ ...saved, ...(me?.buyer ? { name: saved.name || me.buyer.name, phone: saved.phone || me.buyer.phone } : {}), notes: '' });
   const [errors, setErrors] = useState({});
   const [quote, setQuote] = useState(null);
   const [coupon, setCoupon] = useState(null);
@@ -231,6 +233,7 @@ export default function Checkout() {
           <div className="mt-8 hidden lg:block">
             <Button type="submit" size="lg" full loading={placing} disabled={blocked || !quote}>{t('checkout.placeOrder', { v: total })}</Button>
             <p className="mt-3 flex items-center justify-center gap-1.5 text-[13px] text-muted"><Lock className="h-3.5 w-3.5" />{t('checkout.secure')}</p>
+            <p className="mt-2 text-center text-[11.5px] text-muted">{t('legal.consent')} <Link to="/legal/terms" className="underline">{t('legal.terms')}</Link> · <Link to="/legal/privacy" className="underline">{t('legal.privacy')}</Link> · <Link to="/legal/returns" className="underline">{t('legal.returns')}</Link></p>
           </div>
         </form>
 
@@ -244,6 +247,7 @@ export default function Checkout() {
       <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-elevated/95 px-4 pt-3 backdrop-blur-md pb-[calc(12px+var(--safe-b))] lg:hidden">
         <Button size="lg" full loading={placing} disabled={blocked || !quote} onClick={place}>{t('checkout.placeOrder', { v: total })}</Button>
         <p className="mt-2 flex items-center justify-center gap-1.5 text-xs text-muted"><Lock className="h-3 w-3" />{t('checkout.secure')}</p>
+        <p className="mt-2 text-center text-[11.5px] text-muted">{t('legal.consent')} <Link to="/legal/terms" className="underline">{t('legal.terms')}</Link> · <Link to="/legal/privacy" className="underline">{t('legal.privacy')}</Link> · <Link to="/legal/returns" className="underline">{t('legal.returns')}</Link></p>
       </div>
     </PageTransition>
   );

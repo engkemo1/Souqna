@@ -7,6 +7,7 @@ import Skeleton from '../ui/Skeleton.jsx';
 import { StoreLogo } from '../store/StoreChrome.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { cx } from '../ui/cx.js';
+import SameDayBadge from '../store/SameDayBadge.jsx';
 
 export default function StoreCard({ store: s, index = 0, large }) {
   const { t, tr, lang } = useI18n();
@@ -27,6 +28,7 @@ export default function StoreCard({ store: s, index = 0, large }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
           <div className="absolute start-3 top-3 flex flex-wrap gap-1.5">
             {s.featured && <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11.5px] font-semibold text-neutral-900 shadow-sm backdrop-blur"><BadgeCheck className="h-3.5 w-3.5 text-[#FF5A1F]" />{t('market.featured')}</span>}
+            {s.sameDay && <SameDayBadge solid />}
             {s.offerBadge && <span className="rounded-full px-2.5 py-1 text-[11.5px] font-bold text-white shadow-sm" style={{ backgroundColor: brand ? `rgb(${brand})` : '#B4532A' }}>{tr(s.offerBadge)}</span>}
           </div>
           <span className="absolute bottom-3 end-3 hidden translate-y-2 items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-sm font-semibold text-neutral-900 opacity-0 shadow-soft transition duration-300 group-hover:translate-y-0 group-hover:opacity-100 [@media(hover:hover)]:inline-flex">

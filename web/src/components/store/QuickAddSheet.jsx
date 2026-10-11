@@ -13,7 +13,7 @@ import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { sp } from '../../lib/store.jsx';
 
-export default function QuickAddSheet({ slug, product, onClose }) {
+export default function QuickAddSheet({ slug, product, onClose, onAdded, step }) {
   const { t, tr } = useI18n();
   const { data, error, loading, reload } = useApi(product ? `/stores/${slug}/products/${product.slug}` : null);
   const p = data?.product;
@@ -35,11 +35,11 @@ export default function QuickAddSheet({ slug, product, onClose }) {
   const onAdd = () => {
     if (needsSize) { setSizeError(true); return; }
     add({ product: p, variant, color, size, fromEl: imgRef.current });
-    onClose();
+    if (onAdded) onAdded(); else onClose();
   };
 
   return (
-    <Sheet open={!!product} onClose={onClose} title={product ? tr(product.name) : ''} side="auto" desktop="center" size="lg"
+    <Sheet open={!!product} onClose={onClose} title={product ? `${step ? `${step} · ` : ''}${tr(product.name)}` : ''} side="auto" desktop="center" size="lg"
       footer={p && (
         <Button full size="lg" disabled={available <= 0 && !needsSize} onClick={onAdd}>
           {available <= 0 && !needsSize ? t('product.outOfStock') : t('product.addToCart')}

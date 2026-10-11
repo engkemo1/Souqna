@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Plus, X, Check, Eye, Info, Package } from 'lucide-react';
+import { ChevronDown, Plus, X, Check, Eye, Info, Package, Sparkles, Loader2 } from 'lucide-react';
 import { onColor } from '@souqna/shared/theme';
 import { useApi, useIsDesktop, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
@@ -263,6 +263,24 @@ export default function ProductEditor() {
   }, [data, isNew]);
 
   const set = (patch) => setF((x) => ({ ...x, ...patch }));
+  const [aiBusy, setAiBusy] = useState(false);
+  const aiFill = async () => {
+    const first = f.media[0]; if (!first || aiBusy) return;
+    setAiBusy(true);
+    try {
+      const { suggestion: a } = await api('/owner/ai/product', { method: 'POST', body: { mediaId: first.id, hint: f.name_ar || undefined } });
+      const patch = {};
+      if (!f.name_ar.trim() && a.name_ar) patch.name_ar = a.name_ar;
+      if (!f.name_en.trim() && a.name_en) patch.name_en = a.name_en;
+      if (!f.description_ar.trim() && a.description_ar) patch.description_ar = a.description_ar;
+      if (!f.description_en.trim() && a.description_en) patch.description_en = a.description_en;
+      if (!f.colors.length && a.colors?.length) patch.colors = a.colors.map((n) => PRESET_COLORS.find((p) => p[2] === n)).filter(Boolean).map(([hex, ar, en]) => ({ hex, name_ar: ar, name_en: en }));
+      if (!f.sizes.length && a.size_kind) { const i = ['clothes', 'pants', 'shoes', 'kids', 'length', 'free'].indexOf(a.size_kind); if (i >= 0) patch.sizes = SIZE_SETS[i].slice(0, i === 5 ? 1 : undefined); }
+      if (multiDept && !f.department && a.department) patch.department = a.department;
+      set(patch); toast({ title: t('editor.aiFilled') });
+    } catch (err) { toast({ tone: 'error', title: errorMessage(t, err) }); }
+    setAiBusy(false);
+  };
   const dirty = useMemo(() => JSON.stringify(toPayload(f)) !== JSON.stringify(toPayload(initial)), [f, initial]);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && !saving && currentLocation.pathname !== nextLocation.pathname);
 
@@ -315,6 +333,11 @@ export default function ProductEditor() {
   const S = {
     basic: (
       <div className="grid gap-4 sm:grid-cols-2">
+        {f.media.length > 0 && (
+          <button type="button" onClick={aiFill} disabled={aiBusy} className="flex items-center justify-center gap-2 rounded-xl border border-brand/40 bg-brand/5 px-4 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-60 sm:col-span-2">
+            {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{t('editor.aiFill')}
+          </button>
+        )}
         <Field label={t('editor.nameAr')} error={errors.name_ar}><Input dir="rtl" value={f.name_ar} onChange={(e) => set({ name_ar: e.target.value })} /></Field>
         <Field label={t('editor.nameEn')} error={errors.name_en}><Input dir="ltr" value={f.name_en} onChange={(e) => set({ name_en: e.target.value })} /></Field>
         {multiDept && (

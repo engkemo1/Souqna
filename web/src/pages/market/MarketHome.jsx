@@ -10,6 +10,10 @@ import Brand from '../../components/market/Brand.jsx';
 import PromoBar from '../../components/market/PromoBar.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import MarketSearchBar from '../../components/market/MarketSearchBar.jsx';
+import StylistChat from '../../components/market/StylistChat.jsx';
+import WearThis from '../../components/market/WearThis.jsx';
+import RequestBanner from '../../components/market/RequestBanner.jsx';
+import LookOfDay from '../../components/market/LookOfDay.jsx';
 import DeptStrip from '../../components/market/DeptStrip.jsx';
 import ProductRail from '../../components/market/ProductRail.jsx';
 import StoreCard, { StoreCardSkeleton } from '../../components/market/StoreCard.jsx';
@@ -124,6 +128,9 @@ export default function MarketHome() {
 
       {/* shop by department (every department, even ones with no store yet) */}
       <div className="mt-10"><DeptStrip departments={base?.departments || []} /></div>
+      <LookOfDay />
+      <WearThis />
+      <RequestBanner className="mt-8" />
 
       {/* product shelves, Amazon-style */}
       <div className="mt-6 border-y border-line bg-secondary/50">
@@ -210,8 +217,12 @@ export default function MarketHome() {
 
       <footer className="container mt-16 flex flex-col items-center justify-between gap-4 border-t border-line py-10 text-sm text-muted sm:flex-row">
         <Brand />
-        <p>© {new Date().getFullYear()} {t('market.footer')}</p>
+        <div className="flex flex-col items-center gap-2 sm:items-end">
+          <nav className="flex flex-wrap justify-center gap-x-4 gap-y-1">{[['privacy', 'legal.privacy'], ['terms', 'legal.terms'], ['returns', 'legal.returns']].map(([k, l]) => <Link key={k} to={`/legal/${k}`} className="hover:text-fg">{t(l)}</Link>)}</nav>
+          <p>© {new Date().getFullYear()} {t('market.footer')}</p>
+        </div>
       </footer>
+      <StylistChat />
     </div>
   );
 }

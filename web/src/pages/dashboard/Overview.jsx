@@ -15,6 +15,8 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import { Segmented } from '../../components/ui/Field.jsx';
 import { ErrorState, EmptyState } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
+import WeeklyReportCard from '../../components/dash/WeeklyReportCard.jsx';
+import SameDayCard from '../../components/dash/SameDayCard.jsx';
 import AppAlertsCard from '../../components/dash/AppAlertsCard.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
@@ -52,6 +54,8 @@ export default function Overview() {
   return (
     <PageTransition>
       <AppAlertsCard hideWhenDone className="mb-6" />
+      <SameDayCard className="mb-6" />
+      <WeeklyReportCard className="mb-6" />
       {/* greeting + today */}
       <div className="mb-6 flex flex-col gap-5 sm:mb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>

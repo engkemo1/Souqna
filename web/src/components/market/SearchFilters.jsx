@@ -65,6 +65,7 @@ export default function SearchFilters({ params, set, facets, departments, label,
       </Group>
 
       <Group title={t('search.options')}>
+        <Toggle checked={flag('same_day')} onChange={(v) => set({ same_day: v ? '1' : '' })}>{t('sameday.filter')}</Toggle>
         <Toggle checked={flag('sale')} onChange={(v) => set({ sale: v ? '1' : '' })}>{t('search.onSale')}</Toggle>
         <Toggle checked={flag('new')} onChange={(v) => set({ new: v ? '1' : '' })}>{t('search.newOnly')}</Toggle>
         <Toggle checked={flag('in_stock')} onChange={(v) => set({ in_stock: v ? '1' : '' })}>{t('search.inStock')}</Toggle>

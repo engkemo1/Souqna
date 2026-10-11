@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search } from 'lucide-react';
+import { Search, Camera } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useDepartments } from '../../lib/departments.js';
 
@@ -20,6 +20,11 @@ export default function MarketSearchBar({ initial = '', autoFocus, chips = true 
           className="h-14 w-full rounded-2xl border border-line-strong bg-elevated ps-12 pe-28 text-base shadow-soft outline-none transition placeholder:text-muted/80 focus:border-ring focus:shadow-ring" />
         <button type="submit" className="absolute end-2 top-1/2 h-10 -translate-y-1/2 rounded-xl bg-btn px-5 text-sm font-semibold text-on-btn transition active:scale-95">{t('search.go')}</button>
       </form>
+      {chips && (
+        <Link to="/visual" className="mt-3 inline-flex h-11 items-center gap-2 rounded-full bg-secondary px-4 text-sm font-bold text-brand transition hover:brightness-95 active:scale-95">
+          <Camera className="h-[18px] w-[18px]" />{t('visual.cta')}
+        </Link>
+      )}
       {chips && list.length > 0 && (
         <div className="scroll-x -mx-4 mt-3 gap-2 px-4 sm:mx-0 sm:flex-wrap sm:px-0">
           {list.slice(0, 9).map((d) => (

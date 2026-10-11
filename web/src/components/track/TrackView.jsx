@@ -5,6 +5,7 @@ import SmartImage from '../ui/SmartImage.jsx';
 import Button from '../ui/Button.jsx';
 import { cx } from '../ui/cx.js';
 import { SALES_WHATSAPP } from '../../config/contact.js';
+import ReviewForm from './ReviewForm.jsx';
 
 const STEPS = [
   { key: 'pending', icon: ClipboardCheck },
@@ -70,9 +71,10 @@ export default function TrackView({ order: o }) {
       <div className="rounded-3xl border border-line bg-elevated p-5 sm:p-6">
         <ul className="space-y-3">
           {o.items.map((it, i) => (
-            <li key={i} className="flex items-center gap-3">
+            <li key={i} className="flex flex-wrap items-center gap-3">
               <SmartImage media={it.image} ratio="4 / 5" sizes="56px" className="w-14 shrink-0 rounded-lg" />
-              <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{tr(it.name)}</p><p className="text-xs text-muted">{[it.size, `× ${it.qty}`].filter(Boolean).join(' · ')}</p></div>
+              <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{tr(it.name)}</p><p className="text-xs text-muted">{[it.size, `× ${it.qty}`].filter(Boolean).join(' · ')}</p>
+                {o.status === 'delivered' && o.token && it.productId && <div className="mt-1"><ReviewForm token={o.token} item={it} /></div>}</div>
               <span className="text-sm font-semibold tabular">{formatMoney(it.price * it.qty, lang)}</span>
             </li>
           ))}

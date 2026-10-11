@@ -12,10 +12,14 @@ import { h, AppError } from '../lib/errors.js';
 import { listDepartments, assertDepartments } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
-import { saveDeptImage, removeDeptImage } from '../lib/deptImage.js';
+import { visualStatus, saveVisualSettings } from '../lib/visual.js';
+import { stylistStatus, saveStylistSettings } from '../lib/stylist.js';
+import { saveDeptImage, removeDeptImage, saveStylistAvatar } from '../lib/deptImage.js';
+import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
 import { verifyTotp } from '../lib/totp.js';
-import { snapshotDb, runBackup, lastBackup } from '../lib/backup.js';
+import { snapshotDb, runBackup, lastBackup, runOffsiteBackup, lastOffsite } from '../lib/backup.js';
+import { offsiteEnabled } from '../lib/r2.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -93,6 +97,7 @@ r.patch('/orders/:id/status', h((req, res) => {
     q.run('UPDATE orders SET status=?, updated_at=? WHERE id=?', [status, now, o.id]);
     insert('order_events', { order_id: o.id, status, note: null, created_at: now });
   });
+  notifyOrderStatus(o.id, status);
   res.json({ id: o.id, status });
 }));
 
@@ -242,7 +247,7 @@ const demoPasswordsUnchanged = () => {
 r.get('/status', h((_req, res) => {
   const insecureJwt = config.jwtSecret.startsWith('dev-only') || config.jwtSecret.length < 24;
   res.json({
-    backup: lastBackup(), backupDir: !!config.backupDir,
+    backup: lastBackup(), backupDir: !!config.backupDir, offsite: { enabled: offsiteEnabled, last: lastOffsite() },
     whatsappConfigured: isWhatsAppConfigured(), template: config.wa.template, registrationOpen: config.allowRegister,
     env: config.env, node: process.version, uptimeSec: Math.round(process.uptime()),
     checks: [
@@ -250,6 +255,7 @@ r.get('/status', h((_req, res) => {
       { id: 'admin', ok: config.adminKey.length >= 16, label: 'ADMIN_KEY قوي (16+ حرف)', fix: 'اضبط ADMIN_KEY بقيمة طويلة.' },
       { id: 'totp', ok: !!config.adminTotpSecret, label: 'تأكيد خطوتين لدخول الأدمن', fix: 'شغّل npm run admin-totp -w server واضبط ADMIN_TOTP_SECRET.' },
       { id: 'backup', ok: !!lastBackup() && Date.now() - Date.parse(lastBackup().at) < 36 * 3600e3, label: 'نسخة احتياطية يومية (قاعدة البيانات + الصور)', fix: 'اضبط BACKUP_DIR على مجلد على قرص دائم.' },
+      { id: 'offsite', ok: offsiteEnabled && !!lastOffsite() && Date.now() - Date.parse(lastOffsite().at) < 36 * 3600e3, label: 'نسخة احتياطية خارج Railway (Cloudflare R2 خاص)', fix: 'اعمل bucket خاص للنسخ واضبط BACKUP_R2_BUCKET.' },
       { id: 'demo-pw', ok: !demoPasswordsUnchanged(), label: 'باسورد حساب تاون ستايل التجريبي اتغيّر', fix: 'npm run set-password -w server -- townstyle@banhalook.app' },
       { id: 'register', ok: !config.allowRegister, label: 'التسجيل العام مقفول', fix: 'شيل ALLOW_REGISTER=1.' },
       { id: 'prod', ok: config.env === 'production', label: 'NODE_ENV=production', fix: 'اضبط NODE_ENV=production.' },
@@ -258,15 +264,66 @@ r.get('/status', h((_req, res) => {
   });
 }));
 
+/* ---- stylist chat settings ---- */
+r.get('/stylist', h((_req, res) => res.json(stylistStatus())));
+r.put('/stylist', h((req, res) => {
+  const b = z.object({ enabled: z.boolean().optional(), provider: z.enum(['anthropic', 'cloudflare']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional(), nameAr: z.string().trim().min(2).max(20).optional(), nameEn: z.string().trim().min(2).max(20).optional() }).parse(req.body);
+  saveStylistSettings(b);
+  res.json(stylistStatus());
+}));
+
+/* ---- visual search settings (on/off, model, free daily quota) ---- */
+r.get('/visual', h((_req, res) => res.json(visualStatus())));
+r.put('/visual', h((req, res) => {
+  const body = z.object({ enabled: z.boolean().optional(), model: z.enum(['color', 'clip', 'jina', 'cloudflare']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional() }).parse(req.body);
+  saveVisualSettings(body);
+  res.json(visualStatus());
+}));
+
 /** One-click download of a consistent database copy (for off-site safekeeping). Photos are covered by `npm run backup` / BACKUP_DIR. */
 r.get('/backup/db', h((_req, res, next) => {
   const tmp = path.join(os.tmpdir(), `bo-dl-${crypto.randomBytes(6).toString('hex')}.db`);
   snapshotDb(tmp);
   res.download(tmp, `banha-outfit-${new Date().toISOString().slice(0, 10)}.db`, (err) => { fs.rm(tmp, { force: true }, () => {}); if (err) next(err); });
 }));
+r.post('/backup/offsite', h(async (_req, res) => {
+  if (!offsiteEnabled) throw new AppError(400, 'backup_not_configured', 'BACKUP_R2_BUCKET is not set on the server.');
+  res.json(await runOffsiteBackup());
+}));
 r.post('/backup/run', h((_req, res) => {
   if (!config.backupDir) throw new AppError(400, 'backup_not_configured', 'BACKUP_DIR is not set on the server.');
   res.json(runBackup());
+}));
+
+/* ---------------------------------------------------------- shopper accounts (support: look up by phone, set a temporary password) */
+r.get('/buyers', h((req, res) => {
+  const term = String(req.query.q || '').replace(/\D/g, '');
+  const items = q.all(`SELECT b.id, b.name, b.phone, b.created_at, (SELECT COUNT(*) FROM orders o WHERE o.buyer_id=b.id) AS orders FROM buyers b ${term ? 'WHERE b.phone LIKE ?' : ''} ORDER BY b.id DESC LIMIT 50`, term ? [`%${term}%`] : []);
+  res.json({ items, total: q.val('SELECT COUNT(*) FROM buyers') });
+}));
+r.post('/buyers/:id/reset-password', h((req, res) => {
+  const b = q.get('SELECT id FROM buyers WHERE id=?', [Number(req.params.id)]);
+  if (!b) throw new AppError(404, 'not_found', 'Account not found.');
+  const temp = crypto.randomBytes(5).toString('hex');
+  q.run('UPDATE buyers SET password_hash=? WHERE id=?', [bcrypt.hashSync(temp, 10), b.id]);
+  res.json({ password: temp });
+}));
+
+/* ---------------------------------------------------------- sourcing requests ("not in Banha — we bring it") */
+const SRC_STATUSES = ['new', 'quoted', 'approved', 'ordered', 'arrived', 'delivered', 'cancelled'];
+r.get('/sourcing', h((req, res) => {
+  const status = SRC_STATUSES.includes(String(req.query.status)) ? String(req.query.status) : null;
+  const items = q.all(`SELECT * FROM sourcing_requests ${status ? 'WHERE status=?' : ''} ORDER BY (status IN ('new','approved')) DESC, created_at DESC LIMIT 200`, status ? [status] : []);
+  const counts = Object.fromEntries(q.all('SELECT status, COUNT(*) AS c FROM sourcing_requests GROUP BY status').map((x) => [x.status, x.c]));
+  counts.all = Object.values(counts).reduce((a, b) => a + b, 0);
+  res.json({ items, counts });
+}));
+r.patch('/sourcing/:id', h((req, res) => {
+  const b = z.object({ status: z.enum(SRC_STATUSES).optional(), quote_price: z.coerce.number().int().min(0).max(1e6).nullable().optional(), admin_note: z.string().max(600).optional() }).parse(req.body);
+  const row = q.get('SELECT id FROM sourcing_requests WHERE id=?', [Number(req.params.id)]);
+  if (!row) throw new AppError(404, 'not_found', 'Request not found.');
+  update('sourcing_requests', row.id, { ...b, updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ') });
+  res.json({ ok: true });
 }));
 
 /** Polled by the admin UI: new delivery requests since a timestamp + live counters. */
@@ -277,6 +334,7 @@ r.get('/notifications', h((req, res) => {
   const services = q.all("SELECT r.id, r.plan, r.type, r.created_at AS at, s.name_ar AS store_name FROM service_requests r JOIN stores s ON s.id=r.store_id WHERE r.created_at > ? ORDER BY r.created_at DESC LIMIT 10", [since]);
   res.json({
     services, servicesNew: q.val("SELECT COUNT(*) FROM service_requests WHERE status='new'"),
+    sourcing: q.all("SELECT id, number, title, created_at AS at FROM sourcing_requests WHERE created_at > ? ORDER BY created_at DESC LIMIT 10", [since]), sourcingNew: q.val("SELECT COUNT(*) FROM sourcing_requests WHERE status IN ('new','approved')"),
     items, now: new Date().toISOString().slice(0, 19).replace('T', ' '),
     open: q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform' AND status NOT IN ('delivered','cancelled')"),
     ready: q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform' AND status='processing'"),
@@ -490,6 +548,19 @@ r.post('/departments/:id/image', deptUpload.single('file'), h(async (req, res) =
   update('departments', d.id, { image: url });
   await removeDeptImage(d.image);
   res.json({ departments: listDepartments({ all: true }) });
+}));
+r.post('/stylist/avatar', deptUpload.single('file'), h(async (req, res) => {
+  if (!req.file) throw new AppError(422, 'validation_failed', 'Pick an image.', { file: 'required' });
+  const prev = stylistStatus().avatar;
+  saveStylistSettings({ avatar: await saveStylistAvatar(req.file.buffer) });
+  await removeDeptImage(prev);
+  res.json(stylistStatus());
+}));
+r.delete('/stylist/avatar', h(async (_req, res) => {
+  const prev = stylistStatus().avatar;
+  saveStylistSettings({ avatar: '' });
+  await removeDeptImage(prev);
+  res.json(stylistStatus());
 }));
 r.delete('/departments/:id/image', h(async (req, res) => {
   const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);

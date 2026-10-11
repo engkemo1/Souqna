@@ -7,6 +7,7 @@ import { useDepartments } from '../../lib/departments.js';
 import { formatNumber, formatMoney } from '../../lib/format.js';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import MarketSearchBar from '../../components/market/MarketSearchBar.jsx';
+import StylistChat from '../../components/market/StylistChat.jsx';
 import Brand from '../../components/market/Brand.jsx';
 import ProductCard, { ProductCardSkeleton, ProductGrid } from '../../components/store/ProductCard.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -15,6 +16,7 @@ import { EmptyState, ErrorState } from '../../components/ui/States.jsx';
 import { cx } from '../../components/ui/cx.js';
 import SearchFilters from '../../components/market/SearchFilters.jsx';
 import { api } from '../../lib/api.js';
+import RequestBanner from '../../components/market/RequestBanner.jsx';
 
 export default function MarketSearch() {
   const { t, lang } = useI18n();
@@ -24,7 +26,7 @@ export default function MarketSearch() {
   const sort = params.get('sort') || 'relevance';
   const { list, label } = useDepartments();
   const dq = useDebounced(q, 150);
-  const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store'];
+  const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store', 'same_day'];
   const [open, setOpen] = useState(false);
   const key = new URLSearchParams({ q: dq, department, sort, ...Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || '']).filter(([, v]) => v)) }).toString();
   const activeCount = FILTER_KEYS.filter((k) => params.get(k)).length + (department ? 1 : 0);
@@ -77,7 +79,10 @@ export default function MarketSearch() {
             {page < (data.pages || 1) && <div className="mt-10 text-center"><Button variant="outline" size="lg" loading={busy} onClick={loadMore}>{t('common.loadMore')}</Button></div>}
           </>
         ) : (
+          <>
           <EmptyState icon={SearchX} title={q ? t('search.noResultsFor', { q }) : t('search.noResults')} body={q ? t('search.noResultsForBody') : t('search.noResultsBody')} action={<Button variant="outline" onClick={() => setParams({}, { replace: true })}>{t('common.clearAll')}</Button>} />
+          {q && <RequestBanner className="!px-0 mt-6" title={t('req.empty')} query={q} />}
+          </>
         )}
           </div>
         </div>
@@ -94,6 +99,7 @@ export default function MarketSearch() {
         )}
       </main>
       <footer className="container flex items-center justify-between border-t border-line py-8 text-sm text-muted"><Brand /><p>© {new Date().getFullYear()} {t('market.footer')}</p></footer>
+      <StylistChat />
     </div>
   );
 }

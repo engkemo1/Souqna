@@ -208,7 +208,7 @@ export function StoreFooter() {
       </div>
       <div className="border-t border-white/10">
         <div className="container flex flex-col items-center justify-between gap-3 py-6 text-xs text-footer-muted sm:flex-row">
-          <p>© {new Date().getFullYear()} {tr(store.name)}</p>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1"><p>© {new Date().getFullYear()} {tr(store.name)}</p>{[['privacy', 'legal.privacy'], ['terms', 'legal.terms'], ['returns', 'legal.returns']].map(([k, l]) => <Link key={k} className="hover:text-on-footer" to={`/legal/${k}`}>{t(l)}</Link>)}</div>
           <Link to="/" className="inline-flex items-center gap-1.5 hover:text-on-footer"><Store className="h-3.5 w-3.5" />{t('store.poweredBy')} · {t('app.name')}</Link>
         </div>
       </div>

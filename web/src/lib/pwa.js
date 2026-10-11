@@ -66,3 +66,35 @@ export function usePush() {
   const test = useCallback(() => api('/owner/push/test', { method: 'POST', body: {} }), []);
   return { supported, ...state, enable, disable, test };
 }
+
+
+/** Shopper phone notifications (order status, price drops, offers). Same service worker as the store owners' alerts. */
+export function useBuyerPush() {
+  const supported = typeof window !== 'undefined' && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+  const [state, setState] = useState({ ready: false, enabled: false, permission: supported ? Notification.permission : 'unsupported' });
+  const refresh = useCallback(async () => {
+    if (!supported) return setState({ ready: true, enabled: false, permission: 'unsupported' });
+    try {
+      const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+      const sub = reg ? await reg.pushManager.getSubscription() : null;
+      setState({ ready: true, enabled: !!sub && Notification.permission === 'granted', permission: Notification.permission });
+    } catch { setState({ ready: true, enabled: false, permission: Notification.permission }); }
+  }, [supported]);
+  useEffect(() => { refresh(); }, [refresh]);
+  const enable = useCallback(async () => {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { await refresh(); return false; }
+    const reg = await navigator.serviceWorker.register('/sw.js').then(() => navigator.serviceWorker.ready);
+    const { key } = await api('/buyer/push/key');
+    const sub = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(key) }));
+    await api('/buyer/push/subscribe', { method: 'POST', body: sub.toJSON() });
+    await refresh(); return true;
+  }, [refresh]);
+  const disable = useCallback(async () => {
+    const reg = await navigator.serviceWorker.getRegistration('/sw.js');
+    const sub = reg ? await reg.pushManager.getSubscription() : null;
+    if (sub) { await api('/buyer/push/unsubscribe', { method: 'POST', body: { endpoint: sub.endpoint } }).catch(() => {}); await sub.unsubscribe(); }
+    await refresh();
+  }, [refresh]);
+  return { supported, ...state, enable, disable };
+}

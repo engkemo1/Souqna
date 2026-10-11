@@ -6,6 +6,11 @@ export const tokenStore = {
   set(t) { try { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ } },
 };
 
+export const buyerTokenStore = {
+  get() { try { return localStorage.getItem('souqna.buyer'); } catch { return null; } },
+  set(t) { try { t ? localStorage.setItem('souqna.buyer', t) : localStorage.removeItem('souqna.buyer'); } catch { /* ignore */ } },
+};
+
 export class ApiError extends Error {
   constructor(status, code, message, fields) {
     super(message);
@@ -40,6 +45,7 @@ export async function api(rawPath, { method = 'GET', body, signal, headers: rawH
       headers: {
         ...(body && !(body instanceof FormData) ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(buyerTokenStore.get() && !path.startsWith('/owner') && !path.startsWith('/admin') ? { 'x-buyer-token': buyerTokenStore.get() } : {}),
         ...headers,
       },
       body: body instanceof FormData ? body : body ? JSON.stringify(body) : undefined,

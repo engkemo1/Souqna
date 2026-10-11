@@ -4,7 +4,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Images, FolderTree, Palette, Settings, LogOut, ExternalLink, Plus, Menu, Camera } from 'lucide-react';
+  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Images, FolderTree, Palette, Settings, LogOut, ExternalLink, Plus, Menu, Camera, Star } from 'lucide-react';
 import { useAuth } from '../../lib/auth.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
@@ -23,6 +23,7 @@ export function useNav() {
       { to: '/dashboard/orders', icon: ShoppingBag, label: t('dash.orders'), badge: 'pending' },
       { to: '/dashboard/products', icon: Package, label: t('dash.products') },
       { to: '/dashboard/customers', icon: Users, label: t('dash.customers') },
+      { to: '/dashboard/reviews', icon: Star, label: t('dash.reviews') },
       { to: '/dashboard/analytics', icon: BarChart3, label: t('dash.analytics') },
     ] },
     { group: t('dash.manage'), items: [

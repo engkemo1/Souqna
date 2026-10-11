@@ -2,6 +2,7 @@ import { decodeDepartments } from '@souqna/shared';
 import { buildTheme } from '@souqna/shared';
 import { q, json } from '../db/index.js';
 import { mediaMap, getMedia, serializeMedia } from './media.js';
+import { sameDayActive, cairoNow } from './sameDay.js';
 
 export const bi = (row, field) => ({ ar: row[`${field}_ar`] ?? '', en: row[`${field}_en`] ?? '' });
 
@@ -35,6 +36,9 @@ export function serializeStore(s, { withTheme = true } = {}) {
     shippingFee: s.shipping_fee,
     freeShippingOver: s.free_shipping_over,
     productCount: s.product_count ?? undefined,
+    sameDay: sameDayActive(s),
+    sameDayUntil: sameDayActive(s) ? s.same_day_until : null,
+    sameDaySet: s.same_day_date === cairoNow().date, // owner UI: already switched on today (even if the cut-off has passed)
   };
   if (withTheme) {
     const t = buildTheme(json(s.theme_json, {}));
@@ -72,6 +76,8 @@ export function serializeCards(rows) {
     byProduct.set(r.product_id, list);
   }
   const media = mediaMap(pm.map((r) => r.media_id));
+  const nowC = cairoNow();
+  const sd = new Map(q.all(`SELECT id, same_day_date, same_day_until FROM stores WHERE id IN (${[...new Set(rows.map((r) => r.store_id))].map(() => '?').join(',')})`, [...new Set(rows.map((r) => r.store_id))]).map((x) => [x.id, sameDayActive(x, nowC)]));
   return rows.map((p) => {
     const images = (byProduct.get(p.id) || []).map((id) => media.get(id)).filter(Boolean);
     return {
@@ -89,6 +95,7 @@ export function serializeCards(rows) {
       rating: p.rating,
       ratingCount: p.rating_count,
       categoryId: p.category_id,
+      sameDay: !!sd.get(p.store_id),
     };
   });
 }
@@ -104,6 +111,7 @@ export function serializeProductDetail(p) {
     ...card,
     description: bi(p, 'description'),
     sku: p.sku,
+    department: p.department || null,
     media,
     sizes: json(p.sizes_json, []),
     variants,

@@ -1,0 +1,124 @@
+import { Router } from 'express';
+import bcrypt from 'bcryptjs';
+import { z } from 'zod';
+import { q, insert } from '../db/index.js';
+import { h, AppError, notFound } from '../lib/errors.js';
+import { signBuyer, requireBuyer } from '../lib/buyers.js';
+import { vapidPublicKey } from '../lib/push.js';
+import { mediaMap } from '../lib/media.js';
+import { bi } from '../lib/serialize.js';
+
+const r = Router();
+const normPhone = (v) => { const d = String(v || '').replace(/\D/g, ''); return d.startsWith('20') && d.length === 12 ? `0${d.slice(2)}` : d; };
+
+const attempts = new Map();
+function throttle(key, max = 10) {
+  const now = Date.now(); const a = (attempts.get(key) || []).filter((t) => now - t < 10 * 60e3);
+  if (a.length >= max) throw new AppError(429, 'too_many_attempts', 'Too many attempts. Please wait a few minutes.');
+  attempts.set(key, [...a, now]);
+}
+const phoneSchema = z.string().trim().transform(normPhone).refine((p) => /^01[0-9]{9}$/.test(p), 'phone_invalid');
+const out = (b) => ({ id: b.id, name: b.name, phone: b.phone });
+const unread = (id) => q.val('SELECT COUNT(*) FROM buyer_notifications WHERE buyer_id=? AND read=0', [id]);
+
+r.post('/register', h((req, res) => {
+  const b = z.object({ name: z.string().trim().min(2, 'required').max(60), phone: phoneSchema, password: z.string().min(6, 'password_short').max(100) }).parse(req.body);
+  throttle(`reg:${req.ip}`, 8);
+  if (q.get('SELECT 1 AS x FROM buyers WHERE phone=?', [b.phone])) throw new AppError(409, 'phone_taken', 'This number already has an account. Sign in instead.', { phone: 'phone_taken' });
+  const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: bcrypt.hashSync(b.password, 10) });
+  const buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
+  res.status(201).json({ token: signBuyer(buyer), buyer: out(buyer), unread: 0 });
+}));
+
+r.post('/login', h((req, res) => {
+  const b = z.object({ phone: phoneSchema, password: z.string().min(1).max(100) }).parse(req.body);
+  throttle(`login:${req.ip}:${b.phone}`);
+  const buyer = q.get('SELECT * FROM buyers WHERE phone=?', [b.phone]);
+  if (!buyer || !bcrypt.compareSync(b.password, buyer.password_hash)) throw new AppError(401, 'invalid_credentials', 'Number or password is incorrect.');
+  res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });
+}));
+
+r.use(requireBuyer);
+
+r.get('/me', h((req, res) => res.json({ buyer: out(req.buyer), unread: unread(req.buyer.id) })));
+
+r.put('/me', h((req, res) => {
+  const b = z.object({ name: z.string().trim().min(2).max(60).optional(), password: z.string().min(6).max(100).optional(), current: z.string().max(100).optional() }).parse(req.body);
+  if (b.password) {
+    const row = q.get('SELECT password_hash FROM buyers WHERE id=?', [req.buyer.id]);
+    if (!bcrypt.compareSync(b.current || '', row.password_hash)) throw new AppError(401, 'invalid_credentials', 'Current password is incorrect.');
+    q.run('UPDATE buyers SET password_hash=? WHERE id=?', [bcrypt.hashSync(b.password, 10), req.buyer.id]);
+  }
+  if (b.name) q.run('UPDATE buyers SET name=? WHERE id=?', [b.name, req.buyer.id]);
+  res.json({ buyer: out(q.get('SELECT id, name, phone FROM buyers WHERE id=?', [req.buyer.id])) });
+}));
+
+/* ------------------------------------------------ orders (placed while signed in, or claimed with number + phone) */
+const orderRows = (buyerId) => {
+  const rows = q.all('SELECT o.*, s.name_ar AS s_ar, s.name_en AS s_en, s.slug AS s_slug FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.buyer_id=? ORDER BY o.id DESC LIMIT 50', [buyerId]);
+  const items = rows.length ? q.all(`SELECT * FROM order_items WHERE order_id IN (${rows.map(() => '?').join(',')})`, rows.map((x) => x.id)) : [];
+  const media = mediaMap(items.map((i) => i.media_id));
+  return rows.map((o) => ({
+    number: o.number, token: o.track_token, status: o.status, total: o.total, createdAt: o.created_at,
+    store: { slug: o.s_slug, name: { ar: o.s_ar, en: o.s_en } },
+    items: items.filter((i) => i.order_id === o.id).map((i) => ({ name: bi(i, 'name'), qty: i.qty, image: media.get(i.media_id) || null })),
+  }));
+};
+r.get('/orders', h((req, res) => res.json({ items: orderRows(req.buyer.id) })));
+
+r.post('/orders/claim', h((req, res) => {
+  throttle(`claim:${req.ip}`, 15);
+  const b = z.object({ number: z.string().trim().min(3).max(30), phone: z.string().trim().min(8).max(20) }).parse(req.body);
+  const o = q.get('SELECT * FROM orders WHERE UPPER(number)=UPPER(?)', [b.number]);
+  if (!o || normPhone(o.phone) !== normPhone(b.phone)) throw notFound('Order');
+  if (o.buyer_id && o.buyer_id !== req.buyer.id) throw new AppError(409, 'order_claimed', 'This order belongs to another account.');
+  q.run('UPDATE orders SET buyer_id=? WHERE id=?', [req.buyer.id, o.id]);
+  res.json({ items: orderRows(req.buyer.id) });
+}));
+
+/* ------------------------------------------------ wardrobe: what this shopper actually bought (delivered orders) */
+r.get('/wardrobe', h((req, res) => {
+  const rows = q.all(`SELECT oi.product_id, oi.name_ar, oi.name_en, oi.color, oi.size, oi.media_id, o.created_at, p.slug AS pslug, p.department, s.slug AS sslug, s.name_ar AS s_ar, s.name_en AS s_en
+    FROM order_items oi JOIN orders o ON o.id=oi.order_id JOIN stores s ON s.id=o.store_id LEFT JOIN products p ON p.id=oi.product_id
+    WHERE o.buyer_id=? AND o.status='delivered' ORDER BY o.id DESC LIMIT 120`, [req.buyer.id]);
+  const media = mediaMap(rows.map((x) => x.media_id));
+  res.json({ items: rows.map((x) => ({ productId: x.product_id, name: bi(x, 'name'), color: x.color, size: x.size, department: x.department, boughtAt: x.created_at, image: media.get(x.media_id) || null, store: { slug: x.sslug, name: { ar: x.s_ar, en: x.s_en } }, slug: x.pslug })) });
+}));
+
+/* ------------------------------------------------ notifications, watches, follows, push */
+r.get('/notifications', h((req, res) => {
+  res.json({ items: q.all('SELECT id, kind, title, body, url, read, created_at AS createdAt FROM buyer_notifications WHERE buyer_id=? ORDER BY id DESC LIMIT 60', [req.buyer.id]).map((n) => ({ ...n, read: !!n.read })), unread: unread(req.buyer.id) });
+}));
+r.post('/notifications/read', h((req, res) => { q.run('UPDATE buyer_notifications SET read=1 WHERE buyer_id=?', [req.buyer.id]); res.json({ unread: 0 }); }));
+
+r.get('/watches', h((req, res) => res.json({ productIds: q.all('SELECT product_id FROM buyer_watches WHERE buyer_id=?', [req.buyer.id]).map((x) => x.product_id) })));
+r.post('/watches', h((req, res) => {
+  const { productId } = z.object({ productId: z.coerce.number().int().positive() }).parse(req.body);
+  if (!q.get("SELECT 1 AS x FROM products WHERE id=? AND status='active'", [productId])) throw notFound('Product');
+  q.run('INSERT OR IGNORE INTO buyer_watches (buyer_id, product_id) VALUES (?,?)', [req.buyer.id, productId]);
+  res.status(201).json({ ok: true });
+}));
+r.delete('/watches/:id', h((req, res) => { q.run('DELETE FROM buyer_watches WHERE buyer_id=? AND product_id=?', [req.buyer.id, Number(req.params.id)]); res.json({ ok: true }); }));
+
+r.get('/follows', h((req, res) => res.json({ stores: q.all('SELECT s.slug, s.name_ar, s.name_en FROM buyer_follows f JOIN stores s ON s.id=f.store_id WHERE f.buyer_id=?', [req.buyer.id]).map((s) => ({ slug: s.slug, name: { ar: s.name_ar, en: s.name_en } })) })));
+r.post('/follows', h((req, res) => {
+  const { slug } = z.object({ slug: z.string().max(60) }).parse(req.body);
+  const s = q.get("SELECT id FROM stores WHERE slug=? AND status='active'", [slug]);
+  if (!s) throw notFound('Store');
+  q.run('INSERT OR IGNORE INTO buyer_follows (buyer_id, store_id) VALUES (?,?)', [req.buyer.id, s.id]);
+  res.status(201).json({ ok: true });
+}));
+r.delete('/follows/:slug', h((req, res) => { q.run('DELETE FROM buyer_follows WHERE buyer_id=? AND store_id=(SELECT id FROM stores WHERE slug=?)', [req.buyer.id, req.params.slug]); res.json({ ok: true }); }));
+
+r.get('/push/key', h((_req, res) => res.json({ key: vapidPublicKey() })));
+r.post('/push/subscribe', h((req, res) => {
+  const b = z.object({ endpoint: z.string().url().max(600), keys: z.object({ p256dh: z.string().max(200), auth: z.string().max(100) }) }).parse(req.body);
+  q.run('INSERT OR REPLACE INTO buyer_push (buyer_id, endpoint, p256dh, auth) VALUES (?,?,?,?)', [req.buyer.id, b.endpoint, b.keys.p256dh, b.keys.auth]);
+  res.status(201).json({ ok: true });
+}));
+r.post('/push/unsubscribe', h((req, res) => {
+  const { endpoint } = z.object({ endpoint: z.string().max(600) }).parse(req.body);
+  q.run('DELETE FROM buyer_push WHERE buyer_id=? AND endpoint=?', [req.buyer.id, endpoint]); res.json({ ok: true });
+}));
+
+export default r;

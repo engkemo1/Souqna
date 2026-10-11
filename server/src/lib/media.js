@@ -64,6 +64,7 @@ const SIZE_SETS = {
   logo: { thumb: 160, sm: 400 },
   banner: { sm: 400, md: 800, lg: 1400, xl: 2000 },
   cover: { sm: 400, md: 800, lg: 1400 },
+  review: { thumb: 160, md: 900 },
 };
 const MAX_ORIGINAL = 2400;
 const CANVAS_W = 1600, CANVAS_H = 2000; // product photos: uniform 4:5

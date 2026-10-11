@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX } from 'lucide-react';
+import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -18,6 +18,8 @@ const NAV = [
   { to: '/admin/reports', icon: BarChart3, label: 'التقارير' },
   { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
   { to: '/admin/services', icon: Camera, label: 'الخدمات', badge: 'services' },
+  { to: '/admin/sourcing', icon: PackagePlus, label: 'طلبات من برّه', badge: 'sourcing' },
+  { to: '/admin/buyers', icon: Users, label: 'حسابات العملاء' },
   { to: '/admin/system', icon: ShieldCheck, label: 'النظام' },
 ];
 
@@ -65,7 +67,7 @@ function Gate({ onAuthed }) {
 /** Polls for new delivery requests: bell counter, toast, optional sound + browser notification. */
 function useDeliveryAlerts() {
   const toast = useToast();
-  const [counts, setCounts] = useState({ open: 0, ready: 0, services: 0 });
+  const [counts, setCounts] = useState({ open: 0, ready: 0, services: 0, sourcing: 0 });
   const [recent, setRecent] = useState([]);
   const [sound, setSound] = useState(() => { try { return localStorage.getItem('bo.adminSound') !== '0'; } catch { return true; } });
   const since = useRef(null);
@@ -83,7 +85,8 @@ function useDeliveryAlerts() {
       try {
         const d = await adminApi(`/notifications${since.current ? `?since=${encodeURIComponent(since.current)}` : ''}`);
         if (stop) return;
-        setCounts({ open: d.open, ready: d.ready, services: d.servicesNew });
+        setCounts({ open: d.open, ready: d.ready, services: d.servicesNew, sourcing: d.sourcingNew });
+        if (since.current && d.sourcing?.length) { for (const sr of d.sourcing.slice().reverse()) toast({ title: `طلب من برّه بنها: ${sr.title}`, description: sr.number, tone: 'info', duration: 10000 }); if (soundRef.current) beep(); }
         if (since.current && d.services?.length) {
           for (const sv of d.services.slice().reverse()) toast({ title: `${sv.type === 'design_banner' ? 'طلب تصميم بنر' : sv.type === 'design_cover' ? 'طلب تصميم غلاف' : 'طلب تصوير جديد'} من ${sv.store_name}`, description: sv.type?.startsWith('design') ? 'عايز يشوف أشكال ويختار' : sv.plan === 'monthly' ? 'اشتراك شهري' : 'مرة واحدة', tone: 'info', duration: 10000 });
           if (soundRef.current) beep();

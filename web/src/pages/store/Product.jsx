@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw, Banknote, PackageX } from 'lucide-react';
 import { useStore, sp } from '../../lib/store.jsx';
@@ -12,6 +12,12 @@ import VariantPicker, { resolveVariant } from '../../components/store/VariantPic
 import { useAddToCart } from '../../components/store/useAddToCart.js';
 import ProductCard from '../../components/store/ProductCard.jsx';
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
+import SizeAdvisor from '../../components/store/SizeAdvisor.jsx';
+import ReviewsSection from '../../components/store/ReviewsSection.jsx';
+import { useBuyer } from '../../lib/buyer.jsx';
+import { api } from '../../lib/api.js';
+import { Bell } from 'lucide-react';
+import SameDayBadge from '../../components/store/SameDayBadge.jsx';
 import { SectionHeader } from './StoreHome.jsx';
 import { Price, QtyStepper } from '../../components/ui/Commerce.jsx';
 import Skeleton, { SkeletonText } from '../../components/ui/Skeleton.jsx';
@@ -36,6 +42,31 @@ function Accordion({ title, children, defaultOpen }) {
           </motion.div>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+
+/** "Tell me if the price drops" + "follow this store": need a (free, optional) account because the alerts have to reach someone. */
+function ProductAlerts({ product, store }) {
+  const { t, tr } = useI18n();
+  const me = useBuyer();
+  const toast = useToast();
+  const nav = useNavigate();
+  const [watch, setWatch] = useState(false); const [follow, setFollow] = useState(false);
+  useEffect(() => {
+    if (!me?.buyer) { setWatch(false); setFollow(false); return; }
+    api('/buyer/watches').then((r) => setWatch(r.productIds.includes(product.id))).catch(() => {});
+    api('/buyer/follows').then((r) => setFollow(r.stores.some((s) => s.slug === store.slug))).catch(() => {});
+  }, [me?.buyer, product.id, store.slug]);
+  if (!me?.ready) return null;
+  const guard = (fn) => async () => { if (!me.buyer) { toast({ title: t('acc.needLogin'), tone: 'info' }); nav('/account'); return; } try { await fn(); } catch { toast({ tone: 'error', title: t('error.body') }); } };
+  const toggleWatch = guard(async () => { if (watch) await api(`/buyer/watches/${product.id}`, { method: 'DELETE' }); else await api('/buyer/watches', { method: 'POST', body: { productId: product.id } }); setWatch(!watch); });
+  const toggleFollow = guard(async () => { if (follow) await api(`/buyer/follows/${store.slug}`, { method: 'DELETE' }); else await api('/buyer/follows', { method: 'POST', body: { slug: store.slug } }); setFollow(!follow); });
+  return (
+    <div className="mt-4 flex flex-wrap gap-2">
+      <button type="button" onClick={toggleWatch} aria-pressed={watch} className={cx('inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition', watch ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-line-strong hover:bg-fg/[0.04]')}><Bell className="h-4 w-4" />{watch ? t('acc.watching') : t('acc.watch')}</button>
+      <button type="button" onClick={toggleFollow} aria-pressed={follow} className={cx('inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition', follow ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-line-strong hover:bg-fg/[0.04]')}>{follow ? t('acc.followingS', { s: tr(store.name) }) : t('acc.follow', { s: tr(store.name) })}</button>
     </div>
   );
 }
@@ -165,6 +196,7 @@ export default function Product() {
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 {p.discount > 0 && <span className="rounded-full bg-sale px-2.5 py-0.5 text-xs font-bold text-white">-{p.discount}%</span>}
                 {p.isNew && <span className="rounded-full bg-fg px-2.5 py-0.5 text-xs font-semibold text-canvas">{t('product.new')}</span>}
+                {p.sameDay && <SameDayBadge until={store.sameDayUntil} />}
                 {p.category && <Link to={sp(store.slug, `shop?category=${p.category.slug}`)} className="text-xs font-medium text-muted hover:text-fg">{tr(p.category.name)}</Link>}
               </div>
               <h1 className="font-display text-[1.65rem] font-bold leading-tight sm:text-3xl xl:text-[2.1rem]">{tr(p.name)}</h1>
@@ -186,6 +218,7 @@ export default function Product() {
           <div className="mt-7">
             <VariantPicker product={p} color={color} size={size} onColor={(c) => { setColor(c); setSize(p.sizes.length === 1 ? p.sizes[0] : null); }}
               onSize={(s) => { setSize(s); setSizeError(false); }} sizeError={sizeError} />
+            <SizeAdvisor product={p} onPick={(s) => { setSize(s); setSizeError(false); }} />
           </div>
 
           <AnimatePresence>
@@ -202,7 +235,10 @@ export default function Product() {
             <div className="flex-1"><AddButton state={addState} disabled={ctaDisabled} onClick={onAdd} label={ctaLabel} /></div>
           </div>
 
+          <ProductAlerts product={p} store={store} />
+
           <ul className="mt-7 grid gap-3 rounded-2xl bg-secondary p-4 text-sm text-on-secondary">
+            {p.sameDay && <li className="flex items-center gap-3 font-semibold text-emerald-800"><Truck className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('sameday.productLine', { time: new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(`2000-01-01T${store.sameDayUntil || '18:00'}:00`)) })}</li>}
             <li className="flex items-center gap-3"><Truck className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.delivery')}</li>
             <li className="flex items-center gap-3"><Banknote className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.cod')}</li>
             <li className="flex items-center gap-3"><RefreshCcw className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.exchange')}</li>
@@ -221,6 +257,8 @@ export default function Product() {
           </div>
         </section>
       </div>
+
+      <ReviewsSection slug={store.slug} pslug={p.slug} />
 
       {data.related?.length > 0 && (
         <section className="container mt-16 sm:mt-24">

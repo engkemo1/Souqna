@@ -263,3 +263,86 @@ CREATE TABLE IF NOT EXISTS platform_coupons (
   active INTEGER NOT NULL DEFAULT 1,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Visual search: one image embedding per product (its primary photo), tagged with the model that produced it.
+CREATE TABLE IF NOT EXISTS product_vectors (
+  product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+  media_id INTEGER NOT NULL,
+  model TEXT NOT NULL,
+  vec BLOB NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS reviews (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+  name TEXT NOT NULL,
+  rating INTEGER NOT NULL,
+  comment TEXT,
+  media_ids TEXT NOT NULL DEFAULT '[]',
+  status TEXT NOT NULL DEFAULT 'published',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(order_id, product_id)
+);
+CREATE INDEX IF NOT EXISTS idx_reviews_product ON reviews(product_id, status, created_at);
+CREATE INDEX IF NOT EXISTS idx_reviews_store ON reviews(store_id, created_at);
+
+-- "Not in Banha? We get it for you": platform-level sourcing requests (inspection before handover is part of the promise)
+CREATE TABLE IF NOT EXISTS sourcing_requests (
+  id INTEGER PRIMARY KEY,
+  number TEXT NOT NULL UNIQUE,
+  track_token TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL, details TEXT, link TEXT, size TEXT, color TEXT, budget INTEGER,
+  photo TEXT,
+  name TEXT NOT NULL, phone TEXT NOT NULL, governorate TEXT, city TEXT, address TEXT NOT NULL,
+  source TEXT,
+  status TEXT NOT NULL DEFAULT 'new',
+  quote_price INTEGER,
+  admin_note TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_sourcing_status ON sourcing_requests(status, created_at);
+
+-- Optional shopper accounts (mobile + password). Browsing and checkout never require one.
+CREATE TABLE IF NOT EXISTS buyers (
+  id INTEGER PRIMARY KEY,
+  phone TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL,
+  password_hash TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS buyer_notifications (
+  id INTEGER PRIMARY KEY,
+  buyer_id INTEGER NOT NULL REFERENCES buyers(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL, title TEXT NOT NULL, body TEXT, url TEXT,
+  read INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bn_buyer ON buyer_notifications(buyer_id, read, id);
+CREATE TABLE IF NOT EXISTS buyer_push (
+  id INTEGER PRIMARY KEY,
+  buyer_id INTEGER NOT NULL REFERENCES buyers(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE, p256dh TEXT NOT NULL, auth TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS buyer_watches (
+  buyer_id INTEGER NOT NULL REFERENCES buyers(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (buyer_id, product_id)
+);
+CREATE TABLE IF NOT EXISTS buyer_follows (
+  buyer_id INTEGER NOT NULL REFERENCES buyers(id) ON DELETE CASCADE,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (buyer_id, store_id)
+);
+
+CREATE TABLE IF NOT EXISTS shared_looks (
+  token TEXT PRIMARY KEY,
+  title TEXT NOT NULL DEFAULT '',
+  items_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

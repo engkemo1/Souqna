@@ -10,6 +10,12 @@ import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { requireOwner } from '../lib/auth.js';
 import { vapidPublicKey, sendTest } from '../lib/push.js';
 import { clampInt, nowIso, slugify } from '../lib/util.js';
+import { notifyOrderStatus, notifyPriceDrop, notifyFollowers } from '../lib/buyers.js';
+import { recomputeRatings } from '../lib/reviews.js';
+import { weeklyReport } from '../lib/report.js';
+import { cairoNow } from '../lib/sameDay.js';
+import { triggerReindex } from '../lib/visual.js';
+import { describeProduct } from '../lib/stylist.js';
 import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMediaFile } from '../lib/media.js';
 import {
   serializeStore, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi, stockStatus,
@@ -48,6 +54,32 @@ r.get('/notifications', h((req, res) => {
 r.get('/store', h((req, res) => {
   const t = buildTheme(json(req.store.theme_json, {}));
   res.json({ store: serializeStore(req.store), user: req.user, themeReport: t.report, themeChecks: t.checks });
+}));
+
+/* ---------------------------------------------------------- same-day delivery: switched on for today, expires by itself */
+r.put('/store/same-day', h((req, res) => {
+  const b = z.object({ on: z.boolean(), until: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid').optional() }).parse(req.body);
+  const now = cairoNow();
+  const until = b.until || req.store.same_day_until || '18:00';
+  if (b.on && until <= now.hm) throw new AppError(422, 'validation_failed', 'The cut-off time has already passed today.', { until: 'time_passed' });
+  update('stores', req.store.id, { same_day_date: b.on ? now.date : null, same_day_until: until });
+  if (b.on && req.store.same_day_date !== now.date) notifyFollowers(req.store.id, { kind: 'sameday', title: `${req.store.name_ar} بيوصّل النهاردة ⚡`, body: `اطلب قبل ${until} وهيوصلك النهاردة` });
+  res.json({ store: serializeStore(q.get('SELECT * FROM stores WHERE id=?', [req.store.id])) });
+}));
+
+/* ---------------------------------------------------------- reviews */
+r.get('/reviews', h((req, res) => {
+  const rows = q.all(`SELECT rv.*, p.name_ar AS pname_ar, p.name_en AS pname_en, p.slug AS pslug FROM reviews rv JOIN products p ON p.id=rv.product_id WHERE rv.store_id=? ORDER BY rv.id DESC LIMIT 100`, [req.store.id]);
+  const media = mediaMap(rows.flatMap((x) => JSON.parse(x.media_ids || '[]')));
+  res.json({ items: rows.map((x) => ({ id: x.id, name: x.name, rating: x.rating, comment: x.comment || '', status: x.status, createdAt: x.created_at, product: { slug: x.pslug, name: bi(x, 'pname') }, photos: JSON.parse(x.media_ids || '[]').map((id) => media.get(id)).filter(Boolean) })) });
+}));
+
+r.patch('/reviews/:id', h((req, res) => {
+  const b = z.object({ status: z.enum(['published', 'hidden']) }).parse(req.body);
+  const rv = q.get('SELECT * FROM reviews WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
+  if (!rv) throw notFound('Review');
+  tx(() => { q.run('UPDATE reviews SET status=? WHERE id=?', [b.status, rv.id]); recomputeRatings(rv.product_id, rv.store_id); });
+  res.json({ ok: true });
 }));
 
 const storeSchema = z.object({
@@ -225,6 +257,8 @@ r.get('/overview', h((req, res) => {
   });
 }));
 
+r.get('/report/weekly', h(async (req, res) => { res.json(await weeklyReport(req.store.id, { refresh: req.query.refresh === '1' })); }));
+
 r.get('/analytics', h((req, res) => {
   const n = [7, 30, 90].includes(Number(req.query.range)) ? Number(req.query.range) : 30;
   const sid = req.store.id;
@@ -281,6 +315,28 @@ r.post('/media', upload.array('files', 12), h(async (req, res) => {
   const out = [];
   for (const f of files) out.push(serializeMedia(await processImage(f.buffer, { storeId: req.store.id, kind })));
   res.status(201).json({ media: out });
+}));
+
+const aiHits = new Map();
+/** AI listing helper: fill the name, description and colours from the product photo. */
+r.post('/ai/product', h(async (req, res) => {
+  const b = z.object({ mediaId: z.coerce.number().int().positive(), hint: z.string().max(120).optional() }).parse(req.body);
+  const m = q.get('SELECT * FROM media WHERE id=? AND store_id=?', [b.mediaId, req.store.id]);
+  if (!m) throw notFound('Image');
+  const day = new Date().toISOString().slice(0, 10); const key = `${req.store.id}:${day}`;
+  const used = aiHits.get(key) || 0;
+  if (used >= 40) throw new AppError(429, 'rate_limited', 'Daily AI limit reached for this store.');
+  let src; for (const f of ['md.jpg', 'sm.jpg', 'original.jpg']) { try { src = await readMediaFile(m, f); break; } catch { /* next */ } }
+  if (!src) throw notFound('Image');
+  try {
+    const suggestion = await describeProduct(src, { hint: b.hint, departments: decodeDepartments(req.store.departments) });
+    aiHits.set(key, used + 1);
+    res.json({ suggestion });
+  } catch (e) {
+    if (e.code === 'ai_unavailable') throw new AppError(503, 'ai_unavailable', 'The AI assistant is not set up yet.');
+    if (e.code === 'stylist_unavailable') throw new AppError(503, 'stylist_unavailable', 'The AI assistant is unavailable right now.');
+    throw e;
+  }
 }));
 
 r.delete('/media/:id', h(async (req, res) => {
@@ -434,6 +490,7 @@ function saveProduct(storeId, data, existing) {
 r.post('/products', h((req, res) => {
   const data = productSchema.parse(req.body);
   const id = saveProduct(req.store.id, data, null);
+  triggerReindex();
   res.status(201).json({ product: serializeProductDetail(q.get('SELECT * FROM products WHERE id=?', [id])) });
 }));
 
@@ -442,6 +499,8 @@ r.put('/products/:id', h((req, res) => {
   if (!p) throw notFound('Product');
   const data = productSchema.parse(req.body);
   saveProduct(req.store.id, data, p);
+  notifyPriceDrop(p.id, p.price, data.price);
+  triggerReindex();
   res.json({ product: serializeProductDetail(q.get('SELECT * FROM products WHERE id=?', [p.id])) });
 }));
 
@@ -462,6 +521,7 @@ r.patch('/products/:id', h((req, res) => {
   const hasVariants = q.val('SELECT COUNT(*) FROM variants WHERE product_id=?', [p.id]) > 0;
   if (body.stock !== undefined && hasVariants) throw badRequest('has_variants', 'Update stock per variant for this product.');
   update('products', p.id, { price: body.price, compare_at_price: body.compare_at_price === undefined ? undefined : body.compare_at_price || null, stock: body.stock, status: body.status, featured: body.featured === undefined ? undefined : Number(body.featured), updated_at: nowIso() });
+  if (body.price !== undefined) notifyPriceDrop(p.id, p.price, body.price);
   const np = q.get('SELECT * FROM products WHERE id=?', [p.id]);
   res.json({ product: { id: np.id, price: np.price, compareAt: np.compare_at_price, stock: np.stock, status: np.status, stockStatus: stockStatus(np), featured: !!np.featured } });
 }));
@@ -547,6 +607,7 @@ r.patch('/orders/:id/status', h((req, res) => {
       if (o.customer_id) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [o.total, o.customer_id]);
     }
   });
+  notifyOrderStatus(o.id, status);
   res.json({ status, next: ownerNext({ status, delivery_by: o.delivery_by }) });
 }));
 
@@ -702,6 +763,7 @@ r.post('/offers', h((req, res) => {
   const d = offerSchema.parse(req.body);
   if (q.val('SELECT id FROM offers WHERE store_id=? AND UPPER(code)=?', [req.store.id, d.code])) throw new AppError(422, 'validation_failed', 'Code already used', { code: 'code_taken' });
   const id = insert('offers', { ...d, active: d.active ? 1 : 0, store_id: req.store.id });
+  if (d.active) notifyFollowers(req.store.id, { kind: 'offer', title: `عرض جديد من ${req.store.name_ar}`, body: d.title_ar });
   res.status(201).json({ offer: serializeOffer(q.get('SELECT * FROM offers WHERE id=?', [id])) });
 }));
 r.put('/offers/:id', h((req, res) => {

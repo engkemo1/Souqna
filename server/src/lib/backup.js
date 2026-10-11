@@ -1,7 +1,10 @@
 import fs from 'node:fs';
+import os from 'node:os';
+import zlib from 'node:zlib';
 import path from 'node:path';
 import { db } from '../db/index.js';
 import { config } from '../config.js';
+import { offsiteEnabled, offsitePut, offsiteDelete } from './r2.js';
 
 const day = () => new Date().toISOString().slice(0, 10);
 
@@ -45,6 +48,28 @@ export function runBackup(dir = config.backupDir) {
   return info;
 }
 
+const OFFSITE_FILE = () => path.join(path.resolve(config.backupDir || os.tmpdir()), 'last-offsite.json');
+export const lastOffsite = () => { try { return JSON.parse(fs.readFileSync(OFFSITE_FILE(), 'utf8')); } catch { return null; } };
+
+/** Gzipped database copy → private R2 bucket (db/souqna-YYYY-MM-DD.db.gz); old days are removed after BACKUP_KEEP_DAYS. */
+export async function runOffsiteBackup() {
+  if (!offsiteEnabled) throw new Error('Off-site backup is not configured (BACKUP_R2_BUCKET).');
+  const tmp = path.join(os.tmpdir(), `souqna-offsite-${process.pid}.db`);
+  try {
+    snapshotDb(tmp);
+    const gz = zlib.gzipSync(fs.readFileSync(tmp), { level: 6 });
+    const key = `db/souqna-${day()}.db.gz`;
+    await offsitePut(key, gz);
+    for (let i = 0; i < 4; i++) {
+      const d = new Date(Date.now() - (config.backupKeepDays + i) * 864e5).toISOString().slice(0, 10);
+      try { await offsiteDelete(`db/souqna-${d}.db.gz`); } catch { /* retention is best-effort */ }
+    }
+    const info = { at: new Date().toISOString(), key, bytes: gz.length };
+    try { fs.writeFileSync(OFFSITE_FILE(), JSON.stringify(info)); } catch { /* status file is optional */ }
+    return info;
+  } finally { try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ } }
+}
+
 export const lastBackup = () => {
   if (!config.backupDir) return null;
   try { return JSON.parse(fs.readFileSync(path.join(path.resolve(config.backupDir), 'last-backup.json'), 'utf8')); } catch { return null; }
@@ -52,6 +77,12 @@ export const lastBackup = () => {
 
 /** In-process daily schedule: runs shortly after boot (if the last backup is >20 h old), then every 24 h. */
 export function startBackupSchedule() {
+  if (offsiteEnabled) {
+    const goOff = () => runOffsiteBackup().then((i) => console.log(`off-site backup ok: ${i.key} (${i.bytes} bytes)`)).catch((e) => console.warn('off-site backup failed:', e.message));
+    const lo = lastOffsite();
+    if (!lo || Date.now() - Date.parse(lo.at) > 20 * 3600e3) setTimeout(goOff, 45e3).unref();
+    setInterval(goOff, 24 * 3600e3).unref();
+  }
   if (!config.backupDir) return;
   const go = () => { try { const i = runBackup(); console.log(`backup ok: ${i.file} (+${i.media.copied} photo(s))`); } catch (e) { console.warn('backup failed:', e.message); } };
   const last = lastBackup();
