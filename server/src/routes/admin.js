@@ -1,5 +1,6 @@
 import { encodeDepartments, DEPT_SLUG_RE, decodeDepartments, ORDER_STATUSES } from '@souqna/shared';
 import { Router } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
@@ -10,6 +11,8 @@ import { config } from '../config.js';
 import { h, AppError } from '../lib/errors.js';
 import { listDepartments, assertDepartments } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
+import { purgeMediaFiles } from '../lib/media.js';
+import { saveDeptImage, removeDeptImage } from '../lib/deptImage.js';
 import { serializeStore } from '../lib/serialize.js';
 import { verifyTotp } from '../lib/totp.js';
 import { snapshotDb, runBackup, lastBackup } from '../lib/backup.js';
@@ -395,12 +398,18 @@ const createSchema = z.object({
   auto_whatsapp: z.boolean().default(false),
 });
 
+const PW_CHARS = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const genPassword = (n = 10) => Array.from({ length: n }, () => PW_CHARS[crypto.randomInt(PW_CHARS.length)]).join('');
+const origin = (req) => `${req.protocol}://${req.get('host')}`;
+const credentials = (req, slug, email, password) => ({ slug, email, password, storeUrl: `${origin(req)}/s/${slug}`, loginUrl: `${origin(req)}/login` });
+
 r.post('/stores', h((req, res) => {
   const d = createSchema.parse(req.body);
   assertDepartments(d.departments);
   if (q.get('SELECT id FROM users WHERE email=?', [d.email])) throw new AppError(422, 'validation_failed', 'Email already in use', { email: 'email_taken' });
+  const password = d.password || genPassword();
   const out = tx(() => {
-    const uid = insert('users', { name: d.owner_name, email: d.email, password_hash: bcrypt.hashSync(d.password || crypto.randomBytes(18).toString('base64url'), 10) });
+    const uid = insert('users', { name: d.owner_name, email: d.email, password_hash: bcrypt.hashSync(password, 10) });
     let slug = slugify(d.store_name);
     if (!/^[a-z0-9-]+$/.test(slug) || !slug) slug = `store-${uid}`;
     let i = 1;
@@ -419,7 +428,7 @@ r.post('/stores', h((req, res) => {
       insert('categories', { store_id: sid, slug: cs, name_ar: ar, name_en: en, sort: idx }));
     return { slug, sid, uid };
   });
-  res.status(201).json({ slug: out.slug, setup: makeSetupLink(req, out.uid) });
+  res.status(201).json({ ...credentials(req, out.slug, d.email, password), setup: makeSetupLink(req, out.uid) });
 }));
 
 r.post('/stores/:slug/login-as', h((req, res) => {
@@ -429,15 +438,19 @@ r.post('/stores/:slug/login-as', h((req, res) => {
   res.json({ token: signToken({ id: store.uid }), user: { id: store.uid, name: store.name, email: store.email } });
 }));
 
-r.delete('/stores/:slug', h((req, res) => {
+r.delete('/stores/:slug', h(async (req, res) => {
   const body = z.object({ confirm: z.string() }).parse(req.body);
   const store = q.get('SELECT id, owner_id FROM stores WHERE slug=?', [req.params.slug]);
   if (!store) throw new AppError(404, 'not_found', 'Store not found.');
   if (body.confirm !== req.params.slug) throw new AppError(422, 'validation_failed', 'Type the store slug to confirm.', { confirm: 'mismatch' });
+  const files = q.all('SELECT * FROM media WHERE store_id=?', [store.id]);
   tx(() => {
     q.run('DELETE FROM stores WHERE id=?', [store.id]); // cascades products, orders, customers, media rows, etc.
     q.run('DELETE FROM users WHERE id=?', [store.owner_id]);
   });
+  // free the disk space the store's photos were using (DB rows alone don't release it)
+  for (const m of files) { try { await purgeMediaFiles(m); } catch { /* ignore */ } }
+  try { fs.rmSync(path.join(config.mediaDir, String(store.id)), { recursive: true, force: true }); } catch { /* ignore */ }
   res.json({ deleted: req.params.slug });
 }));
 
@@ -466,6 +479,23 @@ r.patch('/departments/:id', h((req, res) => {
     sizes_json: body.sizes ? JSON.stringify([...new Set(body.sizes)]) : undefined,
     active: body.active === undefined ? undefined : body.active ? 1 : 0,
   });
+  res.json({ departments: listDepartments({ all: true }) });
+}));
+const deptUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
+r.post('/departments/:id/image', deptUpload.single('file'), h(async (req, res) => {
+  const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);
+  if (!d) throw new AppError(404, 'not_found', 'Department not found.');
+  if (!req.file) throw new AppError(422, 'validation_failed', 'Pick an image.', { file: 'required' });
+  const url = await saveDeptImage(req.file.buffer, d.slug);
+  update('departments', d.id, { image: url });
+  await removeDeptImage(d.image);
+  res.json({ departments: listDepartments({ all: true }) });
+}));
+r.delete('/departments/:id/image', h(async (req, res) => {
+  const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);
+  if (!d) throw new AppError(404, 'not_found', 'Department not found.');
+  update('departments', d.id, { image: null });
+  await removeDeptImage(d.image);
   res.json({ departments: listDepartments({ all: true }) });
 }));
 r.delete('/departments/:id', h((req, res) => {
@@ -501,6 +531,16 @@ r.patch('/stores/:slug/products/:id', h((req, res) => {
   });
   const np = q.get('SELECT id, price, stock, status, featured FROM products WHERE id=?', [p.id]);
   res.json({ ...np, featured: !!np.featured });
+}));
+
+/** Set a new password for the store owner (typed by the admin, or generated). Returned once so it can be handed over; only a hash is stored. */
+r.post('/stores/:slug/reset-password', h((req, res) => {
+  const { password } = z.object({ password: z.string().min(8).max(100).optional() }).parse(req.body || {});
+  const row = q.get('SELECT u.id, u.email FROM stores s JOIN users u ON u.id=s.owner_id WHERE s.slug=?', [req.params.slug]);
+  if (!row) throw new AppError(404, 'not_found', 'Store not found.');
+  const pw = password || genPassword();
+  update('users', row.id, { password_hash: bcrypt.hashSync(pw, 10), setup_token_hash: null, setup_expires: null });
+  res.json(credentials(req, req.params.slug, row.email, pw));
 }));
 
 r.post('/stores/:slug/setup-link', h((req, res) => {

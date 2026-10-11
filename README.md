@@ -142,3 +142,7 @@ Each store picks one or many departments (women, men, kids, shoes, bags, hijab, 
 3. **Backups**: set `BACKUP_DIR` to a folder on a persistent disk. The server then snapshots the database (consistent `VACUUM INTO`) and mirrors new photos every 24 h and keeps `BACKUP_KEEP_DAYS` daily DB copies. Run on demand with `npm run backup -w server`. The admin “النظام” page can also download the database. Keep an off-server copy as well. Restore: stop the server, copy `db/souqna-DATE.db` over `DB_FILE` and `media/` over `MEDIA_DIR`.
 4. **Demo passwords**: the seed now generates a random Town Style password (printed at the end of the seed). On an existing database run `npm run set-password -w server -- townstyle@banhalook.app` (prints a new random password). Set the store’s real phone from the admin Stores page.
 5. **Push notifications** need HTTPS (the PWA service worker does too). VAPID keys are created automatically on first run.
+
+## Photo storage on Cloudflare R2 (free 10 GB)
+
+Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` and every new photo is uploaded to R2 (the volume keeps only the database). Photos already on the volume keep working; move them with `npm run media:to-r2 -w server` (safe to re-run, frees the disk space). Deleting a photo or a store also deletes it from R2.

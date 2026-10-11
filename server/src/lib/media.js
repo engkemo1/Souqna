@@ -27,6 +27,33 @@ import { IMAGE_SIZES } from '@souqna/shared';
 import { config } from '../config.js';
 import { q, insert } from '../db/index.js';
 import { badRequest } from './errors.js';
+import { r2Enabled, r2Put, r2Delete, r2Get } from './r2.js';
+
+const fileNames = (sizes) => ['original.jpg', ...sizes.flatMap((s) => [`${s.name}.webp`, `${s.name}.jpg`])];
+
+/** Upload a finished rendition folder to R2 and drop the local copy. */
+async function publishToR2(storeId, key, dir) {
+  const files = await fs.readdir(dir);
+  for (const f of files) await r2Put(`${storeId}/${key}/${f}`, await fs.readFile(path.join(dir, f)));
+  await fs.rm(dir, { recursive: true, force: true });
+}
+
+/** Read one stored file of a media row, from the local disk or from R2. */
+export async function readMediaFile(m, file) {
+  if (m.remote) return r2Get(`${m.store_id}/${m.key}/${file}`);
+  return fs.readFile(path.join(mediaDirFor(m.store_id, m.key), file));
+}
+
+/** Delete every stored file of media rows (local folder and/or R2 objects). */
+export async function purgeMediaFiles(m) {
+  if (m.remote) {
+    const sizes = typeof m.sizes === 'string' ? JSON.parse(m.sizes) : m.sizes;
+    for (const f of fileNames(sizes)) { try { await r2Delete(`${m.store_id}/${m.key}/${f}`); } catch (e) { console.error('[r2 delete]', e.message); } }
+  }
+  await fs.rm(mediaDirFor(m.store_id, m.key), { recursive: true, force: true });
+}
+
+export { publishToR2 };
 
 sharp.cache(false);
 sharp.concurrency(2);
@@ -68,6 +95,7 @@ async function productCanvas(data) {
 
 /** Re-render an existing product image from its stored original into the uniform 4:5 canvas (used by the one-off migration). */
 export async function reprocessProductMedia(m) {
+  if (m.remote) return; // photos already on R2 are not re-rendered
   const dir = mediaDirFor(m.store_id, m.key);
   const src = await fs.readFile(path.join(dir, 'original.jpg'));
   const normalised = await productCanvas(src);
@@ -155,8 +183,11 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
   const { r, g, b } = stats.dominant;
   const color = '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
 
+  if (r2Enabled) await publishToR2(storeId, key, dir);
+
   const id = insert('media', {
     store_id: storeId,
+    remote: r2Enabled ? 1 : 0,
     kind,
     key,
     width,
@@ -186,7 +217,7 @@ export function serializeMedia(m) {
     color: m.color,
     lqip: m.lqip,
     alt: m.alt || '',
-    base: `${config.mediaBaseUrl}/${m.store_id}/${m.key}`,
+    base: `${m.remote ? config.r2.publicUrl : config.mediaBaseUrl}/${m.store_id}/${m.key}`,
     sizes, // [{ name, width }]
     formats: ['webp', 'jpg'],
   };
@@ -203,5 +234,5 @@ export function mediaMap(ids) {
 export async function deleteMedia(m) {
   if (!m) return;
   q.run('DELETE FROM media WHERE id=?', [m.id]);
-  await fs.rm(mediaDirFor(m.store_id, m.key), { recursive: true, force: true });
+  await purgeMediaFiles(m);
 }

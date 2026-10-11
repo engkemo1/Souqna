@@ -10,7 +10,7 @@ import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { requireOwner } from '../lib/auth.js';
 import { vapidPublicKey, sendTest } from '../lib/push.js';
 import { clampInt, nowIso, slugify } from '../lib/util.js';
-import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia } from '../lib/media.js';
+import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMediaFile } from '../lib/media.js';
 import {
   serializeStore, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi, stockStatus,
 } from '../lib/serialize.js';
@@ -118,10 +118,10 @@ r.post('/store/cover/auto', h(async (req, res) => {
   for (const id of ids) {
     const m = getMedia(id);
     if (!m) continue;
-    const dir = path.join(config.mediaDir, String(m.store_id), m.key);
-    const file = ['lg.jpg', 'md.jpg', 'original.jpg'].map((f) => path.join(dir, f)).find((f) => fs.existsSync(f));
-    if (!file) continue;
-    const card = await sharp(file).resize(cardW, cardH, { fit: 'cover', position: 'attention' }).composite([{ input: mask, blend: 'dest-in' }, { input: frame }]).png().toBuffer();
+    let src = null;
+    for (const f of ['lg.jpg', 'md.jpg', 'original.jpg']) { try { src = await readMediaFile(m, f); break; } catch { /* try next size */ } }
+    if (!src) continue;
+    const card = await sharp(src).resize(cardW, cardH, { fit: 'cover', position: 'attention' }).composite([{ input: mask, blend: 'dest-in' }, { input: frame }]).png().toBuffer();
     const left = W - 96 - (i + 1) * cardW - i * gap;
     layers.push({ input: card, left, top: top + (i === 1 ? -28 : 28) });
     i++;

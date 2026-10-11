@@ -7,6 +7,7 @@
     "start": "node --no-warnings --env-file-if-exists=../.env src/index.js",
     "seed": "node --no-warnings --env-file-if-exists=../.env src/db/seed.js",
     "boot": "node --no-warnings src/boot.js",
+    "media:to-r2": "node --no-warnings --env-file-if-exists=../.env src/scripts/media-to-r2.js",
     "backup": "node --no-warnings --env-file-if-exists=../.env src/scripts/backup.js",
     "admin-totp": "node --no-warnings --env-file-if-exists=../.env src/scripts/admin-totp.js",
     "set-password": "node --no-warnings --env-file-if-exists=../.env src/scripts/set-password.js",

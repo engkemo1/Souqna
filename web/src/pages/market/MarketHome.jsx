@@ -10,8 +10,9 @@ import Brand from '../../components/market/Brand.jsx';
 import PromoBar from '../../components/market/PromoBar.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import MarketSearchBar from '../../components/market/MarketSearchBar.jsx';
+import DeptStrip from '../../components/market/DeptStrip.jsx';
+import ProductRail from '../../components/market/ProductRail.jsx';
 import StoreCard, { StoreCardSkeleton } from '../../components/market/StoreCard.jsx';
-import ProductCard, { ProductCardSkeleton } from '../../components/store/ProductCard.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { Select } from '../../components/ui/Field.jsx';
@@ -83,7 +84,7 @@ export default function MarketHome() {
 
   const featured = (base?.stores || []).filter((s) => s.featured);
   const { label: deptLabel } = useDepartments();
-  const cats = ['all', ...(base?.categories || []).map((c) => c.id)];
+  const cats = ['all', ...(base?.departments || []).map((d) => d.slug)];
   const titleLines = t('market.heroTitle').split('\n');
 
   return (
@@ -121,29 +122,31 @@ export default function MarketHome() {
 
       <div className="container"><Why /></div>
 
+      {/* shop by department (every department, even ones with no store yet) */}
+      <div className="mt-10"><DeptStrip departments={base?.departments || []} /></div>
+
+      {/* product shelves, Amazon-style */}
+      <div className="mt-6 border-y border-line bg-secondary/50">
+        <ProductRail title={t('market.trending')} items={base?.trending} loading={!base} to="/search?sort=best" />
+      </div>
+      <ProductRail title={t('market.deals')} items={base?.deals} to="/search?sale=1" />
+      <div className="border-y border-line bg-secondary/50">
+        <ProductRail title={t('market.newArrivals')} items={base?.newest} to="/search?sort=newest" />
+      </div>
+      {(base?.deptRails || []).map((r, i) => (
+        <div key={r.slug} className={i % 2 === 0 ? '' : 'border-y border-line bg-secondary/50'}>
+          <ProductRail title={t('market.topIn', { d: r.name?.[lang] || r.name?.ar })} items={r.items} to={`/search?department=${r.slug}`} />
+        </div>
+      ))}
+
       {/* featured */}
-      <section className="mt-14 border-y border-line bg-elevated">
+      <section className="mt-6 border-y border-line bg-elevated">
        <div className="container py-12 sm:py-14">
         <div className="mb-8 flex items-end justify-between"><h2 className="font-display text-display-sm font-bold">{t('market.featuredStores')}</h2></div>
         <div className="grid gap-5 md:grid-cols-2 lg:gap-6">
           {!base ? [0, 1].map((i) => <StoreCardSkeleton key={i} large />) : featured.slice(0, 2).map((s, i) => <StoreCard key={s.id} store={s} index={i} large />)}
         </div>
       </div>
-      </section>
-
-      {/* trending products across stores */}
-      <section className="border-b border-line bg-secondary/50">
-       <div className="container py-12 sm:py-14">
-        <h2 className="mb-8 font-display text-display-sm font-bold">{t('market.trending')}</h2>
-        <div className="scroll-x -mx-4 gap-3 px-4 pb-2 sm:gap-5">
-          {!base ? Array.from({ length: 5 }, (_, i) => <div key={i} className="w-[46%] shrink-0 sm:w-[30%] lg:w-[22%] xl:w-[18%]"><ProductCardSkeleton /></div>) :
-            base.trending.map((p, i) => (
-              <div key={p.id} className="w-[46%] shrink-0 snap-start sm:w-[30%] lg:w-[22%] xl:w-[18%]">
-                <ProductCard product={p} slug={p.store.slug} index={i} showStore />
-              </div>
-            ))}
-        </div>
-       </div>
       </section>
 
       {/* all stores with filters */}

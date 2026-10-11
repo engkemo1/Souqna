@@ -29,7 +29,7 @@ function loadStore(slug) {
 
 /* ---------------------------------------------------------- marketplace */
 
-r.get('/departments', h((_req, res) => res.json({ departments: listDepartments().map(({ slug, name, sizes }) => ({ slug, name, sizes })) })));
+r.get('/departments', h((_req, res) => res.json({ departments: listDepartments().map(({ slug, name, sizes, image }) => ({ slug, name, sizes, image })) })));
 
 /* ---------------------------------------------------------- global product search */
 
@@ -44,7 +44,7 @@ const SYNONYMS = {
 };
 
 r.get('/search', h((req, res) => {
-  const { q: term = '', department = '', store = '', sort = 'relevance', min, max, page = '1' } = req.query;
+  const { q: term = '', department = '', store = '', sort = 'relevance', min, max, page = '1', sale, new: isNew, in_stock: inStock, rating } = req.query;
   const tokens = normText(String(term).slice(0, 80)).split(/\s+/).filter(Boolean).slice(0, 6);
   const where = ["p.status='active'", "s.status='active'", 's.hidden=0']; const params = [];
   for (const tk of tokens) {
@@ -59,13 +59,19 @@ r.get('/search', h((req, res) => {
     }
     where.push(`(${ors.join(' OR ')})`);
   }
-  if (department) {
-    const d = String(department).replace(/[^a-z0-9_]/g, '');
-    where.push('p.department=?'); params.push(d);
-  }
-  if (store) { where.push('s.slug=?'); params.push(String(store)); }
   if (min) { where.push('p.price >= ?'); params.push(clampInt(min, 0, 1e7, 0)); }
   if (max) { where.push('p.price <= ?'); params.push(clampInt(max, 0, 1e7, 1e7)); }
+  if (sale === '1') where.push('p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price');
+  if (isNew === '1') where.push("(p.is_new=1 OR p.created_at >= datetime('now','-30 days'))");
+  if (inStock === '1') where.push('(p.track_stock=0 OR p.stock>0)');
+  if (rating === '1') where.push('p.rating >= 4');
+  // facets (counts per department / per store) are computed with every filter EXCEPT their own
+  const baseWhere = [...where]; const baseParams = [...params];
+  const deptSlug = String(department).replace(/[^a-z0-9_]/g, '');
+  const storeSlug = String(store).replace(/[^a-z0-9_-]/gi, '');
+  const facetFrom = (extra, extraParams) => ({ sql: `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${[...baseWhere, ...extra].join(' AND ')}`, params: [...baseParams, ...extraParams] });
+  if (deptSlug) { where.push('p.department=?'); params.push(deptSlug); }
+  if (storeSlug) { where.push('s.slug=?'); params.push(storeSlug); }
   const order = { relevance: 'p.featured DESC, p.sold_count DESC, p.id DESC', price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: 'p.created_at DESC', best: 'p.sold_count DESC' }[sort] || 'p.sold_count DESC';
   const limit = 24; const pg = clampInt(page, 1, 1000, 1);
   const from = `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${where.join(' AND ')}`;
@@ -73,9 +79,13 @@ r.get('/search', h((req, res) => {
   const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en ${from} ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, limit, (pg - 1) * limit]);
   const items = serializeCards(rows).map((c, i) => ({ ...c, store: { slug: rows[i].store_slug, name: bi(rows[i], 'store_name') } }));
   const price = q.get(`SELECT MIN(p.price) AS min, MAX(p.price) AS max ${from}`, params);
-  // which departments have matches (for the filter chips), ignoring the department filter itself
+  const fd = facetFrom(storeSlug ? ['s.slug=?'] : [], storeSlug ? [storeSlug] : []);
+  const departments = q.all(`SELECT p.department AS slug, COUNT(*) AS n ${fd.sql} AND p.department IS NOT NULL GROUP BY p.department`, fd.params);
+  const fs2 = facetFrom(deptSlug ? ['p.department=?'] : [], deptSlug ? [deptSlug] : []);
+  const stores = q.all(`SELECT s.slug AS slug, s.name_ar AS name_ar, s.name_en AS name_en, COUNT(*) AS n ${fs2.sql} GROUP BY s.id ORDER BY n DESC LIMIT 12`, fs2.params)
+    .map((x) => ({ slug: x.slug, name: { ar: x.name_ar, en: x.name_en }, n: x.n }));
   cache(res, 20);
-  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 } });
+  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores } });
 }));
 
 r.get('/marketplace', h((req, res) => {
@@ -111,8 +121,20 @@ r.get('/marketplace', h((req, res) => {
      WHERE p.status='active' AND s.status='active' ORDER BY p.sold_count DESC LIMIT 12`,
   );
   const trending = serializeCards(trendingRows).map((c, i) => ({ ...c, store: { slug: trendingRows[i].store_slug, name: bi(trendingRows[i], 'store_name') } }));
+  const railRows = (sql, params = []) => {
+    const rs = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id
+      WHERE p.status='active' AND s.status='active' AND s.hidden=0 ${sql}`, params);
+    return serializeCards(rs).map((c, i) => ({ ...c, store: { slug: rs[i].store_slug, name: bi(rs[i], 'store_name') } }));
+  };
+  const newest = railRows("ORDER BY p.is_new DESC, p.created_at DESC LIMIT 12");
+  const deals = railRows('AND p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price ORDER BY (p.compare_at_price - p.price) * 1.0 / p.compare_at_price DESC LIMIT 12');
+  const deptCounts = q.all("SELECT p.department AS slug, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL GROUP BY p.department");
+  const countBy = new Map(deptCounts.map((d) => [d.slug, d.n]));
+  const departments = listDepartments().map((d) => ({ slug: d.slug, name: d.name, image: d.image, products: countBy.get(d.slug) || 0 }));
+  const deptRails = departments.filter((d) => d.products >= 3).sort((a, b) => b.products - a.products).slice(0, 4)
+    .map((d) => ({ slug: d.slug, name: d.name, items: railRows('AND p.department=? ORDER BY p.sold_count DESC, p.id DESC LIMIT 10', [d.slug]) }));
   cache(res, 60);
-  res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending });
+  res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails });
 }));
 
 /* ---------------------------------------------------------- storefront */

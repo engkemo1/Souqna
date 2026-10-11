@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { SearchX } from 'lucide-react';
+import { SearchX, SlidersHorizontal, X } from 'lucide-react';
 import { useApi, useDebounced } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useDepartments } from '../../lib/departments.js';
@@ -13,6 +13,7 @@ import Button from '../../components/ui/Button.jsx';
 import { Select } from '../../components/ui/Field.jsx';
 import { EmptyState, ErrorState } from '../../components/ui/States.jsx';
 import { cx } from '../../components/ui/cx.js';
+import SearchFilters from '../../components/market/SearchFilters.jsx';
 import { api } from '../../lib/api.js';
 
 export default function MarketSearch() {
@@ -23,7 +24,10 @@ export default function MarketSearch() {
   const sort = params.get('sort') || 'relevance';
   const { list, label } = useDepartments();
   const dq = useDebounced(q, 150);
-  const key = new URLSearchParams({ q: dq, department, sort }).toString();
+  const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store'];
+  const [open, setOpen] = useState(false);
+  const key = new URLSearchParams({ q: dq, department, sort, ...Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || '']).filter(([, v]) => v)) }).toString();
+  const activeCount = FILTER_KEYS.filter((k) => params.get(k)).length + (department ? 1 : 0);
   const { data, error, loading, reload } = useApi(`/search?${key}`);
   const [more, setMore] = useState({ key: '', items: [], page: 1 });
   const [busy, setBusy] = useState(false);
@@ -38,6 +42,8 @@ export default function MarketSearch() {
     setBusy(false);
   };
   const total = data?.total ?? 0;
+  const clearFilters = () => { const n = new URLSearchParams(); if (q) n.set('q', q); if (sort !== 'relevance') n.set('sort', sort); setParams(n, { replace: true }); };
+  const panel = <SearchFilters params={params} set={set} facets={data?.facets} departments={list} label={label} activeCount={activeCount} onClear={clearFilters} />;
 
   return (
     <div className="min-h-dvh">
@@ -45,19 +51,19 @@ export default function MarketSearch() {
       <main className="container pb-20 pt-4 sm:pt-8">
         <div className="max-w-2xl" key={q}><MarketSearchBar initial={q} autoFocus={!q && !department} chips={false} /></div>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="scroll-x -mx-4 gap-2 px-4 sm:mx-0 sm:flex-wrap sm:px-0" role="tablist" aria-label={t('settings.departments')}>
-            {[{ slug: '', name: t('search.allDepartments') }, ...list.map((d) => ({ slug: d.slug, name: label(d.slug) }))].map((d) => (
-              <button key={d.slug} type="button" role="tab" aria-selected={department === d.slug} onClick={() => set({ department: d.slug })}
-                className={cx('h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition', department === d.slug ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>{d.name}</button>
-            ))}
-          </div>
-          <Select size="sm" value={sort} onChange={(e) => set({ sort: e.target.value === 'relevance' ? '' : e.target.value })} className="sm:w-52 [&_select]:h-11" aria-label={t('common.sort')}>
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <button type="button" onClick={() => setOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-strong bg-elevated px-4 text-sm font-semibold lg:hidden">
+            <SlidersHorizontal className="h-4 w-4" />{t('search.filters')}{activeCount > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-fg px-1 text-xs text-canvas">{activeCount}</span>}
+          </button>
+          <Select size="sm" value={sort} onChange={(e) => set({ sort: e.target.value === 'relevance' ? '' : e.target.value })} className="ms-auto w-48 sm:w-52 [&_select]:h-11" aria-label={t('common.sort')}>
             {['relevance', 'price_asc', 'price_desc', 'newest'].map((s) => <option key={s} value={s}>{t(`search.sort.${s}`)}</option>)}
           </Select>
         </div>
 
-        <p className="mb-5 mt-5 text-sm text-muted" aria-live="polite">
+        <div className="mt-5 lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
+          <aside className="hidden lg:block"><div className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto pe-1">{panel}</div></aside>
+          <div className="min-w-0">
+        <p className="mb-5 text-sm text-muted" aria-live="polite">
           {loading && !data ? t('common.loading') : q || department
             ? t('search.results', { n: formatNumber(total, lang), range: data?.price?.max ? `${formatMoney(data.price.min, lang)} – ${formatMoney(data.price.max, lang)}` : '' })
             : t('search.allProducts', { n: formatNumber(total, lang) })}
@@ -72,6 +78,19 @@ export default function MarketSearch() {
           </>
         ) : (
           <EmptyState icon={SearchX} title={q ? t('search.noResultsFor', { q }) : t('search.noResults')} body={q ? t('search.noResultsForBody') : t('search.noResultsBody')} action={<Button variant="outline" onClick={() => setParams({}, { replace: true })}>{t('common.clearAll')}</Button>} />
+        )}
+          </div>
+        </div>
+
+        {open && (
+          <div className="fixed inset-0 z-50 lg:hidden" role="dialog" aria-modal="true" aria-label={t('search.filters')}>
+            <button type="button" className="absolute inset-0 bg-black/50" aria-label="close" onClick={() => setOpen(false)} />
+            <div className="absolute inset-x-0 bottom-0 flex max-h-[88dvh] flex-col rounded-t-3xl bg-canvas shadow-lift">
+              <div className="flex items-center justify-between border-b border-line px-5 py-4"><h2 className="font-display text-lg font-bold">{t('search.filters')}</h2><button type="button" onClick={() => setOpen(false)} aria-label="close" className="grid h-9 w-9 place-items-center rounded-full hover:bg-secondary"><X className="h-5 w-5" /></button></div>
+              <div className="overflow-y-auto px-5 py-4">{panel}</div>
+              <div className="border-t border-line p-4"><Button size="lg" className="w-full" onClick={() => setOpen(false)}>{t('search.showResults', { n: formatNumber(total, lang) })}</Button></div>
+            </div>
+          </div>
         )}
       </main>
       <footer className="container flex items-center justify-between border-t border-line py-8 text-sm text-muted"><Brand /><p>© {new Date().getFullYear()} {t('market.footer')}</p></footer>

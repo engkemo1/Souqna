@@ -39,6 +39,16 @@ export async function adminApi(path, { method = 'GET', body, signal, key, sessio
   return data;
 }
 
+/** multipart upload (admin) */
+export async function adminUpload(path, file) {
+  const fd = new FormData(); fd.append('file', file);
+  let res;
+  try { res = await fetch(`/api/admin${path}`, { method: 'POST', headers: { 'x-admin-key': adminKey.get(), 'x-admin-session': adminSession.get() }, body: fd }); } catch { throw new AdminError(0, 'network', 'مفيش اتصال بالسيرفر'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const err = data?.error || {}; if (res.status === 401) onAuthFail(); throw new AdminError(res.status, err.code || 'error', err.message || 'حصل خطأ', err.fields); }
+  return data;
+}
+
 /** GET with loading/error/reload and optional polling. */
 export function useAdminApi(path, { every = 0 } = {}) {
   const [state, setState] = useState({ data: undefined, error: null, loading: true });

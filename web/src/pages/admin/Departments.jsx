@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, X, ImagePlus } from 'lucide-react';
 import { PageHeader } from '../../components/dash/Kit.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -8,7 +8,7 @@ import { Field, Input, Switch } from '../../components/ui/Field.jsx';
 import { ErrorState, EmptyState } from '../../components/ui/States.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
-import { adminApi, useAdminApi, fmtNum } from './adminApi.js';
+import { adminApi, adminUpload, useAdminApi, fmtNum } from './adminApi.js';
 
 const PRESETS = [
   ['ملابس', ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL']],
@@ -40,6 +40,41 @@ function SizesEditor({ value, onChange }) {
         {PRESETS.map(([label, sizes]) => <button key={label} type="button" onClick={() => onChange(sizes)} className="h-8 rounded-full border border-line-strong px-3 text-xs font-medium hover:border-fg">{label}</button>)}
       </div>
       <p className="mt-1.5 text-[12px] text-muted">اضغط على مجموعة جاهزة عشان تملا المقاسات بسرعة (بتستبدل الموجود).</p>
+    </div>
+  );
+}
+
+function DeptPhoto({ dept, onSaved }) {
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
+  const pick = async (e) => {
+    const file = e.target.files?.[0]; e.target.value = '';
+    if (!file) return;
+    setBusy(true);
+    try { const r = await adminUpload(`/departments/${dept.id}/image`, file); onSaved(r.departments); toast({ title: 'اتغيرت صورة القسم' }); }
+    catch (x) { toast({ tone: 'error', title: x.code === 'image_too_small' ? 'الصورة صغيرة (200 بكسل على الأقل)' : x.code === 'invalid_image' ? 'الملف ده مش صورة مدعومة' : x.message }); }
+    setBusy(false);
+  };
+  const reset = async () => {
+    setBusy(true);
+    try { const r = await adminApi(`/departments/${dept.id}/image`, { method: 'DELETE' }); onSaved(r.departments); toast({ title: 'رجعنا للصورة الافتراضية' }); } catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy(false);
+  };
+  const cur = dept.image;
+  return (
+    <div>
+      <p className="mb-2 text-sm font-medium">صورة القسم</p>
+      <div className="flex items-center gap-4">
+        <span className="grid h-20 w-20 shrink-0 place-items-center overflow-hidden rounded-full border border-line bg-secondary text-muted">{cur ? <img src={cur} alt="" className="h-full w-full object-cover" /> : <ImagePlus className="h-6 w-6" />}</span>
+        <div className="flex flex-wrap gap-2">
+          <label className={`inline-flex h-10 cursor-pointer items-center gap-2 rounded-xl border border-line-strong bg-elevated px-4 text-sm font-semibold hover:border-fg ${busy ? 'pointer-events-none opacity-60' : ''}`}>
+            <ImagePlus className="h-4 w-4" />{cur ? 'تغيير الصورة' : 'رفع صورة'}
+            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={pick} disabled={busy} />
+          </label>
+          {cur && <Button variant="outline" onClick={reset} loading={busy}>رجّع الافتراضية</Button>}
+        </div>
+      </div>
+      <p className="mt-1.5 text-[12px] text-muted">صورة مربعة أو قريبة من المربع (400×400 أو أكتر). بتتقص وتتصغّر لوحدها. لازم تكون صورة ليك أو مجانية للاستخدام التجاري.</p>
     </div>
   );
 }
@@ -82,6 +117,7 @@ function DeptSheet({ dept, onClose, onSaved }) {
             </Field>
             <Field label="الترتيب" hint="الأصغر يظهر الأول"><Input type="number" dir="ltr" min={0} value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value })} /></Field>
           </div>
+          {isNew ? <p className="rounded-xl bg-secondary px-3 py-2 text-[13px] text-muted">تقدر ترفع صورة القسم بعد ما تضيفه (تعديل ← صورة القسم).</p> : <DeptPhoto dept={dept} onSaved={onSaved} />}
           <div><p className="mb-2 text-sm font-medium">المقاسات الخاصة بالقسم</p><SizesEditor value={f.sizes} onChange={(sizes) => setF({ ...f, sizes })} />
             <p className="mt-2 text-[13px] text-muted">دي المقاسات اللي بتظهر لصاحب المحل جاهزة وهو بيضيف منتج في المحل اللي فيه القسم ده.</p></div>
           {!isNew && <Switch checked={f.active} onChange={(v) => setF({ ...f, active: v })} label="القسم مفعّل" description="لو اتقفل مش هيظهر للمحلات الجديدة ولا في الفلتر" />}
@@ -110,7 +146,7 @@ export default function Departments() {
           {list.map((d) => (
             <li key={d.id} className="flex flex-col rounded-2xl border border-line bg-elevated p-4">
               <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0"><p className="truncate text-lg font-semibold">{d.name_ar}</p><p className="text-[13px] text-muted" dir="ltr">{d.name_en} · {d.slug}</p></div>
+                <div className="flex min-w-0 items-center gap-3">{d.image && <img src={d.image} alt="" className="h-11 w-11 shrink-0 rounded-full object-cover" />}<div className="min-w-0"><p className="truncate text-lg font-semibold">{d.name_ar}</p><p className="text-[13px] text-muted" dir="ltr">{d.name_en} · {d.slug}</p></div></div>
                 {!d.active && <Badge tone="danger" size="sm">متوقف</Badge>}
               </div>
               <p className="mt-2 text-sm text-muted">{fmtNum(d.stores_count)} محل</p>
@@ -123,7 +159,7 @@ export default function Departments() {
           ))}
         </ul>
       )}
-      <DeptSheet dept={edit} onClose={() => setEdit(null)} onSaved={(l) => { setLocal(l); reload(); }} />
+      <DeptSheet dept={edit === 'new' || !edit ? edit : list.find((x) => x.id === edit.id) || edit} onClose={() => setEdit(null)} onSaved={(l) => { setLocal(l); reload(); }} />
     </div>
   );
 }

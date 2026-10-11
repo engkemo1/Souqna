@@ -24,6 +24,10 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   if (!cols.includes('delivery_mode')) db.exec("ALTER TABLE stores ADD COLUMN delivery_mode TEXT NOT NULL DEFAULT 'store'");
   if (!cols.includes('hero_mode')) db.exec("ALTER TABLE stores ADD COLUMN hero_mode TEXT NOT NULL DEFAULT 'auto'");
   db.exec("UPDATE stores SET departments=',' || category || ',' WHERE departments='' AND category NOT IN ('mixed','')");
+  const mcols = db.prepare('PRAGMA table_info(media)').all().map((c) => c.name);
+  if (!mcols.includes('remote')) db.exec('ALTER TABLE media ADD COLUMN remote INTEGER NOT NULL DEFAULT 0');
+  const dcols = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);
+  if (!dcols.includes('image')) db.exec('ALTER TABLE departments ADD COLUMN image TEXT');
   const pcols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!pcols.includes('department')) db.exec('ALTER TABLE products ADD COLUMN department TEXT');
   // Single-department stores: their products belong to that department.

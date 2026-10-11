@@ -38,6 +38,10 @@ export function errorHandler(err, req, res, _next) {
   if (String(err?.message || '').includes('UNIQUE constraint failed')) {
     return res.status(409).json({ error: { code: 'already_exists', message: 'This value is already in use.' } });
   }
+  if (['ENOSPC', 'EDQUOT', 'EROFS', 'EACCES', 'EPERM'].includes(err?.code)) {
+    console.error('[storage]', err.code, req.method, req.originalUrl, err.message);
+    return res.status(507).json({ error: { code: 'storage_full', message: 'Storage is full or not writable.' } });
+  }
   console.error('[unhandled]', req.method, req.originalUrl, err);
   res.status(500).json({ error: { code: 'server_error', message: 'Something went wrong. Please try again.' } });
 }

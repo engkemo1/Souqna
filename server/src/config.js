@@ -12,6 +12,14 @@ export const config = {
   mediaDir: process.env.MEDIA_DIR || path.join(ROOT, 'data', 'media'),
   // Set to your CDN origin (e.g. https://cdn.banhalook.app/media) — the API emits URLs relative to this base.
   mediaBaseUrl: process.env.MEDIA_BASE_URL || '/media',
+  // Cloudflare R2 photo storage (optional). When all five are set, new photos go to R2 instead of the volume.
+  r2: {
+    accountId: process.env.R2_ACCOUNT_ID || '',
+    accessKeyId: process.env.R2_ACCESS_KEY_ID || '',
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY || '',
+    bucket: process.env.R2_BUCKET || '',
+    publicUrl: (process.env.R2_PUBLIC_URL || '').replace(/\/+$/, ''),
+  },
   webDist: path.resolve(ROOT, '..', 'web', 'dist'),
   maxUploadMb: 15,
   // Accounts are created by the Banha Outfit team, not by the public. Set ALLOW_REGISTER=1 only to re-open sign-up.
