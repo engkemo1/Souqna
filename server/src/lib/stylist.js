@@ -167,9 +167,18 @@ export async function callLlm(provider, system, messages) {
   return String(j.result?.response ?? j.result?.text ?? '');
 }
 const parseJson = (t) => {
-  const text = String(t).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const original = String(t).trim();
+  const text = original.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
   const start = text.indexOf('{');
-  if (start < 0) throw new Error('no JSON in reply');
+  // Some Workers AI models ignore response_format and return useful prose. Keep
+  // the assistant available in that case instead of turning a valid answer into
+  // a generic "unavailable" error. Product matching requires structured JSON,
+  // so treat prose as a normal fashion chat reply and never invent catalogue items.
+  if (start < 0) {
+    const say = text.replace(/^\s*(?:assistant|مودة)\s*[:：-]\s*/i, '').slice(0, 700).trim();
+    if (say) return { intent: 'chat', say, tips: '', budget: null, slots: [] };
+    throw new Error('empty reply from AI provider');
+  }
   let depth = 0; let quoted = false; let escaped = false;
   for (let i = start; i < text.length; i++) {
     const ch = text[i];
