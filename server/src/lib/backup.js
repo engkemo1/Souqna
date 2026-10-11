@@ -49,7 +49,13 @@ export function runBackup(dir = config.backupDir) {
 }
 
 const OFFSITE_FILE = () => path.join(path.resolve(config.backupDir || os.tmpdir()), 'last-offsite.json');
-export const lastOffsite = () => { try { return JSON.parse(fs.readFileSync(OFFSITE_FILE(), 'utf8')); } catch { return null; } };
+export const lastOffsite = () => {
+  try {
+    const saved = db.prepare("SELECT value FROM app_settings WHERE key='backup_offsite_last'").get()?.value;
+    if (saved) return JSON.parse(saved);
+  } catch { /* fall back to the local status file */ }
+  try { return JSON.parse(fs.readFileSync(OFFSITE_FILE(), 'utf8')); } catch { return null; }
+};
 
 /** Gzipped database copy → private R2 bucket (db/souqna-YYYY-MM-DD.db.gz); old days are removed after BACKUP_KEEP_DAYS. */
 export async function runOffsiteBackup() {
@@ -65,7 +71,9 @@ export async function runOffsiteBackup() {
       try { await offsiteDelete(`db/souqna-${d}.db.gz`); } catch { /* retention is best-effort */ }
     }
     const info = { at: new Date().toISOString(), key, bytes: gz.length };
-    try { fs.writeFileSync(OFFSITE_FILE(), JSON.stringify(info)); } catch { /* status file is optional */ }
+    const saved = JSON.stringify(info);
+    db.prepare("INSERT INTO app_settings(key,value) VALUES('backup_offsite_last',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value").run(saved);
+    try { fs.writeFileSync(OFFSITE_FILE(), saved); } catch { /* status file is optional */ }
     return info;
   } finally { try { fs.rmSync(tmp, { force: true }); } catch { /* ignore */ } }
 }

@@ -170,8 +170,8 @@ r.get('/look-share/:token', h(async (req, res) => {
 }));
 
 r.get('/look-of-day', h(async (_req, res) => {
-  if (!stylistSettings().enabled) return res.json({ day: null, entries: [] });
-  res.set('Cache-Control', 'public, max-age=300');
+  const mode = q.get("SELECT value FROM app_settings WHERE key='look_of_day_mode'")?.value || 'ai';
+  res.set('Cache-Control', mode === 'manual' || mode === 'off' ? 'no-store' : 'public, max-age=300');
   res.json(await lookOfDay());
 }));
 

@@ -18,23 +18,56 @@ function StoreCartLink({ slug, name, tr, t }) {
 
 function LookRow({ look, lang, tr, t, added, onAdd }) {
   return (
-    <div className="mt-3">
-      <p className="mb-1.5 text-[13px] font-bold">{look.label}</p>
-      <div className="scroll-x -mx-1 gap-2 px-1 pb-1">
+    <div className="mt-4 rounded-2xl border border-line bg-canvas/60 p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-sm font-bold sm:text-base">{look.label}</p>
+        <span className="text-[12px] text-muted">{t('lod.options', { n: look.items.length })}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
         {look.items.map((p, i) => (
-          <Link key={p.id} to={`/s/${p.store.slug}/p/${p.slug}`} className={cx('w-[120px] shrink-0 rounded-xl border bg-elevated p-1.5 text-start transition hover:border-fg', i === look.pick ? 'border-brand ring-1 ring-brand/40' : 'border-line')}>
-            <SmartImage media={p.image} ratio="4 / 5" className="rounded-lg" sizes="120px" />
-            <p className="mt-1.5 line-clamp-2 min-h-[2.4em] text-[12px] font-medium leading-snug">{tr(p.name)}</p>
-            <p className="text-[13px] font-bold text-sale">{formatMoney(p.price, lang)}</p>
-            <p className="truncate text-[11px] text-muted">{tr(p.store.name)}</p>
+          <Link key={p.id} to={'/s/' + p.store.slug + '/p/' + p.slug} className={cx('group min-w-0 rounded-2xl border bg-elevated p-2 text-start transition hover:-translate-y-0.5 hover:border-fg hover:shadow-sm', i === look.pick ? 'border-brand ring-1 ring-brand/40' : 'border-line')}>
+            <div className="relative">
+              <SmartImage media={p.image} ratio="4 / 5" className="overflow-hidden rounded-xl" sizes="(min-width:1280px) 220px, (min-width:640px) 30vw, 44vw" />
+              {i === look.pick && <span className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-1 text-[10px] font-bold text-white"><Check className="h-3 w-3" />{t('lod.picked')}</span>}
+            </div>
+            <p className="mt-2 line-clamp-2 min-h-[2.6em] text-[12px] font-semibold leading-snug sm:text-[13px]">{tr(p.name)}</p>
+            <p className="mt-1 text-sm font-bold text-sale">{formatMoney(p.price, lang)}</p>
+            <p className="mt-0.5 truncate text-[11px] text-muted">{tr(p.store.name)}</p>
           </Link>
         ))}
       </div>
       {look.items[look.pick] && (
-        <button type="button" onClick={() => onAdd(look.items[look.pick])} className={cx('mt-1 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold transition', added ? 'border-brand text-brand' : 'border-line-strong hover:border-fg')}>
+        <button type="button" onClick={() => onAdd(look.items[look.pick])} className={cx('mt-3 inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[12.5px] font-semibold transition', added ? 'border-brand text-brand' : 'border-line-strong bg-elevated hover:border-fg')}>
           {added ? <Check className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}{added ? t('stylist.added') : t('stylist.addPick')}
         </button>
       )}
+    </div>
+  );
+}
+
+function ManualLookCards({ looks, lang, tr, t, added, onAdd }) {
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+      {looks.map((look, index) => {
+        const p = look.items[0];
+        if (!p) return null;
+        return (
+          <article key={`${p.id}-${index}`} className="overflow-hidden rounded-2xl border border-line bg-canvas/60 p-2.5 sm:p-3">
+            <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="group block min-w-0 text-start">
+              <div className="relative">
+                <SmartImage media={p.image} ratio="4 / 5" className="overflow-hidden rounded-xl" sizes="(min-width:1280px) 220px, (min-width:640px) 30vw, 44vw" />
+                <span className="absolute start-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-elevated/95 px-2.5 py-1 text-[11px] font-semibold shadow-sm">{look.label}</span>
+              </div>
+              <p className="mt-2 line-clamp-2 min-h-[2.6em] text-[12px] font-semibold leading-snug sm:text-[13px]">{tr(p.name)}</p>
+              <p className="mt-1 text-sm font-bold text-sale">{formatMoney(p.price, lang)}</p>
+              <p className="mt-0.5 truncate text-[11px] text-muted">{tr(p.store.name)}</p>
+            </Link>
+            <button type="button" onClick={() => onAdd(p)} className={cx('mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition sm:text-xs', added.includes(p.id) ? 'border-brand text-brand' : 'border-line-strong bg-elevated hover:border-fg')}>
+              {added.includes(p.id) ? <Check className="h-3.5 w-3.5" /> : <ShoppingBag className="h-3.5 w-3.5" />}{added.includes(p.id) ? t('stylist.added') : t('stylist.addPick')}
+            </button>
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -71,8 +104,8 @@ export default function LookSet({ data, name }) {
   };
   return (
     <>
-      {m.tips && <p className="mt-2 max-w-[90%] rounded-xl border border-brand/30 bg-brand/5 px-3 py-2 text-[13px] leading-relaxed">✨ {m.tips}</p>}
-      {m.looks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
+      {m.tips && <p className="mt-3 rounded-2xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] leading-relaxed sm:text-sm">✨ {m.tips}</p>}
+      {m.manual ? <><p className="mt-4 text-sm font-bold">قطع الأوتفيت المختارة</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} /></> : m.looks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
       <p className="mt-3 text-[13.5px] font-semibold">{t('stylist.total', { p: formatMoney(m.total, lang) })}{m.overBudget && <span className="ms-2 font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-4 py-2 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t('stylist.addAll')}</button>

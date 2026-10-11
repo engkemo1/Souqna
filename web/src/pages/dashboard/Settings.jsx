@@ -6,6 +6,7 @@ import { api, upload } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import DesignHelp from '../../components/dash/DesignHelp.jsx';
+import MapLinkField from '../../components/dash/MapLinkField.jsx';
 import { PageHeader, Panel } from '../../components/dash/Kit.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
@@ -183,7 +184,7 @@ export default function Settings() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('settings.phone')}><Input dir="ltr" inputMode="tel" value={f.phone} onChange={set('phone')} className="text-start" /></Field>
               <Field label={t('settings.whatsapp')}><Input dir="ltr" inputMode="tel" value={f.whatsapp} onChange={set('whatsapp')} className="text-start" /></Field>
-              <Field label={t('settings.mapUrl')} hint={t('settings.mapUrlHint')} error={errors.map_url}><Input dir="ltr" inputMode="url" placeholder="https://maps.app.goo.gl/..." value={f.map_url} onChange={set('map_url')} className="text-start" /></Field>
+              <div className="sm:col-span-2"><MapLinkField value={f.map_url} onChange={(value) => setF({ ...f, map_url: value })} error={errors.map_url} query={[f.name_ar, f.address_ar, f.address_en].filter(Boolean).join(' ')} /></div>
               <Field label={t('settings.opensAt')} error={errors.opens_at}><Input type="time" dir="ltr" value={f.opens_at} onChange={set('opens_at')} /></Field>
               <Field label={t('settings.closesAt')} error={errors.closes_at}><Input type="time" dir="ltr" value={f.closes_at} onChange={set('closes_at')} /></Field>
               <Field label={t('settings.dayOff')}>

@@ -11,6 +11,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { tokenStore } from '../../lib/api.js';
 import { adminApi, useAdminApi, fmtMoney, fmtNum, fmtDateTime, useAdminDepartments } from './adminApi.js';
+import MapLinkField from '../../components/dash/MapLinkField.jsx';
 
 const DeptPicker = ({ value, onChange, depts }) => (
   <div className="flex flex-wrap gap-2" role="group">
@@ -68,7 +69,7 @@ function CreateSheet({ open, onClose, onDone, depts }) {
             <Field label="رقم التليفون" error={errs.phone}><Input dir="ltr" inputMode="tel" required pattern="01[0125][0-9]{8}" value={f.phone} onChange={set('phone')} className="text-start" /></Field>
             <Field label="واتساب المحل (لو مختلف)" optional error={errs.whatsapp}><Input dir="ltr" inputMode="tel" pattern="01[0125][0-9]{8}" value={f.whatsapp} onChange={set('whatsapp')} className="text-start" /></Field>
             <Field label="العنوان" optional><Input value={f.address} onChange={set('address')} placeholder="شارع ...، بنها" /></Field>
-            <Field label="لينك اللوكيشن (جوجل ماب)" optional error={errs.map_url} className="sm:col-span-2"><Input dir="ltr" type="url" value={f.map_url} onChange={set('map_url')} placeholder="https://maps.app.goo.gl/..." className="text-start" /></Field>
+            <MapLinkField value={f.map_url} onChange={(value) => setF({ ...f, map_url: value })} error={errs.map_url} query={[f.store_name, f.address].filter(Boolean).join(' ')} className="sm:col-span-2" />
             <Field label="بيفتح الساعة"><Input type="time" dir="ltr" value={f.opens_at} onChange={set('opens_at')} /></Field>
             <Field label="بيقفل الساعة"><Input type="time" dir="ltr" value={f.closes_at} onChange={set('closes_at')} /></Field>
           </div>

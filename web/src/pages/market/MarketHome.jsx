@@ -83,6 +83,7 @@ export default function MarketHome() {
   const path = useMemo(() => `/marketplace?${new URLSearchParams({ q, category, sort })}`, [q, category, sort]);
   const { data, error, loading, reload } = useApi(path);
   const { data: base } = useApi('/marketplace?q=&category=all&sort=featured');
+  const showWearThis = base?.features?.stylist !== false;
 
   useEffect(() => { document.title = `${t('app.name')} · ${t('app.tagline')}`; }, [t]);
 
@@ -129,8 +130,10 @@ export default function MarketHome() {
       {/* shop by department (every department, even ones with no store yet) */}
       <div className="mt-10"><DeptStrip departments={base?.departments || []} /></div>
       <LookOfDay />
-      <WearThis />
-      <RequestBanner className="mt-8" />
+      <div className="container mt-8 grid gap-4 md:grid-cols-2">
+        {showWearThis && <WearThis className="h-full" />}
+        <RequestBanner compact className={showWearThis ? 'h-full' : 'h-full md:col-span-2'} />
+      </div>
 
       {/* product shelves, Amazon-style */}
       <div className="mt-6 border-y border-line bg-secondary/50">

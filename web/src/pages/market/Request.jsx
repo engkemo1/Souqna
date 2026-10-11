@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
-import { PackagePlus, ShieldCheck, Truck, Eye, ImagePlus, X, Check, Copy, MessageCircle } from 'lucide-react';
+import { PackagePlus, ShieldCheck, Truck, Eye, ImagePlus, X, Check, Copy, MessageCircle, ArrowRight } from 'lucide-react';
 import { GOVERNORATES } from '@souqna/shared';
 import { api } from '../../lib/api.js';
 import { useApi } from '../../lib/hooks.js';
@@ -29,7 +29,8 @@ async function shrink(file, max = 1400) {
 }
 
 function Shell({ children }) {
-  return <div className="min-h-dvh bg-canvas"><MarketHeader /><main className="container max-w-xl pb-16 pt-6 sm:pt-10">{children}</main></div>;
+  const { t } = useI18n();
+  return <div className="min-h-dvh bg-canvas"><MarketHeader /><main className="container max-w-xl pb-16 pt-6 sm:pt-10"><Link to="/" className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-sm font-semibold hover:border-fg"><ArrowRight className="h-4 w-4" />{t('req.backMarket')}</Link>{children}</main></div>;
 }
 
 function Promise3() {

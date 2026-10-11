@@ -32,7 +32,7 @@ export function saveVisualSettings({ enabled, model, dailyFree }) {
   if (enabled !== undefined) put('visual_enabled', enabled ? '1' : '0');
   if (model) put('visual_model', model);
   if (dailyFree !== undefined) put('visual_daily', Math.max(0, Math.min(1000, Math.floor(dailyFree))));
-  return visualSettings(); س
+  return visualSettings();
 }
 
 export function visualStatus() {

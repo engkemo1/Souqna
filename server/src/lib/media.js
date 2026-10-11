@@ -20,6 +20,7 @@
  * can be synced to S3/R2 and fronted by any CDN by setting MEDIA_BASE_URL.
  */
 import fs from 'node:fs/promises';
+import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
@@ -33,9 +34,17 @@ const fileNames = (sizes) => ['original.jpg', ...sizes.flatMap((s) => [`${s.name
 
 /** Upload a finished rendition folder to R2 and drop the local copy. */
 async function publishToR2(storeId, key, dir) {
-  const files = await fs.readdir(dir);
-  for (const f of files) await r2Put(`${storeId}/${key}/${f}`, await fs.readFile(path.join(dir, f)));
-  await fs.rm(dir, { recursive: true, force: true });
+  const uploaded = [];
+  try {
+    const files = await fs.readdir(dir);
+    for (const f of files) {
+      await r2Put(`${storeId}/${key}/${f}`, await fs.readFile(path.join(dir, f)));
+      uploaded.push(f);
+    }
+  } catch (e) {
+    await Promise.all(uploaded.map((f) => r2Delete(`${storeId}/${key}/${f}`).catch(() => {})));
+    throw e;
+  } finally { await fs.rm(dir, { recursive: true, force: true }); }
 }
 
 /** Read one stored file of a media row, from the local disk or from R2. */
@@ -140,7 +149,8 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
   if (kind === 'product' && Math.min(meta.width || 0, meta.height || 0) < MIN_PRODUCT_SIDE) throw badRequest('image_too_small', `Image is too small (min ${MIN_PRODUCT_SIDE}px on the short side).`);
 
   const key = crypto.createHash('sha1').update(buffer).update(String(Date.now() + Math.random())).digest('hex').slice(0, 16);
-  const dir = mediaDirFor(storeId, key);
+  // Stage R2-bound images on the container temp area instead of the Railway media volume.
+  const dir = r2Enabled ? path.join(os.tmpdir(), 'souqna-r2-media', String(storeId), key) : mediaDirFor(storeId, key);
   await fs.mkdir(dir, { recursive: true });
 
   // Normalise: honour EXIF orientation, sRGB, strip metadata, cap size.

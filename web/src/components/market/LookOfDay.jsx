@@ -6,7 +6,7 @@ import ModaAvatar from './ModaAvatar.jsx';
 import LookSet from './LookSet.jsx';
 import { cx } from '../ui/cx.js';
 
-/** Home-page card: today's look, picked daily by the stylist from real products (one for her, one for him). */
+/** Home-page card: today's complete looks for different audiences and ages. */
 export default function LookOfDay() {
   const { t, lang } = useI18n();
   const { data } = useApi('/look-of-day');
@@ -17,26 +17,33 @@ export default function LookOfDay() {
   const e = entries[Math.min(tab, entries.length - 1)];
   const name = feat?.features?.stylistName?.[lang] || feat?.features?.stylistName?.ar || t('stylist.defaultName');
   const avatar = feat?.features?.stylistAvatar || null;
-  const tabName = (p) => (p === 'her' ? t('lod.her') : t('lod.him'));
+  const tabName = (entry) => `${t(`lod.audience.${entry.audience || (entry.persona === 'her' ? 'women' : 'men')}`)}${entry.age ? ` · ${entry.age}` : ''}`;
   return (
-    <section className="container mt-12">
-      <div className="overflow-hidden rounded-3xl border border-line bg-elevated p-5 sm:p-8">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <ModaAvatar src={avatar} size={52} />
-            <div>
-              <h2 className="font-display text-xl font-bold leading-tight sm:text-2xl">{t('lod.title')}</h2>
-              <p className="text-[13px] text-muted">{t('lod.by', { n: name })}{e.occasion ? ` · ${e.occasion}` : ''}</p>
+    <section className="container mt-10 sm:mt-14">
+      <div className="overflow-hidden rounded-[28px] border border-brand/20 bg-elevated shadow-sm">
+        <div className="bg-gradient-to-l from-brand/10 via-secondary/50 to-elevated p-5 sm:p-7">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <ModaAvatar src={avatar} size={56} />
+              <div className="min-w-0">
+                <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-elevated/80 px-2.5 py-1 text-[11px] font-semibold text-brand">
+                  <Sparkles className="h-3.5 w-3.5" />{t('lod.todayTag')}
+                </div>
+                <h2 className="font-display text-xl font-bold leading-tight sm:text-2xl">{t('lod.title')}</h2>
+                <p className="mt-1 text-[12px] text-muted sm:text-[13px]">{tabName(e)}{e.occasion ? ' · ' + e.occasion : ''} · {t('lod.by', { n: name })}</p>
+              </div>
             </div>
+            {entries.length > 1 && (
+              <div className="flex max-w-full flex-wrap justify-end gap-1 rounded-2xl border border-line bg-elevated/80 p-1" role="tablist" aria-label={t('lod.title')}>
+                {entries.map((x, i) => <button key={`${x.audience || x.persona || 'look'}-${x.age || ''}-${x.occasion || ''}-${i}`} type="button" role="tab" aria-selected={tab === i} onClick={() => setTab(i)} className={cx('max-w-full rounded-full px-3 py-2 text-xs font-semibold transition sm:text-sm', tab === i ? 'bg-fg text-canvas shadow-sm' : 'text-muted hover:text-fg')}>{tabName(x)}</button>)}
+              </div>
+            )}
           </div>
-          {entries.length > 1 && (
-            <div className="inline-flex rounded-full bg-secondary p-1" role="tablist">
-              {entries.map((x, i) => <button key={x.persona} type="button" role="tab" aria-selected={tab === i} onClick={() => setTab(i)} className={cx('rounded-full px-4 py-1.5 text-sm font-semibold transition', tab === i ? 'bg-fg text-canvas' : 'text-muted')}>{tabName(x.persona)}</button>)}
-            </div>
-          )}
         </div>
-        {e.say && <p className="mt-4 flex items-start gap-2 text-[15px] leading-relaxed"><Sparkles className="mt-1 h-4 w-4 shrink-0 text-brand" />{e.say}</p>}
-        <div key={e.persona}><LookSet data={e} name={name} /></div>
+        <div className="px-4 pb-5 sm:px-6 sm:pb-7">
+          {e.say && <p className="flex items-start gap-2 rounded-2xl border border-brand/15 bg-brand/5 px-4 py-3 text-[14px] leading-relaxed sm:text-[15px]"><Sparkles className="mt-1 h-4 w-4 shrink-0 text-brand" />{e.say}</p>}
+          <div key={`${e.audience || e.persona || 'look'}-${e.age || ''}-${e.occasion || ''}-${tab}`}><LookSet data={e} name={name} /></div>
+        </div>
       </div>
     </section>
   );

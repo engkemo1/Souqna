@@ -33,13 +33,13 @@ export default function DesignHelp({ what = 'banner', className = '' }) {
   };
 
   return (
-    <div className={`flex flex-col gap-3 rounded-2xl border border-line bg-secondary/40 p-4 text-sm sm:flex-row sm:items-center ${className}`}>
+    <div className={`grid min-w-0 grid-cols-[2.5rem_minmax(0,1fr)] items-start gap-3 rounded-2xl border border-line bg-secondary/40 p-4 text-sm ${className}`}>
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-brand"><Palette className="h-5 w-5" /></span>
-      <div className="flex-1">
-        <p className="font-semibold">{t('design.title')}</p>
-        <p className="mt-0.5 text-[13px] leading-relaxed text-muted">{t(`design.body.${what}`)}</p>
+      <div className="min-w-0">
+        <p className="break-words font-semibold">{t('design.title')}</p>
+        <p className="mt-0.5 break-words text-[13px] leading-relaxed text-muted">{t(`design.body.${what}`)}</p>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="col-span-2 flex min-w-0 flex-wrap gap-2">
         <Button size="sm" icon={Send} loading={busy} disabled={sent} onClick={send}>{sent ? t('design.sentShort') : t('design.request')}</Button>
         <Button variant="outline" size="sm" href={`https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer">{t('design.cta')}</Button>
       </div>

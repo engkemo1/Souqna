@@ -13,13 +13,13 @@ import { listDepartments, assertDepartments } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings } from '../lib/visual.js';
-import { stylistStatus, saveStylistSettings } from '../lib/stylist.js';
+import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts } from '../lib/stylist.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
 import { verifyTotp } from '../lib/totp.js';
 import { snapshotDb, runBackup, lastBackup, runOffsiteBackup, lastOffsite } from '../lib/backup.js';
-import { offsiteEnabled } from '../lib/r2.js';
+import { offsiteEnabled, r2Enabled } from '../lib/r2.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -247,7 +247,7 @@ const demoPasswordsUnchanged = () => {
 r.get('/status', h((_req, res) => {
   const insecureJwt = config.jwtSecret.startsWith('dev-only') || config.jwtSecret.length < 24;
   res.json({
-    backup: lastBackup(), backupDir: !!config.backupDir, offsite: { enabled: offsiteEnabled, last: lastOffsite() },
+    backup: lastBackup(), backupDir: !!config.backupDir, offsite: { enabled: offsiteEnabled, last: lastOffsite() }, mediaR2Enabled: r2Enabled,
     whatsappConfigured: isWhatsAppConfigured(), template: config.wa.template, registrationOpen: config.allowRegister,
     env: config.env, node: process.version, uptimeSec: Math.round(process.uptime()),
     checks: [
@@ -255,7 +255,8 @@ r.get('/status', h((_req, res) => {
       { id: 'admin', ok: config.adminKey.length >= 16, label: 'ADMIN_KEY قوي (16+ حرف)', fix: 'اضبط ADMIN_KEY بقيمة طويلة.' },
       { id: 'totp', ok: !!config.adminTotpSecret, label: 'تأكيد خطوتين لدخول الأدمن', fix: 'شغّل npm run admin-totp -w server واضبط ADMIN_TOTP_SECRET.' },
       { id: 'backup', ok: !!lastBackup() && Date.now() - Date.parse(lastBackup().at) < 36 * 3600e3, label: 'نسخة احتياطية يومية (قاعدة البيانات + الصور)', fix: 'اضبط BACKUP_DIR على مجلد على قرص دائم.' },
-      { id: 'offsite', ok: offsiteEnabled && !!lastOffsite() && Date.now() - Date.parse(lastOffsite().at) < 36 * 3600e3, label: 'نسخة احتياطية خارج Railway (Cloudflare R2 خاص)', fix: 'اعمل bucket خاص للنسخ واضبط BACKUP_R2_BUCKET.' },
+      { id: 'offsite', ok: offsiteEnabled && !!lastOffsite() && Date.now() - Date.parse(lastOffsite().at) < 36 * 3600e3, label: 'نسخة احتياطية خارج Railway (Cloudflare R2 خاص)', fix: 'اضبط R2_ACCOUNT_ID وBACKUP_R2_BUCKET وR2_ACCESS_KEY_ID وR2_SECRET_ACCESS_KEY (أو مفاتيح النسخ المخصصة)، وتأكد أن الـ bucket خاص والمفاتيح لها صلاحية الكتابة عليه. CF_AI_TOKEN ليس مفتاح R2.' },
+      { id: 'media-r2', ok: r2Enabled, optional: true, label: 'تخزين صور المنتجات على Cloudflare R2', fix: 'لو رفع الصور بيفشل، راجع R2_ACCOUNT_ID وR2_BUCKET وR2_ACCESS_KEY_ID وR2_SECRET_ACCESS_KEY وR2_PUBLIC_URL. استخدم bucket الصور العام banha-media، وخلي BACKUP_R2_BUCKET خاصاً للنسخ فقط.' },
       { id: 'demo-pw', ok: !demoPasswordsUnchanged(), label: 'باسورد حساب تاون ستايل التجريبي اتغيّر', fix: 'npm run set-password -w server -- townstyle@banhalook.app' },
       { id: 'register', ok: !config.allowRegister, label: 'التسجيل العام مقفول', fix: 'شيل ALLOW_REGISTER=1.' },
       { id: 'prod', ok: config.env === 'production', label: 'NODE_ENV=production', fix: 'اضبط NODE_ENV=production.' },
@@ -268,8 +269,76 @@ r.get('/status', h((_req, res) => {
 r.get('/stylist', h((_req, res) => res.json(stylistStatus())));
 r.put('/stylist', h((req, res) => {
   const b = z.object({ enabled: z.boolean().optional(), provider: z.enum(['anthropic', 'cloudflare']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional(), nameAr: z.string().trim().min(2).max(20).optional(), nameEn: z.string().trim().min(2).max(20).optional() }).parse(req.body);
+  const current = stylistStatus().provider;
+  if (b.provider && b.provider !== current && !providerReady[b.provider]()) {
+    throw new AppError(400, 'stylist_provider_not_configured', 'Configure the selected AI provider credentials before switching to it.');
+  }
   saveStylistSettings(b);
   res.json(stylistStatus());
+}));
+
+/* ---- Moda's admin-taught style memory ---- */
+const trainingPieceSchema = z.object({ label: z.string().trim().min(1).max(50), productId: z.coerce.number().int().positive() });
+const trainingExampleSchema = z.object({
+  audience: z.enum(['women', 'men', 'kids']), age: z.string().trim().max(40).optional().default(''),
+  occasion: z.string().trim().min(2).max(80), lesson: z.string().trim().max(300).optional().default(''),
+  pieces: z.array(trainingPieceSchema).min(2).max(8),
+});
+const trainingLessonSchema = z.object({
+  topic: z.string().trim().max(80).optional().default(''), question: z.string().trim().min(4).max(400),
+  answer: z.string().trim().min(10).max(1000), tags: z.string().trim().max(160).optional().default(''),
+});
+r.get('/stylist/training', h((_req, res) => res.json(stylistTrainingSettings())));
+r.put('/stylist/training', h((req, res) => {
+  const body = z.object({ guidance: z.string().trim().max(1600) }).parse(req.body);
+  res.json(saveStylistTrainingGuidance(body.guidance));
+}));
+r.post('/stylist/training/examples', h((req, res) => {
+  const body = trainingExampleSchema.parse(req.body);
+  if (body.audience === 'kids' && !body.age) throw new AppError(422, 'validation_failed', 'Add the child age range to the training example.');
+  try {
+    const saved = addStylistTrainingExample(body);
+    res.status(saved.added ? 201 : 200).json(saved);
+  } catch (error) {
+    if (error.code === 'training_products_unavailable') throw new AppError(422, 'validation_failed', 'One or more selected products are no longer available. Refresh the product list.');
+    throw error;
+  }
+}));
+r.delete('/stylist/training/examples/:id', h((req, res) => res.json(deleteStylistTrainingExample(String(req.params.id).slice(0, 80)))));
+r.post('/stylist/training/lessons', h((req, res) => {
+  const lesson = trainingLessonSchema.parse(req.body);
+  const saved = addStylistTrainingLesson(lesson);
+  res.status(saved.added ? 201 : 200).json(saved);
+}));
+r.delete('/stylist/training/lessons/:id', h((req, res) => res.json(deleteStylistTrainingLesson(String(req.params.id).slice(0, 80)))));
+
+/* ---- look of the day: AI-picked, manually curated, or hidden ---- */
+const lookPieceSchema = z.object({ label: z.string().trim().min(1).max(50), productId: z.coerce.number().int().positive() });
+const lookOutfitSchema = z.object({
+  audience: z.enum(['women', 'men', 'kids']),
+  age: z.string().trim().max(40).optional().default(''),
+  say: z.string().max(700).optional().default(''),
+  tips: z.string().max(300).optional().default(''),
+  occasion: z.string().trim().min(2).max(80),
+  pieces: z.array(lookPieceSchema).min(2).max(8),
+});
+const manualLookSchema = z.object({ outfits: z.array(lookOutfitSchema).max(12).default([]) });
+r.get('/look-of-day', h((_req, res) => res.json(lookOfDayAdminSettings())));
+r.get('/look-of-day/products', h((req, res) => res.json({ items: searchLookOfDayProducts(req.query.q) })));
+r.put('/look-of-day', h((req, res) => {
+  const body = z.object({ mode: z.enum(['ai', 'manual', 'off']), manual: manualLookSchema.optional() }).parse(req.body);
+  if (body.mode === 'manual') {
+    if (!body.manual?.outfits.length) throw new AppError(422, 'validation_failed', 'Add at least one complete outfit.');
+    if (body.manual.outfits.some((outfit) => outfit.audience === 'kids' && !outfit.age.trim())) {
+      throw new AppError(422, 'validation_failed', 'Add the child age range for every kids outfit.');
+    }
+    const ids = [...new Set(body.manual.outfits.flatMap((outfit) => outfit.pieces.map((piece) => piece.productId)))];
+    const valid = q.all(`SELECT p.id FROM products p JOIN stores s ON s.id=p.store_id
+      WHERE p.id IN (${ids.map(() => '?').join(',')}) AND p.status='active' AND s.status='active' AND s.hidden=0
+        AND (p.track_stock=0 OR p.stock>0)`, ids).map((row) => row.id);
+    if (valid.length !== ids.length) throw new AppError(422, 'validation_failed', 'One or more selected products are no longer available. Refresh the product list.');
+  }
+  res.json(saveLookOfDayAdminSettings({ mode: body.mode, manual: body.manual }));
 }));
 
 /* ---- visual search settings (on/off, model, free daily quota) ---- */
@@ -287,7 +356,7 @@ r.get('/backup/db', h((_req, res, next) => {
   res.download(tmp, `banha-outfit-${new Date().toISOString().slice(0, 10)}.db`, (err) => { fs.rm(tmp, { force: true }, () => {}); if (err) next(err); });
 }));
 r.post('/backup/offsite', h(async (_req, res) => {
-  if (!offsiteEnabled) throw new AppError(400, 'backup_not_configured', 'BACKUP_R2_BUCKET is not set on the server.');
+  if (!offsiteEnabled) throw new AppError(400, 'backup_not_configured', 'Configure R2_ACCOUNT_ID, BACKUP_R2_BUCKET, and R2 S3 access key and secret with write access to the private bucket.');
   res.json(await runOffsiteBackup());
 }));
 r.post('/backup/run', h((_req, res) => {
