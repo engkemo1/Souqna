@@ -160,13 +160,29 @@ export async function callLlm(provider, system, messages) {
   }
   const res = await fetch(`${process.env.CF_API_BASE || 'https://api.cloudflare.com/client/v4'}/accounts/${cfAccount()}/ai/run/${process.env.STYLIST_CF_MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast'}`, {
     method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${cfToken()}` },
-    body: JSON.stringify({ messages: [{ role: 'system', content: system }, ...messages], max_tokens: 1100, temperature: 0.4 }), signal: AbortSignal.timeout(40000),
+    body: JSON.stringify({ messages: [{ role: 'system', content: system }, ...messages], response_format: { type: 'json_object' }, max_tokens: 1100, temperature: 0.4 }), signal: AbortSignal.timeout(40000),
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || j.success === false) throw new Error(`Cloudflare AI ${res.status}: ${JSON.stringify(j.errors || j).slice(0, 160)}`);
   return String(j.result?.response ?? j.result?.text ?? '');
 }
-const parseJson = (t) => { const m = String(t).match(/\{[\s\S]*\}/); if (!m) throw new Error('no JSON in reply'); return JSON.parse(m[0]); };
+const parseJson = (t) => {
+  const text = String(t).trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  const start = text.indexOf('{');
+  if (start < 0) throw new Error('no JSON in reply');
+  let depth = 0; let quoted = false; let escaped = false;
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+    if (quoted) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') quoted = false;
+    } else if (ch === '"') quoted = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}' && --depth === 0) return JSON.parse(text.slice(start, i + 1));
+  }
+  throw new Error('incomplete JSON in reply');
+};
 
 function systemPrompt(name, profile, training = '') {
   const depts = listDepartments().map((d) => `${d.slug} = ${d.name_ar}`).join('\n');
