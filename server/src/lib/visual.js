@@ -15,6 +15,33 @@ import { readMediaFile } from './media.js';
 
 const GRID_W = 6, GRID_H = 8, HUE_BINS = 12;
 
+/* ---------------- settings ---------------- */
+const DEF = { visual_enabled: '1', visual_model: 'color', visual_daily: '40' };
+
+export function visualSettings() {
+  const m = { ...DEF, ...Object.fromEntries(q.all("SELECT key, value FROM app_settings WHERE key LIKE 'visual_%'").map((r) => [r.key, r.value])) };
+  return {
+    enabled: m.visual_enabled === '1',
+    model: m.visual_model || 'color',
+    dailyFree: Math.max(0, Number(m.visual_daily) || 0),
+  };
+}
+
+export function saveVisualSettings({ enabled, model, dailyFree }) {
+  const put = (k, v) => q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [k, String(v)]);
+  if (enabled !== undefined) put('visual_enabled', enabled ? '1' : '0');
+  if (model) put('visual_model', model);
+  if (dailyFree !== undefined) put('visual_daily', Math.max(0, Math.min(1000, Math.floor(dailyFree))));
+  return visualSettings(); س
+}
+
+export function visualStatus() {
+  const s = visualSettings();
+  const indexed = (q.get('SELECT COUNT(*) AS c FROM product_vectors')?.c) || 0;
+  const total = (q.get("SELECT COUNT(*) AS c FROM products WHERE status='active'")?.c) || 0;
+  return { ...s, indexed, total };
+}
+
 /** weight cells near the centre more (the garment), ignore the borders (background / blurred padding) */
 const CELL_W = Array.from({ length: GRID_H }, (_, y) => Array.from({ length: GRID_W }, (_, x) => {
   const dx = (x + 0.5) / GRID_W - 0.5, dy = (y + 0.5) / GRID_H - 0.5;
@@ -61,7 +88,7 @@ async function loadClip() {
       console.log('[visual] CLIP model ready');
       return { tf, processor, model };
     })();
-    clipPromise.catch(() => {});
+    clipPromise.catch(() => { });
   }
   return clipPromise;
 }
@@ -73,7 +100,7 @@ async function clipEmbed(buffer) {
     const { image_embeds } = await model(await processor(img));
     return Array.from(image_embeds.data);
   });
-  clipQueue = run.catch(() => {});
+  clipQueue = run.catch(() => { });
   return run;
 }
 

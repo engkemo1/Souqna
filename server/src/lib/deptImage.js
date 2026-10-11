@@ -25,12 +25,31 @@ export async function saveDeptImage(buffer, slug) {
   return `${config.mediaBaseUrl}/${name}`;
 }
 
-/** Best-effort removal of a previously saved department photo. */
+export async function saveStylistAvatar(buffer) {
+  let webp;
+  try {
+    const meta = await sharp(buffer, { failOn: 'error' }).metadata();
+    if (Math.min(meta.width || 0, meta.height || 0) < 200) throw badRequest('image_too_small', 'Image is too small (min 200px).');
+    webp = await sharp(buffer).rotate().resize(480, 480, { fit: 'cover', position: sharp.strategy.attention }).webp({ quality: 85 }).toBuffer();
+  } catch (e) {
+    if (e.code === 'image_too_small') throw e;
+    throw badRequest('invalid_image', 'This file is not a supported image.');
+  }
+  const name = `stylist/avatar-${crypto.randomBytes(4).toString('hex')}.webp`;
+  if (r2Enabled) { await r2Put(name, webp); return `${config.r2.publicUrl}/${name}`; }
+  const file = path.join(config.mediaDir, name);
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, webp);
+  return `${config.mediaBaseUrl}/${name}`;
+}
+
+/** Best-effort removal of a previously saved department or stylist photo. */
 export async function removeDeptImage(url) {
   if (!url) return;
   try {
-    const name = url.slice(url.indexOf('departments/'));
-    if (!name.startsWith('departments/')) return;
+    const m = url.match(/(departments|stylist)\/[^?#]+/);
+    if (!m) return;
+    const name = m[0];
     if (url.startsWith(config.r2.publicUrl) && r2Enabled) await r2Delete(name);
     else await fs.rm(path.join(config.mediaDir, name), { force: true });
   } catch { /* ignore */ }
