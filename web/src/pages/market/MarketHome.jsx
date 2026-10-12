@@ -14,6 +14,7 @@ import StylistChat from '../../components/market/StylistChat.jsx';
 import WearThis from '../../components/market/WearThis.jsx';
 import RequestBanner from '../../components/market/RequestBanner.jsx';
 import LookOfDay from '../../components/market/LookOfDay.jsx';
+import HomepageAds from '../../components/market/HomepageAds.jsx';
 import DeptStrip from '../../components/market/DeptStrip.jsx';
 import ProductRail from '../../components/market/ProductRail.jsx';
 import StoreCard, { StoreCardSkeleton } from '../../components/market/StoreCard.jsx';
@@ -125,6 +126,7 @@ export default function MarketHome() {
         <HeroCollage stores={featured.length >= 3 ? featured : base?.stores || []} />
       </section>
 
+      <HomepageAds />
       <div className="container"><Why /></div>
 
       {/* shop by department (every department, even ones with no store yet) */}

@@ -47,23 +47,27 @@ function LookRow({ look, lang, tr, t, added, onAdd }) {
 
 function ManualLookCards({ looks, lang, tr, t, added, onAdd }) {
   return (
-    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+    <div className={cx('mx-auto mt-4 grid w-full grid-cols-1 justify-center gap-3 sm:grid-cols-2 sm:gap-4', looks.length <= 2 ? 'max-w-3xl' : 'max-w-5xl xl:grid-cols-3')}>
       {looks.map((look, index) => {
         const p = look.items[0];
         if (!p) return null;
         return (
-          <article key={`${p.id}-${index}`} className="overflow-hidden rounded-2xl border border-line bg-canvas/60 p-2.5 sm:p-3">
+          <article key={`${p.id}-${index}`} className="group overflow-hidden rounded-2xl border border-line bg-canvas/70 p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md sm:rounded-3xl sm:p-3">
             <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="group block min-w-0 text-start">
               <div className="relative">
-                <SmartImage media={p.image} ratio="4 / 5" className="overflow-hidden rounded-xl" sizes="(min-width:1280px) 220px, (min-width:640px) 30vw, 44vw" />
-                <span className="absolute start-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full bg-elevated/95 px-2.5 py-1 text-[11px] font-semibold shadow-sm">{look.label}</span>
+                <SmartImage media={p.image} ratio="4 / 4.5" className="overflow-hidden rounded-xl sm:rounded-2xl" sizes="(min-width:1280px) 360px, (min-width:640px) 42vw, 92vw" />
+                <span className="absolute start-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full border border-line/70 bg-elevated/95 px-3 py-1.5 text-[11px] font-bold shadow-sm sm:text-xs">{look.label}</span>
               </div>
-              <p className="mt-2 line-clamp-2 min-h-[2.6em] text-[12px] font-semibold leading-snug sm:text-[13px]">{tr(p.name)}</p>
-              <p className="mt-1 text-sm font-bold text-sale">{formatMoney(p.price, lang)}</p>
-              <p className="mt-0.5 truncate text-[11px] text-muted">{tr(p.store.name)}</p>
+              <div className="px-1 pb-1 pt-3">
+                <p className="line-clamp-2 min-h-[2.6em] text-sm font-bold leading-snug sm:text-base">{tr(p.name)}</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-base font-extrabold text-sale sm:text-lg">{formatMoney(p.price, lang)}</p>
+                  <p className="max-w-[55%] truncate text-xs text-muted">{tr(p.store.name)}</p>
+                </div>
+              </div>
             </Link>
-            <button type="button" onClick={() => onAdd(p)} className={cx('mt-2 inline-flex max-w-full items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold transition sm:text-xs', added.includes(p.id) ? 'border-brand text-brand' : 'border-line-strong bg-elevated hover:border-fg')}>
-              {added.includes(p.id) ? <Check className="h-3.5 w-3.5" /> : <ShoppingBag className="h-3.5 w-3.5" />}{added.includes(p.id) ? t('stylist.added') : t('stylist.addPick')}
+            <button type="button" onClick={() => onAdd(p)} className={cx('mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition sm:text-sm', added.includes(p.id) ? 'border-brand bg-brand/5 text-brand' : 'border-line-strong bg-elevated hover:border-brand hover:text-brand')}>
+              {added.includes(p.id) ? <Check className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}{added.includes(p.id) ? t('stylist.added') : t('stylist.addPick')}
             </button>
           </article>
         );

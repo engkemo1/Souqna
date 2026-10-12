@@ -129,6 +129,20 @@ CREATE TABLE IF NOT EXISTS banners (
   active INTEGER NOT NULL DEFAULT 1
 );
 
+CREATE TABLE IF NOT EXISTS homepage_ads (
+  id INTEGER PRIMARY KEY,
+  image_url TEXT NOT NULL,
+  title_ar TEXT NOT NULL, title_en TEXT NOT NULL,
+  subtitle_ar TEXT NOT NULL DEFAULT '', subtitle_en TEXT NOT NULL DEFAULT '',
+  cta_ar TEXT NOT NULL DEFAULT '', cta_en TEXT NOT NULL DEFAULT '',
+  link TEXT NOT NULL DEFAULT '/search',
+  starts_at TEXT, ends_at TEXT,
+  position INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_homepage_ads_live ON homepage_ads(active, position, id);
+
 CREATE TABLE IF NOT EXISTS offers (
   id INTEGER PRIMARY KEY,
   store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,

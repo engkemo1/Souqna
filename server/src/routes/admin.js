@@ -14,7 +14,7 @@ import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
 import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
-import { saveDeptImage, removeDeptImage, saveStylistAvatar } from '../lib/deptImage.js';
+import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
 import { verifyTotp } from '../lib/totp.js';
@@ -339,7 +339,6 @@ r.put('/stylist/training', h((req, res) => {
 }));
 r.post('/stylist/training/examples', h((req, res) => {
   const body = trainingExampleSchema.parse(req.body);
-  if (body.audience === 'kids' && !body.age) throw new AppError(422, 'validation_failed', 'Add the child age range to the training example.');
   try {
     const saved = addStylistTrainingExample(body);
     res.status(saved.added ? 201 : 200).json(saved);
@@ -434,9 +433,6 @@ r.put('/look-of-day', h((req, res) => {
   const body = z.object({ mode: z.enum(['ai', 'manual', 'off']), manual: manualLookSchema.optional() }).parse(req.body);
   if (body.mode === 'manual') {
     if (!body.manual?.outfits.length) throw new AppError(422, 'validation_failed', 'Add at least one complete outfit.');
-    if (body.manual.outfits.some((outfit) => outfit.audience === 'kids' && !outfit.age.trim())) {
-      throw new AppError(422, 'validation_failed', 'Add the child age range for every kids outfit.');
-    }
     const ids = [...new Set(body.manual.outfits.flatMap((outfit) => outfit.pieces.map((piece) => piece.productId)))];
     const valid = q.all(`SELECT p.id FROM products p JOIN stores s ON s.id=p.store_id
       WHERE p.id IN (${ids.map(() => '?').join(',')}) AND p.status='active' AND s.status='active' AND s.hidden=0
@@ -745,6 +741,68 @@ r.delete('/departments/:id/image', h(async (req, res) => {
   await removeDeptImage(d.image);
   res.json({ departments: listDepartments({ all: true }) });
 }));
+
+/* ---- platform homepage advertisements ---- */
+r.post('/homepage-ads/image', deptUpload.single('file'), h(async (req, res) => {
+  if (!req.file) throw new AppError(422, 'validation_failed', 'Pick an image.', { file: 'required' });
+  res.json({ image: await saveHomepageAdImage(req.file.buffer) });
+}));
+r.delete('/homepage-ads/image', h(async (req, res) => {
+  const body = z.object({ image: z.string().trim().min(1).max(500) }).parse(req.body);
+  if (!body.image.includes('/homepage-ads/')) throw new AppError(422, 'validation_failed', 'Invalid campaign image.');
+  await removeDeptImage(body.image);
+  res.json({ removed: true });
+}));
+const homepageAdSchema = z.object({
+  image: z.string().trim().min(1).max(500),
+  title_ar: z.string().trim().min(2).max(80), title_en: z.string().trim().min(2).max(80),
+  subtitle_ar: z.string().trim().max(160).optional().default(''), subtitle_en: z.string().trim().max(160).optional().default(''),
+  cta_ar: z.string().trim().max(30).optional().default(''), cta_en: z.string().trim().max(30).optional().default(''),
+  link: z.string().trim().min(1).max(200).refine((value) => value.startsWith('/') && !value.startsWith('//') && !value.includes('\\') && !/[\r\n]/.test(value), 'Use a safe internal page link.'),
+  starts_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  ends_at: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  position: z.coerce.number().int().min(0).max(999).default(0), active: z.boolean().default(true),
+}).refine((value) => !value.starts_at || !value.ends_at || value.ends_at >= value.starts_at, { message: 'End date must be after start date.', path: ['ends_at'] });
+const homepageAdOut = (ad) => ({
+  id: ad.id, image: ad.image_url, title: { ar: ad.title_ar, en: ad.title_en },
+  subtitle: { ar: ad.subtitle_ar, en: ad.subtitle_en }, cta: { ar: ad.cta_ar, en: ad.cta_en },
+  link: ad.link, startsAt: ad.starts_at, endsAt: ad.ends_at, position: ad.position, active: !!ad.active,
+});
+const homepageAdsOut = () => q.all('SELECT * FROM homepage_ads ORDER BY position, id').map(homepageAdOut);
+const homepageAdWrite = (ad) => ({
+  image_url: ad.image, title_ar: ad.title_ar, title_en: ad.title_en,
+  subtitle_ar: ad.subtitle_ar, subtitle_en: ad.subtitle_en, cta_ar: ad.cta_ar, cta_en: ad.cta_en,
+  link: ad.link, starts_at: ad.starts_at || null, ends_at: ad.ends_at || null,
+  position: ad.position, active: Number(ad.active),
+});
+r.get('/homepage-ads', h((_req, res) => res.json({ items: homepageAdsOut() })));
+r.post('/homepage-ads', h((req, res) => {
+  const ad = homepageAdSchema.parse(req.body);
+  const id = insert('homepage_ads', homepageAdWrite(ad));
+  res.status(201).json({ ad: homepageAdOut(q.get('SELECT * FROM homepage_ads WHERE id=?', [id])), items: homepageAdsOut() });
+}));
+r.put('/homepage-ads/:id', h(async (req, res) => {
+  const existing = q.get('SELECT * FROM homepage_ads WHERE id=?', [Number(req.params.id)]);
+  if (!existing) throw new AppError(404, 'not_found', 'Homepage ad not found.');
+  const ad = homepageAdSchema.parse(req.body);
+  update('homepage_ads', existing.id, homepageAdWrite(ad));
+  if (existing.image_url !== ad.image) await removeDeptImage(existing.image_url);
+  res.json({ ad: homepageAdOut(q.get('SELECT * FROM homepage_ads WHERE id=?', [existing.id])), items: homepageAdsOut() });
+}));
+r.patch('/homepage-ads/:id', h((req, res) => {
+  const { active } = z.object({ active: z.boolean() }).parse(req.body);
+  const changed = q.run('UPDATE homepage_ads SET active=? WHERE id=?', [Number(active), Number(req.params.id)]).changes;
+  if (!changed) throw new AppError(404, 'not_found', 'Homepage ad not found.');
+  res.json({ items: homepageAdsOut() });
+}));
+r.delete('/homepage-ads/:id', h(async (req, res) => {
+  const existing = q.get('SELECT * FROM homepage_ads WHERE id=?', [Number(req.params.id)]);
+  if (!existing) throw new AppError(404, 'not_found', 'Homepage ad not found.');
+  q.run('DELETE FROM homepage_ads WHERE id=?', [existing.id]);
+  await removeDeptImage(existing.image_url);
+  res.json({ items: homepageAdsOut() });
+}));
+
 r.delete('/departments/:id', h((req, res) => {
   const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);
   if (!d) throw new AppError(404, 'not_found', 'Department not found.');

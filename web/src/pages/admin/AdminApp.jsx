@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users } from 'lucide-react';
+import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -17,6 +17,7 @@ const NAV = [
   { to: '/admin/deliveries', icon: Truck, label: 'التوصيل', badge: 'open' },
   { to: '/admin/reports', icon: BarChart3, label: 'التقارير' },
   { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
+  { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
   { to: '/admin/services', icon: Camera, label: 'الخدمات', badge: 'services' },
   { to: '/admin/sourcing', icon: PackagePlus, label: 'طلبات من برّه', badge: 'sourcing' },
   { to: '/admin/buyers', icon: Users, label: 'حسابات العملاء' },

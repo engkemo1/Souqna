@@ -59,6 +59,7 @@ const AdminSourcing = lazy(() => import('./pages/admin/Sourcing.jsx'));
 const AdminBuyers = lazy(() => import('./pages/admin/Buyers.jsx'));
 const AdminReports = lazy(() => import('./pages/admin/Reports.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
+const AdminHomepageAds = lazy(() => import('./pages/admin/HomepageAds.jsx'));
 const StoreManage = lazy(() => import('./pages/admin/StoreManage.jsx'));
 const AdminSystem = lazy(() => import('./pages/admin/System.jsx'));
 const More = lazy(() => import('./pages/dashboard/More.jsx'));
@@ -144,6 +145,7 @@ const router = createBrowserRouter([
           { path: 'sourcing', element: <AdminSourcing /> },
           { path: 'buyers', element: <AdminBuyers /> },
           { path: 'coupons', element: <AdminCoupons /> },
+          { path: 'ads', element: <AdminHomepageAds /> },
           { path: 'reports', element: <AdminReports /> },
           { path: 'system', element: <AdminSystem /> },
           {

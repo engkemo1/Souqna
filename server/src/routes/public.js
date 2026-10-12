@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { clampInt, nowIso } from '../lib/util.js';
 import { mediaMap, processImage } from '../lib/media.js';
-import { sameDaySql } from '../lib/sameDay.js';
+import { sameDaySql, cairoNow } from '../lib/sameDay.js';
 import { buyerFromReq } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
@@ -39,6 +39,17 @@ function loadStore(slug) {
 /* ---------------------------------------------------------- marketplace */
 
 r.get('/departments', h((_req, res) => res.json({ departments: listDepartments().map(({ slug, name, sizes, image }) => ({ slug, name, sizes, image })) })));
+
+r.get('/homepage-ads', h((_req, res) => {
+  const today = cairoNow().date;
+  const items = q.all(`SELECT id, image_url, title_ar, title_en, subtitle_ar, subtitle_en, cta_ar, cta_en, link
+    FROM homepage_ads WHERE active=1 AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>=?)
+    ORDER BY position, id LIMIT 6`, [today, today]).map((ad) => ({
+    id: ad.id, image: ad.image_url, title: bi(ad, 'title'), subtitle: bi(ad, 'subtitle'), cta: bi(ad, 'cta'), link: ad.link,
+  }));
+  cache(res, 30);
+  res.json({ items });
+}));
 
 /* ---------------------------------------------------------- global product search */
 
@@ -298,7 +309,8 @@ r.get('/stores/:slug', h((req, res) => {
   const d = new Date().toISOString().slice(0, 10);
   const offers = q.all(
     `SELECT * FROM offers WHERE store_id=? AND active=1 AND code IS NOT NULL
-     AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>=?) ORDER BY value DESC LIMIT 3`, [s.id, d, d],
+     AND (starts_at IS NULL OR starts_at<=?) AND (ends_at IS NULL OR ends_at>=?)
+     AND (usage_limit IS NULL OR usage_count<usage_limit) ORDER BY value DESC LIMIT 3`, [s.id, d, d],
   );
   cache(res, 30);
   res.json({

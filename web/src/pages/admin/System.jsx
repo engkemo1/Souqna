@@ -425,8 +425,7 @@ function LookOfDayPanel() {
     const completePieces = outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).length;
     const partialPieces = outfit.pieces.some((piece) => piece.label.trim() || piece.productId)
       && outfit.pieces.some((piece) => !piece.label.trim() || !piece.productId);
-    return outfit.occasion.trim().length >= 2 && (outfit.audience !== 'kids' || outfit.age.trim().length > 0)
-      && completePieces >= 2 && !partialPieces;
+    return outfit.occasion.trim().length >= 2 && completePieces >= 2 && !partialPieces;
   };
   const touchesOutfit = (outfit) => outfit.occasion.trim() || outfit.age.trim() || outfit.say.trim() || outfit.tips.trim()
     || outfit.pieces.some((piece) => piece.label.trim() || piece.productId);
@@ -540,7 +539,7 @@ function LookOfDayPanel() {
                   <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">أوتفيت {outfitIndex + 1}</h3><div className="flex items-center gap-2"><Button size="sm" variant="outline" icon={Sparkles} loading={teachingIndex === outfitIndex} disabled={!outfitReady(outfit) || teachingIndex !== null} onClick={() => teachOutfit(outfitIndex)}>علّم مودة منه</Button><button type="button" aria-label="حذف الأوتفيت" onClick={() => setF((current) => ({ ...current, manual: { outfits: current.manual.outfits.filter((_, i) => i !== outfitIndex) } }))} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-line-strong text-muted hover:border-sale hover:text-sale"><Trash2 className="h-4 w-4" /></button></div></div>
                   <div className="grid min-w-0 gap-3 sm:grid-cols-3">
                     <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">الفئة</span><Select value={outfit.audience} onChange={(e) => changeOutfit(outfitIndex, (x) => ({ ...x, audience: e.target.value }))}><option value="women">حريمي</option><option value="men">رجالي</option><option value="kids">أطفال</option></Select></label>
-                    <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">العمر أو الفئة العمرية{outfit.audience === 'kids' ? ' — مطلوب' : ' (اختياري)'}</span><Input value={outfit.age} maxLength={40} onChange={(e) => changeOutfit(outfitIndex, (x) => ({ ...x, age: e.target.value }))} placeholder="مثال: ٨–١٠ سنين" /></label>
+                    <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">العمر أو الفئة العمرية (اختياري)</span><Input value={outfit.age} maxLength={40} onChange={(e) => changeOutfit(outfitIndex, (x) => ({ ...x, age: e.target.value }))} placeholder="مثال: ٨–١٠ سنين" /></label>
                     <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">المناسبة — مطلوبة</span><Input list="look-of-day-occasions" value={outfit.occasion} maxLength={80} onChange={(e) => changeOutfit(outfitIndex, (x) => ({ ...x, occasion: e.target.value }))} placeholder="أوتفيت كتب كتاب" /></label>
                   </div>
                   <div className="grid min-w-0 gap-3 sm:grid-cols-2">
@@ -563,7 +562,7 @@ function LookOfDayPanel() {
               <Button size="sm" variant="outline" icon={Plus} disabled={f.manual.outfits.length >= 12} onClick={() => setF((current) => ({ ...current, manual: { outfits: [...current.manual.outfits, blankOutfit()] } }))}>إضافة أوتفيت</Button>
               <p className="text-xs text-muted">تقدر تضيف لحد ١٢ أوتفيت في اليوم. الكاب والطاقية يتضافوا كإكسسوار من منتجات المحلات.</p>
             </div>
-            {!manualReady && <p className="text-xs text-sale">لكل أوتفيت مضاف: اختار الفئة والمناسبة، وأضف منتجين على الأقل. أوتفيت الأطفال لازم يتحدد له العمر.</p>}
+            {!manualReady && <p className="text-xs text-sale">لكل أوتفيت مضاف: اختار الفئة والمناسبة، وأضف منتجين على الأقل. تحديد العمر اختياري.</p>}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">

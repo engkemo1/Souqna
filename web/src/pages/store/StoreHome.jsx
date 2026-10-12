@@ -90,29 +90,30 @@ function OfferBand() {
   const { offers } = useStore();
   const { t, tr, lang } = useI18n();
   const toast = useToast();
-  const o = offers[0];
-  if (!o) return null;
-  const value = o.type === 'percentage' ? `${o.value}%` : o.type === 'fixed' ? formatMoney(o.value, lang) : t('offers.type.free_shipping');
-  const copy = () => {
-    navigator.clipboard?.writeText(o.code).catch(() => {});
-    toast({ title: t('common.copied'), description: o.code, icon: Ticket });
-  };
+  if (!offers?.length) return null;
   return (
     <section className="container mt-14 sm:mt-20">
-      <div className="relative overflow-hidden rounded-3xl bg-primary px-6 py-8 text-on-primary sm:px-10 sm:py-12">
-        <div className="pointer-events-none absolute -end-16 -top-16 h-64 w-64 rounded-full bg-on-primary/10" />
-        <div className="pointer-events-none absolute -bottom-24 end-24 h-56 w-56 rounded-full bg-on-primary/5" />
-        <div className="relative flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold opacity-80">{tr(o.title)}</p>
-            <p className="mt-1 font-display text-4xl font-bold sm:text-5xl">{o.type === 'free_shipping' ? value : t('offers.off', { v: value })}</p>
-            {o.minSubtotal > 0 && <p className="mt-2 text-sm opacity-80">{t('offers.minOrder', { v: formatMoney(o.minSubtotal, lang) })}</p>}
-          </div>
-          <button type="button" onClick={copy} className="group inline-flex h-14 items-center justify-between gap-4 rounded-2xl border-2 border-dashed border-on-primary/40 bg-on-primary/10 ps-5 pe-3 transition hover:bg-on-primary/15 active:scale-[.98] sm:min-w-[260px]">
-            <span className="font-mono text-lg font-bold tracking-widest">{o.code}</span>
-            <span className="inline-flex items-center gap-1.5 rounded-xl bg-on-primary px-3 py-2 text-sm font-semibold text-primary"><Copy className="h-4 w-4" />{t('common.copy')}</span>
-          </button>
-        </div>
+      <SectionHeader title={t('offers.title')} />
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {offers.map((o) => {
+          const value = o.type === 'percentage' ? `${o.value}%` : o.type === 'fixed' ? formatMoney(o.value, lang) : t('offers.type.free_shipping');
+          const copy = () => {
+            navigator.clipboard?.writeText(o.code).catch(() => {});
+            toast({ title: t('common.copied'), description: o.code, icon: Ticket });
+          };
+          return (
+            <article key={o.id} className="relative isolate overflow-hidden rounded-3xl bg-primary p-5 text-on-primary shadow-sm sm:p-6">
+              <div className="pointer-events-none absolute -end-10 -top-12 -z-10 h-40 w-40 rounded-full bg-on-primary/10" />
+              <p className="line-clamp-1 text-sm font-semibold opacity-85">{tr(o.title)}</p>
+              <p className="mt-2 font-display text-3xl font-extrabold sm:text-4xl">{o.type === 'free_shipping' ? value : t('offers.off', { v: value })}</p>
+              {o.minSubtotal > 0 && <p className="mt-2 text-sm opacity-80">{t('offers.minOrder', { v: formatMoney(o.minSubtotal, lang) })}</p>}
+              <button type="button" onClick={copy} className="mt-5 flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl border border-dashed border-on-primary/40 bg-on-primary/10 px-3 py-2 transition hover:bg-on-primary/15 active:scale-[.99]">
+                <span className="truncate font-mono text-base font-bold tracking-widest" dir="ltr">{o.code}</span>
+                <span className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-on-primary px-3 py-2 text-sm font-semibold text-primary"><Copy className="h-4 w-4" />{t('common.copy')}</span>
+              </button>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
