@@ -8,6 +8,7 @@ import { parseMessage } from '../src/lib/moda/parse.js';
 import { enrichAll } from '../src/lib/moda/products.js';
 import { loadKnowledge } from '../src/lib/moda/knowledge.js';
 import { checkLabels, checkText } from '../src/lib/moda/guard.js';
+import { respond } from '../src/lib/moda/respond.js';
 
 const DIR = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'test-fixtures');
 const catalog = JSON.parse(fs.readFileSync(path.join(DIR, 'occasion-catalog.json'), 'utf8'));
@@ -89,6 +90,21 @@ test('Moda uses local product ratings to change future rankings', async () => {
   const firstId = first.blocks.tabs[0].items[0].id;
   const rated = await runModa('عايزة كوتشي', { ...opts, profile: { dislikedProductIds: String(firstId) } });
   assert.notEqual(rated.blocks.tabs[0].items[0].id, firstId);
+});
+
+test('partial couple reply explains unavailable outfit without showing a zero total', () => {
+  const reply = respond({
+    state: 'partial', intent: 'shop', persons: ['men', 'women'], context: 'engagement_guest',
+    people: [
+      { aud: 'men', look: null, picks: [{ slotKey: 'shirt', product: { id: 1, key: 'shirt', name_ar: 'قميص', price: 609, colorKeys: [] }, optional: false }], missing: [], subtotal: 609 },
+      { aud: 'women', look: null, picks: [], missing: [{ base: 'heels_low' }], subtotal: 0 },
+    ],
+    total: 609, budget: null, over: 0, dropped: [], missing: [{ base: 'heels_low' }], relaxed: [], palette: [], ask: [],
+    weather: { temp: 23, fabrics_ar: ['قطن', 'كريب'], band: 'warm', notes: [] }, eventTime: {},
+  });
+  assert.match(reply.say, /ملقتش قطع مناسبة ليها دلوقتي/);
+  assert.match(reply.say, /23 درجة/);
+  assert.doesNotMatch(reply.say, /0 جنيه/);
 });
 
 test('answer buttons continue the previous request', async () => {

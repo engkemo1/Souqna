@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Send, Mic, MicOff, Loader2, Camera, Volume2, VolumeX, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
+import { X, Send, Mic, MicOff, Loader2, Camera, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { formatMoney } from '../../lib/format.js';
@@ -9,32 +9,12 @@ import { errorMessage } from '../ui/States.jsx';
 import { cx } from '../ui/cx.js';
 
 const store = { get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } } };
-const TTS = typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
 const textValue = (value) => {
   if (typeof value === 'string') return value.trim();
   if (value == null) return '';
   if (Array.isArray(value)) return value.map(textValue).filter(Boolean).join(' ');
   if (typeof value === 'object') return textValue(value.text || value.content || value.message || value.response || value.output);
   return String(value);
-};
-const speak = (txt, lang, onState) => {
-  const words = textValue(txt);
-  if (!TTS || !words) return;
-  TTS.cancel(); const u = new SpeechSynthesisUtterance(words.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, ''));
-  u.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
-  const voices = TTS.getVoices();
-  const isArabic = lang === 'ar';
-  const feminine = (x) => /female|woman|zira|sara|salma|leila|layla|hoda|nora|noura|dalia|dina|هدي|نورا|سارة|سلمى|ليلى|داليا|دينا/i.test(x.name || '');
-  const v = isArabic
-    ? voices.find((x) => x.lang?.toLowerCase() === 'ar-eg' && feminine(x))
-      || voices.find((x) => /arabic|egypt|مصري/i.test(`${x.name} ${x.lang}`) && feminine(x))
-      || voices.find((x) => x.lang?.toLowerCase() === 'ar-eg')
-      || voices.find((x) => /arabic|egypt|مصري/i.test(`${x.name} ${x.lang}`))
-      || voices.find((x) => x.lang?.toLowerCase().startsWith('ar'))
-    : voices.find((x) => x.lang?.toLowerCase().startsWith('en'));
-  if (v) u.voice = v;
-  u.rate = isArabic ? 0.92 : 0.96; u.pitch = isArabic ? 1.04 : 1;
-  u.onstart = () => onState?.(true); u.onend = () => onState?.(false); u.onerror = () => onState?.(false); TTS.speak(u);
 };
 /** shrink a photo to ~768px JPEG so the upload stays small */
 const shrink = (file) => new Promise((resolve, reject) => {
@@ -85,9 +65,7 @@ export default function StylistChat() {
   const fileRef = useRef(null);
   const [photo, setPhoto] = useState(null);
   const [photo2, setPhoto2] = useState(null); // a second photo = "compare these two"
-  const [talking, setTalking] = useState(false);
   const [similar, setSimilar] = useState(false);
-  const [voiceOn, setVoiceOn] = useState(() => store.get('moda.voice', false));
   const [profile, setProfile] = useState(() => store.get('moda.profile', {}));
   const [session, setSession] = useState(null); // ذاكرة الطلب الحالي عند السيرفر (المناسبة/الفئة/الميزانية) بتتبعت مع كل رسالة
   const end = useRef(null);
@@ -98,7 +76,7 @@ export default function StylistChat() {
     window.addEventListener('moda:open', on); return () => window.removeEventListener('moda:open', on);
   }, []);
   useEffect(() => { end.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [msgs, busy, open]);
-  useEffect(() => { if (!open) { rec.current?.stop?.(); TTS?.cancel(); setTalking(false); } }, [open]);
+  useEffect(() => { if (!open) rec.current?.stop?.(); }, [open]);
   if (!feat || feat.features?.stylist === false) return null;
 
   // answers: إجابة زرار سؤال ({ [questionId]: value })، و raw = النص اللي يظهر للعميل في الفقاعة
@@ -122,7 +100,6 @@ export default function StylistChat() {
       setMsgs([...next, { role: 'assistant', feedbackQuestion: content || shown, ...reply }]);
       if (data.session) setSession(data.session);
       if (data.remember && Object.keys(data.remember).length) { const p = { ...profile, ...data.remember }; setProfile(p); store.set('moda.profile', p); }
-      if (voiceOn) speak([reply.say, reply.tips].filter(Boolean).join('. '), lang, setTalking);
     } catch (e) { setMsgs([...next, { role: 'assistant', error: errorMessage(t, e) }]); }
     setBusy(false);
   };
@@ -138,7 +115,6 @@ export default function StylistChat() {
   };
 
   const pick = async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const s = await shrink(f); if (photo && !photo2) setPhoto2(s); else if (photo) setPhoto2(s); else setPhoto(s); } catch { /* ignore */ } };
-  const toggleVoice = () => { const v = !voiceOn; setVoiceOn(v); store.set('moda.voice', v); if (!v) { TTS?.cancel(); setTalking(false); } };
   const learnFromRating = (rating, reason, question, items, productIds = []) => {
     const clean = (value, max) => String(value || '').replace(/[\r\n]+/g, ' ').trim().slice(0, max);
     const entry = rating === 'good'
@@ -179,11 +155,10 @@ export default function StylistChat() {
           <button type="button" className="absolute inset-0 bg-black/40 sm:hidden" aria-label="close" onClick={() => setOpen(false)} />
           <div className="absolute inset-x-0 bottom-0 flex h-[92dvh] flex-col overflow-hidden rounded-t-3xl border border-line bg-canvas shadow-lift sm:static sm:h-full sm:rounded-3xl">
             <header className="flex items-center justify-between gap-3 border-b border-line bg-elevated px-4 py-3">
-              <div className="flex items-center gap-3"><ModaAvatar src={avatar} size={44} talking={talking} thinking={busy} />
+              <div className="flex items-center gap-3"><ModaAvatar src={avatar} size={44} thinking={busy} />
                 <div><p className="font-display text-base font-bold leading-tight">{name}</p><p className="text-[12px] text-muted">{t('stylist.sub')}</p></div></div>
               <div className="flex items-center gap-1">
                 {!!(profile.styleMemory || profile.likedProductIds || profile.dislikedProductIds) && <button type="button" onClick={clearStyleMemory} aria-label={t('stylist.clearLearning')} title={t('stylist.clearLearning')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg"><RotateCcw className="h-4 w-4" /></button>}
-                {TTS && <button type="button" onClick={toggleVoice} aria-pressed={voiceOn} aria-label={t('stylist.voice')} className={cx('grid h-9 w-9 place-items-center rounded-full hover:bg-secondary', voiceOn && 'text-brand')}>{voiceOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button>}
                 <button type="button" onClick={() => setOpen(false)} aria-label="close" className="grid h-9 w-9 place-items-center rounded-full hover:bg-secondary"><X className="h-5 w-5" /></button>
               </div>
             </header>
@@ -191,7 +166,7 @@ export default function StylistChat() {
             <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
               {!msgs.length && (
                 <div>
-                  <div className="mb-3 grid place-items-center"><ModaAvatar src={avatar} size={230} talking={talking} thinking={busy} tilt living /></div>
+                  <div className="mb-3 grid place-items-center"><ModaAvatar src={avatar} size={230} thinking={busy} tilt living /></div>
                   <div className="flex items-end gap-2"><div className="max-w-[92%] rounded-2xl rounded-ss-sm bg-secondary px-3.5 py-2.5 text-[14.5px] leading-relaxed">{t('stylist.hello', { n: name })}</div></div>
                   <div className="mt-3 flex flex-wrap gap-2">{chips.map((c) => <button key={c} type="button" onClick={() => send(c)} className="rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[13px] font-medium transition hover:border-fg">{c}</button>)}</div>
                 </div>

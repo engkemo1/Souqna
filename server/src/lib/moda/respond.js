@@ -74,7 +74,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   // ---------- مقدمة حسب الحالة ----------
   let intro;
   if (plan.state === 'none') intro = say('intro_none');
-  else if (plan.state === 'partial') intro = say('intro_partial', { occasion, missing: joinAr((plan.missing || []).map((m) => `${itemAr(K, m.base)}${m.material ? ` ${K.synonyms.materials[m.material]?.[0] || m.material}` : ''}`)) });
+  else if (plan.state === 'partial') intro = say(couple ? 'intro_partial_couple' : 'intro_partial', { occasion, missing: joinAr((plan.missing || []).map((m) => `${itemAr(K, m.base)}${m.material ? ` ${K.synonyms.materials[m.material]?.[0] || m.material}` : ''}`)) });
   else if (plan.state === 'alternatives') intro = `${say('intro_alternatives')} ${relaxedTexts.join(' ')}`.trim();
   else if (plan.state === 'over_budget') intro = say('over_budget', { total: nf(plan.total), budget: nf(plan.budget), over: nf(plan.over) });
   else intro = say(couple ? 'intro_full_couple' : 'intro_full', { occasion, palette: paletteAr });
@@ -88,7 +88,13 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   // ---------- الإجمالي ----------
   const subtotals = plan.people.map((p) => p.subtotal);
   if (plan.state !== 'none' && plan.state !== 'over_budget') {
-    if (couple) parts.push(say('total_line_couple', { him: nf(subtotals[plan.people.findIndex((p) => p.aud === 'men')]), her: nf(subtotals[plan.people.findIndex((p) => p.aud !== 'men')]), total: nf(plan.total) }));
+    if (couple) {
+      const him = plan.people.find((p) => p.aud === 'men');
+      const her = plan.people.find((p) => p.aud !== 'men');
+      if (!him?.picks.length && her?.picks.length) parts.push(say('total_line_couple_her_only', { her: nf(her.subtotal) }));
+      else if (him?.picks.length && !her?.picks.length) parts.push(say('total_line_couple_him_only', { him: nf(him.subtotal) }));
+      else if (him?.picks.length && her?.picks.length) parts.push(say('total_line_couple', { him: nf(him.subtotal), her: nf(her.subtotal), total: nf(plan.total) }));
+    }
     else parts.push(say('total_line', { total: nf(plan.total) }));
     if (plan.budget && plan.total <= plan.budget) parts.push(say('within_budget', { budget: nf(plan.budget) }));
   } else if (plan.state === 'over_budget') {
