@@ -104,7 +104,10 @@ export default function LookSet({ data, name }) {
   };
   return (
     <>
-      {m.tips && <p className="mt-3 rounded-2xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] leading-relaxed sm:text-sm">✨ {m.tips}</p>}
+      {(m.tips || m.palette?.length > 0) && <div className="mt-3 rounded-2xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] leading-relaxed sm:text-sm">
+        {m.palette?.length > 0 && <p className="mb-1 text-[12px] font-semibold text-brand">لوحة الألوان: {m.palette.join(' · ')}</p>}
+        {m.tips && <p>✨ {m.tips}</p>}
+      </div>}
       {m.manual ? <><p className="mt-4 text-sm font-bold">قطع الأوتفيت المختارة</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} /></> : m.looks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
       <p className="mt-3 text-[13.5px] font-semibold">{t('stylist.total', { p: formatMoney(m.total, lang) })}{m.overBudget && <span className="ms-2 font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
       <div className="mt-3 flex flex-wrap gap-2">

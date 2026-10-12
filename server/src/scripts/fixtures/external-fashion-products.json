@@ -1,0 +1,75 @@
+{
+  "source": "ZARA Egypt public catalogue snapshot, checked 2026-10-12; price and item names are from the Egypt site, with color variant confirmed on the linked Zara regional item page where noted.",
+  "products": [
+    {
+      "id": "zara-eg-poplin-oyster-white",
+      "name_ar": "قميص بوبلين بقصة واسعة",
+      "name_en": "Relaxed Fit Poplin Shirt",
+      "department": "men",
+      "cat_text": "Men's shirts قميص",
+      "price": 4290,
+      "colors": [{ "name_ar": "أوف وايت", "name_en": "Oyster White" }],
+      "sourceUrls": [
+        "https://www.zara.com/eg/en/man-shirts-white-l1753.html",
+        "https://www.zara.com/ae/en/relaxed-fit-popelinhemd-p05588301.html?v1=575061719"
+      ]
+    },
+    {
+      "id": "zara-eg-easy-care-white-shirt",
+      "name_ar": "قميص رسمي سهل العناية",
+      "name_en": "Easy Care Textured Shirt",
+      "department": "men",
+      "cat_text": "Men's dress shirts قميص رسمي",
+      "price": 2290,
+      "colors": [{ "name_ar": "أبيض", "name_en": "White" }],
+      "sourceUrls": ["https://www.zara.com/eg/en/man-shirts-white-l1753.html"]
+    },
+    {
+      "id": "zara-eg-slim-chino-khaki",
+      "name_ar": "بنطلون تشينو بقصة ضيقة",
+      "name_en": "Slim Fit Chinos",
+      "department": "men",
+      "cat_text": "Men's trousers بنطلون",
+      "price": 2290,
+      "colors": [{ "name_ar": "كاكي", "name_en": "Khaki" }],
+      "sourceUrls": [
+        "https://www.zara.com/eg/en/man-trousers-beige-l4575.html",
+        "https://www.zara.com/cw/es/slim-fit-chinos-p06786300.html?v1=561603701"
+      ]
+    },
+    {
+      "id": "zara-eg-black-pleated-trousers",
+      "name_ar": "بنطلون أسود واسع بكسرات",
+      "name_en": "Relaxed Fit Flowing Pleated Trousers",
+      "department": "men",
+      "cat_text": "Men's trousers بنطلون رسمي",
+      "price": 2590,
+      "colors": [{ "name_ar": "أسود", "name_en": "Black" }],
+      "sourceUrls": ["https://www.zara.com/eg/en/man-trousers-black-l2524.html"]
+    }
+  ],
+  "looks": [
+    {
+      "id": "smart-casual-day-out",
+      "brief": "Smart-casual daytime outing; warm, quiet neutral palette; budget 7000 EGP.",
+      "palette": ["Oyster White", "Khaki"],
+      "budget": 7000,
+      "slots": [
+        { "label": "قميص", "color": "Oyster White", "keywords": ["relaxed fit poplin shirt", "قميص بوبلين"] },
+        { "label": "بنطلون", "color": "Khaki", "keywords": ["slim fit chinos", "تشينو"] }
+      ],
+      "expectedProducts": ["zara-eg-poplin-oyster-white", "zara-eg-slim-chino-khaki"]
+    },
+    {
+      "id": "polished-evening",
+      "brief": "Polished evening dinner; classic white and black; budget 5500 EGP.",
+      "palette": ["White", "Black"],
+      "budget": 5500,
+      "slots": [
+        { "label": "قميص", "color": "White", "keywords": ["easy care textured shirt", "قميص رسمي"] },
+        { "label": "بنطلون", "color": "Black", "keywords": ["pleated trousers", "بنطلون رسمي"] }
+      ],
+      "expectedProducts": ["zara-eg-easy-care-white-shirt", "zara-eg-black-pleated-trousers"]
+    }
+  ]
+}

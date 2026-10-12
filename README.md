@@ -107,6 +107,13 @@ Owner (Bearer token): `/api/owner/overview`, `/analytics`, `/orders` (+ `PATCH /
 
 Errors are always friendly and typed (`{ error: { code, message, fields } }`); SQL errors and stack traces never reach the client. Prices are always re-read on the server at checkout.
 
+## Moda quality checks
+- `npm run test:stylist -w server` checks garment matching, colour ranking, category boundaries, result limits and budget fitting.
+- `npm run evaluate:stylist -w server` reports coverage and runs fixed Arabic shopping scenarios against `server/seed-assets/catalog.json`.
+- `npm run evaluate:stylist:external -w server` checks the production ranking logic against a small, dated snapshot of real Zara Egypt products and two outfit briefs. It is a repeatable reference set, not a live feed; product prices and availability must be rechecked before shopping.
+- Moda's built-in styling guidance is informed by public material from Stitch Fix's StyleFile/Style Shuffle, men's fit/workwear guides, women's occasionwear guides, Vogue's proportion/layering advice and Nordstrom Styling Services. It covers common men's and women's garment families and outfit formulas while treating the client's preference, occasion, budget and fit as decisive. This changes Moda's instructions and feedback loop; it does not fine-tune the underlying AI model.
+- The bundled demo evaluator uses the demo catalogue and production ranking code, but it does not call the AI provider or read live store data. Review recommendations with a stylist and run the same cases against real active inventory before drawing conclusions about live outfit quality.
+
 ## Production notes
 - Set a strong `JWT_SECRET` (see `.env.example`).
 - `npm run build && npm start` serves the API and the built web app from one port; put it behind Nginx/Caddy with HTTPS.

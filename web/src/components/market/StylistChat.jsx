@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Send, Mic, MicOff, Loader2, Camera, Volume2, VolumeX, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { X, Send, Mic, MicOff, Loader2, Camera, Volume2, VolumeX, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { formatMoney } from '../../lib/format.js';
@@ -44,7 +44,7 @@ const shrink = (file) => new Promise((resolve, reject) => {
 });
 const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
 
-function ModaFeedback({ question, reply, items, t }) {
+function ModaFeedback({ question, reply, items, t, onRated }) {
   const [reason, setReason] = useState('');
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,6 +54,7 @@ function ModaFeedback({ question, reply, items, t }) {
     try {
       const res = await fetch('/api/stylist/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ rating, ...(why ? { reason: why } : {}), question: String(question || '').slice(0, 300) || 'طلب تنسيق ملابس', reply: String(reply || '').slice(0, 500), items: (items || []).slice(0, 12).map((item) => String(item).slice(0, 120)) }) });
       if (!res.ok) throw new Error('feedback');
+      onRated?.(rating, why || '');
       setDone(true);
     } catch { /* feedback is optional; keep the chat usable when offline */ }
     setBusy(false);
@@ -133,6 +134,21 @@ export default function StylistChat() {
 
   const pick = async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const s = await shrink(f); if (photo && !photo2) setPhoto2(s); else if (photo) setPhoto2(s); else setPhoto(s); } catch { /* ignore */ } };
   const toggleVoice = () => { const v = !voiceOn; setVoiceOn(v); store.set('moda.voice', v); if (!v) { TTS?.cancel(); setTalking(false); } };
+  const learnFromRating = (rating, reason, question, items) => {
+    const clean = (value, max) => String(value || '').replace(/[\r\n]+/g, ' ').trim().slice(0, max);
+    const entry = rating === 'good'
+      ? `أعجبته لموقف مشابه: ${clean(question, 80)}؛ القطع: ${clean(items.join('، '), 110)}`
+      : `لم تناسبه لموقف مشابه: ${clean(question, 80)}؛ السبب ${clean(reason, 20)}؛ القطع: ${clean(items.join('، '), 90)}`;
+    const previous = String(profile.styleMemory || '').split('\n').map((line) => line.trim()).filter(Boolean);
+    const nextMemory = [entry, ...previous.filter((line) => line !== entry)].slice(0, 4).join('\n').slice(0, 380);
+    const nextProfile = { ...profile, styleMemory: nextMemory };
+    setProfile(nextProfile); store.set('moda.profile', nextProfile);
+  };
+  const clearStyleMemory = () => {
+    const nextProfile = { ...profile };
+    delete nextProfile.styleMemory;
+    setProfile(nextProfile); store.set('moda.profile', nextProfile);
+  };
   const chips = [t('stylist.chip1'), t('stylist.chip2'), t('stylist.chip3')];
   return (
     <>
@@ -150,6 +166,7 @@ export default function StylistChat() {
               <div className="flex items-center gap-3"><ModaAvatar src={avatar} size={44} talking={talking} thinking={busy} />
                 <div><p className="font-display text-base font-bold leading-tight">{name}</p><p className="text-[12px] text-muted">{t('stylist.sub')}</p></div></div>
               <div className="flex items-center gap-1">
+                {!!profile.styleMemory && <button type="button" onClick={clearStyleMemory} aria-label={t('stylist.clearLearning')} title={t('stylist.clearLearning')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg"><RotateCcw className="h-4 w-4" /></button>}
                 {TTS && <button type="button" onClick={toggleVoice} aria-pressed={voiceOn} aria-label={t('stylist.voice')} className={cx('grid h-9 w-9 place-items-center rounded-full hover:bg-secondary', voiceOn && 'text-brand')}>{voiceOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button>}
                 <button type="button" onClick={() => setOpen(false)} aria-label="close" className="grid h-9 w-9 place-items-center rounded-full hover:bg-secondary"><X className="h-5 w-5" /></button>
               </div>
@@ -169,7 +186,7 @@ export default function StylistChat() {
                 <div key={i} className="max-w-full">
                   {(m.say || m.error) && <div className={cx('max-w-[90%] rounded-2xl rounded-ss-sm px-3.5 py-2.5 text-[14.5px] leading-relaxed', m.error ? 'bg-sale/10 text-sale' : 'bg-secondary')}>{m.error || m.say}</div>}
                   <LookSet data={m} name={name} />
-                  {!m.error && (m.say || m.looks?.length > 0) && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, m.tips].filter(Boolean).join(' — ')} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${look.label}: ${tr(p.name)} (${p.price})` : ''; }).filter(Boolean)} t={t} />}
+                  {!m.error && (m.say || m.looks?.length > 0) && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, m.tips].filter(Boolean).join(' — ')} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean))} t={t} />}
                   {m.intent === 'shop' && m.missing?.length > 0 && <p className="mt-1 text-[12.5px] text-muted">{t('stylist.missing', { x: m.missing.join('، ') })}</p>}
                   {m.intent === 'shop' && !m.looks?.length && !m.error && <p className="mt-2 text-[13px] text-muted">{t('stylist.none')}</p>}
                 </div>

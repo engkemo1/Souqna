@@ -1,6 +1,6 @@
 /** Legal pages (privacy, terms, returns). Arabic is the reference text; English is a faithful translation.
  *  Contact details come from config/contact.js at render time. Keep UPDATED in sync when the text changes. */
-export const LEGAL_UPDATED = '2026-10-11';
+export const LEGAL_UPDATED = '2026-10-12';
 
 export const LEGAL = {
   privacy: {
@@ -13,7 +13,8 @@ export const LEGAL = {
           'لو عملت حساب (اختياري): الاسم ورقم الموبايل وباسورد متشفّر (إحنا مش بنشوف الباسورد)، بالإضافة لخزانتك والمنتجات اللي بتتابعها وإشعاراتك.',
           'التقييمات: نص التقييم وأي صور بترفعها، وبيظهروا للناس باسمك الأول فقط.',
           'طلبات "مش لاقي في بنها": الوصف والصورة (لو رفعتها) وبيانات التواصل والعنوان اللي بتكتبها.',
-          'المساعد مودة: الرسائل والصور اللي بتبعتها للمساعد بتتبعت لمزوّد الذكاء الاصطناعي (Anthropic أو Cloudflare) عشان يرد عليك. إحنا مش بنخزّن صور المحادثة على سيرفراتنا. ممكن نحتفظ بنص قصير عن تفضيلاتك (زي المقاس أو الألوان) على جهازك بس.',
+          'المساعد مودة: الرسائل والصور اللي بتبعتها للمساعد بتتبعت لمزوّد الذكاء الاصطناعي (Anthropic أو Cloudflare) عشان يرد عليك. إحنا مش بنخزّن صور المحادثة على سيرفراتنا. ممكن نحتفظ بنص قصير عن تفضيلاتك وتقييماتك لمودة على جهازك بس، وتقدر تمسح التفضيلات اللي اتعلمتها مودة من زر المسح داخل المحادثة.',
+          'لو قيّمت رد مودة، بنحفظ تقييمك وطلبك والرد والقطع المقترحة وسبب التقييم (لو اخترته) في سجل محدود يراجعه فريق بنها أوتفيت لتحسين جودة التنسيق. تقدر تتجنب إرسال التقييم، وفريق الإدارة يقدر يحذف السجل.',
           'بيانات تقنية بسيطة: عدد زيارات كل متجر في اليوم (إجمالي بدون هوية)، ونوع المتصفح وعنوان الـIP لأغراض الأمان ومنع الإساءة.',
         ]],
         ['بنستخدم بياناتك في إيه', [
@@ -30,7 +31,7 @@ export const LEGAL = {
           'الجهات الرسمية لو القانون طلب ده.',
         ]],
         ['الكوكيز والتخزين على جهازك', [
-          'مش بنستخدم كوكيز إعلانية. بنحفظ على جهازك حاجات ضرورية للتشغيل زي السلة والمفضلة واللغة ودخول حسابك.',
+          'مش بنستخدم كوكيز إعلانية. بنحفظ على جهازك حاجات ضرورية للتشغيل والتخصيص زي السلة والمفضلة واللغة ودخول حسابك وتفضيلات مودة؛ وتقدر تمسح ذاكرة التفضيلات من داخل محادثتها.',
           'لو فعّلت الإشعارات، المتصفح بيحفظ اشتراكك عشان نقدر نبعتلك تنبيهات، وتقدر توقفها في أي وقت من إعدادات المتصفح.',
         ]],
         ['الاحتفاظ بالبيانات والأمان', [
@@ -57,7 +58,8 @@ export const LEGAL = {
           'If you create an account (optional): your name, mobile number and a hashed password (we never see it), plus your wardrobe, the products you watch and your notifications.',
           'Reviews: the review text and any photos you upload; they are shown with your first name only.',
           '"Can\'t find it in Banha" requests: the description, photo (if you add one), contact details and address you enter.',
-          'The Moda assistant: messages and photos you send are passed to our AI provider (Anthropic or Cloudflare) so it can answer. We do not store chat photos on our servers. A short note of your preferences (such as size or colours) may be kept on your own device only.',
+          'The Moda assistant: messages and photos you send are passed to our AI provider (Anthropic or Cloudflare) so it can answer. We do not store chat photos on our servers. A short note of your preferences and Moda ratings may be kept on your device only; you can clear the learned preference memory in the chat.',
+          'If you rate a Moda reply, we store your rating, request, reply, suggested pieces and any selected reason in a limited feedback log for the Banha Outfit team to review and improve styling quality. Rating is optional, and administrators can delete the feedback record.',
           'Basic technical data: aggregate daily visit counts per store (not tied to a person), and browser type and IP address for security and abuse prevention.',
         ]],
         ['How we use your data', [
@@ -74,7 +76,7 @@ export const LEGAL = {
           'Public authorities where the law requires it.',
         ]],
         ['Cookies and on-device storage', [
-          'We do not use advertising cookies. We store only what the site needs on your device: cart, favourites, language and your sign-in.',
+          'We do not use advertising cookies. We store only what the site needs on your device for operation and personalisation: cart, favourites, language, sign-in and Moda preferences; you can clear the learned preference memory in the chat.',
           'If you enable notifications, your browser stores your subscription so we can send alerts; you can stop them at any time in your browser settings.',
         ]],
         ['Retention and security', [

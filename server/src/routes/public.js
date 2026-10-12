@@ -127,7 +127,7 @@ const chatHits = new Map();
 r.post('/stylist', h(async (req, res) => {
   const st = stylistSettings();
   if (!st.enabled) throw new AppError(503, 'stylist_disabled', 'The stylist is switched off.');
-  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(700) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string().max(100)).optional() }).parse(req.body);
+  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(700) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string().max(500)).optional() }).parse(req.body);
   if (body.messages[body.messages.length - 1].role !== 'user') throw new AppError(422, 'validation_failed', 'Last message must be from the shopper.');
   const ip = req.ip || 'x'; const now = Date.now();
   const recent = (chatHits.get(ip) || []).filter((t) => now - t < 86400e3);

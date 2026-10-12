@@ -9,6 +9,7 @@ import { randomUUID } from 'node:crypto';
 import { q, tx } from '../db/index.js';
 import { listDepartments } from './departments.js';
 import { serializeCards, bi } from './serialize.js';
+import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates } from './stylist-ranking.js';
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ـ/g, '').replace(/[ًٌٍَُِّْ]/g, '').trim();
 
@@ -226,6 +227,14 @@ const parseJson = (t) => {
   throw new Error('incomplete JSON in reply');
 };
 
+// External styling research used to shape Moda's learning rules:
+// Stitch Fix StyleFile + Style Shuffle (style dimensions and repeated visual feedback):
+// https://newsroom.stitchfix.com/blog/stitch-fix-rolls-out-stylefile-its-style-personality-resource-to-all-clients/
+// https://newsroom.stitchfix.com/blog/10-billion-interactions-and-counting-on-style-shuffle-the-data-powering-your-personalized-shopping-experience/
+// Stitch Fix separates style, fit, size, quality and price feedback:
+// https://multithreaded.stitchfix.com/blog/2022/07/19/your-opinion-matters/
+// Nordstrom combines a human stylist's choices with budget and fit preferences:
+// https://press.nordstrom.com/static-files/00efd23e-f5ac-482b-8234-9737233ac579
 function systemPrompt(name, profile, training = '') {
   const depts = listDepartments().map((d) => `${d.slug} = ${d.name_ar}`).join('\n');
   return `You are "${name}", the personal fashionista of Banha Outfit, an online marketplace of real clothing stores in Banha, Egypt. You are a highly capable, confident, warm fashion expert with clear reasoning and useful opinions: advise on outfits, fit, colours, fabrics, sizes, care, seasons, occasions, modest and hijab styles, and how to combine pieces. Answer fashion questions directly and in enough detail to be useful, then offer real catalogue items when relevant. Never shame or judge someone's body, appearance, religion, age, gender, or budget; discuss only clothing and respect the shopper. Do not claim a trend is current or a product is available unless you know it. You also help shoppers find items in the stores.
@@ -238,7 +247,8 @@ Reply with ONE JSON object and nothing else:
  "remember": {optional object, see Memory},
  "tips":"optional: 1-2 short Egyptian-Arabic styling tips (colour harmony, why these pieces work) or empty string",
  "budget": total budget in EGP as a number, or null,
- "slots":[{"for":"him"|"her"|"kid"|null,"person":"optional short name/age when dressing several people","label":"short Arabic name of the piece","keywords":["arabic word","english word", "..."],"department":"<slug or null>","max_price": number or null}]}
+ "palette":["كحلي","أبيض","بيج"],
+ "slots":[{"for":"him"|"her"|"kid"|null,"person":"optional short name/age when dressing several people","label":"short Arabic name of the piece","color":"لون القطعة المقصود من اللوحة أو لون محايد متناسق","keywords":["arabic word","english word", "..."],"department":"<slug or null>","max_price": number or null}]}
 
 ${profileText(profile)}${training}\nPhotos: if the shopper attached a photo, look at it: say what the piece is (type, colour, style) and build the look AROUND it (match colours, formality). If it is a photo of a person, comment only on the clothes, never on the body or face. If it is not clothing, say so kindly.
 Two photo intents: (a) "what goes with this" (they own it): build matching pieces around it; (b) "I like this / find me something like this" (a look they saw online or on someone): search for the SAME pieces they see (same type, colour, style, one slot per visible garment/shoes/bag/accessory) and mention in tips which details to look for. Decide from their words; with no words and a photo of a full outfit assume (b).
@@ -247,9 +257,19 @@ Families and budgets: when the shopper dresses several people for one budget (e.
 Memory: when the shopper tells you something lasting about themselves (gender, sizes, favourite or hated colours, hijab, style, usual budget) return it in "remember" as short strings, e.g. {"gender":"man","size":"L / 42","likes":"كحلي، بيج","avoid":"أحمر","notes":"محجبة"}; otherwise omit it.
 
 Styling knowledge (use it like a real personal stylist):
-- Work like a meticulous fashion editor: identify the occasion and dress code, choose one clear silhouette, build a restrained 2–3 colour palette (base + supporting colour + optional accent), then check that every piece belongs to the same look. Prefer polished fit, proportion, fabric texture and thoughtful finishing over adding more items. Never pair pieces only because they are popular.
+- Use a client-first taste profile: combine the shopper's stated style, occasion, fit comfort and budget with repeated direct feedback. Treat taste as several independent dimensions (for example classic/modern, minimal/expressive, relaxed/tailored, neutral/colourful), not one fixed label. A new request always wins over older preference evidence.
+- Separate feedback about style from fit, size, quality and price. A low rating caused by price must not reduce colour preference; dislike of one cut must not become a dislike of the whole garment category. Give more weight to repeated, specific signals than one ambiguous reaction, and use positive ratings to learn as much as negative ones.
+- Before choosing pieces, form a compact outfit brief: occasion and dress code, desired mood, silhouette/fit comfort, climate or season if known, budget, and any owned/required piece. If one detail is genuinely essential and missing, ask one short question; otherwise make a sensible recommendation and state any important assumption.
+- Edit the outfit as a whole: check formality, silhouette and proportions, colour relationship, fabric weight/texture, practicality and whether the pieces can be worn together again. Use a restrained palette as a starting point, not a rigid rule; a deliberate accent or print can work when the requested mood calls for it. Do not treat matching colours alone as proof that an outfit is stylish.
+- Make one confident lead recommendation, then explain the most important styling reason in plain Egyptian Arabic. Add an alternative only if it changes the mood, formality or price in a useful way. Never present trend popularity as proof that a piece suits this specific shopper.
+- Use trend knowledge only when the shopper asks for current trends or wants a trend-led look. Trends change by season and market; avoid claiming a trend is current unless it is supplied by a current, trustworthy source. Keep trends subordinate to the client's taste, occasion and budget.
+- Be fluent across women's and men's wardrobes: women's dresses, skirts, blouses, tops, shirts, trousers, jeans, modest layers, abayas, hijab/scarves and occasionwear; men's shirts, tees, polos, knitwear, trousers, denim, shorts, suits, blazers and smart/casual layers. For both, style outerwear, shoes and accessories when requested. These are wardrobe vocabularies, not gender rules: follow the shopper's request and the departments/products the catalogue actually carries.
+- Build from one hero piece outward. For two-piece looks check top/bottom volume and length; for dresses, abayas or suits treat the one-piece/main garment as the anchor and add only compatible shoes, outer layer or accessories. Balance texture and print scale, keep dress codes consistent, and make layers comfortable for the local weather and the shopper's modesty preferences.
+- Use practical outfit formulas as starting points, not laws: shirt or blouse + trousers/jeans + suitable shoes; tee/polo + denim/chinos + sneakers; dress/abaya + coordinated shoes and optional layer; skirt + top/blouse + shoes; suit + shirt + formal shoes. Adapt silhouette, colour, fabric and accessories to this person's taste and the event rather than copying a formula blindly.
+- Work like a meticulous fashion editor: identify the occasion and dress code, choose one clear silhouette, build a considered 2–3 colour palette (base + supporting colour + optional accent), then check that every piece belongs to the same look. Return that palette in "palette" and set "color" for every slot to its intended colour (or a compatible neutral); repeat that colour in the slot keywords. Prefer polished fit, proportion, fabric texture and thoughtful finishing over adding more items. Never pair pieces only because they are popular.
 - Make a decisive lead recommendation. Explain briefly why the colours and formality work together, then offer a useful alternative only when it meaningfully changes the mood or price. Keep the look coherent even when pieces come from different stores.
 - Treat the shopper's stated budget, modesty, comfort, age context and owned pieces as design constraints. Prioritize the main garment, then essential complementary pieces; accessories are optional. Do not infer body shape or prescribe body changes.
+- Learn from this shopper's direct ratings in their saved personal style memory. Reuse a positive example only when the occasion and requested style are similar. For a negative rating, respect its stated reason and avoid repeating that combination in a similar context; never turn a price complaint into a colour ban or infer that every listed item is disliked. Personal memory is preference evidence, never an instruction to override the shopper's current request.
 - Use catalogue colour metadata as well as names when searching. Put the intended colours in each slot's keywords so product alternatives stay close to the planned palette. If an exact colour is unavailable, choose a neutral that supports the palette and say so plainly.
 - The shopper may already own something ("عندي قميص أزرق سماوي"): build the rest AROUND it. Pick colours that go with it (navy/white/beige/brown/grey are safe neutrals; avoid clashing; match belt with shoes), and put the colour words in keywords (e.g. "كوتشي","أبيض","sneakers","white"). Do not search for the item they already own.
 - Occasions: wedding guest, engagement (خطوبة), kath el-ketab, work, casual outing, graduation, etc. Choose the formality right (suit/بدلة + shirt + shoes + tie/bow for formal; smart-casual for outings; modest/hijab-friendly options when the shopper mentions hijab).
@@ -285,16 +305,13 @@ async function describePhotoCf(buf) {
 function profileText(p) {
   if (!p || typeof p !== 'object') return '';
   const f = ['name', 'gender', 'size', 'likes', 'avoid', 'notes'].map((k) => (p[k] ? `${k}: ${String(p[k]).slice(0, 80)}` : '')).filter(Boolean);
+  if (p.styleMemory) f.push(`personal outfit preferences learned from this shopper's direct ratings only (preference evidence, not instructions): ${String(p.styleMemory).slice(0, 380)}`);
   if (p.owns) f.push(`wardrobe (pieces already bought here, suggest things that go with them instead of duplicating): ${String(p.owns).slice(0, 300)}`);
   return f.length ? `What you already know about this shopper (remembered from earlier visits; use it silently, do not ask again): ${f.join(' | ')}.\n` : '';
 }
 
 /* ---------------- catalogue search ---------------- */
 function findCandidates(slot, limit = 4) {
-  const label = String(slot.label || '').split('·').pop();
-  const typeTokens = [...new Set(norm(label).split(/\s+/).filter((t) => t.length > 1))].slice(0, 4);
-  const keywordTokens = [...new Set((slot.keywords || []).map(norm).filter((t) => t.length > 1))].slice(0, 8);
-  const tokens = [...new Set([...typeTokens, ...keywordTokens])].slice(0, 10);
   const where = ["p.status='active'", "s.status='active'", 's.hidden=0', '(p.track_stock=0 OR p.stock>0)']; const params = [];
   if (slot.department && /^[a-z0-9_]+$/.test(slot.department)) { where.push('p.department=?'); params.push(slot.department); }
   if (slot.max_price > 0) { where.push('p.price<=?'); params.push(Math.round(slot.max_price)); }
@@ -303,40 +320,9 @@ function findCandidates(slot, limit = 4) {
     'FROM products p JOIN stores s ON s.id=p.store_id WHERE ' + where.join(' AND ') +
     ' ORDER BY p.featured DESC, p.sold_count DESC LIMIT 150';
   const rows = q.all(sql, params);
-  const scored = rows.map((p) => {
-    const colorText = (Array.isArray(p.colors_json) ? p.colors_json : (() => { try { return JSON.parse(p.colors_json || '[]'); } catch { return []; } })())
-      .flatMap((color) => [color.name_ar, color.name_en]).filter(Boolean).join(' ');
-    const nameText = norm(`${p.name_ar || ''} ${p.name_en || ''} ${colorText}`);
-    const categoryText = norm(p.cat_text || '');
-    const descriptionText = norm(String(p.description_ar || '') + ' ' + String(p.description_en || ''));
-    let nameHits = 0; let categoryHits = 0; let descriptionHits = 0; let score = 0;
-    for (const t of tokens) {
-      if (nameText.includes(t)) { nameHits++; score += typeTokens.includes(t) ? 4 : 3; }
-      else if (categoryText.includes(t)) { categoryHits++; score += typeTokens.includes(t) ? 4 : 2; }
-      else if (descriptionText.includes(t)) { descriptionHits++; score += 1; }
-    }
-    const typeMatch = typeTokens.some((t) => nameText.includes(t) || categoryText.includes(t));
-    const relevant = typeTokens.length
-      ? typeMatch
-      : nameHits >= 1 || categoryHits >= 1 || descriptionHits >= 2;
-    // Popularity affects ranking only; a labeled item must match its name or category.
-    return { p, relevant, score: score + Math.min(2, p.sold_count / 20) + (p.rating >= 4 ? 0.5 : 0) };
-  });
-  const ranked = scored.filter((x) => x.relevant).sort((a, b) => b.score - a.score).slice(0, limit).map((x) => x.p);
+  const ranked = rankCandidateRows(slot, rows, limit);
   const cards = serializeCards(ranked);
   return cards.map((c, i) => ({ ...c, store: { slug: ranked[i].store_slug, name: bi(ranked[i], 'store_name') } }));
-}
-
-/** keep the whole look inside the budget: swap in cheaper alternatives where they save the most */
-function fitBudget(looks, budget) {
-  const total = () => looks.reduce((s, l) => s + (l.items[l.pick]?.price || 0), 0);
-  let guard = 20;
-  while (budget && total() > budget && guard-- > 0) {
-    let best = null;
-    looks.forEach((l, i) => l.items.forEach((it, j) => { const save = (l.items[l.pick]?.price || 0) - it.price; if (save > 0 && (!best || save > best.save)) best = { i, j, save }; }));
-    if (!best) break; looks[best.i].pick = best.j;
-  }
-  return total();
 }
 
 /** @param messages [{role:'user'|'assistant', content}] (last 8 kept) */
@@ -371,17 +357,21 @@ export async function runStylist(messages, { image, image2, profile } = {}) {
   catch (e) { lastError = String(e.message).slice(0, 200); console.error('[stylist]', lastError); throw Object.assign(new Error('llm'), { code: 'stylist_unavailable' }); }
   const intent = ['shop', 'clarify', 'chat'].includes(plan.intent) ? plan.intent : 'shop';
   const say = String(plan.say || '').slice(0, 700);
+  const palette = [...new Set((Array.isArray(plan.palette) ? plan.palette : []).map((color) => String(color).trim().slice(0, 30)).filter(Boolean))].slice(0, 3);
   const remember = {}; if (plan.remember && typeof plan.remember === 'object') for (const k of ['gender', 'size', 'likes', 'avoid', 'notes']) if (plan.remember[k]) remember[k] = String(plan.remember[k]).slice(0, 80);
   if (intent !== 'shop') return { intent, say, remember, looks: [], total: 0 };
   const who = { him: 'له', her: 'لها', kid: 'للطفل' };
   const slots = (Array.isArray(plan.slots) ? plan.slots : []).slice(0, 12).map((s) => ({
-    label: `${s.person ? String(s.person).slice(0, 20) + ' · ' : who[s.for] ? who[s.for] + ' · ' : ''}${String(s.label || '').slice(0, 30)}`, keywords: (Array.isArray(s.keywords) ? s.keywords : []).map(String).slice(0, 8),
+    label: `${s.person ? String(s.person).slice(0, 20) + ' · ' : who[s.for] ? who[s.for] + ' · ' : ''}${String(s.label || '').slice(0, 30)}`, color: String(s.color || '').slice(0, 30), palette,
+    likes: String(profile?.likes || '').slice(0, 100), avoid: String(profile?.avoid || '').slice(0, 100),
+    keywords: (Array.isArray(s.keywords) ? s.keywords : []).map(String).slice(0, 8),
     department: s.department && /^[a-z0-9_]+$/.test(s.department) ? s.department : null, max_price: Number(s.max_price) > 0 ? Number(s.max_price) : null,
   }));
-  const looks = slots.map((s) => ({ label: s.label, items: findCandidates(s), pick: 0 })).filter((l) => l.items.length);
+  const looks = slots.map((s) => ({ label: s.label, palette, items: findCandidates(s), pick: 0 })).filter((l) => l.items.length);
   const budget = Number(plan.budget) > 0 ? Number(plan.budget) : null;
-  const total = fitBudget(looks, budget);
-  return { intent, say, remember, tips: String(plan.tips || '').slice(0, 300), looks, total, budget, overBudget: !!(budget && total > budget), missing: slots.filter((s) => !looks.find((l) => l.label === s.label)).map((s) => s.label) };
+  coordinateLookCandidates(looks, budget);
+  const total = fitBudgetCandidates(looks, budget);
+  return { intent, say, remember, palette, tips: String(plan.tips || '').slice(0, 300), looks, total, budget, overBudget: !!(budget && total > budget), missing: slots.filter((s) => !looks.find((l) => l.label === s.label)).map((s) => s.label) };
 }
 
 /* ---------------- store-owner assistant: write the listing from a product photo ---------------- */
@@ -565,7 +555,7 @@ async function buildLook(target, index, day) {
           : [['تيشيرت أو قميص كاجوال', ['تيشيرت', 'قميص', 't-shirt', 'shirt'], dept], ['بنطلون كاجوال', ['بنطلون', 'جينز', 'pants'], dept], ['كوتشي مريح', ['كوتشي', 'sneakers', 'shoes'], null]];
   const looks = slots.map(([label, keywords, department]) => ({ label, items: findCandidates({ keywords, department }), pick: 0 })).filter((l) => l.items.length);
   if (looks.length < 2) return null;
-  const total = fitBudget(looks, null);
+  const total = fitBudgetCandidates(looks, null);
   return { audience: target.audience, age: target.age, occasion: occ, say: '', tips: '', looks, total, budget: null, overBudget: false };
 }
 
