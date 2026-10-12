@@ -15,20 +15,26 @@ import { matchesVisualType, visualTypeOptions } from './visual-taxonomy.js';
 const GRID_W = 6, GRID_H = 8, HUE_BINS = 12;
 
 /* ---------------- settings ---------------- */
-const DEF = { visual_enabled: '1', visual_model: 'color', visual_daily: '40' };
+// Conservative initial match floors: the fallback color model must be nearly identical;
+// semantic embeddings can accept a slightly wider range. These are tunable in Admin.
+const DEF = { visual_enabled: '1', visual_model: 'color', visual_daily: '40', visual_min_color: '97', visual_min_jina: '78' };
 
 export function visualSettings() {
   const m = { ...DEF, ...Object.fromEntries(q.all("SELECT key, value FROM app_settings WHERE key LIKE 'visual_%'").map((r) => [r.key, r.value])) };
+  const model = m.visual_model === 'jina' && m.visual_jina_consent === '1' ? 'jina' : 'color';
+  const readFloor = (key) => Math.max(0, Math.min(100, Number.isFinite(Number(m[key])) ? Number(m[key]) : Number(DEF[key])));
   return {
     enabled: m.visual_enabled === '1',
     // Older admin builds exposed a nonfunctional Jina option. Require the new explicit setting save
     // (which also shows the data-transfer notice) before sending any images to the hosted API.
-    model: m.visual_model === 'jina' && m.visual_jina_consent === '1' ? 'jina' : 'color',
+    model,
     dailyFree: Math.max(0, Number(m.visual_daily) || 0),
+    minSimilarity: readFloor(model === 'jina' ? 'visual_min_jina' : 'visual_min_color'),
+    minSimilarityByModel: { color: readFloor('visual_min_color'), jina: readFloor('visual_min_jina') },
   };
 }
 
-export function saveVisualSettings({ enabled, model, dailyFree }) {
+export function saveVisualSettings({ enabled, model, dailyFree, minSimilarity }) {
   const put = (k, v) => q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [k, String(v)]);
   if (enabled !== undefined) put('visual_enabled', enabled ? '1' : '0');
   if (model) {
@@ -36,6 +42,10 @@ export function saveVisualSettings({ enabled, model, dailyFree }) {
     put('visual_jina_consent', model === 'jina' ? '1' : '0');
   }
   if (dailyFree !== undefined) put('visual_daily', Math.max(0, Math.min(1000, Math.floor(dailyFree))));
+  if (minSimilarity !== undefined) {
+    const target = model || visualSettings().model;
+    put(target === 'jina' ? 'visual_min_jina' : 'visual_min_color', Math.max(0, Math.min(100, Math.floor(minSimilarity))));
+  }
   return visualSettings();
 }
 
@@ -173,7 +183,9 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
   if (!visualTypeOptions().some((candidate) => candidate.key === type)) {
     throw new VisualProviderError('Choose the kind of item you are looking for.', 422);
   }
-  const { vec: qv, model } = await embedImage(buffer);
+  const settings = visualSettings();
+  const selectedModel = settings.model === 'jina' ? JINA_MODEL : 'color-v1';
+  const { vec: qv, model } = await embedImage(buffer, selectedModel);
   const rows = q.all(
     `SELECT v.product_id, v.vec, p.name_ar, p.name_en, p.department,
        COALESCE(c.name_ar || ' ' || c.name_en, '') AS cat_text
@@ -182,7 +194,9 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
       WHERE v.model=? AND p.status='active' AND (p.track_stock=0 OR p.stock>0)
         AND s.status='active' AND s.hidden=0 ${department ? 'AND p.department=?' : ''}`,
     department ? [model, department] : [model]);
+  const minSimilarity = settings.minSimilarity / 100;
   return rows.filter((r) => matchesVisualType(r, type)).map((r) => ({ id: r.product_id, score: dot(qv, fromBlob(r.vec)) }))
+    .filter((x) => Number.isFinite(x.score) && x.score >= minSimilarity)
     .sort((a, b) => b.score - a.score).slice(0, limit);
 }
 

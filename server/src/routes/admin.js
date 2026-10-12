@@ -449,7 +449,7 @@ r.put('/look-of-day', h((req, res) => {
 /* ---- visual search settings (on/off, model, free daily quota) ---- */
 r.get('/visual', h((_req, res) => res.json(visualStatus())));
 r.put('/visual', h((req, res) => {
-  const body = z.object({ enabled: z.boolean().optional(), model: z.enum(['color', 'jina']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional() }).parse(req.body);
+  const body = z.object({ enabled: z.boolean().optional(), model: z.enum(['color', 'jina']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional(), minSimilarity: z.coerce.number().int().min(0).max(100).optional() }).parse(req.body);
   if (body.model === 'jina' && !process.env.JINA_API_KEY) throw new AppError(422, 'jina_key_required', 'أضف مفتاح JINA_API_KEY في Railway أولًا.');
   saveVisualSettings(body);
   if (body.model) triggerReindex(1000);

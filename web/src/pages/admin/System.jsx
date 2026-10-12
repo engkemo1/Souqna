@@ -15,12 +15,12 @@ function VisualPanel() {
   const { data, reload } = useAdminApi('/visual');
   const [f, setF] = useState(null);
   const [busy, setBusy] = useState(false);
-  if (data && !f) setF({ enabled: data.enabled, model: data.model, dailyFree: String(data.dailyFree) });
+  if (data && !f) setF({ enabled: data.enabled, model: data.model, dailyFree: String(data.dailyFree), minSimilarity: String(data.minSimilarity) });
   if (!data || !f) return <Panel title="البحث بالصورة"><Skeleton className="h-40 w-full" /></Panel>;
-  const dirty = f.enabled !== data.enabled || f.model !== data.model || Number(f.dailyFree) !== data.dailyFree;
+  const dirty = f.enabled !== data.enabled || f.model !== data.model || Number(f.dailyFree) !== data.dailyFree || Number(f.minSimilarity) !== data.minSimilarity;
   const save = async () => {
     setBusy(true);
-    try { await adminApi('/visual', { method: 'PUT', body: { enabled: f.enabled, model: f.model, dailyFree: Number(f.dailyFree) || 0 } }); toast({ title: 'اتحفظ' }); setF(null); reload(); }
+    try { await adminApi('/visual', { method: 'PUT', body: { enabled: f.enabled, model: f.model, dailyFree: Number(f.dailyFree) || 0, minSimilarity: Number(f.minSimilarity) || 0 } }); toast({ title: 'اتحفظ' }); setF(null); reload(); }
     catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy(false);
   };
@@ -33,7 +33,7 @@ function VisualPanel() {
   ];
   const Opt = ({ id, title, body, available }) => {
     return (
-      <button type="button" disabled={!available} onClick={() => setF({ ...f, model: id })} aria-pressed={f.model === id}
+      <button type="button" disabled={!available} onClick={() => setF({ ...f, model: id, minSimilarity: String(data.minSimilarityByModel?.[id] ?? f.minSimilarity) })} aria-pressed={f.model === id}
         className={`rounded-xl border p-3 text-start transition disabled:cursor-not-allowed disabled:opacity-60 ${f.model === id ? 'border-fg bg-secondary' : 'border-line-strong hover:border-fg'}`}>
         <p className="font-semibold">{title}</p><p className="mt-0.5 text-[12.5px] text-muted">{body}</p>
         {id === 'jina' && !available && <p className="mt-1.5 text-[12px] font-medium text-sale">أضف <span dir="ltr">JINA_API_KEY</span> في Railway لتفعيل الاختيار.</p>}
@@ -49,10 +49,13 @@ function VisualPanel() {
           <div className="grid gap-2 sm:grid-cols-2">{OPTS.map(([id, title, body, available]) => <Opt key={id} id={id} title={title} body={body} available={available} />)}</div>
           <p className="mt-2 text-[12.5px] text-muted">اختيار Jina يرسل صور المنتجات وصور البحث إلى خدمة Jina لتحليلها، وتُعاد فهرسة صور المنتجات على دفعات في الخلفية. لن يتم إرسال الصور عند اختيار مقارنة الألوان. راجع سياسة الخصوصية قبل تشغيل الخدمة.</p>
         </div>
+        <label className="block max-w-xs"><span className="mb-1.5 block text-sm font-medium">أقل درجة تشابه لقبول النتيجة</span>
+          <Input type="number" dir="ltr" min={0} max={100} step={1} value={f.minSimilarity} onChange={(e) => setF({ ...f, minSimilarity: e.target.value })} className="text-start" />
+          <span className="mt-1 block text-[12px] text-muted">دي درجة مقارنة فنية وليست نسبة دقة مضمونة. رفعها يقلل النتائج الضعيفة؛ لو مفيش منتج يعدّيها هنقول إن مفيش حاجة قريبة. القيم الافتراضية محافظة، وراجعها بصور بحث حقيقية قبل ما تقللها.</span></label>
         <label className="block max-w-xs"><span className="mb-1.5 block text-sm font-medium">عمليات بحث مجانية لكل زائر في اليوم</span>
           <Input type="number" dir="ltr" min={0} max={1000} value={f.dailyFree} onChange={(e) => setF({ ...f, dailyFree: e.target.value })} className="text-start" />
           <span className="mt-1 block text-[12px] text-muted">0 = من غير حد. ده الأساس لو حبينا نعمل باقة مدفوعة بعدين.</span></label>
-        <div className="flex flex-wrap items-center gap-3"><Button onClick={save} loading={busy} disabled={!dirty}>حفظ</Button>{dirty && <span className="text-[13px] text-muted">في تغييرات لسه ما اتحفظتش</span>}</div>
+        <div className="flex flex-wrap items-center gap-3"><Button onClick={save} loading={busy} disabled={!dirty || !Number.isFinite(Number(f.minSimilarity)) || Number(f.minSimilarity) < 0 || Number(f.minSimilarity) > 100}>حفظ</Button>{dirty && <span className="text-[13px] text-muted">في تغييرات لسه ما اتحفظتش</span>}</div>
         <dl className="grid gap-2 border-t border-line pt-4 text-sm sm:grid-cols-2">
           {[['مفهرس بمقارنة الألوان', idx['color-v1'] || 0], ['مفهرس بالتحليل الذكي', idx['jina-embeddings-v5-omni-nano'] || 0], ['منتجات تنتظر الفهرسة', data.pending || 0], ['إجمالي المنتجات النشطة', data.total],
             ['حالة مفتاح Jina', jinaReady ? 'متصل' : 'غير مضاف']].map(([k, v]) => (
