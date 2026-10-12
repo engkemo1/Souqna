@@ -162,7 +162,7 @@
       "name_ar": "طقم قطعتين أو جمبسوت", "formality": 4, "taste": ["modern", "bold", "elegant"],
       "slots": [["two_piece_set|jumpsuit", 1, 55], ["heels_low|heels_high", 1, 25], ["clutch|handbag", 1, 12], ["jewelry", 0, 8]],
       "colors": ["black", "navy", "emerald", "burgundy"], "avoid_colors": ["white", "cream"],
-      "tip_ar": "بديل مختلف عن الفستان. جمبسوت أو توب وجيبة بنفس القماش.",
+      "tip_ar": "لو مش حابة الفستان، الجمبسوت اختيار شيك؛ وممكن كمان توب وجيبة من نفس القماش.",
       "status": "sourced", "src": ["knot", "cairo360", "asos"] },
 
     { "id": "w_eng_womens_suit", "audience": ["women"], "contexts": ["engagement_guest", "work_formal", "graduation"],

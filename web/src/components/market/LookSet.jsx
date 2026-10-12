@@ -21,7 +21,7 @@ function LookRow({ look, lang, tr, t, added, onAdd }) {
     <div className="mt-4 rounded-2xl border border-line bg-canvas/60 p-3 sm:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-sm font-bold sm:text-base">{look.label}</p>
-        <span className="text-[12px] text-muted">{t('lod.options', { n: look.items.length })}</span>
+        <span className="text-[12px] text-muted">{look.items.length === 1 ? (lang === 'ar' ? 'اختيار واحد' : '1 option') : t('lod.options', { n: look.items.length })}</span>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
         {look.items.map((p, i) => (
@@ -80,7 +80,10 @@ export default function LookSet({ data, name }) {
   const [tab, setTab] = useState(0);
   const m = data; const miss = (m?.missing || []).slice(0, 4);
   const ar = lang === 'ar';
-  if (!m?.looks?.length && !miss.length) return null;
+  const weatherTips = Array.isArray(m?.tips) ? m.tips.filter(Boolean) : m?.tips ? [m.tips] : [];
+  const styleTips = Array.isArray(m?.styleTips) ? m.styleTips.filter(Boolean) : m?.styleTips ? [m.styleTips] : [];
+  const hasAdvice = weatherTips.length > 0 || styleTips.length > 0 || (m?.palette?.length || 0) > 0;
+  if (!m?.looks?.length && !miss.length && !hasAdvice) return null;
   const tabs = m.tabs?.length > 1 ? m.tabs : null;
   const shownLooks = tabs ? (tabs[Math.min(tab, tabs.length - 1)].items.filter((i) => i.card).map((i) => ({ label: i.label, items: [i.card], pick: 0 }))) : m.looks;
   const orderItems = (m.missingItems || []);
@@ -89,8 +92,17 @@ export default function LookSet({ data, name }) {
   ) : miss.length > 0 && (
     <div className="mt-3 space-y-1.5">{miss.map((x) => <Link key={x} to={`/request?title=${encodeURIComponent(x)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-brand/50 bg-brand/5 px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" />{t('req.moda', { x })}</Link>)}</div>
   );
-  if (!m.looks?.length) return missing;
+  const advice = hasAdvice && <div className="mt-3 rounded-2xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] leading-relaxed sm:text-sm">
+    {m.palette?.length > 0 && <p className="mb-1 text-[12px] font-semibold text-brand">{ar ? 'ألوان مقترحة' : 'Suggested colours'}: {m.palette.join(' · ')}</p>}
+    {weatherTips.map((tip, i) => <p key={`weather-${i}`} className={i ? 'mt-1' : ''}>✨ {tip}</p>)}
+    {styleTips.length > 0 && <div className={weatherTips.length ? 'mt-2 border-t border-brand/15 pt-2' : ''}>
+      <p className="mb-1 font-semibold text-brand">{t('stylist.styleProposal')}</p>
+      {styleTips.map((tip, i) => <p key={`style-${i}`} className={i ? 'mt-1' : ''}>{tip}</p>)}
+    </div>}
+  </div>;
+  if (!m.looks?.length) return <>{advice}{missing}</>;
   const money = (n) => formatMoney(n, lang);
+  const totalLabel = m.state === 'partial' ? t('stylist.availableTotal', { p: money(m.total) }) : t('stylist.total', { p: money(m.total) });
   const picks = m.looks.map((l) => l.items[l.pick]).filter(Boolean);
   const startAdd = (items) => setQuick({ queue: items, i: 0 });
   const nextAdd = () => {
@@ -100,7 +112,7 @@ export default function LookSet({ data, name }) {
   };
   const share = () => {
     const lines = m.looks.map((l) => { const p = l.items[l.pick]; return `${l.label}: ${tr(p.name)} — ${formatMoney(p.price, lang)}\n${location.origin}/s/${p.store.slug}/p/${p.slug}`; });
-    window.open(`https://wa.me/?text=${encodeURIComponent(`${name} ✨\n${lines.join('\n\n')}\n\n${t('stylist.total', { p: formatMoney(m.total, lang) })}`)}`, '_blank', 'noopener');
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${name} ✨\n${lines.join('\n\n')}\n\n${totalLabel}`)}`, '_blank', 'noopener');
   };
   const shareLink = async () => {
     try {
@@ -112,17 +124,14 @@ export default function LookSet({ data, name }) {
   };
   return (
     <>
-      {(m.tips || m.palette?.length > 0) && <div className="mt-3 rounded-2xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] leading-relaxed sm:text-sm">
-        {m.palette?.length > 0 && <p className="mb-1 text-[12px] font-semibold text-brand">لوحة الألوان: {m.palette.join(' · ')}</p>}
-        {m.tips && <p>✨ {m.tips}</p>}
-      </div>}
+      {advice}
       {m.state === 'alternatives' && <p className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-[12px] font-semibold text-muted">{ar ? 'أقرب بديل متاح' : 'Closest available'}</p>}
       {m.state === 'partial' && <p className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-[12px] font-semibold text-muted">{ar ? 'جزء من الطقم متاح' : 'Part of the look is available'}</p>}
       {tabs && <div role="tablist" className="mt-4 grid grid-cols-2 gap-1 rounded-full bg-secondary p-1">{tabs.map((tb, i) => <button key={tb.id} type="button" role="tab" aria-selected={i === tab} onClick={() => setTab(i)} className={cx('rounded-full px-3 py-2 text-[13px] font-bold transition', i === tab ? 'bg-elevated shadow-sm' : 'text-muted')}>{tb.label} <span className="font-normal">· {Number(tb.subtotal) > 0 ? money(tb.subtotal) : (ar ? 'لسه مفيش قطع' : 'No items yet')}</span></button>)}</div>}
       {m.manual ? <><p className="mt-4 text-sm font-bold">قطع الأوتفيت المختارة</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} /></> : shownLooks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
-      <p className="mt-3 text-[13.5px] font-semibold">{tabs && m.state === 'partial' ? (ar ? 'إجمالي القطع المتاحة: ' : 'Available items total: ') : ''}{t('stylist.total', { p: formatMoney(m.total, lang) })}{m.overBudget && <span className="ms-2 font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
+      <p className="mt-3 text-[13.5px] font-semibold">{totalLabel}{m.overBudget && <span className="ms-2 font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-4 py-2 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t('stylist.addAll')}</button>
+        <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-4 py-2 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t(m.state === 'partial' ? 'stylist.addAvailable' : 'stylist.addAll')}</button>
         {[...new Map(picks.map((p) => [p.store.slug, p.store.name])).entries()].map(([sl, nm]) => <StoreCartLink key={sl} slug={sl} name={nm} tr={tr} t={t} />)}
       </div>
       <button type="button" onClick={shareLink} className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[13px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{t('stylist.share')}</button>

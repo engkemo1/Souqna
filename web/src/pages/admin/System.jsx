@@ -270,7 +270,7 @@ function ModaTrainingPanel() {
   return (
     <Panel title="تعليم مودة" subtitle="اختياراتك المعتمدة وتوجيهك بيفضلوا محفوظين وبيساعدوا مودة في اقتراحاتها الجديدة" className="lg:col-span-2">
       <div className="space-y-4">
-        <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-sm leading-relaxed text-muted">هنا بتعلّم مودة بقواعد ذوق، وإجابات خبير معتمدة، وأوتفيتات توافق عليها. لما ييجي سؤال مشابه تستخدم الدرس المناسب، ولما ترشح لبس تبحث عن قطع متاحة فعلًا من المحلات.</div>
+        <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-sm leading-relaxed text-muted">هنا بنحفظ قواعد الذوق ودروس الخبير وأمثلة الأوتفيتات. دي بتساعد مسار الردود اللي بيستخدم نموذج ذكاء؛ ترشيح المنتجات الأساسي بيتحدد من نوع المنتج ودرجة رسميته وقواعد التنسيق. لو نوع قطعة متصنف غلط، صحّح اسمها أو قسمها في بيانات المنتج.</div>
         <section className="space-y-3 rounded-2xl border border-line bg-canvas/50 p-3 sm:p-4">
           <div><h3 className="font-semibold">ملاحظات الزباين على اقتراحات مودة</h3><p className="mt-1 text-xs text-muted">راجعوا الأسباب، واكتبوا الإجابة اللي شايفينها صح قبل ما تتحول الملاحظة لدرس تتعلم منه.</p></div>
           {feedbackData?.items?.length ? feedbackData.items.map((item) => <article key={item.id} className="space-y-2 rounded-xl border border-line bg-elevated p-3">

@@ -142,7 +142,7 @@ function modaCatalogRows() {
     ORDER BY p.featured DESC, p.sold_count DESC, p.id DESC LIMIT 5000`);
 }
 function modaClientResponse(result) {
-  const base = { intent: result.intent || (result.state === 'chat' ? 'chat' : 'shop'), state: result.state, say: result.say, tips: result.tips || [], questions: result.questions || [], session: result.session };
+  const base = { intent: result.intent || (result.state === 'chat' ? 'chat' : 'shop'), state: result.state, say: result.say, tips: result.tips || [], styleTips: result.styleTips || [], questions: result.questions || [], session: result.session };
   if (!result.blocks) return { ...base, looks: [], total: 0, weatherSource: result.weatherSource || null };
   const cards = new Map(cardsByIds(result.blocks.tabs.flatMap((tab) => tab.items.map((item) => item.id))).map((card) => [card.id, card]));
   const tabs = result.blocks.tabs.map((tab) => ({

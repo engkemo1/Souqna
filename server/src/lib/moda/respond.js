@@ -54,12 +54,19 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   if (plan.state === 'clarify') {
     const asks = plan.ask || [];
     const first = asks[0];
-    const text = first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'budget' ? say('clarify_budget') : first === 'color_preference' ? say('clarify_color') : first === 'dress_kind' ? say('dress_clarify') : say('clarify_generic');
-    return { state: 'clarify', intent: 'shop', say: text, questions: asks.slice(0, K.questions.limits.max_questions_per_turn).map((a) => buildQuestion(K, a, L)).filter(Boolean), blocks: null, ask: asks };
+    const couple = plan.persons?.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
+    const text = first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'budget' ? say(couple ? 'clarify_budget_couple' : 'clarify_budget') : first === 'time_if_dressy' ? say('clarify_time') : first === 'venue_if_dressy' ? say('clarify_venue') : first === 'color_preference' ? say('clarify_color') : first === 'dress_kind' ? say('dress_clarify') : say('clarify_generic');
+    const questions = asks.slice(0, K.questions.limits.max_questions_per_turn).map((a) => {
+      const q = buildQuestion(K, a, L);
+      return a === 'budget' && couple && q ? { ...q, text: say('clarify_budget_couple') } : q;
+    }).filter(Boolean);
+    return { state: 'clarify', intent: 'shop', say: text, questions, blocks: null, ask: asks };
   }
 
   const ctxAr = plan.context ? (K.contexts.get(plan.context)?.ar || '') : '';
   const occasion = String(ctxAr).replace(/\s*\(.*?\)\s*/g, ' ').split('/')[0].trim() || 'المناسبة';
+  const occasionForAr = { engagement_guest: 'للخطوبة', engagement_self: 'لخطوبتك', katb_kitab: 'لكتب الكتاب', wedding_guest: 'للفرح', wedding_self: 'لفرحك', graduation: 'للتخرج', family_gathering: 'للمة العيلة', birthday_party: 'لعيد الميلاد', date_night: 'لخروجة أو عشا', work_formal: 'للشغل', work_casual: 'للشغل' };
+  const occasionFor = L === 'en' ? occasion : (occasionForAr[plan.context] || `لـ${occasion}`);
   const paletteAr = joinAr((plan.palette || []).map((c) => colorAr(K, c)));
   const couple = plan.people.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
   const condolence = plan.tone === 'sober';
@@ -75,10 +82,10 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   // ---------- مقدمة حسب الحالة ----------
   let intro;
   if (plan.state === 'none') intro = say('intro_none');
-  else if (plan.state === 'partial') intro = say(couple ? 'intro_partial_couple' : 'intro_partial', { occasion, missing: joinAr((plan.missing || []).map((m) => `${itemAr(K, m.base)}${m.material ? ` ${K.synonyms.materials[m.material]?.[0] || m.material}` : ''}`)) });
+  else if (plan.state === 'partial') intro = say(couple ? 'intro_partial_couple' : 'intro_partial', { occasion, occasionFor, missing: joinAr((plan.missing || []).map((m) => `${itemAr(K, m.base)}${m.material ? ` ${K.synonyms.materials[m.material]?.[0] || m.material}` : ''}`)) });
   else if (plan.state === 'alternatives') intro = `${say('intro_alternatives')} ${relaxedTexts.join(' ')}`.trim();
   else if (plan.state === 'over_budget') intro = say('over_budget', { total: nf(plan.total), budget: nf(plan.budget), over: nf(plan.over) });
-  else intro = say(couple ? 'intro_full_couple' : 'intro_full', { occasion, palette: paletteAr });
+  else intro = say(couple ? 'intro_full_couple' : 'intro_full', { occasion, occasionFor, palette: paletteAr });
   parts.push(intro);
 
   if (condolence) {
@@ -112,6 +119,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
 
   // ---------- جو ووقت ----------
   const tips = [];
+  const styleTips = [];
   const adv = plan.weather;
   if (!condolence && adv) {
     if (adv.fabrics_ar?.length) tips.push(say('weather_line', { temp: adv.temp, fabrics: joinAr(adv.fabrics_ar.slice(0, 2)) }));
@@ -121,7 +129,11 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   }
   if (!condolence) {
     const seen = new Set();
-    for (const pe of plan.people) if (pe.look?.tip_ar && !seen.has(pe.look.tip_ar)) { seen.add(pe.look.tip_ar); tips.push(say('tip_formats', { tip: pe.look.tip_ar })); }
+    for (const pe of plan.people) if (pe.look?.tip_ar && !seen.has(pe.look.tip_ar)) {
+      seen.add(pe.look.tip_ar);
+      const who = couple ? `${tabLabel(pe.aud, plan.persons, P)}: ` : '';
+      styleTips.push(`${who}${pe.look.tip_ar}`);
+    }
   }
 
   // ---------- بلوكات المنتجات ----------
@@ -134,7 +146,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   const questions = condolence ? [] : (plan.ask || []).slice(0, 1).map((a) => buildQuestion(K, a, L)).filter(Boolean);
 
   return {
-    state: plan.state, intent: 'shop', say: parts.filter(Boolean).join(' '), tips: tips.slice(0, 3), questions,
+    state: plan.state, intent: 'shop', say: parts.filter(Boolean).join(' '), tips: tips.slice(0, 2), styleTips: styleTips.slice(0, 2), questions,
     blocks: { tabs, total: plan.total, budget: plan.budget, over: plan.over, palette: (plan.palette || []).map((c) => ({ key: c, ar: colorAr(K, c) })), couple },
     missing: plan.missing || [], relaxed: plan.relaxed || [],
   };

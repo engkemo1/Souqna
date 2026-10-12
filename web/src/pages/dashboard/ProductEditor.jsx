@@ -348,7 +348,7 @@ export default function ProductEditor() {
             </div>
           </Field>
         )}
-        <Field label="درجة الرسمية (بتساعد مودة ترشّحها للمناسبة الصح)" hint="سيبها تلقائي لو مش متأكد، ومودة هتحددها من اسم المنتج وخامته." optional={t('common.optional')} className="sm:col-span-2">
+        <Field label="درجة الرسمية (بتساعد مودة ترشّحها للمناسبة الصح)" hint="سيبها تلقائي لو مش متأكد. الدرجة بتحدد رسمية القطعة، مش نوعها؛ وضّح في الاسم والقسم لو المنتج رياضي أو رسمي." optional={t('common.optional')} className="sm:col-span-2">
           <div className="flex flex-wrap gap-2" role="group">
             {[['', 'تلقائي'], ['1', '1 · بيتي'], ['2', '2 · كاجوال'], ['3', '3 · شيك'], ['4', '4 · رسمي / نص رسمي'], ['5', '5 · سواريه / رسمي جدًا']].map(([v, label]) => <button key={v} type="button" aria-pressed={f.style_level === v} onClick={() => set({ style_level: v })}
               className={cx('h-10 rounded-full border px-4 text-sm font-medium transition active:scale-95', f.style_level === v ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{label}</button>)}

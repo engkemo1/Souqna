@@ -58,6 +58,7 @@ function applyAnswers(parsed, answers = {}, K) {
 const mergeFromSession = (cur, prev) => {
   if (!prev) return cur;
   const m = { ...cur };
+  m.flags = { ...(prev.flags || {}), ...(cur.flags || {}) };
   for (const k of ['persons', 'garments', 'colors', 'avoidColors', 'taste', 'ownedPieces']) if (!m[k]?.length && prev[k]?.length) m[k] = prev[k];
   for (const k of ['context', 'contextEffective', 'budget', 'daypart', 'dateOffsetDays', 'season']) if ((m[k] === null || m[k] === undefined) && prev[k] != null) m[k] = prev[k];
   if (!cur.context && prev.role) m.role = prev.role;
@@ -132,14 +133,17 @@ export async function runModa(messages, opts = {}) {
   let plan = planOutfit(parsed, excludeIds.length ? rows.filter((p) => !excludeIds.includes(p.id)) : rows, { adv, eventTime, profile, K });
   if (excludeIds.length && plan.state === 'none') plan = planOutfit(parsed, rows, { adv, eventTime, profile, K });
 
-  let res = respond(plan, { seed, lang, profile, assistantName });
+  // Finish every clarification before showing picks. Questions should not be
+  // buried after a partial or low-confidence product result.
+  const needsClarificationFirst = Boolean(plan.ask?.length) && plan.state !== 'none';
+  let res = respond(needsClarificationFirst ? { ...plan, state: 'clarify' } : plan, { seed, lang, profile, assistantName });
   const g = guardResponse(res, { lang });
   if (!g.ok) res = { ...res, say: pick(K.phrases.ar.fallback_generic, seed), guard: g.problems };
 
-  const shown = plan.people ? plan.people.flatMap((p) => p.picks.map((x) => x.product.id)) : [];
+  const shown = !needsClarificationFirst && plan.people ? plan.people.flatMap((p) => p.picks.map((x) => x.product.id)) : [];
   const nextSession = {
     turn: (session?.turn || 0) + 1, parsed: { ...parsed, advice: null }, pending: plan.state === 'clarify' || Boolean(plan.ask?.length), pendingQuestion: plan.ask?.[0] || null, shown: [...new Set([...(session?.shown || []), ...shown])].slice(-60),
-    lastTotal: plan.total ?? null, lastBudgetUsed: plan.budget ?? plan.total ?? null,
+    lastTotal: needsClarificationFirst ? (session?.lastTotal ?? null) : (plan.total ?? null), lastBudgetUsed: needsClarificationFirst ? (session?.lastBudgetUsed ?? null) : (plan.budget ?? plan.total ?? null),
   };
   return { ...res, session: nextSession, parsed, weatherSource: weather.source === 'met_norway' ? 'met_norway' : null, debug: { eventTime, weather: adv } };
 }

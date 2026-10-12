@@ -12,22 +12,8 @@
      "women"
     ],
     "context": "engagement_guest",
-    "state": "full",
-    "tabs": [
-     "him",
-     "her"
-    ],
-    "must_families": {
-     "him": [
-      "suit|classic_set",
-      "shirt",
-      "formal_shoes|loafers"
-     ],
-     "her": [
-      "dress_party|dress_evening|jumpsuit|two_piece_set",
-      "heels_low|heels_high|flats"
-     ]
-    },
+    "state": "clarify",
+    "products": false,
     "must_not": [
      "near_white_for_guests",
      "galabeya",
@@ -51,19 +37,9 @@
      "women"
     ],
     "context": "engagement_guest",
-    "state": "full",
-    "tabs": [
-     "him",
-     "her"
-    ],
-    "must_families": {
-     "him": [
-      "suit"
-     ],
-     "her": [
-      "dress_party|dress_evening|dress_casual"
-     ]
-    },
+    "state": "clarify",
+    "products": false,
+    "ask": ["budget"],
     "must_not": [
      "near_white_for_guests"
     ]

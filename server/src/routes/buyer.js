@@ -51,6 +51,7 @@ function cleanChatMessages(messages) {
     return {
       role: 'assistant', say: String(message.say || '').slice(0, 1400),
       ...(message.tips ? { tips: message.tips } : {}),
+      ...(message.styleTips ? { styleTips: message.styleTips } : {}),
       ...(['intent', 'state', 'total', 'budget', 'overBudget', 'weatherSource', 'feedbackQuestion'].reduce((out, key) => (message[key] !== undefined ? { ...out, [key]: message[key] } : out), {})),
       ...(Array.isArray(message.looks) ? { looks: message.looks.slice(0, 4) } : {}),
       ...(Array.isArray(message.questions) ? { questions: message.questions.slice(0, 4) } : {}),

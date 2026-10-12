@@ -19,6 +19,7 @@ const textValue = (value) => {
   if (typeof value === 'object') return textValue(value.text || value.content || value.message || value.response || value.output);
   return String(value);
 };
+const textList = (value) => Array.isArray(value) ? value.map(textValue).filter(Boolean) : value ? [textValue(value)].filter(Boolean) : [];
 /** shrink a photo to ~768px JPEG so the upload stays small */
 const shrink = (file) => new Promise((resolve, reject) => {
   const img = new Image(); const url = URL.createObjectURL(file);
@@ -71,6 +72,7 @@ export default function StylistChat() {
   const [similar, setSimilar] = useState(false);
   const [profile, setProfile] = useState(() => store.get('moda.profile', {}));
   const [session, setSession] = useState(null); // ذاكرة الطلب الحالي عند السيرفر (المناسبة/الفئة/الميزانية) بتتبعت مع كل رسالة
+  const [questionAnswers, setQuestionAnswers] = useState({});
   const chatIdRef = useRef(null);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState([]);
@@ -93,7 +95,7 @@ export default function StylistChat() {
     if ((!content && !photo) || busy) return;
     const image = photo; const image2 = photo2; const shown = content || (image2 ? t('stylist.compareMsg') : similar ? t('stylist.similarMsg') : t('stylist.photoMsg')); setSimilar(false);
     const next = [...msgs, { role: 'user', content: shown, photo: image, photo2: image2, answered: !!answers }];
-    setMsgs(next); setText(''); setPhoto(null); setPhoto2(null); setBusy(true);
+    setMsgs(next); setQuestionAnswers({}); setText(''); setPhoto(null); setPhoto2(null); setBusy(true);
     try {
       const body = { messages: next.map((m, idx) => ({ role: m.role, content: m.role === 'assistant' ? (m.say || m.content || '') : (answers && idx === next.length - 1 ? '' : m.content) })).filter((m, idx) => m.content || (answers && idx === next.length - 1)), profile };
       if (session) body.session = session;
@@ -103,7 +105,7 @@ export default function StylistChat() {
       const res = await fetch('/api/stylist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw Object.assign(new Error('x'), { code: data?.error?.code });
-      const reply = { ...data, say: textValue(data.say), tips: textValue(data.tips) };
+      const reply = { ...data, say: textValue(data.say), tips: textList(data.tips), styleTips: textList(data.styleTips) };
       if (!reply.say && !reply.looks?.length) throw Object.assign(new Error('empty_reply'), { code: 'stylist_unavailable' });
       const completed = [...next, { role: 'assistant', feedbackQuestion: content || shown, ...reply }];
       setMsgs(completed);
@@ -122,7 +124,7 @@ export default function StylistChat() {
   const historyMessages = (items) => items.map((m) => {
     if (m.role === 'user') return { role: 'user', content: `${String(m.content || '').slice(0, 600)}${m.photo ? ` (${t('stylist.photoNotSaved')})` : ''}`.slice(0, 700) };
     return {
-      role: 'assistant', say: String(m.say || m.content || '').slice(0, 1400), tips: m.tips,
+      role: 'assistant', say: String(m.say || m.content || '').slice(0, 1400), tips: m.tips, styleTips: m.styleTips,
       intent: m.intent, state: m.state, total: m.total, budget: m.budget, overBudget: m.overBudget,
       weatherSource: m.weatherSource, looks: m.looks, questions: m.questions, missingItems: m.missingItems, missing: m.missing, tabs: m.tabs,
       palette: m.palette, feedbackQuestion: m.feedbackQuestion,
@@ -135,7 +137,7 @@ export default function StylistChat() {
     setHistoryError(false);
   };
   const startNewChat = () => {
-    setMsgs([]); setSession(null); setText(''); setPhoto(null); setPhoto2(null);
+    setMsgs([]); setQuestionAnswers({}); setSession(null); setText(''); setPhoto(null); setPhoto2(null);
     chatIdRef.current = null; setHistoryOpen(false); setHistoryError(false);
   };
   const showHistory = async () => {
@@ -251,16 +253,18 @@ export default function StylistChat() {
                   {(m.say || m.error) && <div className={cx('max-w-[90%] rounded-2xl rounded-ss-sm px-3.5 py-2.5 text-[14.5px] leading-relaxed', m.error ? 'bg-sale/10 text-sale' : 'bg-secondary')}>{m.error || m.say}</div>}
                   {m.weatherSource === 'met_norway' && <p className="mt-1 text-[10px] text-muted"><a href="https://api.met.no/" target="_blank" rel="noreferrer" className="underline">{lang === 'ar' ? 'بيانات الطقس: MET Norway' : 'Weather data: MET Norway'}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer" className="underline">CC BY 4.0</a></p>}
                   <LookSet data={m} name={name} />
-                  {i === msgs.length - 1 && m.questions?.length > 0 && !busy && m.questions.map((qq) => (
-                    <div key={qq.id} className="mt-3">
-                      <p className="mb-1.5 text-[13px] font-semibold">{qq.text}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {qq.options.map((o) => <button key={String(o.label)} type="button" onClick={() => (o.value === 'other' ? document.querySelector('[data-moda-input]')?.focus() : send(o.label, { [qq.id]: o.value }))} className="rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[13px] font-medium transition hover:border-brand hover:text-brand">{o.label}</button>)}
+                  {i === msgs.length - 1 && m.questions?.length > 0 && !busy && <>
+                    {m.questions.map((qq) => (
+                      <div key={qq.id} className="mt-3">
+                        <p className="mb-1.5 text-[13px] font-semibold">{qq.text}</p>
+                        <div className="flex flex-wrap gap-2">
+                          {qq.options.map((o) => <button key={String(o.label)} type="button" aria-pressed={questionAnswers[qq.id] === o.value} onClick={() => (o.value === 'other' ? document.querySelector('[data-moda-input]')?.focus() : setQuestionAnswers((current) => ({ ...current, [qq.id]: o.value })))} className={cx('rounded-full border px-3.5 py-2 text-[13px] font-medium transition', questionAnswers[qq.id] === o.value ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong bg-elevated hover:border-brand hover:text-brand')}>{o.label}</button>)}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                  {!m.historyReadOnly && !m.error && m.looks?.length > 0 && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, m.tips].filter(Boolean).join(' — ')} productIds={(m.looks || []).map((look) => look.items?.[look.pick]?.id).filter((id) => id != null)} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason, productIds) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean), productIds)} t={t} />}
-                  {m.intent === 'shop' && !m.looks?.length && !m.error && <p className="mt-2 text-[13px] text-muted">{t('stylist.none')}</p>}
+                    ))}
+                    {m.questions.every((q) => Object.hasOwn(questionAnswers, q.id)) && <button type="button" onClick={() => send(m.questions.map((q) => `${q.text} ${q.options.find((o) => o.value === questionAnswers[q.id])?.label || ''}`).join('، '), questionAnswers)} className="mt-3 rounded-full bg-btn px-4 py-2.5 text-sm font-semibold text-on-btn">{lang === 'ar' ? 'ورّيني الاقتراح' : 'Show my outfit'}</button>}
+                  </>}
+                  {!m.historyReadOnly && !m.error && m.looks?.length > 0 && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, ...(m.tips || []), ...(m.styleTips || [])].filter(Boolean).join(' — ')} productIds={(m.looks || []).map((look) => look.items?.[look.pick]?.id).filter((id) => id != null)} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason, productIds) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean), productIds)} t={t} />}
                 </div>
               ))}
               {busy && <div className="flex items-center gap-2 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />{t('stylist.thinking')}</div>}

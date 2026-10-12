@@ -211,7 +211,10 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
 
 function lookCandidates(aud, context, K, parsed, role) {
   const taste = parsed.taste || [];
-  return K.outfits.looks.filter((l) => l.status !== 'draft' && l.audience.includes(aud) && l.contexts.includes(context)).map((l) => ({ look: l, t: l.taste?.filter((x) => taste.includes(x)).length || 0 }));
+  const owned = new Set((parsed.ownedPieces || []).map((piece) => piece.key));
+  return K.outfits.looks.filter((l) => l.status !== 'draft' && l.audience.includes(aud) && l.contexts.includes(context)
+    && (l.id !== 'm_owned_blazer' || owned.has('blazer')))
+    .map((l) => ({ look: l, t: l.taste?.filter((x) => taste.includes(x)).length || 0 }));
 }
 
 /** سياق افتراضي لما العميل يطلب قطعة من غير مناسبة ومعاه قطع مملوكة (صورة). */
@@ -348,9 +351,11 @@ export function planOutfit(parsed, products, env = {}) {
   else state = 'full';
 
   const slotTotal = fills.reduce((t, f) => t + f.slotsCount, 0);
+  // Gather every recommendation-critical detail in the same clarification turn.
+  // Moda must not reveal a provisional look between these answers.
   if (!budget && !parsed.flags?.budgetFlexible && (persons.length > 1 || slotTotal > 2) && state !== 'none') asks.push('budget');
-  else if (context && !parsed.daypart && (K.contexts.get(context)?.formality?.[1] || 0) >= 4 && state !== 'none') asks.push('time_if_dressy');
-  else if (parsed.garments.length === 1 && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && state !== 'none') asks.push('color_preference');
+  if (context && !parsed.daypart && (K.contexts.get(context)?.formality?.[1] || 0) >= 4 && state !== 'none') asks.push('time_if_dressy');
+  if (parsed.garments.length === 1 && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && state !== 'none') asks.push('color_preference');
 
   const palette = [];
   for (const f of fills) for (const p of f.picks) { const c = primary(p.product); if (c && !palette.includes(c) && !['black', 'white'].includes(c) || (c && palette.length < 1 && !palette.includes(c))) palette.push(c); }
@@ -359,7 +364,7 @@ export function planOutfit(parsed, products, env = {}) {
     ...base, state, persons, context, role, budget, total, over, dropped, missing, relaxed, ask: asks, palette: palette.slice(0, 3),
     people: fills.map((f) => ({
       aud: f.aud, mode: f.mode, look: f.look ? { id: f.look.id, name_ar: f.look.name_ar, tip_ar: f.look.tip_ar, formality: f.look.formality } : null,
-      picks: f.picks.map((p) => ({ slotKey: p.slot.base, optional: !p.slot.required, product: p.product, relaxed: p.relaxedKind })),
+      picks: f.picks.map((p) => ({ slotKey: p.slot.base, optional: !p.slot.required, hero: p.slot.hero, product: p.product, relaxed: p.relaxedKind })),
       missing: f.missing, subtotal: sumPicks(f.picks),
     })),
     tone: context === 'condolence' ? 'sober' : 'normal',

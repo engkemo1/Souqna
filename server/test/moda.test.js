@@ -25,7 +25,17 @@ const allItems = (res) => (res.blocks?.tabs || []).flatMap((t) => t.items);
 for (const sc of scenarios) {
   test(sc.id, async () => {
     const ex = sc.expect;
-    const res = await runModa(sc.message, { products: rows, now: new Date(sc.now), weatherMock: sc.weather_mock || { temp_c: 21, feels_like_c: 21, rain_pct: 2 }, imageText: sc.image_stub || '' });
+    const options = { products: rows, now: new Date(sc.now), weatherMock: sc.weather_mock || { temp_c: 21, feels_like_c: 21, rain_pct: 2 }, imageText: sc.image_stub || '' };
+    let res = await runModa(sc.message, options);
+    // Product-quality scenarios represent a shopper who answered Moda's needed follow-up questions.
+    if (ex.state !== 'clarify') {
+      for (let turn = 0; res.state === 'clarify' && turn < 4; turn += 1) {
+        const id = res.questions?.[0]?.id;
+        const answers = { budget: 'flexible', time_if_dressy: 'night', venue_if_dressy: 'hall', season_if_unknown: 'mid', color_preference: 'any' };
+        if (!Object.hasOwn(answers, id)) break;
+        res = await runModa('', { ...options, session: res.session, answers: { [id]: answers[id] } });
+      }
+    }
     const items = allItems(res);
     assert.equal(res.state, ex.state, `state: got ${res.state}\n${res.say}`);
     if (ex.context) assert.ok([res.parsed.context, res.parsed.contextEffective].includes(ex.context), `context ${res.parsed.context}/${res.parsed.contextEffective}`);
@@ -46,7 +56,7 @@ for (const sc of scenarios) {
     for (const bad of ex.must_not || []) {
       if (bad === 'near_white_for_guests' && !ex.allow_near_white) for (const i of items) if (HERO.has(i.key)) assert.ok(!K.nearWhite.has(i.colors[0]), `near-white hero ${i.name}`);
       if (bad === 'galabeya' || bad === 'jalabiya') assert.ok(!items.some((i) => i.key === 'jalabiya'));
-      if (bad === 'relationship_words_in_labels') assert.ok(checkLabels(res.blocks.tabs.flatMap((t) => [t.label, ...t.items.map((i) => i.label)])).ok);
+      if (bad === 'relationship_words_in_labels' && res.blocks) assert.ok(checkLabels(res.blocks.tabs.flatMap((t) => [t.label, ...t.items.map((i) => i.label)])).ok);
       if (bad === 'sleeveless') assert.ok(!items.some((i) => byId.get(i.id)?.sleeveless));
       if (bad === 'suit' || bad === 'formal_shoes') assert.ok(!items.some((i) => i.key === bad));
       if (bad === 'wool') assert.ok(!items.some((i) => byId.get(i.id)?.materials?.has('wool')));
@@ -96,9 +106,9 @@ test('Moda uses local product ratings to change future rankings', async () => {
     { id: 1002, name_ar: 'كوتشي رياضي حريمي', department: 'women', price: 500, stock: 5, track_stock: 1, sold_count: 0, rating: 0 },
   ]);
   const opts = { products, now: new Date('2026-10-12T19:30:00+03:00') };
-  const first = await runModa('عايزة كوتشي', opts);
+  const first = await runModa('عايزة كوتشي أسود', opts);
   const firstId = first.blocks.tabs[0].items[0].id;
-  const rated = await runModa('عايزة كوتشي', { ...opts, profile: { dislikedProductIds: String(firstId) } });
+  const rated = await runModa('عايزة كوتشي أسود', { ...opts, profile: { dislikedProductIds: String(firstId) } });
   assert.notEqual(rated.blocks.tabs[0].items[0].id, firstId);
 });
 
@@ -112,8 +122,8 @@ test('partial couple reply clearly separates available items and hides zero tota
     total: 609, budget: null, over: 0, dropped: [], missing: [{ base: 'heels_low' }], relaxed: [], palette: [], ask: [],
     weather: { temp: 23, fabrics_ar: ['قطن', 'كريب'], band: 'warm', notes: [] }, eventTime: {},
   });
-  assert.match(reply.say, /لقيتلكم شوية قطع مناسبة/);
-  assert.match(reply.say, /المتاح حاليًا ليك 609 جنيه/);
+  assert.match(reply.say, /لقيت قطع مناسبة/);
+  assert.match(reply.say, /سعر القطع المتاحة حاليًا: ليك 609 جنيه/);
   assert.doesNotMatch(reply.say, /ليها:? 0 جنيه|والاتنين/);
   assert.doesNotMatch(reply.say, /23/);
   assert.ok(reply.tips.some((tip) => /23 درجة/.test(tip)));
@@ -126,14 +136,44 @@ test('answer buttons continue the previous request', async () => {
   r = await runModa('', { products: rows, now, session: r.session, answers: { who_is_it_for: 'men' } });
   assert.equal(r.state, 'clarify'); assert.ok(r.questions.some((q) => q.id === 'what_occasion'));
   r = await runModa('', { products: rows, now, session: r.session, answers: { what_occasion: 'wedding_guest' } });
-  assert.ok(['full', 'alternatives'].includes(r.state), r.state);
+  assert.equal(r.state, 'clarify'); assert.equal(r.questions[0]?.id, 'budget'); assert.equal(r.blocks, null);
   r = await runModa('', { products: rows, now, session: r.session, answers: { budget: [3000, 6000] } });
+  assert.equal(r.state, 'clarify'); assert.equal(r.questions[0]?.id, 'time_if_dressy'); assert.equal(r.blocks, null);
+  r = await runModa('', { products: rows, now, session: r.session, answers: { time_if_dressy: 'night' } });
   assert.ok(r.blocks.total <= 6000, String(r.blocks.total));
+});
+
+test('asks all required questions before showing recommendations', async () => {
+  const now = new Date('2026-10-12T19:30:00+03:00');
+  const first = await runModa('أنا وخطيبتي رايحين خطوبة عايزين طقم لينا الاتنين', { products: rows, now });
+  assert.equal(first.state, 'clarify');
+  assert.equal(first.questions[0]?.id, 'budget');
+  assert.deepEqual(first.questions.map((q) => q.id), ['budget', 'time_if_dressy']);
+  assert.equal(first.blocks, null);
+  assert.equal(first.say, 'ميزانيتكم الإجمالية للطقمين تقريبًا كام؟');
+  assert.deepEqual(first.session.shown, []);
+  assert.equal(first.session.lastTotal, null);
+
+  const final = await runModa('', { products: rows, now, session: first.session, answers: { budget: 'flexible', time_if_dressy: 'night' } });
+  assert.notEqual(final.state, 'clarify');
+  assert.ok(final.blocks?.tabs?.length, 'recommendations should appear only after the final answer');
+  assert.equal(final.styleTips.length, 2, 'the two outfit suggestions should appear with the final recommendation');
+});
+
+test('track and running pants cannot match formal trousers', async () => {
+  const sports = enrichAll([
+    { id: 2001, name_ar: 'بنطلون قماش رجالي', name_en: 'Tapered Track Pants', department: 'men', price: 609, stock: 3, track_stock: 1 },
+    { id: 2002, name_ar: 'بنطلون رجالي', name_en: 'Woven Running Pants', department: 'men', price: 569, stock: 3, track_stock: 1 },
+  ], K);
+  assert.deepEqual(sports.map((p) => p.key), ['sport_bottom', 'sport_bottom']);
+  const result = await runModa('عايز بنطلون لفرح صاحبي بالليل والميزانية ١٠٠٠ جنيه', { products: sports, now: new Date('2026-10-12T19:30:00+03:00') });
+  assert.equal(result.state, 'none');
+  assert.equal(allItems(result).length, 0);
 });
 
 test('cheaper followup lowers total', async () => {
   const now = new Date('2026-10-12T19:30:00+03:00');
-  const a = await runModa('عايز لبس فرح صاحبي', { products: rows, now });
+  const a = await runModa('عايز لبس فرح صاحبي بالليل وميزانيتي ٦٠٠٠ جنيه', { products: rows, now });
   const b = await runModa('ارخص', { products: rows, now, session: a.session });
   assert.ok(b.blocks.total <= a.blocks.total, `${b.blocks.total} vs ${a.blocks.total}`);
 });
@@ -143,6 +183,7 @@ test('llm fallback: only vocabulary values are accepted', async () => {
   const now = new Date('2026-10-12T19:30:00+03:00');
   const good = makeLlmExtract(async () => '{"persons":["men"],"context":"casual_outing","garments":["shirt"]}');
   let r = await runModa('qwerty zxcv blorp', { products: rows, now, llmExtract: good });
+  if (r.state === 'clarify' && r.questions?.[0]?.id === 'color_preference') r = await runModa('', { products: rows, now, session: r.session, answers: { color_preference: 'black' } });
   assert.equal(r.state === 'chat', false); assert.ok(r.blocks, 'should use extracted intent');
   const bad = makeLlmExtract(async () => '{"persons":["aliens"],"context":"condolence","garments":["spaceship"]}');
   r = await runModa('qwerty zxcv blorp', { products: rows, now, llmExtract: bad });

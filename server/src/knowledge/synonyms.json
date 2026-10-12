@@ -80,7 +80,7 @@
     "perfume":       ["برفان", "عطر", "perfume", "parfum", "scent", "birfan"],
 
     "sport_top":    ["تيشيرت رياضي", "توب رياضي", "sport top", "gym top", "performance tee"],
-    "sport_bottom": ["شورت رياضي", "بنطلون رياضي", "sport shorts", "gym shorts", "yoga pants"],
+    "sport_bottom": ["شورت رياضي", "بنطلون رياضي", "بنطلون تراك", "بنطلون جري", "sport shorts", "gym shorts", "yoga pants", "track pants", "track trousers", "track trouser", "running pants", "running trousers", "running trouser", "athletic pants", "workout pants"],
     "tracksuit":    ["ترينج", "ترنج", "تريننج", "ترينج كامل", "طقم رياضي", "tracksuit", "track suit", "trenj", "trening"],
     "sport_shoes":  ["حذاء جري", "كوتشي جري", "running shoes", "training shoes", "gym shoes"],
 
