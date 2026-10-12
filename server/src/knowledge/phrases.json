@@ -66,6 +66,9 @@
   "clarify_budget": [
    "ميزانيتك تقريبًا قد إيه؟"
   ],
+  "clarify_color": [
+   "تحب القطعة دي بأي لون؟"
+  ],
   "clarify_generic": [
    "محتاج أعرف حاجة بسيطة علشان أرشحلك صح:"
   ],
@@ -195,6 +198,9 @@
   ],
   "clarify_budget": [
    "Roughly what's your budget?"
+  ],
+  "clarify_color": [
+   "What color would you like?"
   ],
   "didnt_understand": [
    "I didn't quite get that. Is this for an occasion, or are you looking for a specific piece?"

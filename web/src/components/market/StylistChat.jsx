@@ -194,7 +194,7 @@ export default function StylistChat() {
                   <LookSet data={m} name={name} />
                   {i === msgs.length - 1 && m.questions?.length > 0 && !busy && m.questions.map((qq) => (
                     <div key={qq.id} className="mt-3">
-                      {m.questions.length > 1 && <p className="mb-1.5 text-[13px] font-semibold">{qq.text}</p>}
+                      <p className="mb-1.5 text-[13px] font-semibold">{qq.text}</p>
                       <div className="flex flex-wrap gap-2">
                         {qq.options.map((o) => <button key={String(o.label)} type="button" onClick={() => (o.value === 'other' ? document.querySelector('[data-moda-input]')?.focus() : send(o.label, { [qq.id]: o.value }))} className="rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[13px] font-medium transition hover:border-brand hover:text-brand">{o.label}</button>)}
                       </div>

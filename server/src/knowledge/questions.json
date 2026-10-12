@@ -1,5 +1,5 @@
 {
- "_about": "أسئلة مودة بالعامية المصرية. كل سؤال بأزرار جاهزة. القاعدة: مانسألش غير اللي ناقص فعلًا، وبحد أقصى 3 أسئلة في الرد الواحد، ومانسألش نفس السؤال تاني لو الإجابة محفوظة في بروفايل العميل. الأزرار فيها value بيروح للكود، وlabel هو اللي بيظهر.",
+  "_about": "أسئلة مودة بالعامية المصرية. كل سؤال بأزرار جاهزة. القاعدة: مانسألش غير اللي ناقص فعلًا، وبحد أقصى 3 أسئلة في الرد الواحد. الأزرار فيها value بيروح للكود، وlabel هو اللي بيظهر.",
  "version": 1,
  "limits": {
   "max_questions_per_turn": 3,
@@ -13,7 +13,8 @@
   "venue": "venue_if_dressy",
   "time_of_day": "time_if_dressy",
   "season": "season_if_unknown",
-  "taste": "taste_quick",
+    "color": "color_preference",
+    "taste": "taste_quick",
   "dress_kind": "dress_kind"
  },
  "when_to_ask": {
@@ -301,6 +302,22 @@
      "[6000, null]": "Over 6,000 EGP",
      "flexible": "Not important"
     }
+   }
+  },
+  "color_preference": {
+   "text": "تحب القطعة دي بأي لون؟",
+   "type": "single",
+   "options": [
+    { "label": "أسود", "value": "black" },
+    { "label": "أبيض", "value": "white" },
+    { "label": "كحلي", "value": "navy" },
+    { "label": "بيج", "value": "beige" },
+    { "label": "أزرق", "value": "blue" },
+    { "label": "أي لون مناسب", "value": "any" }
+   ],
+   "en": {
+    "text": "What color would you like?",
+    "options": { "black": "Black", "white": "White", "navy": "Navy", "beige": "Beige", "blue": "Blue", "any": "Any suitable color" }
    }
   },
   "venue_if_dressy": {

@@ -344,7 +344,9 @@ export function planOutfit(parsed, products, env = {}) {
   else state = 'full';
 
   const slotTotal = fills.reduce((t, f) => t + f.slotsCount, 0);
-  if (!budget && (persons.length > 1 || slotTotal > 2) && state !== 'none') asks.push('budget');
+  if (!budget && !parsed.flags?.budgetFlexible && (persons.length > 1 || slotTotal > 2) && state !== 'none') asks.push('budget');
+  else if (context && !parsed.daypart && (K.contexts.get(context)?.formality?.[1] || 0) >= 4 && state !== 'none') asks.push('time_if_dressy');
+  else if (parsed.garments.length === 1 && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && state !== 'none') asks.push('color_preference');
 
   const palette = [];
   for (const f of fills) for (const p of f.picks) { const c = primary(p.product); if (c && !palette.includes(c) && !['black', 'white'].includes(c) || (c && palette.length < 1 && !palette.includes(c))) palette.push(c); }

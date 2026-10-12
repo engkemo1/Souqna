@@ -53,7 +53,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   if (plan.state === 'clarify') {
     const asks = plan.ask || [];
     const first = asks[0];
-    const text = first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'dress_kind' ? say('dress_clarify') : say('clarify_generic');
+    const text = first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'budget' ? say('clarify_budget') : first === 'color_preference' ? say('clarify_color') : first === 'dress_kind' ? say('dress_clarify') : say('clarify_generic');
     return { state: 'clarify', intent: 'shop', say: text, questions: asks.slice(0, K.questions.limits.max_questions_per_turn).map((a) => buildQuestion(K, a, L)).filter(Boolean), blocks: null, ask: asks };
   }
 

@@ -26,7 +26,7 @@ const lastUserText = (messages) => {
 };
 
 /** إجابات الأزرار → حقول parse. */
-function applyAnswers(parsed, answers = {}) {
+function applyAnswers(parsed, answers = {}, K) {
   const out = { ...parsed };
   for (const [id, v] of Object.entries(answers || {})) {
     if (id === 'who_is_it_for') {
@@ -36,9 +36,18 @@ function applyAnswers(parsed, answers = {}) {
       else out.persons = [v];
     } else if (id === 'couple_who' || id === 'family_who' || id === 'kids_who') out.persons = [].concat(v);
     else if (id === 'what_occasion' && v !== 'other') { out.context = v; out.contextEffective = v; out.role = out.role || 'guest'; }
+    else if (id === 'time_if_dressy') out.daypart = v;
     else if (id === 'budget') {
-      if (Array.isArray(v)) out.budget = { value: v[1] ?? Math.round((v[0] || 1000) * 1.5), kind: 'total' };
+      out.flags = { ...out.flags, budgetFlexible: v === 'flexible' || (Array.isArray(v) && v[1] == null) };
+      if (Array.isArray(v)) out.budget = { value: v[1] ?? null, kind: 'total' };
       else if (typeof v === 'number') out.budget = { value: v, kind: 'total' };
+    } else if (id === 'color_preference') {
+      out.flags = { ...out.flags, colorFlexible: v === 'any' };
+      if (v !== 'any' && K.colors.has(v)) {
+        out.flags.colorPreference = v;
+        if (out.garments.length === 1) out.garments = out.garments.map((g) => ({ ...g, color: v }));
+        else out.colors = [v];
+      }
     } else if (id === 'dress_kind') out.garments = [{ key: v, color: null, material: null, text: v, position: 0 }];
     else if (id === 'taste_style') out.taste = [].concat(v);
     else if (id === 'engagement_role') { out.role = v === 'self' ? 'self' : 'guest'; if (v === 'self' && out.context === 'engagement_guest') out.contextEffective = 'engagement_self'; }
@@ -73,8 +82,20 @@ export async function runModa(messages, opts = {}) {
   // ---------- دمج مع الجلسة ----------
   const hasAnswers = answers && Object.keys(answers).length;
   const continuing = session?.parsed && (session.pending || parsed.intent === 'followup' || hasAnswers || (parsed.intent === 'shop' && !parsed.persons.length && !parsed.garments.length && session.parsed.persons?.length));
-  if (hasAnswers) parsed = applyAnswers({ ...parsed, intent: 'shop' }, answers);
+  if (hasAnswers) parsed = applyAnswers({ ...parsed, intent: 'shop' }, answers, K);
   if (continuing && (parsed.intent === 'shop' || parsed.intent === 'followup' || parsed.intent === 'unknown')) { parsed = mergeFromSession(parsed, session.parsed); parsed.intent = 'shop'; }
+  if (session?.pendingQuestion === 'budget' && /مش فارق|مش فارقة|براحتك|من غير ميزانية|any budget|flexible/i.test(parsed.normalized || '')) {
+    parsed.budget = { value: null, kind: 'total' };
+    parsed.flags = { ...parsed.flags, budgetFlexible: true };
+  }
+  if (session?.pendingQuestion === 'color_preference' && /أي لون|اي لون|مش فارق|مش فارقة|سيبها علي|اختاري|any color|no preference/i.test(parsed.normalized || '')) {
+    parsed.flags = { ...parsed.flags, colorFlexible: true };
+  }
+  if (parsed.flags?.colorPreference && parsed.garments.length === 1) {
+    parsed.garments = parsed.garments.map((g) => ({ ...g, color: parsed.flags.colorPreference }));
+  } else if (parsed.garments.length === 1 && !parsed.garments[0].color && parsed.colors?.length === 1) {
+    parsed.garments = parsed.garments.map((g) => ({ ...g, color: parsed.colors[0] }));
+  }
 
   // ---------- متابعات ----------
   let excludeIds = []; const prevTotal = session?.lastTotal;
@@ -117,7 +138,7 @@ export async function runModa(messages, opts = {}) {
 
   const shown = plan.people ? plan.people.flatMap((p) => p.picks.map((x) => x.product.id)) : [];
   const nextSession = {
-    turn: (session?.turn || 0) + 1, parsed: { ...parsed, advice: null }, pending: plan.state === 'clarify', shown: [...new Set([...(session?.shown || []), ...shown])].slice(-60),
+    turn: (session?.turn || 0) + 1, parsed: { ...parsed, advice: null }, pending: plan.state === 'clarify' || Boolean(plan.ask?.length), pendingQuestion: plan.ask?.[0] || null, shown: [...new Set([...(session?.shown || []), ...shown])].slice(-60),
     lastTotal: plan.total ?? null, lastBudgetUsed: plan.budget ?? plan.total ?? null,
   };
   return { ...res, session: nextSession, parsed, weatherSource: weather.source === 'met_norway' ? 'met_norway' : null, debug: { eventTime, weather: adv } };
