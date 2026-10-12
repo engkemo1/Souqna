@@ -127,24 +127,40 @@ function StylistPanel() {
 function ModaTestLabPanel() {
   const toast = useToast();
   const { data, reload } = useAdminApi('/stylist/lab');
-  const [form, setForm] = useState({ name: '', message: '', expectedGarment: '', expectedAudience: '', maxBudget: '' });
+  const [form, setForm] = useState({ name: '', message: '', expectedGarment: '', expectedAudience: '', expectedContext: '', expectedQuestions: [], forbiddenGarments: [], maxBudget: '', answers: {} });
   const [result, setResult] = useState(null);
+  const [labSession, setLabSession] = useState(null);
+  const [answerDraft, setAnswerDraft] = useState({});
+  const [answerHistory, setAnswerHistory] = useState({});
+  const [batch, setBatch] = useState(null);
   const [correction, setCorrection] = useState('');
   const [busy, setBusy] = useState('');
   const field = 'w-full rounded-xl border border-line-strong bg-elevated px-3 py-2 text-sm';
-  const run = async (values = form) => {
+  const run = async (values = form, { session = null, answers = {}, replayAnswers = false } = {}) => {
     if (values.message.trim().length < 2) return;
     setBusy('run'); setResult(null);
-    try { setResult(await adminApi('/stylist/lab/run', { method: 'POST', body: { ...values, maxBudget: values.maxBudget ? Number(values.maxBudget) : null } })); }
+    try {
+      const output = await adminApi('/stylist/lab/run', { method: 'POST', body: { ...values, maxBudget: values.maxBudget ? Number(values.maxBudget) : null, session, answers, replayAnswers } });
+      setResult(output); setLabSession(output.session || null); setAnswerDraft({});
+      setAnswerHistory((all) => ({ ...all, ...answers }));
+    }
     catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy('');
   };
+  const startRun = () => { setLabSession(null); setAnswerHistory({}); setBatch(null); run(form); };
+  const answerQuestions = () => run(form, { session: labSession, answers: answerDraft });
   const saveScenario = async () => {
     setBusy('save');
     try {
-      await adminApi('/stylist/lab/scenarios', { method: 'POST', body: { ...form, maxBudget: form.maxBudget ? Number(form.maxBudget) : null } });
+      await adminApi('/stylist/lab/scenarios', { method: 'POST', body: { ...form, answers: answerHistory, maxBudget: form.maxBudget ? Number(form.maxBudget) : null } });
       toast({ title: 'اتحفظ السيناريو' }); reload();
     } catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy('');
+  };
+  const runAll = async () => {
+    setBusy('all'); setBatch(null);
+    try { setBatch(await adminApi('/stylist/lab/run-all', { method: 'POST', body: {} })); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy('');
   };
   const removeScenario = async (id) => {
@@ -161,35 +177,41 @@ function ModaTestLabPanel() {
         topic: 'تصحيح من استوديو اختبار مودة', question: form.message.trim(), answer: correction.trim(),
         tags: `استوديو الاختبار، ${form.expectedGarment || ''}`.slice(0, 160),
       } });
-      toast({ title: 'اتحفظ التصحيح كدرس لمودة' }); setCorrection('');
+      toast({ title: 'اتحفظ التصحيح كمسودة للردود، راجعه واعتمده من قسم تعليم مودة' }); setCorrection('');
     } catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy('');
   };
   const chooseScenario = (item) => {
-    const next = { name: item.name || '', message: item.message || '', expectedGarment: item.expectedGarment || '', expectedAudience: item.expectedAudience || '', maxBudget: item.maxBudget ? String(item.maxBudget) : '' };
-    setForm(next); setCorrection(''); run(next);
+    const next = { ...form, name: item.name || '', message: item.message || '', expectedGarment: item.expectedGarment || '', expectedAudience: item.expectedAudience || '', expectedContext: item.expectedContext || '', expectedQuestions: item.expectedQuestions || [], forbiddenGarments: item.forbiddenGarments || [], answers: item.answers || {}, maxBudget: item.maxBudget ? String(item.maxBudget) : '' };
+    setForm(next); setCorrection(''); setLabSession(null); setAnswerHistory({}); run(next, { answers: next.answers, replayAnswers: true });
   };
   return (
     <Panel title="استوديو اختبار مودة" subtitle="جرّبوا كلام الزباين على المنتجات الحقيقية، راجعوا فهم مودة، واحفظوا التصحيح كدرس" className="lg:col-span-2">
       <div className="space-y-4">
-        <p className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-sm leading-relaxed text-muted">الاختبار يستخدم محرك مودة والكتالوج الحالي مباشرة، من غير استدعاء Cloudflare أو أي موديل مدفوع. السيناريو المحفوظ يفضل متاحًا للمراجعة بعدين.</p>
+        <p className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-sm leading-relaxed text-muted">الاختبار يستخدم محرك مودة والكتالوج الحالي مباشرة من غير استدعاء موديل مدفوع. جاوب أسئلتها هنا وشوف الاقتراح النهائي، أو شغّل كل السيناريوهات المحفوظة قبل اعتماد أي تصحيح.</p>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block"><span className="mb-1 block text-xs font-medium text-muted">اسم السيناريو (اختياري)</span><Input maxLength={80} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: تمييز كوتشي من كوتش" /></label>
           <label className="block"><span className="mb-1 block text-xs font-medium text-muted">القطعة المتوقع فهمها</span><select className={field} value={form.expectedGarment} onChange={(e) => setForm({ ...form, expectedGarment: e.target.value })}><option value="">من غير توقع</option>{(data?.garments || []).map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
           <label className="block"><span className="mb-1 block text-xs font-medium text-muted">الطلب لمين؟ (اختياري)</span><select className={field} value={form.expectedAudience} onChange={(e) => setForm({ ...form, expectedAudience: e.target.value })}><option value="">من غير توقع</option><option value="women">حريمي</option><option value="women_hijab">محجبة</option><option value="men">رجالي</option><option value="boys">ولد</option><option value="girls">بنت</option></select></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium">المناسبة المتوقعة</span><select className={field} value={form.expectedContext} onChange={(e) => setForm({ ...form, expectedContext: e.target.value })}><option value="">من غير توقع</option>{(data?.contexts || []).map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
           <label className="block"><span className="mb-1 block text-xs font-medium text-muted">أقصى ميزانية (اختياري، جنيه)</span><Input type="number" min={1} max={1000000} value={form.maxBudget} onChange={(e) => setForm({ ...form, maxBudget: e.target.value })} placeholder="مثال: 2000" /></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium">أسئلة لازم تظهر قبل الاقتراح (اختياري)</span><select multiple className={`${field} min-h-24`} value={form.expectedQuestions} onChange={(e) => setForm({ ...form, expectedQuestions: [...e.target.selectedOptions].map((o) => o.value) })}>{(data?.questionIds || []).map((id) => <option key={id} value={id}>{id}</option>)}</select></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium">أنواع ممنوع تظهر في النتيجة (اختياري)</span><select multiple className={`${field} min-h-24`} value={form.forbiddenGarments} onChange={(e) => setForm({ ...form, forbiddenGarments: [...e.target.selectedOptions].map((o) => o.value) })}>{(data?.garments || []).map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
         </div>
         <label className="block"><span className="mb-1 block text-xs font-medium text-muted">رسالة الزبون</span><Textarea rows={2} maxLength={400} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="مثال: عايزة كوتشي أبيض يمشي مع بنطلون جينز" /></label>
-        <div className="flex flex-wrap gap-2"><Button size="sm" icon={Sparkles} loading={busy === 'run'} disabled={form.message.trim().length < 2 || !!busy} onClick={() => run()}>اختبر مودة</Button><Button size="sm" variant="outline" icon={Plus} loading={busy === 'save'} disabled={form.message.trim().length < 2 || !!busy} onClick={saveScenario}>احفظ السيناريو</Button></div>
+        <div className="flex flex-wrap gap-2"><Button size="sm" icon={Sparkles} loading={busy === 'run'} disabled={form.message.trim().length < 2 || !!busy} onClick={startRun}>اختبر مودة من الأول</Button><Button size="sm" variant="outline" icon={CheckCircle2} loading={busy === 'all'} disabled={!data?.scenarios?.length || !!busy} onClick={runAll}>شغّل كل السيناريوهات ({data?.scenarios?.length || 0})</Button><Button size="sm" variant="outline" icon={Plus} loading={busy === 'save'} disabled={form.message.trim().length < 2 || !!busy} onClick={saveScenario}>احفظ السيناريو</Button></div>
+        {batch && <section className="space-y-2 rounded-2xl border border-line p-3"><p className="font-semibold">نتيجة مجموعة الاختبارات: {batch.passed} ناجح، {batch.failed} محتاج مراجعة، {batch.pending} محتاج معايير/إجابات من {batch.total}</p>{batch.results.map((item) => <details key={item.id} className="rounded-lg border border-line p-2"><summary className="cursor-pointer text-sm"><span className={item.passed === true ? 'text-emerald-700' : item.passed === false ? 'text-sale' : 'text-muted'}>{item.passed === true ? 'ناجح' : item.passed === false ? 'محتاج مراجعة' : 'معلّق'}</span> · {item.name}</summary><ul className="mt-2 space-y-1 text-xs">{item.checks.map((check) => <li key={check.id}>{check.passed ? '✓' : 'راجع'} · {check.label}</li>)}</ul></details>)}</section>}
         {result && <section className="space-y-3 rounded-2xl border border-line bg-canvas/50 p-3 sm:p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">نتيجة الاختبار · {({ shop: 'اقتراح منتجات', clarify: 'طلب توضيح', chat: 'رد محادثة', none: 'من غير منتجات', partial: 'اقتراح جزئي', full: 'اقتراح كامل', over_budget: 'فوق الميزانية', alternatives: 'بدائل' })[result.state] || result.state}</h3><span className={'rounded-full px-3 py-1 text-xs font-semibold ' + (result.passed === null ? 'bg-secondary text-muted' : result.passed ? 'bg-emerald-600/10 text-emerald-700' : 'bg-sale/10 text-sale')}>{result.passed === null ? 'مفيش قواعد مقارنة' : result.passed ? 'الاختبار ناجح' : 'محتاج مراجعة'}</span></div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">نتيجة الاختبار · {({ shop: 'اقتراح منتجات', clarify: 'طلب توضيح', chat: 'رد محادثة', none: 'من غير منتجات', partial: 'اقتراح جزئي', full: 'اقتراح كامل', over_budget: 'فوق الميزانية', alternatives: 'بدائل' })[result.state] || result.state}</h3><span className={'rounded-full px-3 py-1 text-xs font-semibold ' + (result.passed === null ? 'bg-secondary text-muted' : result.passed ? 'bg-emerald-600/10 text-emerald-700' : 'bg-sale/10 text-sale')}>{result.passed === null ? (result.questions?.length ? 'محتاج إجابات' : 'أضف معيار مقارنة') : result.passed ? 'الاختبار ناجح' : 'محتاج مراجعة'}</span></div>
           <p className="rounded-xl bg-elevated p-3 text-sm leading-relaxed">{result.say}</p>
           <div className="grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-muted">القطع اللي فهمها:</span> {result.parsed.garments.length ? result.parsed.garments.map((g) => data?.garments?.find((item) => item.key === g.key)?.label || g.text || g.key).join('، ') : 'مفهمتش قطعة محددة'}</p><p><span className="text-muted">الشخص:</span> {result.parsed.persons.join('، ') || 'غير محدد'}</p></div>
           {result.checks.length > 0 && <ul className="space-y-1.5">{result.checks.map((check) => <li key={check.id} className="flex items-center justify-between gap-3 rounded-lg border border-line p-2 text-sm"><span>{check.label}{check.id === 'budget' ? ` · المتوقع حتى ${check.expected} جنيه، الفعلي ${check.actual ?? 'غير متاح'}` : ''}</span><strong className={check.passed ? 'text-emerald-700' : 'text-sale'}>{check.passed ? 'تمام' : 'راجع'}</strong></li>)}</ul>}
+          {result.questions?.length > 0 && <div className="space-y-3 rounded-xl border border-brand/25 bg-brand/5 p-3"><p className="text-sm font-semibold">مودة محتاجة إجابات قبل الترشيح. اختار إجابة لكل سؤال وبعدين كمّل الاختبار.</p>{result.questions.map((question) => <div key={question.id}><p className="mb-1 text-sm font-medium">{question.text}</p><div className="flex flex-wrap gap-2">{question.options.map((option) => <button key={String(option.value)} type="button" aria-pressed={answerDraft[question.id] === option.value} onClick={() => setAnswerDraft((current) => ({ ...current, [question.id]: option.value }))} className={'rounded-full border px-3 py-1.5 text-xs ' + (answerDraft[question.id] === option.value ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong bg-elevated')}>{option.label}</button>)}</div></div>)}{result.questions.every((question) => Object.hasOwn(answerDraft, question.id)) && <Button size="sm" loading={busy === 'run'} disabled={!!busy} onClick={answerQuestions}>كمّل بالإجابات دي</Button>}</div>}
+          {result.turns?.length > 0 && <details><summary className="cursor-pointer text-xs font-semibold">خطوات الجولة دي ({result.turns.length})</summary><ol className="mt-2 space-y-1 text-xs">{result.turns.map((turn, i) => <li key={i}>الخطوة {i + 1}: {turn.state === 'clarify' ? 'أسئلة قبل عرض المنتجات' : `النتيجة: ${turn.selected.length} قطعة`}</li>)}</ol></details>}
           {result.selected.length > 0 ? <div><p className="mb-1 text-xs font-medium text-muted">المنتجات التي رشحها من الكتالوج · الإجمالي {result.total?.toLocaleString('ar-EG')} جنيه</p><ul className="space-y-1">{result.selected.map((item, i) => <li key={`${item.key}-${i}`} className="flex justify-between gap-3 rounded-lg bg-elevated px-3 py-2 text-sm"><span>{item.name || item.label || item.key}{item.store ? ` · ${item.store}` : ''}</span><span className="shrink-0">{item.price != null ? `${Number(item.price).toLocaleString('ar-EG')} ج.م` : ''}</span></li>)}</ul></div> : <p className="text-sm text-muted">مفيش منتجات متاحة للطلب ده حاليًا.</p>}
-          <div className="space-y-2 border-t border-line pt-3"><Textarea rows={2} maxLength={1000} value={correction} onChange={(e) => setCorrection(e.target.value)} placeholder="لو النتيجة غلط، اكتب التصحيح اللي مودة تتعلمه…" /><Button size="sm" loading={busy === 'lesson'} disabled={correction.trim().length < 10 || !!busy} onClick={saveCorrection}>احفظ التصحيح كدرس</Button></div>
+          <div className="space-y-2 border-t border-line pt-3"><p className="text-xs text-muted">ده تصحيح لمسودة ردّ في مسار الموديل؛ مش هيغيّر تصنيف المنتجات أو محرك الترشيح إلا بعد المراجعة والاعتماد. لتصحيح نوع قطعة بعينها، عدّل «نوع القطعة عند مودة» في المنتج.</p><Textarea rows={2} maxLength={1000} value={correction} onChange={(e) => setCorrection(e.target.value)} placeholder="لو الرد محتاج تصحيح، اكتب الإجابة الخبيرة…" /><Button size="sm" loading={busy === 'lesson'} disabled={correction.trim().length < 10 || !!busy} onClick={saveCorrection}>احفظ مسودة التصحيح</Button></div>
         </section>}
-        {data?.scenarios?.length > 0 && <section className="space-y-2 border-t border-line pt-3"><h3 className="font-semibold">السيناريوهات المحفوظة ({data.scenarios.length})</h3>{data.scenarios.map((item) => <article key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3"><button type="button" disabled={!!busy} onClick={() => chooseScenario(item)} className="min-w-0 flex-1 text-start"><p className="truncate text-sm font-medium">{item.name}</p><p className="truncate text-xs text-muted">{item.message}</p></button><button type="button" disabled={!!busy} aria-label="حذف السيناريو" onClick={() => removeScenario(item.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line-strong text-muted hover:border-sale hover:text-sale disabled:opacity-50"><Trash2 className="h-4 w-4" /></button></article>)}</section>}
+        {data?.scenarios?.length > 0 && <section className="space-y-2 border-t border-line pt-3"><h3 className="font-semibold">السيناريوهات المحفوظة ({data.scenarios.length})</h3>{data.scenarios.map((item) => <article key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3"><button type="button" disabled={!!busy} onClick={() => chooseScenario(item)} className="min-w-0 flex-1 text-start"><p className="truncate text-sm font-medium">{item.name}</p><p className="truncate text-xs text-muted">{item.message}{item.answers && Object.keys(item.answers).length ? ` · ${Object.keys(item.answers).length} إجابات محفوظة` : ''}</p></button><button type="button" disabled={!!busy} aria-label="حذف السيناريو" onClick={() => removeScenario(item.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line-strong text-muted hover:border-sale hover:text-sale disabled:opacity-50"><Trash2 className="h-4 w-4" /></button></article>)}</section>}
       </div>
     </Panel>
   );
@@ -237,7 +259,7 @@ function ModaTrainingPanel() {
     try {
       const result = await adminApi('/stylist/training/lessons', { method: 'POST', body: lessonForm });
       setLessonForm({ topic: '', question: '', answer: '', tags: '' });
-      toast({ title: result.added ? 'مودة حفظت الدرس وهتستفيد منه في الأسئلة المشابهة' : 'الدرس ده موجود عند مودة بالفعل' });
+      toast({ title: result.added ? 'اتحفظ كمسودة. راجعه واعتمده عشان يدخل مسار الموديل' : 'الدرس ده موجود عند مودة بالفعل' });
       reload();
     } catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy('');
@@ -245,6 +267,12 @@ function ModaTrainingPanel() {
   const removeLesson = async (id) => {
     setBusy(id);
     try { await adminApi('/stylist/training/lessons/' + encodeURIComponent(id), { method: 'DELETE' }); toast({ title: 'اتحذف الدرس من تعليم مودة' }); reload(); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy('');
+  };
+  const approveLesson = async (id) => {
+    setBusy(id);
+    try { await adminApi('/stylist/training/lessons/' + encodeURIComponent(id) + '/approve', { method: 'POST', body: {} }); toast({ title: 'اتعتمد الدرس لمسار الموديل' }); reload(); reloadFeedback(); }
     catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy('');
   };
@@ -260,7 +288,7 @@ function ModaTrainingPanel() {
     setBusy(item.id);
     try {
       await adminApi('/stylist/feedback/' + encodeURIComponent(item.id) + '/lesson', { method: 'POST', body: { answer } });
-      toast({ title: 'مودة اتعلمت من الدرس المعتمد' });
+      toast({ title: 'التصحيح اتحفظ كمسودة للمراجعة، ولسه ما اتفعلش' });
       setFeedbackAnswers((all) => { const next = { ...all }; delete next[item.id]; return next; });
       reload(); reloadFeedback();
     } catch (x) { toast({ tone: 'error', title: x.message }); }
@@ -270,14 +298,14 @@ function ModaTrainingPanel() {
   return (
     <Panel title="تعليم مودة" subtitle="اختياراتك المعتمدة وتوجيهك بيفضلوا محفوظين وبيساعدوا مودة في اقتراحاتها الجديدة" className="lg:col-span-2">
       <div className="space-y-4">
-        <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-sm leading-relaxed text-muted">هنا بنحفظ قواعد الذوق ودروس الخبير وأمثلة الأوتفيتات. دي بتساعد مسار الردود اللي بيستخدم نموذج ذكاء؛ ترشيح المنتجات الأساسي بيتحدد من نوع المنتج ودرجة رسميته وقواعد التنسيق. لو نوع قطعة متصنف غلط، صحّح اسمها أو قسمها في بيانات المنتج.</div>
+        <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-sm leading-relaxed text-muted">الدروس الجديدة بتفضل مسودات لحد مراجعتها واعتمادها، وبتدخل في مسار الردود اللي بيستخدم الموديل فقط. ترشيح مودة الأساسي بيقرأ نوع القطعة ودرجة رسميتها من الكتالوج؛ تصحيح نوع المنتج من محرر المنتج بيأثر على الترشيحات بعد حفظه.</div>
         <section className="space-y-3 rounded-2xl border border-line bg-canvas/50 p-3 sm:p-4">
           <div><h3 className="font-semibold">ملاحظات الزباين على اقتراحات مودة</h3><p className="mt-1 text-xs text-muted">راجعوا الأسباب، واكتبوا الإجابة اللي شايفينها صح قبل ما تتحول الملاحظة لدرس تتعلم منه.</p></div>
           {feedbackData?.items?.length ? feedbackData.items.map((item) => <article key={item.id} className="space-y-2 rounded-xl border border-line bg-elevated p-3">
             <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-muted">{item.rating === 'good' ? 'تقييم إيجابي' : 'محتاج مراجعة'}{item.reason ? ` · ${{ mismatch: 'القطع مش متناسقة', color: 'الألوان', occasion: 'المناسبة', price: 'السعر أو الميزانية', fit: 'المقاس أو الراحة', other: 'سبب آخر' }[item.reason] || item.reason}` : ''} · {new Date(item.createdAt).toLocaleDateString('ar-EG')}</p><p className="mt-1 text-sm font-medium">طلب الزبون: {item.question}</p>{item.reply && <p className="mt-1 text-sm text-muted">رد مودة: {item.reply}</p>}{item.items?.length > 0 && <p className="mt-1 text-xs text-muted">القطع: {item.items.join('، ')}</p>}{item.note && <p className="mt-1 text-sm text-muted">ملاحظة: {item.note}</p>}</div>
               <button type="button" disabled={!!busy} onClick={() => dismissFeedback(item.id)} className="shrink-0 rounded-lg border border-line-strong px-2.5 py-1.5 text-xs text-muted hover:border-sale hover:text-sale">حذف</button></div>
-            {item.rating === 'bad' && <><Textarea rows={2} maxLength={1000} value={feedbackAnswers[item.id] || ''} onChange={(e) => setFeedbackAnswers((all) => ({ ...all, [item.id]: e.target.value }))} placeholder="اكتبوا نصيحة التنسيق الصحيحة عشان تتحفظ كدرس معتمد…" />
-              <Button size="sm" loading={busy === item.id} disabled={(feedbackAnswers[item.id] || '').trim().length < 10 || !!busy} onClick={() => teachFeedback(item)}>حوّلها لدرس لمودة</Button></>}
+            {item.rating === 'bad' && <><Textarea rows={2} maxLength={1000} value={feedbackAnswers[item.id] || ''} onChange={(e) => setFeedbackAnswers((all) => ({ ...all, [item.id]: e.target.value }))} placeholder="اكتبوا التصحيح المقترح؛ هيتحفظ للمراجعة قبل ما يدخل مسار الموديل…" />
+              <Button size="sm" loading={busy === item.id} disabled={(feedbackAnswers[item.id] || '').trim().length < 10 || !!busy} onClick={() => teachFeedback(item)}>احفظ التصحيح كمسودة</Button></>}
           </article>) : <p className="text-sm text-muted">مفيش ملاحظات جديدة لحد دلوقتي.</p>}
         </section>
         <label className="block"><span className="mb-1.5 block text-sm font-medium">قواعد الذوق اللي عايز مودة تلتزم بيها</span><Textarea rows={3} maxLength={1600} value={guidance} onChange={(e) => setGuidance(e.target.value)} placeholder="مثال: اختاري ألوان متناسقة ومناسبة للمناسبة، وراعي الاحتشام والعمر، وما تقترحيش قطع مش راكبة على بعض." /></label>
@@ -290,13 +318,13 @@ function ModaTrainingPanel() {
           </div>
           <label className="block"><span className="mb-1 block text-xs font-medium text-muted">السؤال أو الموقف</span><Textarea required rows={2} minLength={4} maxLength={400} value={lessonForm.question} onChange={(e) => setLessonForm({ ...lessonForm, question: e.target.value })} placeholder="مثال: أعمل طقم كامل لفرح بميزانية ١٥٠٠ جنيه؟" /></label>
           <label className="block"><span className="mb-1 block text-xs font-medium text-muted">الإجابة اللي تحب مودة تتعلم منها</span><Textarea required rows={3} minLength={10} maxLength={1000} value={lessonForm.answer} onChange={(e) => setLessonForm({ ...lessonForm, answer: e.target.value })} placeholder="اكتب نصيحة خبير واضحة، ووضح القطع الأساسية وإزاي نوازن الميزانية…" /></label>
-          <Button type="submit" size="sm" icon={Plus} loading={busy === 'lesson'} disabled={lessonForm.question.trim().length < 4 || lessonForm.answer.trim().length < 10}>حفظ الدرس</Button>
+          <Button type="submit" size="sm" icon={Plus} loading={busy === 'lesson'} disabled={lessonForm.question.trim().length < 4 || lessonForm.answer.trim().length < 10}>حفظ للمراجعة</Button>
         </form>
         {data.lessons.length > 0 && <div className="space-y-2">
           <h3 className="font-semibold">دروس الأسئلة والإجابات</h3>
           {data.lessons.map((lesson) => <article key={lesson.id} className="flex min-w-0 items-start justify-between gap-3 rounded-xl border border-line p-3">
-            <div className="min-w-0"><p className="font-semibold">{lesson.topic || lesson.question}</p><p className="mt-1 text-xs text-muted">س: {lesson.question}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">ج: {lesson.answer}</p>{lesson.tags && <p className="mt-1 text-xs text-muted">كلمات: {lesson.tags}</p>}</div>
-            <button type="button" disabled={!!busy} aria-label="حذف الدرس" onClick={() => removeLesson(lesson.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line-strong text-muted hover:border-sale hover:text-sale disabled:opacity-50"><Trash2 className="h-4 w-4" /></button>
+            <div className="min-w-0"><p className="font-semibold">{lesson.topic || lesson.question} <span className={'ms-2 rounded-full px-2 py-0.5 text-[10px] ' + (lesson.status === 'draft' ? 'bg-amber-500/10 text-amber-700' : 'bg-emerald-600/10 text-emerald-700')}>{lesson.status === 'draft' ? 'مسودة للمراجعة' : 'معتمد'}</span></p><p className="mt-1 text-xs text-muted">س: {lesson.question}</p><p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed">ج: {lesson.answer}</p>{lesson.tags && <p className="mt-1 text-xs text-muted">كلمات: {lesson.tags}</p>}</div>
+            <div className="flex shrink-0 gap-2">{lesson.status === 'draft' && <Button size="sm" disabled={!!busy} loading={busy === lesson.id} onClick={() => approveLesson(lesson.id)}>اعتمد</Button>}<button type="button" disabled={!!busy} aria-label="حذف الدرس" onClick={() => removeLesson(lesson.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line-strong text-muted hover:border-sale hover:text-sale disabled:opacity-50"><Trash2 className="h-4 w-4" /></button></div>
           </article>)}
         </div>}
         {data.examples.length > 0 ? <div className="space-y-2">

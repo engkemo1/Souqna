@@ -15,7 +15,8 @@ import { recomputeRatings } from '../lib/reviews.js';
 import { weeklyReport } from '../lib/report.js';
 import { cairoNow } from '../lib/sameDay.js';
 import { triggerReindex } from '../lib/visual.js';
-import { describeProduct } from '../lib/stylist.js';
+import { describeProduct, invalidateModaCatalogue } from '../lib/stylist.js';
+import { loadKnowledge } from '../lib/moda/knowledge.js';
 import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMediaFile } from '../lib/media.js';
 import {
   serializeStore, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi, stockStatus,
@@ -24,6 +25,11 @@ import {
 const r = Router();
 // Store-owner JWT, or — when mounted under /api/admin/stores/:slug/as — the platform admin acting on that store (key-checked upstream).
 r.use((req, res, next) => (req.adminStore ? next() : requireOwner(req, res, next)));
+
+r.get('/moda-types', h((_req, res) => {
+  const K = loadKnowledge();
+  res.json({ items: [...K.items.entries()].filter(([, item]) => !item.virtual).map(([key, item]) => ({ key, label: item.ar, family: item.family })) });
+}));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.maxUploadMb * 1024 * 1024, files: 12 } });
 const LOCAL_DAY = "date(created_at, '+3 hours')"; // Cairo
@@ -400,7 +406,7 @@ r.get('/products/:id', h((req, res) => {
   res.json({
     product: {
       ...serializeProductDetail(p),
-      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null,
+      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '',
       compareAt: p.compare_at_price, sold: p.sold_count, views: p.views,
     },
   });
@@ -426,6 +432,7 @@ const productSchema = z.object({
   category_id: z.coerce.number().int().nullable().optional(),
   department: z.string().max(31).nullable().optional(),
   style_level: z.number().int().min(1).max(5).nullable().optional(),
+  moda_key: z.string().max(80).nullable().optional(),
   status: z.enum(['active', 'draft', 'archived']).default('active'),
   featured: z.boolean().optional().default(false),
   is_new: z.boolean().optional().default(false),
@@ -451,13 +458,17 @@ function uniqueSlug(storeId, base, exceptId = 0) {
 function saveProduct(storeId, data, existing) {
   return tx(() => {
     if (data.category_id && !q.val('SELECT id FROM categories WHERE id=? AND store_id=?', [data.category_id, storeId])) throw badRequest('invalid_category', 'Category not found.');
+    if (data.moda_key) {
+      const item = loadKnowledge().items.get(data.moda_key);
+      if (!item || item.virtual) throw badRequest('invalid_moda_type', 'Pick a real garment type from Moda taxonomy.');
+    }
     const mediaIds = data.media.filter((id) => q.val('SELECT id FROM media WHERE id=? AND store_id=?', [id, storeId]));
     const variants = data.variants.filter((v) => v.color || v.size);
     const stock = variants.length ? variants.reduce((s, v) => s + v.stock, 0) : data.stock;
     const row = {
       name_ar: data.name_ar, name_en: data.name_en, description_ar: data.description_ar, description_en: data.description_en,
       price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null,
-      category_id: data.category_id || null, department: productDepartment(storeId, data.department), style_level: data.style_level ?? null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
+      category_id: data.category_id || null, department: productDepartment(storeId, data.department), style_level: data.style_level ?? null, moda_key: data.moda_key || null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };
@@ -491,8 +502,10 @@ function saveProduct(storeId, data, existing) {
 r.post('/products', h((req, res) => {
   const data = productSchema.parse(req.body);
   const id = saveProduct(req.store.id, data, null);
+  invalidateModaCatalogue();
   triggerReindex();
-  res.status(201).json({ product: serializeProductDetail(q.get('SELECT * FROM products WHERE id=?', [id])) });
+  const saved = q.get('SELECT * FROM products WHERE id=?', [id]);
+  res.status(201).json({ product: { ...serializeProductDetail(saved), modaKey: saved.moda_key || '' } });
 }));
 
 r.put('/products/:id', h((req, res) => {
@@ -500,9 +513,11 @@ r.put('/products/:id', h((req, res) => {
   if (!p) throw notFound('Product');
   const data = productSchema.parse(req.body);
   saveProduct(req.store.id, data, p);
+  invalidateModaCatalogue();
   notifyPriceDrop(p.id, p.price, data.price);
   triggerReindex();
-  res.json({ product: serializeProductDetail(q.get('SELECT * FROM products WHERE id=?', [p.id])) });
+  const saved = q.get('SELECT * FROM products WHERE id=?', [p.id]);
+  res.json({ product: { ...serializeProductDetail(saved), modaKey: saved.moda_key || '' } });
 }));
 
 /** Quick edits from the list / mobile: price, stock, status. */
@@ -524,6 +539,7 @@ r.patch('/products/:id', h((req, res) => {
   update('products', p.id, { price: body.price, compare_at_price: body.compare_at_price === undefined ? undefined : body.compare_at_price || null, stock: body.stock, status: body.status, featured: body.featured === undefined ? undefined : Number(body.featured), updated_at: nowIso() });
   if (body.price !== undefined) notifyPriceDrop(p.id, p.price, body.price);
   const np = q.get('SELECT * FROM products WHERE id=?', [p.id]);
+  invalidateModaCatalogue();
   res.json({ product: { id: np.id, price: np.price, compareAt: np.compare_at_price, stock: np.stock, status: np.status, stockStatus: stockStatus(np), featured: !!np.featured } });
 }));
 
@@ -536,6 +552,7 @@ r.patch('/variants/:id', h((req, res) => {
     q.run('UPDATE products SET stock=(SELECT COALESCE(SUM(stock),0) FROM variants WHERE product_id=?), updated_at=? WHERE id=?', [v.product_id, nowIso(), v.product_id]);
   });
   const p = q.get('SELECT * FROM products WHERE id=?', [v.product_id]);
+  invalidateModaCatalogue();
   res.json({ variant: { id: v.id, stock }, product: { id: p.id, stock: p.stock, stockStatus: stockStatus(p) } });
 }));
 
@@ -545,6 +562,7 @@ r.delete('/products/:id', h((req, res) => {
   const hasOrders = q.val('SELECT COUNT(*) FROM order_items WHERE product_id=?', [p.id]);
   if (hasOrders) q.run("UPDATE products SET status='archived' WHERE id=?", [p.id]);
   else q.run('DELETE FROM products WHERE id=?', [p.id]);
+  invalidateModaCatalogue();
   res.json({ archived: !!hasOrders });
 }));
 

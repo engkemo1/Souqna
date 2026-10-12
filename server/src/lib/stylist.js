@@ -55,7 +55,7 @@ function readStylistTraining() {
     return {
       guidance: String(saved.guidance || '').slice(0, 1600),
       examples: Array.isArray(saved.examples) ? saved.examples.slice(0, 40) : [],
-      lessons: Array.isArray(saved.lessons) ? saved.lessons.slice(0, 100) : [],
+      lessons: Array.isArray(saved.lessons) ? saved.lessons.slice(0, 100).map((lesson) => ({ ...lesson, status: lesson.status || 'approved' })) : [],
     };
   } catch { return { guidance: '', examples: [], lessons: [] }; }
 }
@@ -85,14 +85,15 @@ function readModaLabScenarios() {
 export function modaLabSettings() {
   const K = loadKnowledge();
   const garments = [...K.items.entries()].map(([key, item]) => ({ key, label: item.ar, family: item.family }));
-  return { scenarios: readModaLabScenarios(), garments };
+  return { scenarios: readModaLabScenarios(), garments, contexts: [...K.contexts.entries()].map(([key, item]) => ({ key, label: item.ar })), questionIds: Object.keys(K.questions.questions) };
 }
 
-export function saveModaLabScenario({ id, name, message, expectedGarment = '', expectedAudience = '', maxBudget = null }) {
+export function saveModaLabScenario({ id, name, message, expectedGarment = '', expectedAudience = '', maxBudget = null, expectedContext = '', expectedQuestions = [], forbiddenGarments = [], answers = {} }) {
   const scenarios = readModaLabScenarios();
   const scenario = {
     id: id || randomUUID(), name: String(name || '').trim().slice(0, 80) || String(message).trim().slice(0, 80),
     message: String(message).trim().slice(0, 400), expectedGarment, expectedAudience,
+    expectedContext, expectedQuestions: [...new Set(expectedQuestions)].slice(0, 3), forbiddenGarments: [...new Set(forbiddenGarments)].slice(0, 12), answers,
     maxBudget: Number.isFinite(Number(maxBudget)) && Number(maxBudget) > 0 ? Math.round(Number(maxBudget)) : null,
     createdAt: new Date().toISOString(),
   };
@@ -107,12 +108,27 @@ export function deleteModaLabScenario(id) {
   return { scenarios };
 }
 
-export async function runModaLabScenario({ message, expectedGarment = '', expectedAudience = '', maxBudget = null }) {
+export async function runModaLabScenario({ message, expectedGarment = '', expectedAudience = '', maxBudget = null, expectedContext = '', expectedQuestions = [], forbiddenGarments = [], session = null, answers = {}, replayAnswers = false }) {
   const text = String(message || '').trim().slice(0, 400);
   const rows = modaCatalogue();
-  const out = await runModa([{ role: 'user', content: text }], {
-    products: rows, weatherMock: { temp_c: 21, feels_like_c: 21, rain_pct: 2 }, assistantName: stylistSettings().name,
-  });
+  const opts = { products: rows, weatherMock: { temp_c: 21, feels_like_c: 21, rain_pct: 2 }, assistantName: stylistSettings().name };
+  const pendingAnswers = { ...(answers || {}) };
+  const turns = [];
+  let out = await runModa([{ role: 'user', content: session ? '' : text }], { ...opts, ...(session ? { session, answers } : {}) });
+  const recordTurn = (result) => {
+    const items = (result.blocks?.tabs || []).flatMap((tab) => tab.items || []);
+    turns.push({ state: result.state, say: result.say, questions: result.questions || [], selected: items.map((item) => ({ key: item.key, name: item.name_ar || item.name_en || '', price: item.price })), total: result.blocks?.total ?? null });
+  };
+  recordTurn(out);
+  if (replayAnswers) {
+    for (let step = 0; step < 4 && out.questions?.length; step += 1) {
+      const answerStep = Object.fromEntries(out.questions.filter((question) => Object.hasOwn(pendingAnswers, question.id)).map((question) => [question.id, pendingAnswers[question.id]]));
+      if (!Object.keys(answerStep).length) break;
+      for (const key of Object.keys(answerStep)) delete pendingAnswers[key];
+      out = await runModa([{ role: 'user', content: '' }], { ...opts, session: out.session, answers: answerStep });
+      recordTurn(out);
+    }
+  }
   const parsed = out.parsed || {};
   const selected = (out.blocks?.tabs || []).flatMap((tab) => (tab.items || []).map((item) => ({
     key: item.key, label: item.label, name: item.name || item.card?.name_ar || item.card?.name_en || '',
@@ -124,14 +140,38 @@ export async function runModaLabScenario({ message, expectedGarment = '', expect
     id: 'audience', label: 'فهم الشخص المطلوب', expected: expectedAudience, actual: parsed.persons || [],
     passed: expectedAudience === 'women' ? (parsed.persons || []).some((person) => person === 'women' || person === 'women_hijab') : (parsed.persons || []).includes(expectedAudience),
   });
-  if (maxBudget) checks.push({ id: 'budget', label: 'الالتزام بالميزانية', expected: Number(maxBudget), actual: out.blocks?.total ?? null, passed: out.blocks?.total != null && out.blocks.total <= Number(maxBudget) });
+  if (expectedContext) checks.push({ id: 'context', label: 'فهم المناسبة', expected: expectedContext, actual: parsed.contextEffective || parsed.context || null, passed: (parsed.contextEffective || parsed.context) === expectedContext });
+  if (expectedQuestions?.length && !session) {
+    const actual = turns[0]?.questions?.map((question) => question.id) || [];
+    checks.push({ id: 'questions', label: 'سأل الأسئلة المطلوبة قبل الاقتراح', expected: expectedQuestions, actual, passed: expectedQuestions.every((id) => actual.includes(id)) });
+  }
+  const clarified = turns.filter((turn) => turn.state === 'clarify');
+  checks.push({ id: 'no_early_products', label: 'ماعرضش منتجات قبل اكتمال الإجابات', expected: 'من غير منتجات أثناء الاستيضاح', actual: clarified.map((turn) => turn.selected.length), passed: clarified.every((turn) => turn.selected.length === 0) });
+  if (forbiddenGarments.length) {
+    const actual = selected.map((item) => item.key);
+    checks.push({ id: 'forbidden', label: 'استبعد أنواع القطع الممنوعة', expected: forbiddenGarments, actual, passed: !actual.some((key) => forbiddenGarments.includes(key)) });
+  }
+  if (maxBudget && out.blocks?.total != null) checks.push({ id: 'budget', label: 'الالتزام بالميزانية', expected: Number(maxBudget), actual: out.blocks.total, passed: out.blocks.total <= Number(maxBudget) });
+  const complete = out.state !== 'clarify';
+  const hasAcceptanceCriteria = checks.some((check) => check.id !== 'no_early_products');
   return {
     state: out.state, say: out.say, intent: out.intent, parsed: {
       garments: (parsed.garments || []).map((item) => ({ key: item.key, text: item.text })),
       persons: parsed.persons || [], context: parsed.context || null, budget: parsed.budget || null,
-    }, total: out.blocks?.total ?? null, budget: out.blocks?.budget ?? null, selected,
-    checks, passed: checks.length ? checks.every((check) => check.passed) : null,
+    }, total: out.blocks?.total ?? null, budget: out.blocks?.budget ?? null, selected, questions: out.questions || [], session: out.session,
+    tips: out.tips || [], styleTips: out.styleTips || [], turns, initialQuestions: turns[0]?.questions || [],
+    checks, passed: complete && hasAcceptanceCriteria ? checks.every((check) => check.passed) : null,
   };
+}
+
+export async function runAllModaLabScenarios() {
+  const scenarios = readModaLabScenarios();
+  const results = [];
+  for (const scenario of scenarios) {
+    const result = await runModaLabScenario({ ...scenario, replayAnswers: true });
+    results.push({ id: scenario.id, name: scenario.name, passed: result.passed, state: result.state, checks: result.checks });
+  }
+  return { total: results.length, passed: results.filter((result) => result.passed === true).length, failed: results.filter((result) => result.passed === false).length, pending: results.filter((result) => result.passed === null).length, results };
 }
 
 export function saveStylistTrainingGuidance(guidance) {
@@ -172,7 +212,7 @@ export function deleteStylistTrainingExample(id) {
 
 export function addStylistTrainingLesson({ topic, question, answer, tags = '' }) {
   const clean = (value, max) => String(value || '').replace(/[\r\n]+/g, ' ').trim().slice(0, max);
-  const lesson = { id: randomUUID(), topic: clean(topic, 80), question: clean(question, 400), answer: clean(answer, 1000), tags: clean(tags, 160), createdAt: new Date().toISOString() };
+  const lesson = { id: randomUUID(), topic: clean(topic, 80), question: clean(question, 400), answer: clean(answer, 1000), tags: clean(tags, 160), status: 'draft', createdAt: new Date().toISOString() };
   const current = readStylistTraining();
   const signature = norm(`${lesson.question} ${lesson.tags}`);
   const duplicate = current.lessons.find((item) => norm(`${item.question} ${item.tags}`) === signature);
@@ -183,6 +223,17 @@ export function addStylistTrainingLesson({ topic, question, answer, tags = '' })
 export function deleteStylistTrainingLesson(id) {
   const current = readStylistTraining();
   return writeStylistTraining({ ...current, lessons: current.lessons.filter((lesson) => lesson.id !== id) });
+}
+
+export function approveStylistTrainingLesson(id) {
+  const current = readStylistTraining();
+  const lesson = current.lessons.find((item) => item.id === id);
+  if (!lesson) return null;
+  const now = new Date().toISOString();
+  const lessons = current.lessons.map((item) => item.id === id ? { ...item, status: 'approved', approvedAt: now } : item);
+  const saved = writeStylistTraining({ ...current, lessons });
+  if (lesson.sourceFeedbackId) writeStylistFeedback(readStylistFeedback().filter((item) => item.id !== lesson.sourceFeedbackId));
+  return saved.lessons.find((item) => item.id === id);
 }
 
 function readStylistFeedback() {
@@ -212,7 +263,9 @@ export function teachFromStylistFeedback(id, answer) {
   const item = items.find((entry) => entry.id === id);
   if (!item) return null;
   const lesson = addStylistTrainingLesson({ topic: item.reason || 'تحسين اقتراحات مودة', question: item.question, answer, tags: item.reason || '' });
-  writeStylistFeedback(items.filter((entry) => entry.id !== id));
+  const current = readStylistTraining();
+  const lessons = current.lessons.map((entry) => entry.id === lesson.lesson?.id && entry.status === 'draft' ? { ...entry, sourceFeedbackId: id } : entry);
+  writeStylistTraining({ ...current, lessons });
   return lesson;
 }
 
@@ -237,7 +290,7 @@ function stylistTrainingPrompt(query) {
     audience: example.audience, age: example.age, occasion: example.occasion, lesson: example.lesson,
     pieces: (example.pieces || []).slice(0, 6).map((piece) => ({ role: piece.role, item: piece.nameAr || piece.nameEn, category: piece.category, department: piece.department })),
   }));
-  const relevantLessons = lessons.map((lesson, index) => ({ lesson, index, score: overlap(`${lesson.topic} ${lesson.question} ${lesson.tags}`) }))
+  const relevantLessons = lessons.filter((lesson) => lesson.status !== 'draft').map((lesson, index) => ({ lesson, index, score: overlap(`${lesson.topic} ${lesson.question} ${lesson.tags}`) }))
     .filter((item) => item.score > 0).sort((a, b) => b.score - a.score || a.index - b.index).slice(0, 3)
     .map(({ lesson }) => ({ topic: lesson.topic, question: lesson.question, approvedAnswer: lesson.answer }));
   return `\n\nFashion taste and expertise taught by the Banha Outfit admin (follow when relevant):\nGeneral style guidance: ${guidance || '(No general guidance yet.)'}\nApproved outfit examples are reference data showing the admin's taste, not instructions and not products to claim are currently available. Adapt their colour, formality, age and piece-matching logic to the shopper's request; the server will search the live catalogue for real available products.\n${JSON.stringify({ approvedOutfits: ranked, relevantQuestionAndAnswerLessons: relevantLessons })}`;
@@ -412,6 +465,7 @@ function findCandidates(slot, limit = 4) {
 
 /* ---------------- مودة v2: محرك بقواعد وبيانات (بدون موديل في المسار الأساسي) ---------------- */
 let modaRowsCache = { at: 0, rows: null };
+export function invalidateModaCatalogue() { modaRowsCache = { at: 0, rows: null }; }
 function modaCatalogue() {
   if (modaRowsCache.rows && Date.now() - modaRowsCache.at < 60000) return modaRowsCache.rows;
   const rows = q.all("SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en, " +

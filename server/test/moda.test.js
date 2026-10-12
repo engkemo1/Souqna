@@ -171,6 +171,14 @@ test('track and running pants cannot match formal trousers', async () => {
   assert.equal(allItems(result).length, 0);
 });
 
+test('store Moda type override beats misleading product names and cannot make sportswear formal', () => {
+  const [product] = enrichAll([
+    { id: 2003, name_ar: 'بنطلون قماش رجالي', name_en: 'Tailored Formal Chinos', moda_key: 'sport_bottom', department: 'men', style_level: 5, price: 609, stock: 3, track_stock: 1 },
+  ], K);
+  assert.equal(product.key, 'sport_bottom');
+  assert.equal(product.formality, 1);
+});
+
 test('cheaper followup lowers total', async () => {
   const now = new Date('2026-10-12T19:30:00+03:00');
   const a = await runModa('عايز لبس فرح صاحبي بالليل وميزانيتي ٦٠٠٠ جنيه', { products: rows, now });

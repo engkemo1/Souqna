@@ -13,7 +13,7 @@ import { listDepartments, assertDepartments } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
-import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario } from '../lib/stylist.js';
+import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
@@ -355,24 +355,39 @@ r.post('/stylist/training/lessons', h((req, res) => {
   res.status(saved.added ? 201 : 200).json(saved);
 }));
 r.delete('/stylist/training/lessons/:id', h((req, res) => res.json(deleteStylistTrainingLesson(String(req.params.id).slice(0, 80)))));
+r.post('/stylist/training/lessons/:id/approve', h((req, res) => {
+  const lesson = approveStylistTrainingLesson(String(req.params.id).slice(0, 80));
+  if (!lesson) throw new AppError(404, 'lesson_not_found', 'Training lesson not found.');
+  res.json({ lesson });
+}));
 
 /* ---- deterministic Moda test studio (no external model/API calls) ---- */
 const modaLabScenarioSchema = z.object({
   id: z.string().max(80).optional(), name: z.string().trim().max(80).optional().default(''),
   message: z.string().trim().min(2).max(400), expectedGarment: z.string().max(80).optional().default(''),
   expectedAudience: z.enum(['women', 'men', 'boys', 'girls', 'women_hijab']).or(z.literal('')).optional().default(''),
+  expectedContext: z.string().max(80).optional().default(''), expectedQuestions: z.array(z.string().max(80)).max(3).optional().default([]),
+  forbiddenGarments: z.array(z.string().max(80)).max(12).optional().default([]),
   maxBudget: z.coerce.number().int().positive().max(1000000).nullable().optional().default(null),
+  answers: z.record(z.union([z.string().max(100), z.number().int(), z.array(z.union([z.string().max(100), z.number().int()])).max(4)])).optional().default({}),
 });
 r.get('/stylist/lab', h((_req, res) => res.json(modaLabSettings())));
 r.post('/stylist/lab/run', h(async (req, res) => {
-  const body = modaLabScenarioSchema.omit({ id: true, name: true }).parse(req.body || {});
-  const { message, expectedGarment, expectedAudience, maxBudget } = body;
-  const result = await runModaLabScenario({ message, expectedGarment, expectedAudience, maxBudget });
+  const body = modaLabScenarioSchema.omit({ id: true, name: true, answers: true }).extend({
+    session: z.record(z.any()).nullable().optional(), answers: modaLabScenarioSchema.shape.answers,
+    replayAnswers: z.boolean().optional().default(false),
+  }).parse(req.body || {});
+  const { message, expectedGarment, expectedAudience, maxBudget, expectedContext, expectedQuestions, forbiddenGarments, session, answers, replayAnswers } = body;
+  const result = await runModaLabScenario({ message, expectedGarment, expectedAudience, maxBudget, expectedContext, expectedQuestions, forbiddenGarments, session, answers, replayAnswers });
   res.json(result);
 }));
+r.post('/stylist/lab/run-all', h(async (_req, res) => res.json(await runAllModaLabScenarios())));
 r.post('/stylist/lab/scenarios', h((req, res) => {
   const body = modaLabScenarioSchema.parse(req.body || {});
-  if (body.expectedGarment && !modaLabSettings().garments.some((item) => item.key === body.expectedGarment)) throw new AppError(422, 'validation_failed', 'Unknown garment type.');
+  const settings = modaLabSettings();
+  if (body.expectedGarment && !settings.garments.some((item) => item.key === body.expectedGarment)) throw new AppError(422, 'validation_failed', 'Unknown garment type.');
+  if (body.expectedContext && !settings.contexts.some((item) => item.key === body.expectedContext)) throw new AppError(422, 'validation_failed', 'Unknown occasion.');
+  if (body.expectedQuestions.some((item) => !settings.questionIds.includes(item)) || body.forbiddenGarments.some((item) => !settings.garments.some((garment) => garment.key === item))) throw new AppError(422, 'validation_failed', 'Unknown test expectation.');
   res.status(201).json(saveModaLabScenario(body));
 }));
 r.delete('/stylist/lab/scenarios/:id', h((req, res) => res.json(deleteModaLabScenario(String(req.params.id).slice(0, 80)))));

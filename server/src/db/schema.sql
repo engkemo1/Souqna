@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS products (
   seo_title TEXT, seo_description TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  moda_key TEXT,
   UNIQUE(store_id, slug)
 );
 CREATE INDEX IF NOT EXISTS idx_products_store ON products(store_id, status, created_at);

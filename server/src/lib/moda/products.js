@@ -106,7 +106,9 @@ export function colorKeysOf(row, K = loadKnowledge()) {
 /** يضيف حقول مودة لصف المنتج (بدون تعديل الأصل). */
 export function enrichProduct(row, K = loadKnowledge()) {
   const name = `${row.name_ar || ''} ${row.name_en || ''}`;
-  let key = inferKey(name, K);
+  const explicitItem = K.items.get(row.moda_key);
+  const explicitKey = explicitItem && !explicitItem.virtual ? row.moda_key : null;
+  let key = explicitKey || inferKey(name, K);
   if (!key) key = inferKey(`${row.cat_text || ''}`, K);
   const desc = `${row.description_ar || ''}`;
   if (key === 'dress_any') {
@@ -114,7 +116,10 @@ export function enrichProduct(row, K = loadKnowledge()) {
     key = hasAny(K, name, ['شغل', 'work', 'office']) ? 'dress_work' : f0 >= 4 ? 'dress_party' : 'dress_casual';
   }
   const owner = Number(row.style_level) >= 1 && Number(row.style_level) <= 5 ? Number(row.style_level) : null;
-  const formality = owner ?? (key ? inferFormality(key, name, desc, K) : null);
+  const range = K.items.get(key)?.formality || [1, 5];
+  const inferredFormality = key ? inferFormality(key, name, desc, K) : null;
+  const requestedFormality = owner ?? inferredFormality;
+  const formality = key && requestedFormality != null ? Math.max(range[0], Math.min(range[1], requestedFormality)) : requestedFormality;
   const inStock = row.track_stock === 0 || row.track_stock === false ? true : Number(row.stock ?? 1) > 0;
   const materials = fabricTokens(K, `${name} ${desc}`);
   const isSleeveless = hasAny(K, name, ['بدون اكمام', 'sleeveless', 'مكشوف', 'strapless']);

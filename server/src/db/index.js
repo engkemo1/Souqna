@@ -33,6 +33,7 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   const pcols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!pcols.includes('department')) db.exec('ALTER TABLE products ADD COLUMN department TEXT');
   if (!pcols.includes('style_level')) db.exec('ALTER TABLE products ADD COLUMN style_level INTEGER'); // درجة الرسمية 1-5 اللي صاحب المحل حددها لمودة (فاضي = تلقائي)
+  if (!pcols.includes('moda_key')) db.exec('ALTER TABLE products ADD COLUMN moda_key TEXT'); // نوع القطعة الصريح لمحرك مودة (فاضي = تلقائي)
   // Single-department stores: their products belong to that department.
   db.exec(`UPDATE products SET department = (SELECT TRIM(s.departments, ',') FROM stores s WHERE s.id = products.store_id)
            WHERE department IS NULL AND (SELECT LENGTH(s.departments) - LENGTH(REPLACE(s.departments, ',', '')) FROM stores s WHERE s.id = products.store_id) = 2`);

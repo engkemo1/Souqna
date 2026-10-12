@@ -36,7 +36,7 @@ const PRESET_COLORS = [
 
 const EMPTY = {
   name_ar: '', name_en: '', description_ar: '', description_en: '', price: '', compare_at_price: '', cost: '', sku: '',
-  category_id: '', department: '', style_level: '', status: 'active', featured: false, is_new: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
+  category_id: '', department: '', moda_key: '', style_level: '', status: 'active', featured: false, is_new: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
   media: [], seo_title: '', seo_description: '',
 };
 
@@ -50,7 +50,7 @@ function fromProduct(p) {
     ...EMPTY,
     name_ar: p.name.ar, name_en: p.name.en, description_ar: p.description.ar || '', description_en: p.description.en || '',
     price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '',
-    category_id: p.categoryId ? String(p.categoryId) : '', department: p.department || '', style_level: p.styleLevel ? String(p.styleLevel) : '', status: p.status, featured: p.featured, is_new: p.isNewFlag,
+    category_id: p.categoryId ? String(p.categoryId) : '', department: p.department || '', moda_key: p.modaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', status: p.status, featured: p.featured, is_new: p.isNewFlag,
     colors: p.colors, sizes: p.sizes, matrix, variantIds: ids, track_stock: p.trackStock, stock: p.stockCount, low_stock_at: p.lowStockAt,
     media: p.media, seo_title: p.seo.title || '', seo_description: p.seo.description || '',
   };
@@ -65,7 +65,7 @@ function toPayload(f) {
   return {
     name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en,
     price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, cost: f.cost ? Number(f.cost) : null,
-    sku: f.sku || null, category_id: f.category_id ? Number(f.category_id) : null, department: f.department || null, style_level: f.style_level ? Number(f.style_level) : null, status: f.status, featured: f.featured, is_new: f.is_new,
+    sku: f.sku || null, category_id: f.category_id ? Number(f.category_id) : null, department: f.department || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, status: f.status, featured: f.featured, is_new: f.is_new,
     colors: f.colors, sizes: f.sizes, variants, track_stock: f.track_stock, stock: Number(f.stock || 0), low_stock_at: Number(f.low_stock_at || 0),
     media: f.media.map((m) => m.id), primary_media_id: f.media[0]?.id ?? null, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
   };
@@ -250,6 +250,7 @@ export default function ProductEditor() {
   const desktop = useIsDesktop();
   const { data, error, loading, reload } = useApi(isNew ? null : `/owner/products/${id}`, { keepPrevious: false });
   const { data: cats } = useApi('/owner/categories');
+  const { data: modaTypes } = useApi('/owner/moda-types');
   const [f, setF] = useState(EMPTY);
   const [initial, setInitial] = useState(EMPTY);
   const [errors, setErrors] = useState({});
@@ -348,7 +349,13 @@ export default function ProductEditor() {
             </div>
           </Field>
         )}
-        <Field label="درجة الرسمية (بتساعد مودة ترشّحها للمناسبة الصح)" hint="سيبها تلقائي لو مش متأكد. الدرجة بتحدد رسمية القطعة، مش نوعها؛ وضّح في الاسم والقسم لو المنتج رياضي أو رسمي." optional={t('common.optional')} className="sm:col-span-2">
+        <Field label="نوع القطعة عند مودة" hint="اختياري. اختاره لو الاسم أو تصنيف المحل ممكن يتفهم غلط؛ النوع هنا يغلب التخمين من الاسم والتصنيف." optional={t('common.optional')} className="sm:col-span-2">
+          <Select value={f.moda_key} onChange={(e) => set({ moda_key: e.target.value })}>
+            <option value="">تلقائي من اسم المنتج وتصنيف المحل</option>
+            {(modaTypes?.items || []).map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+          </Select>
+        </Field>
+        <Field label="درجة الرسمية (بتساعد مودة ترشّحها للمناسبة الصح)" hint="سيبها تلقائي لو مش متأكد. درجة الرسمية بتتحدد جوه نطاق نوع القطعة؛ الكوتشي أو البنطلون الرياضي مش هيتحولوا لرسمي بسبب الدرجة وحدها." optional={t('common.optional')} className="sm:col-span-2">
           <div className="flex flex-wrap gap-2" role="group">
             {[['', 'تلقائي'], ['1', '1 · بيتي'], ['2', '2 · كاجوال'], ['3', '3 · شيك'], ['4', '4 · رسمي / نص رسمي'], ['5', '5 · سواريه / رسمي جدًا']].map(([v, label]) => <button key={v} type="button" aria-pressed={f.style_level === v} onClick={() => set({ style_level: v })}
               className={cx('h-10 rounded-full border px-4 text-sm font-medium transition active:scale-95', f.style_level === v ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{label}</button>)}
