@@ -400,7 +400,7 @@ r.get('/products/:id', h((req, res) => {
   res.json({
     product: {
       ...serializeProductDetail(p),
-      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '',
+      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null,
       compareAt: p.compare_at_price, sold: p.sold_count, views: p.views,
     },
   });
@@ -425,6 +425,7 @@ const productSchema = z.object({
   sku: z.string().trim().max(60).optional().nullable(),
   category_id: z.coerce.number().int().nullable().optional(),
   department: z.string().max(31).nullable().optional(),
+  style_level: z.number().int().min(1).max(5).nullable().optional(),
   status: z.enum(['active', 'draft', 'archived']).default('active'),
   featured: z.boolean().optional().default(false),
   is_new: z.boolean().optional().default(false),
@@ -456,7 +457,7 @@ function saveProduct(storeId, data, existing) {
     const row = {
       name_ar: data.name_ar, name_en: data.name_en, description_ar: data.description_ar, description_en: data.description_en,
       price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null,
-      category_id: data.category_id || null, department: productDepartment(storeId, data.department), status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
+      category_id: data.category_id || null, department: productDepartment(storeId, data.department), style_level: data.style_level ?? null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };

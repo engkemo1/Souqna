@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates } from './stylist-ranking.js';
+import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates, slotOwnerLabel, cleanSay } from './stylist-ranking.js';
 
 const product = (name, colors, extra = {}) => ({
   name_ar: name, name_en: name, colors_json: JSON.stringify(colors), description_ar: '', description_en: '',
@@ -100,4 +100,18 @@ test('uses the closest-ranked alternative before dropping to a much cheaper low-
 test('reports when catalogue options cannot satisfy a total budget', () => {
   const looks = [{ items: [{ price: 1200 }], pick: 0 }, { items: [{ price: 900 }], pick: 0 }];
   assert.equal(fitBudgetCandidates(looks, 1800), 2100);
+});
+
+test('relationship words never become the owner label of a piece', () => {
+  assert.equal(slotOwnerLabel({ person: 'خطيبتي', for: 'her' }), 'لها');
+  assert.equal(slotOwnerLabel({ person: 'خطيب', for: 'him' }), 'له');
+  assert.equal(slotOwnerLabel({ person: 'أحمد ٨ سنين', for: 'kid' }), 'أحمد ٨ سنين');
+  assert.equal(slotOwnerLabel({ for: 'her' }), 'لها');
+});
+
+test('cleanSay strips foreign-script noise and cuts at a sentence end', () => {
+  assert.equal(cleanSay('جهزتلك طقم 很好 للخطوبة'), 'جهزتلك طقم للخطوبة');
+  const long = `${'جملة قصيرة. '.repeat(80)}كلمة مقطوعة في النص`;
+  const out = cleanSay(long, 100);
+  assert.ok(out.length <= 100 && out.endsWith('.'));
 });

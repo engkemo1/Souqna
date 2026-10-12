@@ -1,0 +1,289 @@
+{
+  "_about": "تصنيف مودة: سلّم الرسمية، العائلات، الأنواع، الألوان. كل المفاتيح (key) بالإنجليزي ثابتة، والاسم العربي للعرض. المراجعة: review = draft | sourced | reviewed",
+  "version": 1,
+
+  "formality": [
+    { "level": 1, "key": "home",     "ar": "بيتي ومريح",            "examples_ar": "بيجامة، ترينج، لبس قعدة" },
+    { "level": 2, "key": "casual",   "ar": "كاجوال يومي",           "examples_ar": "خروجة بسيطة، جامعة، مشاوير" },
+    { "level": 3, "key": "smart",    "ar": "شيك (سمارت كاجوال)",    "examples_ar": "شغل عادي، خروجة شيك، غدا عيلة" },
+    { "level": 4, "key": "dressy",   "ar": "رسمي / نص رسمي",        "examples_ar": "خطوبة، كتب كتاب، ضيف فرح، شغل رسمي" },
+    { "level": 5, "key": "formal",   "ar": "سواريه / رسمي جدًا",    "examples_ar": "الفرح نفسه، عروسة وعريس، حفلة بلاك تاي" }
+  ],
+
+  "formality_signals": {
+    "_about": "كلمات في اسم المنتج أو وصفه أو خامته بتساعد الكود يقترح درجة الرسمية. صاحب المحل يقدر يعدّلها من محرر المنتج.",
+    "name_words": [
+      { "words": ["سواريه", "سهرة", "سهره", "soiree", "evening", "gown"],        "formality": 5 },
+      { "words": ["كوكتيل", "cocktail", "party", "حفلات", "حفلة", "مناسبات"],    "formality": 4 },
+      { "words": ["رسمي", "formal", "كلاسيك", "classic"],                         "formality": 4 },
+      { "words": ["خروج", "خروجات", "outing"],                                   "formality": 2 },
+      { "words": ["كاجوال", "casual", "يومي", "daily"],                           "formality": 2 },
+      { "words": ["رياضي", "تمارين", "جري", "sport", "training", "تراك"],         "formality": 1 },
+      { "words": ["بيت", "منزلي", "نوم", "بيجامة", "home", "sleep"],              "formality": 1 }
+    ],
+    "fabrics_up":   ["ساتان", "دانتيل", "قطيفة", "تول", "ترتر", "حرير", "تافتا", "اورجانزا", "مطرز", "مطرزة", "تطريز", "embroidered", "satin", "lace", "velvet", "tulle", "sequin", "silk", "organza"],
+    "fabrics_mid":  ["شيفون", "كريب", "chiffon", "crepe"],
+    "fabrics_down": ["قطن", "جيرسيه", "ليكرا", "فليس", "اياروبين", "ايروبين", "فيسكوز", "cotton", "jersey", "fleece", "viscose"],
+    "rule": "الخامة لوحدها لا تحدد الرسمية: تضيف أو تنقص نقطة واحدة فقط لو الاسم نفسه مش واضح."
+  },
+
+  "contexts": [
+    { "key": "home",             "ar": "في البيت",                 "formality": [1, 1] },
+    { "key": "casual_outing",    "ar": "خروجة / مشوار",            "formality": [2, 3] },
+    { "key": "university",       "ar": "جامعة / مدرسة",            "formality": [2, 3] },
+    { "key": "work_casual",      "ar": "شغل (عادي)",               "formality": [3, 3] },
+    { "key": "work_formal",      "ar": "شغل (رسمي) / مقابلة",      "formality": [4, 4] },
+    { "key": "date_night",       "ar": "خروجة رومانسية / عشا",     "formality": [3, 4] },
+    { "key": "family_gathering", "ar": "غدا أو سهرة عيلة",         "formality": [3, 3] },
+    { "key": "eid",              "ar": "العيد",                    "formality": [3, 4] },
+    { "key": "ramadan_iftar",    "ar": "فطار / سحور رمضان",        "formality": [3, 4] },
+    { "key": "engagement_guest", "ar": "خطوبة (ضيف)",              "formality": [4, 5] },
+    { "key": "engagement_self",  "ar": "خطوبتي أنا",               "formality": [4, 5] },
+    { "key": "katb_kitab",       "ar": "كتب كتاب",                 "formality": [4, 5] },
+    { "key": "wedding_guest",    "ar": "فرح (ضيف)",                "formality": [4, 5] },
+    { "key": "wedding_self",     "ar": "فرحي أنا (عروسة / عريس)",  "formality": [5, 5] },
+    { "key": "sahel_beach",      "ar": "الساحل / البحر",           "formality": [1, 3] },
+    { "key": "travel",           "ar": "سفر / مصيف",               "formality": [2, 2] },
+    { "key": "graduation",       "ar": "تخرج",                     "formality": [4, 5] },
+    { "key": "birthday_party",   "ar": "عيد ميلاد / حفلة",         "formality": [3, 4] },
+    { "key": "condolence",       "ar": "عزاء",                     "formality": [3, 4], "explicit_only": true },
+    { "key": "sport",            "ar": "رياضة / جيم",              "formality": [1, 1] }
+  ],
+
+  "audiences": [
+    { "key": "men",         "ar": "رجل" },
+    { "key": "women",       "ar": "ست / بنت" },
+    { "key": "women_hijab", "ar": "محجبة" },
+    { "key": "girls",       "ar": "بنت صغيرة" },
+    { "key": "boys",        "ar": "ولد صغير" }
+  ],
+
+  "families": {
+    "tops": {
+      "ar": "علويات",
+      "items": [
+        { "key": "tshirt", "ar": "تيشيرت",  "formality": [1, 2] },
+        { "key": "polo",   "ar": "بولو",     "formality": [2, 3] },
+        { "key": "shirt",  "ar": "قميص",     "formality": [3, 5] },
+        { "key": "blouse", "ar": "بلوزة",    "formality": [3, 5] },
+        { "key": "sweater","ar": "سويتر / كنزة / بلوفر", "formality": [2, 4] },
+        { "key": "hoodie", "ar": "هودي",     "formality": [1, 2] },
+        { "key": "tunic",  "ar": "تونيك",    "formality": [2, 3] },
+        { "key": "top",    "ar": "توب",      "formality": [2, 4] }
+      ]
+    },
+    "bottoms": {
+      "ar": "سفليات",
+      "items": [
+        { "key": "jeans",    "ar": "جينز",                 "formality": [2, 3] },
+        { "key": "trousers", "ar": "بنطلون قماش",          "formality": [3, 5] },
+        { "key": "chinos",   "ar": "شينو",                 "formality": [2, 4] },
+        { "key": "shorts",   "ar": "شورت",                 "formality": [1, 2] },
+        { "key": "skirt",    "ar": "جيبة / تنورة",         "formality": [2, 5] },
+        { "key": "leggings", "ar": "ليجنز",                "formality": [1, 2] },
+        { "key": "joggers",  "ar": "ترينج / بنطلون رياضي", "formality": [1, 2] }
+      ]
+    },
+    "dresses": {
+      "ar": "دريسات وفساتين",
+      "_note": "كلمة 'دريس' عامة. النوع بيتحدد من الاسم/الوصف (سواريه، خروج...). دريس بدون وصف = خروج (2-3) لحد ما ييجي وصف أرسم.",
+      "items": [
+        { "key": "dress_any",     "ar": "دريس / فستان (بدون تحديد)", "formality": [2, 5], "virtual": true },
+        { "key": "dress_casual",  "ar": "دريس / فستان خروج",    "formality": [2, 3] },
+        { "key": "dress_work",    "ar": "فستان شغل",            "formality": [3, 4] },
+        { "key": "dress_party",   "ar": "فستان / دريس سواريه",  "formality": [4, 5] },
+        { "key": "dress_evening", "ar": "فستان سهرة طويل",      "formality": [5, 5] },
+        { "key": "dress_bridal",  "ar": "فستان زفاف",           "formality": [5, 5] },
+        { "key": "dress_beach",   "ar": "فستان صيفي / ساحل",    "formality": [1, 3] },
+        { "key": "jumpsuit",      "ar": "جمبسوت",               "formality": [3, 5] },
+        { "key": "two_piece_set", "ar": "طقم قطعتين (توب وجيبة / بنطلون)", "formality": [3, 5] }
+      ],
+      "attributes": {
+        "length": ["mini", "midi", "maxi"],
+        "length_ar": { "mini": "قصير (ميني)", "midi": "ميدي", "maxi": "طويل (ماكسي)" },
+        "cut_ar": ["منفوش", "ضيق على الجسم (بودي كون)", "A-line", "رابط (راب)", "قميص", "كلوش", "سمكة"],
+        "neckline_ar": ["رقبة عالية", "V", "مربع", "كتف واحد", "بدون أكمام"],
+        "sleeve_ar": ["بدون أكمام", "أكمام قصيرة", "أكمام طويلة", "أكمام بالون"]
+      }
+    },
+    "suiting": {
+      "ar": "بدل وأطقم كلاسيك",
+      "items": [
+        { "key": "suit",        "ar": "بدلة (جاكيت وبنطلون)",     "formality": [4, 5] },
+        { "key": "classic_set", "ar": "طقم كلاسيك (جاكيت وبنطلون منفصلين)", "formality": [3, 4] },
+        { "key": "blazer",      "ar": "بليزر",                    "formality": [3, 4] },
+        { "key": "waistcoat",   "ar": "صديري / فيست",             "formality": [4, 5] },
+        { "key": "tuxedo",      "ar": "تاكسيدو / بدلة سواريه",    "formality": [5, 5] },
+        { "key": "womens_suit", "ar": "تايير حريمي",              "formality": [4, 4] }
+      ],
+      "attributes": {
+        "cut_ar": { "classic": "كلاسيك (عادي)", "slim": "سليم فِت", "double_breasted": "دبل بريست (صفين أزرار)" },
+        "fit_ar": ["سليم", "عادي", "مريح"]
+      }
+    },
+    "outerwear": {
+      "ar": "جاكيتات وأغطية",
+      "items": [
+        { "key": "jacket",   "ar": "جاكيت",      "formality": [2, 3] },
+        { "key": "coat",     "ar": "بالطو / معطف","formality": [3, 5] },
+        { "key": "cardigan", "ar": "كارديجان",   "formality": [2, 4] },
+        { "key": "shawl",    "ar": "شال / ستول", "formality": [3, 5] }
+      ]
+    },
+    "modest": {
+      "ar": "محتشم",
+      "items": [
+        { "key": "abaya",      "ar": "عباية",           "formality": [2, 5] },
+        { "key": "jalabiya",   "ar": "جلابية",          "formality": [1, 4] },
+        { "key": "hijab_set",  "ar": "طقم محجبات",      "formality": [2, 4] },
+        { "key": "tarha",      "ar": "طرحة / حجاب",     "formality": [1, 5] },
+        { "key": "long_cardigan", "ar": "كارديجان / كيمونو طويل", "formality": [2, 3] }
+      ],
+      "abaya_cuts": {
+        "_source": "نينا لاين - أسماء العبايات",
+        "cuts_ar": {
+          "closh":      "كلوش (واسعة من الأسفل زي الجرس)",
+          "butterfly":  "فراشة (ضيقة من فوق وواسعة من تحت)",
+          "straight":   "وتد (مستقيمة)",
+          "cape":       "كاب (واسعة من الأكتاف)",
+          "bisht":      "بشت (خليجي)",
+          "double_face":"دبل فيس (وشين بلونين)",
+          "ruffle":     "كشكشة (للمناسبات)",
+          "embroidered":"مطرزة"
+        },
+        "closh_types_ar": ["دوبل كلوش", "كلوش عادي", "نص كلوش", "ربع كلوش", "كلوش بكسرات", "كلوش طبقات"]
+      }
+    },
+    "shoes": {
+      "ar": "أحذية",
+      "items": [
+        { "key": "shoes_any",    "ar": "حذاء (بدون تحديد)",        "formality": [1, 5], "virtual": true },
+        { "key": "sneakers",     "ar": "كوتشي",                    "formality": [1, 3] },
+        { "key": "formal_shoes", "ar": "حذاء رسمي (أوكسفورد)",     "formality": [4, 5] },
+        { "key": "loafers",      "ar": "لوفر / موكاسين",           "formality": [3, 4] },
+        { "key": "heels_low",    "ar": "كعب واطي / وسط",           "formality": [3, 5] },
+        { "key": "heels_high",   "ar": "كعب عالي / ستيليتو",       "formality": [4, 5] },
+        { "key": "flats",        "ar": "بالرينا / فلات",           "formality": [2, 4] },
+        { "key": "sandals",      "ar": "صندل",                     "formality": [1, 4] },
+        { "key": "boots",        "ar": "بوت",                      "formality": [2, 4] },
+        { "key": "slippers",     "ar": "شبشب / سليبرز",            "formality": [1, 1] }
+      ]
+    },
+    "bags": {
+      "ar": "شنط",
+      "items": [
+        { "key": "handbag",  "ar": "شنطة يد",       "formality": [2, 4] },
+        { "key": "clutch",   "ar": "كلتش / شنطة سواريه", "formality": [4, 5] },
+        { "key": "crossbody","ar": "شنطة كروس",     "formality": [2, 3] },
+        { "key": "tote",     "ar": "شنطة توت",      "formality": [2, 3] },
+        { "key": "backpack", "ar": "شنطة ضهر",      "formality": [1, 2] }
+      ]
+    },
+    "accessories": {
+      "ar": "إكسسوارات",
+      "items": [
+        { "key": "tie",          "ar": "كرافتة",          "formality": [4, 5] },
+        { "key": "bow_tie",      "ar": "بابيون", "formality": [5, 5] },
+        { "key": "pocket_square","ar": "منديل جيب",       "formality": [4, 5] },
+        { "key": "belt",         "ar": "حزام",            "formality": [2, 5] },
+        { "key": "watch",        "ar": "ساعة",            "formality": [2, 5] },
+        { "key": "jewelry",      "ar": "إكسسوار / مجوهرات","formality": [2, 5] },
+        { "key": "cap",          "ar": "كاب",             "formality": [1, 2] },
+        { "key": "socks",        "ar": "شراب",            "formality": [1, 5] },
+        { "key": "perfume",      "ar": "برفان",           "formality": [1, 5] }
+      ]
+    },
+    "sport": {
+      "ar": "رياضة",
+      "items": [
+        { "key": "sport_top",    "ar": "توب / تيشيرت رياضي", "formality": [1, 1] },
+        { "key": "sport_bottom", "ar": "بنطلون / شورت رياضي","formality": [1, 1] },
+        { "key": "tracksuit",    "ar": "ترينج كامل",         "formality": [1, 2] },
+        { "key": "sport_shoes",  "ar": "حذاء رياضي",         "formality": [1, 1] }
+      ]
+    },
+    "underwear_sleep": {
+      "ar": "داخلي ونوم",
+      "_note": "مودة لا تركّب أطقم من الملابس الداخلية. تعرضها فقط لو طلب العميل صراحة.",
+      "items": [
+        { "key": "sleepwear", "ar": "بيجامة / لبس نوم", "formality": [1, 1] }
+      ]
+    }
+  },
+
+  "colors": {
+    "_about": "عائلات الألوان تُستخدم لبناء لوحة 2-3 ألوان. العميل ممكن يغيّرها من الأسئلة.",
+    "list": [
+      { "key": "black",    "ar": "أسود",       "family": "neutral" },
+      { "key": "white",    "ar": "أبيض",       "family": "neutral" },
+      { "key": "grey",     "ar": "رمادي",      "family": "neutral" },
+      { "key": "navy",     "ar": "كحلي",       "family": "neutral" },
+      { "key": "beige",    "ar": "بيج",        "family": "neutral" },
+      { "key": "cream",    "ar": "كريمي",      "family": "neutral" },
+      { "key": "off_white","ar": "أوف وايت",   "family": "neutral" },
+      { "key": "champagne","ar": "شامبانيا",   "family": "neutral" },
+      { "key": "brown",    "ar": "بني",        "family": "earth" },
+      { "key": "camel",    "ar": "جملي",       "family": "earth" },
+      { "key": "olive",    "ar": "زيتي",       "family": "earth" },
+      { "key": "burgundy", "ar": "بوردو",      "family": "jewel" },
+      { "key": "emerald",  "ar": "أخضر زمردي", "family": "jewel" },
+      { "key": "royal_blue","ar":"أزرق ملكي",  "family": "jewel" },
+      { "key": "purple",   "ar": "بنفسجي",     "family": "jewel" },
+      { "key": "red",      "ar": "أحمر",       "family": "bold" },
+      { "key": "blue",     "ar": "أزرق",       "family": "soft" },
+      { "key": "green",    "ar": "أخضر",       "family": "earth" },
+      { "key": "pink",     "ar": "وردي",       "family": "soft" },
+      { "key": "blush",    "ar": "وردي فاتح",  "family": "soft" },
+      { "key": "sky_blue", "ar": "أزرق سماوي", "family": "soft" },
+      { "key": "lavender", "ar": "لافندر",     "family": "soft" },
+      { "key": "mint",     "ar": "مينت",       "family": "soft" },
+      { "key": "coral",    "ar": "كورال",      "family": "soft" },
+      { "key": "yellow",   "ar": "أصفر",       "family": "bold" },
+      { "key": "orange",   "ar": "برتقالي",    "family": "bold" },
+      { "key": "fuchsia",  "ar": "فوشيا",      "family": "bold" },
+      { "key": "gold",     "ar": "دهبي",       "family": "metallic" },
+      { "key": "silver",   "ar": "فضي",        "family": "metallic" }
+    ],
+    "near_white": ["white", "off_white", "cream", "champagne", "beige", "silver", "blush", "sky_blue"],
+    "near_white_note": "الضيفة تتجنبها في الفرح والخطوبة (ممكن تبان بيضا في الصور). المصدر: الجزيرة نت + Cairo360 + The Knot. الاستثناء: لو العروسة طلبت صراحة.",
+    "safe_pairs": [
+      ["navy", "white", "beige"],
+      ["navy", "grey", "burgundy"],
+      ["black", "white", "gold"],
+      ["black", "grey", "red"],
+      ["brown", "beige", "cream"],
+      ["olive", "beige", "brown"],
+      ["burgundy", "navy", "cream"],
+      ["emerald", "black", "gold"],
+      ["blush", "grey", "navy"],
+      ["sky_blue", "white", "navy"]
+    ],
+    "couples_rule": "الاتنين في نفس قصة الألوان: لوحة مشتركة أو متكاملة، مش نسخة طبق الأصل."
+  },
+
+  "seasons": [
+    { "key": "summer", "ar": "صيف",   "fabrics_ar": ["كتان", "قطن", "شيفون", "فيسكوز"], "avoid_ar": ["صوف", "قطيفة", "ساتان تقيل"] },
+    { "key": "winter", "ar": "شتا",   "fabrics_ar": ["صوف", "قطيفة", "كريب", "فليس"],    "avoid_ar": ["كتان خفيف"] },
+    { "key": "mid",    "ar": "ربيع/خريف", "fabrics_ar": ["قطن", "كريب", "تريكو"],        "note_ar": "الجو متقلب، يفضل طبقات خفيفة" }
+  ],
+
+  "venues": [
+    { "key": "hall",     "ar": "قاعة / فندق",  "note_ar": "أقرب للرسمي، تكييف: شال أو جاكيت خفيف" },
+    { "key": "home",     "ar": "في البيت",     "note_ar": "أريح شوية، لكن لسه شيك" },
+    { "key": "garden",   "ar": "حديقة / نادي", "note_ar": "كعب عريض أو بلوك، خامات خفيفة" },
+    { "key": "sahel",    "ar": "الساحل / شاطئ","note_ar": "كتان وشيفون وباستيل، حذاء مسطح أو وِدج (Cairo360)" },
+    { "key": "mosque",   "ar": "جامع / كنيسة", "note_ar": "محتشم: أكمام وطول مناسبين" }
+  ],
+
+  "substitutes": {
+    "_about": "لو القطعة المطلوبة مش موجودة: بدائل من نفس الاستخدام بترتيب الأفضلية. بتتعلّم 'relaxed: substitute' في الرد.",
+    "tuxedo": ["suit"], "suit": ["classic_set"], "classic_set": ["suit", "blazer"], "blazer": ["jacket", "classic_set"],
+    "formal_shoes": ["loafers"], "loafers": ["formal_shoes", "sneakers"], "sneakers": ["loafers"],
+    "heels_high": ["heels_low"], "heels_low": ["heels_high", "flats"], "flats": ["heels_low", "sandals"],
+    "dress_party": ["dress_evening", "two_piece_set", "jumpsuit"], "dress_evening": ["dress_party"],
+    "dress_casual": ["dress_work"], "dress_work": ["dress_casual"], "jumpsuit": ["two_piece_set", "dress_party"],
+    "clutch": ["handbag", "crossbody"], "handbag": ["crossbody", "clutch", "tote"],
+    "bow_tie": ["tie"], "tie": ["bow_tie"], "abaya": ["dress_party"], "hijab_set": ["abaya", "tunic"],
+    "shirt": ["polo"], "polo": ["shirt"], "trousers": ["chinos"], "chinos": ["trousers"], "cardigan": ["blazer", "shawl"], "shawl": ["cardigan", "blazer"]
+  }
+}

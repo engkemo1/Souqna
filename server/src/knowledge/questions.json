@@ -1,0 +1,562 @@
+{
+ "_about": "أسئلة مودة بالعامية المصرية. كل سؤال بأزرار جاهزة. القاعدة: مانسألش غير اللي ناقص فعلًا، وبحد أقصى 3 أسئلة في الرد الواحد، ومانسألش نفس السؤال تاني لو الإجابة محفوظة في بروفايل العميل. الأزرار فيها value بيروح للكود، وlabel هو اللي بيظهر.",
+ "version": 1,
+ "limits": {
+  "max_questions_per_turn": 3,
+  "ask_again_after_days": 120
+ },
+ "ask_when_missing": {
+  "_about": "الحقل الناقص → السؤال. الترتيب = الأولوية. مفيش سؤال يتسأل لو الحقل اتفهم من الرسالة نفسها.",
+  "audience": "who_is_it_for",
+  "context": "what_occasion",
+  "budget": "budget",
+  "venue": "venue_if_dressy",
+  "time_of_day": "time_if_dressy",
+  "season": "season_if_unknown",
+  "taste": "taste_quick",
+  "dress_kind": "dress_kind"
+ },
+ "when_to_ask": {
+  "who_is_it_for": "لو مفيش جنس/فئة واضحة من الرسالة ولا من البروفايل",
+  "what_occasion": "لو الطلب مش فيه مناسبة ولا قطعة محددة (مثلًا: 'عايز لبس شيك')",
+  "budget": "لو الطلب أكتر من قطعتين أو عيلة ولا فيه ميزانية",
+  "venue_if_dressy": "لو المناسبة رسمية (درجة 4 أو 5) ومفيش مكان",
+  "time_if_dressy": "لو المناسبة رسمية ومفيش وقت",
+  "season_if_unknown": "لو الخامة هتفرق (ساتان/كتان/صوف) ومفيش موسم ولا شهر واضح",
+  "taste_quick": "مرة واحدة لأول مرة للعميل، أو لو عمل طلب بدون أي تلميح عن ذوقه"
+ },
+ "questions": {
+  "who_is_it_for": {
+   "text": "اللبس ده لمين؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "ليا (راجل)",
+     "value": "men"
+    },
+    {
+     "label": "ليا (ست)",
+     "value": "women"
+    },
+    {
+     "label": "ليا (محجبة)",
+     "value": "women_hijab"
+    },
+    {
+     "label": "ليا ولخطيبي/ـتي",
+     "value": "couple"
+    },
+    {
+     "label": "أولاد",
+     "value": "kids"
+    },
+    {
+     "label": "لعيلة كاملة",
+     "value": "family"
+    }
+   ],
+   "follow_up": {
+    "couple": "couple_who",
+    "kids": "kids_who",
+    "family": "family_who"
+   },
+   "en": {
+    "text": "Who is this for?",
+    "options": {
+     "men": "Me (man)",
+     "women": "Me (woman)",
+     "women_hijab": "Me (hijabi)",
+     "couple": "Me and my partner",
+     "kids": "Kids",
+     "family": "The whole family"
+    }
+   }
+  },
+  "couple_who": {
+   "text": "تمام. مين هيلبس؟",
+   "type": "multi",
+   "options": [
+    {
+     "label": "راجل",
+     "value": "men"
+    },
+    {
+     "label": "ست",
+     "value": "women"
+    },
+    {
+     "label": "ست محجبة",
+     "value": "women_hijab"
+    }
+   ],
+   "note": "المودة تفهم 'أنا وخطيبتي' من الرسالة بدون سؤال. السؤال ده بس لو الصياغة مش واضحة."
+  },
+  "kids_who": {
+   "text": "الأولاد كام سنة وإيه الجنس؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "بنت (٢-٦ سنين)",
+     "value": "girls_2_6"
+    },
+    {
+     "label": "بنت (٧-١٢ سنة)",
+     "value": "girls_7_12"
+    },
+    {
+     "label": "ولد (٢-٦ سنين)",
+     "value": "boys_2_6"
+    },
+    {
+     "label": "ولد (٧-١٢ سنة)",
+     "value": "boys_7_12"
+    },
+    {
+     "label": "تين أو أكبر",
+     "value": "teen"
+    }
+   ]
+  },
+  "family_who": {
+   "text": "مين هيلبس في العيلة؟ (تقدر تختار أكتر من واحد)",
+   "type": "multi",
+   "options": [
+    {
+     "label": "بابا",
+     "value": "men"
+    },
+    {
+     "label": "ماما",
+     "value": "women"
+    },
+    {
+     "label": "ماما محجبة",
+     "value": "women_hijab"
+    },
+    {
+     "label": "ولد",
+     "value": "boys"
+    },
+    {
+     "label": "بنت",
+     "value": "girls"
+    }
+   ]
+  },
+  "what_occasion": {
+   "text": "ده لأنهي مناسبة؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "خطوبة",
+     "value": "engagement_guest"
+    },
+    {
+     "label": "كتب كتاب",
+     "value": "katb_kitab"
+    },
+    {
+     "label": "فرح",
+     "value": "wedding_guest"
+    },
+    {
+     "label": "شغل",
+     "value": "work_casual"
+    },
+    {
+     "label": "خروجة",
+     "value": "casual_outing"
+    },
+    {
+     "label": "جامعة",
+     "value": "university"
+    },
+    {
+     "label": "العيد",
+     "value": "eid"
+    },
+    {
+     "label": "حاجة تانية",
+     "value": "other"
+    }
+   ],
+   "follow_up": {
+    "other": "occasion_other"
+   },
+   "en": {
+    "text": "What's the occasion?",
+    "options": {
+     "engagement_guest": "Engagement",
+     "katb_kitab": "Katb el-kitab",
+     "wedding_guest": "Wedding",
+     "work_casual": "Work",
+     "casual_outing": "Going out",
+     "university": "University",
+     "eid": "Eid",
+     "other": "Something else"
+    }
+   }
+  },
+  "occasion_other": {
+   "text": "مناسبة إيه بالظبط؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "عشا / خروجة رومانسية",
+     "value": "date_night"
+    },
+    {
+     "label": "فطار / سحور رمضان",
+     "value": "ramadan_iftar"
+    },
+    {
+     "label": "الساحل / البحر",
+     "value": "sahel_beach"
+    },
+    {
+     "label": "سفر",
+     "value": "travel"
+    },
+    {
+     "label": "تخرج",
+     "value": "graduation"
+    },
+    {
+     "label": "عيد ميلاد / حفلة",
+     "value": "birthday_party"
+    },
+    {
+     "label": "رياضة / جيم",
+     "value": "sport"
+    },
+    {
+     "label": "مقابلة شغل",
+     "value": "work_formal"
+    },
+    {
+     "label": "غدا / عزومة عيلة",
+     "value": "family_gathering"
+    }
+   ]
+  },
+  "engagement_role": {
+   "text": "إنت ضيف ولا الخطوبة بتاعتك؟",
+   "type": "single",
+   "ask_if": "context in [engagement_guest, wedding_guest] and not role",
+   "options": [
+    {
+     "label": "ضيف",
+     "value": "guest"
+    },
+    {
+     "label": "الخطوبة بتاعتي",
+     "value": "self"
+    }
+   ]
+  },
+  "budget": {
+   "text": "ميزانيتك تقريبًا قد إيه؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "لحد ١٠٠٠ جنيه",
+     "value": [
+      0,
+      1000
+     ]
+    },
+    {
+     "label": "١٠٠٠ – ٣٠٠٠ جنيه",
+     "value": [
+      1000,
+      3000
+     ]
+    },
+    {
+     "label": "٣٠٠٠ – ٦٠٠٠ جنيه",
+     "value": [
+      3000,
+      6000
+     ]
+    },
+    {
+     "label": "أكتر من ٦٠٠٠ جنيه",
+     "value": [
+      6000,
+      null
+     ]
+    },
+    {
+     "label": "مش فارق، المهم الشكل",
+     "value": "flexible"
+    }
+   ],
+   "note": "الميزانية دايمًا إجمالي الطقم كله. لو عايز يحدد رقم بنفسه يكتبه.",
+   "en": {
+    "text": "Roughly what's your budget?",
+    "options": {
+     "[0, 1000]": "Up to 1,000 EGP",
+     "[1000, 3000]": "1,000 – 3,000 EGP",
+     "[3000, 6000]": "3,000 – 6,000 EGP",
+     "[6000, null]": "Over 6,000 EGP",
+     "flexible": "Not important"
+    }
+   }
+  },
+  "venue_if_dressy": {
+   "text": "المناسبة فين؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "قاعة أو فندق",
+     "value": "hall"
+    },
+    {
+     "label": "حديقة أو نادي",
+     "value": "garden"
+    },
+    {
+     "label": "في البيت",
+     "value": "home"
+    },
+    {
+     "label": "الساحل / البحر",
+     "value": "sahel"
+    }
+   ]
+  },
+  "time_if_dressy": {
+   "text": "الوقت إيه؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "نهار",
+     "value": "day"
+    },
+    {
+     "label": "بالليل",
+     "value": "night"
+    }
+   ]
+  },
+  "season_if_unknown": {
+   "text": "الجو عامل إزاي؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "حر (صيف)",
+     "value": "summer"
+    },
+    {
+     "label": "برد (شتا)",
+     "value": "winter"
+    },
+    {
+     "label": "معتدل / متقلب",
+     "value": "mid"
+    }
+   ]
+  },
+  "taste_quick": {
+   "_about": "تتسأل مرة واحدة في أول محادثة. 4 أسئلة قصيرة، ممكن يتخطاها العميل بزر 'سيبها عليكي/عليك'. الإجابات بتتحفظ في البروفايل.",
+   "intro": "علشان أرشحلك حاجة تشبهك، جاوبني على كام سؤال سريع. وممكن تتخطاهم.",
+   "skip_label": "سيبها عليا",
+   "steps": [
+    "taste_style",
+    "taste_fit",
+    "taste_color",
+    "taste_dislike"
+   ]
+  },
+  "taste_style": {
+   "text": "بتحب شكلك يبقى إزاي غالبًا؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "كلاسيك وهادي",
+     "value": "classic"
+    },
+    {
+     "label": "عصري ومودرن",
+     "value": "modern"
+    },
+    {
+     "label": "بسيط ومريح",
+     "value": "minimal"
+    },
+    {
+     "label": "مميز ولافت",
+     "value": "bold"
+    }
+   ],
+   "saves_to": "profile.style"
+  },
+  "taste_fit": {
+   "text": "بتفضّل القصّة إزاي؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "واسعة ومريحة",
+     "value": "relaxed"
+    },
+    {
+     "label": "مظبوطة على الجسم",
+     "value": "tailored"
+    },
+    {
+     "label": "وسط، مش فارق",
+     "value": "regular"
+    }
+   ],
+   "saves_to": "profile.fit"
+  },
+  "taste_color": {
+   "text": "الألوان اللي بتحبها؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "هادية (أسود، كحلي، بيج، رمادي)",
+     "value": "neutral"
+    },
+    {
+     "label": "ترابية (بني، زيتي، جملي)",
+     "value": "earth"
+    },
+    {
+     "label": "غامقة وفخمة (بوردو، زمردي)",
+     "value": "jewel"
+    },
+    {
+     "label": "فاتحة وباستيل",
+     "value": "soft"
+    },
+    {
+     "label": "ألوان قوية وجريئة",
+     "value": "bold"
+    }
+   ],
+   "saves_to": "profile.likes"
+  },
+  "taste_dislike": {
+   "text": "في ألوان أو حاجات مش بتحبها خالص؟ (اكتبها أو اختار)",
+   "type": "multi_or_text",
+   "options": [
+    {
+     "label": "الأحمر",
+     "value": "red"
+    },
+    {
+     "label": "الأصفر",
+     "value": "yellow"
+    },
+    {
+     "label": "الوردي",
+     "value": "pink"
+    },
+    {
+     "label": "الدانتيل",
+     "value": "lace"
+    },
+    {
+     "label": "الألوان اللامعة",
+     "value": "shiny"
+    },
+    {
+     "label": "مفيش",
+     "value": "none"
+    }
+   ],
+   "saves_to": "profile.avoid"
+  },
+  "modest_preference": {
+   "text": "عايزة اللبس محتشم (أكمام وطول)؟",
+   "type": "single",
+   "ask_if": "audience is women and hijab not stated and context is dressy",
+   "options": [
+    {
+     "label": "أيوه، محتشم",
+     "value": "modest"
+    },
+    {
+     "label": "عادي",
+     "value": "regular"
+    }
+   ]
+  },
+  "dress_kind": {
+   "text": "دريس للخروج ولا سواريه لمناسبة؟",
+   "type": "single",
+   "options": [
+    {
+     "label": "للخروج",
+     "value": "dress_casual"
+    },
+    {
+     "label": "سواريه / مناسبة",
+     "value": "dress_party"
+    },
+    {
+     "label": "للشغل",
+     "value": "dress_work"
+    },
+    {
+     "label": "ساحل / صيفي",
+     "value": "dress_beach"
+    }
+   ],
+   "en": {
+    "text": "A casual dress or an evening dress?",
+    "options": {
+     "dress_casual": "Casual",
+     "dress_party": "Evening / occasion",
+     "dress_work": "Work",
+     "dress_beach": "Beach / summer"
+    }
+   }
+  }
+ },
+ "feedback": {
+  "_about": "بعد ما تعرض الطقم: زر 👍/👎. لو 👎، نسأل عن السبب علشان مانخلطش السعر بالذوق.",
+  "prompt": "الطقم ده عجبك؟",
+  "buttons": [
+   {
+    "label": "عجبني",
+    "value": "like"
+   },
+   {
+    "label": "مش أوي",
+    "value": "dislike"
+   }
+  ],
+  "dislike_reasons": {
+   "text": "إيه اللي مش عاجبك؟",
+   "options": [
+    {
+     "label": "السعر",
+     "value": "price"
+    },
+    {
+     "label": "اللون",
+     "value": "color"
+    },
+    {
+     "label": "الموديل / القصة",
+     "value": "cut"
+    },
+    {
+     "label": "مش مناسب للمناسبة",
+     "value": "occasion"
+    },
+    {
+     "label": "الجودة",
+     "value": "quality"
+    },
+    {
+     "label": "حاجة تانية",
+     "value": "other"
+    }
+   ],
+   "rule": "السعر مايبقاش سبب إننا نمنع لون أو قصة. اللون بس يمنع اللون. القصة بس تمنع القصة."
+  }
+ }
+}

@@ -152,4 +152,27 @@ export function coordinateLookCandidates(looks, budget = null) {
   looks.forEach((look, index) => { look.pick = selected.picks[index] ?? 0; });
 }
 
+const RELATION_WORDS = /خطيب|عريس|عروس|زوج|مرات|حبيب|شريك|fianc|wife|husband|partner|spouse|boyfriend|girlfriend/i;
+const OWNER_WORDS = { him: 'له', her: 'لها', kid: 'للطفل' };
+
+/** Who a slot is for. Relationship words from the model ("خطيب", "خطيبتي") are not names of pieces or people, so they fall back to له / لها. */
+export function slotOwnerLabel(slot) {
+  const person = String(slot?.person || '').replace(/[\r\n]+/g, ' ').trim().slice(0, 20);
+  if (person && !RELATION_WORDS.test(person)) return person;
+  return OWNER_WORDS[slot?.for] || '';
+}
+
+/** Make the model's "say" readable: drop stray Chinese/Cyrillic/etc. characters some models emit, collapse spaces, and cut at a sentence end instead of mid-word. */
+export function cleanSay(value, max = 700) {
+  let text = String(value ?? '')
+    .replace(/[^؀-ۿݐ-ݿ -~ -ÿ–—‘-”…\n️‍\p{Extended_Pictographic}]/gu, ' ')
+    .replace(/[ \t]+/g, ' ').replace(/\s*\n\s*/g, ' ').trim();
+  if (text.length > max) {
+    const cut = text.slice(0, max);
+    const end = Math.max(cut.lastIndexOf('.'), cut.lastIndexOf('!'), cut.lastIndexOf('؟'), cut.lastIndexOf('?'), cut.lastIndexOf('،'));
+    text = (end > max * 0.5 ? cut.slice(0, end + (cut[end] === '،' ? 0 : 1)) : cut.replace(/\s+\S*$/, '')).trim();
+  }
+  return text;
+}
+
 export { norm as normalizeStylistText };

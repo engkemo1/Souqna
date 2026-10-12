@@ -9,7 +9,9 @@ import { randomUUID } from 'node:crypto';
 import { q, tx } from '../db/index.js';
 import { listDepartments } from './departments.js';
 import { serializeCards, bi } from './serialize.js';
-import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates } from './stylist-ranking.js';
+import { runModa } from './moda/engine.js';
+import { makeLlmExtract } from './moda/llm.js';
+import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates, slotOwnerLabel, cleanSay } from './stylist-ranking.js';
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ـ/g, '').replace(/[ًٌٍَُِّْ]/g, '').trim();
 
@@ -243,7 +245,7 @@ You do NOT know the stock. You only decide WHAT to look for; the system searches
 
 Reply with ONE JSON object and nothing else:
 {"intent":"shop"|"clarify"|"chat",
- "say":"one or two short Egyptian-Arabic sentences shown to the shopper before the products (or your one question if intent is clarify)",
+ "say":"one or two short, clear, complete Egyptian-Arabic sentences shown BEFORE the products, saying what you put together and why (never 'it will suit you' alone, never promise availability, never claim you found something). Plain Arabic words only, no Chinese/English mixed in. If intent is clarify, your one question",
  "remember": {optional object, see Memory},
  "tips":"optional: 1-2 short Egyptian-Arabic styling tips (colour harmony, why these pieces work) or empty string",
  "budget": total budget in EGP as a number, or null,
@@ -273,7 +275,7 @@ Styling knowledge (use it like a real personal stylist):
 - Use catalogue colour metadata as well as names when searching. Put the intended colours in each slot's keywords so product alternatives stay close to the planned palette. If an exact colour is unavailable, choose a neutral that supports the palette and say so plainly.
 - The shopper may already own something ("عندي قميص أزرق سماوي"): build the rest AROUND it. Pick colours that go with it (navy/white/beige/brown/grey are safe neutrals; avoid clashing; match belt with shoes), and put the colour words in keywords (e.g. "كوتشي","أبيض","sneakers","white"). Do not search for the item they already own.
 - Occasions: wedding guest, engagement (خطوبة), kath el-ketab, work, casual outing, graduation, etc. Choose the formality right (suit/بدلة + shirt + shoes + tie/bow for formal; smart-casual for outings; modest/hijab-friendly options when the shopper mentions hijab).
-- Couples: when the shopper dresses two people (e.g. "أنا وخطيبتي"), make ONE colour story that coordinates both (same palette or complementary, not identical), and give slots for both. Set "for":"him" for the man's pieces and "for":"her" for the woman's.
+- Couples: when the shopper dresses two people (e.g. "أنا وخطيبتي"), make ONE colour story that coordinates both (same palette or complementary, not identical), and give slots for both: the man's main piece (suit/shirt + shoes) AND the woman's main piece (dress/abaya + shoes, optional bag). Set "for":"him" for the man's pieces and "for":"her" for the woman's. NEVER put relationship words (خطيب, خطيبة, عريس, زوجة...) in "person" or "label": "label" is only the garment name (e.g. "بدلة", "فستان سهرة", "حذاء رسمي") and "person" is left out for couples. Example for "أنا وخطيبتي رايحين خطوبة": {"intent":"shop","say":"جهزتلكم طقمين متناسقين للخطوبة: بدلة كحلي ليك وفستان بيج لها بنفس الألوان.","palette":["كحلي","بيج","أبيض"],"slots":[{"for":"him","label":"بدلة","color":"كحلي","keywords":["بدلة","suit"],"department":null,"max_price":null},{"for":"him","label":"حذاء رسمي","color":"بني","keywords":["حذاء","جزمة","shoes"],"department":null,"max_price":null},{"for":"her","label":"فستان سهرة","color":"بيج","keywords":["فستان","سهرة","dress"],"department":null,"max_price":null},{"for":"her","label":"حذاء كعب","color":"بيج","keywords":["كعب","حذاء","heels"],"department":null,"max_price":null}]}
 - If gender/occasion is unknown but the request is otherwise clear, assume a sensible default instead of asking; ask only when truly stuck.
 - Put the colour logic in "tips" (e.g. "بدلة كحلي مع قميص أبيض وكوتشي جلد بني، وهي فستان بلون بيج يكمّل الألوان").
 - Give useful answers to fashion questions about matching, fit, modesty, care and budget trade-offs. If something depends on personal preference, say so kindly and give a clear recommendation; do not invent certainty.
@@ -310,6 +312,27 @@ function profileText(p) {
   return f.length ? `What you already know about this shopper (remembered from earlier visits; use it silently, do not ask again): ${f.join(' | ')}.\n` : '';
 }
 
+// A no-cost, deterministic path for a request with an unambiguous couple + occasion.
+// This also keeps common Egyptian Arabic wording from depending on provider quality.
+function coupleOccasionPlan(text) {
+  const value = norm(text);
+  const twoPeople = /(?:انا\s*(?:و|مع)\s*(?:خطيبتي|مراتي|زوجتي|صاحبتي|حبيبتي))|(?:انا\s*و\s*(?:خطيبى|جوزي|زوجي))/u.test(value);
+  const occasion = /خطوبه|فرح|زفاف|مناسبه/u.test(value);
+  if (!twoPeople || !occasion) return null;
+  return {
+    intent: 'shop',
+    say: 'هظبطلكم طقمين مناسبين للمناسبة بألوان ماشية مع بعض، من غير ما يبقوا نسخة واحدة.',
+    tips: 'الكحلي مع الأبيض أو البيج اختيار شيك وآمن لخطوبة؛ لو بتحبوا ألوان أجرأ قولولي.',
+    palette: ['كحلي', 'أبيض', 'بيج'], budget: null,
+    slots: [
+      { for: 'him', label: 'بدلة', color: 'كحلي', keywords: ['بدلة', 'suit', 'formal'], department: null, max_price: null },
+      { for: 'him', label: 'قميص', color: 'أبيض', keywords: ['قميص', 'shirt', 'formal'], department: null, max_price: null },
+      { for: 'her', label: 'فستان', color: 'بيج', keywords: ['فستان', 'dress', 'سهرة'], department: null, max_price: null },
+      { for: 'her', label: 'حذاء', color: 'بيج', keywords: ['حذاء', 'shoes', 'كعب'], department: null, max_price: null },
+    ],
+  };
+}
+
 /* ---------------- catalogue search ---------------- */
 function findCandidates(slot, limit = 4) {
   const where = ["p.status='active'", "s.status='active'", 's.hidden=0', '(p.track_stock=0 OR p.stock>0)']; const params = [];
@@ -325,16 +348,69 @@ function findCandidates(slot, limit = 4) {
   return cards.map((c, i) => ({ ...c, store: { slug: ranked[i].store_slug, name: bi(ranked[i], 'store_name') } }));
 }
 
+
+/* ---------------- مودة v2: محرك بقواعد وبيانات (بدون موديل في المسار الأساسي) ---------------- */
+let modaRowsCache = { at: 0, rows: null };
+function modaCatalogue() {
+  if (modaRowsCache.rows && Date.now() - modaRowsCache.at < 60000) return modaRowsCache.rows;
+  const rows = q.all("SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en, " +
+    "(SELECT c.name_ar || char(32) || c.name_en FROM categories c WHERE c.id=p.category_id) AS cat_text " +
+    "FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 LIMIT 5000");
+  modaRowsCache = { at: Date.now(), rows };
+  return rows;
+}
+export const modaEngineEnabled = () => (process.env.STYLIST_ENGINE || 'moda') !== 'legacy';
+
+/** يرجّع نفس شكل الرد القديم + الحقول الجديدة (state, tabs, questions, session). */
+export async function runModaStylist(messages, { profile, session, answers, imageText = '' } = {}) {
+  const history = messages.slice(-8).map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 600) }));
+  const rows = modaCatalogue();
+  // احتياطي مجاني: لو القواعد مافهمتش الرسالة، Cloudflare بيستخرج (شخص/مناسبة/قطعة) من قاموس محدد بس
+  const llmExtract = providerReady.cloudflare() ? makeLlmExtract(async (system, msgs) => parseJson(await callLlm('cloudflare', system, msgs))) : null;
+  const out = await runModa(history, { products: rows, profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract });
+  const ids = [...new Set((out.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.id)))];
+  const byId = new Map(rows.filter((r) => ids.includes(r.id)).map((r) => [r.id, r]));
+  const rowList = ids.map((id) => byId.get(id)).filter(Boolean);
+  const cards = serializeCards(rowList);
+  const cardById = new Map(rowList.map((r, i) => [r.id, { ...cards[i], store: { slug: r.store_slug, name: bi(r, 'store_name') } }]));
+  const multi = (out.blocks?.tabs || []).length > 1;
+  const tabs = (out.blocks?.tabs || []).map((t) => ({ ...t, items: t.items.map((i) => ({ ...i, card: cardById.get(i.id) || null })) }));
+  const looks = tabs.flatMap((t) => t.items.filter((i) => i.card).map((i) => ({ label: `${multi ? `${t.label} · ` : ''}${i.label}`, shown: multi ? `${i.label} (${t.label})` : i.label, palette: (out.blocks.palette || []).map((c) => c.ar), items: [i.card], pick: 0 })));
+  lastError = '';
+  return {
+    intent: out.state === 'clarify' ? 'clarify' : out.state === 'chat' ? 'chat' : 'shop',
+    state: out.state, say: out.say, remember: {}, palette: (out.blocks?.palette || []).map((c) => c.ar), tips: (out.tips || []).join(' '),
+    looks, total: out.blocks?.total || 0, budget: out.blocks?.budget || null, overBudget: out.state === 'over_budget',
+    missing: (out.missing || []).map((m) => m.label), over: out.blocks?.over || 0,
+    tabs, couple: !!out.blocks?.couple, questions: out.questions || [], missingItems: tabs.flatMap((t) => t.missing.map((m) => ({ ...m, tab: t.label }))), session: out.session,
+  };
+}
+
 /** @param messages [{role:'user'|'assistant', content}] (last 8 kept) */
-export async function runStylist(messages, { image, image2, profile } = {}) {
+export async function runStylist(messages, { image, image2, profile, session, answers } = {}) {
   const { provider, name } = stylistSettings();
-  if (!providerReady[provider]?.()) {
-    lastError = provider + ' credentials are not configured';
-    throw Object.assign(new Error('provider_not_configured'), { code: 'stylist_unavailable' });
+  if (modaEngineEnabled() && !image2 && (!image || (image && providerReady.cloudflare()))) {
+    try {
+      let imageText = '';
+      if (image) {
+        const m = String(image).match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+        if (!m) throw Object.assign(new Error('badimg'), { code: 'stylist_bad_image' });
+        imageText = await describePhotoCf(Buffer.from(m[2], 'base64'));
+      }
+      return await runModaStylist(messages, { profile, session, answers, imageText });
+    } catch (e) {
+      if (e.code === 'stylist_bad_image') throw e;
+      console.error('[moda-v2] falling back to legacy:', String(e.message).slice(0, 200));
+    }
   }
   const history = messages.slice(-8).map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 600) }));
   while (history.length && history[0].role !== 'user') history.shift();
   if (!history.length) return { say: '', looks: [], total: 0 };
+  let plan = !image && !image2 ? coupleOccasionPlan(history.at(-1)?.content || '') : null;
+  if (!plan && !providerReady[provider]?.()) {
+    lastError = provider + ' credentials are not configured';
+    throw Object.assign(new Error('provider_not_configured'), { code: 'stylist_unavailable' });
+  }
   if (image) {
     const parse = (v) => { const m = String(v).match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/); if (!m) throw Object.assign(new Error('badimg'), { code: 'stylist_bad_image' }); return m; };
     const mats = [parse(image), ...(image2 ? [parse(image2)] : [])];
@@ -352,26 +428,36 @@ export async function runStylist(messages, { image, image2, profile } = {}) {
       history[history.length - 1] = { role: 'user', content: `${ask}\n\n${descs.map((d, i) => `[Photo ${i + 1} attached by the shopper, described by a vision model: ${d}]`).join('\n')}` };
     }
   }
-  let plan;
-  try { plan = parseJson(await callLlm(provider, systemPrompt(name.ar, profile, stylistTrainingPrompt(history.at(-1)?.content || '')), history)); lastError = ''; }
-  catch (e) { lastError = String(e.message).slice(0, 200); console.error('[stylist]', lastError); throw Object.assign(new Error('llm'), { code: 'stylist_unavailable' }); }
+  if (!plan) {
+    try { plan = parseJson(await callLlm(provider, systemPrompt(name.ar, profile, stylistTrainingPrompt(history.at(-1)?.content || '')), history)); lastError = ''; }
+    catch (e) { lastError = String(e.message).slice(0, 200); console.error('[stylist]', lastError); throw Object.assign(new Error('llm'), { code: 'stylist_unavailable' }); }
+  }
   const intent = ['shop', 'clarify', 'chat'].includes(plan.intent) ? plan.intent : 'shop';
-  const say = String(plan.say || '').slice(0, 700);
+  let say = cleanSay(plan.say);
   const palette = [...new Set((Array.isArray(plan.palette) ? plan.palette : []).map((color) => String(color).trim().slice(0, 30)).filter(Boolean))].slice(0, 3);
   const remember = {}; if (plan.remember && typeof plan.remember === 'object') for (const k of ['gender', 'size', 'likes', 'avoid', 'notes']) if (plan.remember[k]) remember[k] = String(plan.remember[k]).slice(0, 80);
   if (intent !== 'shop') return { intent, say, remember, looks: [], total: 0 };
-  const who = { him: 'له', her: 'لها', kid: 'للطفل' };
-  const slots = (Array.isArray(plan.slots) ? plan.slots : []).slice(0, 12).map((s) => ({
-    label: `${s.person ? String(s.person).slice(0, 20) + ' · ' : who[s.for] ? who[s.for] + ' · ' : ''}${String(s.label || '').slice(0, 30)}`, color: String(s.color || '').slice(0, 30), palette,
-    likes: String(profile?.likes || '').slice(0, 100), avoid: String(profile?.avoid || '').slice(0, 100),
-    keywords: (Array.isArray(s.keywords) ? s.keywords : []).map(String).slice(0, 8),
-    department: s.department && /^[a-z0-9_]+$/.test(s.department) ? s.department : null, max_price: Number(s.max_price) > 0 ? Number(s.max_price) : null,
-  }));
+  const slots = (Array.isArray(plan.slots) ? plan.slots : []).slice(0, 12).map((s) => {
+    const piece = String(s.label || '').replace(/[\r\n·]+/g, ' ').trim().slice(0, 30);
+    const owner = slotOwnerLabel(s);
+    return {
+      // matching uses the last "·" part (the garment), so the owner goes first; `shown` is the readable text for the shopper
+      label: `${owner ? owner + ' · ' : ''}${piece}`, shown: owner ? `${piece} (${owner})` : piece,
+      color: String(s.color || '').slice(0, 30), palette,
+      likes: String(profile?.likes || '').slice(0, 100), avoid: String(profile?.avoid || '').slice(0, 100),
+      keywords: (Array.isArray(s.keywords) ? s.keywords : []).map(String).slice(0, 8),
+      department: s.department && /^[a-z0-9_]+$/.test(s.department) ? s.department : null, max_price: Number(s.max_price) > 0 ? Number(s.max_price) : null,
+    };
+  });
   const looks = slots.map((s) => ({ label: s.label, palette, items: findCandidates(s), pick: 0 })).filter((l) => l.items.length);
   const budget = Number(plan.budget) > 0 ? Number(plan.budget) : null;
   coordinateLookCandidates(looks, budget);
   const total = fitBudgetCandidates(looks, budget);
-  return { intent, say, remember, palette, tips: String(plan.tips || '').slice(0, 300), looks, total, budget, overBudget: !!(budget && total > budget), missing: slots.filter((s) => !looks.find((l) => l.label === s.label)).map((s) => s.label) };
+  const missing = slots.filter((s) => !looks.find((l) => l.label === s.label)).map((s) => s.shown);
+  // Never leave the model's upbeat line ("this will suit you") on screen when nothing was actually found.
+  if (!looks.length) say = 'دورت في محلات بنها ومالقيتش قطع مناسبة للطلب ده دلوقتي. جرّب تحدد القطعة أو الميزانية بشكل تاني، أو ابعت طلب ونوفرهولك.';
+  else if (missing.length) say = `${say}${say ? ' ' : ''}لقيت جزء من اللوك، والباقي مش متاح دلوقتي.`;
+  return { intent, say, remember, palette, tips: looks.length ? String(plan.tips || '').slice(0, 300) : '', looks, total, budget, overBudget: !!(budget && total > budget), missing };
 }
 
 /* ---------------- store-owner assistant: write the listing from a product photo ---------------- */
@@ -418,10 +504,10 @@ const KID_OCCASIONS = ['أوتفيت خروجة للأطفال', 'أوتفيت �
 const KID_AGES = ['من ٤ لـ٦ سنين', 'من ٧ لـ١٠ سنين', 'من ١١ لـ١٤ سنة'];
 const cairoDay = () => new Date(Date.now() + 3 * 3600e3).toISOString().slice(0, 10);
 const dayNumber = (day) => Math.floor(Date.parse(`${day}T00:00:00Z`) / 864e5);
-const LOOK_OF_DAY_VERSION = 4;
 const LOOK_OF_DAY_MODE_KEY = 'look_of_day_mode';
 const LOOK_OF_DAY_MANUAL_KEY = 'look_of_day_manual';
-let lodInflight = null;
+const LOOK_OF_DAY_PROPOSAL_KEY = 'look_of_day_ai_proposal';
+const LOOK_OF_DAY_APPROVED_KEY = 'look_of_day_ai_approved';
 
 export function lookOfDayMode() {
   const mode = q.get('SELECT value FROM app_settings WHERE key=?', [LOOK_OF_DAY_MODE_KEY])?.value;
@@ -478,6 +564,13 @@ export function lookOfDayAdminSettings() {
   const outfits = storedManualOutfits(raw);
   const ids = outfits.flatMap((outfit) => (Array.isArray(outfit.pieces) ? outfit.pieces : []).map((piece) => Number(piece.productId)));
   const products = new Map(productCards(manualProductRows(ids)).map((product) => [product.id, product]));
+  const readEntrySetting = (key) => {
+    try { return JSON.parse(q.get('SELECT value FROM app_settings WHERE key=?', [key])?.value || 'null'); }
+    catch { return null; }
+  };
+  const proposal = readEntrySetting(LOOK_OF_DAY_PROPOSAL_KEY);
+  const approved = readEntrySetting(LOOK_OF_DAY_APPROVED_KEY);
+  const hydrateEntries = (entries) => (Array.isArray(entries) ? entries : []).map(revalidate).filter(Boolean);
   return { mode: lookOfDayMode(), manual: { outfits: outfits.map((outfit) => ({
     audience: ['women', 'men', 'kids'].includes(outfit.audience) ? outfit.audience : 'women',
     age: String(outfit.age || ''), say: String(outfit.say || ''), tips: String(outfit.tips || ''), occasion: String(outfit.occasion || ''),
@@ -485,7 +578,8 @@ export function lookOfDayAdminSettings() {
       const productId = Number(piece.productId);
       return { label: String(piece.label || ''), productId, product: products.get(productId) || null };
     }),
-  })) } };
+  })) }, proposal: proposal ? { day: proposal.day, generatedAt: proposal.generatedAt, entries: hydrateEntries(proposal.entries) } : null,
+  approvedAt: approved?.approvedAt || null };
 }
 
 export function saveLookOfDayAdminSettings({ mode, manual }) {
@@ -515,7 +609,7 @@ function buildManualLookEntries() {
   }).filter(Boolean);
 }
 
-async function buildLook(target, index, day) {
+async function buildLook(target, index, day, { aiOnly = false } = {}) {
   const dayIndex = dayNumber(day);
   const occ = target.audience === 'kids'
     ? KID_OCCASIONS[(dayIndex + index) % KID_OCCASIONS.length]
@@ -527,9 +621,11 @@ async function buildLook(target, index, day) {
       const clothingDept = target.audience === 'kids' ? 'الأطفال' : target.audience === 'women' ? 'الحريمي' : 'الرجالي';
       const ask = `اعمل أوتفيت كامل ومتناسق لـ ${person} مناسب لـ ${occ}، اختار القطعة الأساسية ومعاها قطعتين يكملوها من منتجات المحلات، بحدود 1800 جنيه. اختار الملابس من قسم ${clothingDept}، والحذاء أو الإكسسوار من تصنيفه الصحيح مع مراعاة الفئة والعمر. الكابات والطاقيات إكسسوارات وليست أقسام ملابس مستقلة. حط سن الطفل في اسم كل قطعة لو كان الأوتفيت للأطفال.`;
       const r = await runStylist([{ role: 'user', content: ask }]);
-      if (r.looks?.length >= 2) return { audience: target.audience, age: target.age, occasion: occ, say: r.say, tips: r.tips || '', looks: r.looks, total: r.total, budget: r.budget || null, overBudget: !!r.overBudget };
+      if (r.looks?.length >= 2 && (!aiOnly || !r.missing?.length)) return { audience: target.audience, age: target.age, occasion: occ, say: r.say, tips: r.tips || '', looks: r.looks, total: r.total, budget: r.budget || null, overBudget: !!r.overBudget };
     } catch (e) { console.error('[look-of-day]', e.code || e.message); }
   }
+  // AI review mode must never silently turn a deterministic guess into an AI proposal.
+  if (aiOnly) return null;
   const event = norm(occ);
   const formal = ['خطوبه', 'كتب كتاب', 'فرح', 'مناسبه', 'سهره'].some((word) => event.includes(word));
   const work = event.includes('مقابله') || event.includes('شغل');
@@ -559,6 +655,40 @@ async function buildLook(target, index, day) {
   return { audience: target.audience, age: target.age, occasion: occ, say: '', tips: '', looks, total, budget: null, overBudget: false };
 }
 
+function saveLookOfDayEntrySetting(key, value) {
+  q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [key, JSON.stringify(value)]);
+}
+
+export async function generateLookOfDayProposal() {
+  const { enabled, provider } = stylistSettings();
+  if (!enabled || !providerReady[provider]?.()) throw Object.assign(new Error('provider_not_configured'), { code: 'stylist_unavailable' });
+  const day = cairoDay();
+  const entries = [];
+  for (const [index, target] of dailyTargets(day).entries()) {
+    const entry = await buildLook(target, index, day, { aiOnly: true });
+    if (entry) entries.push(entry);
+  }
+  if (!entries.length) throw Object.assign(new Error('no_valid_looks'), { code: 'look_of_day_no_suggestions' });
+  const proposal = { day, generatedAt: new Date().toISOString(), entries };
+  saveLookOfDayEntrySetting(LOOK_OF_DAY_PROPOSAL_KEY, proposal);
+  return lookOfDayAdminSettings();
+}
+
+export function approveLookOfDayProposal() {
+  let proposal = null;
+  try { proposal = JSON.parse(q.get('SELECT value FROM app_settings WHERE key=?', [LOOK_OF_DAY_PROPOSAL_KEY])?.value || 'null'); } catch { /* invalid proposal */ }
+  const entries = (Array.isArray(proposal?.entries) ? proposal.entries : []).map(revalidate).filter(Boolean);
+  if (!entries.length) throw Object.assign(new Error('no_valid_looks'), { code: 'look_of_day_no_suggestions' });
+  const approved = { approvedAt: new Date().toISOString(), entries };
+  saveLookOfDayEntrySetting(LOOK_OF_DAY_APPROVED_KEY, approved);
+  return lookOfDayAdminSettings();
+}
+
+export function discardLookOfDayProposal() {
+  q.run('DELETE FROM app_settings WHERE key=?', [LOOK_OF_DAY_PROPOSAL_KEY]);
+  return lookOfDayAdminSettings();
+}
+
 function dailyTargets(day) {
   const index = dayNumber(day);
   const ages = [KID_AGES[index % KID_AGES.length], KID_AGES[(index + 1) % KID_AGES.length]];
@@ -575,9 +705,14 @@ function revalidate(entry) {
   const ids = entry.looks.flatMap((l) => l.items.map((i) => i.id));
   if (!ids.length) return null;
   const ok = new Set(q.all(`SELECT p.id FROM products p JOIN stores s ON s.id=p.store_id WHERE p.id IN (${ids.map(() => '?').join(',')}) AND p.status='active' AND s.status='active' AND s.hidden=0 AND (p.track_stock=0 OR p.stock>0)`, ids).map((r) => r.id));
-  const looks = entry.looks.map((l) => { const items = l.items.filter((i) => ok.has(i.id)); return items.length ? { ...l, items, pick: 0 } : null; }).filter(Boolean);
+  const looks = entry.looks.map((l) => {
+    const selectedId = l.items[l.pick]?.id;
+    const items = l.items.filter((i) => ok.has(i.id));
+    const pick = items.findIndex((item) => item.id === selectedId);
+    return items.length ? { ...l, items, pick: Math.max(0, pick) } : null;
+  }).filter(Boolean);
   if (looks.length < 2) return null;
-  return { ...entry, looks, total: looks.reduce((sum, l) => sum + l.items[0].price, 0) };
+  return { ...entry, looks, total: looks.reduce((sum, l) => sum + l.items[l.pick]?.price, 0) };
 }
 
 export async function lookOfDay() {
@@ -585,22 +720,10 @@ export async function lookOfDay() {
   const mode = lookOfDayMode();
   if (mode === 'off') return { day, entries: [] };
   if (mode === 'manual') return { day, entries: buildManualLookEntries() };
-  const row = q.get("SELECT value FROM app_settings WHERE key='look_of_day'");
-  let cached = null; try { cached = row ? JSON.parse(row.value) : null; } catch { /* rebuild */ }
-  if (cached?.version === LOOK_OF_DAY_VERSION && cached?.day === day && cached.entries?.length) {
-    const entries = cached.entries.map(revalidate).filter(Boolean);
-    if (entries.length) return { day, entries };
-  }
-  if (cached?.version === LOOK_OF_DAY_VERSION && cached?.day === day && cached.failedAt && Date.now() - cached.failedAt < 10 * 60e3) return { day, entries: [] };
-  if (!lodInflight) {
-    lodInflight = (async () => {
-      const entries = (await Promise.all(dailyTargets(day).map((target, index) => buildLook(target, index, day)))).filter(Boolean);
-      const val = JSON.stringify(entries.length ? { version: LOOK_OF_DAY_VERSION, day, entries } : { version: LOOK_OF_DAY_VERSION, day, entries: [], failedAt: Date.now() });
-      q.run("INSERT INTO app_settings(key,value) VALUES('look_of_day',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [val]);
-      return { day, entries };
-    })().finally(() => { lodInflight = null; });
-  }
-  return lodInflight;
+  // AI-generated looks remain private until a platform admin approves them.
+  let approved = null;
+  try { approved = JSON.parse(q.get('SELECT value FROM app_settings WHERE key=?', [LOOK_OF_DAY_APPROVED_KEY])?.value || 'null'); } catch { /* invalid approval */ }
+  return { day, entries: (Array.isArray(approved?.entries) ? approved.entries : []).map(revalidate).filter(Boolean) };
 }
 
 

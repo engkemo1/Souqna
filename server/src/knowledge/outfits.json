@@ -1,0 +1,334 @@
+{
+  "_about": "تركيبات مودة. كل 'look' = وصفة لبس بدرجة رسمية معينة. المحرك بيختار الـlooks اللي تنفع للسياق + الفئة + الرسمية + الذوق + الميزانية، وبعدين الكود يدور في المخزون على كل slot. الموديل (AI) ما بيخترعش قطع: بيختار من هنا أو من قاعدة التركيب.\n\nشكل الـslot: [المفتاح أو بدائل مفصولة |, مطلوب(1)/اختياري(0), نسبة الميزانية %]. المفاتيح من taxonomy.json.\nstatus: sourced = اتبنت على مصدر مذكور في sources، draft = من الخبرة العامة وتحتاج مراجعة من حد من السوق، reviewed = راجعها حد.",
+  "version": 1,
+
+  "sources": {
+    "knot":    "The Knot - what to wear to an engagement party (دريس كود كوكتيل/كاجوال/بلاك تاي، الأبيض ممنوع على الضيف)",
+    "cairo360":"Cairo360 - wedding guest dress code: Sahel vs City (خامات وألوان حسب المكان)",
+    "aljazeera":"الجزيرة نت - أصول ارتداء الأبيض للمدعوات (الأبيض والألوان القريبة منه للعروسة)",
+    "sayidaty_beige":"سيدتي - فساتين خطوبة بيج 2023 (راحة، منفوش، ساتان، طرحة بنفس اللون للمحجبات)",
+    "sayidaty_suit":"سيدتي - بدلة العريس للخطوبة والزفاف (كرافتة تنسيق مع فستان العروسة، قواعد القياس)",
+    "ahram_suits":"الأهرام - دليل أنواع البدل (كلاسيك، دبل بريست، سليم فِت)",
+    "ahram_eid":"الأهرام - ملابس العيد (ألوان فاتحة، قطن وكتان، طبقات)",
+    "youm7_work":"اليوم السابع 2026 - لبس الشغل (بليزر وبنطلون قماش، ألوان هادية، حذاء مريح)",
+    "ninaline":"نينا لاين - أسماء العبايات",
+    "asos":"ASOS - engagement party ideas (رسمية المكان أهم من أي دريس كود مكتوب)",
+    "stitchfix":"Harvard D3 - Stitch Fix (استبيان الذوق + تقييم لكل قطعة)",
+    "thevou":"TheVou - أسئلة المستايلست (ستايل، لون، قصّة، مناسبة، وقت اليوم)"
+  },
+
+  "rules": {
+    "compose": [
+      "ابدأ بالقطعة الرئيسية (hero) بتاعة الـlook، وبعدين كمّل الباقي.",
+      "الفرق في الرسمية بين أي قطعتين في نفس الطقم مايزيدش عن درجة واحدة (مثال: مفيش بدلة مع كوتشي رياضي).",
+      "لوحة ألوان من 2 لـ3 ألوان: أساسي + داعم + (اختياري) لمسة. الإكسسوار والحزام بياخدوا لون الحذاء أو الحقيبة.",
+      "قطعة واحدة بس لافتة (طبعة أو لون جريء)، والباقي هادي.",
+      "الحزام بنفس لون الحذاء في الأطقم الرسمية.",
+      "الراحة مهمة في المناسبات اللي فيها قعدة طويلة أو رقص (اختار قصّة مريحة وحذاء يتحمل).",
+      "الألوان اللي العميل قال إنه مابيحبهاش بتتشال من اللوحة حتى لو أنسب."
+    ],
+    "formality_match": "المنتج بيتقبل لو درجته جوه مدى الـlook (أو فرق درجة واحدة لو مفيش بديل). الدرجة بتيجي من formality_signals في taxonomy.json أو من اللي صاحب المحل حطه.",
+    "near_white_guests": "في الفرح والخطوبة والضيف: ممنوع الأبيض والألوان القريبة منه (near_white). مسموح للعروسة أو لو الدعوة طلبت صراحة.",
+    "couples": [
+      "الاتنين في قصة ألوان واحدة (لوحة مشتركة أو متكاملة، مش نسخة طبق الأصل).",
+      "الرجل بيختار كرافتة أو منديل أو حزام بلون فستان/عباية شريكته (سيدتي).",
+      "الأطقم بتتعرض في تبويبين (ليك/ليها) وإجمالي لكل واحد وإجمالي الاتنين."
+    ],
+    "budget": [
+      "الميزانية المذكورة دايمًا إجمالي. القطع المطلوبة (required) الأول، والاختيارية بتتحذف قبل ما نتخطى الميزانية.",
+      "نسبة الميزانية لكل slot موجودة في الـlook، والكود بيعدّلها حسب المتاح.",
+      "لو الإجمالي أعلى من الميزانية: نستبدل القطعة الأقل تأثيرًا بأرخص بديل، وفي الآخر نقول للعميل بوضوح إن الطقم زاد كام."
+    ],
+    "fallback_ladder": [
+      "1) وسّع اللون لقريب منه في نفس اللوحة.",
+      "2) وسّع السعر 15%.",
+      "3) رسمية ±1 درجة.",
+      "4) بديل من نفس العائلة (مثال: طقم كلاسيك بدل بدلة).",
+      "5) لو لسه مفيش: اعرض الأجزاء اللي لقيناها ووضّح اللي ناقص مع زر 'اطلبه'، وماتجاملش."
+    ],
+    "never": [
+      "العزاء (condolence): ما يظهرش في أي سؤال بأزرار ولا اقتراح ولا قائمة مناسبات. المحرك يستخدمه بس لو العميل كتب كلمة عزاء/جنازة صراحة (الكلمات في synonyms.contexts.condolence).",
+      "ماتقترحش جلابية في فرح أو خطوبة إلا لو العميل طلبها أو اختار ذوق 'بلدي'.",
+      "ماتقترحش ملابس داخلية ضمن أطقم. تعرضها بس لو اتطلبت صراحة.",
+      "ماتحكمش على جسم العميل ولا تقول 'ده مش هيليق على جسمك'. اتكلم عن القصّة والخامة بس."
+    ]
+  },
+
+  "looks": [
+
+    { "id": "m_eng_suit", "audience": ["men"], "contexts": ["engagement_guest", "katb_kitab", "wedding_guest", "graduation"],
+      "name_ar": "بدلة كلاسيك", "formality": 5, "taste": ["classic", "elegant"],
+      "slots": [["suit", 1, 55], ["shirt", 1, 12], ["formal_shoes", 1, 20], ["tie", 0, 6], ["belt", 0, 4], ["watch", 0, 3]],
+      "colors": ["navy", "grey", "black"], "avoid_colors": ["white", "cream"],
+      "tip_ar": "البدلة الكحلي أو الرمادي أكتر لون بيمشي في أي خطوبة أو فرح. القميص أبيض أو أزرق سماوي، والكرافتة بتتنسق مع لون فستان شريكتك.",
+      "status": "sourced", "src": ["knot", "sayidaty_suit", "ahram_suits"] },
+
+    { "id": "m_eng_classic_set", "audience": ["men"], "contexts": ["engagement_guest", "katb_kitab", "wedding_guest", "date_night"],
+      "name_ar": "طقم كلاسيك (جاكيت وبنطلون منفصلين)", "formality": 4, "taste": ["modern", "elegant", "relaxed"],
+      "slots": [["classic_set|blazer+trousers", 1, 55], ["shirt", 1, 12], ["formal_shoes|loafers", 1, 22], ["belt", 0, 6], ["watch", 0, 5]],
+      "colors": ["navy", "grey", "olive", "brown"], "avoid_colors": ["white"],
+      "tip_ar": "أريح وأخف من البدلة الكاملة، ولسه شيك. الجاكيت والبنطلون ممكن يبقوا بدرجتين من نفس اللون. من غير كرافتة لو الجو حر.",
+      "status": "sourced", "src": ["knot", "asos"] },
+
+    { "id": "m_owned_blazer", "audience": ["men"], "contexts": ["casual_outing", "family_gathering", "date_night", "engagement_guest", "work_casual", "work_formal"],
+      "name_ar": "تنسيق بليزر موجود", "formality": 3, "taste": ["modern", "classic", "relaxed"],
+      "slots": [["blazer", 0, 0], ["shirt|polo", 1, 45], ["trousers|chinos", 1, 55]],
+      "colors": ["navy", "grey", "beige", "olive"], "avoid_colors": [],
+      "tip_ar": "نسّق البليزر مع قميص أو بولو وبنطلون قماش أو شينو بدرجة متناسقة.",
+      "status": "reviewed", "src": [] },
+
+    { "id": "m_eng_smart", "audience": ["men"], "contexts": ["engagement_guest", "family_gathering", "date_night", "ramadan_iftar"],
+      "name_ar": "قميص وبنطلون شيك", "formality": 3, "taste": ["modern", "relaxed", "minimal"],
+      "slots": [["shirt", 1, 20], ["trousers|chinos", 1, 30], ["loafers|formal_shoes", 1, 35], ["belt", 0, 8], ["watch", 0, 7]],
+      "colors": ["navy", "olive", "beige", "brown", "sky_blue"], "avoid_colors": [],
+      "tip_ar": "للخطوبات اللي في البيت أو الجو فيها هادي. قميص مقلّم أو سادة مع بنطلون شينو بلون مختلف.",
+      "status": "draft", "src": ["knot"] },
+
+    { "id": "m_wed_tux", "audience": ["men"], "contexts": ["wedding_guest", "graduation"],
+      "name_ar": "بدلة سواريه / تاكسيدو", "formality": 5, "taste": ["classic", "elegant", "bold"],
+      "slots": [["tuxedo|suit", 1, 50], ["shirt", 1, 12], ["formal_shoes", 1, 20], ["bow_tie|tie", 1, 6], ["pocket_square", 0, 4], ["watch", 0, 5], ["belt", 0, 3]],
+      "colors": ["black", "navy", "grey"], "avoid_colors": ["white", "cream"],
+      "tip_ar": "لو الدعوة بلاك تاي أو الفرح في فندق كبير بالليل. التاكسيدو بعد ٦ مساءً.",
+      "status": "sourced", "src": ["sayidaty_suit", "knot"] },
+
+    { "id": "m_groom", "audience": ["men"], "contexts": ["wedding_self", "engagement_self"],
+      "name_ar": "بدلة العريس", "formality": 5, "taste": ["classic", "elegant"],
+      "slots": [["suit|tuxedo", 1, 55], ["shirt", 1, 12], ["formal_shoes", 1, 18], ["tie|bow_tie", 1, 6], ["pocket_square", 0, 3], ["watch", 0, 3], ["belt", 0, 3]],
+      "colors": ["black", "navy", "grey", "burgundy"], "avoid_colors": [],
+      "tip_ar": "في الخطوبة نسّق الكرافتة أو المنديل مع فستان العروسة. في الفرح الأفضل شكل كلاسيك أكتر (سيدتي). جرّب البدلة بالقميص والحذاء قبل ما تقرر.",
+      "status": "sourced", "src": ["sayidaty_suit"] },
+
+    { "id": "m_work", "audience": ["men"], "contexts": ["work_casual", "work_formal"],
+      "name_ar": "لبس شغل رسمي", "formality": 4, "taste": ["classic", "minimal"],
+      "slots": [["shirt", 1, 22], ["trousers", 1, 30], ["blazer|jacket", 0, 20], ["formal_shoes|loafers", 1, 22], ["belt", 0, 4], ["watch", 0, 2]],
+      "colors": ["navy", "grey", "white", "sky_blue"], "avoid_colors": ["fuchsia", "yellow"],
+      "tip_ar": "قميص + بنطلون قماش + حذاء جلد. زوّد بليزر للاجتماعات والمقابلات.",
+      "status": "draft", "src": ["youm7_work"] },
+
+    { "id": "m_work_smart", "audience": ["men"], "contexts": ["work_casual", "university"],
+      "name_ar": "شغل سمارت كاجوال", "formality": 3, "taste": ["modern", "relaxed", "minimal"],
+      "slots": [["shirt|polo", 1, 22], ["chinos|trousers", 1, 32], ["loafers|sneakers", 1, 36], ["belt", 0, 5], ["watch", 0, 5]],
+      "colors": ["navy", "beige", "olive", "white"], "avoid_colors": [],
+      "tip_ar": "بنطلون شينو مع قميص أو بولو، وحذاء جلد أو كوتشي جلد نظيف.",
+      "status": "draft", "src": ["youm7_work"] },
+
+    { "id": "m_casual", "audience": ["men"], "contexts": ["casual_outing", "university", "travel", "family_gathering"],
+      "name_ar": "كاجوال يومي", "formality": 2, "taste": ["relaxed", "modern", "minimal"],
+      "slots": [["tshirt|polo|shirt", 1, 22], ["jeans|chinos", 1, 33], ["sneakers", 1, 35], ["jacket|hoodie", 0, 10]],
+      "colors": ["black", "white", "navy", "grey", "olive"], "avoid_colors": [],
+      "tip_ar": "تيشيرت أو بولو + جينز + كوتشي نضيف. جاكيت خفيف فوقه لو الجو بارد.",
+      "status": "draft", "src": [] },
+
+    { "id": "m_eid", "audience": ["men"], "contexts": ["eid", "ramadan_iftar"],
+      "name_ar": "لبس العيد", "formality": 3, "taste": ["modern", "relaxed", "classic"],
+      "slots": [["shirt|polo", 1, 22], ["chinos|trousers", 1, 32], ["loafers|sneakers", 1, 36], ["sweater|cardigan", 0, 10]],
+      "colors": ["sky_blue", "white", "beige", "mint", "sky_blue"], "avoid_colors": [],
+      "tip_ar": "ألوان فاتحة وخامات خفيفة (قطن وكتان)، وطبقة خفيفة فوقها علشان الجو المتقلب (الأهرام).",
+      "status": "sourced", "src": ["ahram_eid"] },
+
+    { "id": "m_sahel", "audience": ["men"], "contexts": ["sahel_beach"],
+      "name_ar": "الساحل", "formality": 2, "taste": ["relaxed", "minimal"],
+      "slots": [["shirt|polo|tshirt", 1, 30], ["shorts|chinos", 1, 30], ["sandals|sneakers", 1, 30], ["cap", 0, 10]],
+      "colors": ["white", "sky_blue", "beige", "mint"], "avoid_colors": [],
+      "tip_ar": "كتان وقطن خفيف، وألوان فاتحة.", "status": "sourced", "src": ["cairo360"] },
+
+    { "id": "m_condolence", "audience": ["men"], "contexts": ["condolence"],
+      "name_ar": "عزاء", "formality": 4, "taste": ["classic", "minimal"],
+      "slots": [["shirt", 1, 25], ["trousers", 1, 35], ["formal_shoes", 1, 30], ["blazer|jacket", 0, 10]],
+      "colors": ["black", "navy", "grey", "white"], "avoid_colors": ["red", "yellow", "orange", "fuchsia"],
+      "tip_ar": "ألوان غامقة وهادية وبدون أي حاجة لافتة.", "status": "draft", "src": [] },
+
+    { "id": "m_sport", "audience": ["men"], "contexts": ["sport"],
+      "name_ar": "رياضة", "formality": 1, "taste": ["relaxed"],
+      "slots": [["sport_top|tshirt", 1, 25], ["sport_bottom|shorts|joggers", 1, 30], ["sport_shoes|sneakers", 1, 40], ["socks", 0, 5]],
+      "colors": [], "avoid_colors": [], "tip_ar": "خامة بتشرب العرق وحذاء مناسب للنشاط.", "status": "draft", "src": [] },
+
+
+    { "id": "w_eng_party_dress", "audience": ["women"], "contexts": ["engagement_guest", "katb_kitab", "wedding_guest", "graduation"],
+      "name_ar": "فستان سواريه", "formality": 5, "taste": ["elegant", "classic", "modern"],
+      "slots": [["dress_party|dress_evening", 1, 55], ["heels_low|heels_high|flats", 1, 22], ["clutch|handbag", 1, 10], ["shawl", 0, 5], ["jewelry", 0, 8]],
+      "colors": ["emerald", "burgundy", "navy", "black", "royal_blue", "purple", "gold"], "avoid_colors": ["white", "cream", "beige", "blush", "silver", "sky_blue"],
+      "tip_ar": "ميدي أو طويل بخامة ساتان أو كريب أو حرير. اللون غامق أو جوهري، وتجنبي الأبيض والألوان القريبة منه. خدي شال لو القاعة تكييف.",
+      "status": "sourced", "src": ["knot", "cairo360", "aljazeera"] },
+
+    { "id": "w_eng_midi_dress", "audience": ["women"], "contexts": ["engagement_guest", "katb_kitab", "date_night", "birthday_party", "ramadan_iftar"],
+      "name_ar": "دريس ميدي شيك", "formality": 4, "taste": ["modern", "elegant", "minimal"],
+      "slots": [["dress_party|dress_casual|dress_work", 1, 52], ["heels_low|flats|loafers", 1, 25], ["handbag|clutch", 1, 13], ["jewelry", 0, 10]],
+      "colors": ["navy", "burgundy", "olive", "emerald", "black", "mint"], "avoid_colors": ["white", "cream"],
+      "tip_ar": "للخطوبات الأهدى أو اللي في البيت. دريس ميدي بخامة أنيقة وحذاء مريح.",
+      "status": "draft", "src": ["asos", "sayidaty_beige"] },
+
+    { "id": "w_eng_two_piece", "audience": ["women"], "contexts": ["engagement_guest", "wedding_guest", "date_night"],
+      "name_ar": "طقم قطعتين أو جمبسوت", "formality": 4, "taste": ["modern", "bold", "elegant"],
+      "slots": [["two_piece_set|jumpsuit", 1, 55], ["heels_low|heels_high", 1, 25], ["clutch|handbag", 1, 12], ["jewelry", 0, 8]],
+      "colors": ["black", "navy", "emerald", "burgundy"], "avoid_colors": ["white", "cream"],
+      "tip_ar": "بديل مختلف عن الفستان. جمبسوت أو توب وجيبة بنفس القماش.",
+      "status": "sourced", "src": ["knot", "cairo360", "asos"] },
+
+    { "id": "w_eng_womens_suit", "audience": ["women"], "contexts": ["engagement_guest", "work_formal", "graduation"],
+      "name_ar": "تايير", "formality": 4, "taste": ["classic", "elegant", "minimal"],
+      "slots": [["womens_suit", 1, 60], ["blouse|top", 1, 15], ["heels_low|flats", 1, 20], ["handbag", 0, 5]],
+      "colors": ["navy", "black", "grey", "burgundy"], "avoid_colors": ["white"],
+      "tip_ar": "للنهار أو للي بتحب الرسمي. دريسكود 'كوكتيل' بيقبل التايير (The Knot).",
+      "status": "sourced", "src": ["knot"] },
+
+    { "id": "w_bride_engagement", "audience": ["women"], "contexts": ["engagement_self"],
+      "name_ar": "فستان خطوبتي", "formality": 5, "taste": ["elegant", "classic", "modern"],
+      "slots": [["dress_party|dress_evening", 1, 60], ["heels_low|heels_high|flats", 1, 25], ["clutch", 0, 8], ["jewelry", 0, 7]],
+      "colors": ["beige", "blush", "cream", "white", "gold", "champagne", "pink"], "avoid_colors": [],
+      "tip_ar": "الراحة أول حاجة لأنك هتتحركي وترقصي. المنفوش والساتان من الأكتر طلبًا، والبيج لون الموسم (سيدتي). جربي القصّة قبل اليوم.",
+      "status": "sourced", "src": ["sayidaty_beige", "asos"] },
+
+    { "id": "w_bride_wedding", "audience": ["women"], "contexts": ["wedding_self"],
+      "name_ar": "فستان الفرح", "formality": 5, "taste": ["elegant", "classic"],
+      "slots": [["dress_bridal", 1, 70], ["heels_high|heels_low", 1, 20], ["jewelry", 0, 10]],
+      "colors": ["white", "cream", "champagne"], "avoid_colors": [],
+      "tip_ar": "الأبيض والعاجي للعروسة. اختاري حذاء مريح للوقوف الطويل.",
+      "status": "draft", "src": ["aljazeera"] },
+
+    { "id": "w_work", "audience": ["women"], "contexts": ["work_casual", "work_formal"],
+      "name_ar": "لبس شغل", "formality": 4, "taste": ["classic", "minimal", "modern"],
+      "slots": [["blouse|shirt|top", 1, 20], ["trousers|skirt", 1, 30], ["blazer|cardigan", 0, 18], ["flats|heels_low|loafers", 1, 22], ["handbag", 0, 10]],
+      "colors": ["black", "beige", "grey", "navy", "off_white", "sky_blue"], "avoid_colors": ["fuchsia"],
+      "tip_ar": "بليزر + بنطلون قماش مستقيم أو جيبة ميدي، وألوان هادية مع لمسة باستيل. حذاء مريح (كعب وسط أو بالرينا) وشنطة عملية (اليوم السابع).",
+      "status": "sourced", "src": ["youm7_work"] },
+
+    { "id": "w_work_dress", "audience": ["women"], "contexts": ["work_casual", "university"],
+      "name_ar": "دريس شغل", "formality": 3, "taste": ["modern", "elegant"],
+      "slots": [["dress_work|dress_casual", 1, 55], ["flats|heels_low|loafers", 1, 28], ["handbag", 1, 12], ["cardigan|blazer", 0, 5]],
+      "colors": ["navy", "olive", "beige", "black", "burgundy"], "avoid_colors": [],
+      "tip_ar": "دريس بسيط بقماش مريح ومظبوط، وكارديجان فوقه لو التكييف.",
+      "status": "draft", "src": ["youm7_work"] },
+
+    { "id": "w_casual", "audience": ["women"], "contexts": ["casual_outing", "university", "travel", "family_gathering"],
+      "name_ar": "كاجوال يومي", "formality": 2, "taste": ["relaxed", "modern", "minimal"],
+      "slots": [["tshirt|blouse|top|sweater", 1, 22], ["jeans|trousers|skirt", 1, 33], ["sneakers|flats|sandals", 1, 35], ["jacket|cardigan", 0, 10]],
+      "colors": ["white", "black", "beige", "navy", "olive", "sky_blue"], "avoid_colors": [],
+      "tip_ar": "تيشيرت أو بلوزة + جينز أو جيبة + كوتشي أو بالرينا.", "status": "draft", "src": [] },
+
+    { "id": "w_casual_dress", "audience": ["women"], "contexts": ["casual_outing", "date_night", "family_gathering", "eid"],
+      "name_ar": "دريس خروجة", "formality": 3, "taste": ["modern", "relaxed", "elegant"],
+      "slots": [["dress_casual", 1, 55], ["sneakers|flats|sandals|heels_low", 1, 28], ["crossbody|handbag", 1, 12], ["jacket|cardigan", 0, 5]],
+      "colors": ["olive", "navy", "beige", "burgundy", "sky_blue", "mint"], "avoid_colors": [],
+      "tip_ar": "دريس مريح وخفيف. ممكن تلبسيه بكوتشي للخروجة العادية أو بكعب وسط للعزومة.",
+      "status": "draft", "src": [] },
+
+    { "id": "w_eid", "audience": ["women"], "contexts": ["eid", "ramadan_iftar"],
+      "name_ar": "لبس العيد", "formality": 3, "taste": ["modern", "elegant", "relaxed"],
+      "slots": [["dress_casual|dress_party|two_piece_set", 1, 55], ["flats|sandals|heels_low", 1, 25], ["handbag|crossbody", 1, 12], ["cardigan|jacket", 0, 8]],
+      "colors": ["pink", "sky_blue", "yellow", "white", "mint", "lavender"], "avoid_colors": [],
+      "tip_ar": "ألوان فاتحة وخامات خفيفة (قطن وكتان وحرير)، والفستان بيخلي الجسم يتهوّى (الأهرام).",
+      "status": "sourced", "src": ["ahram_eid"] },
+
+    { "id": "w_sahel", "audience": ["women"], "contexts": ["sahel_beach"],
+      "name_ar": "الساحل", "formality": 2, "taste": ["relaxed", "minimal", "bold"],
+      "slots": [["dress_beach|dress_casual", 1, 55], ["sandals|flats", 1, 28], ["tote|crossbody", 0, 10], ["jewelry|cap", 0, 7]],
+      "colors": ["coral", "lavender", "sky_blue", "mint", "white", "yellow"], "avoid_colors": ["black", "burgundy"],
+      "tip_ar": "كتان وشيفون وقطن، ألوان باستيل. الحذاء مسطح أو وِدج لأن الكعب بيغطس في الرمل (Cairo360).",
+      "status": "sourced", "src": ["cairo360"] },
+
+    { "id": "w_condolence", "audience": ["women"], "contexts": ["condolence"],
+      "name_ar": "عزاء", "formality": 4, "taste": ["classic", "minimal"],
+      "slots": [["dress_work|dress_casual|abaya", 1, 55], ["flats|heels_low", 1, 30], ["handbag", 0, 10], ["shawl|tarha", 0, 5]],
+      "colors": ["black", "navy", "grey", "brown"], "avoid_colors": ["red", "yellow", "orange", "fuchsia", "pink"],
+      "tip_ar": "محتشم وغامق وهادي.", "status": "draft", "src": [] },
+
+    { "id": "w_sport", "audience": ["women", "women_hijab"], "contexts": ["sport"],
+      "name_ar": "رياضة", "formality": 1, "taste": ["relaxed"],
+      "slots": [["sport_top|tshirt", 1, 25], ["sport_bottom|leggings|joggers", 1, 30], ["sport_shoes|sneakers", 1, 40], ["socks", 0, 5]],
+      "colors": [], "avoid_colors": [], "tip_ar": "للمحجبات: توب طويل أو أكمام طويلة وليجنز مريح.", "status": "draft", "src": [] },
+
+
+    { "id": "h_eng_abaya", "audience": ["women_hijab"], "contexts": ["engagement_guest", "katb_kitab", "wedding_guest", "graduation"],
+      "name_ar": "عباية مناسبات + طرحة", "formality": 5, "taste": ["elegant", "classic"],
+      "slots": [["abaya", 1, 50], ["tarha", 1, 15], ["heels_low|flats", 1, 20], ["clutch|handbag", 1, 10], ["jewelry", 0, 5]],
+      "colors": ["emerald", "burgundy", "navy", "black", "royal_blue", "purple"], "avoid_colors": ["white", "cream", "beige", "blush", "silver"],
+      "tip_ar": "عباية كشكشة أو مطرزة، والطرحة شيفون أو ساتان بنفس اللون أو درجة قريبة منه. البساطة أحسن (Less is more).",
+      "status": "sourced", "src": ["ninaline", "sayidaty_beige", "aljazeera"] },
+
+    { "id": "h_eng_dress", "audience": ["women_hijab"], "contexts": ["engagement_guest", "katb_kitab", "wedding_guest", "birthday_party"],
+      "name_ar": "فستان سواريه محتشم + طرحة", "formality": 5, "taste": ["elegant", "modern"],
+      "slots": [["dress_party|dress_evening", 1, 50], ["tarha", 1, 15], ["heels_low|flats", 1, 20], ["clutch", 0, 10], ["jewelry", 0, 5]],
+      "colors": ["emerald", "burgundy", "navy", "black", "royal_blue", "purple"], "avoid_colors": ["white", "cream", "beige", "blush", "silver"],
+      "tip_ar": "اختاري فستان بأكمام طويلة وطول ميدي أو ماكسي. الطرحة بنفس لون الفستان أو نود، وحذاء مدبب بنفس اللون (سيدتي).",
+      "status": "sourced", "src": ["sayidaty_beige", "knot"] },
+
+    { "id": "h_eng_hijab_set", "audience": ["women_hijab"], "contexts": ["engagement_guest", "date_night", "family_gathering", "eid"],
+      "name_ar": "طقم محجبات شيك", "formality": 4, "taste": ["modern", "minimal"],
+      "slots": [["hijab_set|two_piece_set", 1, 55], ["tarha", 1, 12], ["flats|heels_low", 1, 22], ["handbag", 0, 11]],
+      "colors": ["navy", "olive", "burgundy", "beige", "black"], "avoid_colors": ["white"],
+      "tip_ar": "توب طويل وجيبة أو بنطلون واسع، والطرحة في نفس العائلة اللونية.",
+      "status": "draft", "src": [] },
+
+    { "id": "h_bride_engagement", "audience": ["women_hijab"], "contexts": ["engagement_self"],
+      "name_ar": "خطوبتي (محجبة)", "formality": 5, "taste": ["elegant", "classic", "modern"],
+      "slots": [["dress_party|dress_evening|abaya", 1, 55], ["tarha", 1, 12], ["heels_low|heels_high|flats", 1, 20], ["clutch", 0, 8], ["jewelry", 0, 5]],
+      "colors": ["beige", "blush", "cream", "champagne", "pink", "gold", "white"], "avoid_colors": [],
+      "tip_ar": "طرحة ساتان بنفس لون الفستان، وحذاء مدبب. الطرحة بالخرز أو الحواف المطرزة بتنوّر الوش، ولو اتنين طبقات اختاري بنفس اللون وخامات مختلفة (Brides Club ME + سيدتي).",
+      "status": "sourced", "src": ["sayidaty_beige"] },
+
+    { "id": "h_work", "audience": ["women_hijab"], "contexts": ["work_casual", "work_formal", "university"],
+      "name_ar": "شغل / جامعة (محجبة)", "formality": 3, "taste": ["classic", "minimal", "modern"],
+      "slots": [["blouse|shirt|tunic", 1, 18], ["trousers|skirt", 1, 28], ["tarha", 1, 10], ["blazer|cardigan|long_cardigan", 0, 16], ["flats|loafers|sneakers", 1, 20], ["handbag", 0, 8]],
+      "colors": ["black", "beige", "grey", "navy", "olive", "sky_blue"], "avoid_colors": [],
+      "tip_ar": "توب طويل وبنطلون واسع أو جيبة ميدي، وكارديجان طويل فوقها.",
+      "status": "draft", "src": ["youm7_work"] },
+
+    { "id": "h_casual", "audience": ["women_hijab"], "contexts": ["casual_outing", "family_gathering", "travel"],
+      "name_ar": "كاجوال (محجبة)", "formality": 2, "taste": ["relaxed", "modern", "minimal"],
+      "slots": [["tunic|blouse|tshirt", 1, 20], ["jeans|trousers|skirt", 1, 28], ["tarha", 1, 10], ["long_cardigan|jacket", 0, 12], ["sneakers|flats", 1, 25], ["crossbody|handbag", 0, 5]],
+      "colors": ["beige", "olive", "navy", "black", "white", "sky_blue"], "avoid_colors": [],
+      "tip_ar": "تونيك طويل مع جينز واسع وكارديجان طويل، وكوتشي.", "status": "draft", "src": [] },
+
+    { "id": "h_casual_abaya", "audience": ["women_hijab"], "contexts": ["casual_outing", "university", "work_casual", "eid", "family_gathering"],
+      "name_ar": "عباية كاجوال", "formality": 3, "taste": ["modern", "relaxed", "minimal"],
+      "slots": [["abaya", 1, 55], ["tarha", 1, 12], ["sneakers|flats", 1, 23], ["crossbody|handbag", 0, 10]],
+      "colors": ["black", "navy", "beige", "olive", "grey"], "avoid_colors": [],
+      "tip_ar": "عباية كلوش أو وتد بخامة خفيفة (كريب أو قطن) للجامعة والخروجات.",
+      "status": "sourced", "src": ["ninaline"] },
+
+    { "id": "h_eid", "audience": ["women_hijab"], "contexts": ["eid", "ramadan_iftar"],
+      "name_ar": "لبس العيد (محجبة)", "formality": 4, "taste": ["elegant", "modern"],
+      "slots": [["abaya|dress_casual|dress_party", 1, 52], ["tarha", 1, 15], ["flats|sandals|heels_low", 1, 22], ["handbag", 0, 11]],
+      "colors": ["pink", "sky_blue", "mint", "lavender", "white", "yellow"], "avoid_colors": [],
+      "tip_ar": "ألوان فاتحة وخامات خفيفة، وطرحة بنفس اللون.", "status": "sourced", "src": ["ahram_eid"] },
+
+
+    { "id": "g_eid_party", "audience": ["girls"], "contexts": ["eid", "engagement_guest", "wedding_guest", "birthday_party", "family_gathering"],
+      "name_ar": "بنوتة شيك", "formality": 4, "taste": ["elegant"],
+      "slots": [["dress_party|dress_casual", 1, 65], ["flats|sandals", 1, 28], ["handbag", 0, 7]],
+      "colors": ["pink", "lavender", "sky_blue", "mint", "navy", "burgundy"], "avoid_colors": ["white"],
+      "tip_ar": "قماش ناعم ومريح بمقاس مظبوط علشان تلعب براحتها (الأهرام). في الأفراح تجنبي الأبيض.",
+      "status": "sourced", "src": ["ahram_eid"] },
+
+    { "id": "g_casual", "audience": ["girls"], "contexts": ["casual_outing", "university", "travel", "sport"],
+      "name_ar": "بنوتة كاجوال", "formality": 2, "taste": ["relaxed"],
+      "slots": [["tshirt|tunic|top", 1, 28], ["jeans|leggings|skirt|shorts", 1, 35], ["sneakers", 1, 37]],
+      "colors": [], "avoid_colors": [], "tip_ar": "خامات قطن ناعمة وألوان فاتحة.", "status": "draft", "src": ["ahram_eid"] },
+
+    { "id": "b_eid_party", "audience": ["boys"], "contexts": ["eid", "engagement_guest", "wedding_guest", "birthday_party", "family_gathering"],
+      "name_ar": "ولد شيك", "formality": 4, "taste": ["classic", "elegant"],
+      "slots": [["shirt", 1, 25], ["trousers|chinos", 1, 30], ["formal_shoes|loafers|sneakers", 1, 30], ["waistcoat|blazer", 0, 10], ["bow_tie|tie", 0, 5]],
+      "colors": ["navy", "sky_blue", "white", "grey", "burgundy"], "avoid_colors": [],
+      "tip_ar": "قميص + بنطلون قماش، وفيست أو بليزر خفيف. الخامة ناعمة ومقاس مظبوط (الأهرام).",
+      "status": "sourced", "src": ["ahram_eid"] },
+
+    { "id": "b_casual", "audience": ["boys"], "contexts": ["casual_outing", "university", "travel", "sport"],
+      "name_ar": "ولد كاجوال", "formality": 2, "taste": ["relaxed"],
+      "slots": [["tshirt|polo", 1, 28], ["jeans|shorts|joggers", 1, 35], ["sneakers", 1, 37]],
+      "colors": [], "avoid_colors": [], "tip_ar": "قطن مريح وألوان فاتحة للصيف.", "status": "draft", "src": ["ahram_eid"] }
+
+  ],
+
+  "couple_pairs": {
+    "_about": "ازاي نربط look الراجل بـlook الست في نفس المناسبة. الكود بيختار الاتنين من نفس الرسمية ويشتغل على لوحة مشتركة.",
+    "formality_gap_max": 1,
+    "pairs": [
+      { "men": "m_eng_suit",        "women": ["w_eng_party_dress", "w_eng_two_piece", "h_eng_abaya", "h_eng_dress"], "note_ar": "الكرافتة أو المنديل بلون فستانها." },
+      { "men": "m_eng_classic_set", "women": ["w_eng_midi_dress", "w_eng_two_piece", "h_eng_hijab_set"],           "note_ar": "أريح للاتنين، من غير كرافتة." },
+      { "men": "m_eng_smart",       "women": ["w_eng_midi_dress", "w_casual_dress", "h_casual_abaya"],             "note_ar": "للخطوبات الأهدى أو العائلية." },
+      { "men": "m_groom",           "women": ["w_bride_engagement", "h_bride_engagement", "w_bride_wedding"],      "note_ar": "العريس والعروسة: لون الكرافتة أو المنديل من لوحة الفستان." }
+    ],
+    "palettes_hint": "استخدم taxonomy.colors.safe_pairs. مثال: بدلة كحلي + فستان زمردي/بوردو + كرافتة بنفس درجة الفستان."
+  }
+}

@@ -13,7 +13,7 @@ import { listDepartments, assertDepartments } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings } from '../lib/visual.js';
-import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts } from '../lib/stylist.js';
+import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal } from '../lib/stylist.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
@@ -334,6 +334,22 @@ const lookOutfitSchema = z.object({
 const manualLookSchema = z.object({ outfits: z.array(lookOutfitSchema).max(12).default([]) });
 r.get('/look-of-day', h((_req, res) => res.json(lookOfDayAdminSettings())));
 r.get('/look-of-day/products', h((req, res) => res.json({ items: searchLookOfDayProducts(req.query.q) })));
+r.post('/look-of-day/ai-proposal', h(async (_req, res) => {
+  try { res.json(await generateLookOfDayProposal()); }
+  catch (e) {
+    if (e.code === 'look_of_day_no_suggestions') throw new AppError(422, e.code, 'الذكاء الاصطناعي ماطلعش اقتراحات مكتملة للمراجعة. جرّب تاني أو استخدم الاختيار اليدوي.');
+    if (e.code === 'stylist_unavailable') throw new AppError(503, e.code, 'الذكاء الاصطناعي مش متاح دلوقتي. مفيش اقتراحات هتتنشر تلقائيًا.');
+    throw e;
+  }
+}));
+r.post('/look-of-day/approve-ai', h((_req, res) => {
+  try { res.json(approveLookOfDayProposal()); }
+  catch (e) {
+    if (e.code === 'look_of_day_no_suggestions') throw new AppError(422, e.code, 'مفيش اقتراحات صالحة للاعتماد. ولّد اقتراحات جديدة أو اختار اللوك يدويًا.');
+    throw e;
+  }
+}));
+r.delete('/look-of-day/ai-proposal', h((_req, res) => res.json(discardLookOfDayProposal())));
 r.put('/look-of-day', h((req, res) => {
   const body = z.object({ mode: z.enum(['ai', 'manual', 'off']), manual: manualLookSchema.optional() }).parse(req.body);
   if (body.mode === 'manual') {

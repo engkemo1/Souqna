@@ -1,0 +1,4393 @@
+{
+ "_about": "كتالوج اختبار لمودة: منتجات مناسبات ورسمية بشكل صفوف قاعدة البيانات. expect = الإجابة الصحيحة (المفتاح والرسمية) تستخدمها الاختبارات، المحرك مايشوفهاش. trap = فخ مقصود: near_white (ألوان قريبة من الأبيض)، bare_dress_word (دريس بدون وصف)، galabeya.",
+ "version": 1,
+ "stores": [
+  "ahmed-fashion",
+  "lamar-boutique",
+  "noor-modest",
+  "kids-corner",
+  "sport-zone"
+ ],
+ "products": [
+  {
+   "id": 1,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بدلة كلاسيك كحلي",
+   "name_en": "Classic Navy Suit",
+   "description_ar": "بدلة كلاسيك كحلي بخامة صوف، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Classic Navy Suit.",
+   "price": 4200,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "بدل بدل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 20,
+   "rating": 4.8,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "suit",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 2,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بدلة سليم فِت رمادي",
+   "name_en": "Slim Fit Grey Suit",
+   "description_ar": "بدلة سليم فِت رمادي بخامة صوف، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Slim Fit Grey Suit.",
+   "price": 3800,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "بدل بدل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 25,
+   "rating": 4.5,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "suit",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 3,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بدلة سوداء رسمية",
+   "name_en": "Black Formal Suit",
+   "description_ar": "بدلة سوداء رسمية بخامة صوف، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Black Formal Suit.",
+   "price": 4500,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "بدل بدل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 4,
+   "rating": 4.7,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "suit",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 4,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بدلة دبل بريست كحلي",
+   "name_en": "Double Breasted Navy Suit",
+   "description_ar": "بدلة دبل بريست كحلي بخامة صوف، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Double Breasted Navy Suit.",
+   "price": 5200,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "بدل بدل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 6,
+   "rating": 4.2,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "suit",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 5,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بدلة كتان بيج صيفي",
+   "name_en": "Linen Beige Summer Suit",
+   "description_ar": "بدلة كتان بيج صيفي بخامة كتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Linen Beige Summer Suit.",
+   "price": 3100,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "بدل بدل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 3,
+   "rating": 4.8,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "suit",
+    "formality": 4,
+    "season": "summer",
+    "trap": null
+   }
+  },
+  {
+   "id": 6,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بدلة بوردو",
+   "name_en": "Burgundy Suit",
+   "description_ar": "بدلة بوردو بخامة صوف، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Burgundy Suit.",
+   "price": 4800,
+   "colors_json": [
+    {
+     "name_ar": "بوردو",
+     "name_en": "Burgundy",
+     "hex": "#6D1F2F"
+    }
+   ],
+   "cat_text": "بدل بدل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 13,
+   "rating": 3.8,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "suit",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 7,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "طقم كلاسيك جاكيت وبنطلون بني",
+   "name_en": "Classic Set Brown",
+   "description_ar": "طقم كلاسيك جاكيت وبنطلون بني بخامة صوف، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Classic Set Brown.",
+   "price": 2600,
+   "colors_json": [
+    {
+     "name_ar": "بني",
+     "name_en": "Brown",
+     "hex": "#6B4A2F"
+    }
+   ],
+   "cat_text": "أطقم كلاسيك أطقم كلاسيك",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 27,
+   "rating": 4.3,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "classic_set",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 8,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "طقم كلاسيك زيتي",
+   "name_en": "Classic Set Olive",
+   "description_ar": "طقم كلاسيك زيتي بخامة قطن، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Classic Set Olive.",
+   "price": 2700,
+   "colors_json": [
+    {
+     "name_ar": "زيتي",
+     "name_en": "Olive",
+     "hex": "#6B7345"
+    }
+   ],
+   "cat_text": "أطقم كلاسيك أطقم كلاسيك",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 15,
+   "rating": 3.9,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "classic_set",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 9,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "طقم كلاسيك رمادي فاتح",
+   "name_en": "Classic Set Light Grey",
+   "description_ar": "طقم كلاسيك رمادي فاتح بخامة صوف، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Classic Set Light Grey.",
+   "price": 2500,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "أطقم كلاسيك أطقم كلاسيك",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 27,
+   "rating": 3.9,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "classic_set",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 10,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بليزر كحلي",
+   "name_en": "Navy Blazer",
+   "description_ar": "بليزر كحلي بخامة صوف، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Navy Blazer.",
+   "price": 1900,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "بليزر بليزر",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 36,
+   "rating": 3.9,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "blazer",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 11,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بليزر بيج",
+   "name_en": "Beige Blazer",
+   "description_ar": "بليزر بيج بخامة كتان، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Beige Blazer.",
+   "price": 1800,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "بليزر بليزر",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 14,
+   "rating": 4.5,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "blazer",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 12,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بليزر رمادي",
+   "name_en": "Grey Blazer",
+   "description_ar": "بليزر رمادي بخامة صوف، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Grey Blazer.",
+   "price": 1850,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "بليزر بليزر",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 37,
+   "rating": 4.8,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "blazer",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 13,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بنطلون قماش كلاسيك أسود",
+   "name_en": "Dress Trousers Black",
+   "description_ar": "بنطلون قماش كلاسيك أسود بخامة قماش، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Dress Trousers Black.",
+   "price": 950,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "بناطيل بناطيل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 36,
+   "rating": 4.4,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "trousers",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 14,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بنطلون قماش كلاسيك كحلي",
+   "name_en": "Dress Trousers Navy",
+   "description_ar": "بنطلون قماش كلاسيك كحلي بخامة قماش، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Dress Trousers Navy.",
+   "price": 950,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "بناطيل بناطيل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 3,
+   "rating": 4.9,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "trousers",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 15,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بنطلون قماش كلاسيك رمادي",
+   "name_en": "Dress Trousers Grey",
+   "description_ar": "بنطلون قماش كلاسيك رمادي بخامة قماش، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Dress Trousers Grey.",
+   "price": 900,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "بناطيل بناطيل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 2,
+   "rating": 4.4,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "trousers",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 16,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بنطلون شينو بيج",
+   "name_en": "Chinos Beige",
+   "description_ar": "بنطلون شينو بيج بخامة قطن، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Chinos Beige.",
+   "price": 720,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "بناطيل بناطيل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 8,
+   "rating": 4.1,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "chinos",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 17,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بنطلون شينو زيتي",
+   "name_en": "Chinos Olive",
+   "description_ar": "بنطلون شينو زيتي بخامة قطن، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Chinos Olive.",
+   "price": 720,
+   "colors_json": [
+    {
+     "name_ar": "زيتي",
+     "name_en": "Olive",
+     "hex": "#6B7345"
+    }
+   ],
+   "cat_text": "بناطيل بناطيل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 9,
+   "rating": 4.4,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "chinos",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 18,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بنطلون شينو أسود",
+   "name_en": "Chinos Black",
+   "description_ar": "بنطلون شينو أسود بخامة قطن، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Chinos Black.",
+   "price": 720,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "بناطيل بناطيل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 36,
+   "rating": 4.1,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "chinos",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 19,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "قميص أبيض كلاسيك",
+   "name_en": "Classic White Shirt",
+   "description_ar": "قميص أبيض كلاسيك بخامة قطن، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Classic White Shirt.",
+   "price": 650,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "قمصان قمصان",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 52,
+   "rating": 4.6,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "shirt",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 20,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "قميص أزرق سماوي",
+   "name_en": "Light Blue Shirt",
+   "description_ar": "قميص أزرق سماوي بخامة قطن، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Light Blue Shirt.",
+   "price": 650,
+   "colors_json": [
+    {
+     "name_ar": "أزرق سماوي",
+     "name_en": "Sky Blue",
+     "hex": "#A9CDE8"
+    }
+   ],
+   "cat_text": "قمصان قمصان",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 6,
+   "rating": 4.4,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "shirt",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 21,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "قميص مقلّم كحلي",
+   "name_en": "Navy Striped Shirt",
+   "description_ar": "قميص مقلّم كحلي بخامة قطن، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Navy Striped Shirt.",
+   "price": 700,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "قمصان قمصان",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 40,
+   "rating": 4.0,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "shirt",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 22,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "قميص سادة أسود",
+   "name_en": "Black Shirt",
+   "description_ar": "قميص سادة أسود بخامة قطن، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Black Shirt.",
+   "price": 680,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "قمصان قمصان",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 6,
+   "rating": 4.4,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "shirt",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 23,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "قميص كتان بيج",
+   "name_en": "Beige Linen Shirt",
+   "description_ar": "قميص كتان بيج بخامة كتان، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Beige Linen Shirt.",
+   "price": 580,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "قمصان قمصان",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 4,
+   "rating": 4.4,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "shirt",
+    "formality": 3,
+    "season": "summer",
+    "trap": null
+   }
+  },
+  {
+   "id": 24,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بولو كحلي",
+   "name_en": "Navy Polo",
+   "description_ar": "بولو كحلي بخامة قطن، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Navy Polo.",
+   "price": 420,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "بولو بولو",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 39,
+   "rating": 4.0,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "polo",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 25,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بولو أبيض",
+   "name_en": "White Polo",
+   "description_ar": "بولو أبيض بخامة قطن، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "White Polo.",
+   "price": 420,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "بولو بولو",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 43,
+   "rating": 4.4,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "polo",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 26,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "حذاء أوكسفورد أسود",
+   "name_en": "Black Oxford",
+   "description_ar": "حذاء أوكسفورد أسود بخامة جلد، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Black Oxford.",
+   "price": 1900,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "أحذية رجالي أحذية رجالي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 49,
+   "rating": 4.1,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "formal_shoes",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 27,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "حذاء أوكسفورد بني",
+   "name_en": "Brown Oxford",
+   "description_ar": "حذاء أوكسفورد بني بخامة جلد، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Brown Oxford.",
+   "price": 1900,
+   "colors_json": [
+    {
+     "name_ar": "بني",
+     "name_en": "Brown",
+     "hex": "#6B4A2F"
+    }
+   ],
+   "cat_text": "أحذية رجالي أحذية رجالي",
+   "stock": 0,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 37,
+   "rating": 4.8,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "formal_shoes",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 28,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "لوفر جلد بني",
+   "name_en": "Brown Leather Loafer",
+   "description_ar": "لوفر جلد بني بخامة جلد، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Brown Leather Loafer.",
+   "price": 1500,
+   "colors_json": [
+    {
+     "name_ar": "بني",
+     "name_en": "Brown",
+     "hex": "#6B4A2F"
+    }
+   ],
+   "cat_text": "أحذية رجالي أحذية رجالي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 23,
+   "rating": 4.1,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "loafers",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 29,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "لوفر جلد أسود",
+   "name_en": "Black Leather Loafer",
+   "description_ar": "لوفر جلد أسود بخامة جلد، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Black Leather Loafer.",
+   "price": 1500,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "أحذية رجالي أحذية رجالي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 50,
+   "rating": 4.0,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "loafers",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 30,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "كوتشي جلد أبيض",
+   "name_en": "White Leather Sneaker",
+   "description_ar": "كوتشي جلد أبيض بخامة جلد، مناسب لـالخروجات اليومية.",
+   "description_en": "White Leather Sneaker.",
+   "price": 1300,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "أحذية رجالي أحذية رجالي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 49,
+   "rating": 4.1,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "sneakers",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 31,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "كوتشي رياضي",
+   "name_en": "Sport Sneaker",
+   "description_ar": "كوتشي رياضي بخامة قماش، مناسب لـالرياضة والبيت.",
+   "description_en": "Sport Sneaker.",
+   "price": 1100,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "أحذية رجالي أحذية رجالي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 36,
+   "rating": 4.1,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "sneakers",
+    "formality": 1,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 32,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "كرافتة حرير كحلي",
+   "name_en": "Navy Silk Tie",
+   "description_ar": "كرافتة حرير كحلي بخامة حرير، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Navy Silk Tie.",
+   "price": 350,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "كرافتات كرافتات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 31,
+   "rating": 4.8,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "tie",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 33,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "كرافتة حرير بوردو",
+   "name_en": "Burgundy Silk Tie",
+   "description_ar": "كرافتة حرير بوردو بخامة حرير، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Burgundy Silk Tie.",
+   "price": 350,
+   "colors_json": [
+    {
+     "name_ar": "بوردو",
+     "name_en": "Burgundy",
+     "hex": "#6D1F2F"
+    }
+   ],
+   "cat_text": "كرافتات كرافتات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 46,
+   "rating": 4.3,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "tie",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 34,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "كرافتة رمادي",
+   "name_en": "Grey Tie",
+   "description_ar": "كرافتة رمادي بخامة حرير، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Grey Tie.",
+   "price": 320,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "كرافتات كرافتات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 38,
+   "rating": 4.9,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "tie",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 35,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "بابيون أسود",
+   "name_en": "Black Bow Tie",
+   "description_ar": "بابيون أسود بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Black Bow Tie.",
+   "price": 280,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "كرافتات كرافتات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 7,
+   "rating": 4.4,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "bow_tie",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 36,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "حزام جلد أسود",
+   "name_en": "Black Leather Belt",
+   "description_ar": "حزام جلد أسود بخامة جلد، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Black Leather Belt.",
+   "price": 400,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "أحزمة أحزمة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 10,
+   "rating": 4.6,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "belt",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 37,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "حزام جلد بني",
+   "name_en": "Brown Leather Belt",
+   "description_ar": "حزام جلد بني بخامة جلد، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Brown Leather Belt.",
+   "price": 400,
+   "colors_json": [
+    {
+     "name_ar": "بني",
+     "name_en": "Brown",
+     "hex": "#6B4A2F"
+    }
+   ],
+   "cat_text": "أحزمة أحزمة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 9,
+   "rating": 4.8,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "belt",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 38,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "ساعة كلاسيك جلد",
+   "name_en": "Classic Leather Watch",
+   "description_ar": "ساعة كلاسيك جلد بخامة جلد، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Classic Leather Watch.",
+   "price": 1800,
+   "colors_json": [
+    {
+     "name_ar": "بني",
+     "name_en": "Brown",
+     "hex": "#6B4A2F"
+    }
+   ],
+   "cat_text": "ساعات ساعات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 26,
+   "rating": 3.8,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "watch",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 39,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "منديل جيب أبيض",
+   "name_en": "White Pocket Square",
+   "description_ar": "منديل جيب أبيض بخامة قطن، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "White Pocket Square.",
+   "price": 120,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "إكسسوارات رجالي إكسسوارات رجالي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 42,
+   "rating": 3.9,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "pocket_square",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 40,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "جينز أزرق",
+   "name_en": "Blue Jeans",
+   "description_ar": "جينز أزرق بخامة دنيم، مناسب لـالخروجات اليومية.",
+   "description_en": "Blue Jeans.",
+   "price": 750,
+   "colors_json": [
+    {
+     "name_ar": "أزرق",
+     "name_en": "Blue",
+     "hex": "#30558F"
+    }
+   ],
+   "cat_text": "جينز جينز",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 35,
+   "rating": 4.4,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "jeans",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 41,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "تيشيرت أبيض",
+   "name_en": "White Tee",
+   "description_ar": "تيشيرت أبيض بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "White Tee.",
+   "price": 300,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "تيشيرتات تيشيرتات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 56,
+   "rating": 4.7,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "tshirt",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 42,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "تيشيرت أسود",
+   "name_en": "Black Tee",
+   "description_ar": "تيشيرت أسود بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Black Tee.",
+   "price": 300,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "تيشيرتات تيشيرتات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 21,
+   "rating": 4.6,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "tshirt",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 43,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "هودي رمادي",
+   "name_en": "Grey Hoodie",
+   "description_ar": "هودي رمادي بخامة قطن، مناسب لـالرياضة والبيت.",
+   "description_en": "Grey Hoodie.",
+   "price": 800,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "هوديز هوديز",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 38,
+   "rating": 4.3,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "hoodie",
+    "formality": 1,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 44,
+   "store_slug": "ahmed-fashion",
+   "name_ar": "جاكيت بومبر",
+   "name_en": "Bomber Jacket",
+   "description_ar": "جاكيت بومبر بخامة بوليستر، مناسب لـالخروجات اليومية.",
+   "description_en": "Bomber Jacket.",
+   "price": 1100,
+   "colors_json": [
+    {
+     "name_ar": "زيتي",
+     "name_en": "Olive",
+     "hex": "#6B7345"
+    }
+   ],
+   "cat_text": "جواكت جواكت",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 51,
+   "rating": 4.3,
+   "audience": null,
+   "department": "men",
+   "expect": {
+    "key": "jacket",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 45,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان سواريه ساتان زمردي ميدي",
+   "name_en": "Emerald Satin Midi Party Dress",
+   "description_ar": "فستان سواريه ساتان زمردي ميدي بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Emerald Satin Midi Party Dress.",
+   "price": 2800,
+   "colors_json": [
+    {
+     "name_ar": "أخضر زمردي",
+     "name_en": "Emerald",
+     "hex": "#0E6B4F"
+    }
+   ],
+   "cat_text": "فساتين سواريه فساتين سواريه",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 53,
+   "rating": 3.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_party",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 46,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان سواريه بوردو طويل",
+   "name_en": "Burgundy Long Party Dress",
+   "description_ar": "فستان سواريه بوردو طويل بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Burgundy Long Party Dress.",
+   "price": 3200,
+   "colors_json": [
+    {
+     "name_ar": "بوردو",
+     "name_en": "Burgundy",
+     "hex": "#6D1F2F"
+    }
+   ],
+   "cat_text": "فساتين سواريه فساتين سواريه",
+   "stock": 0,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 17,
+   "rating": 4.3,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_party",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 47,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان سواريه كحلي كريب",
+   "name_en": "Navy Crepe Party Dress",
+   "description_ar": "فستان سواريه كحلي كريب بخامة كريب، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Navy Crepe Party Dress.",
+   "price": 2600,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "فساتين سواريه فساتين سواريه",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 42,
+   "rating": 3.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_party",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 48,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان سواريه أبيض منفوش",
+   "name_en": "White Puffy Party Dress",
+   "description_ar": "فستان سواريه أبيض منفوش بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "White Puffy Party Dress.",
+   "price": 3500,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "فساتين سواريه فساتين سواريه",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 46,
+   "rating": 4.6,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_party",
+    "formality": 5,
+    "season": null,
+    "trap": "near_white"
+   }
+  },
+  {
+   "id": 49,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان سواريه بيج فاتح دانتيل",
+   "name_en": "Light Beige Lace Party Dress",
+   "description_ar": "فستان سواريه بيج فاتح دانتيل بخامة دانتيل، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Light Beige Lace Party Dress.",
+   "price": 3300,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "فساتين سواريه فساتين سواريه",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 41,
+   "rating": 4.4,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_party",
+    "formality": 5,
+    "season": null,
+    "trap": "near_white"
+   }
+  },
+  {
+   "id": 50,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان سواريه فضي ترتر",
+   "name_en": "Silver Sequin Party Dress",
+   "description_ar": "فستان سواريه فضي ترتر بخامة ترتر، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Silver Sequin Party Dress.",
+   "price": 3600,
+   "colors_json": [
+    {
+     "name_ar": "فضي",
+     "name_en": "Silver",
+     "hex": "#C0C0C4"
+    }
+   ],
+   "cat_text": "فساتين سواريه فساتين سواريه",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 43,
+   "rating": 4.7,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_party",
+    "formality": 5,
+    "season": null,
+    "trap": "near_white"
+   }
+  },
+  {
+   "id": 51,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان سواريه أسود طويل",
+   "name_en": "Black Long Party Dress",
+   "description_ar": "فستان سواريه أسود طويل بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Black Long Party Dress.",
+   "price": 3000,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "فساتين سواريه فساتين سواريه",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 18,
+   "rating": 4.6,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_party",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 52,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان حفلات وردي فاتح شيفون",
+   "name_en": "Blush Chiffon Party Dress",
+   "description_ar": "فستان حفلات وردي فاتح شيفون بخامة شيفون، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Blush Chiffon Party Dress.",
+   "price": 2200,
+   "colors_json": [
+    {
+     "name_ar": "وردي فاتح",
+     "name_en": "Blush",
+     "hex": "#F2C9CF"
+    }
+   ],
+   "cat_text": "فساتين سواريه فساتين سواريه",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 56,
+   "rating": 4.5,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_party",
+    "formality": 4,
+    "season": null,
+    "trap": "near_white"
+   }
+  },
+  {
+   "id": 53,
+   "store_slug": "lamar-boutique",
+   "name_ar": "دريس مناسبات أخضر زيتي ميدي",
+   "name_en": "Olive Midi Occasion Dress",
+   "description_ar": "دريس مناسبات أخضر زيتي ميدي بخامة كريب، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Olive Midi Occasion Dress.",
+   "price": 1900,
+   "colors_json": [
+    {
+     "name_ar": "زيتي",
+     "name_en": "Olive",
+     "hex": "#6B7345"
+    }
+   ],
+   "cat_text": "فساتين سواريه فساتين سواريه",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 1,
+   "rating": 4.8,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_party",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 54,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان سهرة ملكي أزرق ماكسي",
+   "name_en": "Royal Blue Evening Gown",
+   "description_ar": "فستان سهرة ملكي أزرق ماكسي بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Royal Blue Evening Gown.",
+   "price": 4800,
+   "colors_json": [
+    {
+     "name_ar": "أزرق ملكي",
+     "name_en": "Royal Blue",
+     "hex": "#1F3FA8"
+    }
+   ],
+   "cat_text": "فساتين سهرة فساتين سهرة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 22,
+   "rating": 4.0,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_evening",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 55,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان سهرة دهبي",
+   "name_en": "Gold Evening Gown",
+   "description_ar": "فستان سهرة دهبي بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Gold Evening Gown.",
+   "price": 5200,
+   "colors_json": [
+    {
+     "name_ar": "دهبي",
+     "name_en": "Gold",
+     "hex": "#C9A227"
+    }
+   ],
+   "cat_text": "فساتين سهرة فساتين سهرة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 7,
+   "rating": 4.3,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_evening",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 56,
+   "store_slug": "lamar-boutique",
+   "name_ar": "دريس خروج كتان أزرق سماوي",
+   "name_en": "Sky Blue Linen Day Dress",
+   "description_ar": "دريس خروج كتان أزرق سماوي بخامة كتان، مناسب لـالخروجات اليومية.",
+   "description_en": "Sky Blue Linen Day Dress.",
+   "price": 850,
+   "colors_json": [
+    {
+     "name_ar": "أزرق سماوي",
+     "name_en": "Sky Blue",
+     "hex": "#A9CDE8"
+    }
+   ],
+   "cat_text": "دريسات دريسات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 13,
+   "rating": 4.6,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_casual",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 57,
+   "store_slug": "lamar-boutique",
+   "name_ar": "دريس قطن زيتي",
+   "name_en": "Olive Cotton Dress",
+   "description_ar": "دريس قطن زيتي بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Olive Cotton Dress.",
+   "price": 780,
+   "colors_json": [
+    {
+     "name_ar": "زيتي",
+     "name_en": "Olive",
+     "hex": "#6B7345"
+    }
+   ],
+   "cat_text": "دريسات دريسات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 8,
+   "rating": 4.6,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_casual",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 58,
+   "store_slug": "lamar-boutique",
+   "name_ar": "دريس يومي أسود",
+   "name_en": "Black Daily Dress",
+   "description_ar": "دريس يومي أسود بخامة فيسكوز، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Black Daily Dress.",
+   "price": 820,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "دريسات دريسات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 25,
+   "rating": 4.2,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_casual",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 59,
+   "store_slug": "lamar-boutique",
+   "name_ar": "دريس فيسكوز بيج",
+   "name_en": "Beige Viscose Dress",
+   "description_ar": "دريس فيسكوز بيج بخامة فيسكوز، مناسب لـالخروجات اليومية.",
+   "description_en": "Beige Viscose Dress.",
+   "price": 700,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "دريسات دريسات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 55,
+   "rating": 4.3,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_casual",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 60,
+   "store_slug": "lamar-boutique",
+   "name_ar": "دريس كحلي",
+   "name_en": "Navy Dress",
+   "description_ar": "دريس كحلي بخامة كريب، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Navy Dress.",
+   "price": 900,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "دريسات دريسات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 10,
+   "rating": 4.3,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_casual",
+    "formality": 3,
+    "season": null,
+    "trap": "bare_dress_word"
+   }
+  },
+  {
+   "id": 61,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان شغل كحلي كريب",
+   "name_en": "Navy Work Dress",
+   "description_ar": "فستان شغل كحلي كريب بخامة كريب، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Navy Work Dress.",
+   "price": 1300,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "فساتين شغل فساتين شغل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 35,
+   "rating": 4.1,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_work",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 62,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان شغل رمادي",
+   "name_en": "Grey Work Dress",
+   "description_ar": "فستان شغل رمادي بخامة كريب، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Grey Work Dress.",
+   "price": 1250,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "فساتين شغل فساتين شغل",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 8,
+   "rating": 4.7,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_work",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 63,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان صيفي كورال",
+   "name_en": "Coral Summer Dress",
+   "description_ar": "فستان صيفي كورال بخامة كتان، مناسب لـالخروجات اليومية.",
+   "description_en": "Coral Summer Dress.",
+   "price": 700,
+   "colors_json": [
+    {
+     "name_ar": "كورال",
+     "name_en": "Coral",
+     "hex": "#F08A6E"
+    }
+   ],
+   "cat_text": "فساتين صيفي فساتين صيفي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 55,
+   "rating": 4.4,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_beach",
+    "formality": 2,
+    "season": "summer",
+    "trap": null
+   }
+  },
+  {
+   "id": 64,
+   "store_slug": "lamar-boutique",
+   "name_ar": "فستان صيفي مينت",
+   "name_en": "Mint Summer Dress",
+   "description_ar": "فستان صيفي مينت بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Mint Summer Dress.",
+   "price": 700,
+   "colors_json": [
+    {
+     "name_ar": "مينت",
+     "name_en": "Mint",
+     "hex": "#A8DCC4"
+    }
+   ],
+   "cat_text": "فساتين صيفي فساتين صيفي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 45,
+   "rating": 4.3,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "dress_beach",
+    "formality": 2,
+    "season": "summer",
+    "trap": null
+   }
+  },
+  {
+   "id": 65,
+   "store_slug": "lamar-boutique",
+   "name_ar": "جمبسوت أسود كريب",
+   "name_en": "Black Crepe Jumpsuit",
+   "description_ar": "جمبسوت أسود كريب بخامة كريب، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Black Crepe Jumpsuit.",
+   "price": 1900,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "جمبسوت جمبسوت",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 22,
+   "rating": 4.6,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "jumpsuit",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 66,
+   "store_slug": "lamar-boutique",
+   "name_ar": "جمبسوت زمردي",
+   "name_en": "Emerald Jumpsuit",
+   "description_ar": "جمبسوت زمردي بخامة كريب، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Emerald Jumpsuit.",
+   "price": 2000,
+   "colors_json": [
+    {
+     "name_ar": "أخضر زمردي",
+     "name_en": "Emerald",
+     "hex": "#0E6B4F"
+    }
+   ],
+   "cat_text": "جمبسوت جمبسوت",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 24,
+   "rating": 4.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "jumpsuit",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 67,
+   "store_slug": "lamar-boutique",
+   "name_ar": "طقم جيبة وتوب ساتان بوردو",
+   "name_en": "Burgundy Satin Skirt Set",
+   "description_ar": "طقم جيبة وتوب ساتان بوردو بخامة ساتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Burgundy Satin Skirt Set.",
+   "price": 2300,
+   "colors_json": [
+    {
+     "name_ar": "بوردو",
+     "name_en": "Burgundy",
+     "hex": "#6D1F2F"
+    }
+   ],
+   "cat_text": "أطقم أطقم",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 9,
+   "rating": 3.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "two_piece_set",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 68,
+   "store_slug": "lamar-boutique",
+   "name_ar": "طقم جيبة وتوب كحلي",
+   "name_en": "Navy Skirt Set",
+   "description_ar": "طقم جيبة وتوب كحلي بخامة كريب، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Navy Skirt Set.",
+   "price": 2100,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "أطقم أطقم",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 9,
+   "rating": 4.1,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "two_piece_set",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 69,
+   "store_slug": "lamar-boutique",
+   "name_ar": "تايير كحلي",
+   "name_en": "Navy Women Suit",
+   "description_ar": "تايير كحلي بخامة صوف، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Navy Women Suit.",
+   "price": 3200,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "تاييرات تاييرات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 14,
+   "rating": 3.8,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "womens_suit",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 70,
+   "store_slug": "lamar-boutique",
+   "name_ar": "تايير أسود",
+   "name_en": "Black Women Suit",
+   "description_ar": "تايير أسود بخامة صوف، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Black Women Suit.",
+   "price": 3200,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "تاييرات تاييرات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 53,
+   "rating": 4.4,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "womens_suit",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 71,
+   "store_slug": "lamar-boutique",
+   "name_ar": "بلوزة ساتان بيج",
+   "name_en": "Beige Satin Blouse",
+   "description_ar": "بلوزة ساتان بيج بخامة ساتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Beige Satin Blouse.",
+   "price": 650,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "بلوزات بلوزات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 16,
+   "rating": 4.1,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "blouse",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 72,
+   "store_slug": "lamar-boutique",
+   "name_ar": "بلوزة بيضا",
+   "name_en": "White Blouse",
+   "description_ar": "بلوزة بيضا بخامة قطن، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "White Blouse.",
+   "price": 600,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "بلوزات بلوزات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 9,
+   "rating": 4.3,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "blouse",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 73,
+   "store_slug": "lamar-boutique",
+   "name_ar": "توب أسود",
+   "name_en": "Black Top",
+   "description_ar": "توب أسود بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Black Top.",
+   "price": 400,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "توبات توبات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 23,
+   "rating": 4.5,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "top",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 74,
+   "store_slug": "lamar-boutique",
+   "name_ar": "جيبة ميدي بليسيه كحلي",
+   "name_en": "Navy Pleated Midi Skirt",
+   "description_ar": "جيبة ميدي بليسيه كحلي بخامة شيفون، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Navy Pleated Midi Skirt.",
+   "price": 750,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "جيبات جيبات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 20,
+   "rating": 4.8,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "skirt",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 75,
+   "store_slug": "lamar-boutique",
+   "name_ar": "جيبة أسود",
+   "name_en": "Black Skirt",
+   "description_ar": "جيبة أسود بخامة كريب، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Black Skirt.",
+   "price": 700,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "جيبات جيبات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 44,
+   "rating": 4.7,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "skirt",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 76,
+   "store_slug": "lamar-boutique",
+   "name_ar": "بنطلون قماش واسع أسود",
+   "name_en": "Wide Black Trousers",
+   "description_ar": "بنطلون قماش واسع أسود بخامة قماش، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Wide Black Trousers.",
+   "price": 800,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "بناطيل حريمي بناطيل حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 60,
+   "rating": 4.5,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "trousers",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 77,
+   "store_slug": "lamar-boutique",
+   "name_ar": "بنطلون قماش واسع بيج",
+   "name_en": "Wide Beige Trousers",
+   "description_ar": "بنطلون قماش واسع بيج بخامة قماش، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Wide Beige Trousers.",
+   "price": 800,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "بناطيل حريمي بناطيل حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 43,
+   "rating": 4.6,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "trousers",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 78,
+   "store_slug": "lamar-boutique",
+   "name_ar": "جينز واسع أزرق",
+   "name_en": "Wide Blue Jeans",
+   "description_ar": "جينز واسع أزرق بخامة دنيم، مناسب لـالخروجات اليومية.",
+   "description_en": "Wide Blue Jeans.",
+   "price": 850,
+   "colors_json": [
+    {
+     "name_ar": "أزرق",
+     "name_en": "Blue",
+     "hex": "#30558F"
+    }
+   ],
+   "cat_text": "جينز حريمي جينز حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 29,
+   "rating": 4.8,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "jeans",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 79,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كعب ستيليتو أسود",
+   "name_en": "Black Stiletto",
+   "description_ar": "كعب ستيليتو أسود بخامة جلد، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Black Stiletto.",
+   "price": 1600,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "أحذية حريمي أحذية حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 49,
+   "rating": 4.8,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "heels_high",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 80,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كعب ستيليتو ذهبي",
+   "name_en": "Gold Stiletto",
+   "description_ar": "كعب ستيليتو ذهبي بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Gold Stiletto.",
+   "price": 1700,
+   "colors_json": [
+    {
+     "name_ar": "دهبي",
+     "name_en": "Gold",
+     "hex": "#C9A227"
+    }
+   ],
+   "cat_text": "أحذية حريمي أحذية حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 43,
+   "rating": 4.7,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "heels_high",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 81,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كعب وسط بيج",
+   "name_en": "Beige Mid Heel",
+   "description_ar": "كعب وسط بيج بخامة جلد، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Beige Mid Heel.",
+   "price": 1400,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "أحذية حريمي أحذية حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 25,
+   "rating": 4.2,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "heels_low",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 82,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كعب وسط أسود",
+   "name_en": "Black Mid Heel",
+   "description_ar": "كعب وسط أسود بخامة جلد، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Black Mid Heel.",
+   "price": 1400,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "أحذية حريمي أحذية حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 25,
+   "rating": 3.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "heels_low",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 83,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كعب بلوك كحلي",
+   "name_en": "Navy Block Heel",
+   "description_ar": "كعب بلوك كحلي بخامة جلد، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Navy Block Heel.",
+   "price": 1450,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "أحذية حريمي أحذية حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 40,
+   "rating": 4.2,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "heels_low",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 84,
+   "store_slug": "lamar-boutique",
+   "name_ar": "بالرينا أسود",
+   "name_en": "Black Ballerina",
+   "description_ar": "بالرينا أسود بخامة جلد، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Black Ballerina.",
+   "price": 900,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "أحذية حريمي أحذية حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 12,
+   "rating": 3.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "flats",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 85,
+   "store_slug": "lamar-boutique",
+   "name_ar": "بالرينا بيج",
+   "name_en": "Beige Ballerina",
+   "description_ar": "بالرينا بيج بخامة جلد، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Beige Ballerina.",
+   "price": 900,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "أحذية حريمي أحذية حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 13,
+   "rating": 4.3,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "flats",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 86,
+   "store_slug": "lamar-boutique",
+   "name_ar": "صندل مسطح ذهبي",
+   "name_en": "Gold Flat Sandal",
+   "description_ar": "صندل مسطح ذهبي بخامة جلد، مناسب لـالخروجات اليومية.",
+   "description_en": "Gold Flat Sandal.",
+   "price": 700,
+   "colors_json": [
+    {
+     "name_ar": "دهبي",
+     "name_en": "Gold",
+     "hex": "#C9A227"
+    }
+   ],
+   "cat_text": "أحذية حريمي أحذية حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 7,
+   "rating": 4.2,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "sandals",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 87,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كوتشي أبيض حريمي",
+   "name_en": "White Sneaker",
+   "description_ar": "كوتشي أبيض حريمي بخامة جلد، مناسب لـالخروجات اليومية.",
+   "description_en": "White Sneaker.",
+   "price": 1100,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "أحذية حريمي أحذية حريمي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 3,
+   "rating": 3.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "sneakers",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 88,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كلتش سواريه ذهبي",
+   "name_en": "Gold Clutch",
+   "description_ar": "كلتش سواريه ذهبي بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Gold Clutch.",
+   "price": 800,
+   "colors_json": [
+    {
+     "name_ar": "دهبي",
+     "name_en": "Gold",
+     "hex": "#C9A227"
+    }
+   ],
+   "cat_text": "شنط شنط",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 36,
+   "rating": 4.0,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "clutch",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 89,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كلتش أسود",
+   "name_en": "Black Clutch",
+   "description_ar": "كلتش أسود بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Black Clutch.",
+   "price": 750,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "شنط شنط",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 6,
+   "rating": 4.8,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "clutch",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 90,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كلتش بوردو",
+   "name_en": "Burgundy Clutch",
+   "description_ar": "كلتش بوردو بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Burgundy Clutch.",
+   "price": 800,
+   "colors_json": [
+    {
+     "name_ar": "بوردو",
+     "name_en": "Burgundy",
+     "hex": "#6D1F2F"
+    }
+   ],
+   "cat_text": "شنط شنط",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 39,
+   "rating": 3.8,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "clutch",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 91,
+   "store_slug": "lamar-boutique",
+   "name_ar": "شنطة يد جلد بيج",
+   "name_en": "Beige Leather Handbag",
+   "description_ar": "شنطة يد جلد بيج بخامة جلد، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Beige Leather Handbag.",
+   "price": 1500,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "شنط شنط",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 55,
+   "rating": 4.0,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "handbag",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 92,
+   "store_slug": "lamar-boutique",
+   "name_ar": "شنطة يد جلد أسود",
+   "name_en": "Black Leather Handbag",
+   "description_ar": "شنطة يد جلد أسود بخامة جلد، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Black Leather Handbag.",
+   "price": 1500,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "شنط شنط",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 24,
+   "rating": 4.0,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "handbag",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 93,
+   "store_slug": "lamar-boutique",
+   "name_ar": "شال شيفون رمادي",
+   "name_en": "Grey Chiffon Shawl",
+   "description_ar": "شال شيفون رمادي بخامة شيفون، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Grey Chiffon Shawl.",
+   "price": 400,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "شالات شالات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 16,
+   "rating": 4.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "shawl",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 94,
+   "store_slug": "lamar-boutique",
+   "name_ar": "شال ساتان أسود",
+   "name_en": "Black Satin Shawl",
+   "description_ar": "شال ساتان أسود بخامة ساتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Black Satin Shawl.",
+   "price": 450,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "شالات شالات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 38,
+   "rating": 4.2,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "shawl",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 95,
+   "store_slug": "lamar-boutique",
+   "name_ar": "طقم إكسسوار دهبي",
+   "name_en": "Gold Jewelry Set",
+   "description_ar": "طقم إكسسوار دهبي بخامة معدن، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Gold Jewelry Set.",
+   "price": 450,
+   "colors_json": [
+    {
+     "name_ar": "دهبي",
+     "name_en": "Gold",
+     "hex": "#C9A227"
+    }
+   ],
+   "cat_text": "إكسسوارات إكسسوارات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 7,
+   "rating": 3.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "jewelry",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 96,
+   "store_slug": "lamar-boutique",
+   "name_ar": "كارديجان بيج",
+   "name_en": "Beige Cardigan",
+   "description_ar": "كارديجان بيج بخامة تريكو، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Beige Cardigan.",
+   "price": 650,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "كارديجان كارديجان",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 31,
+   "rating": 4.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "cardigan",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 97,
+   "store_slug": "lamar-boutique",
+   "name_ar": "بليزر نسائي كحلي",
+   "name_en": "Women Navy Blazer",
+   "description_ar": "بليزر نسائي كحلي بخامة صوف، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Women Navy Blazer.",
+   "price": 1500,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "بليزر بليزر",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 29,
+   "rating": 4.3,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "blazer",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 98,
+   "store_slug": "lamar-boutique",
+   "name_ar": "بليزر نسائي أسود",
+   "name_en": "Women Black Blazer",
+   "description_ar": "بليزر نسائي أسود بخامة صوف، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Women Black Blazer.",
+   "price": 1500,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "بليزر بليزر",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 19,
+   "rating": 3.9,
+   "audience": null,
+   "department": "women",
+   "expect": {
+    "key": "blazer",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 99,
+   "store_slug": "noor-modest",
+   "name_ar": "عباية كلوش سوداء كريب",
+   "name_en": "Black Closh Abaya",
+   "description_ar": "عباية كلوش سوداء كريب بخامة كريب، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Black Closh Abaya.",
+   "price": 1400,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "عبايات عبايات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 6,
+   "rating": 4.6,
+   "audience": null,
+   "department": "abaya",
+   "expect": {
+    "key": "abaya",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 100,
+   "store_slug": "noor-modest",
+   "name_ar": "عباية فراشة كحلي",
+   "name_en": "Navy Butterfly Abaya",
+   "description_ar": "عباية فراشة كحلي بخامة كريب، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Navy Butterfly Abaya.",
+   "price": 1500,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "عبايات عبايات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 47,
+   "rating": 4.1,
+   "audience": null,
+   "department": "abaya",
+   "expect": {
+    "key": "abaya",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 101,
+   "store_slug": "noor-modest",
+   "name_ar": "عباية كشكشة بوردو سواريه",
+   "name_en": "Burgundy Ruffle Party Abaya",
+   "description_ar": "عباية كشكشة بوردو سواريه بخامة كريب، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Burgundy Ruffle Party Abaya.",
+   "price": 2600,
+   "colors_json": [
+    {
+     "name_ar": "بوردو",
+     "name_en": "Burgundy",
+     "hex": "#6D1F2F"
+    }
+   ],
+   "cat_text": "عبايات عبايات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 53,
+   "rating": 4.6,
+   "audience": null,
+   "department": "abaya",
+   "expect": {
+    "key": "abaya",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 102,
+   "store_slug": "noor-modest",
+   "name_ar": "عباية مطرزة زمردي",
+   "name_en": "Emerald Embroidered Abaya",
+   "description_ar": "عباية مطرزة زمردي بخامة كريب، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Emerald Embroidered Abaya.",
+   "price": 3000,
+   "colors_json": [
+    {
+     "name_ar": "أخضر زمردي",
+     "name_en": "Emerald",
+     "hex": "#0E6B4F"
+    }
+   ],
+   "cat_text": "عبايات عبايات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 33,
+   "rating": 3.8,
+   "audience": null,
+   "department": "abaya",
+   "expect": {
+    "key": "abaya",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 103,
+   "store_slug": "noor-modest",
+   "name_ar": "عباية دبل فيس بيج",
+   "name_en": "Beige Double Face Abaya",
+   "description_ar": "عباية دبل فيس بيج بخامة كريب، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Beige Double Face Abaya.",
+   "price": 1600,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "عبايات عبايات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 60,
+   "rating": 4.8,
+   "audience": null,
+   "department": "abaya",
+   "expect": {
+    "key": "abaya",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 104,
+   "store_slug": "noor-modest",
+   "name_ar": "عباية وتد رمادي",
+   "name_en": "Grey Straight Abaya",
+   "description_ar": "عباية وتد رمادي بخامة كريب، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Grey Straight Abaya.",
+   "price": 1300,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "عبايات عبايات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 23,
+   "rating": 4.0,
+   "audience": null,
+   "department": "abaya",
+   "expect": {
+    "key": "abaya",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 105,
+   "store_slug": "noor-modest",
+   "name_ar": "عباية بشت بني",
+   "name_en": "Brown Bisht Abaya",
+   "description_ar": "عباية بشت بني بخامة كريب، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Brown Bisht Abaya.",
+   "price": 2200,
+   "colors_json": [
+    {
+     "name_ar": "بني",
+     "name_en": "Brown",
+     "hex": "#6B4A2F"
+    }
+   ],
+   "cat_text": "عبايات عبايات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 34,
+   "rating": 4.8,
+   "audience": null,
+   "department": "abaya",
+   "expect": {
+    "key": "abaya",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 106,
+   "store_slug": "noor-modest",
+   "name_ar": "عباية كلوش كاجوال زيتي",
+   "name_en": "Olive Casual Closh Abaya",
+   "description_ar": "عباية كلوش كاجوال زيتي بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Olive Casual Closh Abaya.",
+   "price": 1200,
+   "colors_json": [
+    {
+     "name_ar": "زيتي",
+     "name_en": "Olive",
+     "hex": "#6B7345"
+    }
+   ],
+   "cat_text": "عبايات عبايات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 48,
+   "rating": 4.4,
+   "audience": null,
+   "department": "abaya",
+   "expect": {
+    "key": "abaya",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 107,
+   "store_slug": "noor-modest",
+   "name_ar": "طرحة شيفون بوردو",
+   "name_en": "Hijab Burgundy",
+   "description_ar": "طرحة شيفون بوردو بخامة شيفون، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Hijab Burgundy.",
+   "price": 250,
+   "colors_json": [
+    {
+     "name_ar": "بوردو",
+     "name_en": "Burgundy",
+     "hex": "#6D1F2F"
+    }
+   ],
+   "cat_text": "طرح طرح",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 41,
+   "rating": 4.7,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "tarha",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 108,
+   "store_slug": "noor-modest",
+   "name_ar": "طرحة ساتان زمردي",
+   "name_en": "Hijab Emerald",
+   "description_ar": "طرحة ساتان زمردي بخامة ساتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Hijab Emerald.",
+   "price": 300,
+   "colors_json": [
+    {
+     "name_ar": "أخضر زمردي",
+     "name_en": "Emerald",
+     "hex": "#0E6B4F"
+    }
+   ],
+   "cat_text": "طرح طرح",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 44,
+   "rating": 4.7,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "tarha",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 109,
+   "store_slug": "noor-modest",
+   "name_ar": "طرحة ساتان كحلي",
+   "name_en": "Hijab Navy",
+   "description_ar": "طرحة ساتان كحلي بخامة ساتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Hijab Navy.",
+   "price": 300,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "طرح طرح",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 33,
+   "rating": 4.2,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "tarha",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 110,
+   "store_slug": "noor-modest",
+   "name_ar": "طرحة شيفون أسود",
+   "name_en": "Hijab Black",
+   "description_ar": "طرحة شيفون أسود بخامة شيفون، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Hijab Black.",
+   "price": 250,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "طرح طرح",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 10,
+   "rating": 4.2,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "tarha",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 111,
+   "store_slug": "noor-modest",
+   "name_ar": "طرحة شيفون بيج",
+   "name_en": "Hijab Beige",
+   "description_ar": "طرحة شيفون بيج بخامة شيفون، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Hijab Beige.",
+   "price": 250,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "طرح طرح",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 14,
+   "rating": 4.4,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "tarha",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 112,
+   "store_slug": "noor-modest",
+   "name_ar": "طرحة شيفون نود",
+   "name_en": "Hijab Nude",
+   "description_ar": "طرحة شيفون نود بخامة شيفون، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Hijab Nude.",
+   "price": 250,
+   "colors_json": [
+    {
+     "name_ar": "نود",
+     "name_en": "Nude",
+     "hex": "#E0BFA8"
+    }
+   ],
+   "cat_text": "طرح طرح",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 49,
+   "rating": 4.4,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "tarha",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 113,
+   "store_slug": "noor-modest",
+   "name_ar": "طرحة شيفون رمادي",
+   "name_en": "Hijab Grey",
+   "description_ar": "طرحة شيفون رمادي بخامة شيفون، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Hijab Grey.",
+   "price": 250,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "طرح طرح",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 40,
+   "rating": 4.0,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "tarha",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 114,
+   "store_slug": "noor-modest",
+   "name_ar": "طقم محجبات تونيك وبنطلون زيتي",
+   "name_en": "Olive Tunic Pants Set",
+   "description_ar": "طقم محجبات تونيك وبنطلون زيتي بخامة قطن، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Olive Tunic Pants Set.",
+   "price": 1700,
+   "colors_json": [
+    {
+     "name_ar": "زيتي",
+     "name_en": "Olive",
+     "hex": "#6B7345"
+    }
+   ],
+   "cat_text": "أطقم محجبات أطقم محجبات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 51,
+   "rating": 4.7,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "hijab_set",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 115,
+   "store_slug": "noor-modest",
+   "name_ar": "طقم محجبات بيج",
+   "name_en": "Beige Hijab Set",
+   "description_ar": "طقم محجبات بيج بخامة قطن، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Beige Hijab Set.",
+   "price": 1700,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "أطقم محجبات أطقم محجبات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 48,
+   "rating": 4.7,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "hijab_set",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 116,
+   "store_slug": "noor-modest",
+   "name_ar": "طقم محجبات كحلي",
+   "name_en": "Navy Hijab Set",
+   "description_ar": "طقم محجبات كحلي بخامة كريب، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Navy Hijab Set.",
+   "price": 1900,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "أطقم محجبات أطقم محجبات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 51,
+   "rating": 4.1,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "hijab_set",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 117,
+   "store_slug": "noor-modest",
+   "name_ar": "كيمونو طويل بيج",
+   "name_en": "Beige Long Kimono",
+   "description_ar": "كيمونو طويل بيج بخامة شيفون، مناسب لـالخروجات اليومية.",
+   "description_en": "Beige Long Kimono.",
+   "price": 900,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "كارديجان كارديجان",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 25,
+   "rating": 4.6,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "long_cardigan",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 118,
+   "store_slug": "noor-modest",
+   "name_ar": "كيمونو طويل أسود",
+   "name_en": "Black Long Kimono",
+   "description_ar": "كيمونو طويل أسود بخامة شيفون، مناسب لـالخروجات اليومية.",
+   "description_en": "Black Long Kimono.",
+   "price": 900,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "كارديجان كارديجان",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 14,
+   "rating": 4.0,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "long_cardigan",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 119,
+   "store_slug": "noor-modest",
+   "name_ar": "تونيك طويل أسود",
+   "name_en": "Black Long Tunic",
+   "description_ar": "تونيك طويل أسود بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Black Long Tunic.",
+   "price": 600,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "تونيك تونيك",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 31,
+   "rating": 4.2,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "tunic",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 120,
+   "store_slug": "noor-modest",
+   "name_ar": "تونيك طويل كحلي",
+   "name_en": "Navy Long Tunic",
+   "description_ar": "تونيك طويل كحلي بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Navy Long Tunic.",
+   "price": 600,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "تونيك تونيك",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 1,
+   "rating": 4.9,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "tunic",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 121,
+   "store_slug": "noor-modest",
+   "name_ar": "فستان سواريه أكمام طويلة زمردي",
+   "name_en": "Emerald Long Sleeve Party Dress",
+   "description_ar": "فستان سواريه أكمام طويلة زمردي بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Emerald Long Sleeve Party Dress.",
+   "price": 3100,
+   "colors_json": [
+    {
+     "name_ar": "أخضر زمردي",
+     "name_en": "Emerald",
+     "hex": "#0E6B4F"
+    }
+   ],
+   "cat_text": "فساتين محتشمة فساتين محتشمة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 50,
+   "rating": 4.1,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "dress_party",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 122,
+   "store_slug": "noor-modest",
+   "name_ar": "فستان سواريه محتشم كحلي أكمام طويلة",
+   "name_en": "Navy Modest Party Dress",
+   "description_ar": "فستان سواريه محتشم كحلي أكمام طويلة بخامة كريب، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Navy Modest Party Dress.",
+   "price": 2900,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "فساتين محتشمة فساتين محتشمة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 16,
+   "rating": 4.0,
+   "audience": null,
+   "department": "hijab",
+   "expect": {
+    "key": "dress_party",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 123,
+   "store_slug": "noor-modest",
+   "name_ar": "جلابية مطرزة بيج",
+   "name_en": "Beige Embroidered Jalabiya",
+   "description_ar": "جلابية مطرزة بيج بخامة قطن، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Beige Embroidered Jalabiya.",
+   "price": 1800,
+   "colors_json": [
+    {
+     "name_ar": "بيج",
+     "name_en": "Beige",
+     "hex": "#D9C3A3"
+    }
+   ],
+   "cat_text": "جلابيات جلابيات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 38,
+   "rating": 4.9,
+   "audience": null,
+   "department": "jalabiya",
+   "expect": {
+    "key": "jalabiya",
+    "formality": 4,
+    "season": null,
+    "trap": "galabeya"
+   }
+  },
+  {
+   "id": 124,
+   "store_slug": "noor-modest",
+   "name_ar": "جلابية قطن للبيت",
+   "name_en": "Cotton Home Jalabiya",
+   "description_ar": "جلابية قطن للبيت بخامة قطن، مناسب لـالرياضة والبيت.",
+   "description_en": "Cotton Home Jalabiya.",
+   "price": 700,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "جلابيات جلابيات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 28,
+   "rating": 4.7,
+   "audience": null,
+   "department": "jalabiya",
+   "expect": {
+    "key": "jalabiya",
+    "formality": 1,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 125,
+   "store_slug": "kids-corner",
+   "name_ar": "فستان بنات حفلات وردي",
+   "name_en": "Girls Party Dress Pink",
+   "description_ar": "فستان بنات حفلات وردي بخامة ساتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Girls Party Dress Pink.",
+   "price": 700,
+   "colors_json": [
+    {
+     "name_ar": "وردي",
+     "name_en": "Pink",
+     "hex": "#E58CA7"
+    }
+   ],
+   "cat_text": "فساتين بنات فساتين بنات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 46,
+   "rating": 4.9,
+   "audience": "girls",
+   "department": "kids",
+   "expect": {
+    "key": "dress_party",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 126,
+   "store_slug": "kids-corner",
+   "name_ar": "فستان بنات حفلات لافندر",
+   "name_en": "Girls Party Dress Lavender",
+   "description_ar": "فستان بنات حفلات لافندر بخامة ساتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Girls Party Dress Lavender.",
+   "price": 700,
+   "colors_json": [
+    {
+     "name_ar": "لافندر",
+     "name_en": "Lavender",
+     "hex": "#B9A7D8"
+    }
+   ],
+   "cat_text": "فساتين بنات فساتين بنات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 23,
+   "rating": 3.9,
+   "audience": "girls",
+   "department": "kids",
+   "expect": {
+    "key": "dress_party",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 127,
+   "store_slug": "kids-corner",
+   "name_ar": "فستان بنات حفلات أبيض",
+   "name_en": "Girls Party Dress White",
+   "description_ar": "فستان بنات حفلات أبيض بخامة ساتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Girls Party Dress White.",
+   "price": 750,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "فساتين بنات فساتين بنات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 6,
+   "rating": 4.0,
+   "audience": "girls",
+   "department": "kids",
+   "expect": {
+    "key": "dress_party",
+    "formality": 4,
+    "season": null,
+    "trap": "near_white"
+   }
+  },
+  {
+   "id": 128,
+   "store_slug": "kids-corner",
+   "name_ar": "فستان بنات حفلات كحلي",
+   "name_en": "Girls Party Dress Navy",
+   "description_ar": "فستان بنات حفلات كحلي بخامة ساتان، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Girls Party Dress Navy.",
+   "price": 650,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "فساتين بنات فساتين بنات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 12,
+   "rating": 4.2,
+   "audience": "girls",
+   "department": "kids",
+   "expect": {
+    "key": "dress_party",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 129,
+   "store_slug": "kids-corner",
+   "name_ar": "تيشيرت بنات",
+   "name_en": "Girls Tee",
+   "description_ar": "تيشيرت بنات بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Girls Tee.",
+   "price": 200,
+   "colors_json": [
+    {
+     "name_ar": "وردي",
+     "name_en": "Pink",
+     "hex": "#E58CA7"
+    }
+   ],
+   "cat_text": "بنات بنات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 30,
+   "rating": 4.5,
+   "audience": "girls",
+   "department": "kids",
+   "expect": {
+    "key": "tshirt",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 130,
+   "store_slug": "kids-corner",
+   "name_ar": "ليجنز بنات",
+   "name_en": "Girls Leggings",
+   "description_ar": "ليجنز بنات بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Girls Leggings.",
+   "price": 220,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "بنات بنات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 57,
+   "rating": 4.5,
+   "audience": "girls",
+   "department": "kids",
+   "expect": {
+    "key": "leggings",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 131,
+   "store_slug": "kids-corner",
+   "name_ar": "جيبة بنات",
+   "name_en": "Girls Skirt",
+   "description_ar": "جيبة بنات بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Girls Skirt.",
+   "price": 300,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "بنات بنات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 0,
+   "rating": 4.3,
+   "audience": "girls",
+   "department": "kids",
+   "expect": {
+    "key": "skirt",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 132,
+   "store_slug": "kids-corner",
+   "name_ar": "كوتشي بنات",
+   "name_en": "Girls Sneaker",
+   "description_ar": "كوتشي بنات بخامة قماش، مناسب لـالخروجات اليومية.",
+   "description_en": "Girls Sneaker.",
+   "price": 550,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "بنات بنات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 41,
+   "rating": 4.2,
+   "audience": "girls",
+   "department": "kids",
+   "expect": {
+    "key": "sneakers",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 133,
+   "store_slug": "kids-corner",
+   "name_ar": "بالرينا بنات",
+   "name_en": "Girls Ballerina",
+   "description_ar": "بالرينا بنات بخامة جلد، مناسب لـالشغل والخروجات الشيك.",
+   "description_en": "Girls Ballerina.",
+   "price": 400,
+   "colors_json": [
+    {
+     "name_ar": "وردي",
+     "name_en": "Pink",
+     "hex": "#E58CA7"
+    }
+   ],
+   "cat_text": "بنات بنات",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 41,
+   "rating": 3.9,
+   "audience": "girls",
+   "department": "kids",
+   "expect": {
+    "key": "flats",
+    "formality": 3,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 134,
+   "store_slug": "kids-corner",
+   "name_ar": "قميص ولادي أبيض",
+   "name_en": "Boys White Shirt",
+   "description_ar": "قميص ولادي أبيض بخامة قطن، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Boys White Shirt.",
+   "price": 300,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "ولادي ولادي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 42,
+   "rating": 3.9,
+   "audience": "boys",
+   "department": "kids",
+   "expect": {
+    "key": "shirt",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 135,
+   "store_slug": "kids-corner",
+   "name_ar": "بنطلون ولادي قماش",
+   "name_en": "Boys Trousers",
+   "description_ar": "بنطلون ولادي قماش بخامة قماش، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Boys Trousers.",
+   "price": 350,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "ولادي ولادي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 24,
+   "rating": 4.7,
+   "audience": "boys",
+   "department": "kids",
+   "expect": {
+    "key": "trousers",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 136,
+   "store_slug": "kids-corner",
+   "name_ar": "فيست ولادي رمادي",
+   "name_en": "Boys Grey Vest",
+   "description_ar": "فيست ولادي رمادي بخامة قماش، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Boys Grey Vest.",
+   "price": 300,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "ولادي ولادي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 48,
+   "rating": 4.0,
+   "audience": "boys",
+   "department": "kids",
+   "expect": {
+    "key": "waistcoat",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 137,
+   "store_slug": "kids-corner",
+   "name_ar": "بابيون ولادي",
+   "name_en": "Boys Bow Tie",
+   "description_ar": "بابيون ولادي بخامة ساتان، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Boys Bow Tie.",
+   "price": 100,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "ولادي ولادي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 56,
+   "rating": 4.0,
+   "audience": "boys",
+   "department": "kids",
+   "expect": {
+    "key": "bow_tie",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 138,
+   "store_slug": "kids-corner",
+   "name_ar": "حذاء ولادي رسمي",
+   "name_en": "Boys Formal Shoes",
+   "description_ar": "حذاء ولادي رسمي بخامة جلد، مناسب لـالخطوبة والمناسبات والشغل.",
+   "description_en": "Boys Formal Shoes.",
+   "price": 650,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "ولادي ولادي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 50,
+   "rating": 4.5,
+   "audience": "boys",
+   "department": "kids",
+   "expect": {
+    "key": "formal_shoes",
+    "formality": 4,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 139,
+   "store_slug": "kids-corner",
+   "name_ar": "تيشيرت ولادي",
+   "name_en": "Boys Tee",
+   "description_ar": "تيشيرت ولادي بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Boys Tee.",
+   "price": 180,
+   "colors_json": [
+    {
+     "name_ar": "أزرق",
+     "name_en": "Blue",
+     "hex": "#30558F"
+    }
+   ],
+   "cat_text": "ولادي ولادي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 5,
+   "rating": 4.7,
+   "audience": "boys",
+   "department": "kids",
+   "expect": {
+    "key": "tshirt",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 140,
+   "store_slug": "kids-corner",
+   "name_ar": "شورت ولادي",
+   "name_en": "Boys Shorts",
+   "description_ar": "شورت ولادي بخامة قطن، مناسب لـالخروجات اليومية.",
+   "description_en": "Boys Shorts.",
+   "price": 200,
+   "colors_json": [
+    {
+     "name_ar": "زيتي",
+     "name_en": "Olive",
+     "hex": "#6B7345"
+    }
+   ],
+   "cat_text": "ولادي ولادي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 46,
+   "rating": 4.2,
+   "audience": "boys",
+   "department": "kids",
+   "expect": {
+    "key": "shorts",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 141,
+   "store_slug": "kids-corner",
+   "name_ar": "كوتشي ولادي",
+   "name_en": "Boys Sneaker",
+   "description_ar": "كوتشي ولادي بخامة قماش، مناسب لـالخروجات اليومية.",
+   "description_en": "Boys Sneaker.",
+   "price": 500,
+   "colors_json": [
+    {
+     "name_ar": "أبيض",
+     "name_en": "White",
+     "hex": "#F5F5F3"
+    }
+   ],
+   "cat_text": "ولادي ولادي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 25,
+   "rating": 4.6,
+   "audience": "boys",
+   "department": "kids",
+   "expect": {
+    "key": "sneakers",
+    "formality": 2,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 142,
+   "store_slug": "kids-corner",
+   "name_ar": "بدلة ولادي كحلي",
+   "name_en": "Boys Navy Suit",
+   "description_ar": "بدلة ولادي كحلي بخامة قماش، مناسب لـالمناسبات الرسمية والأفراح.",
+   "description_en": "Boys Navy Suit.",
+   "price": 1200,
+   "colors_json": [
+    {
+     "name_ar": "كحلي",
+     "name_en": "Navy",
+     "hex": "#1F2A44"
+    }
+   ],
+   "cat_text": "ولادي ولادي",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 5,
+   "rating": 4.6,
+   "audience": "boys",
+   "department": "kids",
+   "expect": {
+    "key": "suit",
+    "formality": 5,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 143,
+   "store_slug": "sport-zone",
+   "name_ar": "تيشيرت رياضي",
+   "name_en": "Performance Tee",
+   "description_ar": "تيشيرت رياضي بخامة بوليستر، مناسب لـالرياضة والبيت.",
+   "description_en": "Performance Tee.",
+   "price": 360,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "رياضة رياضة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 10,
+   "rating": 4.9,
+   "audience": null,
+   "department": "sports",
+   "expect": {
+    "key": "sport_top",
+    "formality": 1,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 144,
+   "store_slug": "sport-zone",
+   "name_ar": "شورت رياضي",
+   "name_en": "Sport Shorts",
+   "description_ar": "شورت رياضي بخامة بوليستر، مناسب لـالرياضة والبيت.",
+   "description_en": "Sport Shorts.",
+   "price": 380,
+   "colors_json": [
+    {
+     "name_ar": "رمادي",
+     "name_en": "Grey",
+     "hex": "#8E9096"
+    }
+   ],
+   "cat_text": "رياضة رياضة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 1,
+   "rating": 4.0,
+   "audience": null,
+   "department": "sports",
+   "expect": {
+    "key": "sport_bottom",
+    "formality": 1,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 145,
+   "store_slug": "sport-zone",
+   "name_ar": "حذاء جري",
+   "name_en": "Running Shoes",
+   "description_ar": "حذاء جري بخامة شبك، مناسب لـالرياضة والبيت.",
+   "description_en": "Running Shoes.",
+   "price": 1400,
+   "colors_json": [
+    {
+     "name_ar": "أزرق",
+     "name_en": "Blue",
+     "hex": "#30558F"
+    }
+   ],
+   "cat_text": "رياضة رياضة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 57,
+   "rating": 4.3,
+   "audience": null,
+   "department": "sports",
+   "expect": {
+    "key": "sport_shoes",
+    "formality": 1,
+    "season": null,
+    "trap": null
+   }
+  },
+  {
+   "id": 146,
+   "store_slug": "sport-zone",
+   "name_ar": "ليجنز رياضي",
+   "name_en": "Sport Leggings",
+   "description_ar": "ليجنز رياضي بخامة ليكرا، مناسب لـالرياضة والبيت.",
+   "description_en": "Sport Leggings.",
+   "price": 520,
+   "colors_json": [
+    {
+     "name_ar": "أسود",
+     "name_en": "Black",
+     "hex": "#1C1C1E"
+    }
+   ],
+   "cat_text": "رياضة رياضة",
+   "stock": 20,
+   "track_stock": 1,
+   "status": "active",
+   "sold_count": 41,
+   "rating": 4.0,
+   "audience": null,
+   "department": "sports",
+   "expect": {
+    "key": "leggings",
+    "formality": 1,
+    "season": null,
+    "trap": null
+   }
+  }
+ ]
+}

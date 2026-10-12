@@ -15,6 +15,7 @@ import { buyerFromReq } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { searchByImage, visualSettings } from '../lib/visual.js';
 import { runStylist, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
+import { runModa } from '../lib/moda/engine.js';
 import { quote } from '../lib/cart.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert, notifyPlatformDelivery } from '../lib/whatsapp.js';
@@ -124,10 +125,39 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
 
 /* ---------------------------------------------------------- stylist chat ("مودة") */
 const chatHits = new Map();
+function modaCatalogRows() {
+  return q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en,
+      COALESCE(c.name_ar || ' ' || c.name_en, '') AS cat_text
+    FROM products p JOIN stores s ON s.id=p.store_id LEFT JOIN categories c ON c.id=p.category_id
+    WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (p.track_stock=0 OR p.stock>0)
+    ORDER BY p.featured DESC, p.sold_count DESC, p.id DESC LIMIT 5000`);
+}
+function modaClientResponse(result) {
+  const base = { intent: result.intent || (result.state === 'chat' ? 'chat' : 'shop'), state: result.state, say: result.say, tips: result.tips || [], questions: result.questions || [], session: result.session };
+  if (!result.blocks) return { ...base, looks: [], total: 0, weatherSource: result.weatherSource || null };
+  const cards = new Map(cardsByIds(result.blocks.tabs.flatMap((tab) => tab.items.map((item) => item.id))).map((card) => [card.id, card]));
+  const tabs = result.blocks.tabs.map((tab) => ({
+    id: tab.id, label: tab.label, subtotal: tab.subtotal,
+    items: tab.items.map((item) => ({ ...item, card: cards.get(item.id) || null })).filter((item) => item.card),
+  }));
+  const looks = tabs.flatMap((tab) => tab.items.map((item) => ({ label: item.label, items: [item.card], pick: 0 })));
+  const missingItems = result.blocks.tabs.flatMap((tab) => tab.missing.map((item) => ({
+    key: item.payload?.key || item.key, label: item.label, material: item.payload?.material,
+    button: item.button, hint: item.hint, tab: tab.label,
+  })));
+  return {
+    ...base, intent: 'shop', looks, tabs, total: result.blocks.total, budget: result.blocks.budget,
+    overBudget: result.blocks.over > 0, palette: result.blocks.palette.map((color) => color.ar),
+    missing: result.missing.map((item) => item.label), missingItems,
+    weatherSource: result.weatherSource || null,
+  };
+}
+
 r.post('/stylist', h(async (req, res) => {
   const st = stylistSettings();
   if (!st.enabled) throw new AppError(503, 'stylist_disabled', 'The stylist is switched off.');
-  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(700) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string().max(500)).optional() }).parse(req.body);
+  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(700) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string().max(500)).optional(), session: z.record(z.any()).optional(), answers: z.record(z.any()).optional() }).parse(req.body);
+  if (body.session && JSON.stringify(body.session).length > 8000) throw new AppError(422, 'validation_failed', 'Session too large.');
   if (body.messages[body.messages.length - 1].role !== 'user') throw new AppError(422, 'validation_failed', 'Last message must be from the shopper.');
   const ip = req.ip || 'x'; const now = Date.now();
   const recent = (chatHits.get(ip) || []).filter((t) => now - t < 86400e3);
@@ -140,7 +170,14 @@ r.post('/stylist', h(async (req, res) => {
     const owned = q.all("SELECT oi.name_ar, oi.color FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.buyer_id=? AND o.status='delivered' ORDER BY o.id DESC LIMIT 8", [me.id]);
     if (owned.length) profile = { ...(profile || {}), owns: owned.map((x) => [x.name_ar, x.color].filter(Boolean).join(' ')).join('، ').slice(0, 300), ...(me.name ? { name: me.name.split(' ')[0] } : {}) };
   }
-  try { res.json(await runStylist(body.messages, { image: body.image, image2: body.image2, profile })); }
+  try {
+    // Photos still use the vision-capable provider. Text chat uses the local, rule-based Moda engine and live shop inventory.
+    if (body.image || body.image2) return res.json(await runStylist(body.messages, { image: body.image, image2: body.image2, profile, session: body.session, answers: body.answers }));
+    const modaProfile = { ...(profile || {}) };
+    const rows = modaCatalogRows();
+    const result = await runModa(body.messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers });
+    return res.json(modaClientResponse(result));
+  }
   catch (e) { if (e.code === 'stylist_no_vision') throw new AppError(422, 'stylist_no_vision', 'Photos need the Anthropic provider.'); if (e.code === 'stylist_bad_image') throw new AppError(422, 'stylist_bad_image', 'Unsupported image.'); if (e.code === 'stylist_unavailable') throw new AppError(503, 'stylist_unavailable', 'The stylist is unavailable right now.'); throw e; }
 }));
 

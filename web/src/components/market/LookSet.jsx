@@ -77,12 +77,20 @@ export default function LookSet({ data, name }) {
   const { t, tr, lang } = useI18n();
   const [quick, setQuick] = useState(null); // { queue: [product], i }
   const [added, setAdded] = useState([]);
+  const [tab, setTab] = useState(0);
   const m = data; const miss = (m?.missing || []).slice(0, 4);
+  const ar = lang === 'ar';
   if (!m?.looks?.length && !miss.length) return null;
-  const missing = miss.length > 0 && (
+  const tabs = m.tabs?.length > 1 ? m.tabs : null;
+  const shownLooks = tabs ? (tabs[Math.min(tab, tabs.length - 1)].items.filter((i) => i.card).map((i) => ({ label: i.label, items: [i.card], pick: 0 }))) : m.looks;
+  const orderItems = (m.missingItems || []);
+  const missing = orderItems.length > 0 ? (
+    <div className="mt-3 space-y-1.5">{orderItems.slice(0, 4).map((x, i) => <Link key={`${x.key}-${i}`} to={`/request?title=${encodeURIComponent(`${x.label}${x.material ? ' ' + x.material : ''}`)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-brand/50 bg-brand/5 px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" /><span className="flex-1">{x.label}{x.tab && tabs ? ` (${x.tab})` : ''} — {x.hint}</span><span className="rounded-full bg-brand px-3 py-1 text-[12px] text-white">{x.button}</span></Link>)}</div>
+  ) : miss.length > 0 && (
     <div className="mt-3 space-y-1.5">{miss.map((x) => <Link key={x} to={`/request?title=${encodeURIComponent(x)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-brand/50 bg-brand/5 px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" />{t('req.moda', { x })}</Link>)}</div>
   );
   if (!m.looks?.length) return missing;
+  const money = (n) => formatMoney(n, lang);
   const picks = m.looks.map((l) => l.items[l.pick]).filter(Boolean);
   const startAdd = (items) => setQuick({ queue: items, i: 0 });
   const nextAdd = () => {
@@ -108,8 +116,11 @@ export default function LookSet({ data, name }) {
         {m.palette?.length > 0 && <p className="mb-1 text-[12px] font-semibold text-brand">لوحة الألوان: {m.palette.join(' · ')}</p>}
         {m.tips && <p>✨ {m.tips}</p>}
       </div>}
-      {m.manual ? <><p className="mt-4 text-sm font-bold">قطع الأوتفيت المختارة</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} /></> : m.looks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
-      <p className="mt-3 text-[13.5px] font-semibold">{t('stylist.total', { p: formatMoney(m.total, lang) })}{m.overBudget && <span className="ms-2 font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
+      {m.state === 'alternatives' && <p className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-[12px] font-semibold text-muted">{ar ? 'أقرب بديل متاح' : 'Closest available'}</p>}
+      {m.state === 'partial' && <p className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-[12px] font-semibold text-muted">{ar ? 'جزء من الطقم متاح' : 'Part of the look is available'}</p>}
+      {tabs && <div role="tablist" className="mt-4 grid grid-cols-2 gap-1 rounded-full bg-secondary p-1">{tabs.map((tb, i) => <button key={tb.id} type="button" role="tab" aria-selected={i === tab} onClick={() => setTab(i)} className={cx('rounded-full px-3 py-2 text-[13px] font-bold transition', i === tab ? 'bg-elevated shadow-sm' : 'text-muted')}>{tb.label} <span className="font-normal">· {money(tb.subtotal)}</span></button>)}</div>}
+      {m.manual ? <><p className="mt-4 text-sm font-bold">قطع الأوتفيت المختارة</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} /></> : shownLooks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
+      <p className="mt-3 text-[13.5px] font-semibold">{tabs && <span className="me-2 font-normal text-muted">{tabs.map((tb) => `${tb.label}: ${money(tb.subtotal)}`).join(' · ')} ·</span>}{t('stylist.total', { p: formatMoney(m.total, lang) })}{m.overBudget && <span className="ms-2 font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
       <div className="mt-3 flex flex-wrap gap-2">
         <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-4 py-2 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t('stylist.addAll')}</button>
         {[...new Map(picks.map((p) => [p.store.slug, p.store.name])).entries()].map(([sl, nm]) => <StoreCartLink key={sl} slug={sl} name={nm} tr={tr} t={t} />)}

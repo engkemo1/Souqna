@@ -6,6 +6,7 @@
     "dev": "node --watch --no-warnings --env-file-if-exists=../.env src/index.js",
     "start": "node --no-warnings --env-file-if-exists=../.env src/index.js",
     "test:stylist": "node --test src/lib/stylist-ranking.test.js",
+    "test:moda": "node --test test/moda.test.js",
     "evaluate:stylist": "node src/scripts/evaluate-stylist.js",
     "evaluate:stylist:external": "node src/scripts/evaluate-external-fashion.js",
     "seed": "node --no-warnings --env-file-if-exists=../.env src/db/seed.js",

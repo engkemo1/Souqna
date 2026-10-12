@@ -1,0 +1,601 @@
+{
+ "_about": "سيناريوهات اختبار مودة (بدون كتالوج حقيقي). كل سيناريو = رسالة عميل + اللي متوقع المحرك يفهمه ويرجّعه. الاختبار بيفحص: الفهم (audience/context/budget/daypart)، حالة النتيجة (full/partial/alternatives/over_budget/clarify/chat)، والقطع (must_families بمفاتيح taxonomy)، وممنوعات (must_not). now = الوقت المحاكى لكل الاختبارات.",
+ "version": 1,
+ "fixture_catalog": "occasion-catalog.json",
+ "scenarios": [
+  {
+   "id": "couple_engagement_ar",
+   "message": "أنا وخطيبتي رايحين خطوبة عايزين طقم لينا احنا الاتنين",
+   "expect": {
+    "audience": [
+     "men",
+     "women"
+    ],
+    "context": "engagement_guest",
+    "state": "full",
+    "tabs": [
+     "him",
+     "her"
+    ],
+    "must_families": {
+     "him": [
+      "suit|classic_set",
+      "shirt",
+      "formal_shoes|loafers"
+     ],
+     "her": [
+      "dress_party|dress_evening|jumpsuit|two_piece_set",
+      "heels_low|heels_high|flats"
+     ]
+    },
+    "must_not": [
+     "near_white_for_guests",
+     "galabeya",
+     "relationship_words_in_labels",
+     "jalabiya"
+    ],
+    "ask": [
+     "budget"
+    ],
+    "notes": "الحالة اللي اشتكى منها العميل. المحرك يفهم الاتنين بدون سؤال جنس، ومايظهرش 'خطيب' كاسم قطعة."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "couple_engagement_franco",
+   "message": "ana w khatibty rayhin khotoba 3ayzeen badla w fostan",
+   "expect": {
+    "audience": [
+     "men",
+     "women"
+    ],
+    "context": "engagement_guest",
+    "state": "full",
+    "tabs": [
+     "him",
+     "her"
+    ],
+    "must_families": {
+     "him": [
+      "suit"
+     ],
+     "her": [
+      "dress_party|dress_evening|dress_casual"
+     ]
+    },
+    "must_not": [
+     "near_white_for_guests"
+    ]
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "english_engagement_self",
+   "message": "I need an outfit for my engagement party, budget 5000 EGP",
+   "expect": {
+    "context": "engagement_self",
+    "budget_total": 5000,
+    "state": "clarify",
+    "ask": [
+     "audience"
+    ],
+    "language": "en"
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "man_wedding_guest_budget",
+   "message": "عايز لبس فرح صاحبي بالليل ميزانيتي ٦٠٠٠ جنيه",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "context": "wedding_guest",
+    "daypart": "night",
+    "budget_total": 6000,
+    "state": "full",
+    "must_families": {
+     "him": [
+      "suit|tuxedo|classic_set",
+      "shirt",
+      "formal_shoes|loafers"
+     ]
+    },
+    "must_total_leq": 6000,
+    "must_not": [
+     "near_white_for_guests"
+    ]
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "woman_wedding_guest_no_white",
+   "message": "رايحة فرح صاحبتي عايزة فستان سواريه",
+   "expect": {
+    "audience": [
+     "women"
+    ],
+    "context": "wedding_guest",
+    "state": "full",
+    "must_families": {
+     "her": [
+      "dress_party|dress_evening"
+     ]
+    },
+    "must_not": [
+     "near_white_for_guests"
+    ],
+    "notes": "الفستان الأبيض والبيج الفاتح والفضي والوردي الفاتح لازم يتشالوا حتى لو الأعلى مبيعًا."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "hijabi_engagement_budget",
+   "message": "أنا محجبة ورايحة خطوبة بنت خالي، ميزانيتي ٤٠٠٠",
+   "expect": {
+    "audience": [
+     "women_hijab"
+    ],
+    "context": "engagement_guest",
+    "budget_total": 4000,
+    "state": "full",
+    "must_families": {
+     "her": [
+      "abaya|dress_party|hijab_set",
+      "tarha"
+     ]
+    },
+    "must_total_leq": 4000,
+    "must_not": [
+     "near_white_for_guests",
+     "sleeveless"
+    ]
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "kids_eid_budget",
+   "message": "عيد الأولاد ٣٠٠٠ جنيه، عندي ولد وبنت ٨ سنين",
+   "expect": {
+    "audience": [
+     "boys",
+     "girls"
+    ],
+    "context": "eid",
+    "budget_total": 3000,
+    "state": "full",
+    "persons": 2,
+    "must_total_leq": 3000,
+    "notes": "الميزانية إجمالي للاتنين. أطفال بس، فمفيش لبس للأب أو الأم."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "family_eid_budget",
+   "message": "عيد العيلة ٨٠٠٠ جنيه: أنا ومراتي وولد وبنت ٨ سنين",
+   "expect": {
+    "audience": [
+     "men",
+     "women",
+     "boys",
+     "girls"
+    ],
+    "context": "eid",
+    "budget_total": 8000,
+    "state": "full",
+    "persons": 4,
+    "must_total_leq": 8000,
+    "notes": "الإجمالي لأربعة أشخاص، قصة ألوان واحدة. الأطفال أرخص."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "family_eid_too_low",
+   "message": "عيد العيلة ٣٠٠٠ جنيه: أنا ومراتي وولد وبنت",
+   "expect": {
+    "audience": [
+     "men",
+     "women",
+     "boys",
+     "girls"
+    ],
+    "context": "eid",
+    "budget_total": 3000,
+    "state": "over_budget",
+    "persons": 4,
+    "must_not": [
+     "exceed_silently"
+    ],
+    "notes": "مستحيل في الكتالوج. نقول الحقيقة ونقترح نقلل الأشخاص أو نزود الميزانية، ماينفعش نخرج عنها بصمت."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "single_piece_shirt",
+   "message": "عايز قميص أبيض",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "state": "full",
+    "slots": 1,
+    "must_families": {
+     "him": [
+      "shirt"
+     ]
+    },
+    "must_colors": [
+     "white"
+    ]
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "single_piece_franco_bag",
+   "message": "3ayza shanta soda",
+   "expect": {
+    "audience": [
+     "women"
+    ],
+    "state": "full",
+    "slots": 1,
+    "must_families": {
+     "her": [
+      "handbag|clutch"
+     ]
+    },
+    "must_colors": [
+     "black"
+    ]
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "photo_matching_blazer",
+   "message": "رشحلي يتماشى معاه إيه",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "state": "full",
+    "must_families": {
+     "him": [
+      "trousers|chinos",
+      "shirt|polo"
+     ]
+    },
+    "notes": "الصورة: بليزر كحلي. الاختبار بيحاكي وصف الرؤية بدل صورة حقيقية."
+   },
+   "image_stub": "بليزر رجالي كحلي بقصة سليم",
+   "image": null,
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "bare_dress_word",
+   "message": "عايزة دريس",
+   "expect": {
+    "audience": [
+     "women"
+    ],
+    "state": "clarify",
+    "ask": [
+     "dress_kind"
+    ],
+    "notes": "'دريس' لوحدها = خروج مبدئيًا، ونسأل: للخروج ولا سواريه؟"
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "woman_work_budget",
+   "message": "محتاجة لبس شغل ميزانيتي ٣٠٠٠",
+   "expect": {
+    "audience": [
+     "women"
+    ],
+    "context": "work_casual",
+    "budget_total": 3000,
+    "state": "full",
+    "must_total_leq": 3000,
+    "must_families": {
+     "her": [
+      "blouse|dress_work|dress_casual|top"
+     ]
+    }
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "man_sahel",
+   "message": "هسافر الساحل الويك إند عايز لبس",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "context": "sahel_beach",
+    "state": "full",
+    "must_not": [
+     "suit",
+     "formal_shoes",
+     "wool"
+    ],
+    "season": "summer"
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "hijabi_bride_katb_kitab",
+   "message": "كتب كتابي الأسبوع الجاي وأنا محجبة",
+   "expect": {
+    "audience": [
+     "women_hijab"
+    ],
+    "context": "katb_kitab",
+    "role": "self",
+    "state": "full",
+    "must_families": {
+     "her": [
+      "abaya|dress_party",
+      "tarha"
+     ]
+    },
+    "allow_near_white": true,
+    "notes": "العروسة مسموح لها بالألوان الفاتحة والبيج."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "condolence_explicit",
+   "message": "رايح عزاء النهارده",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "context": "condolence",
+    "state": "full",
+    "must_not": [
+     "red",
+     "yellow",
+     "orange",
+     "fuchsia",
+     "tie_bright"
+    ],
+    "tone": "sober",
+    "no_marketing": true
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "no_results_white_tux",
+   "message": "عايز تاكسيدو أبيض للفرح",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "context": "wedding_guest",
+    "state": "alternatives",
+    "honest_message": true,
+    "notes": "مفيش تاكسيدو في الكتالوج. المفروض نقول كده بصراحة ونعرض أقرب بديل (بدلة سودا)، من غير 'جهزتلك'."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "partial_missing_piece",
+   "message": "عايزة فستان سواريه وجاكيت جلد للخطوبة",
+   "expect": {
+    "audience": [
+     "women"
+    ],
+    "context": "engagement_guest",
+    "state": "partial",
+    "missing": [
+     "leather_jacket"
+    ],
+    "order_button": true,
+    "must_families": {
+     "her": [
+      "dress_party"
+     ]
+    }
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "over_budget_impossible",
+   "message": "عايز بدلة وجزمة وكرافتة بألف جنيه",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "budget_total": 1000,
+    "state": "over_budget",
+    "must_not": [
+     "exceed_silently"
+    ],
+    "notes": "مستحيل في الكتالوج. نقول إن أقل طقم لقيناه بكام، وإنه زاد كام."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "mixed_language_night",
+   "message": "عايز outfit للـ wedding بالليل budget 7000",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "context": "wedding_guest",
+    "daypart": "night",
+    "budget_total": 7000,
+    "state": "full",
+    "must_total_leq": 7000
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "greeting",
+   "message": "ازيك",
+   "expect": {
+    "state": "chat",
+    "intent": "greeting",
+    "products": false
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "advice_white_at_wedding",
+   "message": "ينفع ألبس أبيض في الفرح؟",
+   "expect": {
+    "state": "chat",
+    "intent": "advice",
+    "advice_id": "white_at_wedding",
+    "products": false
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "out_of_stock_oxford",
+   "message": "عايز حذاء أوكسفورد بني",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "state": "alternatives",
+    "must_not": [
+     "out_of_stock_item"
+    ],
+    "notes": "الأوكسفورد البني نفد. نقول كده ونعرض الأسود أو اللوفر البني."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "kids_girl_engagement",
+   "message": "بنتي ٦ سنين رايحة خطوبة",
+   "expect": {
+    "audience": [
+     "girls"
+    ],
+    "context": "engagement_guest",
+    "state": "full",
+    "must_families": {
+     "her": [
+      "dress_party"
+     ]
+    },
+    "must_not": [
+     "near_white_for_guests"
+    ]
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "typos_stretch",
+   "message": "عايز بدلللة كحلي للخطوبه",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "context": "engagement_guest",
+    "state": "full",
+    "must_families": {
+     "him": [
+      "suit"
+     ]
+    },
+    "must_colors": [
+     "navy"
+    ]
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "weather_cold_night",
+   "message": "فرح الخميس الجاي بالليل عايزة لبس",
+   "expect": {
+    "audience": [
+     "women"
+    ],
+    "context": "wedding_guest",
+    "daypart": "night",
+    "state": "full",
+    "must_families": {
+     "her": [
+      "dress_party|dress_evening",
+      "shawl|blazer|cardigan"
+     ]
+    },
+    "must_not": [
+     "near_white_for_guests"
+    ],
+    "weather_note": true
+   },
+   "weather_mock": {
+    "temp_c": 12,
+    "feels_like_c": 10,
+    "rain_pct": 20
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "explicit_galabeya",
+   "message": "عايز جلابية للخطوبة",
+   "expect": {
+    "audience": [
+     "men"
+    ],
+    "context": "engagement_guest",
+    "state": "full",
+    "must_families": {
+     "him": [
+      "jalabiya"
+     ]
+    },
+    "notes": "العميل طلبها صراحة. الجلابية مخبية من الاقتراحات الافتراضية بس."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  },
+  {
+   "id": "couple_no_occasion",
+   "message": "أنا وخطيبتي عايزين لبس",
+   "expect": {
+    "audience": [
+     "men",
+     "women"
+    ],
+    "state": "clarify",
+    "ask": [
+     "occasion"
+    ],
+    "notes": "فهم الاتنين من الرسالة، وسؤال المناسبة بس."
+   },
+   "now": "2026-10-12T19:30:00+03:00",
+   "city": "banha"
+  }
+ ]
+}

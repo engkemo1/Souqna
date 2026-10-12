@@ -1,0 +1,371 @@
+{
+ "_about": "كل جملة بتظهر للعميل بتيجي من هنا (مش من الموديل). عامية مصرية، قصيرة، ومن غير مجاملة. المتغيرات بين أقواس: {occasion} المناسبة، {palette} الألوان، {total} الإجمالي بالجنيه، {budget} الميزانية، {missing} القطع الناقصة، {name} الاسم، {n} عدد. الكود بيختار جملة عشوائية من القائمة علشان الكلام ماينفعش يتكرر بنفس الصياغة. لو العميل كتب إنجليزي بالكامل بنرد من 'en'.",
+ "version": 1,
+ "ar": {
+  "greeting": [
+   "أهلاً بيك! أنا مودة، مستايلستك الشخصية. قولي رايح فين أو عايز تلبس إيه وأنا أظبطلك.",
+   "يا أهلاً! احكيلي عن المناسبة أو القطعة اللي بتدور عليها وأرشحلك من محلات بنها.",
+   "نورت! عايز لبس لمناسبة معينة ولا بتدور على قطعة؟"
+  ],
+  "greeting_returning": [
+   "أهلاً بيك تاني يا {name}! عايز نكمل على ذوقك المعتاد ولا في مناسبة جديدة؟"
+  ],
+  "thanks": [
+   "العفو! لو احتجت حاجة تانية أنا هنا.",
+   "ولا يهمك، بالسلامة وإن شاء الله تعجبك."
+  ],
+  "intro_full": [
+   "جهزتلك طقم ل{occasion} بألوان {palette}.",
+   "ده اللي رشحتهولك ل{occasion}: ألوان {palette} متناسقة مع بعض.",
+   "ل{occasion} اخترتلك طقم كامل من المتاح دلوقتي، بألوان {palette}."
+  ],
+  "intro_full_couple": [
+   "جهزتلكم طقمين ل{occasion} بنفس قصة الألوان ({palette})، من غير ما يبقوا نسخة واحدة.",
+   "اخترتلكم طقمين ل{occasion} متناسقين مع بعض بألوان {palette}."
+  ],
+  "intro_partial": [
+   "لقيت جزء من الطقم ل{occasion}، لكن في حاجات مش متاحة دلوقتي: {missing}.",
+   "الطقم ل{occasion} ناقصه {missing} لأنها مش موجودة في المحلات حاليًا. اللي لقيته تحت."
+  ],
+  "intro_alternatives": [
+   "ملقتش بالظبط اللي طلبته، فده أقرب بديل لقيته.",
+   "مفيش مطابق تمامًا للطلب، فوسّعت البحث لأقرب حاجة."
+  ],
+  "intro_none": [
+   "دورت في محلات بنها ومالقيتش حاجة مناسبة للطلب ده دلوقتي. تحب أوسّع السعر أو اللون؟",
+   "مفيش منتجات مناسبة للطلب ده في المحلات حاليًا. ممكن تغيّر اللون أو الميزانية، أو أسجّل طلبك وننبّهك لما يتوفر."
+  ],
+  "relaxed_labels": {
+   "color": "غيّرت اللون لقريب منه",
+   "price": "زودت السعر شوية",
+   "formality": "نزّلت أو رفعت الرسمية درجة",
+   "substitute": "بديل من نفس النوع"
+  },
+  "total_line": [
+   "إجمالي الطقم: {total} جنيه.",
+   "الإجمالي: {total} جنيه."
+  ],
+  "total_line_couple": [
+   "إجمالي ليك: {him} جنيه، وليها: {her} جنيه، والاتنين: {total} جنيه."
+  ],
+  "within_budget": [
+   "وده جوه ميزانيتك ({budget} جنيه)."
+  ],
+  "over_budget": [
+   "الطقم زاد عن ميزانيتك ({budget} جنيه) بـ{over} جنيه. تحب أرخّصه؟",
+   "أقل طقم لقيته كله بـ{total} جنيه، وده أعلى من ميزانيتك بـ{over} جنيه."
+  ],
+  "order_missing_button": "اطلبه",
+  "order_missing_hint": "مش متاح دلوقتي. تحب نبلّغ المحلات ونبلغك لو اتوفر؟",
+  "clarify_audience": [
+   "اللبس ده لمين؟"
+  ],
+  "clarify_occasion": [
+   "ده لأنهي مناسبة؟"
+  ],
+  "clarify_budget": [
+   "ميزانيتك تقريبًا قد إيه؟"
+  ],
+  "clarify_generic": [
+   "محتاج أعرف حاجة بسيطة علشان أرشحلك صح:"
+  ],
+  "didnt_understand": [
+   "مفهمتش قصدك بالظبط. تقصد تدور على لبس لمناسبة ولا بتسأل عن حاجة معينة؟",
+   "ممكن توضحلي أكتر؟ قولي المناسبة أو القطعة اللي عايزها."
+  ],
+  "skip_taste_ack": [
+   "تمام، هظبطها على ذوق عام وتقدر تعدّل بعدين."
+  ],
+  "taste_saved": [
+   "حفظت ذوقك، المرة الجاية مش هسألك تاني."
+  ],
+  "tips_prefix": "نصيحة:",
+  "tip_formats": [
+   "نصيحة: {tip}",
+   "{tip}"
+  ],
+  "feedback_thanks_like": [
+   "تمام! هفتكر إن ده عجبك."
+  ],
+  "feedback_thanks_dislike": [
+   "شكرًا إنك قلتلي. هراعي {reason} في الاقتراحات الجاية."
+  ],
+  "fallback_unavailable": [
+   "في مشكلة مؤقتة عندي، حاول تاني بعد شوية.",
+   "المساعد مش متاح دلوقتي. ممكن تتصفح الأقسام بنفسك لحد ما يرجع."
+  ],
+  "fallback_generic": [
+   "مقدرتش أجهز ترشيح دلوقتي. اختار المناسبة من هنا وأنا أكمل:"
+  ],
+  "photo_received": [
+   "شفت الصورة. بحلل القطعة وأرشحلك اللي يتماشى معاها."
+  ],
+  "photo_not_clothing": [
+   "الصورة مش لبس. ابعتلي صورة قطعة أو لوك تعجبك وأطلعلك شبهه."
+  ],
+  "photo_compare_verdict": [
+   "أنا هاخد {pick}، لأن {reason}."
+  ],
+  "condolence": {
+   "_about": "بتتستخدم بس لو العميل سأل صراحة عن لبس العزاء. نبرة هادية، بدون عروض أو أسئلة ذوق أو تسويق.",
+   "intro": [
+    "ربنا يرحمه ويصبركم. دي اقتراحات بسيطة وهادية."
+   ],
+   "no_results": [
+    "مالقيتش حاجة مناسبة دلوقتي في المحلات. ربنا يصبركم."
+   ]
+  },
+  "dress_word_hint": "لو الطلب 'دريس' بس من غير وصف، نفترض خروج ونسأل: 'للخروج ولا لمناسبة (سواريه)؟'",
+  "dress_clarify": [
+   "دريس للخروج ولا سواريه لمناسبة؟"
+  ],
+  "weather_line": [
+   "الجو وقتها حوالي {temp}°، فاخترت خامات {fabrics}.",
+   "متوقع {temp}° وقتها، فراعيت ده: {fabrics}."
+  ],
+  "weather_layer": [
+   "خد معاك {layers} علشان البرد بالليل."
+  ],
+  "weather_rain": [
+   "فيه احتمال مطر، فحذاء مقفول وجاكيت أحسن."
+  ],
+  "weather_approx": [
+   "الجو تقريبي لأن المناسبة بعيدة شوية."
+  ],
+  "night_note": [
+   "المناسبة بالليل، فمال للألوان الأغمق."
+  ],
+  "alt_item": [
+   "{wanted} مش متاح دلوقتي، فجبتلك {got} بداله"
+  ],
+  "alt_color": [
+   "{wanted} مش متاح بالظبط، فجبتلك أقرب لون ليه"
+  ],
+  "budget_swap": [
+   "علشان الميزانية، بدّلت {slot} بأرخص بديل مناسب."
+  ],
+  "dropped_optional": [
+   "شيلت {dropped} علشان الميزانية، وتقدر تضيفها بعدين."
+  ],
+  "over_hint": [
+   "لو تحب أقلل الأشخاص أو القطع، أو تزود الميزانية، قولي."
+  ],
+  "complete_look": [
+   "دي القطع اللي طلبتها. تحب أكمّلها بباقي الطقم؟"
+  ],
+  "tab_him": "ليك",
+  "tab_her": "ليها",
+  "tab_boy": "الولد",
+  "tab_girl": "البنت",
+  "tab_all": "الطقم",
+  "unknown_followup": [
+   "تمام، قولي عايز إيه بالظبط."
+  ]
+ },
+ "en": {
+  "greeting": [
+   "Hi! I'm Moda, your personal stylist. Tell me the occasion or the piece you're after and I'll put a look together from Banha stores."
+  ],
+  "intro_full": [
+   "Here's a complete look for {occasion} in {palette}."
+  ],
+  "intro_full_couple": [
+   "Here are two coordinated looks for {occasion}, in a shared {palette} palette."
+  ],
+  "intro_partial": [
+   "I found part of the look for {occasion}. Not currently available: {missing}."
+  ],
+  "intro_none": [
+   "I couldn't find a good match in the stores right now. Want me to widen the budget or colour?"
+  ],
+  "total_line": [
+   "Total: {total} EGP."
+  ],
+  "within_budget": [
+   "That's within your {budget} EGP budget."
+  ],
+  "over_budget": [
+   "This comes to {total} EGP, which is {over} EGP over your {budget} EGP budget. Want a cheaper version?"
+  ],
+  "clarify_audience": [
+   "Who is this for?"
+  ],
+  "clarify_occasion": [
+   "What's the occasion?"
+  ],
+  "clarify_budget": [
+   "Roughly what's your budget?"
+  ],
+  "didnt_understand": [
+   "I didn't quite get that. Is this for an occasion, or are you looking for a specific piece?"
+  ],
+  "fallback_unavailable": [
+   "Something went wrong on my side. Please try again in a moment."
+  ],
+  "order_missing_button": "Request it",
+  "weather_line": [
+   "Around {temp}° then, so I picked {fabrics}."
+  ],
+  "tab_him": "For you",
+  "tab_her": "For her",
+  "tab_boy": "Boy",
+  "tab_girl": "Girl",
+  "tab_all": "Look",
+  "intro_alternatives": [
+   "I couldn't find an exact match, so here's the closest option."
+  ],
+  "alt_item": [
+   "{wanted} isn't available, so I picked {got} instead"
+  ],
+  "thanks": [
+   "You're welcome!"
+  ],
+  "order_missing_hint": [
+   "Not available now. Want us to notify you when it's back?"
+  ],
+  "alt_color": [
+   "{wanted} isn't available in that exact colour, so I picked the closest"
+  ]
+ },
+ "advice": {
+  "_about": "إجابات جاهزة على أسئلة النصيحة الشائعة (بدل ما نعتمد على الموديل). كل واحدة مرتبطة بكلمات مفتاحية. الموديل المجاني ممكن يصيغ ردود تانية، لكن لازم تعدي فحص الجودة (عربي، قصير، مفيهوش لغات مختلطة).",
+  "items": [
+   {
+    "id": "white_at_wedding",
+    "keywords_ar": [
+     "ابيض",
+     "لبس ابيض",
+     "فستان ابيض",
+     "الابيض في الفرح",
+     "اسكت ابيض"
+    ],
+    "keywords_en": [
+     "white",
+     "white dress",
+     "wear white"
+    ],
+    "answer_ar": "الأبيض والألوان اللي قريبة منه (عاجي، كريمي، بيج فاتح، فضي) المفروض تتجنبيها كضيفة في الفرح أو الخطوبة، لأنها للعروسة، وممكن تبان بيضا في الصور. اختاري لون غامق أو جوهري زي الزمردي والبوردو والكحلي. ولو العروسة طلبت الأبيض صراحة يبقى عادي.",
+    "src": [
+     "aljazeera",
+     "cairo360",
+     "knot"
+    ]
+   },
+   {
+    "id": "belt_shoes",
+    "keywords_ar": [
+     "حزام",
+     "الحزام والجزمة",
+     "لون الحزام"
+    ],
+    "keywords_en": [
+     "belt",
+     "belt and shoes"
+    ],
+    "answer_ar": "في الأطقم الرسمية خلي الحزام بنفس لون الحذاء. أسود مع أسود، وبني مع بني.",
+    "src": []
+   },
+   {
+    "id": "suit_fit",
+    "keywords_ar": [
+     "قياس البدلة",
+     "البدلة مظبوطة",
+     "طول الجاكيت",
+     "ازاي اعرف البدلة مظبوطة",
+     "مقاس البدلة"
+    ],
+    "keywords_en": [
+     "suit fit",
+     "how should a suit fit"
+    ],
+    "answer_ar": "الجاكيت ماينزلش عن طرف صوابعك لما تنزل إيدك على جنبك، وطرف كم القميص يبان حوالي نص بوصة من كم الجاكيت، والبنطلون يلمس كعب الحذاء من قدام. جرّب البدلة بالقميص والحذاء اللي هتلبسهم قبل ما تقرر.",
+    "src": [
+     "sayidaty_suit"
+    ]
+   },
+   {
+    "id": "colors_navy",
+    "keywords_ar": [
+     "كحلي مع ايه",
+     "ايه يمشي مع الكحلي",
+     "الكحلي"
+    ],
+    "keywords_en": [
+     "what goes with navy",
+     "navy"
+    ],
+    "answer_ar": "الكحلي بيمشي مع الأبيض والبيج والرمادي والبوردو والبني. لو بدلة كحلي: قميص أبيض أو أزرق سماوي، وحذاء بني أو أسود حسب الرسمية.",
+    "src": []
+   },
+   {
+    "id": "ac_shawl",
+    "keywords_ar": [
+     "تكييف",
+     "شال",
+     "القاعة برد",
+     "جاكيت للفرح"
+    ],
+    "keywords_en": [
+     "air conditioning",
+     "shawl",
+     "cold hall"
+    ],
+    "answer_ar": "القاعات عادة تكييفها قوي، فخدي شال أو جاكيت خفيف أو بليزر طويل بنفس لوحة الألوان.",
+    "src": [
+     "cairo360",
+     "knot"
+    ]
+   },
+   {
+    "id": "comfort_dance",
+    "keywords_ar": [
+     "هرقص",
+     "هتحرك",
+     "رقص",
+     "مريح",
+     "كعب"
+    ],
+    "keywords_en": [
+     "dancing",
+     "comfortable",
+     "heels"
+    ],
+    "answer_ar": "لو هتقعدي وتقفي كتير وترقصي، اختاري قصّة مريحة وحذاء بكعب وسط أو عريض. الراحة بتبان في الصور.",
+    "src": [
+     "sayidaty_beige",
+     "knot"
+    ]
+   },
+   {
+    "id": "sahel_wedding",
+    "keywords_ar": [
+     "فرح في الساحل",
+     "فرح ساحل",
+     "فرح على البحر",
+     "الساحل فرح"
+    ],
+    "keywords_en": [
+     "beach wedding",
+     "sahel wedding"
+    ],
+    "answer_ar": "لفرح الساحل: كتان وشيفون وقطن بألوان باستيل (كورال، لافندر، أزرق فاتح)، وحذاء مسطح أو وِدج لأن الكعب بيغطس في الرمل. وتجنبي الأسود والأحمر الغامق.",
+    "src": [
+     "cairo360"
+    ]
+   },
+   {
+    "id": "galabeya_wedding",
+    "keywords_ar": [
+     "جلابيه في الفرح",
+     "جلابية للخطوبة",
+     "جلابيه للفرح"
+    ],
+    "keywords_en": [
+     "galabeya at wedding"
+    ],
+    "answer_ar": "في المناسبات الرسمية في القاهرة ومحافظات الدلتا الأشهر بدلة للرجال وفستان للستات. الجلابية بتنفع في المناسبات البلدي أو العائلية. لو حابب أعرضلك جلابيات شيك أعرضها.",
+    "src": []
+   }
+  ]
+ }
+}

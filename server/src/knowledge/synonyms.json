@@ -1,0 +1,247 @@
+{
+  "_about": "قاموس المرادفات: بيحوّل أي كلمة (عامية مصرية، فصحى، إنجليزي، فرانكو، أخطاء إملائية شائعة) لمفتاح ثابت. الكود بينضّف النص الأول (توحيد الهمزات والتاء المربوطة والياء، وشيل التشكيل والمدّ، وتحويل الأرقام العربية، وlowercase للإنجليزي) وبعدين يدور هنا. كل القيم مكتوبة بعد التنضيف: ا بدل أ/إ/آ، ه بدل ة، ي بدل ى.",
+  "version": 1,
+
+  "normalize_hints": {
+    "franco_digits": { "2": "ء/ا", "3": "ع", "5": "خ", "6": "ط", "7": "ح", "8": "غ", "9": "ق" },
+    "stretch": "تقليل الحروف المكررة (فسسستان → فستان، helloooo → hello)"
+  },
+
+  "garments": {
+    "tshirt":   ["تيشيرت", "تيشرت", "تي شيرت", "tshirt", "t-shirt", "tee", "tishert", "tisherte", "tshert"],
+    "polo":     ["بولو", "polo", "بولو شيرت"],
+    "shirt":    ["قميص", "قمصان", "قميصه", "شيرت", "shirt", "shirts", "amees", "2ames", "2amees", "3amees"],
+    "blouse":   ["بلوزه", "بلوزة", "بلوزات", "blouse", "bluza", "blousa"],
+    "sweater":  ["سويتر", "سويتشيرت", "كنزه", "بلوفر", "تريكو", "sweater", "pullover", "jumper", "knit", "kanza", "swetar"],
+    "hoodie":   ["هودي", "هوديز", "hoodie", "hoody", "hodi"],
+    "tunic":    ["تونيك", "tunic"],
+    "top":      ["توب", "top", "crop top", "كروب"],
+    "jeans":    ["جينز", "جينس", "بنطلون جينز", "jeans", "denim", "jins", "jeanz"],
+    "trousers": ["بنطلون", "بنطلونات", "بنطلون قماش", "بنطلون رسمي", "بنطال", "pantalon", "trousers", "pants", "bantalon", "bantaloon", "bantlon", "pantaloon"],
+    "chinos":   ["شينو", "chino", "chinos"],
+    "shorts":   ["شورت", "شورتات", "shorts", "short", "shorte"],
+    "skirt":    ["جيبه", "جيبة", "تنوره", "تنورة", "جيبات", "skirt", "gheba", "jeepa", "gibba"],
+    "leggings": ["ليجنز", "ليجن", "leggings", "legging"],
+    "joggers":  ["جوجرز", "بنطلون ترينج", "بنطلون ترنج", "joggers", "sweatpants", "training pants", "jogger pants"],
+
+    "dress_any":     ["فستان", "فساتين", "دريس", "دريسات", "dress", "dresses", "dres", "fostan", "fustan", "fostaan", "fostann"],
+    "dress_casual":  ["دريس خروج", "فستان خروج", "فستان كاجوال", "فستان يومي", "دريس كاجوال", "casual dress", "day dress", "dress5oroog"],
+    "dress_work":    ["فستان شغل", "دريس شغل", "work dress", "office dress"],
+    "dress_party":   ["سواريه", "دريس سواريه", "فستان سواريه", "فستان حفله", "فستان حفلات", "كوكتيل", "فستان كوكتيل", "فستان مناسبات", "دريس مناسبات", "party dress", "cocktail dress", "swaree", "soiree", "swarih", "sawareeh", "fostan swaree", "fustan sawareh"],
+    "dress_evening": ["فستان سهره", "فستان سهرة", "سهره", "فستان طويل", "ماكسي", "جاون", "evening dress", "gown", "maxi dress", "long dress", "fostan sahra", "fustan sahra"],
+    "dress_bridal":  ["فستان زفاف", "فستان فرح", "فستان عروسه", "فستان العروسه", "wedding dress", "bridal gown", "fostan 3arosa", "fostan fara7"],
+    "dress_beach":   ["فستان صيفي", "فستان ساحل", "فستان بحر", "beach dress", "sun dress", "summer dress"],
+    "jumpsuit":      ["جمبسوت", "جامبسوت", "اوفرول", "jumpsuit", "romper", "playsuit"],
+    "two_piece_set": ["طقم قطعتين", "طقم جيبه", "طقم جيبة", "طقم توب", "كو اورد", "كوردينيت", "طقم جيبه وبلوزه", "two piece", "co-ord", "coord", "matching set"],
+
+    "suit":        ["بدله", "بدلة", "بدل", "بدله رسمي", "بدله سوداء", "suit", "suits", "badla", "badlaa", "badlah", "bedla", "badlet"],
+    "classic_set": ["طقم كلاسيك", "طقم رجالي", "جاكيت وبنطلون", "طقم قماش", "طقم كلاسيكي", "classic set", "two piece suit", "separates", "tacm classic", "tu2m classic", "taqm classic"],
+    "blazer":      ["بليزر", "جاكيت بليزر", "جاكت بليزر", "blazer", "sport coat", "blayzer"],
+    "waistcoat":   ["صديري", "فيست", "فست", "waistcoat", "vest", "sedeery"],
+    "tuxedo":      ["تاكسيدو", "توكسيدو", "تكسيدو", "بدله سواريه", "tuxedo", "tux", "smoking", "سموكنج"],
+    "womens_suit": ["تايير", "تاييرات", "بدله حريمي", "طقم حريمي رسمي", "tailleur", "pantsuit", "women suit", "tayer", "tayeer"],
+
+    "jacket":   ["جاكيت", "جاكت", "جواكت", "jacket", "bomber", "jakit", "jaket", "جاكيت جلد"],
+    "coat":     ["بالطو", "معطف", "كوت", "coat", "overcoat", "trench", "balto", "baltoo"],
+    "cardigan": ["كارديجان", "كاردجان", "cardigan", "cardigen"],
+    "shawl":    ["شال", "ستول", "شال سواريه", "shawl", "stole", "wrap", "shal"],
+
+    "abaya":     ["عباءه", "عباية", "عبايه", "عبايات", "abaya", "abayas", "3abaya", "3abaia", "3abayah", "abaia"],
+    "jalabiya":  ["جلابيه", "جلابية", "جلاليب", "قفطان", "كفتان", "jalabiya", "galabeya", "gallabiya", "kaftan", "caftan", "galabia", "gelabya", "galabiyya"],
+    "hijab_set": ["طقم محجبات", "طقم حجاب", "تنوره وبلوزه محجبات", "hijab set", "modest set"],
+    "tarha":     ["طرحه", "طرح", "حجاب", "اسكارف", "ايشارب", "شال راس", "طرحه شيفون", "hijab", "scarf", "headscarf", "tarha", "tar7a", "hegab", "7egab", "esharb", "eshaarb"],
+    "long_cardigan": ["كيمونو", "كارديجان طويل", "kimono", "duster", "long cardigan"],
+
+    "sneakers":     ["كوتشي", "كوتش", "كوتشيات", "سنيكرز", "حذاء رياضي", "جزمه رياضه", "كوتشي رياضي", "sneakers", "sneaker", "trainers", "kotshi", "koshi", "kotchi", "kutshi", "koutchi", "cotchi"],
+    "shoes_any":    ["حذاء", "احذيه", "جزمه", "جزم", "shoes", "shoe", "footwear", "gazma", "gozma", "gazam"],
+    "formal_shoes": ["حذاء رسمي", "جزمه رسمي", "جزمه كلاسيك", "جزمه جلد", "حذاء كلاسيك", "اوكسفورد", "اكسفورد", "oxford", "derby", "dress shoes", "formal shoes", "gazma classic", "gazmet"],
+    "loafers":      ["لوفر", "موكاسين", "loafer", "loafers", "moccasin", "lofer"],
+    "heels_low":    ["كعب واطي", "كعب وسط", "كعب متوسط", "mid heel", "low heel", "kitten heel", "block heel"],
+    "heels_high":   ["كعب", "كعب عالي", "ستيليتو", "هيلز", "heels", "high heels", "stiletto", "pumps", "ka3b", "ka3b 3ali", "heelz"],
+    "flats":        ["بالرينا", "فلات", "حذاء مسطح", "flats", "ballerina", "ballet flats", "balerina"],
+    "sandals":      ["صندل", "صنادل", "sandal", "sandals", "sandle"],
+    "boots":        ["بوت", "بوتات", "boot", "boots", "boat"],
+    "slippers":     ["شبشب", "شباشب", "سليبرز", "slippers", "slides", "flip flops", "shebsheb", "chapchab"],
+
+    "handbag":   ["شنطه", "شنطة", "شنط", "شنطه ايد", "شنطه يد", "bag", "handbag", "purse", "shanta", "shanta eed", "shanta yad", "shantah"],
+    "clutch":    ["كلتش", "شنطه سواريه", "clutch", "evening bag", "clatch"],
+    "crossbody": ["شنطه كروس", "كروس", "crossbody", "cross body"],
+    "tote":      ["توت", "شنطه توت", "tote"],
+    "backpack":  ["شنطه ضهر", "شنطه ظهر", "باك باك", "backpack", "rucksack", "bag pack"],
+
+    "tie":           ["كرافته", "كرافتة", "ربطه عنق", "tie", "necktie", "krafta", "kravata", "cravate"],
+    "bow_tie":       ["بابيون", "papyon", "papion", "bow tie", "bowtie", "فراشه"],
+    "pocket_square": ["منديل جيب", "منديل بدله", "pocket square"],
+    "belt":          ["حزام", "حزام جلد", "belt", "ezam", "7izam", "hezam"],
+    "watch":         ["ساعه", "ساعة", "watch", "sa3a", "sa3a eed"],
+    "jewelry":       ["اكسسوار", "اكسسوارات", "مجوهرات", "سلسله", "اسواره", "حلق", "خاتم", "دبله", "accessories", "jewelry", "jewellery", "necklace", "bracelet", "earrings", "ring", "ikseswar", "accessory"],
+    "cap":           ["كاب", "كابات", "طاقيه", "قبعه", "cap", "hat", "kab"],
+    "socks":         ["شراب", "جوارب", "شرابات", "socks", "sock", "shorab"],
+    "perfume":       ["برفان", "عطر", "perfume", "parfum", "scent", "birfan"],
+
+    "sport_top":    ["تيشيرت رياضي", "توب رياضي", "sport top", "gym top", "performance tee"],
+    "sport_bottom": ["شورت رياضي", "بنطلون رياضي", "sport shorts", "gym shorts", "yoga pants"],
+    "tracksuit":    ["ترينج", "ترنج", "تريننج", "ترينج كامل", "طقم رياضي", "tracksuit", "track suit", "trenj", "trening"],
+    "sport_shoes":  ["حذاء جري", "كوتشي جري", "running shoes", "training shoes", "gym shoes"],
+
+    "sleepwear": ["بيجامه", "بيجامة", "لبس نوم", "قميص نوم", "pajama", "pyjamas", "sleepwear", "nightgown", "bijama", "bejama"]
+  },
+
+  "contexts": {
+    "engagement_guest": ["خطوبه", "خطوبة", "حفله خطوبه", "رايح خطوبه", "رايحه خطوبه", "engagement", "engagement party", "khotoba", "khotouba", "khetoba", "ro7 khotoba", "rayeh khotoba", "rayha khotoba", "rayh khotoba", "rayha khotouba", "khotoba ya3ni"],
+    "engagement_self": ["خطوبتي", "خطوبتنا", "خطوبه بتاعتي", "my engagement", "khotobty", "khotobti", "khotobetna"],
+    "katb_kitab":      ["كتب كتاب", "كتب الكتاب", "عقد قران", "كتب كتابي", "katb kitab", "ketb ketab", "katb el ketab", "ketb el kitab", "aqd qeran", "3a2d", "katb ktab", "ktb ktab"],
+    "wedding_guest":   ["فرح", "فرح صاحبي", "فرح صاحبتي", "فرح قريبي", "فرح اخويا", "عزومه فرح", "رايح فرح", "رايحه فرح", "زفاف", "حفله زفاف", "wedding", "wedding guest", "fara7", "fara7 sa7by", "fara7 sa7bty", "farah", "ray7 fara7", "rayha fara7", "rayh fara7", "rayeh fara7", "wedding party"],
+    "wedding_self":    ["فرحي", "فرحنا", "عروسه", "عريس", "ليله العمر", "ليلة العمر", "فرح بتاعي", "bride", "groom", "my wedding", "fara7y", "fara7i", "fara7na", "3aroosa", "3arees", "3aroosah", "3ares"],
+    "casual_outing":   ["خروجه", "خروجة", "مشوار", "خروج", "مشاوير", "سهره مع صحابي", "كافيه", "كافيهات", "مول", "outing", "going out", "casual", "hangout", "coffee", "mall", "kharga", "5roga", "5arga", "5orog", "mashwar", "mashware", "cafe"],
+    "university":      ["جامعه", "جامعة", "كليه", "كلية", "مدرسه", "مدرسة", "محاضرات", "university", "college", "school", "campus", "gam3a", "gam3ah", "kolleya", "madrasa"],
+    "work_casual":     ["شغل", "الشغل", "ماشي الشغل", "رايح الشغل", "مكتب", "اوفيس", "work", "office", "shoghl", "shogl", "sho8l", "shoghlak", "shoghly", "office look"],
+    "work_formal":     ["مقابله شغل", "انترفيو", "مقابلة شغل", "اجتماع", "ميتنج", "مؤتمر", "شغل رسمي", "interview", "job interview", "meeting", "business formal", "formal work", "moqabla shoghl", "interview shoghl"],
+    "date_night":      ["عشا", "عشا رومانسي", "ديت", "خروجه رومانسيه", "date", "date night", "dinner date", "romantic dinner", "3asha", "dinner"],
+    "family_gathering":["غدا", "عزومه", "عزومة", "سهره عيله", "زياره", "زيارة", "عيله", "family", "family lunch", "gathering", "visit", "3ezooma", "3ezoma", "3azooma", "ghada"],
+    "eid":             ["عيد", "العيد", "عيد الفطر", "عيد الاضحي", "لبس العيد", "eid", "eid outfit", "3eed", "3ed", "3eid", "eed", "labs el 3eed", "libs el eid"],
+    "ramadan_iftar":   ["رمضان", "فطار", "سحور", "غبقه", "ramadan", "iftar", "suhoor", "sohour", "ramdan", "ftar", "fatar"],
+    "sahel_beach":     ["ساحل", "الساحل", "بحر", "شاطئ", "مصيف", "العلمين", "بول", "sahel", "beach", "sea", "pool", "north coast", "alamein", "7el", "sa7el", "ba7r", "mas2f", "masyaf"],
+    "travel":          ["سفر", "مسافر", "رحله", "رحلة", "سياحه", "شرم", "الغردقه", "travel", "trip", "vacation", "holiday", "safar", "ra7la", "rehla", "sharm", "hurghada", "ghardaka"],
+    "graduation":      ["تخرج", "حفل تخرج", "graduation", "takharog", "takharrug", "5orog tkharog", "takhrog"],
+    "birthday_party":  ["عيد ميلاد", "حفله", "حفلة", "بيرثداي", "birthday", "party", "b-day", "3eed meelad", "3id milad", "haflet", "hafla"],
+    "condolence":      ["عزاء", "عزا", "جنازه", "وفاه", "condolence", "funeral", "3aza", "3azaa", "3azzaa", "mat3am"],
+    "sport":           ["جيم", "رياضه", "تمارين", "جري", "gym", "workout", "sport", "running", "gym wear", "reyada", "tamareen", "gem"],
+    "home":            ["في البيت", "قعده", "بيت", "لبس بيت", "at home", "home wear", "loungewear", "lounge", "fel beit", "fel bet", "labs beit"]
+  },
+
+  "audiences": {
+    "men":         ["انا راجل", "رجالي", "ولادي", "للرجاله", "ليا انا راجل", "men", "man", "male", "mens", "for him", "rgaly", "regali", "regaly", "ragel", "ana ragel", "lel regala"],
+    "women":       ["انا ست", "حريمي", "بناتي", "للبنات", "ليا انا ست", "women", "woman", "female", "womens", "for her", "7areemy", "harimi", "7arimi", "banaty", "lel banat", "ana set", "ana bent"],
+    "women_hijab": ["محجبه", "محجبة", "حجاب", "ليا انا محجبه", "hijabi", "veiled", "muhajaba", "mohagaba", "ana mo7agaba", "mohagabah", "ana mohagaba", "mo7agaba"],
+    "girls":       ["بنتي", "بنت صغيره", "طفله", "اطفال بنات", "girl", "girls", "baby girl", "binty", "benty", "tefla", "tefl banat", "banoty"],
+    "boys":        ["ابني", "ولد صغير", "طفل", "اطفال ولاد", "boy", "boys", "baby boy", "ebny", "ebni", "ibny", "tefl awlad", "walad", "walady"]
+  },
+
+  "relationships": {
+    "_about": "كلمات بتحدد مين بيلبس. عمرها ما تتحط في اسم القطعة أو 'person'. الكود بيفهمها كإشارة لعدد الناس وجنسهم.",
+    "self": ["انا", "ليا", "عايز", "عايزه", "عاوز", "عاوزه", "محتاج", "محتاجه", "نفسي", "me", "i want", "i need", "ana", "3ayez", "3ayza", "3awez", "3awza", "3ayz", "3ayza", "mehtag", "mehtaga"],
+    "partner_female": ["خطيبتي", "مراتي", "زوجتي", "صاحبتي", "حبيبتي", "عروستي", "fiancee", "wife", "girlfriend", "khatibty", "khatebty", "mrati", "merati", "sa7bty", "7abibty", "7abebty"],
+    "partner_male":   ["خطيبي", "جوزي", "زوجي", "صاحبي", "حبيبي", "fiance", "husband", "boyfriend", "khatiby", "khateby", "gowzy", "gozy", "sa7by", "7abiby"],
+    "kids_ref":       ["ابني", "بنتي", "ولادي", "اولادي", "اطفالي", "اخويا الصغير", "اختي الصغيره", "my son", "my daughter", "my kids", "ebny", "binty", "awlady", "ololady", "o5ty el sghera"],
+    "parents_ref":    ["بابا", "ماما", "ابويا", "امي", "والدي", "والدتي", "dad", "mom", "father", "mother", "baba", "mama", "abouya", "omy", "ommy"],
+    "both": ["احنا الاتنين", "لينا", "لينا احنا", "اتنين", "الاتنين", "both", "us", "for us", "ehna el etneen", "ehna eletneen", "lina", "lena", "etnen", "el etneen"]
+  },
+
+  "budget_words": {
+    "_about": "بيستخرج الرقم والعملة. الأرقام العربية والهندية بتتحول، وكلمات زي 'ألف' و'الف' و'k' بتتضرب.",
+    "currency": ["جنيه", "جنية", "جم", "egp", "le", "l.e", "pound", "pounds", "geneh", "genee", "gnh", "gineh"],
+    "multipliers": { "الف": 1000, "الاف": 1000, "k": 1000, "الفين": 2000, "تلات الاف": 3000, "تلاتة الاف": 3000, "اربعه الاف": 4000, "خمس الاف": 5000, "خمسه الاف": 5000, "الف ونص": 1500 },
+    "total_markers": ["ميزانيتي", "ميزانيه", "ميزانية", "budget", "في حدود", "حدود", "اجمالي", "اجمالى", "مجموع", "كله", "كلها", "بحد اقصي", "maximum", "max", "up to", "around", "about", "mezaneyty", "mizaniti", "mizanyty", "7ud", "7udood"],
+    "per_item_markers": ["للواحد", "كل قطعه", "للقطعه", "each", "per piece", "per item", "lel wa7ed", "kol 2et3a"],
+    "cheap": ["رخيص", "اقتصادي", "ببلاش", "مش غالي", "cheap", "budget friendly", "affordable", "r5is", "ra5is", "2te3sady"],
+    "premium": ["غالي", "فاخر", "برايم", "اغلي حاجه", "premium", "luxury", "high end", "ghaly", "fakher"]
+  },
+
+  "tastes": {
+    "classic":  ["كلاسيك", "كلاسيكي", "رسمي", "محافظ", "classic", "traditional", "conservative", "ra2ee", "hady"],
+    "modern":   ["عصري", "مودرن", "حديث", "ترندي", "موضه", "modern", "trendy", "fashionable", "contemporary", "3asry", "moderne"],
+    "minimal":  ["بسيط", "ميني مال", "ساده", "سادة", "هادي", "minimal", "simple", "clean", "basic", "baseet", "basit"],
+    "bold":     ["جريء", "لافت", "مختلف", "ملفت", "مميز", "bold", "statement", "standout", "eye-catching", "gari2", "malfet"],
+    "relaxed":  ["مريح", "واسع", "فضفاض", "كاجوال", "comfy", "relaxed", "loose", "comfortable", "mreeh", "mree7", "wase3"],
+    "tailored": ["مظبوط", "ضيق", "سليم", "على الجسم", "slim", "fitted", "tailored", "tight", "mazboot", "da2e2"],
+    "elegant":  ["شيك", "أنيق", "انيق", "راقي", "elegant", "chic", "classy", "sophisticated", "sheek", "chic", "shik", "ra2y", "anee2"]
+  },
+
+  "intents": {
+    "greeting":  ["اهلا", "هاي", "هلو", "ازيك", "ازاي", "سلام", "صباح الخير", "مساء الخير", "hi", "hello", "hey", "ahlan", "ezayak", "ezayek", "salam", "good morning", "7ay", "ahlen", "marhaba"],
+    "thanks":    ["شكرا", "تسلم", "تسلمي", "متشكر", "ميرسي", "thanks", "thank you", "thx", "shokran", "teslam", "mersi", "merci", "tesalam"],
+    "yes":       ["ايوه", "اه", "اكيد", "تمام", "ماشي", "اوك", "yes", "yeah", "ok", "okay", "sure", "aywa", "aiwa", "tamam", "mashy", "oke", "okey"],
+    "no":        ["لا", "لأ", "مش عايز", "مش عاوز", "مش كده", "غيره", "no", "nope", "not that", "la", "la2", "mesh", "ghayyar", "msh"],
+    "show_more": ["كمان", "غيره", "حاجه تانيه", "حاجة تانية", "بدائل", "اختيار تاني", "more", "another", "other options", "different one", "alternatives", "kaman", "7aga tanya", "taneya", "ghayro", "haga tanya"],
+    "cheaper":   ["ارخص", "اقل سعر", "اقل في السعر", "اقل", "cheaper", "less expensive", "lower price", "arkhas", "arkhaass", "a2al"],
+    "compare":   ["اقارن", "قارنلي", "مين احسن", "ايه احسن", "اختار", "compare", "which is better", "which one", "2aren", "eh a7san", "a7san eh"],
+    "reset":     ["ابدا من الاول", "من الاول", "مسح", "start over", "reset", "clear", "ebda2 men el awel", "men el awel", "ebda men el awal"]
+  },
+
+  "negation_markers": ["مش عايز", "مش عاوز", "من غير", "بدون", "مش بحب", "اكره", "متجبليش", "no", "without", "not", "don't want", "hate", "avoid", "msh 3ayez", "min gheir", "bedon", "mosh b7eb", "mesh b7eb", "mesh 3ayz", "bela", "bila"],
+
+  "colors": {
+    "black": ["اسود", "سوداء", "سودا", "سوده", "black", "soda", "sooda", "aswad", "eswed"],
+    "white": ["ابيض", "بيضاء", "بيضا", "white", "abyad", "abyed", "byda"],
+    "grey": ["رمادي", "رصاصي", "grey", "gray", "ramady", "rmady", "ramadi"],
+    "navy": ["كحلي", "ازرق غامق", "navy", "dark blue", "kahly", "kahli", "ka7ly"],
+    "beige": ["بيج", "beige", "bej"],
+    "cream": ["كريمي", "كريم", "cream", "kremy"],
+    "off_white": ["اوف وايت", "off white", "offwhite"],
+    "champagne": ["شامبانيا", "champagne"],
+    "brown": ["بني", "قهوي", "brown", "bonny", "bony", "benny"],
+    "camel": ["جملي", "camel", "gamaly"],
+    "olive": ["زيتي", "زيتوني", "olive", "zeity", "zaity"],
+    "burgundy": ["بوردو", "عنابي", "burgundy", "bordo", "bordeaux", "3enaby", "enaby"],
+    "emerald": ["اخضر زمردي", "زمردي", "emerald", "zomorrody"],
+    "royal_blue": ["ازرق ملكي", "royal blue"],
+    "purple": ["بنفسجي", "موف", "purple", "mauve", "banafsegy"],
+    "pink": ["وردي", "بينك", "pink", "wardy"],
+    "blush": ["وردي فاتح", "blush"],
+    "sky_blue": ["ازرق سماوي", "ازرق فاتح", "سماوي", "سمائي", "sky blue", "light blue", "samawy"],
+    "lavender": ["لافندر", "lavender", "lavander"],
+    "mint": ["مينت", "نعناعي", "mint"],
+    "coral": ["كورال", "coral"],
+    "yellow": ["اصفر", "yellow", "asfar"],
+    "orange": ["برتقالي", "orange", "bortoaly"],
+    "fuchsia": ["فوشيا", "fuchsia", "fushia"],
+    "gold": ["ذهبي", "دهبي", "gold", "dahaby", "dahabi"],
+    "silver": ["فضي", "فضه", "silver", "fedy"],
+    "red": ["احمر", "حمرا", "red", "ahmar", "a7mar"],
+    "blue": ["ازرق", "blue", "azra2", "azra"],
+    "green": ["اخضر", "green", "akhdar", "a5dar"],
+    "nude": ["نود", "nude"]
+  },
+
+  "materials": {
+    "_about": "خامة مذكورة في الطلب (مثلًا 'جاكيت جلد'). بتتعامل كشرط أساسي للقطعة المطلوبة صراحة، مش بتتساهل فيها.",
+    "leather": ["جلد", "leather"], "wool": ["صوف", "wool"], "linen": ["كتان", "linen"], "satin": ["ساتان", "satin"],
+    "cotton": ["قطن", "cotton"], "chiffon": ["شيفون", "chiffon"], "lace": ["دانتيل", "lace"], "crepe": ["كريب", "crepe"],
+    "silk": ["حرير", "silk"], "velvet": ["قطيفه", "velvet"], "denim": ["دنيم", "denim"]
+  },
+
+  "gender_hints": {
+    "male":   ["عايز", "عاوز", "محتاج", "رايح", "ناوي", "نفسي اشتري", "3ayez", "3awez", "3ayz", "rayeh", "ray7", "rayih", "mehtag", "muhtag", "ana ragel"],
+    "female": ["عايزه", "عاوزه", "محتاجه", "رايحه", "ناويه", "3ayza", "3awza", "3ayzah", "rayha", "ray7a", "rayah", "mehtaga", "muhtaga"],
+    "plural": ["عايزين", "عاوزين", "رايحين", "محتاجين", "3ayzeen", "3awzeen", "rayhin", "rayheen", "ray7in"]
+  },
+
+  "partner_strict": {
+    "female": ["خطيبتي", "مراتي", "زوجتي", "عروستي", "khatibty", "khatebty", "mrati", "merati", "fiancee", "wife"],
+    "male":   ["خطيبي", "جوزي", "زوجي", "khatiby", "khateby", "gowzy", "gozy", "fiance", "husband"],
+    "loose_female": ["صاحبتي", "حبيبتي", "sa7bty", "7abibty", "7abebty", "girlfriend"],
+    "loose_male":   ["صاحبي", "حبيبي", "sa7by", "7abiby", "boyfriend"],
+    "pair_prefix": ["انا و", "انا مع", "وانا", "me and", "ana w", "ana we", "انا ", "احنا "]
+  },
+
+  "kids_words": {
+    "girl_strict": ["بنتي", "بنوتتي", "binty", "benty", "banoty", "my daughter", "baby girl"],
+    "boy_strict":  ["ابني", "ولدي", "ebny", "ebni", "ibny", "my son", "baby boy"],
+    "girl_weak": ["بنت", "بنوته", "طفله", "girl", "bent"],
+    "boy_weak":  ["ولد", "طفل", "boy", "walad"],
+    "kids_plural": ["اولاد", "ولاد", "اطفال", "العيال", "kids", "children", "awlad", "ولادي", "اولادي"],
+    "age_units": ["سنين", "سنه", "سنوات", "سنة", "شهور", "years", "year", "yo", "yrs", "senen", "sneen"]
+  },
+
+  "time_words": {
+    "night": ["بالليل", "الليل", "ليل", "الليله", "سهره", "مساء", "بليل", "night", "tonight", "evening", "belel", "bellayl"],
+    "day": ["الصبح", "صباحا", "صباح", "نهار", "بالنهار", "الضهر", "ظهر", "العصر", "day", "daytime", "morning", "afternoon"],
+    "today": ["النهارده", "انهارده", "اليوم", "today", "el nharda"],
+    "tomorrow": ["بكره", "بكرا", "tomorrow", "bokra"],
+    "next_week_markers": ["الجاي", "الجايه", "القادم", "القادمه", "الاسبوع الجاي", "next"],
+    "weekdays": { "0": ["الاحد", "sunday"], "1": ["الاثنين", "monday"], "2": ["الثلاثاء", "التلات", "tuesday"], "3": ["الاربعاء", "الاربع", "wednesday"], "4": ["الخميس", "thursday", "el khamis"], "5": ["الجمعه", "friday", "el gom3a"], "6": ["السبت", "saturday", "el sabt"] }
+  },
+
+  "season_words": {
+    "summer": ["صيف", "حر", "صيفي", "summer", "hot"],
+    "winter": ["شتا", "شتاء", "برد", "شتوي", "winter", "cold"],
+    "mid": ["خريف", "ربيع", "autumn", "fall", "spring"]
+  },
+
+  "advice_markers": {
+    "question": ["ينفع", "يصح", "هل", "ممكن البس", "ممكن ألبس", "ازاي", "ليه", "ايه الفرق", "is it ok", "can i", "should i", "how do i", "how should"],
+    "shopping_verbs": ["عايز", "عايزه", "عاوز", "عاوزه", "محتاج", "محتاجه", "رشح", "رشحلي", "دورلي", "هاتلي", "اعرضلي", "عايزين", "want", "need", "find", "show", "looking", "3ayez", "3ayza", "3awez", "3awza"],
+    "full_look": ["طقم", "لوك", "outfit", "look", "تنسيق", "طقمين", "كامل", "set"]
+  }
+}

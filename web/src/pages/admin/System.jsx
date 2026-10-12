@@ -6,7 +6,7 @@ import { PageHeader, Panel } from '../../components/dash/Kit.jsx';
 import { Switch, Input, Textarea, Select } from '../../components/ui/Field.jsx';
 import { ErrorState } from '../../components/ui/States.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
-import { useAdminApi, adminApi, adminUpload, adminKey, adminSession, fmtDateTime } from './adminApi.js';
+import { useAdminApi, adminApi, adminUpload, adminKey, adminSession, fmtDateTime, fmtMoney } from './adminApi.js';
 
 const uptime = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return [d && `${d} يوم`, h && `${h} ساعة`, `${m} دقيقة`].filter(Boolean).join(' ') ; };
 
@@ -310,6 +310,7 @@ function LookOfDayPanel() {
   const [f, setF] = useState(null);
   const [baseline, setBaseline] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [aiBusy, setAiBusy] = useState('');
   const [teachingIndex, setTeachingIndex] = useState(null);
   useEffect(() => {
     if (!data) return;
@@ -366,8 +367,26 @@ function LookOfDayPanel() {
     } catch (x) { toast({ tone: 'error', title: x.message }); }
     setTeachingIndex(null);
   };
+  const generateAiProposal = async () => {
+    setAiBusy('generate');
+    try { await adminApi('/look-of-day/ai-proposal', { method: 'POST', body: {} }); toast({ title: 'جهزت اقتراحات للمراجعة في الأدمن' }); reload(); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setAiBusy('');
+  };
+  const approveAiProposal = async () => {
+    setAiBusy('approve');
+    try { await adminApi('/look-of-day/approve-ai', { method: 'POST', body: {} }); toast({ title: 'تم اعتماد الاقتراحات ونشرها' }); reload(); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setAiBusy('');
+  };
+  const discardAiProposal = async () => {
+    setAiBusy('discard');
+    try { await adminApi('/look-of-day/ai-proposal', { method: 'DELETE' }); toast({ title: 'اتشالت الاقتراحات من المراجعة' }); reload(); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setAiBusy('');
+  };
   const modes = [
-    ['ai', 'اختيار تلقائي بالذكاء الاصطناعي', 'اقتراحات يومية متنوعة للحريمي والرجالي والأطفال بأعمار مختلفة. لو الذكاء مش متاح، النظام يستخدم ترشيح المنتجات.'],
+    ['ai', 'اقتراحات الذكاء الاصطناعي', 'الاقتراحات تفضل خاصة في الأدمن لحد ما تراجعها وتعتمدها. لو مفيش اعتماد، مفيش اقتراح AI جديد هيظهر للزوار.'],
     ['manual', 'اختيار يدوي من الإدارة', 'ضيف كذا أوتفيت في اليوم، وحدد الفئة والعمر والمناسبة وقطع كل طقم. من غير استدعاء AI.'],
     ['off', 'إخفاء القسم', 'القسم مش هيظهر للزوار. اختياراتك اليدوية هتفضل محفوظة.'],
   ];
@@ -382,6 +401,35 @@ function LookOfDayPanel() {
             </button>
           ))}
         </div>
+        {f.mode === 'ai' && (
+          <div className="space-y-3 border-t border-line pt-4">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div><p className="font-semibold">اقتراحات الذكاء الاصطناعي</p><p className="text-xs text-muted">ولّد اقتراحات، راجع القطع والأسعار، وبعدها اعتمد المناسب بس.</p></div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" icon={Sparkles} loading={aiBusy === 'generate'} disabled={!!aiBusy} onClick={generateAiProposal}>توليد اقتراحات للمراجعة</Button>
+                {data.proposal?.entries?.length > 0 && <Button size="sm" loading={aiBusy === 'approve'} disabled={!!aiBusy} onClick={approveAiProposal}>اعتماد ونشر الاقتراحات</Button>}
+                {data.proposal?.entries?.length > 0 && <Button size="sm" variant="outline" icon={Trash2} loading={aiBusy === 'discard'} disabled={!!aiBusy} onClick={discardAiProposal}>تجاهل الاقتراحات</Button>}
+              </div>
+            </div>
+            {data.approvedAt && <p className="text-xs text-emerald-700">آخر اعتماد: {fmtDateTime(data.approvedAt)}. اللوك المعتمد يفضل ظاهرًا لحد اعتماد اقتراح جديد أو تغيير طريقة العرض.</p>}
+            {data.proposal?.entries?.length ? <div className="grid gap-3 md:grid-cols-2">
+              {data.proposal.entries.map((entry, index) => (
+                <section key={`${entry.audience}-${index}`} className="space-y-2 rounded-xl border border-line bg-canvas/60 p-3">
+                  <div><p className="font-semibold">{entry.audience === 'women' ? 'حريمي' : entry.audience === 'men' ? 'رجالي' : `أطفال ${entry.age || ''}`} · {entry.occasion}</p>{entry.say && <p className="mt-1 text-xs text-muted">{entry.say}</p>}</div>
+                  <div className="space-y-2">{entry.looks.map((look) => {
+                    const item = look.items?.[look.pick];
+                    return item ? <div key={look.label} className="flex min-w-0 items-center gap-2 rounded-lg bg-elevated p-2">
+                      {item.image?.base ? <img src={`${item.image.base}/thumb.webp`} alt="" className="h-12 w-10 shrink-0 rounded-md object-cover" /> : <span className="h-12 w-10 shrink-0 rounded-md bg-secondary" />}
+                      <div className="min-w-0"><p className="truncate text-xs text-muted">{look.label}</p><p className="truncate text-sm font-medium">{item.name?.ar || item.name?.en}</p><p className="text-xs">{fmtMoney(item.price)}</p></div>
+                    </div> : null;
+                  })}</div>
+                  {entry.tips && <p className="text-xs text-muted">{entry.tips}</p>}
+                  <p className="text-xs font-semibold">الإجمالي: {fmtMoney(entry.total)}</p>
+                </section>
+              ))}
+            </div> : <p className="rounded-xl bg-secondary/50 p-3 text-sm text-muted">مفيش اقتراحات AI للمراجعة حاليًا. التوليد مش هيأثر على اللي ظاهر للزوار قبل الاعتماد.</p>}
+          </div>
+        )}
         {f.mode === 'manual' && (
           <div className="space-y-4 border-t border-line pt-4">
             <p className="text-sm text-muted">ضيف عدة أوتفيتات كاملة لليوم. لكل طقم اختار الفئة (حريمي، رجالي أو أطفال)، والعمر لو مناسب، والمناسبة، ثم اختار القطع المتناسقة من منتجات المحلات. الكاب والطاقية ضمن الإكسسوارات.</p>
