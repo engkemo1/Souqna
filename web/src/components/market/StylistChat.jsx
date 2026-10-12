@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Send, Mic, MicOff, Loader2, Camera, ThumbsUp, ThumbsDown, RotateCcw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { X, Send, Mic, MicOff, Loader2, Camera, ThumbsUp, ThumbsDown, RotateCcw, History, Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
+import { api } from '../../lib/api.js';
+import { useBuyer } from '../../lib/buyer.jsx';
 import { formatMoney } from '../../lib/format.js';
 import ModaAvatar from './ModaAvatar.jsx';
 import LookSet from './LookSet.jsx';
@@ -53,6 +56,7 @@ function ModaFeedback({ question, reply, items, productIds, t, onRated }) {
 /** Floating shopping assistant: chat in text or voice, answers come with real products from Banha stores. */
 export default function StylistChat() {
   const { t, tr, lang } = useI18n();
+  const { buyer } = useBuyer();
   const { data: feat } = useApi('/marketplace?q=&category=all&sort=featured');
   const avatar = feat?.features?.stylistAvatar || null;
   const name = feat?.features?.stylistName?.[lang] || feat?.features?.stylistName?.ar || t('stylist.defaultName');
@@ -68,6 +72,11 @@ export default function StylistChat() {
   const [similar, setSimilar] = useState(false);
   const [profile, setProfile] = useState(() => store.get('moda.profile', {}));
   const [session, setSession] = useState(null); // ذاكرة الطلب الحالي عند السيرفر (المناسبة/الفئة/الميزانية) بتتبعت مع كل رسالة
+  const chatIdRef = useRef(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyBusy, setHistoryBusy] = useState(false);
+  const [historyError, setHistoryError] = useState(false);
   const end = useRef(null);
   const sendRef = useRef(null);
 
@@ -97,13 +106,60 @@ export default function StylistChat() {
       if (!res.ok) throw Object.assign(new Error('x'), { code: data?.error?.code });
       const reply = { ...data, say: textValue(data.say), tips: textValue(data.tips) };
       if (!reply.say && !reply.looks?.length) throw Object.assign(new Error('empty_reply'), { code: 'stylist_unavailable' });
-      setMsgs([...next, { role: 'assistant', feedbackQuestion: content || shown, ...reply }]);
+      const completed = [...next, { role: 'assistant', feedbackQuestion: content || shown, ...reply }];
+      setMsgs(completed);
       if (data.session) setSession(data.session);
       if (data.remember && Object.keys(data.remember).length) { const p = { ...profile, ...data.remember }; setProfile(p); store.set('moda.profile', p); }
-    } catch (e) { setMsgs([...next, { role: 'assistant', error: errorMessage(t, e) }]); }
+      if (buyer) await saveChat(completed, data.session || session).catch(() => setHistoryError(true));
+    } catch (e) {
+      const completed = [...next, { role: 'assistant', error: errorMessage(t, e) }];
+      setMsgs(completed);
+      if (buyer) await saveChat(completed, session).catch(() => setHistoryError(true));
+    }
     setBusy(false);
   };
   sendRef.current = send;
+
+  const historyMessages = (items) => items.map((m) => {
+    if (m.role === 'user') return { role: 'user', content: `${String(m.content || '').slice(0, 600)}${m.photo ? ` (${t('stylist.photoNotSaved')})` : ''}`.slice(0, 700) };
+    return {
+      role: 'assistant', say: String(m.say || m.content || '').slice(0, 1400), tips: m.tips,
+      intent: m.intent, state: m.state, total: m.total, budget: m.budget, overBudget: m.overBudget,
+      weatherSource: m.weatherSource, looks: m.looks, questions: m.questions, missingItems: m.missingItems, missing: m.missing, tabs: m.tabs,
+      palette: m.palette, feedbackQuestion: m.feedbackQuestion,
+    };
+  }).slice(-40);
+  const saveChat = async (items, currentSession) => {
+    const path = chatIdRef.current ? `/buyer/chats/${chatIdRef.current}` : '/buyer/chats';
+    const saved = await api(path, { method: chatIdRef.current ? 'PUT' : 'POST', body: { messages: historyMessages(items), session: currentSession || null } });
+    chatIdRef.current = saved.id;
+    setHistoryError(false);
+  };
+  const startNewChat = () => {
+    setMsgs([]); setSession(null); setText(''); setPhoto(null); setPhoto2(null);
+    chatIdRef.current = null; setHistoryOpen(false); setHistoryError(false);
+  };
+  const showHistory = async () => {
+    setHistoryOpen(true); setHistoryError(false); setHistoryBusy(true);
+    try { const result = await api('/buyer/chats'); setHistory(result.items || []); }
+    catch { setHistoryError(true); }
+    setHistoryBusy(false);
+  };
+  const openHistory = async (id) => {
+    setHistoryBusy(true); setHistoryError(false);
+    try {
+      const result = await api(`/buyer/chats/${id}`);
+      const saved = result.chat;
+      setMsgs((saved.messages || []).map((m) => m.role === 'assistant' ? { ...m, historyReadOnly: true } : m));
+      setSession(saved.session || null); chatIdRef.current = saved.id;
+      setHistoryOpen(false);
+    } catch { setHistoryError(true); }
+    setHistoryBusy(false);
+  };
+  const deleteHistory = async (id) => {
+    try { await api(`/buyer/chats/${id}`, { method: 'DELETE' }); setHistory((items) => items.filter((item) => item.id !== id)); if (chatIdRef.current === id) startNewChat(); }
+    catch { setHistoryError(true); }
+  };
 
   const mic = () => {
     if (!SR) return;
@@ -146,29 +202,47 @@ export default function StylistChat() {
     <>
       {!open && (
         <button type="button" onClick={() => setOpen(true)} aria-label={t('stylist.open', { n: name })}
-          className="fixed bottom-5 end-4 z-40 inline-flex h-14 items-center gap-2 rounded-full bg-btn ps-1.5 pe-5 text-[15px] font-bold text-on-btn shadow-lift transition active:scale-95 sm:bottom-6 sm:end-6">
-          <ModaAvatar src={avatar} size={44} ring={false} />{name}
+          className="fixed bottom-4 end-4 z-40 inline-flex h-14 items-center gap-2.5 rounded-full bg-btn ps-1.5 pe-5 text-[15px] font-bold text-on-btn shadow-lift transition hover:brightness-105 active:scale-95 sm:bottom-6 sm:end-6">
+          <ModaAvatar src={avatar} size={44} ring={false} /><span>{t('stylist.open')}</span>
         </button>
       )}
       {open && (
-        <div className="fixed inset-0 z-50 sm:inset-auto sm:bottom-6 sm:end-6 sm:h-[640px] sm:max-h-[calc(100dvh-3rem)] sm:w-[400px]" role="dialog" aria-modal="true" aria-label={name}>
+        <div className="fixed inset-0 z-50 sm:inset-auto sm:bottom-5 sm:end-5 sm:h-[min(820px,calc(100dvh-2.5rem))] sm:w-[min(580px,calc(100vw-2.5rem))]" role="dialog" aria-modal="true" aria-label={name}>
           <button type="button" className="absolute inset-0 bg-black/40 sm:hidden" aria-label="close" onClick={() => setOpen(false)} />
-          <div className="absolute inset-x-0 bottom-0 flex h-[92dvh] flex-col overflow-hidden rounded-t-3xl border border-line bg-canvas shadow-lift sm:static sm:h-full sm:rounded-3xl">
-            <header className="flex items-center justify-between gap-3 border-b border-line bg-elevated px-4 py-3">
-              <div className="flex items-center gap-3"><ModaAvatar src={avatar} size={44} thinking={busy} />
-                <div><p className="font-display text-base font-bold leading-tight">{name}</p><p className="text-[12px] text-muted">{t('stylist.sub')}</p></div></div>
-              <div className="flex items-center gap-1">
+          <div className="absolute inset-0 flex flex-col overflow-hidden rounded-none border border-line bg-canvas shadow-lift sm:static sm:h-full sm:rounded-3xl">
+            <header className="flex items-center justify-between gap-3 border-b border-line bg-elevated px-4 py-3 sm:px-5">
+              <div className="flex min-w-0 items-center gap-3"><ModaAvatar src={avatar} size={46} thinking={busy} />
+                <div className="min-w-0"><p className="font-display text-base font-bold leading-tight">{name}</p><p className="truncate text-[12px] text-muted">{historyError ? t('stylist.historyError') : buyer ? t('stylist.historyStored') : t('stylist.sub')}</p></div></div>
+              <div className="flex shrink-0 items-center gap-1">
+                <button type="button" disabled={busy} onClick={startNewChat} aria-label={t('stylist.newChat')} title={t('stylist.newChat')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg disabled:opacity-40"><Plus className="h-5 w-5" /></button>
+                {buyer && <button type="button" disabled={busy} onClick={showHistory} aria-label={t('stylist.history')} title={t('stylist.history')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg disabled:opacity-40"><History className="h-5 w-5" /></button>}
                 {!!(profile.styleMemory || profile.likedProductIds || profile.dislikedProductIds) && <button type="button" onClick={clearStyleMemory} aria-label={t('stylist.clearLearning')} title={t('stylist.clearLearning')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg"><RotateCcw className="h-4 w-4" /></button>}
                 <button type="button" onClick={() => setOpen(false)} aria-label="close" className="grid h-9 w-9 place-items-center rounded-full hover:bg-secondary"><X className="h-5 w-5" /></button>
               </div>
             </header>
 
-            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-4">
+            {historyOpen ? (
+              <section className="flex-1 overflow-y-auto px-4 py-4 sm:px-5" aria-label={t('stylist.history')}>
+                <div className="mb-4 flex items-center justify-between gap-3"><div><h2 className="text-lg font-bold">{t('stylist.history')}</h2><p className="text-xs text-muted">{t('stylist.historyStored')}</p></div><button type="button" onClick={() => setHistoryOpen(false)} className="rounded-full border border-line-strong px-3 py-1.5 text-sm font-semibold">{t('common.back')}</button></div>
+                {historyBusy && <p className="py-8 text-center text-sm text-muted">{t('common.loading')}</p>}
+                {!historyBusy && historyError && <p role="alert" className="rounded-xl bg-sale/10 px-3 py-2 text-sm text-sale">{t('stylist.historyError')}</p>}
+                {!historyBusy && !historyError && !history.length && <p className="py-10 text-center text-sm text-muted">{t('stylist.historyEmpty')}</p>}
+                <div className="space-y-2">{history.map((item) => (
+                  <div key={item.id} className="flex items-center gap-2 rounded-2xl border border-line bg-elevated p-2">
+                    <button type="button" onClick={() => openHistory(item.id)} className="min-w-0 flex-1 rounded-xl px-2 py-2 text-start hover:bg-secondary"><span className="block truncate text-sm font-semibold">{item.title}</span><span className="mt-1 block text-xs text-muted">{new Date(item.updatedAt).toLocaleDateString(lang === 'ar' ? 'ar-EG' : 'en-US')}</span></button>
+                    <button type="button" onClick={() => deleteHistory(item.id)} aria-label={t('stylist.deleteChat')} title={t('stylist.deleteChat')} className="grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted hover:bg-sale/10 hover:text-sale"><Trash2 className="h-4 w-4" /></button>
+                  </div>
+                ))}</div>
+              </section>
+            ) : (
+            <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-5">
               {!msgs.length && (
                 <div>
-                  <div className="mb-3 grid place-items-center"><ModaAvatar src={avatar} size={230} thinking={busy} tilt living /></div>
-                  <div className="flex items-end gap-2"><div className="max-w-[92%] rounded-2xl rounded-ss-sm bg-secondary px-3.5 py-2.5 text-[14.5px] leading-relaxed">{t('stylist.hello', { n: name })}</div></div>
-                  <div className="mt-3 flex flex-wrap gap-2">{chips.map((c) => <button key={c} type="button" onClick={() => send(c)} className="rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[13px] font-medium transition hover:border-fg">{c}</button>)}</div>
+                  <div className="mb-4 grid place-items-center"><ModaAvatar src={avatar} size={128} thinking={busy} tilt living /></div>
+                  <div className="flex items-end gap-2"><div className="max-w-[95%] rounded-2xl rounded-ss-sm bg-secondary px-4 py-3 text-[15px] leading-relaxed">{t('stylist.hello', { n: name })}</div></div>
+                  <p className="mt-4 text-xs font-semibold text-muted">{t('stylist.tryAsking')}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">{chips.map((c) => <button key={c} type="button" onClick={() => send(c)} className="rounded-2xl border border-line-strong bg-elevated px-3.5 py-2.5 text-start text-[13px] font-medium leading-relaxed transition hover:border-brand hover:bg-brand/5">{c}</button>)}</div>
+                  {!buyer && <p className="mt-5 text-center text-xs text-muted"><Link to="/account" onClick={() => setOpen(false)} className="font-semibold text-brand underline">{t('stylist.signInForHistory')}</Link></p>}
                 </div>
               )}
               {msgs.map((m, i) => m.role === 'user' ? (
@@ -186,23 +260,23 @@ export default function StylistChat() {
                       </div>
                     </div>
                   ))}
-                  {!m.error && m.looks?.length > 0 && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, m.tips].filter(Boolean).join(' — ')} productIds={(m.looks || []).map((look) => look.items?.[look.pick]?.id).filter((id) => id != null)} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason, productIds) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean), productIds)} t={t} />}
+                  {!m.historyReadOnly && !m.error && m.looks?.length > 0 && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, m.tips].filter(Boolean).join(' — ')} productIds={(m.looks || []).map((look) => look.items?.[look.pick]?.id).filter((id) => id != null)} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason, productIds) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean), productIds)} t={t} />}
                   {m.intent === 'shop' && !m.looks?.length && !m.error && <p className="mt-2 text-[13px] text-muted">{t('stylist.none')}</p>}
                 </div>
               ))}
               {busy && <div className="flex items-center gap-2 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />{t('stylist.thinking')}</div>}
               <div ref={end} />
-            </div>
+            </div>)}
 
-            {photo && <div className="flex items-center gap-2 border-t border-line bg-elevated px-3 pt-2"><img src={photo} alt="" className="h-14 w-14 rounded-lg object-cover" />{photo2 && <img src={photo2} alt="" className="h-14 w-14 rounded-lg object-cover" />}<button type="button" onClick={() => { setPhoto(photo2 || null); setPhoto2(null); }} aria-label="remove" className="grid h-7 w-7 place-items-center rounded-full bg-secondary"><X className="h-4 w-4" /></button>{!photo2 && <span className="text-[12px] text-muted">{t('stylist.addSecond')}</span>}</div>}
-            <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex items-center gap-2 border-t border-line bg-elevated p-3">
+            {!historyOpen && photo && <div className="flex items-center gap-2 border-t border-line bg-elevated px-3 pt-2"><img src={photo} alt="" className="h-14 w-14 rounded-lg object-cover" />{photo2 && <img src={photo2} alt="" className="h-14 w-14 rounded-lg object-cover" />}<button type="button" onClick={() => { setPhoto(photo2 || null); setPhoto2(null); }} aria-label="remove" className="grid h-7 w-7 place-items-center rounded-full bg-secondary"><X className="h-4 w-4" /></button>{!photo2 && <span className="text-[12px] text-muted">{t('stylist.addSecond')}</span>}</div>}
+            {!historyOpen && <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex items-center gap-2 border-t border-line bg-elevated p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3">
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={pick} />
               <button type="button" onClick={() => fileRef.current?.click()} aria-label={t('stylist.photo')} className={cx('grid h-11 w-11 shrink-0 place-items-center rounded-full border transition', photo ? 'border-brand text-brand' : 'border-line-strong hover:border-fg')}><Camera className="h-5 w-5" /></button>
               {SR && <button type="button" onClick={mic} aria-label={t('stylist.mic')} className={cx('grid h-11 w-11 shrink-0 place-items-center rounded-full border transition', listening ? 'border-sale bg-sale/10 text-sale' : 'border-line-strong hover:border-fg')}>{listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}</button>}
               <input data-moda-input value={text} onChange={(e) => setText(e.target.value)} maxLength={500} placeholder={listening ? t('stylist.listening') : t('stylist.placeholder')} aria-label={t('stylist.placeholder')}
                 className="h-11 min-w-0 flex-1 rounded-full border border-line-strong bg-canvas px-4 text-base outline-none focus:border-ring" />
               <button type="submit" disabled={busy || (!text.trim() && !photo)} aria-label={t('stylist.send')} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-btn text-on-btn transition disabled:opacity-40"><Send className="h-5 w-5 rtl:-scale-x-100" /></button>
-            </form>
+            </form>}
           </div>
         </div>
       )}

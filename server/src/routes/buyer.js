@@ -42,6 +42,71 @@ r.use(requireBuyer);
 
 r.get('/me', h((req, res) => res.json({ buyer: out(req.buyer), unread: unread(req.buyer.id) })));
 
+/* ------------------------------------------------ Moda chat history (signed-in buyers only; photos are never persisted) */
+const chatMessagesSchema = z.array(z.record(z.any())).min(2).max(40);
+function cleanChatMessages(messages) {
+  return messages.map((message) => {
+    if (message.role === 'user') return { role: 'user', content: String(message.content || '').slice(0, 700) };
+    if (message.role !== 'assistant') return null;
+    return {
+      role: 'assistant', say: String(message.say || '').slice(0, 1400),
+      ...(message.tips ? { tips: message.tips } : {}),
+      ...(['intent', 'state', 'total', 'budget', 'overBudget', 'weatherSource', 'feedbackQuestion'].reduce((out, key) => (message[key] !== undefined ? { ...out, [key]: message[key] } : out), {})),
+      ...(Array.isArray(message.looks) ? { looks: message.looks.slice(0, 4) } : {}),
+      ...(Array.isArray(message.questions) ? { questions: message.questions.slice(0, 4) } : {}),
+      ...(Array.isArray(message.missingItems) ? { missingItems: message.missingItems.slice(0, 12) } : {}),
+      ...(Array.isArray(message.missing) ? { missing: message.missing.slice(0, 12) } : {}),
+      ...(Array.isArray(message.tabs) ? { tabs: message.tabs.slice(0, 4) } : {}),
+      ...(Array.isArray(message.palette) ? { palette: message.palette.slice(0, 8) } : {}),
+    };
+  }).filter(Boolean);
+}
+const chatTitle = (messages) => String(messages.find((m) => m.role === 'user')?.content || 'محادثة مودة').replace(/[\r\n]+/g, ' ').trim().slice(0, 64) || 'محادثة مودة';
+const chatSession = (value) => {
+  if (value == null) return null;
+  const encoded = JSON.stringify(value);
+  if (encoded.length > 20000) throw new AppError(422, 'validation_failed', 'Chat session is too large.');
+  return encoded;
+};
+r.get('/chats', h((req, res) => {
+  const items = q.all('SELECT id, title, updated_at AS updatedAt, created_at AS createdAt FROM buyer_stylist_chats WHERE buyer_id=? ORDER BY updated_at DESC, id DESC LIMIT 20', [req.buyer.id]);
+  res.json({ items });
+}));
+r.get('/chats/:id', h((req, res) => {
+  const id = z.coerce.number().int().positive().parse(req.params.id);
+  const row = q.get('SELECT id, title, messages_json, session_json, updated_at AS updatedAt FROM buyer_stylist_chats WHERE id=? AND buyer_id=?', [id, req.buyer.id]);
+  if (!row) throw notFound('Chat');
+  let messages = []; let session = null;
+  try { messages = JSON.parse(row.messages_json); session = row.session_json ? JSON.parse(row.session_json) : null; } catch { throw new AppError(500, 'server_error', 'Saved chat could not be read.'); }
+  res.json({ chat: { id: row.id, title: row.title, updatedAt: row.updatedAt, messages, session } });
+}));
+const saveChat = (req, res, create) => {
+  const body = z.object({ id: z.number().int().positive().optional(), messages: chatMessagesSchema, session: z.record(z.any()).optional().nullable() }).parse(req.body);
+  const messages = cleanChatMessages(body.messages);
+  if (messages.length < 2 || !messages.some((message) => message.role === 'user') || !messages.some((message) => message.role === 'assistant')) throw new AppError(422, 'validation_failed', 'A saved chat needs a shopper message and a Moda reply.');
+  const encoded = JSON.stringify(messages);
+  if (encoded.length > 300000) throw new AppError(413, 'payload_too_large', 'This conversation is too long to save.');
+  const session = chatSession(body.session);
+  const title = chatTitle(messages);
+  let id = create ? body.id : z.coerce.number().int().positive().parse(req.params.id);
+  if (create) {
+    id = insert('buyer_stylist_chats', { buyer_id: req.buyer.id, title, messages_json: encoded, session_json: session, updated_at: new Date().toISOString() });
+    q.run('DELETE FROM buyer_stylist_chats WHERE buyer_id=? AND id NOT IN (SELECT id FROM buyer_stylist_chats WHERE buyer_id=? ORDER BY updated_at DESC, id DESC LIMIT 20)', [req.buyer.id, req.buyer.id]);
+    return res.status(201).json({ id });
+  }
+  const owned = q.get('SELECT id FROM buyer_stylist_chats WHERE id=? AND buyer_id=?', [id, req.buyer.id]);
+  if (!owned) throw notFound('Chat');
+  q.run('UPDATE buyer_stylist_chats SET title=?, messages_json=?, session_json=?, updated_at=? WHERE id=? AND buyer_id=?', [title, encoded, session, new Date().toISOString(), id, req.buyer.id]);
+  res.json({ id });
+};
+r.post('/chats', h((req, res) => saveChat(req, res, true)));
+r.put('/chats/:id', h((req, res) => saveChat(req, res, false)));
+r.delete('/chats/:id', h((req, res) => {
+  const id = z.coerce.number().int().positive().parse(req.params.id);
+  q.run('DELETE FROM buyer_stylist_chats WHERE id=? AND buyer_id=?', [id, req.buyer.id]);
+  res.json({ ok: true });
+}));
+
 r.put('/me', h((req, res) => {
   const b = z.object({ name: z.string().trim().min(2).max(60).optional(), password: z.string().min(6).max(100).optional(), current: z.string().max(100).optional() }).parse(req.body);
   if (b.password) {

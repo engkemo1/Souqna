@@ -339,6 +339,16 @@ CREATE TABLE IF NOT EXISTS buyer_follows (
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (buyer_id, store_id)
 );
+CREATE TABLE IF NOT EXISTS buyer_stylist_chats (
+  id INTEGER PRIMARY KEY,
+  buyer_id INTEGER NOT NULL REFERENCES buyers(id) ON DELETE CASCADE,
+  title TEXT NOT NULL DEFAULT 'محادثة مودة',
+  messages_json TEXT NOT NULL,
+  session_json TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_bsc_buyer_updated ON buyer_stylist_chats(buyer_id, updated_at DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS shared_looks (
   token TEXT PRIMARY KEY,
