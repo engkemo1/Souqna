@@ -153,3 +153,5 @@ Each store picks one or many departments (women, men, kids, shoes, bags, hijab, 
 ## Photo storage on Cloudflare R2 (free 10 GB)
 
 Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` and every new photo is uploaded to R2 (the volume keeps only the database). Photos already on the volume keep working; move them with `npm run media:to-r2 -w server` (safe to re-run, frees the disk space). Deleting a photo or a store also deletes it from R2.
+
+The admin System page shows the filesystem mounted for the database and the app process memory. For account-wide Cloudflare R2 usage, set `CF_R2_METRICS_TOKEN` to an API token with Workers R2 Storage Read permission; the account id comes from `CF_ACCOUNT_ID` or `R2_ACCOUNT_ID`. Cloudflare notes that account metrics can lag recent changes. This server disk measurement is not the Railway volume quota; check Railway Metrics for plan limits.

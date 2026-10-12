@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, AlertTriangle, Info, Download, DatabaseBackup, Sparkles, Search, Plus, Trash2 } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Info, Download, DatabaseBackup, Sparkles, Search, Plus, Trash2, HardDrive, Database, Cloud } from 'lucide-react';
 import Button from '../../components/ui/Button.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { PageHeader, Panel } from '../../components/dash/Kit.jsx';
@@ -527,6 +527,62 @@ function BackupPanel({ data, reload }) {
   );
 }
 
+const fmtBytes = (n) => {
+  if (!Number.isFinite(Number(n))) return 'غير متاح';
+  const units = ['بايت', 'KB', 'MB', 'GB', 'TB'];
+  let value = Number(n), i = 0;
+  while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+  return `${value.toFixed(i < 2 ? 0 : 1)} ${units[i]}`;
+};
+
+function ResourcePanel() {
+  const { data, error, loading, reload } = useAdminApi('/resources');
+  const disk = data?.disk;
+  const database = data?.database;
+  const r2 = data?.r2;
+  const diskPercent = disk?.totalBytes ? Math.min(100, disk.usedBytes / disk.totalBytes * 100) : 0;
+  const standardGB = (r2?.standardBytes || 0) / (1024 ** 3);
+  const freeGB = Math.max(0, 10 - standardGB);
+  return (
+    <Panel title="مساحة الاستضافة والتخزين" subtitle="قياس السيرفر مباشر؛ قياس R2 قد يتأخر عدة دقائق." className="lg:col-span-3">
+      {error && !data ? <ErrorState error={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-36 w-full" /> : (
+        <div className="grid gap-4 md:grid-cols-2">
+          <section className="rounded-2xl border border-line bg-secondary/30 p-4">
+            <div className="mb-3 flex items-center gap-2"><HardDrive className="h-5 w-5 text-brand" /><h3 className="font-semibold">قرص السيرفر</h3></div>
+            {disk?.totalBytes ? <>
+              <p className="text-sm">المستخدم <b>{fmtBytes(disk.usedBytes)}</b> من <b>{fmtBytes(disk.totalBytes)}</b></p>
+              <div className="my-3 h-2 overflow-hidden rounded-full bg-line"><div className={`h-full rounded-full ${diskPercent > 90 ? 'bg-sale' : 'bg-brand'}`} style={{ width: `${diskPercent}%` }} /></div>
+              <p className="text-sm text-muted">المتاح: {fmtBytes(disk.freeBytes)} · {diskPercent.toFixed(1)}% مستخدم</p>
+              <p className="mt-2 break-all text-xs text-muted" dir="ltr">{disk.path}</p>
+              <p className="mt-2 text-xs text-muted">ده حجم نظام الملفات على قرص قاعدة البيانات؛ حد Railway أو حجم الـVolume راجعه من لوحة الاستضافة.</p>
+              {diskPercent >= 85 && <p className="mt-3 rounded-xl bg-sale/10 px-3 py-2 text-sm font-medium text-sale">المساحة قربت تمتلئ؛ راجع الملفات أو كبّر الـVolume.</p>}
+            </> : <p className="text-sm text-muted">تعذر قراءة مساحة القرص{disk?.error ? `: ${disk.error}` : ' من السيرفر'}.</p>}
+            <p className="mt-3 border-t border-line pt-3 text-sm text-muted">حجم قاعدة البيانات: <b className="text-fg">{database?.bytes != null ? fmtBytes(database.bytes) : 'غير متاح'}</b></p>
+          </section>
+          <section className="rounded-2xl border border-line bg-secondary/30 p-4">
+            <div className="mb-3 flex items-center gap-2"><Database className="h-5 w-5 text-brand" /><h3 className="font-semibold">ذاكرة التطبيق</h3></div>
+            <p className="text-sm">استهلاك العملية: <b>{fmtBytes(data?.memory?.rssBytes)}</b></p>
+            <p className="mt-1 text-sm text-muted">ذاكرة JavaScript: {fmtBytes(data?.memory?.heapUsedBytes)} من {fmtBytes(data?.memory?.heapTotalBytes)}</p>
+            <p className="mt-2 text-xs text-muted">ده استهلاك تطبيق Node نفسه، مش حد الذاكرة أو الفاتورة. راجع Metrics في Railway للحد الكامل.</p>
+          </section>
+          <section className="rounded-2xl border border-line bg-secondary/30 p-4">
+            <div className="mb-3 flex items-center gap-2"><Cloud className="h-5 w-5 text-brand" /><h3 className="font-semibold">Cloudflare R2</h3></div>
+            {r2?.standardBytes != null ? <>
+              <p className="text-sm">Standard: <b>{fmtBytes(r2.standardBytes)}</b> · {Number(r2.standardObjects || 0).toLocaleString('ar-EG')} عنصر</p>
+              {!!r2.infrequentAccessBytes && <p className="mt-1 text-sm">Infrequent Access: <b>{fmtBytes(r2.infrequentAccessBytes)}</b></p>}
+              <div className="my-3 h-2 overflow-hidden rounded-full bg-line"><div className={`h-full rounded-full ${standardGB >= 10 ? 'bg-sale' : 'bg-brand'}`} style={{ width: `${Math.min(100, standardGB / 10 * 100)}%` }} /></div>
+              <p className="text-sm text-muted">متبقي تقديري من 10 GB-month المجانية: {freeGB.toFixed(2)} GB-month.</p>
+              <p className="mt-2 text-xs text-muted">الرقم يشمل كل buckets الحساب، وقد يتأخر. 10 GB-month حد مجاني للفوترة وليس حدًا يمنع التخزين؛ الفاتورة تعتمد متوسط التخزين خلال الشهر.</p>
+              <p className="mt-2 text-xs text-muted">آخر قياس: {r2.measuredAt ? fmtDateTime(r2.measuredAt.slice(0, 19).replace('T', ' ')) : '—'}</p>
+            </> : <p className="text-sm text-muted">{r2?.error ? `تعذر جلب قياس R2: ${r2.error}` : 'لإظهار القياس، اضبط CF_R2_METRICS_TOKEN بصلاحية قراءة R2. يستخدم CF_ACCOUNT_ID أو R2_ACCOUNT_ID.'}</p>}
+          </section>
+        </div>
+      )}
+      <div className="mt-3 flex items-center justify-between gap-3"><p className="text-xs text-muted">{data?.checkedAt ? `آخر فحص: ${fmtDateTime(data.checkedAt.slice(0, 19).replace('T', ' '))}` : ''}</p><Button size="xs" variant="outline" loading={loading} onClick={reload}>تحديث المساحة</Button></div>
+    </Panel>
+  );
+}
+
 export default function System() {
   const { data, error, loading, reload } = useAdminApi('/status');
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
@@ -548,6 +604,7 @@ export default function System() {
             </ul>
           </Panel>
           <BackupPanel data={data} reload={reload} />
+          <ResourcePanel />
           <VisualPanel />
           <StylistPanel />
           <ModaTrainingPanel />

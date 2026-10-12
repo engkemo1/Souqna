@@ -265,6 +265,50 @@ r.get('/status', h((_req, res) => {
   });
 }));
 
+// Hosting/storage snapshot for admins. Cloudflare R2 metrics cover the account and may lag recent writes.
+let r2MetricsCache = { at: 0, value: null };
+r.get('/resources', h(async (_req, res) => {
+  let disk = null;
+  let database = null;
+  const root = path.dirname(path.resolve(config.dbFile));
+  try {
+    const stat = fs.statfsSync(root);
+    const totalBytes = Number(stat.blocks) * Number(stat.bsize);
+    const freeBytes = Number(stat.bavail) * Number(stat.bsize);
+    disk = { path: root, totalBytes, freeBytes, usedBytes: Math.max(0, totalBytes - freeBytes), source: 'database-volume' };
+  } catch (error) { disk = { path: root, error: error.message }; }
+  try {
+    const stat = fs.statSync(config.dbFile);
+    database = { bytes: stat.size, modifiedAt: stat.mtime.toISOString() };
+  } catch (error) { database = { error: error.message }; }
+
+  const memory = process.memoryUsage();
+  const accountId = process.env.CF_ACCOUNT_ID || config.r2.accountId;
+  const token = process.env.CF_R2_METRICS_TOKEN || '';
+  let r2 = { configured: false, accountId: !!accountId, error: null };
+  if (accountId && token) {
+    if (!r2MetricsCache.value || Date.now() - r2MetricsCache.at > 5 * 60e3) {
+      try {
+        const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(accountId)}/r2/metrics`, {
+          headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(8000),
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.success) throw new Error(payload.errors?.[0]?.message || `Cloudflare API ${response.status}`);
+        const standard = payload.result?.standard?.published || {};
+        const infrequent = payload.result?.infrequentAccess?.published || {};
+        r2MetricsCache = { at: Date.now(), value: {
+          standardBytes: Number(standard.payloadSize || 0) + Number(standard.metadataSize || 0),
+          standardObjects: Number(standard.objects || 0),
+          infrequentAccessBytes: Number(infrequent.payloadSize || 0) + Number(infrequent.metadataSize || 0),
+          infrequentAccessObjects: Number(infrequent.objects || 0),
+        } };
+      } catch (error) { r2 = { configured: true, accountId: true, error: error.message }; }
+    }
+    if (r2MetricsCache.value) r2 = { configured: true, accountId: true, ...r2MetricsCache.value, measuredAt: new Date(r2MetricsCache.at).toISOString() };
+  }
+  res.json({ disk, database, memory: { rssBytes: memory.rss, heapUsedBytes: memory.heapUsed, heapTotalBytes: memory.heapTotal }, r2, checkedAt: new Date().toISOString() });
+}));
+
 /* ---- stylist chat settings ---- */
 r.get('/stylist', h((_req, res) => res.json(stylistStatus())));
 r.put('/stylist', h((req, res) => {
