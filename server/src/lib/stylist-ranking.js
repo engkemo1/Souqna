@@ -15,14 +15,6 @@ const GARMENT_ALIASES = [
   [['leggings', 'legging', 'ليجنز'], 'ليجنز'],
   [['joggers', 'jogger', 'sweatpants', 'تريننج', 'بنطلون رياضي'], 'تريننج'],
   [['cargo pants', 'cargo trousers', 'كارغو', 'كارجو'], 'كارغو'],
-  [['shirt', 'shirts', 'قميص', 'قمصان'], 'قميص'],
-  [['tee', 'tees', 't-shirt', 'tshirts', 'تيشيرت', 'تيشيرتات'], 'تيشيرت'],
-  [['polo', 'polo shirt', 'بولو'], 'بولو'],
-  [['blouse', 'blouses', 'بلوزة', 'بلوزات'], 'بلوزة'],
-  [['top', 'tops', 'كاميزول', 'توب'], 'توب'],
-  [['sweater', 'sweaters', 'jumper', 'knitwear', 'كنزة', 'بلوفر'], 'بلوفر'],
-  [['cardigan', 'cardigans', 'كارديجان'], 'كارديجان'],
-  [['dress', 'dresses', 'gown', 'gowns', 'فستان', 'فساتين'], 'فستان'],
   [['skirt', 'skirts', 'تنورة', 'جيبة', 'جيبات'], 'جيبة'],
   [['jumpsuit', 'jumpsuits', 'romper', 'جمبسوت', 'أوفرول'], 'جمبسوت'],
   [['abaya', 'abayas', 'عباية', 'عبايات'], 'عباية'],
@@ -32,24 +24,29 @@ const GARMENT_ALIASES = [
   [['heel', 'heels', 'high heels', 'كعب', 'كعب عالي'], 'كعب'],
   [['boot', 'boots', 'ankle boots', 'بوت'], 'بوت'],
   [['sandal', 'sandals', 'صندل', 'صنادل'], 'صندل'],
-  [['loafer', 'loafers', 'moccasin', 'moccasins', 'لوفر', 'موكاسان'], 'لوفر'],
+  [['loafer', 'loafers', 'moccasin', 'موكاسان', 'لوفر'], 'لوفر'],
   [['oxford shoes', 'derby shoes', 'dress shoes', 'حذاء رسمي'], 'حذاء رسمي'],
   [['shoe', 'shoes', 'footwear', 'حذاء', 'أحذية', 'جزمة'], 'حذاء'],
   [['handbag', 'handbags', 'purse', 'purses', 'شنطة', 'حقيبة', 'شنط'], 'شنطة'],
-  [['backpack', 'backpacks', 'rucksack', 'شنطة ظهر'], 'شنطة ظهر'],
+  [['backpack', 'rucksack', 'شنطة ظهر'], 'شنطة ظهر'],
   [['belt', 'belts', 'حزام', 'حزام جلد'], 'حزام'],
-  [['scarf', 'scarves', 'طرحة', 'طرحة حجاب', 'وشاح', 'شال'], 'طرحة'],
+  [['scarf', 'scarves', 'طرحة', 'وشاح', 'شال'], 'طرحة'],
   [['hijab', 'headscarf', 'حجاب', 'حجابات'], 'حجاب'],
   [['tie', 'ties', 'necktie', 'كرافتة', 'ربطة عنق'], 'كرافتة'],
-  [['hat', 'hats', 'cap', 'caps', 'كاب', 'قبعة'], 'كاب'],
+  [['hat', 'hats', 'cap', 'caps', 'كاب', 'قبعة', 'طاقية'], 'كاب'],
   [['jewelry', 'jewellery', 'necklace', 'bracelet', 'earrings', 'ring', 'rings', 'مجوهرات', 'اكسسوار', 'إكسسوار', 'سلسلة', 'اسورة', 'إسوارة', 'حلق', 'خاتم'], 'إكسسوار'],
   [['socks', 'sock', 'جوارب', 'شراب'], 'شراب'],
+  [['dress', 'dresses', 'gown', 'gowns', 'فستان', 'فساتين'], 'فستان'],
+  [['shirt', 'shirts', 'قميص', 'قمصان'], 'قميص'],
+  [['tee', 'tees', 't-shirt', 'تيشيرت', 'تيشيرتات'], 'تيشيرت'],
 ];
 
 function aliasesFor(token) {
   const group = GARMENT_ALIASES.find(([aliases, canonical]) => aliases.some((alias) => norm(alias) === token) || norm(canonical) === token);
   return group ? group[0].map(norm) : [token];
 }
+
+const preferenceTokens = (value) => norm(value).split(/[،,;/|]+/).map((item) => item.trim()).filter((item) => item.length > 1);
 
 /** Rank already-eligible catalogue rows for one requested piece. Kept pure so quality cases can run without a live database or AI key. */
 export function rankCandidateRows(slot, rows, limit = 4) {
@@ -58,6 +55,8 @@ export function rankCandidateRows(slot, rows, limit = 4) {
   const keywordTokens = [...new Set((slot.keywords || []).map(norm).filter((token) => token.length > 1))].slice(0, 8);
   const requestedColor = norm(slot.color || '');
   const palette = (Array.isArray(slot.palette) ? slot.palette : []).map(norm).filter(Boolean);
+  const likedColors = preferenceTokens(slot.likes);
+  const avoidedColors = preferenceTokens(slot.avoid);
   const tokens = [...new Set([...typeTokens, ...keywordTokens])].slice(0, 10);
   const scored = rows.map((product) => {
     const colors = Array.isArray(product.colors_json) ? product.colors_json : (() => {
@@ -89,7 +88,10 @@ export function rankCandidateRows(slot, rows, limit = 4) {
     const colorScore = requestedColor && normalizedColorText.includes(requestedColor) ? 12
       : requestedColor && (nameText.includes(requestedColor) || descriptionText.includes(requestedColor)) ? 8
         : palette.some((color) => normalizedColorText.includes(color) || nameText.includes(color)) ? 2 : 0;
-    return { product, relevant, score: score + popularity + colorScore };
+    const colorSurface = `${normalizedColorText} ${nameText} ${descriptionText}`;
+    const preferenceScore = (likedColors.some((color) => colorSurface.includes(color)) ? 6 : 0)
+      - (avoidedColors.some((color) => colorSurface.includes(color)) ? 8 : 0);
+    return { product, relevant, score: score + popularity + colorScore + preferenceScore };
   });
   return scored.filter((entry) => entry.relevant)
     .sort((a, b) => b.score - a.score)
