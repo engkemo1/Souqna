@@ -127,6 +127,77 @@ function StylistPanel() {
   );
 }
 
+function ModaTestLabPanel() {
+  const toast = useToast();
+  const { data, reload } = useAdminApi('/stylist/lab');
+  const [form, setForm] = useState({ name: '', message: '', expectedGarment: '', expectedAudience: '', maxBudget: '' });
+  const [result, setResult] = useState(null);
+  const [correction, setCorrection] = useState('');
+  const [busy, setBusy] = useState('');
+  const field = 'w-full rounded-xl border border-line-strong bg-elevated px-3 py-2 text-sm';
+  const run = async (values = form) => {
+    if (values.message.trim().length < 2) return;
+    setBusy('run'); setResult(null);
+    try { setResult(await adminApi('/stylist/lab/run', { method: 'POST', body: { ...values, maxBudget: values.maxBudget ? Number(values.maxBudget) : null } })); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy('');
+  };
+  const saveScenario = async () => {
+    setBusy('save');
+    try {
+      await adminApi('/stylist/lab/scenarios', { method: 'POST', body: { ...form, maxBudget: form.maxBudget ? Number(form.maxBudget) : null } });
+      toast({ title: 'اتحفظ السيناريو' }); reload();
+    } catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy('');
+  };
+  const removeScenario = async (id) => {
+    setBusy(id);
+    try { await adminApi('/stylist/lab/scenarios/' + encodeURIComponent(id), { method: 'DELETE' }); toast({ title: 'اتحذف السيناريو' }); reload(); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy('');
+  };
+  const saveCorrection = async () => {
+    if (correction.trim().length < 10) return;
+    setBusy('lesson');
+    try {
+      await adminApi('/stylist/training/lessons', { method: 'POST', body: {
+        topic: 'تصحيح من استوديو اختبار مودة', question: form.message.trim(), answer: correction.trim(),
+        tags: `استوديو الاختبار، ${form.expectedGarment || ''}`.slice(0, 160),
+      } });
+      toast({ title: 'اتحفظ التصحيح كدرس لمودة' }); setCorrection('');
+    } catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy('');
+  };
+  const chooseScenario = (item) => {
+    const next = { name: item.name || '', message: item.message || '', expectedGarment: item.expectedGarment || '', expectedAudience: item.expectedAudience || '', maxBudget: item.maxBudget ? String(item.maxBudget) : '' };
+    setForm(next); setCorrection(''); run(next);
+  };
+  return (
+    <Panel title="استوديو اختبار مودة" subtitle="جرّبوا كلام الزباين على المنتجات الحقيقية، راجعوا فهم مودة، واحفظوا التصحيح كدرس" className="lg:col-span-2">
+      <div className="space-y-4">
+        <p className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-sm leading-relaxed text-muted">الاختبار يستخدم محرك مودة والكتالوج الحالي مباشرة، من غير استدعاء Cloudflare أو أي موديل مدفوع. السيناريو المحفوظ يفضل متاحًا للمراجعة بعدين.</p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block"><span className="mb-1 block text-xs font-medium text-muted">اسم السيناريو (اختياري)</span><Input maxLength={80} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="مثال: تمييز كوتشي من كوتش" /></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium text-muted">القطعة المتوقع فهمها</span><select className={field} value={form.expectedGarment} onChange={(e) => setForm({ ...form, expectedGarment: e.target.value })}><option value="">من غير توقع</option>{(data?.garments || []).map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium text-muted">الطلب لمين؟ (اختياري)</span><select className={field} value={form.expectedAudience} onChange={(e) => setForm({ ...form, expectedAudience: e.target.value })}><option value="">من غير توقع</option><option value="women">حريمي</option><option value="women_hijab">محجبة</option><option value="men">رجالي</option><option value="boys">ولد</option><option value="girls">بنت</option></select></label>
+          <label className="block"><span className="mb-1 block text-xs font-medium text-muted">أقصى ميزانية (اختياري، جنيه)</span><Input type="number" min={1} max={1000000} value={form.maxBudget} onChange={(e) => setForm({ ...form, maxBudget: e.target.value })} placeholder="مثال: 2000" /></label>
+        </div>
+        <label className="block"><span className="mb-1 block text-xs font-medium text-muted">رسالة الزبون</span><Textarea rows={2} maxLength={400} value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} placeholder="مثال: عايزة كوتشي أبيض يمشي مع بنطلون جينز" /></label>
+        <div className="flex flex-wrap gap-2"><Button size="sm" icon={Sparkles} loading={busy === 'run'} disabled={form.message.trim().length < 2 || !!busy} onClick={() => run()}>اختبر مودة</Button><Button size="sm" variant="outline" icon={Plus} loading={busy === 'save'} disabled={form.message.trim().length < 2 || !!busy} onClick={saveScenario}>احفظ السيناريو</Button></div>
+        {result && <section className="space-y-3 rounded-2xl border border-line bg-canvas/50 p-3 sm:p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">نتيجة الاختبار · {({ shop: 'اقتراح منتجات', clarify: 'طلب توضيح', chat: 'رد محادثة', none: 'من غير منتجات', partial: 'اقتراح جزئي', full: 'اقتراح كامل', over_budget: 'فوق الميزانية', alternatives: 'بدائل' })[result.state] || result.state}</h3><span className={'rounded-full px-3 py-1 text-xs font-semibold ' + (result.passed === null ? 'bg-secondary text-muted' : result.passed ? 'bg-emerald-600/10 text-emerald-700' : 'bg-sale/10 text-sale')}>{result.passed === null ? 'مفيش قواعد مقارنة' : result.passed ? 'الاختبار ناجح' : 'محتاج مراجعة'}</span></div>
+          <p className="rounded-xl bg-elevated p-3 text-sm leading-relaxed">{result.say}</p>
+          <div className="grid gap-2 text-sm sm:grid-cols-2"><p><span className="text-muted">القطع اللي فهمها:</span> {result.parsed.garments.length ? result.parsed.garments.map((g) => data?.garments?.find((item) => item.key === g.key)?.label || g.text || g.key).join('، ') : 'مفهمتش قطعة محددة'}</p><p><span className="text-muted">الشخص:</span> {result.parsed.persons.join('، ') || 'غير محدد'}</p></div>
+          {result.checks.length > 0 && <ul className="space-y-1.5">{result.checks.map((check) => <li key={check.id} className="flex items-center justify-between gap-3 rounded-lg border border-line p-2 text-sm"><span>{check.label}{check.id === 'budget' ? ` · المتوقع حتى ${check.expected} جنيه، الفعلي ${check.actual ?? 'غير متاح'}` : ''}</span><strong className={check.passed ? 'text-emerald-700' : 'text-sale'}>{check.passed ? 'تمام' : 'راجع'}</strong></li>)}</ul>}
+          {result.selected.length > 0 ? <div><p className="mb-1 text-xs font-medium text-muted">المنتجات التي رشحها من الكتالوج · الإجمالي {result.total?.toLocaleString('ar-EG')} جنيه</p><ul className="space-y-1">{result.selected.map((item, i) => <li key={`${item.key}-${i}`} className="flex justify-between gap-3 rounded-lg bg-elevated px-3 py-2 text-sm"><span>{item.name || item.label || item.key}{item.store ? ` · ${item.store}` : ''}</span><span className="shrink-0">{item.price != null ? `${Number(item.price).toLocaleString('ar-EG')} ج.م` : ''}</span></li>)}</ul></div> : <p className="text-sm text-muted">مفيش منتجات متاحة للطلب ده حاليًا.</p>}
+          <div className="space-y-2 border-t border-line pt-3"><Textarea rows={2} maxLength={1000} value={correction} onChange={(e) => setCorrection(e.target.value)} placeholder="لو النتيجة غلط، اكتب التصحيح اللي مودة تتعلمه…" /><Button size="sm" loading={busy === 'lesson'} disabled={correction.trim().length < 10 || !!busy} onClick={saveCorrection}>احفظ التصحيح كدرس</Button></div>
+        </section>}
+        {data?.scenarios?.length > 0 && <section className="space-y-2 border-t border-line pt-3"><h3 className="font-semibold">السيناريوهات المحفوظة ({data.scenarios.length})</h3>{data.scenarios.map((item) => <article key={item.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3"><button type="button" disabled={!!busy} onClick={() => chooseScenario(item)} className="min-w-0 flex-1 text-start"><p className="truncate text-sm font-medium">{item.name}</p><p className="truncate text-xs text-muted">{item.message}</p></button><button type="button" disabled={!!busy} aria-label="حذف السيناريو" onClick={() => removeScenario(item.id)} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-line-strong text-muted hover:border-sale hover:text-sale disabled:opacity-50"><Trash2 className="h-4 w-4" /></button></article>)}</section>}
+      </div>
+    </Panel>
+  );
+}
+
 function ModaTrainingPanel() {
   const toast = useToast();
   const { data, reload } = useAdminApi('/stylist/training');
@@ -607,6 +678,7 @@ export default function System() {
           <ResourcePanel />
           <VisualPanel />
           <StylistPanel />
+          <ModaTestLabPanel />
           <ModaTrainingPanel />
           <LookOfDayPanel />
           <Panel title="السيرفر">

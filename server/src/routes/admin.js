@@ -13,7 +13,7 @@ import { listDepartments, assertDepartments } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings } from '../lib/visual.js';
-import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal } from '../lib/stylist.js';
+import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario } from '../lib/stylist.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
@@ -355,6 +355,27 @@ r.post('/stylist/training/lessons', h((req, res) => {
   res.status(saved.added ? 201 : 200).json(saved);
 }));
 r.delete('/stylist/training/lessons/:id', h((req, res) => res.json(deleteStylistTrainingLesson(String(req.params.id).slice(0, 80)))));
+
+/* ---- deterministic Moda test studio (no external model/API calls) ---- */
+const modaLabScenarioSchema = z.object({
+  id: z.string().max(80).optional(), name: z.string().trim().max(80).optional().default(''),
+  message: z.string().trim().min(2).max(400), expectedGarment: z.string().max(80).optional().default(''),
+  expectedAudience: z.enum(['women', 'men', 'boys', 'girls', 'women_hijab']).or(z.literal('')).optional().default(''),
+  maxBudget: z.coerce.number().int().positive().max(1000000).nullable().optional().default(null),
+});
+r.get('/stylist/lab', h((_req, res) => res.json(modaLabSettings())));
+r.post('/stylist/lab/run', h(async (req, res) => {
+  const body = modaLabScenarioSchema.omit({ id: true, name: true }).parse(req.body || {});
+  const { message, expectedGarment, expectedAudience, maxBudget } = body;
+  const result = await runModaLabScenario({ message, expectedGarment, expectedAudience, maxBudget });
+  res.json(result);
+}));
+r.post('/stylist/lab/scenarios', h((req, res) => {
+  const body = modaLabScenarioSchema.parse(req.body || {});
+  if (body.expectedGarment && !modaLabSettings().garments.some((item) => item.key === body.expectedGarment)) throw new AppError(422, 'validation_failed', 'Unknown garment type.');
+  res.status(201).json(saveModaLabScenario(body));
+}));
+r.delete('/stylist/lab/scenarios/:id', h((req, res) => res.json(deleteModaLabScenario(String(req.params.id).slice(0, 80)))));
 
 r.get('/stylist/feedback', h((_req, res) => res.json({ items: stylistFeedback() })));
 r.delete('/stylist/feedback/:id', h((req, res) => res.json({ items: deleteStylistFeedback(String(req.params.id).slice(0, 80)) })));

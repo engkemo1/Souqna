@@ -10,6 +10,7 @@ import { q, tx } from '../db/index.js';
 import { listDepartments } from './departments.js';
 import { serializeCards, bi } from './serialize.js';
 import { runModa } from './moda/engine.js';
+import { loadKnowledge } from './moda/knowledge.js';
 import { makeLlmExtract } from './moda/llm.js';
 import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates, slotOwnerLabel, cleanSay } from './stylist-ranking.js';
 
@@ -18,6 +19,7 @@ const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').rep
 /* ---------------- settings ---------------- */
 const DEF = { stylist_enabled: '1', stylist_provider: '', stylist_daily: '15', stylist_name_ar: 'مودة', stylist_name_en: 'Moda', stylist_avatar: '' };
 const STYLIST_TRAINING_KEY = 'moda_training_data';
+const MODA_LAB_KEY = 'moda_test_scenarios';
 const STYLIST_FEEDBACK_KEY = 'moda_feedback';
 const anthropicKey = () => process.env.ANTHROPIC_API_KEY || '';
 const cfAccount = () => process.env.CF_ACCOUNT_ID || process.env.R2_ACCOUNT_ID || '';
@@ -71,6 +73,65 @@ function writeStylistTraining(training) {
 
 export function stylistTrainingSettings() {
   return readStylistTraining();
+}
+
+function readModaLabScenarios() {
+  try {
+    const saved = JSON.parse(q.get('SELECT value FROM app_settings WHERE key=?', [MODA_LAB_KEY])?.value || '[]');
+    return Array.isArray(saved) ? saved.slice(0, 100) : [];
+  } catch { return []; }
+}
+
+export function modaLabSettings() {
+  const K = loadKnowledge();
+  const garments = [...K.items.entries()].map(([key, item]) => ({ key, label: item.ar, family: item.family }));
+  return { scenarios: readModaLabScenarios(), garments };
+}
+
+export function saveModaLabScenario({ id, name, message, expectedGarment = '', expectedAudience = '', maxBudget = null }) {
+  const scenarios = readModaLabScenarios();
+  const scenario = {
+    id: id || randomUUID(), name: String(name || '').trim().slice(0, 80) || String(message).trim().slice(0, 80),
+    message: String(message).trim().slice(0, 400), expectedGarment, expectedAudience,
+    maxBudget: Number.isFinite(Number(maxBudget)) && Number(maxBudget) > 0 ? Math.round(Number(maxBudget)) : null,
+    createdAt: new Date().toISOString(),
+  };
+  const next = [scenario, ...scenarios.filter((item) => item.id !== scenario.id)].slice(0, 100);
+  q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [MODA_LAB_KEY, JSON.stringify(next)]);
+  return scenario;
+}
+
+export function deleteModaLabScenario(id) {
+  const scenarios = readModaLabScenarios().filter((item) => item.id !== id);
+  q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [MODA_LAB_KEY, JSON.stringify(scenarios)]);
+  return { scenarios };
+}
+
+export async function runModaLabScenario({ message, expectedGarment = '', expectedAudience = '', maxBudget = null }) {
+  const text = String(message || '').trim().slice(0, 400);
+  const rows = modaCatalogue();
+  const out = await runModa([{ role: 'user', content: text }], {
+    products: rows, weatherMock: { temp_c: 21, feels_like_c: 21, rain_pct: 2 },
+  });
+  const parsed = out.parsed || {};
+  const selected = (out.blocks?.tabs || []).flatMap((tab) => (tab.items || []).map((item) => ({
+    key: item.key, label: item.label, name: item.name || item.card?.name_ar || item.card?.name_en || '',
+    price: item.price ?? item.card?.price ?? null, store: item.store || item.card?.store?.name || '',
+  })));
+  const checks = [];
+  if (expectedGarment) checks.push({ id: 'garment', label: 'فهم نوع القطعة', expected: expectedGarment, actual: (parsed.garments || []).map((item) => item.key), passed: (parsed.garments || []).some((item) => item.key === expectedGarment) });
+  if (expectedAudience) checks.push({
+    id: 'audience', label: 'فهم الشخص المطلوب', expected: expectedAudience, actual: parsed.persons || [],
+    passed: expectedAudience === 'women' ? (parsed.persons || []).some((person) => person === 'women' || person === 'women_hijab') : (parsed.persons || []).includes(expectedAudience),
+  });
+  if (maxBudget) checks.push({ id: 'budget', label: 'الالتزام بالميزانية', expected: Number(maxBudget), actual: out.blocks?.total ?? null, passed: out.blocks?.total != null && out.blocks.total <= Number(maxBudget) });
+  return {
+    state: out.state, say: out.say, intent: out.intent, parsed: {
+      garments: (parsed.garments || []).map((item) => ({ key: item.key, text: item.text })),
+      persons: parsed.persons || [], context: parsed.context || null, budget: parsed.budget || null,
+    }, total: out.blocks?.total ?? null, budget: out.blocks?.budget ?? null, selected,
+    checks, passed: checks.length ? checks.every((check) => check.passed) : null,
+  };
 }
 
 export function saveStylistTrainingGuidance(guidance) {
