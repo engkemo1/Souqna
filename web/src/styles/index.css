@@ -73,7 +73,9 @@
   [dir='rtl'] .skeleton::after { transform: translateX(100%); animation-name: shimmer-rtl; }
   .eyebrow { @apply text-2xs font-semibold uppercase tracking-[0.18em] text-muted; }
   :lang(ar) .eyebrow { @apply tracking-normal text-xs; }
-  .scroll-x { @apply flex overflow-x-auto snap-x snap-mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+  /* Keep horizontal rails from becoming nested vertical scroll areas on touch screens.
+     The page owns vertical gestures; the rail only consumes horizontal movement. */
+  .scroll-x { @apply flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; overscroll-behavior-y: auto; }
   .scroll-x::-webkit-scrollbar { display: none; }
   .no-scrollbar { scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
@@ -84,6 +86,11 @@
   .link-underline { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size .35s cubic-bezier(.22,1,.36,1); }
   .link-underline:hover { background-size: 100% 1px; }
   [dir='rtl'] .link-underline { background-position: 100% 100%; }
+}
+
+@media (max-width: 639px) {
+  /* Mandatory snapping can make a diagonal swipe feel trapped in a product rail. */
+  .scroll-x { scroll-snap-type: x proximity; }
 }
 
 @keyframes shimmer-rtl { 100% { transform: translateX(-100%); } }
