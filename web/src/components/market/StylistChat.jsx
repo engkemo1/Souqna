@@ -10,12 +10,31 @@ import { cx } from '../ui/cx.js';
 
 const store = { get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } } };
 const TTS = typeof window !== 'undefined' && 'speechSynthesis' in window ? window.speechSynthesis : null;
+const textValue = (value) => {
+  if (typeof value === 'string') return value.trim();
+  if (value == null) return '';
+  if (Array.isArray(value)) return value.map(textValue).filter(Boolean).join(' ');
+  if (typeof value === 'object') return textValue(value.text || value.content || value.message || value.response || value.output);
+  return String(value);
+};
 const speak = (txt, lang, onState) => {
-  if (!TTS || !txt) return;
-  TTS.cancel(); const u = new SpeechSynthesisUtterance(txt.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, ''));
+  const words = textValue(txt);
+  if (!TTS || !words) return;
+  TTS.cancel(); const u = new SpeechSynthesisUtterance(words.replace(/[\u{1F300}-\u{1FAFF}\u2600-\u27BF]/gu, ''));
   u.lang = lang === 'ar' ? 'ar-EG' : 'en-US';
-  const v = TTS.getVoices().find((x) => x.lang?.toLowerCase().startsWith(lang === 'ar' ? 'ar' : 'en')); if (v) u.voice = v;
-  u.rate = 1; u.onstart = () => onState?.(true); u.onend = () => onState?.(false); u.onerror = () => onState?.(false); TTS.speak(u);
+  const voices = TTS.getVoices();
+  const isArabic = lang === 'ar';
+  const feminine = (x) => /female|woman|zira|sara|salma|leila|layla|hoda|nora|noura|dalia|dina|هدي|نورا|سارة|سلمى|ليلى|داليا|دينا/i.test(x.name || '');
+  const v = isArabic
+    ? voices.find((x) => x.lang?.toLowerCase() === 'ar-eg' && feminine(x))
+      || voices.find((x) => /arabic|egypt|مصري/i.test(`${x.name} ${x.lang}`) && feminine(x))
+      || voices.find((x) => x.lang?.toLowerCase() === 'ar-eg')
+      || voices.find((x) => /arabic|egypt|مصري/i.test(`${x.name} ${x.lang}`))
+      || voices.find((x) => x.lang?.toLowerCase().startsWith('ar'))
+    : voices.find((x) => x.lang?.toLowerCase().startsWith('en'));
+  if (v) u.voice = v;
+  u.rate = isArabic ? 0.92 : 0.96; u.pitch = isArabic ? 1.04 : 1;
+  u.onstart = () => onState?.(true); u.onend = () => onState?.(false); u.onerror = () => onState?.(false); TTS.speak(u);
 };
 /** shrink a photo to ~768px JPEG so the upload stays small */
 const shrink = (file) => new Promise((resolve, reject) => {
@@ -93,9 +112,11 @@ export default function StylistChat() {
       const res = await fetch('/api/stylist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw Object.assign(new Error('x'), { code: data?.error?.code });
-      setMsgs([...next, { role: 'assistant', feedbackQuestion: content || shown, ...data }]);
+      const reply = { ...data, say: textValue(data.say), tips: textValue(data.tips) };
+      if (!reply.say && !reply.looks?.length) throw Object.assign(new Error('empty_reply'), { code: 'stylist_unavailable' });
+      setMsgs([...next, { role: 'assistant', feedbackQuestion: content || shown, ...reply }]);
       if (data.remember && Object.keys(data.remember).length) { const p = { ...profile, ...data.remember }; setProfile(p); store.set('moda.profile', p); }
-      if (voiceOn) speak([data.say, data.tips].filter(Boolean).join('. '), lang, setTalking);
+      if (voiceOn) speak([reply.say, reply.tips].filter(Boolean).join('. '), lang, setTalking);
     } catch (e) { setMsgs([...next, { role: 'assistant', error: errorMessage(t, e) }]); }
     setBusy(false);
   };
