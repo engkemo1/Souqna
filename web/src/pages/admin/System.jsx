@@ -130,10 +130,12 @@ function StylistPanel() {
 function ModaTrainingPanel() {
   const toast = useToast();
   const { data, reload } = useAdminApi('/stylist/training');
+  const { data: feedbackData, reload: reloadFeedback } = useAdminApi('/stylist/feedback');
   const [guidance, setGuidance] = useState('');
   const [baseline, setBaseline] = useState(null);
   const [busy, setBusy] = useState('');
   const [lessonForm, setLessonForm] = useState({ topic: '', question: '', answer: '', tags: '' });
+  const [feedbackAnswers, setFeedbackAnswers] = useState({});
   useEffect(() => {
     if (!data || baseline !== null) return;
     setGuidance(data.guidance || '');
@@ -178,11 +180,38 @@ function ModaTrainingPanel() {
     catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy('');
   };
+  const dismissFeedback = async (id) => {
+    setBusy(id);
+    try { await adminApi('/stylist/feedback/' + encodeURIComponent(id), { method: 'DELETE' }); toast({ title: 'الملاحظة اتحذفت من المراجعة' }); reloadFeedback(); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy('');
+  };
+  const teachFeedback = async (item) => {
+    const answer = String(feedbackAnswers[item.id] || '').trim();
+    if (answer.length < 10) return;
+    setBusy(item.id);
+    try {
+      await adminApi('/stylist/feedback/' + encodeURIComponent(item.id) + '/lesson', { method: 'POST', body: { answer } });
+      toast({ title: 'مودة اتعلمت من الدرس المعتمد' });
+      setFeedbackAnswers((all) => { const next = { ...all }; delete next[item.id]; return next; });
+      reload(); reloadFeedback();
+    } catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy('');
+  };
   const audienceName = { women: 'حريمي', men: 'رجالي', kids: 'أطفال' };
   return (
     <Panel title="تعليم مودة" subtitle="اختياراتك المعتمدة وتوجيهك بيفضلوا محفوظين وبيساعدوا مودة في اقتراحاتها الجديدة" className="lg:col-span-2">
       <div className="space-y-4">
         <div className="rounded-xl border border-brand/20 bg-brand/5 p-3 text-sm leading-relaxed text-muted">هنا بتعلّم مودة بقواعد ذوق، وإجابات خبير معتمدة، وأوتفيتات توافق عليها. لما ييجي سؤال مشابه تستخدم الدرس المناسب، ولما ترشح لبس تبحث عن قطع متاحة فعلًا من المحلات.</div>
+        <section className="space-y-3 rounded-2xl border border-line bg-canvas/50 p-3 sm:p-4">
+          <div><h3 className="font-semibold">ملاحظات الزباين على اقتراحات مودة</h3><p className="mt-1 text-xs text-muted">راجعوا الأسباب، واكتبوا الإجابة اللي شايفينها صح قبل ما تتحول الملاحظة لدرس تتعلم منه.</p></div>
+          {feedbackData?.items?.length ? feedbackData.items.map((item) => <article key={item.id} className="space-y-2 rounded-xl border border-line bg-elevated p-3">
+            <div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs text-muted">{item.rating === 'good' ? 'تقييم إيجابي' : 'محتاج مراجعة'}{item.reason ? ` · ${{ mismatch: 'القطع مش متناسقة', color: 'الألوان', occasion: 'المناسبة', price: 'السعر أو الميزانية', fit: 'المقاس أو الراحة', other: 'سبب آخر' }[item.reason] || item.reason}` : ''} · {new Date(item.createdAt).toLocaleDateString('ar-EG')}</p><p className="mt-1 text-sm font-medium">طلب الزبون: {item.question}</p>{item.reply && <p className="mt-1 text-sm text-muted">رد مودة: {item.reply}</p>}{item.items?.length > 0 && <p className="mt-1 text-xs text-muted">القطع: {item.items.join('، ')}</p>}{item.note && <p className="mt-1 text-sm text-muted">ملاحظة: {item.note}</p>}</div>
+              <button type="button" disabled={!!busy} onClick={() => dismissFeedback(item.id)} className="shrink-0 rounded-lg border border-line-strong px-2.5 py-1.5 text-xs text-muted hover:border-sale hover:text-sale">حذف</button></div>
+            {item.rating === 'bad' && <><Textarea rows={2} maxLength={1000} value={feedbackAnswers[item.id] || ''} onChange={(e) => setFeedbackAnswers((all) => ({ ...all, [item.id]: e.target.value }))} placeholder="اكتبوا نصيحة التنسيق الصحيحة عشان تتحفظ كدرس معتمد…" />
+              <Button size="sm" loading={busy === item.id} disabled={(feedbackAnswers[item.id] || '').trim().length < 10 || !!busy} onClick={() => teachFeedback(item)}>حوّلها لدرس لمودة</Button></>}
+          </article>) : <p className="text-sm text-muted">مفيش ملاحظات جديدة لحد دلوقتي.</p>}
+        </section>
         <label className="block"><span className="mb-1.5 block text-sm font-medium">قواعد الذوق اللي عايز مودة تلتزم بيها</span><Textarea rows={3} maxLength={1600} value={guidance} onChange={(e) => setGuidance(e.target.value)} placeholder="مثال: اختاري ألوان متناسقة ومناسبة للمناسبة، وراعي الاحتشام والعمر، وما تقترحيش قطع مش راكبة على بعض." /></label>
         <div className="flex flex-wrap items-center gap-3"><Button onClick={save} loading={busy === 'save'} disabled={guidance === baseline}>حفظ التوجيه</Button><span className="text-xs text-muted">{data.lessons.length} درس و{data.examples.length} أوتفيت محفوظين لمودة</span></div>
         <form onSubmit={addLesson} className="space-y-3 rounded-2xl border border-line bg-canvas/50 p-3 sm:p-4">

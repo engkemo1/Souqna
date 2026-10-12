@@ -13,7 +13,7 @@ import { listDepartments, assertDepartments } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings } from '../lib/visual.js';
-import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts } from '../lib/stylist.js';
+import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts } from '../lib/stylist.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
@@ -311,6 +311,15 @@ r.post('/stylist/training/lessons', h((req, res) => {
   res.status(saved.added ? 201 : 200).json(saved);
 }));
 r.delete('/stylist/training/lessons/:id', h((req, res) => res.json(deleteStylistTrainingLesson(String(req.params.id).slice(0, 80)))));
+
+r.get('/stylist/feedback', h((_req, res) => res.json({ items: stylistFeedback() })));
+r.delete('/stylist/feedback/:id', h((req, res) => res.json({ items: deleteStylistFeedback(String(req.params.id).slice(0, 80)) })));
+r.post('/stylist/feedback/:id/lesson', h((req, res) => {
+  const body = z.object({ answer: z.string().trim().min(10).max(1000) }).parse(req.body);
+  const result = teachFromStylistFeedback(String(req.params.id).slice(0, 80), body.answer);
+  if (!result) throw new AppError(404, 'feedback_not_found', 'Feedback not found.');
+  res.status(201).json(result);
+}));
 
 /* ---- look of the day: AI-picked, manually curated, or hidden ---- */
 const lookPieceSchema = z.object({ label: z.string().trim().min(1).max(50), productId: z.coerce.number().int().positive() });

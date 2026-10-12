@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Send, Mic, MicOff, Loader2, Camera, Volume2, VolumeX } from 'lucide-react';
+import { X, Send, Mic, MicOff, Loader2, Camera, Volume2, VolumeX, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { formatMoney } from '../../lib/format.js';
@@ -24,6 +24,31 @@ const shrink = (file) => new Promise((resolve, reject) => {
   img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('img')); }; img.src = url;
 });
 const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
+
+function ModaFeedback({ question, reply, items, t }) {
+  const [reason, setReason] = useState('');
+  const [done, setDone] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const reasons = [['mismatch', t('stylist.feedbackMismatch')], ['color', t('stylist.feedbackColor')], ['occasion', t('stylist.feedbackOccasion')], ['price', t('stylist.feedbackPrice')], ['fit', t('stylist.feedbackFit')], ['other', t('stylist.feedbackOther')]];
+  const submit = async (rating, why) => {
+    setBusy(true);
+    try {
+      const res = await fetch('/api/stylist/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ rating, ...(why ? { reason: why } : {}), question: String(question || '').slice(0, 300) || 'طلب تنسيق ملابس', reply: String(reply || '').slice(0, 500), items: (items || []).slice(0, 12).map((item) => String(item).slice(0, 120)) }) });
+      if (!res.ok) throw new Error('feedback');
+      setDone(true);
+    } catch { /* feedback is optional; keep the chat usable when offline */ }
+    setBusy(false);
+  };
+  if (done) return <p className="mt-2 text-[11px] text-muted">{t('stylist.feedbackThanks')}</p>;
+  return <div className="mt-2">
+    <div className="flex items-center gap-2 text-[11px] text-muted"><span>{t('stylist.feedbackAsk')}</span>
+      <button type="button" disabled={busy} onClick={() => submit('good')} aria-label={t('stylist.feedbackGood')} className="grid h-7 w-7 place-items-center rounded-full border border-line-strong hover:border-brand hover:text-brand"><ThumbsUp className="h-3.5 w-3.5" /></button>
+      <button type="button" disabled={busy} onClick={() => setReason(reason ? '' : 'choose')} aria-label={t('stylist.feedbackBad')} className="grid h-7 w-7 place-items-center rounded-full border border-line-strong hover:border-sale hover:text-sale"><ThumbsDown className="h-3.5 w-3.5" /></button>
+    </div>
+    <p className="mt-1 text-[10px] leading-relaxed text-muted">{t('stylist.feedbackPrivacy')}</p>
+    {reason === 'choose' && <div className="mt-2 flex flex-wrap gap-1.5">{reasons.map(([key, label]) => <button key={key} type="button" disabled={busy} onClick={() => submit('bad', key)} className="rounded-full border border-line-strong px-2.5 py-1 text-[11px] hover:border-brand">{label}</button>)}</div>}
+  </div>;
+}
 
 /** Floating shopping assistant: chat in text or voice, answers come with real products from Banha stores. */
 export default function StylistChat() {
@@ -68,7 +93,7 @@ export default function StylistChat() {
       const res = await fetch('/api/stylist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw Object.assign(new Error('x'), { code: data?.error?.code });
-      setMsgs([...next, { role: 'assistant', ...data }]);
+      setMsgs([...next, { role: 'assistant', feedbackQuestion: content || shown, ...data }]);
       if (data.remember && Object.keys(data.remember).length) { const p = { ...profile, ...data.remember }; setProfile(p); store.set('moda.profile', p); }
       if (voiceOn) speak([data.say, data.tips].filter(Boolean).join('. '), lang, setTalking);
     } catch (e) { setMsgs([...next, { role: 'assistant', error: errorMessage(t, e) }]); }
@@ -123,6 +148,7 @@ export default function StylistChat() {
                 <div key={i} className="max-w-full">
                   {(m.say || m.error) && <div className={cx('max-w-[90%] rounded-2xl rounded-ss-sm px-3.5 py-2.5 text-[14.5px] leading-relaxed', m.error ? 'bg-sale/10 text-sale' : 'bg-secondary')}>{m.error || m.say}</div>}
                   <LookSet data={m} name={name} />
+                  {!m.error && (m.say || m.looks?.length > 0) && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, m.tips].filter(Boolean).join(' — ')} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${look.label}: ${tr(p.name)} (${p.price})` : ''; }).filter(Boolean)} t={t} />}
                   {m.intent === 'shop' && m.missing?.length > 0 && <p className="mt-1 text-[12.5px] text-muted">{t('stylist.missing', { x: m.missing.join('، ') })}</p>}
                   {m.intent === 'shop' && !m.looks?.length && !m.error && <p className="mt-2 text-[13px] text-muted">{t('stylist.none')}</p>}
                 </div>

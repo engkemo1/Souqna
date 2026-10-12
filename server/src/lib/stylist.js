@@ -15,6 +15,7 @@ const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').rep
 /* ---------------- settings ---------------- */
 const DEF = { stylist_enabled: '1', stylist_provider: '', stylist_daily: '15', stylist_name_ar: 'مودة', stylist_name_en: 'Moda', stylist_avatar: '' };
 const STYLIST_TRAINING_KEY = 'moda_training_data';
+const STYLIST_FEEDBACK_KEY = 'moda_feedback';
 const anthropicKey = () => process.env.ANTHROPIC_API_KEY || '';
 const cfAccount = () => process.env.CF_ACCOUNT_ID || process.env.R2_ACCOUNT_ID || '';
 const cfToken = () => process.env.CF_AI_TOKEN || '';
@@ -120,6 +121,37 @@ export function deleteStylistTrainingLesson(id) {
   return writeStylistTraining({ ...current, lessons: current.lessons.filter((lesson) => lesson.id !== id) });
 }
 
+function readStylistFeedback() {
+  try {
+    const saved = JSON.parse(q.get('SELECT value FROM app_settings WHERE key=?', [STYLIST_FEEDBACK_KEY])?.value || '[]');
+    return Array.isArray(saved) ? saved.slice(0, 500) : [];
+  } catch { return []; }
+}
+
+function writeStylistFeedback(items) {
+  const value = items.slice(0, 500);
+  q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [STYLIST_FEEDBACK_KEY, JSON.stringify(value)]);
+  return value;
+}
+
+export function addStylistFeedback(input) {
+  const items = readStylistFeedback();
+  const item = { id: randomUUID(), ...input, createdAt: new Date().toISOString() };
+  writeStylistFeedback([item, ...items]);
+  return item;
+}
+
+export function stylistFeedback() { return readStylistFeedback(); }
+export function deleteStylistFeedback(id) { return writeStylistFeedback(readStylistFeedback().filter((item) => item.id !== id)); }
+export function teachFromStylistFeedback(id, answer) {
+  const items = readStylistFeedback();
+  const item = items.find((entry) => entry.id === id);
+  if (!item) return null;
+  const lesson = addStylistTrainingLesson({ topic: item.reason || 'تحسين اقتراحات مودة', question: item.question, answer, tags: item.reason || '' });
+  writeStylistFeedback(items.filter((entry) => entry.id !== id));
+  return lesson;
+}
+
 const TRAINING_STOPWORDS = new Set('انا انت انتي هو هي احنا هم ده دي دول اللي اللى في من على مع عن لو هل ايه اي اية عايز عاوز عاوزه عاوزة ممكن محتاجه محتاج عايزة بقى جدا قوي او ولا يكون تكون كان كانت مش ده ده هو هي لها له'.split(' '));
 function trainingTokens(value) {
   return norm(value).replace(/[^\p{L}\p{N}]+/gu, ' ').split(/\s+/).map((token) => token.replace(/^(?:وال|بال|كال|لل|ال)/, '')).filter((token) => token.length > 1 && !TRAINING_STOPWORDS.has(token));
@@ -164,7 +196,8 @@ export async function callLlm(provider, system, messages) {
   });
   const j = await res.json().catch(() => ({}));
   if (!res.ok || j.success === false) throw new Error(`Cloudflare AI ${res.status}: ${JSON.stringify(j.errors || j).slice(0, 160)}`);
-  return String(j.result?.response ?? j.result?.text ?? '');
+  const response = j.result?.response ?? j.result?.text ?? '';
+  return typeof response === 'string' ? response : JSON.stringify(response);
 }
 const parseJson = (t) => {
   const original = String(t).trim();
@@ -214,6 +247,10 @@ Families and budgets: when the shopper dresses several people for one budget (e.
 Memory: when the shopper tells you something lasting about themselves (gender, sizes, favourite or hated colours, hijab, style, usual budget) return it in "remember" as short strings, e.g. {"gender":"man","size":"L / 42","likes":"كحلي، بيج","avoid":"أحمر","notes":"محجبة"}; otherwise omit it.
 
 Styling knowledge (use it like a real personal stylist):
+- Work like a meticulous fashion editor: identify the occasion and dress code, choose one clear silhouette, build a restrained 2–3 colour palette (base + supporting colour + optional accent), then check that every piece belongs to the same look. Prefer polished fit, proportion, fabric texture and thoughtful finishing over adding more items. Never pair pieces only because they are popular.
+- Make a decisive lead recommendation. Explain briefly why the colours and formality work together, then offer a useful alternative only when it meaningfully changes the mood or price. Keep the look coherent even when pieces come from different stores.
+- Treat the shopper's stated budget, modesty, comfort, age context and owned pieces as design constraints. Prioritize the main garment, then essential complementary pieces; accessories are optional. Do not infer body shape or prescribe body changes.
+- Use catalogue colour metadata as well as names when searching. Put the intended colours in each slot's keywords so product alternatives stay close to the planned palette. If an exact colour is unavailable, choose a neutral that supports the palette and say so plainly.
 - The shopper may already own something ("عندي قميص أزرق سماوي"): build the rest AROUND it. Pick colours that go with it (navy/white/beige/brown/grey are safe neutrals; avoid clashing; match belt with shoes), and put the colour words in keywords (e.g. "كوتشي","أبيض","sneakers","white"). Do not search for the item they already own.
 - Occasions: wedding guest, engagement (خطوبة), kath el-ketab, work, casual outing, graduation, etc. Choose the formality right (suit/بدلة + shirt + shoes + tie/bow for formal; smart-casual for outings; modest/hijab-friendly options when the shopper mentions hijab).
 - Couples: when the shopper dresses two people (e.g. "أنا وخطيبتي"), make ONE colour story that coordinates both (same palette or complementary, not identical), and give slots for both. Set "for":"him" for the man's pieces and "for":"her" for the woman's.
@@ -267,7 +304,9 @@ function findCandidates(slot, limit = 4) {
     ' ORDER BY p.featured DESC, p.sold_count DESC LIMIT 150';
   const rows = q.all(sql, params);
   const scored = rows.map((p) => {
-    const nameText = norm(String(p.name_ar || '') + ' ' + String(p.name_en || ''));
+    const colorText = (Array.isArray(p.colors_json) ? p.colors_json : (() => { try { return JSON.parse(p.colors_json || '[]'); } catch { return []; } })())
+      .flatMap((color) => [color.name_ar, color.name_en]).filter(Boolean).join(' ');
+    const nameText = norm(`${p.name_ar || ''} ${p.name_en || ''} ${colorText}`);
     const categoryText = norm(p.cat_text || '');
     const descriptionText = norm(String(p.description_ar || '') + ' ' + String(p.description_en || ''));
     let nameHits = 0; let categoryHits = 0; let descriptionHits = 0; let score = 0;

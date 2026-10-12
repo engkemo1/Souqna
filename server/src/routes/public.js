@@ -14,7 +14,7 @@ import { sameDaySql } from '../lib/sameDay.js';
 import { buyerFromReq } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { searchByImage, visualSettings } from '../lib/visual.js';
-import { runStylist, stylistSettings, lookOfDay, cardsByIds } from '../lib/stylist.js';
+import { runStylist, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
 import { quote } from '../lib/cart.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert, notifyPlatformDelivery } from '../lib/whatsapp.js';
@@ -142,6 +142,20 @@ r.post('/stylist', h(async (req, res) => {
   }
   try { res.json(await runStylist(body.messages, { image: body.image, image2: body.image2, profile })); }
   catch (e) { if (e.code === 'stylist_no_vision') throw new AppError(422, 'stylist_no_vision', 'Photos need the Anthropic provider.'); if (e.code === 'stylist_bad_image') throw new AppError(422, 'stylist_bad_image', 'Unsupported image.'); if (e.code === 'stylist_unavailable') throw new AppError(503, 'stylist_unavailable', 'The stylist is unavailable right now.'); throw e; }
+}));
+
+r.post('/stylist/feedback', h((req, res) => {
+  const body = z.object({
+    rating: z.enum(['good', 'bad']),
+    reason: z.enum(['mismatch', 'color', 'occasion', 'price', 'fit', 'other']).optional(),
+    note: z.string().trim().max(240).optional().default(''),
+    question: z.string().trim().min(1).max(300),
+    reply: z.string().max(500).optional().default(''),
+    items: z.array(z.string().max(120)).max(12).optional().default([]),
+  }).parse(req.body);
+  if (body.rating === 'bad' && !body.reason) throw new AppError(422, 'validation_failed', 'Choose a reason for the feedback.');
+  const item = addStylistFeedback({ ...body, note: body.note.slice(0, 240) });
+  res.status(201).json({ id: item.id });
 }));
 
 r.post('/look-share', h(async (req, res) => {
