@@ -74,7 +74,7 @@ function StylistPanel() {
   const dirty = f.enabled !== data.enabled || f.provider !== data.provider || Number(f.dailyFree) !== data.dailyFree || f.nameAr !== data.name.ar || f.nameEn !== data.name.en;
   const save = async () => {
     setBusy(true);
-    try { await adminApi('/stylist', { method: 'PUT', body: { enabled: f.enabled, provider: f.provider, dailyFree: Number(f.dailyFree) || 0, nameAr: f.nameAr, nameEn: f.nameEn } }); toast({ title: 'اتحفظ' }); setF(null); reload(); }
+    try { const saved = await adminApi('/stylist', { method: 'PUT', body: { enabled: f.enabled, provider: f.provider, dailyFree: Number(f.dailyFree) || 0, nameAr: f.nameAr, nameEn: f.nameEn } }); window.dispatchEvent(new CustomEvent('stylist-settings-updated', { detail: { name: saved.name } })); toast({ title: 'اتحفظ' }); setF(null); reload(); }
     catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy(false);
   };

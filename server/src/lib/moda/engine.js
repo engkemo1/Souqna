@@ -66,7 +66,7 @@ const mergeFromSession = (cur, prev) => {
 
 export async function runModa(messages, opts = {}) {
   const K = loadKnowledge();
-  const { products = [], profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, fetcher } = opts;
+  const { products = [], profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, fetcher, assistantName = null } = opts;
   const text = lastUserText(messages);
   const dow = cairoParts(now).dow;
   const seed = `${text}|${session?.turn || 0}`;
@@ -75,7 +75,7 @@ export async function runModa(messages, opts = {}) {
 
   // ---------- ريست ----------
   if (parsed.followup === 'reset') {
-    const res = respond({ state: 'chat', intent: 'greeting' }, { seed, lang, profile });
+    const res = respond({ state: 'chat', intent: 'greeting' }, { seed, lang, profile, assistantName });
     return { ...res, session: { turn: 1 }, parsed };
   }
 
@@ -118,7 +118,7 @@ export async function runModa(messages, opts = {}) {
 
   const advice = parsed.advice ? K.phrases.advice.items.find((a) => a.id === parsed.advice.id) : null;
   if (parsed.intent !== 'shop') {
-    const res = respond({ state: 'chat', intent: parsed.intent === 'followup' ? 'unknown' : parsed.intent }, { seed, lang, profile, advice });
+    const res = respond({ state: 'chat', intent: parsed.intent === 'followup' ? 'unknown' : parsed.intent }, { seed, lang, profile, advice, assistantName });
     return { ...res, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
   }
 
@@ -132,7 +132,7 @@ export async function runModa(messages, opts = {}) {
   let plan = planOutfit(parsed, excludeIds.length ? rows.filter((p) => !excludeIds.includes(p.id)) : rows, { adv, eventTime, profile, K });
   if (excludeIds.length && plan.state === 'none') plan = planOutfit(parsed, rows, { adv, eventTime, profile, K });
 
-  let res = respond(plan, { seed, lang, profile });
+  let res = respond(plan, { seed, lang, profile, assistantName });
   const g = guardResponse(res, { lang });
   if (!g.ok) res = { ...res, say: pick(K.phrases.ar.fallback_generic, seed), guard: g.problems };
 

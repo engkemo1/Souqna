@@ -1,4 +1,5 @@
 import { useId, useEffect, useRef, useState, lazy, Suspense } from 'react';
+import { useI18n } from '../../lib/i18n.jsx';
 import { MODA_IMG } from './modaImg.js';
 
 const StatesModa = lazy(() => import('./StatesModa.jsx'));
@@ -8,20 +9,21 @@ const StatesModa = lazy(() => import('./StatesModa.jsx'));
  * (real expression frames: blinks and moves her mouth while talking). An image uploaded from the admin replaces it everywhere with a simpler CSS-animated version.
  */
 export default function ModaAvatar({ src, size = 48, talking = false, thinking = false, ring = true, tilt = false, living = false, className = '' }) {
+  const { assistantName } = useI18n();
   if (!src && living && size >= 120) {
     return (
       <span className={className} style={{ display: 'inline-block', width: size, height: size }}>
         <Suspense fallback={<span style={{ display: 'block', width: size, height: size }} />}>
-          <StatesModa size={size} talking={talking} thinking={thinking} />
+          <StatesModa size={size} talking={talking} thinking={thinking} label={assistantName} />
         </Suspense>
       </span>
     );
   }
-  return <PhotoAvatar src={src || MODA_IMG} crop={!src} size={size} talking={talking} thinking={thinking} ring={ring} tilt={tilt} className={className} />;
+  return <PhotoAvatar src={src || MODA_IMG} crop={!src} size={size} talking={talking} thinking={thinking} ring={ring} tilt={tilt} className={className} label={assistantName} />;
 }
 
 /** uploaded 3D render: breathing + sway, 3D tilt that follows the finger/mouse, sound-wave rings while speaking, orbiting dots while thinking */
-function PhotoAvatar({ src, crop, size, talking, thinking, ring, tilt, className }) {
+function PhotoAvatar({ src, crop, size, talking, thinking, ring, tilt, className, label }) {
   const u = useId().replace(/:/g, '');
   const box = useRef(null);
   useEffect(() => {
@@ -56,8 +58,8 @@ function PhotoAvatar({ src, crop, size, talking, thinking, ring, tilt, className
       <span ref={box} style={{ display: 'block', width: '100%', height: '100%', transition: 'transform .25s ease-out', transformStyle: 'preserve-3d' }}>
         <span className={talking ? `p${u}-t` : `p${u}-b`} style={{ display: 'block', width: '100%', height: '100%', borderRadius: '9999px', overflow: 'hidden', background: 'radial-gradient(circle at 30% 22%, #ffd9c2, #ffb08a 55%, #f0743c)', boxShadow: ring ? '0 0 0 2px rgba(255,255,255,.75), 0 6px 18px -6px rgba(240,116,60,.55)' : 'none' }}>
           {crop
-            ? <span role="img" aria-label="Moda" style={{ display: 'block', width: '100%', height: '100%', backgroundImage: `url(${src})`, backgroundSize: '215%', backgroundPosition: '55% 34%', backgroundRepeat: 'no-repeat' }} />
-            : <img src={src} alt="Moda" draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 12%', transform: 'scale(1.08)' }} />}
+            ? <span role="img" aria-label={label} style={{ display: 'block', width: '100%', height: '100%', backgroundImage: `url(${src})`, backgroundSize: '215%', backgroundPosition: '55% 34%', backgroundRepeat: 'no-repeat' }} />
+            : <img src={src} alt={label} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 12%', transform: 'scale(1.08)' }} />}
         </span>
       </span>
     </span>

@@ -14,7 +14,7 @@ const MOUTHS = ['m1', 'm2', 'm3', 'smile', 'm2', 'm1', 'm3'];
 const D = 1254;
 
 /** Moda built from real expression frames: blinks, mouth moves while she talks, gentle sway. No WebGL, just stacked images. */
-export default function StatesModa({ size = 220, talking = false, thinking = false, src = MODA_IMG }) {
+export default function StatesModa({ size = 220, talking = false, thinking = false, src = MODA_IMG, label = 'Moda' }) {
   const [eyes, setEyes] = useState(false);
   const [mouth, setMouth] = useState(null);
   const talkRef = useRef(talking);
@@ -52,7 +52,7 @@ export default function StatesModa({ size = 220, talking = false, thinking = fal
     return <img key={key} src={`/moda/f_${f}.webp`} alt="" draggable={false} style={{ position: 'absolute', left: x * k, top: y * k, width: w * k, height: h * k, opacity: on ? 1 : 0, transition: `opacity ${fade}ms linear`, pointerEvents: 'none' }} />;
   };
   return (
-    <span role="img" aria-label="Moda" style={{ position: 'relative', display: 'inline-block', width: size, height: size, animation: `modaSway${thinking ? 'T' : ''} ${thinking ? 2.4 : 5.2}s ease-in-out infinite`, transformOrigin: '50% 100%' }}>
+    <span role="img" aria-label={label} style={{ position: 'relative', display: 'inline-block', width: size, height: size, animation: `modaSway${thinking ? 'T' : ''} ${thinking ? 2.4 : 5.2}s ease-in-out infinite`, transformOrigin: '50% 100%' }}>
       <style>{`
         @keyframes modaSway{0%,100%{transform:rotate(-.8deg) scale(1)}50%{transform:rotate(.8deg) scale(1.015) translateY(-.6%)}}
         @keyframes modaSwayT{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(-1deg) translateY(-.6%)}}

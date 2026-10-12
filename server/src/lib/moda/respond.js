@@ -35,11 +35,12 @@ const itemCard = (K, pk) => {
 };
 
 /** بيحوّل plan → رد. opts: { seed, lang } */
-export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = null } = {}) {
+export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = null, assistantName = null } = {}) {
   const K = loadKnowledge();
   const L = lang === 'en' ? 'en' : 'ar';
   const P = { ...K.phrases.ar, ...(L === 'en' ? K.phrases.en : {}) };
-  const say = (key, vars = {}) => fill(pick(P[key], `${seed}:${key}`), vars);
+  const name = typeof assistantName === 'string' ? assistantName : assistantName?.[L];
+  const say = (key, vars = {}) => fill(pick(P[key], `${seed}:${key}`), { name: name || (L === 'en' ? 'Moda' : 'مودة'), ...vars });
 
   // ---------- محادثة ----------
   if (plan.state === 'chat') {

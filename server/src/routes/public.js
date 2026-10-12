@@ -184,7 +184,7 @@ r.post('/stylist', h(async (req, res) => {
     if (body.image || body.image2) return res.json(await runStylist(body.messages, { image: body.image, image2: body.image2, profile, session: body.session, answers: body.answers }));
     const modaProfile = { ...(profile || {}) };
     const rows = modaCatalogRows();
-    const result = await runModa(body.messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers });
+    const result = await runModa(body.messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name });
     return res.json(modaClientResponse(result));
   }
   catch (e) { if (e.code === 'stylist_no_vision') throw new AppError(422, 'stylist_no_vision', 'Photos need the Anthropic provider.'); if (e.code === 'stylist_bad_image') throw new AppError(422, 'stylist_bad_image', 'Unsupported image.'); if (e.code === 'stylist_unavailable') throw new AppError(503, 'stylist_unavailable', 'The stylist is unavailable right now.'); throw e; }

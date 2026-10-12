@@ -3,7 +3,7 @@
  "version": 1,
  "ar": {
   "greeting": [
-   "أهلاً بيك! أنا مودة، مستايلستك الشخصية. قولي رايح فين أو عايز تلبس إيه وأنا أظبطلك.",
+   "أهلاً بيك! أنا {name}، مستايلستك الشخصية. قولي رايح فين أو عايز تلبس إيه وأنا أظبطلك.",
    "يا أهلاً! احكيلي عن المناسبة أو القطعة اللي بتدور عليها وأرشحلك من محلات بنها.",
    "نورت! عايز لبس لمناسبة معينة ولا بتدور على قطعة؟"
   ],
@@ -180,7 +180,7 @@
  },
  "en": {
   "greeting": [
-   "Hi! I'm Moda, your personal stylist. Tell me the occasion or the piece you're after and I'll put a look together from Banha stores."
+   "Hi! I'm {name}, your personal stylist. Tell me the occasion or the piece you're after and I'll put a look together from Banha stores."
   ],
   "intro_full": [
    "Here's a complete look for {occasion} in {palette}."

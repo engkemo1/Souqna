@@ -8,14 +8,13 @@ import { cx } from '../ui/cx.js';
 
 /** Home-page card: today's complete looks for different audiences and ages. */
 export default function LookOfDay() {
-  const { t, lang } = useI18n();
+  const { t, lang, assistantName: name } = useI18n();
   const { data } = useApi('/look-of-day');
   const { data: feat } = useApi('/marketplace?q=&category=all&sort=featured');
   const [tab, setTab] = useState(0);
   const entries = data?.entries || [];
   if (!entries.length) return null;
   const e = entries[Math.min(tab, entries.length - 1)];
-  const name = feat?.features?.stylistName?.[lang] || feat?.features?.stylistName?.ar || t('stylist.defaultName');
   const avatar = feat?.features?.stylistAvatar || null;
   const tabName = (entry) => `${t(`lod.audience.${entry.audience || (entry.persona === 'her' ? 'women' : 'men')}`)}${entry.age ? ` · ${entry.age}` : ''}`;
   return (

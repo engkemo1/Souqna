@@ -55,11 +55,10 @@ function ModaFeedback({ question, reply, items, productIds, t, onRated }) {
 
 /** Floating shopping assistant: chat in text or voice, answers come with real products from Banha stores. */
 export default function StylistChat() {
-  const { t, tr, lang } = useI18n();
+  const { t, tr, lang, assistantName: name } = useI18n();
   const { buyer } = useBuyer();
   const { data: feat } = useApi('/marketplace?q=&category=all&sort=featured');
   const avatar = feat?.features?.stylistAvatar || null;
-  const name = feat?.features?.stylistName?.[lang] || feat?.features?.stylistName?.ar || t('stylist.defaultName');
   const [open, setOpen] = useState(false);
   const [msgs, setMsgs] = useState([]);
   const [text, setText] = useState('');
@@ -203,7 +202,7 @@ export default function StylistChat() {
       {!open && (
         <button type="button" onClick={() => setOpen(true)} aria-label={t('stylist.open', { n: name })}
           className="fixed bottom-4 end-4 z-40 inline-flex h-14 items-center gap-2.5 rounded-full bg-btn ps-1.5 pe-5 text-[15px] font-bold text-on-btn shadow-lift transition hover:brightness-105 active:scale-95 sm:bottom-6 sm:end-6">
-          <ModaAvatar src={avatar} size={44} ring={false} /><span>{t('stylist.open')}</span>
+          <ModaAvatar src={avatar} size={44} ring={false} /><span>{t('stylist.open', { n: name })}</span>
         </button>
       )}
       {open && (
@@ -240,7 +239,7 @@ export default function StylistChat() {
                 <div>
                   <div className="mb-4 grid place-items-center"><ModaAvatar src={avatar} size={128} thinking={busy} tilt living /></div>
                   <div className="flex items-end gap-2"><div className="max-w-[95%] rounded-2xl rounded-ss-sm bg-secondary px-4 py-3 text-[15px] leading-relaxed">{t('stylist.hello', { n: name })}</div></div>
-                  <p className="mt-4 text-xs font-semibold text-muted">{t('stylist.tryAsking')}</p>
+                  <p className="mt-4 text-xs font-semibold text-muted">{t('stylist.tryAsking', { n: name })}</p>
                   <div className="mt-2 flex flex-wrap gap-2">{chips.map((c) => <button key={c} type="button" onClick={() => send(c)} className="rounded-2xl border border-line-strong bg-elevated px-3.5 py-2.5 text-start text-[13px] font-medium leading-relaxed transition hover:border-brand hover:bg-brand/5">{c}</button>)}</div>
                   {!buyer && <p className="mt-5 text-center text-xs text-muted"><Link to="/account" onClick={() => setOpen(false)} className="font-semibold text-brand underline">{t('stylist.signInForHistory')}</Link></p>}
                 </div>

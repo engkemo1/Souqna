@@ -111,7 +111,7 @@ export async function runModaLabScenario({ message, expectedGarment = '', expect
   const text = String(message || '').trim().slice(0, 400);
   const rows = modaCatalogue();
   const out = await runModa([{ role: 'user', content: text }], {
-    products: rows, weatherMock: { temp_c: 21, feels_like_c: 21, rain_pct: 2 },
+    products: rows, weatherMock: { temp_c: 21, feels_like_c: 21, rain_pct: 2 }, assistantName: stylistSettings().name,
   });
   const parsed = out.parsed || {};
   const selected = (out.blocks?.tabs || []).flatMap((tab) => (tab.items || []).map((item) => ({
@@ -423,12 +423,12 @@ function modaCatalogue() {
 export const modaEngineEnabled = () => (process.env.STYLIST_ENGINE || 'moda') !== 'legacy';
 
 /** يرجّع نفس شكل الرد القديم + الحقول الجديدة (state, tabs, questions, session). */
-export async function runModaStylist(messages, { profile, session, answers, imageText = '' } = {}) {
+export async function runModaStylist(messages, { profile, session, answers, imageText = '', assistantName = stylistSettings().name } = {}) {
   const history = messages.slice(-8).map((m) => ({ role: m.role === 'assistant' ? 'assistant' : 'user', content: String(m.content).slice(0, 600) }));
   const rows = modaCatalogue();
   // احتياطي مجاني: لو القواعد مافهمتش الرسالة، Cloudflare بيستخرج (شخص/مناسبة/قطعة) من قاموس محدد بس
   const llmExtract = providerReady.cloudflare() ? makeLlmExtract(async (system, msgs) => parseJson(await callLlm('cloudflare', system, msgs))) : null;
-  const out = await runModa(history, { products: rows, profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract });
+  const out = await runModa(history, { products: rows, profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract, assistantName });
   const ids = [...new Set((out.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.id)))];
   const byId = new Map(rows.filter((r) => ids.includes(r.id)).map((r) => [r.id, r]));
   const rowList = ids.map((id) => byId.get(id)).filter(Boolean);
@@ -458,7 +458,7 @@ export async function runStylist(messages, { image, image2, profile, session, an
         if (!m) throw Object.assign(new Error('badimg'), { code: 'stylist_bad_image' });
         imageText = await describePhotoCf(Buffer.from(m[2], 'base64'));
       }
-      return await runModaStylist(messages, { profile, session, answers, imageText });
+      return await runModaStylist(messages, { profile, session, answers, imageText, assistantName: name });
     } catch (e) {
       if (e.code === 'stylist_bad_image') throw e;
       console.error('[moda-v2] falling back to legacy:', String(e.message).slice(0, 200));

@@ -80,6 +80,16 @@ test('shoe slang never gets confused with jackets', () => {
   assert.deepEqual(parseMessage('جاكيت').garments.map((g) => g.key), ['jacket']);
 });
 
+test('assistant display name is used in Arabic and English greeting replies', () => {
+  const assistantName = { ar: 'ليلى', en: 'Laila' };
+  const arabic = Array.from({ length: 20 }, (_, i) => respond({ state: 'chat', intent: 'greeting' }, { seed: `name-ar-${i}`, lang: 'ar', assistantName }).say);
+  const english = respond({ state: 'chat', intent: 'greeting' }, { seed: 'name-en', lang: 'en', assistantName }).say;
+  assert.ok(arabic.some((say) => /أنا ليلى/.test(say)));
+  assert.ok(arabic.every((say) => !/مودة/.test(say)));
+  assert.match(english, /I'm Laila/);
+  assert.doesNotMatch(english, /Moda/);
+});
+
 test('Moda uses local product ratings to change future rankings', async () => {
   const products = enrichAll([
     { id: 1001, name_ar: 'كوتشي رياضي حريمي', department: 'women', price: 500, stock: 5, track_stock: 1, sold_count: 0, rating: 0 },
