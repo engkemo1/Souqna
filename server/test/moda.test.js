@@ -92,19 +92,21 @@ test('Moda uses local product ratings to change future rankings', async () => {
   assert.notEqual(rated.blocks.tabs[0].items[0].id, firstId);
 });
 
-test('partial couple reply explains unavailable outfit without showing a zero total', () => {
+test('partial couple reply clearly separates available items and hides zero totals', () => {
   const reply = respond({
     state: 'partial', intent: 'shop', persons: ['men', 'women'], context: 'engagement_guest',
     people: [
       { aud: 'men', look: null, picks: [{ slotKey: 'shirt', product: { id: 1, key: 'shirt', name_ar: 'قميص', price: 609, colorKeys: [] }, optional: false }], missing: [], subtotal: 609 },
-      { aud: 'women', look: null, picks: [], missing: [{ base: 'heels_low' }], subtotal: 0 },
+      { aud: 'women', look: null, picks: [{ slotKey: 'heels_low', product: { id: 2, key: 'heels_low', name_ar: 'كعب واطي', price: 0, colorKeys: [] }, optional: false }], missing: [{ base: 'clutch' }], subtotal: 0 },
     ],
     total: 609, budget: null, over: 0, dropped: [], missing: [{ base: 'heels_low' }], relaxed: [], palette: [], ask: [],
     weather: { temp: 23, fabrics_ar: ['قطن', 'كريب'], band: 'warm', notes: [] }, eventTime: {},
   });
-  assert.match(reply.say, /ملقتش قطع مناسبة ليها دلوقتي/);
-  assert.match(reply.say, /23 درجة/);
-  assert.doesNotMatch(reply.say, /0 جنيه/);
+  assert.match(reply.say, /لقيتلكم شوية قطع مناسبة/);
+  assert.match(reply.say, /المتاح حاليًا ليك 609 جنيه/);
+  assert.doesNotMatch(reply.say, /ليها:? 0 جنيه|والاتنين/);
+  assert.doesNotMatch(reply.say, /23/);
+  assert.ok(reply.tips.some((tip) => /23 درجة/.test(tip)));
 });
 
 test('answer buttons continue the previous request', async () => {

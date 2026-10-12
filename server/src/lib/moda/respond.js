@@ -86,17 +86,22 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   }
 
   // ---------- الإجمالي ----------
-  const subtotals = plan.people.map((p) => p.subtotal);
   if (plan.state !== 'none' && plan.state !== 'over_budget') {
     if (couple) {
       const him = plan.people.find((p) => p.aud === 'men');
       const her = plan.people.find((p) => p.aud !== 'men');
-      if (!him?.picks.length && her?.picks.length) parts.push(say('total_line_couple_her_only', { her: nf(her.subtotal) }));
-      else if (him?.picks.length && !her?.picks.length) parts.push(say('total_line_couple_him_only', { him: nf(him.subtotal) }));
-      else if (him?.picks.length && her?.picks.length) parts.push(say('total_line_couple', { him: nf(him.subtotal), her: nf(her.subtotal), total: nf(plan.total) }));
-    }
-    else parts.push(say('total_line', { total: nf(plan.total) }));
-    if (plan.budget && plan.total <= plan.budget) parts.push(say('within_budget', { budget: nf(plan.budget) }));
+      const himHasPrice = Number(him?.subtotal) > 0;
+      const herHasPrice = Number(her?.subtotal) > 0;
+      if (plan.state === 'partial' && (himHasPrice || herHasPrice)) {
+        parts.push(say('total_line_couple_partial', {
+          available: [himHasPrice ? `ليك ${nf(him.subtotal)} جنيه` : '', herHasPrice ? `ليها ${nf(her.subtotal)} جنيه` : ''].filter(Boolean).join('، '),
+          total: nf(plan.total),
+        }));
+      } else if (!himHasPrice && herHasPrice) parts.push(say('total_line_couple_her_only', { her: nf(her.subtotal) }));
+      else if (himHasPrice && !herHasPrice) parts.push(say('total_line_couple_him_only', { him: nf(him.subtotal) }));
+      else if (himHasPrice && herHasPrice) parts.push(say('total_line_couple', { him: nf(him.subtotal), her: nf(her.subtotal), total: nf(plan.total) }));
+    } else if (Number(plan.total) > 0) parts.push(say('total_line', { total: nf(plan.total) }));
+    if (plan.budget && plan.total <= plan.budget && Number(plan.total) > 0) parts.push(say('within_budget', { budget: nf(plan.budget) }));
   } else if (plan.state === 'over_budget') {
     parts.push(say('total_line', { total: nf(plan.total) }), say('over_hint'));
   }
@@ -108,7 +113,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   const tips = [];
   const adv = plan.weather;
   if (!condolence && adv) {
-    if (adv.fabrics_ar?.length) parts.push(say('weather_line', { temp: adv.temp, fabrics: joinAr(adv.fabrics_ar.slice(0, 2)) }));
+    if (adv.fabrics_ar?.length) tips.push(say('weather_line', { temp: adv.temp, fabrics: joinAr(adv.fabrics_ar.slice(0, 2)) }));
     if ((adv.band === 'cool' || adv.band === 'cold') && plan.eventTime?.isNight) tips.push(say('weather_layer', { layers: adv.layers === 1 ? 'جاكيت أو شال خفيف' : 'جاكيت تقيل' }));
     if (adv.notes?.includes('rain')) tips.push(say('weather_rain'));
     if (adv.approximate && (plan.eventTime?.daysAhead || 0) > 0) tips.push(say('weather_approx'));
