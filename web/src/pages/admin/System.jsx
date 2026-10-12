@@ -26,20 +26,17 @@ function VisualPanel() {
   };
   const idx = data.indexed || {};
   const P = data.providers || {};
+  const jinaReady = Boolean(P.jina?.configured);
   const OPTS = [
-    ['color', 'عادي (مجاني وخفيف)', 'بيقارن الألوان والشكل العام. من غير أي مصاريف أو مفاتيح.', ''],
-    ['clip', 'CLIP على السيرفر (أدق)', 'بيفهم نوع القطعة والموديل. محتاج حوالي 600 ميجا RAM على Railway، يعني تكلفة زيادة.', ''],
-    ['jina', 'CLIP كخدمة (Jina)', 'نفس دقة CLIP من غير ذاكرة على السيرفر. بيتحاسب بالاستخدام (فيه باقة مجانية).', 'JINA_API_KEY'],
-    ['cloudflare', 'وصف بالذكاء على Cloudflare', 'Cloudflare بيوصف الصورة وبيقارن الوصف. من غير ذاكرة، ودقته أقل من CLIP.', 'CF_AI_TOKEN'],
+    ['color', 'مقارنة الألوان والشكل', 'مجاني وبيخلي الصور داخل سيرفر بنها. مناسب للألوان والتشابه العام، لكنه مش بيفهم نوع القطعة بدقة.', true],
+    ['jina', 'فهم بصري ذكي (Jina)', 'يقارن الصورة بمعناها البصري، وده الاختيار الأفضل لتقليل نتائج الملابس غير المشابهة. يحتاج مفتاح Jina.', jinaReady],
   ];
-  const Opt = ({ id, title, body, need }) => {
-    const miss = need && !P[id]?.configured;
+  const Opt = ({ id, title, body, available }) => {
     return (
-      <button type="button" onClick={() => setF({ ...f, model: id })} aria-pressed={f.model === id}
-        className={`rounded-xl border p-3 text-start transition ${f.model === id ? 'border-fg bg-secondary' : 'border-line-strong hover:border-fg'}`}>
+      <button type="button" disabled={!available} onClick={() => setF({ ...f, model: id })} aria-pressed={f.model === id}
+        className={`rounded-xl border p-3 text-start transition disabled:cursor-not-allowed disabled:opacity-60 ${f.model === id ? 'border-fg bg-secondary' : 'border-line-strong hover:border-fg'}`}>
         <p className="font-semibold">{title}</p><p className="mt-0.5 text-[12.5px] text-muted">{body}</p>
-        {miss && <p className="mt-1.5 text-[12px] font-medium text-sale">محتاج متغير <span dir="ltr">{need}</span> في Railway{id === 'cloudflare' ? ' (و CF_ACCOUNT_ID)' : ''}</p>}
-        {!miss && P[id]?.failed && <p className="mt-1.5 text-[12px] font-medium text-sale" dir="auto">فشل آخر مرة: {P[id].lastError || 'خطأ'} — شغّال بالعادي مؤقتًا</p>}
+        {id === 'jina' && !available && <p className="mt-1.5 text-[12px] font-medium text-sale">أضف <span dir="ltr">JINA_API_KEY</span> في Railway لتفعيل الاختيار.</p>}
       </button>
     );
   };
@@ -49,16 +46,16 @@ function VisualPanel() {
         <Switch checked={f.enabled} onChange={(v) => setF({ ...f, enabled: v })} label="تفعيل البحث بالصورة للزباين" description="لو اتقفل، الزرار بيختفي من الموقع والبحث بيتوقف." />
         <div>
           <p className="mb-2 text-sm font-medium">نوع التحليل</p>
-          <div className="grid gap-2 sm:grid-cols-2">{OPTS.map(([id, title, body, need]) => <Opt key={id} id={id} title={title} body={body} need={need} />)}</div>
-          <p className="mt-2 text-[12.5px] text-muted">لو الخيار المختار مش متظبط أو وقع، الموقع بيشتغل بالعادي لوحده وبيحاول تاني بعد 10 دقايق. بعد تغيير النوع، المنتجات بتتفهرس من جديد في الخلفية.</p>
+          <div className="grid gap-2 sm:grid-cols-2">{OPTS.map(([id, title, body, available]) => <Opt key={id} id={id} title={title} body={body} available={available} />)}</div>
+          <p className="mt-2 text-[12.5px] text-muted">اختيار Jina يرسل صور المنتجات وصور البحث إلى خدمة Jina لتحليلها، وتُعاد فهرسة صور المنتجات على دفعات في الخلفية. لن يتم إرسال الصور عند اختيار مقارنة الألوان. راجع سياسة الخصوصية قبل تشغيل الخدمة.</p>
         </div>
         <label className="block max-w-xs"><span className="mb-1.5 block text-sm font-medium">عمليات بحث مجانية لكل زائر في اليوم</span>
           <Input type="number" dir="ltr" min={0} max={1000} value={f.dailyFree} onChange={(e) => setF({ ...f, dailyFree: e.target.value })} className="text-start" />
           <span className="mt-1 block text-[12px] text-muted">0 = من غير حد. ده الأساس لو حبينا نعمل باقة مدفوعة بعدين.</span></label>
         <div className="flex flex-wrap items-center gap-3"><Button onClick={save} loading={busy} disabled={!dirty}>حفظ</Button>{dirty && <span className="text-[13px] text-muted">في تغييرات لسه ما اتحفظتش</span>}</div>
         <dl className="grid gap-2 border-t border-line pt-4 text-sm sm:grid-cols-2">
-          {[['متفهرس (عادي)', idx['color-v1'] || 0], ['متفهرس (CLIP سيرفر)', idx['clip-b32'] || 0], ['متفهرس (Jina)', idx['jina-clip-v2'] || 0], ['متفهرس (Cloudflare)', idx['cf-llava-bge'] || 0],
-            ['منتجات في انتظار الفهرسة', data.pending], ['الذاكرة المستخدمة حاليًا', `${data.rssMb} MB`], ['CLIP على السيرفر', P.clip?.failed ? 'فشل التحميل' : P.clip?.loaded ? 'محمّل وشغال' : 'غير محمّل']].map(([k, v]) => (
+          {[['مفهرس بمقارنة الألوان', idx['color-v1'] || 0], ['مفهرس بالتحليل الذكي', idx['jina-embeddings-v5-omni-nano'] || 0], ['منتجات تنتظر الفهرسة', data.pending || 0], ['إجمالي المنتجات النشطة', data.total],
+            ['حالة مفتاح Jina', jinaReady ? 'متصل' : 'غير مضاف']].map(([k, v]) => (
             <div key={k} className="flex justify-between gap-3"><dt className="text-muted">{k}</dt><dd className="font-medium" dir="auto">{v}</dd></div>
           ))}
         </dl>

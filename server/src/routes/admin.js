@@ -12,7 +12,7 @@ import { h, AppError } from '../lib/errors.js';
 import { listDepartments, assertDepartments } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
-import { visualStatus, saveVisualSettings } from '../lib/visual.js';
+import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
 import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario } from '../lib/stylist.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
@@ -434,8 +434,10 @@ r.put('/look-of-day', h((req, res) => {
 /* ---- visual search settings (on/off, model, free daily quota) ---- */
 r.get('/visual', h((_req, res) => res.json(visualStatus())));
 r.put('/visual', h((req, res) => {
-  const body = z.object({ enabled: z.boolean().optional(), model: z.enum(['color', 'clip', 'jina', 'cloudflare']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional() }).parse(req.body);
+  const body = z.object({ enabled: z.boolean().optional(), model: z.enum(['color', 'jina']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional() }).parse(req.body);
+  if (body.model === 'jina' && !process.env.JINA_API_KEY) throw new AppError(422, 'jina_key_required', 'أضف مفتاح JINA_API_KEY في Railway أولًا.');
   saveVisualSettings(body);
+  if (body.model) triggerReindex(1000);
   res.json(visualStatus());
 }));
 

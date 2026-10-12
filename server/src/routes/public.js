@@ -13,7 +13,7 @@ import { mediaMap, processImage } from '../lib/media.js';
 import { sameDaySql } from '../lib/sameDay.js';
 import { buyerFromReq } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
-import { searchByImage, visualSettings } from '../lib/visual.js';
+import { searchByImage, visualSettings, VisualProviderError } from '../lib/visual.js';
 import { runStylist, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
 import { runModa } from '../lib/moda/engine.js';
 import { quote } from '../lib/cart.js';
@@ -109,11 +109,15 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
   if (recent.length >= 120 || recent.filter((t) => now - t < 3600e3).length >= 40) throw new AppError(429, 'rate_limited', 'Too many searches, try again later.');
   // free daily quota per visitor (0 = unlimited). Admin → النظام → البحث بالصورة.
   if (vs.dailyFree && recent.filter((t) => t > new Date().setHours(0, 0, 0, 0)).length >= vs.dailyFree) throw new AppError(429, 'visual_quota', 'Daily free searches used up.');
-  hits.set(ip, [...recent, now]);
   if (!req.file) throw new AppError(422, 'validation_failed', 'Pick a photo.', { file: 'required' });
+  hits.set(ip, [...recent, now]);
   const department = String(req.body?.department || '').replace(/[^a-z0-9_]/g, '');
   let top;
-  try { top = await searchByImage(req.file.buffer, { department, limit: 24 }); } catch { throw new AppError(400, 'invalid_image', 'This file is not a supported image.'); }
+  try { top = await searchByImage(req.file.buffer, { department, limit: 24 }); }
+  catch (e) {
+    if (e instanceof VisualProviderError) throw new AppError(e.status, e.code, e.message);
+    throw new AppError(422, 'invalid_image', 'This file is not a supported image.');
+  }
   if (!top.length) return res.json({ items: [], total: 0 });
   const rows = q.all(
     `SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id WHERE p.id IN (${top.map(() => '?').join(',')})`, top.map((t) => t.id));

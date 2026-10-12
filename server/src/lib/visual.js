@@ -1,14 +1,12 @@
 /**
  * Visual search ("صوّرها ولاقيها في بنها").
  * Each product's primary photo is turned into a small vector; a customer's photo is turned into the same kind of
- * vector and compared (cosine similarity) with every active product. Nothing leaves the server and it costs nothing.
+ * vector and compared (cosine similarity) with active products. The built-in colour model keeps images local;
+ * the optional Jina model sends resized image data to Jina only when explicitly selected.
  *
  * Embedder 'color-v1' (built in, no model download): a weighted colour/layout fingerprint — finds items that look alike
- * in colour, tone and shape. A neural embedder (CLIP) can be plugged in later by adding another `EMBEDDERS` entry;
- * vectors from a different model are never mixed, they are re-indexed in the background.
+ * in colour, tone and shape. Model vectors are never mixed; changing models re-indexes products in the background.
  */
-import os from 'node:os';
-import path from 'node:path';
 import sharp from 'sharp';
 import { q } from '../db/index.js';
 import { readMediaFile } from './media.js';
@@ -22,7 +20,9 @@ export function visualSettings() {
   const m = { ...DEF, ...Object.fromEntries(q.all("SELECT key, value FROM app_settings WHERE key LIKE 'visual_%'").map((r) => [r.key, r.value])) };
   return {
     enabled: m.visual_enabled === '1',
-    model: m.visual_model || 'color',
+    // Older admin builds exposed a nonfunctional Jina option. Require the new explicit setting save
+    // (which also shows the data-transfer notice) before sending any images to the hosted API.
+    model: m.visual_model === 'jina' && m.visual_jina_consent === '1' ? 'jina' : 'color',
     dailyFree: Math.max(0, Number(m.visual_daily) || 0),
   };
 }
@@ -30,16 +30,24 @@ export function visualSettings() {
 export function saveVisualSettings({ enabled, model, dailyFree }) {
   const put = (k, v) => q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [k, String(v)]);
   if (enabled !== undefined) put('visual_enabled', enabled ? '1' : '0');
-  if (model) put('visual_model', model);
+  if (model) {
+    put('visual_model', model);
+    put('visual_jina_consent', model === 'jina' ? '1' : '0');
+  }
   if (dailyFree !== undefined) put('visual_daily', Math.max(0, Math.min(1000, Math.floor(dailyFree))));
   return visualSettings();
 }
 
 export function visualStatus() {
   const s = visualSettings();
-  const indexed = (q.get('SELECT COUNT(*) AS c FROM product_vectors')?.c) || 0;
+  const indexed = q.all('SELECT model, COUNT(*) AS c FROM product_vectors GROUP BY model').reduce((o, r) => ({ ...o, [r.model]: r.c }), {});
   const total = (q.get("SELECT COUNT(*) AS c FROM products WHERE status='active'")?.c) || 0;
-  return { ...s, indexed, total };
+  const model = s.model === 'jina' ? JINA_MODEL : 'color-v1';
+  const pending = q.get(`SELECT COUNT(*) AS c FROM products p
+    JOIN product_media pm ON pm.product_id=p.id AND pm.is_primary=1
+    LEFT JOIN product_vectors v ON v.product_id=p.id
+    WHERE p.status='active' AND (v.product_id IS NULL OR v.media_id!=pm.media_id OR v.model!=?)`, [model])?.c || 0;
+  return { ...s, indexed, total, pending, providers: { jina: { configured: Boolean(process.env.JINA_API_KEY) } } };
 }
 
 /** weight cells near the centre more (the garment), ignore the borders (background / blurred padding) */
@@ -72,44 +80,34 @@ async function colorEmbed(buffer) {
   return out;
 }
 
-/* ---------------- CLIP (neural) — enabled with VISUAL_MODEL=clip; falls back to colour-v1 if it cannot load ---------------- */
-const CLIP_ID = 'Xenova/clip-vit-base-patch32';
-let clipPromise = null, clipFailed = false, clipQueue = Promise.resolve();
-async function loadClip() {
-  if (!clipPromise) {
-    clipPromise = (async () => {
-      const tf = await import('@huggingface/transformers');
-      tf.env.cacheDir = process.env.MODEL_CACHE_DIR || path.join(os.tmpdir(), 'banha-models');
-      tf.env.allowLocalModels = false;
-      const [processor, model] = await Promise.all([
-        tf.AutoProcessor.from_pretrained(CLIP_ID),
-        tf.CLIPVisionModelWithProjection.from_pretrained(CLIP_ID, { dtype: 'q8' }),
-      ]);
-      console.log('[visual] CLIP model ready');
-      return { tf, processor, model };
-    })();
-    clipPromise.catch(() => { });
-  }
-  return clipPromise;
+const JINA_MODEL = 'jina-embeddings-v5-omni-nano';
+class VisualProviderError extends Error { constructor(message, status = 503) { super(message); this.status = status; this.code = 'visual_provider_unavailable'; } }
+async function jinaEmbed(buffer) {
+  if (!process.env.JINA_API_KEY) throw new VisualProviderError('Jina image search is selected but JINA_API_KEY is not configured.');
+  const image = await sharp(buffer).rotate().resize(600, 600, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
+  try {
+    const response = await fetch('https://api.jina.ai/v1/embeddings', {
+      method: 'POST', signal: controller.signal,
+      headers: { Authorization: `Bearer ${process.env.JINA_API_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: JINA_MODEL, input: [{ image: `data:image/jpeg;base64,${image.toString('base64')}` }] }),
+    });
+    if (!response.ok) throw new VisualProviderError(`Jina embedding request failed (${response.status}).`, response.status === 429 ? 503 : 502);
+    const embedding = (await response.json())?.data?.[0]?.embedding;
+    if (!Array.isArray(embedding) || !embedding.length || embedding.some((v) => !Number.isFinite(v))) throw new VisualProviderError('Jina returned an invalid image embedding.', 502);
+    return embedding;
+  } catch (e) {
+    if (e instanceof VisualProviderError) throw e;
+    throw new VisualProviderError(e.name === 'AbortError' ? 'Jina image search timed out.' : 'Could not reach Jina image search.');
+  } finally { clearTimeout(timeout); }
 }
-async function clipEmbed(buffer) {
-  const { tf, processor, model } = await loadClip();
-  // one image at a time keeps memory flat on a small server
-  const run = clipQueue.then(async () => {
-    const img = await tf.RawImage.fromBlob(new Blob([await sharp(buffer).rotate().resize(448, 448, { fit: 'inside' }).jpeg({ quality: 90 }).toBuffer()], { type: 'image/jpeg' }));
-    const { image_embeds } = await model(await processor(img));
-    return Array.from(image_embeds.data);
-  });
-  clipQueue = run.catch(() => { });
-  return run;
-}
-
-const EMBEDDERS = { 'color-v1': colorEmbed, 'clip-b32': clipEmbed };
-const WANT_CLIP = String(process.env.VISUAL_MODEL || '').toLowerCase() === 'clip';
-/** The model new vectors are made with right now (CLIP when enabled and loadable, otherwise the built-in colour model). */
+const EMBEDDERS = { 'color-v1': colorEmbed, [JINA_MODEL]: jinaEmbed };
+/** Admin-selected model. Never silently mix or fall back between incompatible vector spaces. */
 export async function activeModel() {
-  if (WANT_CLIP && !clipFailed) {
-    try { await loadClip(); return 'clip-b32'; } catch (e) { clipFailed = true; console.error('[visual] CLIP unavailable, using colour model:', e.message); }
+  if (visualSettings().model === 'jina') {
+    if (!process.env.JINA_API_KEY) throw new VisualProviderError('Jina image search is selected but its API key is not configured.');
+    return JINA_MODEL;
   }
   return 'color-v1';
 }
@@ -121,14 +119,14 @@ function normalise(v) {
 export async function embedImage(buffer, model) {
   const m = model || await activeModel();
   try { return { model: m, vec: normalise(await EMBEDDERS[m](buffer)) }; }
-  catch (e) { if (m === 'color-v1') throw e; clipFailed = true; console.error('[visual] CLIP failed, using colour model:', e.message); return { model: 'color-v1', vec: normalise(await colorEmbed(buffer)) }; }
+  catch (e) { if (e instanceof VisualProviderError) throw e; throw new VisualProviderError('Could not analyze this image.', 422); }
 }
 const toBlob = (f32) => Buffer.from(f32.buffer, f32.byteOffset, f32.byteLength);
 const fromBlob = (b) => new Float32Array(b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength));
 const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
 
 /** Index products whose primary photo has no vector for the active model yet (or whose photo changed). */
-export async function reindexPending(limit = 200) {
+export async function reindexPending(limit = 20) {
   const ACTIVE_MODEL = await activeModel();
   const rows = q.all(
     `SELECT p.id AS product_id, m.* FROM products p
@@ -157,7 +155,7 @@ export function triggerReindex(delay = 4000) {
   timer = setTimeout(async () => {
     if (running) return triggerReindex(10000);
     running = true;
-    try { let r; do { r = await reindexPending(100); } while (r.remaining); } catch (e) { console.error('[visual]', e.message); }
+    try { const r = await reindexPending(20); if (r.remaining) triggerReindex(60_000); } catch (e) { console.error('[visual]', e.message); }
     running = false;
   }, delay);
   timer.unref?.();
@@ -176,3 +174,5 @@ export async function searchByImage(buffer, { department = '', limit = 24 } = {}
     department ? [model, department] : [model]);
   return rows.map((r) => ({ id: r.product_id, score: dot(qv, fromBlob(r.vec)) })).sort((a, b) => b.score - a.score).slice(0, limit);
 }
+
+export { VisualProviderError };
