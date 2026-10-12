@@ -13,7 +13,7 @@ import { mediaMap, processImage } from '../lib/media.js';
 import { sameDaySql } from '../lib/sameDay.js';
 import { buyerFromReq } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
-import { searchByImage, visualSettings, VisualProviderError } from '../lib/visual.js';
+import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
 import { runStylist, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
 import { runModa } from '../lib/moda/engine.js';
 import { quote } from '../lib/cart.js';
@@ -101,6 +101,8 @@ r.get('/search', h((req, res) => {
 /* ---------------------------------------------------------- visual search: "snap it, find it in Banha" */
 const photoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
 const hits = new Map(); // ip -> [timestamps] (simple per-IP limit: 40 photos / hour)
+r.get('/visual-search/types', h((_req, res) => res.json({ types: visualTypeOptions() })));
+
 r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
   const vs = visualSettings();
   if (!vs.enabled) throw new AppError(503, 'visual_disabled', 'Visual search is switched off.');
@@ -112,8 +114,10 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
   if (!req.file) throw new AppError(422, 'validation_failed', 'Pick a photo.', { file: 'required' });
   hits.set(ip, [...recent, now]);
   const department = String(req.body?.department || '').replace(/[^a-z0-9_]/g, '');
+  const type = String(req.body?.type || '').replace(/[^a-z0-9_]/g, '');
+  if (!visualTypeOptions().some((item) => item.key === type)) throw new AppError(422, 'visual_type_required', 'Choose what kind of item you want to find.');
   let top;
-  try { top = await searchByImage(req.file.buffer, { department, limit: 24 }); }
+  try { top = await searchByImage(req.file.buffer, { department, type, limit: 24 }); }
   catch (e) {
     if (e instanceof VisualProviderError) throw new AppError(e.status, e.code, e.message);
     throw new AppError(422, 'invalid_image', 'This file is not a supported image.');
@@ -123,7 +127,8 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
     `SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id WHERE p.id IN (${top.map(() => '?').join(',')})`, top.map((t) => t.id));
   const byId = new Map(rows.map((x) => [x.id, x]));
   const ordered = top.map((t) => byId.get(t.id)).filter(Boolean);
-  const items = serializeCards(ordered).map((c, i) => ({ ...c, store: { slug: ordered[i].store_slug, name: bi(ordered[i], 'store_name') }, match: Math.round(Math.max(0, Math.min(1, top[i].score)) * 100) }));
+  // Cosine scores rank candidates; they are not calibrated match probabilities.
+  const items = serializeCards(ordered).map((c, i) => ({ ...c, store: { slug: ordered[i].store_slug, name: bi(ordered[i], 'store_name') } }));
   res.json({ items, total: items.length });
 }));
 

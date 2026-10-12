@@ -44,7 +44,7 @@ const shrink = (file) => new Promise((resolve, reject) => {
 });
 const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
 
-function ModaFeedback({ question, reply, items, t, onRated }) {
+function ModaFeedback({ question, reply, items, productIds, t, onRated }) {
   const [reason, setReason] = useState('');
   const [done, setDone] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -54,7 +54,7 @@ function ModaFeedback({ question, reply, items, t, onRated }) {
     try {
       const res = await fetch('/api/stylist/feedback', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ rating, ...(why ? { reason: why } : {}), question: String(question || '').slice(0, 300) || 'طلب تنسيق ملابس', reply: String(reply || '').slice(0, 500), items: (items || []).slice(0, 12).map((item) => String(item).slice(0, 120)) }) });
       if (!res.ok) throw new Error('feedback');
-      onRated?.(rating, why || '');
+      onRated?.(rating, why || '', productIds || []);
       setDone(true);
     } catch { /* feedback is optional; keep the chat usable when offline */ }
     setBusy(false);
@@ -139,19 +139,30 @@ export default function StylistChat() {
 
   const pick = async (e) => { const f = e.target.files?.[0]; e.target.value = ''; if (!f) return; try { const s = await shrink(f); if (photo && !photo2) setPhoto2(s); else if (photo) setPhoto2(s); else setPhoto(s); } catch { /* ignore */ } };
   const toggleVoice = () => { const v = !voiceOn; setVoiceOn(v); store.set('moda.voice', v); if (!v) { TTS?.cancel(); setTalking(false); } };
-  const learnFromRating = (rating, reason, question, items) => {
+  const learnFromRating = (rating, reason, question, items, productIds = []) => {
     const clean = (value, max) => String(value || '').replace(/[\r\n]+/g, ' ').trim().slice(0, max);
     const entry = rating === 'good'
       ? `أعجبته لموقف مشابه: ${clean(question, 80)}؛ القطع: ${clean(items.join('، '), 110)}`
       : `لم تناسبه لموقف مشابه: ${clean(question, 80)}؛ السبب ${clean(reason, 20)}؛ القطع: ${clean(items.join('، '), 90)}`;
     const previous = String(profile.styleMemory || '').split('\n').map((line) => line.trim()).filter(Boolean);
     const nextMemory = [entry, ...previous.filter((line) => line !== entry)].slice(0, 4).join('\n').slice(0, 380);
-    const nextProfile = { ...profile, styleMemory: nextMemory };
+    const ids = [...new Set(productIds.map(String).filter((id) => /^\d{1,15}$/.test(id)))].slice(0, 12);
+    const appendIds = (key, excludedKey) => {
+      const previousIds = String(profile[key] || '').split(',').filter((id) => /^\d{1,15}$/.test(id));
+      const excludedIds = new Set(String(profile[excludedKey] || '').split(',').filter(Boolean));
+      const nextIds = [...new Set([...ids, ...previousIds.filter((id) => !excludedIds.has(id))])].slice(0, 20);
+      return nextIds.join(',');
+    };
+    const nextProfile = rating === 'good'
+      ? { ...profile, styleMemory: nextMemory, likedProductIds: appendIds('likedProductIds', 'dislikedProductIds'), dislikedProductIds: String(profile.dislikedProductIds || '').split(',').filter((id) => !ids.includes(id)).join(',') }
+      : { ...profile, styleMemory: nextMemory, dislikedProductIds: appendIds('dislikedProductIds', 'likedProductIds'), likedProductIds: String(profile.likedProductIds || '').split(',').filter((id) => !ids.includes(id)).join(',') };
     setProfile(nextProfile); store.set('moda.profile', nextProfile);
   };
   const clearStyleMemory = () => {
     const nextProfile = { ...profile };
     delete nextProfile.styleMemory;
+    delete nextProfile.likedProductIds;
+    delete nextProfile.dislikedProductIds;
     setProfile(nextProfile); store.set('moda.profile', nextProfile);
   };
   const chips = [t('stylist.chip1'), t('stylist.chip2'), t('stylist.chip3')];
@@ -171,7 +182,7 @@ export default function StylistChat() {
               <div className="flex items-center gap-3"><ModaAvatar src={avatar} size={44} talking={talking} thinking={busy} />
                 <div><p className="font-display text-base font-bold leading-tight">{name}</p><p className="text-[12px] text-muted">{t('stylist.sub')}</p></div></div>
               <div className="flex items-center gap-1">
-                {!!profile.styleMemory && <button type="button" onClick={clearStyleMemory} aria-label={t('stylist.clearLearning')} title={t('stylist.clearLearning')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg"><RotateCcw className="h-4 w-4" /></button>}
+                {!!(profile.styleMemory || profile.likedProductIds || profile.dislikedProductIds) && <button type="button" onClick={clearStyleMemory} aria-label={t('stylist.clearLearning')} title={t('stylist.clearLearning')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg"><RotateCcw className="h-4 w-4" /></button>}
                 {TTS && <button type="button" onClick={toggleVoice} aria-pressed={voiceOn} aria-label={t('stylist.voice')} className={cx('grid h-9 w-9 place-items-center rounded-full hover:bg-secondary', voiceOn && 'text-brand')}>{voiceOn ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button>}
                 <button type="button" onClick={() => setOpen(false)} aria-label="close" className="grid h-9 w-9 place-items-center rounded-full hover:bg-secondary"><X className="h-5 w-5" /></button>
               </div>
@@ -200,7 +211,7 @@ export default function StylistChat() {
                       </div>
                     </div>
                   ))}
-                  {!m.error && m.looks?.length > 0 && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, m.tips].filter(Boolean).join(' — ')} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean))} t={t} />}
+                  {!m.error && m.looks?.length > 0 && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, m.tips].filter(Boolean).join(' — ')} productIds={(m.looks || []).map((look) => look.items?.[look.pick]?.id).filter((id) => id != null)} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason, productIds) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean), productIds)} t={t} />}
                   {m.intent === 'shop' && !m.looks?.length && !m.error && <p className="mt-2 text-[13px] text-muted">{t('stylist.none')}</p>}
                 </div>
               ))}

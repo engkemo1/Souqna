@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runModa } from '../src/lib/moda/engine.js';
+import { parseMessage } from '../src/lib/moda/parse.js';
 import { enrichAll } from '../src/lib/moda/products.js';
 import { loadKnowledge } from '../src/lib/moda/knowledge.js';
 import { checkLabels, checkText } from '../src/lib/moda/guard.js';
@@ -69,6 +70,25 @@ test('condolence never appears unless asked', async () => {
     const res = await runModa(msg, { products: rows, now: new Date('2026-10-12T19:30:00+03:00') });
     assert.ok(!JSON.stringify(res.questions).includes('عزاء') && res.parsed.context !== 'condolence', msg);
   }
+});
+
+test('shoe slang never gets confused with jackets', () => {
+  for (const word of ['كوتشي', 'كوتش']) {
+    assert.deepEqual(parseMessage(word).garments.map((g) => g.key), ['sneakers'], word);
+  }
+  assert.deepEqual(parseMessage('جاكيت').garments.map((g) => g.key), ['jacket']);
+});
+
+test('Moda uses local product ratings to change future rankings', async () => {
+  const products = enrichAll([
+    { id: 1001, name_ar: 'كوتشي رياضي حريمي', department: 'women', price: 500, stock: 5, track_stock: 1, sold_count: 0, rating: 0 },
+    { id: 1002, name_ar: 'كوتشي رياضي حريمي', department: 'women', price: 500, stock: 5, track_stock: 1, sold_count: 0, rating: 0 },
+  ]);
+  const opts = { products, now: new Date('2026-10-12T19:30:00+03:00') };
+  const first = await runModa('عايزة كوتشي', opts);
+  const firstId = first.blocks.tabs[0].items[0].id;
+  const rated = await runModa('عايزة كوتشي', { ...opts, profile: { dislikedProductIds: String(firstId) } });
+  assert.notEqual(rated.blocks.tabs[0].items[0].id, firstId);
 });
 
 test('answer buttons continue the previous request', async () => {

@@ -91,7 +91,7 @@ function levelsFor(slot, K) {
 const primary = (p) => p.colorKeys?.[0] || null;
 
 function scoreProduct(p, slot, ctx) {
-  const { look, K, adv, fTarget, partnerHero, palette, taste, requestedColors, budgetCap } = ctx;
+  const { look, K, adv, fTarget, partnerHero, palette, taste, requestedColors, budgetCap, learnedPreferences } = ctx;
   let s = 10;
   if (fTarget && p.formality != null) s -= 3 * Math.abs(p.formality - fTarget);
   const cols = p.colorKeys || [];
@@ -103,6 +103,8 @@ function scoreProduct(p, slot, ctx) {
   if (partnerHero && DRESSY_ACCESSORY.has(p.key) && cols.some((c) => partnerHero.includes(c))) s += 5;
   if (partnerHero && p.key === 'pocket_square' && cols.some((c) => partnerHero.includes(c))) s += 2;
   if (taste.length && look?.taste?.some((t) => taste.includes(t))) s += 1;
+  if (learnedPreferences?.liked.has(String(p.id))) s += 2;
+  if (learnedPreferences?.disliked.has(String(p.id))) s -= 2;
   s += Math.min(2.5, p.popularity || 0);
   { const ki = slot.keys.indexOf(p.key); if (ki > 0) s -= ki * 1.5; else if (ki < 0) s -= 4; }
   // الجو
@@ -165,7 +167,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
       const list = candidatesAt(slot, lvl, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fR, role, context, userAvoid, lookAvoidHard });
       if (!list.length) continue;
       const cap = personBudget ? (personBudget * slot.share) / 100 * 1.3 : null;
-      const sctx = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fR ? (fR[0] + fR[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], budgetCap: cap };
+      const sctx = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fR ? (fR[0] + fR[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], budgetCap: cap, learnedPreferences: env.learnedPreferences };
       const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => b.s - a.s || a.p.price - b.p.price);
       chosen = { lvl, li, ranked };
       break;
@@ -185,7 +187,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     let pool = [];
     if (subs.length) {
       const pl = candidatesAt(slot, { keys: [...slot.keys, ...subs], color: false, fd: 1, rel: null }, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fRangeLook, role, context, userAvoid, lookAvoidHard });
-      const sctx2 = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fRangeLook ? (fRangeLook[0] + fRangeLook[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], budgetCap: null };
+      const sctx2 = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fRangeLook ? (fRangeLook[0] + fRangeLook[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], budgetCap: null, learnedPreferences: env.learnedPreferences };
       pool = pl.filter((x) => !chosen.ranked.some((r) => r.p.id === x.id)).map((x) => ({ p: x, s: scoreProduct(x, slot, sctx2) - 3, viaPool: true }));
     }
     maxLevel = Math.max(maxLevel, chosen.li);
@@ -282,7 +284,9 @@ export function planOutfit(parsed, products, env = {}) {
   if (!context && parsed.garments.length && parsed.garments.every((g) => g.key === 'dress_any')) return { ...base, state: 'clarify', ask: ['dress_kind'], persons };
 
   const userAvoid = [...(parsed.avoidColors || []), ...(profile.avoidColors || [])];
-  const envC = { adv, role, context, userAvoid, profileTaste: profile.taste || [] };
+  const productIds = (value) => new Set(String(value || '').split(',').filter((id) => /^\d{1,15}$/.test(id)));
+  const learnedPreferences = { liked: productIds(profile.likedProductIds), disliked: productIds(profile.dislikedProductIds) };
+  const envC = { adv, role, context, userAvoid, profileTaste: profile.taste || [], learnedPreferences };
   const wsum = persons.reduce((t, a) => t + (AUD_WEIGHT[a] || 1), 0);
   const pBudget = (a) => (budget ? (budget * (AUD_WEIGHT[a] || 1)) / wsum : null);
 

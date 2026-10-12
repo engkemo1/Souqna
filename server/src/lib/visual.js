@@ -10,6 +10,7 @@
 import sharp from 'sharp';
 import { q } from '../db/index.js';
 import { readMediaFile } from './media.js';
+import { matchesVisualType, visualTypeOptions } from './visual-taxonomy.js';
 
 const GRID_W = 6, GRID_H = 8, HUE_BINS = 12;
 
@@ -49,6 +50,8 @@ export function visualStatus() {
     WHERE p.status='active' AND (v.product_id IS NULL OR v.media_id!=pm.media_id OR v.model!=?)`, [model])?.c || 0;
   return { ...s, indexed, total, pending, providers: { jina: { configured: Boolean(process.env.JINA_API_KEY) } } };
 }
+
+export { visualTypeOptions };
 
 /** weight cells near the centre more (the garment), ignore the borders (background / blurred padding) */
 const CELL_W = Array.from({ length: GRID_H }, (_, y) => Array.from({ length: GRID_W }, (_, x) => {
@@ -166,13 +169,21 @@ export function startVisualIndexer() {
 }
 
 /** Top-N active products most similar to the customer's photo. */
-export async function searchByImage(buffer, { department = '', limit = 24 } = {}) {
+export async function searchByImage(buffer, { department = '', type = '', limit = 24 } = {}) {
+  if (!visualTypeOptions().some((candidate) => candidate.key === type)) {
+    throw new VisualProviderError('Choose the kind of item you are looking for.', 422);
+  }
   const { vec: qv, model } = await embedImage(buffer);
   const rows = q.all(
-    `SELECT v.product_id, v.vec FROM product_vectors v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id
-      WHERE v.model=? AND p.status='active' AND s.status='active' AND s.hidden=0 ${department ? 'AND p.department=?' : ''}`,
+    `SELECT v.product_id, v.vec, p.name_ar, p.name_en, p.department,
+       COALESCE(c.name_ar || ' ' || c.name_en, '') AS cat_text
+       FROM product_vectors v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id
+       LEFT JOIN categories c ON c.id=p.category_id
+      WHERE v.model=? AND p.status='active' AND (p.track_stock=0 OR p.stock>0)
+        AND s.status='active' AND s.hidden=0 ${department ? 'AND p.department=?' : ''}`,
     department ? [model, department] : [model]);
-  return rows.map((r) => ({ id: r.product_id, score: dot(qv, fromBlob(r.vec)) })).sort((a, b) => b.score - a.score).slice(0, limit);
+  return rows.filter((r) => matchesVisualType(r, type)).map((r) => ({ id: r.product_id, score: dot(qv, fromBlob(r.vec)) }))
+    .sort((a, b) => b.score - a.score).slice(0, limit);
 }
 
 export { VisualProviderError };
