@@ -2,9 +2,32 @@
  * Model comparison helpers (used by `npm run compare:visual`). Pure functions + an injectable model adapter
  * ({ embedImage(buffer) → Float32Array, embedTexts(texts) → Float32Array[] }) so they are testable without a real model.
  */
+import fs from 'node:fs';
+import path from 'node:path';
 import sharp from 'sharp';
 import { normalize, dot } from './visual-core.js';
-import { buildTextPrototypes, familyProbabilities } from './visual-classify.js';
+import { buildTextPrototypes, familyProbabilities, FAMILY_PROMPTS } from './visual-classify.js';
+
+const IMG = /\.(jpe?g|png|webp)$/i;
+const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(path.join(dir, e.name)) : IMG.test(e.name) ? [path.join(dir, e.name)] : []));
+
+/**
+ * Build test items from folders instead of the database, so any photos can be used (Amazon downloads, a public dataset, your own phone shots).
+ *  catalogueDir: product photos, any depth. A parent folder named like a garment family (tops, bottoms, dresses, shoes, bags …) gives the product its type.
+ *  queriesDir (optional): real customer-style photos. A query named `<catalogue file name without extension>__anything.jpg` belongs to that product;
+ *  products without queries fall back to synthetic re-shots.
+ */
+export function loadFolderItems(catalogueDir, queriesDir, { limit = Infinity } = {}) {
+  const queries = new Map();
+  if (queriesDir) for (const f of walk(queriesDir)) { const k = path.basename(f).split('__')[0].replace(IMG, ''); if (path.basename(f).includes('__')) (queries.get(k) || queries.set(k, []).get(k)).push(f); }
+  const items = [];
+  for (const f of walk(catalogueDir)) {
+    const stem = path.basename(f).replace(IMG, ''); const parent = path.basename(path.dirname(f)).toLowerCase();
+    items.push({ id: path.relative(catalogueDir, f), family: parent in FAMILY_PROMPTS ? parent : null, buffer: fs.readFileSync(f), queries: (queries.get(stem) || []).map((q) => fs.readFileSync(q)) });
+  }
+  return items.sort(() => Math.random() - 0.5).slice(0, limit);
+}
+
 
 export function percentile(arr, p) {
   if (!arr.length) return NaN;
@@ -41,8 +64,9 @@ export async function evaluateModel(model, items, { shots = 1, rnd = Math.random
 
   let h1 = 0, h5 = 0, rr = 0, n = 0; const margins = [];
   for (let i = 0; i < items.length; i++) {
-    for (let s = 0; s < shots; s++) {
-      const q = normalize(await model.embedImage(await augmentedShot(items[i].buffer, rnd)));
+    const real = items[i].queries?.length ? items[i].queries : null; // real customer photos when provided, else synthetic re-shots
+    for (let s = 0; s < (real ? real.length : shots); s++) {
+      const q = normalize(await model.embedImage(real ? real[s] : await augmentedShot(items[i].buffer, rnd)));
       const scored = vecs.map((v, j) => ({ j, s: dot(q, v) })).sort((a, b) => b.s - a.s);
       const rank = scored.findIndex((x) => x.j === i);
       n++; if (rank === 0) h1++; if (rank >= 0 && rank < 5) h5++; rr += rank >= 0 ? 1 / (rank + 1) : 0;

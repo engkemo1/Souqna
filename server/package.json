@@ -7,7 +7,7 @@
     "start": "node --no-warnings --env-file-if-exists=../.env src/index.js",
     "test:stylist": "node --test src/lib/stylist-ranking.test.js",
     "test:moda": "node --test test/moda.test.js",
-    "test:visual": "node --test test/visual-taxonomy.test.js test/visual-search.test.js test/visual-integration.test.js test/visual-route.test.js test/visual-model-store.test.js test/visual-demand.test.js test/visual-eval.test.js",
+    "test:visual": "node --test test/visual-taxonomy.test.js test/visual-search.test.js test/visual-integration.test.js test/visual-route.test.js test/visual-model-store.test.js test/visual-demand.test.js test/visual-eval.test.js test/visual-testset.test.js",
     "test:buyer-chats": "node --test test/buyer-chats.test.js",
     "test:market-cart": "node --test test/marketplace-cart.test.js",
     "evaluate:stylist": "node src/scripts/evaluate-stylist.js",
@@ -20,6 +20,7 @@
     "set-password": "node --no-warnings --env-file-if-exists=../.env src/scripts/set-password.js",
     "reprocess-media": "node --no-warnings --env-file-if-exists=../.env src/scripts/reprocess-media.js",
     "train:visual": "node --no-warnings --env-file-if-exists=../.env src/scripts/train-visual.js",
+    "testset:visual": "node --no-warnings src/scripts/fetch-test-set.js",
     "compare:visual": "node --no-warnings --env-file-if-exists=../.env src/scripts/compare-visual-models.js",
     "model:prefetch": "node --no-warnings --env-file-if-exists=../.env src/scripts/download-clip-model.js"
   },

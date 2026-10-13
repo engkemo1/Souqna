@@ -84,7 +84,8 @@ export function createClip(modelId, { r2 = true, cacheDir = process.env.MODEL_CA
     async embedTexts(texts) {
       if (!(await api.ready())) throw new Error('CLIP model is not available');
       return serial(async () => {
-        const inputs = state.tokenizer(texts, { padding: true, truncation: true });
+        // fixed 77-token input: Marqo's ONNX text tower rejects shorter batches (verified on the comparison run)
+        const inputs = state.tokenizer(texts, { padding: 'max_length', max_length: 77, truncation: true });
         const { text_embeds } = await state.text(inputs);
         const dim = text_embeds.dims[1];
         return texts.map((_, i) => Float32Array.from(text_embeds.data.slice(i * dim, (i + 1) * dim)));
