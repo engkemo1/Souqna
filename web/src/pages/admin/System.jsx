@@ -7,6 +7,7 @@ import { Switch, Input, Textarea, Select } from '../../components/ui/Field.jsx';
 import { ErrorState } from '../../components/ui/States.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useAdminApi, adminApi, adminUpload, adminKey, adminSession, fmtDateTime, fmtMoney } from './adminApi.js';
+import { useSearchParams } from 'react-router-dom';
 
 const uptime = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return [d && `${d} يوم`, h && `${h} ساعة`, `${m} دقيقة`].filter(Boolean).join(' ') ; };
 
@@ -682,15 +683,22 @@ function ResourcePanel() {
 }
 
 export default function System() {
+  const [searchParams] = useSearchParams();
+  const requestedSection = searchParams.get('section');
+  const section = ['moda', 'visual', 'security'].includes(requestedSection) ? requestedSection : 'security';
   const { data, error, loading, reload } = useAdminApi('/status');
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
   const required = (data?.checks || []).filter((c) => !c.optional);
   const bad = required.filter((c) => !c.ok);
   return (
     <div>
-      <PageHeader title="النظام والأمان" subtitle="جاهزية الموقع للإنتاج" />
+      <PageHeader
+        title={section === 'moda' ? 'مودة والاقتراحات' : section === 'visual' ? 'البحث المرئي' : 'السيرفر والنسخ'}
+        subtitle={section === 'moda' ? 'إعدادات مودة، مراجعة الاقتراحات، وتعليمها' : section === 'visual' ? 'إعدادات البحث بالصور' : 'جاهزية الموقع، النسخ الاحتياطي، وحالة التشغيل'}
+      />
       {loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : (
         <div className="grid gap-4 lg:grid-cols-3">
+          {section === 'security' && <>
           <Panel title="قائمة الجاهزية" className="lg:col-span-2" subtitle={bad.length ? `${bad.length} حاجة لازم تتظبط قبل الإنتاج` : 'كل الإعدادات الأساسية تمام'}>
             <ul className="space-y-3">
               {data.checks.map((c) => (
@@ -703,11 +711,6 @@ export default function System() {
           </Panel>
           <BackupPanel data={data} reload={reload} />
           <ResourcePanel />
-          <VisualPanel />
-          <StylistPanel />
-          <ModaTestLabPanel />
-          <ModaTrainingPanel />
-          <LookOfDayPanel />
           <Panel title="السيرفر">
             <dl className="space-y-3 text-sm">
               {[['البيئة', data.env], ['Node', data.node], ['شغال من', uptime(data.uptimeSec)], ['تخزين الصور', data.mediaR2Enabled ? 'Cloudflare R2' : 'قرص السيرفر (R2 غير مفعّل)'], ['واتساب API', data.whatsappConfigured ? 'متوصل' : 'غير متوصل'], ['قالب واتساب', data.template], ['التسجيل العام', data.registrationOpen ? 'مفتوح' : 'مقفول']].map(([k, v]) => (
@@ -715,6 +718,14 @@ export default function System() {
               ))}
             </dl>
           </Panel>
+          </>}
+          {section === 'visual' && <VisualPanel />}
+          {section === 'moda' && <>
+          <StylistPanel />
+          <ModaTestLabPanel />
+          <ModaTrainingPanel />
+          <LookOfDayPanel />
+          </>}
         </div>
       )}
     </div>

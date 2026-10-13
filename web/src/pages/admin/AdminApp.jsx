@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone } from 'lucide-react';
+import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -9,20 +9,30 @@ import Brand from '../../components/market/Brand.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { adminApi, adminKey, adminSession, setAdminAuthFail, fmtMoney } from './adminApi.js';
 
-const NAV = [
-  { to: '/admin', end: true, icon: LayoutDashboard, label: 'الرئيسية' },
-  { to: '/admin/stores', icon: Store, label: 'المحلات' },
-  { to: '/admin/departments', icon: Tags, label: 'الأقسام' },
-  { to: '/admin/orders', icon: ShoppingBag, label: 'الطلبات' },
-  { to: '/admin/deliveries', icon: Truck, label: 'التوصيل', badge: 'open' },
-  { to: '/admin/reports', icon: BarChart3, label: 'التقارير' },
-  { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
-  { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
-  { to: '/admin/services', icon: Camera, label: 'الخدمات', badge: 'services' },
-  { to: '/admin/sourcing', icon: PackagePlus, label: 'طلبات من برّه', badge: 'sourcing' },
-  { to: '/admin/buyers', icon: Users, label: 'حسابات العملاء' },
-  { to: '/admin/system', icon: ShieldCheck, label: 'النظام' },
+const NAV_GROUPS = [
+  { label: 'الرئيسية', items: [{ to: '/admin', end: true, icon: LayoutDashboard, label: 'نظرة عامة' }] },
+  { label: 'إدارة السوق', items: [
+    { to: '/admin/stores', icon: Store, label: 'المحلات' },
+    { to: '/admin/departments', icon: Tags, label: 'الأقسام' },
+    { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
+    { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
+    { to: '/admin/buyers', icon: Users, label: 'حسابات العملاء' },
+  ] },
+  { label: 'الطلبات والتشغيل', items: [
+    { to: '/admin/orders', icon: ShoppingBag, label: 'الطلبات' },
+    { to: '/admin/deliveries', icon: Truck, label: 'التوصيل', badge: 'open' },
+    { to: '/admin/services', icon: Camera, label: 'الخدمات', badge: 'services' },
+    { to: '/admin/sourcing', icon: PackagePlus, label: 'طلبات من برّه', badge: 'sourcing' },
+  ] },
+  { label: 'التحليلات', items: [{ to: '/admin/reports', icon: BarChart3, label: 'التقارير' }] },
+  { label: 'إعدادات المنصة', items: [{ to: '/admin/system?section=security', icon: ShieldCheck, label: 'السيرفر والنسخ' }] },
 ];
+const SYSTEM_NAV = [
+  { to: '/admin/system?section=moda', icon: Sparkles, label: 'مودة والاقتراحات' },
+  { to: '/admin/system?section=visual', icon: ScanSearch, label: 'البحث المرئي' },
+  { to: '/admin/system?section=security', icon: DatabaseBackup, label: 'السيرفر والنسخ' },
+];
+const NAV = NAV_GROUPS.flatMap((g) => g.items);
 
 function Gate({ onAuthed }) {
   const [key, setKey] = useState('');
@@ -149,16 +159,31 @@ function Bell_({ alerts }) {
 
 function Shell({ onLogout }) {
   const alerts = useDeliveryAlerts();
+  const location = useLocation();
   return (
     <div className="min-h-dvh bg-canvas" dir="rtl">
       <aside className="fixed inset-y-0 start-0 z-30 hidden w-[240px] flex-col border-e border-line bg-elevated p-4 lg:flex">
         <div className="mb-6 px-2 pt-1"><Brand to="/admin" /><p className="mt-1 text-xs font-medium text-muted">لوحة إدارة المنصة</p></div>
-        <nav className="space-y-1">
-          {NAV.map((n) => (
-            <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-medium transition', isActive ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
-              <n.icon className="h-[18px] w-[18px]" />{n.label}
-              {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-white">{alerts.counts[n.badge]}</span>}
-            </NavLink>
+        <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto pb-3">
+          {NAV_GROUPS.map((group) => (
+            <section key={group.label}>
+              <p className="mb-1.5 px-3 text-[11px] font-bold tracking-wide text-muted">{group.label}</p>
+              <div className="space-y-1">
+                {group.items.map((n) => {
+                  const active = n.to.startsWith('/admin/system')
+                    ? location.pathname === '/admin/system' && new URLSearchParams(location.search).get('section') === (n.to.split('section=')[1] || 'security')
+                    : undefined;
+                  return <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
+                    <n.icon className="h-[18px] w-[18px]" />{n.label}
+                    {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-white">{alerts.counts[n.badge]}</span>}
+                  </NavLink>;
+                })}
+                {group.label === 'إعدادات المنصة' && SYSTEM_NAV.filter((n) => !group.items.some((it) => it.to === n.to)).map((n) => {
+                  const active = location.pathname === '/admin/system' && new URLSearchParams(location.search).get('section') === n.to.split('section=')[1];
+                  return <NavLink key={n.to} to={n.to} end className={() => cx('ms-2 flex h-9 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition', active ? 'bg-brand/10 text-brand' : 'text-muted hover:bg-fg/[0.06] hover:text-fg')}><n.icon className="h-4 w-4" />{n.label}</NavLink>;
+                })}
+              </div>
+            </section>
           ))}
         </nav>
         <button type="button" onClick={onLogout} className="mt-auto flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-medium text-muted hover:bg-fg/[0.06]"><LogOut className="h-[18px] w-[18px]" />خروج</button>

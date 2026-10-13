@@ -8,6 +8,9 @@ import { matchTokens } from './parse.js';
 
 const WEAK_KEYS = new Set(['top', 'tunic', 'shoes_any', 'dress_any']);
 const GENERIC_KEYS = new Set(['trousers', 'jacket', 'shirt', 'tshirt']);
+// "wrap" can mean a shawl, but in catalogue names like "wrap jacket" it must
+// not override the explicit garment noun. Keep the alias for standalone wraps.
+const AMBIGUOUS_ALIASES = new Set(['shawl:wrap']);
 
 let aliasTable = null;
 function table(K) {
@@ -31,7 +34,8 @@ export function inferKey(text, K = loadKnowledge()) {
   for (const row of table(K).rows) {
     if (!row.tokens.every((t) => hasToken(set, t) || [...set].some((s) => tokenVariants(s).includes(t)))) continue;
     const first = Math.min(...row.tokens.map((t) => pos.get(t) ?? 99));
-    const score = row.tokens.length * 10 - (WEAK_KEYS.has(row.key) ? 4 : 0) - (GENERIC_KEYS.has(row.key) ? 2 : 0) - first * 0.1;
+    const ambiguous = AMBIGUOUS_ALIASES.has(`${row.key}:${row.tokens.join(' ')}`) ? 4 : 0;
+    const score = row.tokens.length * 10 - (WEAK_KEYS.has(row.key) ? 4 : 0) - (GENERIC_KEYS.has(row.key) ? 2 : 0) - ambiguous - first * 0.1;
     if (!best || score > best.score) best = { key: row.key, score };
   }
   return best?.key || null;
