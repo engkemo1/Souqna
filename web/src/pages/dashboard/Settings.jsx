@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, Palette, ArrowUpRight } from 'lucide-react';
+import { Camera, Palette, ArrowUpRight, Trash2 } from 'lucide-react';
 import { useApi, invalidate } from '../../lib/hooks.js';
 import { api, upload } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -17,6 +17,7 @@ import { ErrorState, errorMessage, fieldErrors } from '../../components/ui/State
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useDepartments } from '../../lib/departments.js';
 import PageTransition from '../../components/PageTransition.jsx';
+import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 
 const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'hero_mode', 'delivery_mode', 'opens_at', 'closes_at', 'day_off', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en'];
 
@@ -58,11 +59,12 @@ function AutoCover({ onDone }) {
   );
 }
 
-function ImageSlot({ label, media, slot, ratio, onUploaded, round }) {
+function ImageSlot({ label, media, slot, ratio, onUploaded, onDelete, deleteBusy, round }) {
   const { t } = useI18n();
   const toast = useToast();
   const ref = useRef(null);
   const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const pick = async (file) => {
     if (!file) return;
     setBusy(true);
@@ -85,6 +87,9 @@ function ImageSlot({ label, media, slot, ratio, onUploaded, round }) {
         </span>
       </button>
       <input ref={ref} type="file" accept="image/*" hidden onChange={(e) => { pick(e.target.files[0]); e.target.value = ''; }} />
+      {media && <button type="button" disabled={busy || deleteBusy} onClick={() => setConfirmDelete(true)} className="mt-2 inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium text-sale hover:bg-sale/10 disabled:opacity-50"><Trash2 className="h-4 w-4" />{t('common.delete')}</button>}
+      {!media && <p className="mt-2 text-xs text-muted">{t('settings.noImage')}</p>}
+      <ConfirmDialog open={confirmDelete} onClose={() => setConfirmDelete(false)} onConfirm={async () => { if (await onDelete()) setConfirmDelete(false); }} danger loading={deleteBusy} title={t('settings.deleteImageTitle')} body={t('settings.deleteImageBody', { label })} confirmLabel={t('common.delete')} />
     </div>
   );
 }
@@ -98,6 +103,7 @@ export default function Settings() {
   const [f, setF] = useState(null);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState('');
   const [initial, setInitial] = useState('');
 
   useEffect(() => {
@@ -140,6 +146,16 @@ export default function Settings() {
     mutate((d) => ({ ...d, store: s }));
     setStore(s);
     invalidate('/stores/');
+  };
+  const deleteImage = async (slot) => {
+    setDeleteBusy(slot);
+    try {
+      await api(`/owner/store/${slot}`, { method: 'DELETE' });
+      onImage(slot)(null);
+      toast({ title: t('settings.imageDeleted') });
+      return true;
+    } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); return false; }
+    finally { setDeleteBusy(''); }
   };
 
   return (
@@ -211,9 +227,9 @@ export default function Settings() {
         <div className="space-y-4 lg:sticky lg:top-6">
           <Panel title={t('settings.brand')}>
             <div className="space-y-5">
-              <ImageSlot label={t('settings.logo')} media={data.store.logo} slot="logo" ratio="1 / 1" round onUploaded={onImage('logo')} />
+              <ImageSlot label={t('settings.logo')} media={data.store.logo} slot="logo" ratio="1 / 1" round onUploaded={onImage('logo')} onDelete={() => deleteImage('logo')} deleteBusy={deleteBusy === 'logo'} />
 <div>
-                <ImageSlot label={t('settings.cover')} media={data.store.cover} slot="cover" ratio="16 / 10" onUploaded={onImage('cover')} />
+                <ImageSlot label={t('settings.cover')} media={data.store.cover} slot="cover" ratio="16 / 10" onUploaded={onImage('cover')} onDelete={() => deleteImage('cover')} deleteBusy={deleteBusy === 'cover'} />
                 <AutoCover onDone={onImage('cover')} />
                 <DesignHelp what="cover" className="mt-3" />
                 <HeroModePicker value={f.hero_mode} onChange={(v) => setF({ ...f, hero_mode: v })} />

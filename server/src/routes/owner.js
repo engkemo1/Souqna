@@ -185,6 +185,14 @@ r.post('/store/:slot(logo|cover)', upload.single('file'), h(async (req, res) => 
   res.json({ media: serializeMedia(m) });
 }));
 
+r.delete('/store/:slot(logo|cover)', h(async (req, res) => {
+  const col = req.params.slot === 'logo' ? 'logo_media_id' : 'cover_media_id';
+  const old = getMedia(req.store[col]);
+  q.run(`UPDATE stores SET ${col}=NULL WHERE id=?`, [req.store.id]);
+  if (old) await deleteMedia(old);
+  res.status(204).end();
+}));
+
 /* ---------------------------------------------------------- overview & analytics */
 
 function periodStats(storeId, days) {
