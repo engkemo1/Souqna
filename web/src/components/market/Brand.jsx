@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n.jsx';
 import { cx } from '../ui/cx.js';
 
-/** Tella mark: three flowing fabric shapes above the Arabic wordmark and fashion descriptor. */
+/** Banha Outfit mark: three flowing fabric shapes above the Arabic wordmark and fashion descriptor. */
 export function BrandMark({ className, mono = false }) {
   const color = mono ? 'currentColor' : '#FF5A1F';
   const accent = mono ? 'currentColor' : '#FF8A5C';

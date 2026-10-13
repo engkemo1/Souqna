@@ -65,7 +65,7 @@ export default function VisualSearch() {
   };
   const pick = (e) => { const file = e.target.files?.[0]; e.target.value = ''; handleFile(file); };
 
-  // a photo shared straight from Instagram / WhatsApp / the gallery (installed app → Share → طِلّة)
+  // a photo shared straight from Instagram / WhatsApp / the gallery (installed app → Share → بنها أوتفيت)
   useEffect(() => {
     const token = sp.get('shared'); if (!token) return;
     (async () => {

@@ -6,7 +6,7 @@ export const LEGAL = {
   privacy: {
     ar: {
       title: 'سياسة الخصوصية',
-      intro: 'طِلّة منصة بتجمع متاجر ملابس من بنها في مكان واحد. الصفحة دي بتوضّح إيه البيانات اللي بنجمعها، ليه، وبنعمل بيها إيه، وإيه حقوقك.',
+      intro: 'بنها أوتفيت منصة بتجمع متاجر ملابس من بنها في مكان واحد. الصفحة دي بتوضّح إيه البيانات اللي بنجمعها، ليه، وبنعمل بيها إيه، وإيه حقوقك.',
       sections: [
         ['البيانات اللي بنجمعها', [
           'عند إتمام الطلب: الاسم، رقم الموبايل، المحافظة والمدينة والعنوان، وملاحظات التوصيل، وتفاصيل الطلب.',
@@ -14,7 +14,7 @@ export const LEGAL = {
           'التقييمات: نص التقييم وأي صور بترفعها، وبيظهروا للناس باسمك الأول فقط.',
           'طلبات "مش لاقي في بنها": الوصف والصورة (لو رفعتها) وبيانات التواصل والعنوان اللي بتكتبها.',
           'المساعد مودة: الرسائل والصور اللي بتبعتها للمساعد بتتبعت لمزوّد الذكاء الاصطناعي (Anthropic أو Cloudflare) عشان يرد عليك. لو عامل حساب، بنحفظ آخر 20 محادثة نصية في حسابك عشان تقدر ترجع لها أو تمسحها من سجل المحادثات. صور الشات نفسها مش بتتحفظ في السجل. من غير حساب، المحادثة بتفضل على جهازك طول ما الصفحة مفتوحة بس. وممكن نحتفظ بنص قصير عن تفضيلاتك وتقييماتك لمودة على جهازك، وتقدر تمسح التفضيلات من داخل المحادثة.',
-          'لو قيّمت رد مودة، بنحفظ تقييمك وطلبك والرد والقطع المقترحة وسبب التقييم (لو اخترته) في سجل محدود يراجعه فريق طِلّة لتحسين جودة التنسيق. تقدر تتجنب إرسال التقييم، وفريق الإدارة يقدر يحذف السجل.',
+          'لو قيّمت رد مودة، بنحفظ تقييمك وطلبك والرد والقطع المقترحة وسبب التقييم (لو اخترته) في سجل محدود يراجعه فريق بنها أوتفيت لتحسين جودة التنسيق. تقدر تتجنب إرسال التقييم، وفريق الإدارة يقدر يحذف السجل.',
           'بيانات تقنية بسيطة: عدد زيارات كل متجر في اليوم (إجمالي بدون هوية)، ونوع المتصفح وعنوان الـIP لأغراض الأمان ومنع الإساءة.',
         ]],
         ['بنستخدم بياناتك في إيه', [
@@ -26,7 +26,7 @@ export const LEGAL = {
         ]],
         ['مين بيشوف بياناتك', [
           'المتجر اللي بتطلب منه بيشوف اسمك ورقمك وعنوانك وتفاصيل طلبك عشان يجهّز ويوصّل.',
-          'فريق طِلّة لما يكون التوصيل علينا أو لما تطلب حاجة من خلالنا.',
+          'فريق بنها أوتفيت لما يكون التوصيل علينا أو لما تطلب حاجة من خلالنا.',
           'مزوّد الذكاء الاصطناعي ومزوّد تخزين الصور واستضافة الموقع (زي Railway وCloudflare) بالقدر اللازم لتشغيل الخدمة فقط.',
           'الجهات الرسمية لو القانون طلب ده.',
         ]],
@@ -51,7 +51,7 @@ export const LEGAL = {
     },
     en: {
       title: 'Privacy Policy',
-      intro: 'Tella brings fashion stores from Banha together in one place. This page explains what data we collect, why, what we do with it, and your rights.',
+      intro: 'Banha Outfit brings fashion stores from Banha together in one place. This page explains what data we collect, why, what we do with it, and your rights.',
       sections: [
         ['Data we collect', [
           'When you place an order: your name, mobile number, governorate, city and address, delivery notes and the order details.',
@@ -59,7 +59,7 @@ export const LEGAL = {
           'Reviews: the review text and any photos you upload; they are shown with your first name only.',
           '"Can\'t find it in Banha" requests: the description, photo (if you add one), contact details and address you enter.',
           'The Moda assistant: messages and photos you send are passed to our AI provider (Anthropic or Cloudflare) so it can answer. If you have an account, we save your latest 20 text conversations to your account so you can revisit or delete them from chat history. Chat photos are not saved in that history. Without an account, the conversation stays on your device only while the page is open. A short note of your preferences and Moda ratings may also be kept on your device; you can clear the learned preference memory in the chat.',
-          'If you rate a Moda reply, we store your rating, request, reply, suggested pieces and any selected reason in a limited feedback log for the Tella team to review and improve styling quality. Rating is optional, and administrators can delete the feedback record.',
+          'If you rate a Moda reply, we store your rating, request, reply, suggested pieces and any selected reason in a limited feedback log for the Banha Outfit team to review and improve styling quality. Rating is optional, and administrators can delete the feedback record.',
           'Basic technical data: aggregate daily visit counts per store (not tied to a person), and browser type and IP address for security and abuse prevention.',
         ]],
         ['How we use your data', [
@@ -71,7 +71,7 @@ export const LEGAL = {
         ]],
         ['Who sees your data', [
           'The store you order from sees your name, number, address and order so it can prepare and deliver.',
-          'The Tella team when we deliver or when you ask us to source something.',
+          'The Banha Outfit team when we deliver or when you ask us to source something.',
           'Our AI provider, photo storage and hosting providers (such as Railway and Cloudflare), only as needed to run the service.',
           'Public authorities where the law requires it.',
         ]],
@@ -99,10 +99,10 @@ export const LEGAL = {
   terms: {
     ar: {
       title: 'الشروط والأحكام',
-      intro: 'باستخدامك لطِلّة أو بإتمامك طلب من خلاله، أنت موافق على الشروط دي. لو مش موافق، من فضلك متستخدمش الخدمة.',
+      intro: 'باستخدامك لبنها أوتفيت أو بإتمامك طلب من خلاله، أنت موافق على الشروط دي. لو مش موافق، من فضلك متستخدمش الخدمة.',
       sections: [
         ['إحنا مين', [
-          'طِلّة منصة بتعرض منتجات متاجر مستقلة من بنها وتسهّل الطلب والتوصيل. كل متجر هو البائع المسؤول عن منتجاته وأسعاره ومخزونه.',
+          'بنها أوتفيت منصة بتعرض منتجات متاجر مستقلة من بنها وتسهّل الطلب والتوصيل. كل متجر هو البائع المسؤول عن منتجاته وأسعاره ومخزونه.',
         ]],
         ['الطلبات والأسعار', [
           'الأسعار بالجنيه المصري وبتتحدد من كل متجر. الطلب بيتأكد بعد ما المتجر (أو فريقنا) يراجعه، وممكن يتعدّل أو يتلغي لو المنتج خلص أو في خطأ واضح في السعر.',
@@ -111,7 +111,7 @@ export const LEGAL = {
         ]],
         ['التوصيل', [
           'مواعيد التوصيل تقديرية. توصيل نفس اليوم متاح في المتاجر اللي بتفعّله وقبل موعد القفل اللي المتجر بيحدده، وبيتوقف تلقائيًا بعده.',
-          'بعض الطلبات بيوصّلها المتجر نفسه وبعضها بيوصّلها فريق طِلّة، وبيتحدد ده عند الطلب.',
+          'بعض الطلبات بيوصّلها المتجر نفسه وبعضها بيوصّلها فريق بنها أوتفيت، وبيتحدد ده عند الطلب.',
         ]],
         ['طلبات "مش لاقي في بنها"', [
           'تقدر تبعتلنا تفاصيل المنتج اللي مش لاقيه وهنحاول نجيبهولك. هنرجعلك بعرض سعر، ومفيش التزام عليك إلا بعد ما توافق عليه.',
@@ -142,9 +142,9 @@ export const LEGAL = {
     },
     en: {
       title: 'Terms & Conditions',
-      intro: 'By using Tella, or placing an order through it, you agree to these terms. If you do not agree, please do not use the service.',
+      intro: 'By using Banha Outfit, or placing an order through it, you agree to these terms. If you do not agree, please do not use the service.',
       sections: [
-        ['Who we are', ['Tella is a platform that shows products from independent stores in Banha and makes ordering and delivery easier. Each store is the seller responsible for its own products, prices and stock.']],
+        ['Who we are', ['Banha Outfit is a platform that shows products from independent stores in Banha and makes ordering and delivery easier. Each store is the seller responsible for its own products, prices and stock.']],
         ['Orders and prices', [
           'Prices are in Egyptian pounds and are set by each store. An order is confirmed after the store (or our team) reviews it, and it may be changed or cancelled if the item is out of stock or there is an obvious pricing error.',
           'Payment is currently cash on delivery. Fees and shipping are shown before you confirm.',
@@ -152,7 +152,7 @@ export const LEGAL = {
         ]],
         ['Delivery', [
           'Delivery times are estimates. Same-day delivery is available from stores that turn it on, before the cut-off time the store sets, and it switches off automatically afterwards.',
-          'Some orders are delivered by the store itself and some by the Tella team; this is decided when you order.',
+          'Some orders are delivered by the store itself and some by the Banha Outfit team; this is decided when you order.',
         ]],
         ['"Can\'t find it in Banha" requests', [
           'You can send us the details of an item you cannot find and we will try to source it. We will come back with a quote, and you are not committed until you accept it.',
@@ -178,7 +178,7 @@ export const LEGAL = {
   returns: {
     ar: {
       title: 'سياسة الاسترجاع والاستبدال',
-      intro: 'عايزينك تشتري وإنت مطمّن. دي القواعد الأساسية للاسترجاع والاستبدال على طِلّة.',
+      intro: 'عايزينك تشتري وإنت مطمّن. دي القواعد الأساسية للاسترجاع والاستبدال على بنها أوتفيت.',
       sections: [
         ['المعاينة قبل الاستلام', [
           'تقدر تفتح الطلب وتعاين المنتج قدام المندوب قبل ما تدفع. لو في عيب أو المنتج مش اللي طلبته، ارفض الاستلام ومش هتدفع أي حاجة.',
@@ -207,7 +207,7 @@ export const LEGAL = {
     },
     en: {
       title: 'Return & Exchange Policy',
-      intro: 'We want you to shop with confidence. These are the basic rules for returns and exchanges on Tella.',
+      intro: 'We want you to shop with confidence. These are the basic rules for returns and exchanges on Banha Outfit.',
       sections: [
         ['Inspection before receiving', [
           'You can open the parcel and inspect the item in front of the courier before you pay. If there is a defect or it is not what you ordered, refuse it and you pay nothing.',

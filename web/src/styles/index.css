@@ -8,7 +8,7 @@
 @tailwind utilities;
 
 /* Platform default tokens (marketplace). Stores & dashboard override these via the Theme Engine. */
-/* Tella brand tokens (marketplace + platform screens).
+/* Banha Outfit brand tokens (marketplace + platform screens).
    Orange is the brand colour but is NOT used as text on white (3.1:1) — buttons are orange with
    near-black labels (6:1), and "brand ink" (#C83705, 5:1) is the orange used for text/links. */
 :root {
