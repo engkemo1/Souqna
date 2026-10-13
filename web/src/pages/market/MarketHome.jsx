@@ -99,7 +99,7 @@ export default function MarketHome() {
       <MarketHeader />
 
       {/* hero */}
-      <section className="container grid items-center gap-12 pb-16 pt-8 sm:pt-14 lg:grid-cols-2 lg:gap-8 lg:pb-24 lg:pt-16">
+      <section className="container grid items-center gap-12 pb-10 pt-8 sm:pb-12 sm:pt-14 lg:grid-cols-2 lg:gap-8 lg:pb-14 lg:pt-16">
         <div className="min-w-0 max-w-xl">
           <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full bg-secondary px-3.5 py-1.5 text-[13px] font-semibold text-brand">
             <Sparkles className="h-3.5 w-3.5" />{t('market.heroEyebrow')}
@@ -127,7 +127,7 @@ export default function MarketHome() {
       </section>
 
       <HomepageAds />
-      <div className="container"><Why /></div>
+      <div className="container mt-8 sm:mt-10"><Why /></div>
 
       {/* shop by department (every department, even ones with no store yet) */}
       <div className="mt-10"><DeptStrip departments={base?.departments || []} /></div>

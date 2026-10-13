@@ -9,7 +9,7 @@ export default function HomepageAds() {
   const items = data?.items || [];
   if (!items.length) return null;
   return (
-    <section className="container mt-10 sm:mt-14" aria-labelledby="homepage-ads-title">
+    <section className="container mt-6 sm:mt-8" aria-labelledby="homepage-ads-title">
       <div className="mb-5 flex items-end justify-between gap-3 sm:mb-6">
         <div>
           <p className="eyebrow mb-1.5 inline-flex items-center gap-1.5"><Megaphone className="h-3.5 w-3.5" />{t('market.adsEyebrow')}</p>
