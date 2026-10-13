@@ -30,7 +30,7 @@ function Row({ r, onChanged }) {
         <p className="flex items-center gap-2 text-lg font-semibold"><PackagePlus className="h-4 w-4 text-brand" />{r.title}</p>
         <Badge tone={TONE[r.status]} dot>{SRC_STATUS_AR[r.status]}</Badge>
       </div>
-      <p className="mt-1 text-sm text-muted"><span dir="ltr">{r.number}</span> · {fmtDateTime(r.created_at)}{r.source === 'moda' ? ' · من مودة' : r.source === 'search' ? ' · من البحث' : ''}</p>
+      <p className="mt-1 text-sm text-muted"><span dir="ltr">{r.number}</span> · {fmtDateTime(r.created_at)}{r.source === 'moda' ? ' · من المساعد الذكي' : r.source === 'search' ? ' · من البحث' : ''}</p>
       <div className="mt-3 flex flex-wrap gap-3">
         {r.photo && <a href={r.photo} target="_blank" rel="noreferrer"><img src={r.photo} alt="" className="h-24 w-24 rounded-xl object-cover" /></a>}
         <div className="min-w-0 flex-1 space-y-1 text-sm">

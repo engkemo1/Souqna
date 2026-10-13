@@ -28,7 +28,7 @@ const NAV_GROUPS = [
   { label: 'إعدادات المنصة', items: [{ to: '/admin/system?section=security', icon: ShieldCheck, label: 'السيرفر والنسخ' }] },
 ];
 const SYSTEM_NAV = [
-  { to: '/admin/system?section=moda', icon: Sparkles, label: 'مودة والاقتراحات' },
+  { to: '/admin/system?section=moda', icon: Sparkles, label: 'المساعد الذكي' },
   { to: '/admin/system?section=visual', icon: ScanSearch, label: 'البحث المرئي' },
   { to: '/admin/system?section=security', icon: DatabaseBackup, label: 'السيرفر والنسخ' },
 ];
