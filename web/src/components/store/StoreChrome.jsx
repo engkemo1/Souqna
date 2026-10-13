@@ -28,10 +28,11 @@ export function CountBadge({ n, bumpKey }) {
 }
 
 export function StoreLogo({ store, size = 36, className }) {
+  const initials = store.logoInitials || (store.name?.ar || store.name?.en || store.code || '').trim().replace(/\s+/g, '').slice(0, 2);
   return store.logo ? (
     <SmartImage media={store.logo} ratio="1 / 1" sizes={`${size * 2}px`} className={cx('shrink-0 rounded-full ring-1 ring-black/5', className)} />
   ) : (
-    <span className={cx('grid shrink-0 place-items-center rounded-full bg-primary font-display text-sm text-on-primary', className)} style={{ width: size, height: size }}>{store.code}</span>
+    <span className={cx('grid shrink-0 place-items-center rounded-full font-display text-sm font-bold text-white', className)} style={{ width: size, height: size, backgroundColor: store.logoColor || undefined }}>{initials}</span>
   );
 }
 

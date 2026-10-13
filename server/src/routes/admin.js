@@ -592,7 +592,7 @@ r.patch('/orders/:id/delivery', h((req, res) => {
 
 r.get('/stores', h((_req, res) => {
   const stores = q.all(`
-    SELECT s.id, s.slug, s.name_ar, s.name_en, s.phone, s.whatsapp, s.auto_whatsapp, s.hidden, s.featured, s.sort_order, s.status, s.delivery_mode, s.departments, s.category, s.created_at,
+    SELECT s.id, s.slug, s.name_ar, s.name_en, s.phone, s.whatsapp, s.auto_whatsapp, s.hidden, s.featured, s.sort_order, s.status, s.delivery_mode, s.departments, s.category, s.logo_initials, s.logo_color, s.created_at,
       u.email AS owner_email, u.name AS owner_name, u.role,
       (SELECT COUNT(*) FROM products p WHERE p.store_id = s.id) AS products_count,
       (SELECT COUNT(*) FROM orders o WHERE o.store_id = s.id) AS orders_count,
@@ -610,12 +610,13 @@ r.patch('/stores/:slug', h((req, res) => {
     departments: z.array(z.string().max(31)).min(1).optional(),
     name_ar: z.string().trim().min(2).max(60).optional(), name_en: z.string().trim().min(2).max(60).optional(),
     phone: z.string().trim().regex(/^01[0125][0-9]{8}$/, 'phone_invalid').optional(),
+    logo_initials: z.string().trim().max(2).optional(), logo_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   }).parse(req.body);
   const store = q.get('SELECT id, owner_id FROM stores WHERE slug=?', [req.params.slug]);
   if (!store) throw new AppError(404, 'not_found', 'Store not found.');
   const patch = {};
   for (const k of ['hidden', 'featured', 'auto_whatsapp']) if (body[k] !== undefined) patch[k] = body[k] ? 1 : 0;
-  for (const k of ['sort_order', 'delivery_mode', 'status', 'name_ar', 'name_en', 'phone']) if (body[k] !== undefined) patch[k] = body[k];
+  for (const k of ['sort_order', 'delivery_mode', 'status', 'name_ar', 'name_en', 'phone', 'logo_initials', 'logo_color']) if (body[k] !== undefined) patch[k] = body[k];
   if (body.departments) { assertDepartments(body.departments); patch.departments = encodeDepartments(body.departments); patch.category = body.departments.length === 1 ? body.departments[0] : 'mixed'; }
   update('stores', store.id, patch);
   if (body.owner_disabled !== undefined) q.run("UPDATE users SET role=? WHERE id=? AND role<>'demo'", [body.owner_disabled ? 'disabled' : 'owner', store.owner_id]);

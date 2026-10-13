@@ -28,6 +28,8 @@ export function serializeStore(s, { withTheme = true } = {}) {
     instagram: s.instagram,
     facebook: s.facebook,
     logo: media.get(s.logo_media_id) || null,
+    logoInitials: s.logo_initials || '',
+    logoColor: s.logo_color || '#1B1B1B',
     cover: media.get(s.cover_media_id) || null,
     rating: s.rating,
     ratingCount: s.rating_count,

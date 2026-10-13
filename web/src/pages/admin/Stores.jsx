@@ -116,7 +116,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
   const [prod, setProd] = useState(null);
   const [del, setDel] = useState('');
   const [link, setLink] = useState(null);
-  if (store && key !== store.slug) { setKey(store.slug); setLink(null); setDel(''); setF({ name_ar: store.name_ar, name_en: store.name_en, phone: store.phone || '', departments: store.departments, delivery_mode: store.delivery_mode, hidden: store.hidden, featured: store.featured, auto_whatsapp: store.auto_whatsapp, suspended: store.status !== 'active', owner_disabled: store.owner_disabled, sort_order: store.sort_order }); }
+  if (store && key !== store.slug) { setKey(store.slug); setLink(null); setDel(''); setF({ name_ar: store.name_ar, name_en: store.name_en, phone: store.phone || '', departments: store.departments, delivery_mode: store.delivery_mode, hidden: store.hidden, featured: store.featured, auto_whatsapp: store.auto_whatsapp, suspended: store.status !== 'active', owner_disabled: store.owner_disabled, sort_order: store.sort_order, logo_initials: store.logo_initials || (store.name_ar || store.name_en || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: store.logo_color || '#1B1B1B' }); }
   if (!store || !f) return <Sheet open={false} onClose={onClose} />;
   const patch = async (body, label) => {
     setBusy(label || 'save');
@@ -124,7 +124,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
   };
   const save = async () => {
     if (!f.departments.length) { toast({ tone: 'error', title: 'اختار قسم واحد على الأقل' }); return; }
-    const ok = await patch({ name_ar: f.name_ar, name_en: f.name_en, phone: f.phone, departments: f.departments, delivery_mode: f.delivery_mode, hidden: f.hidden, featured: f.featured, auto_whatsapp: f.auto_whatsapp, status: f.suspended ? 'suspended' : 'active', owner_disabled: f.owner_disabled, sort_order: Number(f.sort_order) || 0 });
+    const ok = await patch({ name_ar: f.name_ar, name_en: f.name_en, phone: f.phone, departments: f.departments, delivery_mode: f.delivery_mode, hidden: f.hidden, featured: f.featured, auto_whatsapp: f.auto_whatsapp, status: f.suspended ? 'suspended' : 'active', owner_disabled: f.owner_disabled, sort_order: Number(f.sort_order) || 0, logo_initials: f.logo_initials, logo_color: f.logo_color });
     if (ok) { toast({ title: 'اتحفظ' }); onClose(); }
   };
   const setup = async () => { try { const r = await adminApi(`/stores/${store.slug}/setup-link`, { method: 'POST', body: {} }); setLink(r.url); navigator.clipboard?.writeText(r.url); toast({ title: 'اتعمل لينك تفعيل واتنسخ' }); } catch (x) { toast({ tone: 'error', title: x.message }); } };
@@ -145,6 +145,15 @@ function EditSheet({ store, onClose, onChanged, depts }) {
             <Field label="الاسم (إنجليزي)"><Input dir="ltr" value={f.name_en} onChange={(e) => setF({ ...f, name_en: e.target.value })} className="text-start" /></Field>
             <Field label="رقم التليفون"><Input dir="ltr" inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className="text-start" /></Field>
             <Field label="ترتيب الظهور" hint="الأصغر يظهر الأول"><Input type="number" dir="ltr" min={0} value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
+          </div>
+          <div className="rounded-2xl border border-line p-4">
+            <p className="mb-3 text-sm font-semibold">شعار بالحروف</p>
+            <div className="flex items-end gap-3">
+              <Field label="أول حرفين"><Input maxLength={2} value={f.logo_initials} onChange={(e) => setF({ ...f, logo_initials: [...e.target.value].slice(0, 2).join('') })} /></Field>
+              <label className="grid gap-1 text-sm font-medium">اللون<input aria-label="لون شعار الحروف" type="color" value={f.logo_color} onChange={(e) => setF({ ...f, logo_color: e.target.value })} className="h-11 w-16 cursor-pointer rounded-lg border border-line bg-transparent p-1" /></label>
+              <span className="mb-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: f.logo_color }}>{f.logo_initials || (store.name_ar || store.name_en || '').trim().replace(/\s+/g, '').slice(0, 2)}</span>
+            </div>
+            <p className="mt-2 text-xs text-muted">يظهر لو مفيش صورة شعار مرفوعة للمحل.</p>
           </div>
           <div><p className="mb-2 text-sm font-medium">الأقسام</p><DeptPicker depts={depts} value={f.departments} onChange={(v) => setF({ ...f, departments: v })} /></div>
           <div><p className="mb-2 text-sm font-medium">التوصيل</p>

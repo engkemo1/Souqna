@@ -19,7 +19,7 @@ import { useDepartments } from '../../lib/departments.js';
 import PageTransition from '../../components/PageTransition.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'hero_mode', 'delivery_mode', 'opens_at', 'closes_at', 'day_off', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'hero_mode', 'delivery_mode', 'opens_at', 'closes_at', 'day_off', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
 
 function HeroModePicker({ value, onChange }) {
   const { t } = useI18n();
@@ -113,6 +113,7 @@ export default function Settings() {
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
       address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', hero_mode: s.heroMode || 'auto', delivery_mode: s.deliveryMode || 'store', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
       shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
+      logo_initials: s.logoInitials || (s.name.ar || s.name.en || s.code || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: s.logoColor || '#1B1B1B',
     });
     setF(x);
     setInitial(JSON.stringify(x));
@@ -228,6 +229,15 @@ export default function Settings() {
           <Panel title={t('settings.brand')}>
             <div className="space-y-5">
               <ImageSlot label={t('settings.logo')} media={data.store.logo} slot="logo" ratio="1 / 1" round onUploaded={onImage('logo')} onDelete={() => deleteImage('logo')} deleteBusy={deleteBusy === 'logo'} />
+              <div className="space-y-3 rounded-2xl border border-line p-3">
+                <p className="text-sm font-semibold">شعار بالحروف (بدون تكلفة)</p>
+                <div className="flex items-end gap-3">
+                  <Field label="أول حرفين" hint="عربي أو إنجليزي"><Input maxLength={2} value={f.logo_initials} onChange={(e) => setF({ ...f, logo_initials: [...e.target.value].slice(0, 2).join('') })} /></Field>
+                  <label className="grid gap-1 text-sm font-medium">اللون<input aria-label="لون شعار الحروف" type="color" value={f.logo_color} onChange={(e) => setF({ ...f, logo_color: e.target.value })} className="h-11 w-16 cursor-pointer rounded-lg border border-line bg-transparent p-1" /></label>
+                  <span className="mb-0.5 grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold text-white" style={{ backgroundColor: f.logo_color }}>{f.logo_initials || data.store.code}</span>
+                </div>
+                <p className="text-xs text-muted">بيظهر الشعار بالحروف لو مفيش صورة شعار مرفوعة.</p>
+              </div>
 <div>
                 <ImageSlot label={t('settings.cover')} media={data.store.cover} slot="cover" ratio="16 / 10" onUploaded={onImage('cover')} onDelete={() => deleteImage('cover')} deleteBusy={deleteBusy === 'cover'} />
                 <AutoCover onDone={onImage('cover')} />

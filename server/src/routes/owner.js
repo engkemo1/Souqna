@@ -97,6 +97,8 @@ const storeSchema = z.object({
   departments: z.array(z.string().max(31)).min(1, 'departments_required').max(40).optional(),
   phone: z.string().trim().max(20).optional(), whatsapp: z.string().trim().max(20).optional(),
   hero_mode: z.enum(['auto', 'cover', 'slider']).optional(),
+  logo_initials: z.string().trim().max(2).optional(),
+  logo_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   delivery_mode: z.enum(['store', 'platform']).optional(),
   opens_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   closes_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),

@@ -23,6 +23,8 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   if (!cols.includes('departments')) db.exec("ALTER TABLE stores ADD COLUMN departments TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('delivery_mode')) db.exec("ALTER TABLE stores ADD COLUMN delivery_mode TEXT NOT NULL DEFAULT 'store'");
   if (!cols.includes('hero_mode')) db.exec("ALTER TABLE stores ADD COLUMN hero_mode TEXT NOT NULL DEFAULT 'auto'");
+  if (!cols.includes('logo_initials')) db.exec("ALTER TABLE stores ADD COLUMN logo_initials TEXT NOT NULL DEFAULT ''");
+  if (!cols.includes('logo_color')) db.exec("ALTER TABLE stores ADD COLUMN logo_color TEXT NOT NULL DEFAULT '#1B1B1B'");
   if (!cols.includes('same_day_date')) db.exec('ALTER TABLE stores ADD COLUMN same_day_date TEXT');
   if (!cols.includes('same_day_until')) db.exec("ALTER TABLE stores ADD COLUMN same_day_until TEXT NOT NULL DEFAULT '18:00'");
   db.exec("UPDATE stores SET departments=',' || category || ',' WHERE departments='' AND category NOT IN ('mixed','')");
