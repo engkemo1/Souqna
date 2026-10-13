@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { ArrowLeft, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import ModaAvatar from './ModaAvatar.jsx';
@@ -26,10 +27,11 @@ export default function LookOfDay() {
               <ModaAvatar src={avatar} size={56} />
               <div className="min-w-0">
                 <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-elevated/80 px-2.5 py-1 text-[11px] font-semibold text-brand">
-                  <Sparkles className="h-3.5 w-3.5" />{t('lod.todayTag')}
+                  <Sparkles className="h-3.5 w-3.5" />{e.badge || t('lod.todayTag')}
                 </div>
-                <h2 className="font-display text-xl font-bold leading-tight sm:text-2xl">{t('lod.title')}</h2>
+                <h2 className="font-display text-xl font-bold leading-tight sm:text-2xl">{e.title || t('lod.title')}</h2>
                 <p className="mt-1 text-[12px] text-muted sm:text-[13px]">{tabName(e)}{e.occasion ? ' · ' + e.occasion : ''} · {t('lod.by', { n: name })}</p>
+                {e.description && <p className="mt-1 max-w-xl text-[12px] leading-relaxed text-muted sm:text-[13px]">{e.description}</p>}
               </div>
             </div>
             {entries.length > 1 && (
@@ -42,6 +44,7 @@ export default function LookOfDay() {
         <div className="px-4 pb-5 sm:px-6 sm:pb-7">
           {e.say && <p className="flex items-start gap-2 rounded-2xl border border-brand/15 bg-brand/5 px-4 py-3 text-[14px] leading-relaxed sm:text-[15px]"><Sparkles className="mt-1 h-4 w-4 shrink-0 text-brand" />{e.say}</p>}
           <div key={`${e.audience || e.persona || 'look'}-${e.age || ''}-${e.occasion || ''}-${tab}`}><LookSet data={e} name={name} /></div>
+          <Link to={`/look-of-day/${tab}`} className="mt-4 inline-flex items-center gap-2 rounded-full border border-brand/40 px-4 py-2.5 text-sm font-bold text-brand transition hover:bg-brand hover:text-white"><span>{lang === 'ar' ? 'شوف صفحة اللوك كاملة' : 'View the full look'}</span><ArrowLeft className="h-4 w-4" /></Link>
         </div>
       </div>
     </section>

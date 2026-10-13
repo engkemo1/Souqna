@@ -411,7 +411,11 @@ const lookOutfitSchema = z.object({
   occasion: z.string().trim().min(2).max(80),
   pieces: z.array(lookPieceSchema).min(2).max(8),
 });
-const manualLookSchema = z.object({ outfits: z.array(lookOutfitSchema).max(12).default([]) });
+const manualLookSchema = z.object({
+  outfits: z.array(lookOutfitSchema).max(12).default([]),
+  coverImage: z.string().trim().max(500).optional().default('').refine((value) => !value || value.includes('/homepage-ads/'), 'Invalid look image.'), title: z.string().trim().max(100).optional().default(''),
+  description: z.string().trim().max(240).optional().default(''), badge: z.string().trim().max(40).optional().default(''),
+});
 r.get('/look-of-day', h((_req, res) => res.json(lookOfDayAdminSettings())));
 r.get('/look-of-day/products', h((req, res) => res.json({ items: searchLookOfDayProducts(req.query.q) })));
 r.post('/look-of-day/ai-proposal', h(async (_req, res) => {
@@ -430,7 +434,7 @@ r.post('/look-of-day/approve-ai', h((_req, res) => {
   }
 }));
 r.delete('/look-of-day/ai-proposal', h((_req, res) => res.json(discardLookOfDayProposal())));
-r.put('/look-of-day', h((req, res) => {
+r.put('/look-of-day', h(async (req, res) => {
   const body = z.object({ mode: z.enum(['ai', 'manual', 'off']), manual: manualLookSchema.optional() }).parse(req.body);
   if (body.mode === 'manual') {
     if (!body.manual?.outfits.length) throw new AppError(422, 'validation_failed', 'Add at least one complete outfit.');
@@ -440,7 +444,10 @@ r.put('/look-of-day', h((req, res) => {
         AND (p.track_stock=0 OR p.stock>0)`, ids).map((row) => row.id);
     if (valid.length !== ids.length) throw new AppError(422, 'validation_failed', 'One or more selected products are no longer available. Refresh the product list.');
   }
-  res.json(saveLookOfDayAdminSettings({ mode: body.mode, manual: body.manual }));
+  const previousImage = lookOfDayAdminSettings().manual.coverImage;
+  const saved = saveLookOfDayAdminSettings({ mode: body.mode, manual: body.manual });
+  if (body.manual && previousImage && previousImage !== body.manual.coverImage) await removeDeptImage(previousImage);
+  res.json(saved);
 }));
 
 /* ---- visual search settings (on/off, model, free daily quota) ---- */
@@ -722,6 +729,10 @@ r.patch('/departments/:id', h((req, res) => {
   res.json({ departments: listDepartments({ all: true }) });
 }));
 const deptUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
+r.post('/look-of-day/image', deptUpload.single('file'), h(async (req, res) => {
+  if (!req.file) throw new AppError(422, 'validation_failed', 'Pick an image.', { file: 'required' });
+  res.json({ image: await saveHomepageAdImage(req.file.buffer) });
+}));
 r.post('/departments/:id/image', deptUpload.single('file'), h(async (req, res) => {
   const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);
   if (!d) throw new AppError(404, 'not_found', 'Department not found.');

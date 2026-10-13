@@ -22,6 +22,7 @@ const Track = lazy(() => import('./pages/market/Track.jsx'));
 const Join = lazy(() => import('./pages/market/Join.jsx'));
 const Account = lazy(() => import('./pages/market/Account.jsx'));
 const LookShare = lazy(() => import('./pages/market/LookShare.jsx'));
+const LookOfDayDetail = lazy(() => import('./pages/market/LookOfDayDetail.jsx'));
 const Legal = lazy(() => import('./pages/market/Legal.jsx'));
 const Request = lazy(() => import('./pages/market/Request.jsx'));
 
@@ -95,6 +96,7 @@ const router = createBrowserRouter([
       { path: '/join', element: <Join /> },
       { path: '/account', element: <Account /> },
       { path: '/look/:token', element: <LookShare /> },
+      { path: '/look-of-day/:index', element: <LookOfDayDetail /> },
       { path: '/legal', element: <Legal /> },
       { path: '/legal/:doc', element: <Legal /> },
       { path: '/request', element: <Request /> },

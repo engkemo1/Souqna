@@ -45,30 +45,31 @@ function LookRow({ look, lang, tr, t, added, onAdd }) {
   );
 }
 
-function ManualLookCards({ looks, lang, tr, t, added, onAdd }) {
+function ManualLookCards({ looks, lang, tr, t, added, onAdd, editorial = false }) {
   return (
-    <div className={cx('mx-auto mt-4 grid w-full grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4', looks.length <= 2 ? 'max-w-5xl' : 'max-w-6xl xl:grid-cols-3')}>
+    <div className={cx('mx-auto mt-4 grid w-full grid-cols-1 gap-3 sm:gap-4', editorial ? 'lg:grid-cols-2' : 'sm:grid-cols-2', looks.length <= 2 ? 'max-w-5xl' : 'max-w-6xl xl:grid-cols-3')}>
       {looks.map((look, index) => {
         const p = look.items[0];
         if (!p) return null;
         return (
-          <article key={`${p.id}-${index}`} className="group overflow-hidden rounded-2xl border border-line bg-canvas/70 p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md sm:rounded-3xl sm:p-3">
+          <article key={`${p.id}-${index}`} className={cx('group overflow-hidden rounded-2xl border border-line bg-canvas/70 p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md sm:rounded-3xl sm:p-3', editorial && 'grid grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)] items-center gap-2 sm:gap-4')}>
             <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="group block min-w-0 text-start">
               <div className="relative">
-                <SmartImage media={p.image} ratio="4 / 4.5" className="overflow-hidden rounded-xl sm:rounded-2xl" sizes="(min-width:1280px) 360px, (min-width:640px) 42vw, 92vw" />
+                <SmartImage media={p.image} ratio="4 / 4.5" className="overflow-hidden rounded-xl sm:rounded-2xl" sizes={editorial ? '(min-width:1024px) 28vw, 48vw' : '(min-width:1280px) 360px, (min-width:640px) 42vw, 92vw'} />
                 <span className="absolute start-2 top-2 max-w-[calc(100%-1rem)] truncate rounded-full border border-line/70 bg-elevated/95 px-3 py-1.5 text-[11px] font-bold shadow-sm sm:text-xs">{look.label}</span>
               </div>
-              <div className="px-1 pb-1 pt-3">
-                <p className="line-clamp-2 min-h-[2.6em] text-sm font-bold leading-snug sm:text-base">{tr(p.name)}</p>
-                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-base font-extrabold text-sale sm:text-lg">{formatMoney(p.price, lang)}</p>
-                  <p className="max-w-[55%] truncate text-xs text-muted">{tr(p.store.name)}</p>
-                </div>
-              </div>
             </Link>
-            <button type="button" onClick={() => onAdd(p)} className={cx('mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition sm:text-sm', added.includes(p.id) ? 'border-brand bg-brand/5 text-brand' : 'border-line-strong bg-elevated hover:border-brand hover:text-brand')}>
-              {added.includes(p.id) ? <Check className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}{added.includes(p.id) ? t('stylist.added') : t('stylist.addPick')}
-            </button>
+            <div className={cx('min-w-0', editorial ? 'flex flex-col justify-center px-1 py-2 sm:px-2' : 'col-span-full px-1 pb-1 pt-3')}>
+              <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="block min-w-0 text-start">
+                <p className={cx('font-bold leading-snug', editorial ? 'line-clamp-3 text-xs sm:text-base' : 'line-clamp-2 min-h-[2.6em] text-sm sm:text-base')}>{tr(p.name)}</p>
+                <p className="mt-1 truncate text-[11px] text-muted sm:text-xs">{tr(p.store.name)}</p>
+                <p className="mt-2 text-base font-extrabold text-sale sm:text-lg">{formatMoney(p.price, lang)}</p>
+              </Link>
+              {editorial && Array.isArray(p.colors) && p.colors.length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1" aria-label={lang === 'ar' ? 'الألوان المتاحة' : 'Available colours'}>{p.colors.slice(0, 5).map((color) => <span key={color.hex} title={lang === 'ar' ? color.name_ar : color.name_en} className="h-3.5 w-3.5 rounded-full border border-black/15 sm:h-4 sm:w-4" style={{ backgroundColor: color.hex }} />)}</div>}
+              <button type="button" onClick={() => onAdd(p)} className={cx('mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-2 py-2 text-[10px] font-bold transition sm:text-sm', added.includes(p.id) ? 'border-brand bg-brand/5 text-brand' : 'border-line-strong bg-elevated hover:border-brand hover:text-brand')}>
+                {added.includes(p.id) ? <Check className="h-4 w-4 shrink-0" /> : <ShoppingBag className="h-4 w-4 shrink-0" />}{added.includes(p.id) ? t('stylist.added') : t('stylist.addPick')}
+              </button>
+            </div>
           </article>
         );
       })}
@@ -77,7 +78,7 @@ function ManualLookCards({ looks, lang, tr, t, added, onAdd }) {
 }
 
 /** A complete look: styling tip, the pieces, the total, add-everything-to-cart (size picker per piece), per-store cart links and WhatsApp share. */
-export default function LookSet({ data, name }) {
+export default function LookSet({ data, name, marketplace = false, editorial = false, stickyCTA = false }) {
   const { t, tr, lang } = useI18n();
   const [quick, setQuick] = useState(null); // { queue: [product], i }
   const [added, setAdded] = useState([]);
@@ -132,7 +133,7 @@ export default function LookSet({ data, name }) {
       {m.state === 'alternatives' && <p className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-[12px] font-semibold text-muted">{ar ? 'أقرب بديل متاح' : 'Closest available'}</p>}
       {m.state === 'partial' && <p className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-[12px] font-semibold text-muted">{ar ? 'جزء من الطقم متاح' : 'Part of the look is available'}</p>}
       {tabs && <div role="tablist" className="mt-4 grid grid-cols-2 gap-1 rounded-full bg-secondary p-1">{tabs.map((tb, i) => <button key={tb.id} type="button" role="tab" aria-selected={i === tab} onClick={() => setTab(i)} className={cx('rounded-full px-3 py-2 text-[13px] font-bold transition', i === tab ? 'bg-elevated shadow-sm' : 'text-muted')}>{tb.label} <span className="font-normal">· {Number(tb.subtotal) > 0 ? money(tb.subtotal) : (ar ? 'لسه مفيش قطع' : 'No items yet')}</span></button>)}</div>}
-      {m.manual ? <><p className="mt-4 text-sm font-bold">قطع الأوتفيت المختارة</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} /></> : shownLooks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
+      {m.manual ? <><p className="mt-4 text-sm font-bold">{editorial ? (ar ? 'هذا اللوك يحتوي على:' : 'Pieces in this look:') : 'قطع الأوتفيت المختارة'}</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} editorial={editorial} /></> : shownLooks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
       <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-line bg-canvas/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
         <div>
           <p className="text-[11px] font-semibold text-muted">{ar ? 'إجمالي القطع المختارة' : 'Selected items total'}</p>
@@ -145,7 +146,13 @@ export default function LookSet({ data, name }) {
         </div>
       </div>
       {missing}
-      {quick && <QuickAddSheet slug={quick.queue[quick.i].store.slug} product={quick.queue[quick.i]} step={quick.queue.length > 1 ? `${quick.i + 1}/${quick.queue.length}` : ''} onAdded={nextAdd} onClose={() => setQuick(null)} />}
+      {stickyCTA && <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 px-3 pt-3 shadow-[0_-8px_30px_rgba(0,0,0,.08)] backdrop-blur-md sm:px-6" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}>
+        <div className="mx-auto flex max-w-7xl items-center gap-3">
+          <div className="min-w-0 flex-1"><p className="text-[10px] font-semibold text-muted sm:text-xs">{ar ? 'إجمالي اللوك كامل' : 'Full look total'}</p><p className="truncate text-base font-extrabold text-brand sm:text-lg">{money(m.total)}</p></div>
+          <button type="button" onClick={() => startAdd(picks)} className="inline-flex min-h-12 flex-[1.6] items-center justify-center gap-2 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-on-btn sm:flex-none sm:px-8 sm:text-base"><ShoppingBag className="h-4 w-4" />{ar ? 'اشتري اللوك كامل' : 'Buy the full look'}</button>
+        </div>
+      </div>}
+      {quick && <QuickAddSheet slug={quick.queue[quick.i].store.slug} product={quick.queue[quick.i]} marketplace={marketplace} step={quick.queue.length > 1 ? `${quick.i + 1}/${quick.queue.length}` : ''} onAdded={nextAdd} onClose={() => setQuick(null)} />}
     </>
   );
 }

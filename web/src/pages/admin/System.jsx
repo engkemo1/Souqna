@@ -371,7 +371,7 @@ function lookOfDayForm(data) {
   const manual = data.manual || {};
   return {
     mode: data.mode || 'ai',
-    manual: { outfits: (manual.outfits || []).map((outfit) => ({
+    manual: { coverImage: manual.coverImage || '', title: manual.title || '', description: manual.description || '', badge: manual.badge || '', outfits: (manual.outfits || []).map((outfit) => ({
       audience: outfit.audience || 'women', age: outfit.age || '', say: outfit.say || '', tips: outfit.tips || '', occasion: outfit.occasion || '',
       pieces: (outfit.pieces || []).map((piece) => ({ label: piece.label || '', productId: piece.product ? piece.productId : null, product: piece.product || null })),
     })) },
@@ -451,11 +451,11 @@ function LookOfDayPanel() {
   const manualReady = manualOutfits.length > 0 && manualOutfits.every(outfitReady);
   const changeOutfit = (index, fn) => setF((current) => ({
     ...current,
-    manual: { outfits: current.manual.outfits.map((outfit, i) => i === index ? fn(outfit) : outfit) },
+    manual: { ...current.manual, outfits: current.manual.outfits.map((outfit, i) => i === index ? fn(outfit) : outfit) },
   }));
   const save = async () => {
     setBusy(true);
-    const manual = { outfits: manualOutfits.filter((outfit) => outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).length >= 2)
+    const manual = { coverImage: f.manual.coverImage, title: f.manual.title.trim(), description: f.manual.description.trim(), badge: f.manual.badge.trim(), outfits: manualOutfits.filter((outfit) => outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).length >= 2)
       .map((outfit) => ({
         audience: outfit.audience, age: outfit.age.trim(), say: outfit.say.trim(), tips: outfit.tips.trim(), occasion: outfit.occasion.trim(),
         pieces: outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).map((piece) => ({ label: piece.label.trim(), productId: Number(piece.productId) })),
@@ -549,12 +549,23 @@ function LookOfDayPanel() {
         {f.mode === 'manual' && (
           <div className="space-y-4 border-t border-line pt-4">
             <p className="text-sm text-muted">ضيف عدة أوتفيتات كاملة لليوم. لكل طقم اختار الفئة (حريمي، رجالي أو أطفال)، والعمر لو مناسب، والمناسبة، ثم اختار القطع المتناسقة من منتجات المحلات. الكاب والطاقية ضمن الإكسسوارات.</p>
+            <section className="grid gap-3 rounded-2xl border border-line bg-canvas/60 p-3 sm:grid-cols-2 sm:p-4">
+              <div className="sm:col-span-2"><p className="font-semibold">شكل صفحة اللوك</p><p className="mt-1 text-xs text-muted">الصورة اختيارية؛ لو مفيش صورة هنستخدم صورة أول منتج تلقائيًا.</p></div>
+              <label className="block"><span className="mb-1 block text-xs font-medium text-muted">عنوان الصفحة</span><Input value={f.manual.title} maxLength={100} onChange={(e) => setF((x) => ({ ...x, manual: { ...x.manual, title: e.target.value } }))} placeholder="لوك النهارده" /></label>
+              <label className="block"><span className="mb-1 block text-xs font-medium text-muted">شارة صغيرة</span><Input value={f.manual.badge} maxLength={40} onChange={(e) => setF((x) => ({ ...x, manual: { ...x.manual, badge: e.target.value } }))} placeholder="الأكثر طلبًا ✨" /></label>
+              <label className="block sm:col-span-2"><span className="mb-1 block text-xs font-medium text-muted">وصف الصفحة</span><Textarea rows={2} value={f.manual.description} maxLength={240} onChange={(e) => setF((x) => ({ ...x, manual: { ...x.manual, description: e.target.value } }))} placeholder="قطع متناسقة اختيرت بعناية من محلات بنها" /></label>
+              <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
+                {f.manual.coverImage ? <img src={f.manual.coverImage} alt="" className="h-20 w-28 rounded-xl object-cover" /> : <div className="grid h-20 w-28 place-items-center rounded-xl bg-secondary text-xs text-muted">صورة أول منتج</div>}
+                <label className="inline-flex cursor-pointer items-center rounded-full border border-line-strong px-3.5 py-2 text-[13px] font-semibold hover:border-fg">{busy ? 'جاري الرفع…' : 'رفع صورة للهيرو'}<input type="file" accept="image/*" hidden disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; setBusy(true); try { const result = await adminUpload('/look-of-day/image', file); setF((x) => ({ ...x, manual: { ...x.manual, coverImage: result.image } })); toast({ title: 'اترفعت الصورة؛ احفظ الإعداد لنشرها' }); } catch (x) { toast({ tone: 'error', title: x.message }); } setBusy(false); }} /></label>
+                {f.manual.coverImage && <button type="button" onClick={() => setF((x) => ({ ...x, manual: { ...x.manual, coverImage: '' } }))} className="text-sm font-semibold text-sale">استخدم صورة المنتج بدلها</button>}
+              </div>
+            </section>
             <datalist id="look-of-day-occasions">{LOOK_OCCASIONS.map((occasion) => <option key={occasion} value={occasion} />)}</datalist>
             <datalist id="look-of-day-pieces">{LOOK_PIECE_SUGGESTIONS.map((piece) => <option key={piece} value={piece} />)}</datalist>
             <div className="space-y-3">
               {f.manual.outfits.map((outfit, outfitIndex) => (
                 <section key={outfitIndex} className="min-w-0 space-y-3 rounded-2xl border border-line bg-canvas/60 p-3 sm:p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">أوتفيت {outfitIndex + 1}</h3><div className="flex items-center gap-2"><Button size="sm" variant="outline" icon={Sparkles} loading={teachingIndex === outfitIndex} disabled={!outfitReady(outfit) || teachingIndex !== null} onClick={() => teachOutfit(outfitIndex)}>أضف لسجل تعلّم المساعد الذكي</Button><button type="button" aria-label="حذف الأوتفيت" onClick={() => setF((current) => ({ ...current, manual: { outfits: current.manual.outfits.filter((_, i) => i !== outfitIndex) } }))} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-line-strong text-muted hover:border-sale hover:text-sale"><Trash2 className="h-4 w-4" /></button></div></div>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">أوتفيت {outfitIndex + 1}</h3><div className="flex items-center gap-2"><Button size="sm" variant="outline" icon={Sparkles} loading={teachingIndex === outfitIndex} disabled={!outfitReady(outfit) || teachingIndex !== null} onClick={() => teachOutfit(outfitIndex)}>أضف لسجل تعلّم المساعد الذكي</Button><button type="button" aria-label="حذف الأوتفيت" onClick={() => setF((current) => ({ ...current, manual: { ...current.manual, outfits: current.manual.outfits.filter((_, i) => i !== outfitIndex) } }))} className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-line-strong text-muted hover:border-sale hover:text-sale"><Trash2 className="h-4 w-4" /></button></div></div>
                   <div className="grid min-w-0 gap-3 sm:grid-cols-3">
                     <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">الفئة</span><Select value={outfit.audience} onChange={(e) => changeOutfit(outfitIndex, (x) => ({ ...x, audience: e.target.value }))}><option value="women">حريمي</option><option value="men">رجالي</option><option value="kids">أطفال</option></Select></label>
                     <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">العمر أو الفئة العمرية (اختياري)</span><Input value={outfit.age} maxLength={40} onChange={(e) => changeOutfit(outfitIndex, (x) => ({ ...x, age: e.target.value }))} placeholder="مثال: ٨–١٠ سنين" /></label>
@@ -577,7 +588,7 @@ function LookOfDayPanel() {
                   <Button size="sm" variant="outline" icon={Plus} onClick={() => changeOutfit(outfitIndex, (x) => ({ ...x, pieces: [...x.pieces, { label: '', productId: null, product: null }] }))}>إضافة قطعة</Button>
                 </section>
               ))}
-              <Button size="sm" variant="outline" icon={Plus} disabled={f.manual.outfits.length >= 12} onClick={() => setF((current) => ({ ...current, manual: { outfits: [...current.manual.outfits, blankOutfit()] } }))}>إضافة أوتفيت</Button>
+              <Button size="sm" variant="outline" icon={Plus} disabled={f.manual.outfits.length >= 12} onClick={() => setF((current) => ({ ...current, manual: { ...current.manual, outfits: [...current.manual.outfits, blankOutfit()] } }))}>إضافة أوتفيت</Button>
               <p className="text-xs text-muted">تقدر تضيف لحد ١٢ أوتفيت في اليوم. الكاب والطاقية يتضافوا كإكسسوار من منتجات المحلات.</p>
             </div>
             {!manualReady && <p className="text-xs text-sale">لكل أوتفيت مضاف: اختار الفئة والمناسبة، وأضف منتجين على الأقل. تحديد العمر اختياري.</p>}

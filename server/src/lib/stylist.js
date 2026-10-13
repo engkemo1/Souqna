@@ -686,7 +686,9 @@ export function lookOfDayAdminSettings() {
   const proposal = readEntrySetting(LOOK_OF_DAY_PROPOSAL_KEY);
   const approved = readEntrySetting(LOOK_OF_DAY_APPROVED_KEY);
   const hydrateEntries = (entries) => (Array.isArray(entries) ? entries : []).map(revalidate).filter(Boolean);
-  return { mode: lookOfDayMode(), manual: { outfits: outfits.map((outfit) => ({
+  return { mode: lookOfDayMode(), manual: {
+    coverImage: String(raw.coverImage || ''), title: String(raw.title || ''), description: String(raw.description || ''), badge: String(raw.badge || ''),
+    outfits: outfits.map((outfit) => ({
     audience: ['women', 'men', 'kids'].includes(outfit.audience) ? outfit.audience : 'women',
     age: String(outfit.age || ''), say: String(outfit.say || ''), tips: String(outfit.tips || ''), occasion: String(outfit.occasion || ''),
     pieces: (Array.isArray(outfit.pieces) ? outfit.pieces : []).map((piece) => {
@@ -706,7 +708,8 @@ export function saveLookOfDayAdminSettings({ mode, manual }) {
 }
 
 function buildManualLookEntries() {
-  const outfits = storedManualOutfits();
+  const manual = readManualLooks();
+  const outfits = storedManualOutfits(manual);
   const ids = outfits.flatMap((outfit) => (Array.isArray(outfit.pieces) ? outfit.pieces : []).map((piece) => Number(piece.productId)));
   const products = new Map(productCards(manualProductRows(ids)).map((product) => [product.id, product]));
   return outfits.map((outfit) => {
@@ -720,6 +723,7 @@ function buildManualLookEntries() {
       audience, age: String(outfit.age || '').slice(0, 40), occasion: String(outfit.occasion || '').slice(0, 80),
       say: String(outfit.say || '').slice(0, 700), tips: String(outfit.tips || '').slice(0, 300),
       looks, total: looks.reduce((sum, look) => sum + look.items[0].price, 0), budget: null, overBudget: false, manual: true,
+      coverImage: String(manual.coverImage || ''), title: String(manual.title || ''), description: String(manual.description || ''), badge: String(manual.badge || ''),
     };
   }).filter(Boolean);
 }
