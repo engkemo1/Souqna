@@ -25,13 +25,17 @@ warmup.listen(config.port, () =>
 // --- 2. DB setup (may be slow on a fresh empty volume) ------------------
 try {
   if (!fs.existsSync(config.dbFile)) {
-    const bakedDb = path.join(ROOT, 'data', 'souqna.db');
-    const bakedMedia = path.join(ROOT, 'data', 'media');
-    if (path.resolve(bakedDb) !== path.resolve(config.dbFile) && fs.existsSync(bakedDb)) {
+    // The demo DB is baked into the image at /app/seed-db/ (separate from the volume mount)
+    // so this copy always works, even when DB_FILE points to a volume path.
+    const bakedDb = '/app/seed-db/souqna.db';
+    const bakedMedia = '/app/seed-db/media';
+    if (fs.existsSync(bakedDb)) {
       console.log('Empty volume — copying the seeded demo data from the image…');
       fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
       fs.copyFileSync(bakedDb, config.dbFile);
-      if (fs.existsSync(bakedMedia) && path.resolve(bakedMedia) !== path.resolve(config.mediaDir))
+      // Media is on R2 in production; only copy local media if R2 is not configured.
+      const hasR2 = config.r2?.bucket && config.r2?.accessKeyId;
+      if (!hasR2 && fs.existsSync(bakedMedia))
         fs.cpSync(bakedMedia, config.mediaDir, { recursive: true });
     } else {
       console.log('No database found — seeding demo stores (takes ~3 minutes)…');
