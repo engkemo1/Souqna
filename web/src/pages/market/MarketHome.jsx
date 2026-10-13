@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, Store, CreditCard, RotateCcw, MapPin, Sparkles, Camera, MessageSquare, Users, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowLeft, ShoppingBag, Heart, User, Package } from 'lucide-react';
@@ -67,6 +67,147 @@ function Why() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+const DEPT_EMOJI = {
+  women: '👗', men: '👔', kids: '🧒', shoes: '👟', bags: '👜', hijab: '🧕', abaya: '🥻',
+  jalabiya: '👘', underwear: '🩲', wedding_dress: '👰', wedding_suit: '🤵', sports: '🏃',
+  denim: '👖', accessories: '💍', perfume_makeup: '💄', care: '🧴',
+};
+
+/**
+ * Scrollable department tabs + product rail for the selected tab.
+ * Falls back to the classic trending/deals/newest rails when no tab is active.
+ */
+function DeptTabsSection({ base, lang, t }) {
+  const depts = useMemo(
+    () => (base?.departments || []).filter((d) => d.products > 0).sort((a, b) => b.products - a.products),
+    [base],
+  );
+  // default tab = null → shows global trending/deals/newest
+  const [active, setActive] = useState(null);
+  const tabsRef = useRef(null);
+
+  // Reset to null if the dept list changes (new base fetch)
+  useEffect(() => { setActive(null); }, [base]);
+
+  // Scroll active tab into view
+  useEffect(() => {
+    if (!active || !tabsRef.current) return;
+    const btn = tabsRef.current.querySelector(`[data-slug="${active}"]`);
+    btn?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }, [active]);
+
+  const activeDept = depts.find((d) => d.slug === active);
+  // Find matching rail data from deptRails returned by the API
+  const activeDeptRail = active ? (base?.deptRails || []).find((r) => r.slug === active) : null;
+  const fmt = (n) => new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US').format(n);
+
+  return (
+    <div id="products" className="mt-8 scroll-mt-24">
+      {/* ── Tabs bar ───────────────────────────── */}
+      {depts.length > 0 && (
+        <div className="sticky top-[64px] z-10 border-b border-line bg-white/95 backdrop-blur-sm">
+          <div
+            ref={tabsRef}
+            className="container flex gap-1.5 overflow-x-auto pb-0 pt-2 scrollbar-none"
+            role="tablist"
+            aria-label={t('market.shopByDept')}
+          >
+            {/* "الكل" tab */}
+            <button
+              type="button"
+              role="tab"
+              aria-selected={!active}
+              data-slug="all"
+              onClick={() => setActive(null)}
+              className={cx(
+                'relative mb-0 flex h-10 shrink-0 items-center gap-1.5 rounded-t-xl px-4 text-sm font-semibold transition',
+                !active
+                  ? 'text-brand after:absolute after:bottom-0 after:inset-x-0 after:h-0.5 after:rounded-full after:bg-brand'
+                  : 'text-gray-500 hover:text-gray-800',
+              )}
+            >
+              {lang === 'ar' ? 'الكل' : 'All'}
+            </button>
+
+            {depts.map((d) => (
+              <button
+                key={d.slug}
+                type="button"
+                role="tab"
+                aria-selected={active === d.slug}
+                data-slug={d.slug}
+                onClick={() => setActive((prev) => (prev === d.slug ? null : d.slug))}
+                className={cx(
+                  'relative mb-0 flex h-10 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-t-xl px-3.5 text-sm font-semibold transition',
+                  active === d.slug
+                    ? 'text-brand after:absolute after:bottom-0 after:inset-x-0 after:h-0.5 after:rounded-full after:bg-brand'
+                    : 'text-gray-500 hover:text-gray-800',
+                )}
+              >
+                <span className="text-base">{DEPT_EMOJI[d.slug] || '🛍️'}</span>
+                {d.name?.[lang] || d.name?.ar}
+                <span
+                  className={cx(
+                    'rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular',
+                    active === d.slug ? 'bg-brand/10 text-brand' : 'bg-gray-100 text-gray-500',
+                  )}
+                >
+                  {fmt(d.products)}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Product rails ────────────────────── */}
+      {active ? (
+        // Selected department
+        <div className="mt-2">
+          {activeDeptRail ? (
+            <ProductRail
+              title={`${DEPT_EMOJI[active] || ''} ${activeDept?.name?.[lang] || activeDept?.name?.ar || ''}`}
+              items={activeDeptRail.items}
+              to={`/search?department=${active}`}
+            />
+          ) : (
+            // Department has products but not in deptRails (> 4 depts) → link to search
+            <div className="container py-10 text-center">
+              <p className="text-2xl">{DEPT_EMOJI[active] || '🛍️'}</p>
+              <p className="mt-3 font-bold text-gray-900">{activeDept?.name?.[lang] || activeDept?.name?.ar}</p>
+              <p className="mt-1 text-sm text-gray-500">
+                {lang === 'ar'
+                  ? `${fmt(activeDept?.products || 0)} منتج متاح`
+                  : `${fmt(activeDept?.products || 0)} items available`}
+              </p>
+              <Link
+                to={`/search?department=${active}`}
+                className="mt-4 inline-flex items-center gap-2 rounded-2xl bg-brand px-6 py-2.5 text-sm font-bold text-white shadow-sm transition hover:brightness-95"
+              >
+                {lang === 'ar' ? 'تصفّح كل المنتجات' : 'Browse all items'}
+              </Link>
+            </div>
+          )}
+        </div>
+      ) : (
+        // Default: trending / deals / newest
+        <>
+          <div className="mt-2 border-b border-line bg-secondary/50">
+            <ProductRail title={t('market.trending')} items={base?.trending} loading={!base} to="/search?sort=best" />
+          </div>
+          <ProductRail title={t('market.deals')} items={base?.deals} to="/search?sale=1" />
+          <div className="border-y border-line bg-secondary/50">
+            <ProductRail title={t('market.newArrivals')} items={base?.newest} to="/search?sort=newest" />
+          </div>
+        </>
+      )}
+
+      {/* ── Department grid overview (below rails) ── */}
+      <div className="mt-6"><DeptStrip departments={base?.departments || []} /></div>
     </div>
   );
 }
@@ -195,23 +336,9 @@ export default function MarketHome() {
       {/* Why Strip */}
       <div className="container mt-6 sm:mt-8"><Why /></div>
 
-      {/* shop by department (every department, even ones with no store yet) */}
-      <div className="mt-10"><DeptStrip departments={base?.departments || []} /></div>
+      {/* ── Departments tabs + product shelves ──────────────────── */}
+      <DeptTabsSection base={base} lang={lang} t={t} />
       <LookOfDay />
-
-      {/* product shelves, Amazon-style */}
-      <div id="products" className="mt-6 scroll-mt-32 border-y border-line bg-secondary/50">
-        <ProductRail title={t('market.trending')} items={base?.trending} loading={!base} to="/search?sort=best" />
-      </div>
-      <ProductRail title={t('market.deals')} items={base?.deals} to="/search?sale=1" />
-      <div className="border-y border-line bg-secondary/50">
-        <ProductRail title={t('market.newArrivals')} items={base?.newest} to="/search?sort=newest" />
-      </div>
-      {(base?.deptRails || []).map((r, i) => (
-        <div key={r.slug} className={i % 2 === 0 ? '' : 'border-y border-line bg-secondary/50'}>
-          <ProductRail title={t('market.topIn', { d: r.name?.[lang] || r.name?.ar })} items={r.items} to={`/search?department=${r.slug}`} />
-        </div>
-      ))}
 
       {/* A small shop preview leads to a dedicated, searchable store directory. */}
       <section id="stores" className="scroll-mt-32 border-y border-line bg-white">
@@ -220,7 +347,7 @@ export default function MarketHome() {
             <div>
               <span className="inline-flex rounded-full bg-[#fff0e5] px-3 py-1 text-xs font-bold text-brand">{lang === 'ar' ? 'محلات محلية من بنها' : 'Local Banha shops'}</span>
               <h2 className="mt-3 font-display text-2xl font-black text-[#14213D] sm:text-3xl">{t('market.allStores')}</h2>
-              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted sm:text-base">{lang === 'ar' ? 'تصفّح المحلات، ادخل صفحة كل محل، وشوف منتجاته وعروضه في مكان واحد.' : 'Browse local shops, open each store page, and see its products and offers in one place.'}</p>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted sm:text-base">{lang === 'ar' ? 'تصفّح المحلات، ادخل صفحة كل محل، وشوف المنتجات والعروض في مكان واحد.' : 'Browse local shops, open each store page, and see the products and offers in one place.'}</p>
             </div>
             <Link to="/stores" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">{lang === 'ar' ? 'اكتشف كل المحلات' : 'Discover all stores'}<ArrowLeft className="h-4 w-4 rtl:-scale-x-100" /></Link>
           </div>

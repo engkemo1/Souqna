@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup } from 'lucide-react';
+import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -25,12 +25,11 @@ const NAV_GROUPS = [
     { to: '/admin/sourcing', icon: PackagePlus, label: 'طلبات من برّه', badge: 'sourcing' },
   ] },
   { label: 'التحليلات', items: [{ to: '/admin/reports', icon: BarChart3, label: 'التقارير' }] },
-  { label: 'إعدادات المنصة', items: [{ to: '/admin/system?section=security', icon: ShieldCheck, label: 'السيرفر والنسخ' }] },
-];
-const SYSTEM_NAV = [
-  { to: '/admin/system?section=moda', icon: Sparkles, label: 'المساعد الذكي' },
-  { to: '/admin/system?section=visual', icon: ScanSearch, label: 'البحث المرئي' },
-  { to: '/admin/system?section=security', icon: DatabaseBackup, label: 'السيرفر والنسخ' },
+  { label: 'الذكاء الاصطناعي والمنصة', items: [
+    { to: '/admin/system?section=moda', icon: Sparkles, label: 'المساعد الذكي' },
+    { to: '/admin/system?section=visual', icon: ScanSearch, label: 'البحث المرئي' },
+    { to: '/admin/system?section=security', icon: DatabaseBackup, label: 'السيرفر والنسخ' },
+  ] },
 ];
 const NAV = NAV_GROUPS.flatMap((g) => g.items);
 
@@ -157,11 +156,94 @@ function Bell_({ alerts }) {
   );
 }
 
+// Primary items shown in the mobile bottom nav (5 max for clean look)
+const MOBILE_NAV_PRIMARY = [
+  { to: '/admin', end: true, icon: LayoutDashboard, label: 'الرئيسية' },
+  { to: '/admin/orders', icon: ShoppingBag, label: 'الطلبات' },
+  { to: '/admin/deliveries', icon: Truck, label: 'التوصيل', badge: 'open' },
+  { to: '/admin/stores', icon: Store, label: 'المحلات' },
+];
+
+function MobileDrawer({ open, onClose, alerts, onLogout, location }) {
+  // Close on route change
+  const prevPath = useRef(location.pathname + location.search);
+  useEffect(() => {
+    const cur = location.pathname + location.search;
+    if (open && cur !== prevPath.current) onClose();
+    prevPath.current = cur;
+  }, [location, open, onClose]);
+
+  return (
+    <>
+      {/* Backdrop */}
+      {open && (
+        <button
+          type="button"
+          aria-label="إغلاق القائمة"
+          className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      {/* Drawer panel - in RTL, start-0 = right side, slides from right */}
+      <aside
+        className={cx(
+          'fixed inset-y-0 end-0 z-50 flex w-[280px] flex-col border-s border-line bg-elevated transition-transform duration-300 ease-in-out lg:hidden',
+          open ? 'translate-x-0' : 'translate-x-full',
+        )}
+        dir="rtl"
+      >
+        <div className="flex h-16 items-center justify-between gap-3 border-b border-line px-4">
+          <Brand to="/admin" />
+          <button
+            type="button"
+            aria-label="إغلاق"
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-full hover:bg-fg/[0.06]"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <p className="px-5 py-2 text-xs font-medium text-muted">لوحة إدارة المنصة</p>
+        <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto px-3 pb-4">
+          {NAV_GROUPS.map((group) => (
+            <section key={group.label}>
+              <p className="mb-1.5 px-3 text-[11px] font-bold tracking-wide text-muted">{group.label}</p>
+              <div className="space-y-0.5">
+                {group.items.map((n) => {
+                  const targetSec = n.to.startsWith('/admin/system') ? (n.to.split('section=')[1] || 'security') : null;
+                  const active = targetSec
+                    ? location.pathname === '/admin/system' && (new URLSearchParams(location.search).get('section') || 'security') === targetSec
+                    : undefined;
+                  return (
+                    <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
+                      <n.icon className="h-[18px] w-[18px]" />{n.label}
+                      {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-white">{alerts.counts[n.badge]}</span>}
+                    </NavLink>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </nav>
+        <div className="border-t border-line p-3">
+          <button type="button" onClick={onLogout} className="flex h-11 w-full items-center gap-3 rounded-xl px-3 text-[15px] font-medium text-muted hover:bg-fg/[0.06]">
+            <LogOut className="h-[18px] w-[18px]" />خروج
+          </button>
+        </div>
+      </aside>
+    </>
+  );
+}
+
 function Shell({ onLogout }) {
   const alerts = useDeliveryAlerts();
   const location = useLocation();
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const closeDrawer = useCallback(() => setDrawerOpen(false), []);
+
   return (
     <div className="min-h-dvh bg-canvas" dir="rtl">
+      {/* ── Desktop Sidebar ─────────────────────────── */}
       <aside className="fixed inset-y-0 start-0 z-30 hidden w-[240px] flex-col border-e border-line bg-elevated p-4 lg:flex">
         <div className="mb-6 px-2 pt-1"><Brand to="/admin" /><p className="mt-1 text-xs font-medium text-muted">لوحة إدارة المنصة</p></div>
         <nav className="min-h-0 flex-1 space-y-5 overflow-y-auto pb-3">
@@ -170,17 +252,16 @@ function Shell({ onLogout }) {
               <p className="mb-1.5 px-3 text-[11px] font-bold tracking-wide text-muted">{group.label}</p>
               <div className="space-y-1">
                 {group.items.map((n) => {
-                  const active = n.to.startsWith('/admin/system')
-                    ? location.pathname === '/admin/system' && new URLSearchParams(location.search).get('section') === (n.to.split('section=')[1] || 'security')
+                  const targetSec = n.to.startsWith('/admin/system') ? (n.to.split('section=')[1] || 'security') : null;
+                  const active = targetSec
+                    ? location.pathname === '/admin/system' && (new URLSearchParams(location.search).get('section') || 'security') === targetSec
                     : undefined;
-                  return <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
-                    <n.icon className="h-[18px] w-[18px]" />{n.label}
-                    {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-white">{alerts.counts[n.badge]}</span>}
-                  </NavLink>;
-                })}
-                {group.label === 'إعدادات المنصة' && SYSTEM_NAV.filter((n) => !group.items.some((it) => it.to === n.to)).map((n) => {
-                  const active = location.pathname === '/admin/system' && new URLSearchParams(location.search).get('section') === n.to.split('section=')[1];
-                  return <NavLink key={n.to} to={n.to} end className={() => cx('ms-2 flex h-9 items-center gap-3 rounded-xl px-3 text-[13px] font-medium transition', active ? 'bg-brand/10 text-brand' : 'text-muted hover:bg-fg/[0.06] hover:text-fg')}><n.icon className="h-4 w-4" />{n.label}</NavLink>;
+                  return (
+                    <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
+                      <n.icon className="h-[18px] w-[18px]" />{n.label}
+                      {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-white">{alerts.counts[n.badge]}</span>}
+                    </NavLink>
+                  );
                 })}
               </div>
             </section>
@@ -189,22 +270,62 @@ function Shell({ onLogout }) {
         <button type="button" onClick={onLogout} className="mt-auto flex h-11 items-center gap-3 rounded-xl px-3 text-[15px] font-medium text-muted hover:bg-fg/[0.06]"><LogOut className="h-[18px] w-[18px]" />خروج</button>
       </aside>
 
+      {/* ── Mobile Drawer ───────────────────────────── */}
+      <MobileDrawer open={drawerOpen} onClose={closeDrawer} alerts={alerts} onLogout={onLogout} location={location} />
+
+      {/* ── Content Area ────────────────────────────── */}
       <div className="lg:ps-[240px]">
         <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-line bg-canvas/90 px-4 backdrop-blur-md sm:px-6 lg:px-8">
-          <div className="lg:hidden"><Brand to="/admin" /></div>
+          {/* Mobile: hamburger + brand */}
+          <div className="flex items-center gap-3 lg:hidden">
+            <button
+              type="button"
+              aria-label="القائمة"
+              onClick={() => setDrawerOpen(true)}
+              className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-elevated hover:bg-fg/[0.05]"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <Brand to="/admin" />
+          </div>
           <div className="hidden lg:block" />
-          <div className="flex items-center gap-2"><Bell_ alerts={alerts} /><button type="button" onClick={onLogout} aria-label="خروج" className="grid h-10 w-10 place-items-center rounded-full border border-line bg-elevated hover:bg-fg/[0.05] lg:hidden"><LogOut className="h-[18px] w-[18px]" /></button></div>
+          <div className="flex items-center gap-2">
+            <Bell_ alerts={alerts} />
+            <button type="button" onClick={onLogout} aria-label="خروج" className="grid h-10 w-10 place-items-center rounded-full border border-line bg-elevated hover:bg-fg/[0.05] lg:hidden"><LogOut className="h-[18px] w-[18px]" /></button>
+          </div>
         </header>
+        {/* pb-28 on mobile for bottom nav; lg:pb-12 for desktop */}
         <main className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8"><Outlet context={alerts} /></main>
       </div>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 flex overflow-x-auto border-t border-line bg-elevated/95 pb-[var(--safe-b)] backdrop-blur-md lg:hidden" aria-label="التنقل">
-        {NAV.map((n) => (
-          <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('relative flex h-16 min-w-[72px] flex-1 shrink-0 flex-col items-center justify-center gap-1 text-[11px] font-medium', isActive ? 'text-brand' : 'text-muted')}>
-            <n.icon className="h-5 w-5" />{n.label}
-            {n.badge && alerts.counts[n.badge] > 0 && <span className="absolute end-2 top-2 grid h-4 min-w-4 place-items-center rounded-full bg-sale px-1 text-[10px] font-bold text-white">{alerts.counts[n.badge]}</span>}
-          </NavLink>
-        ))}
+      {/* ── Mobile Bottom Nav (5 primary items + menu) ── */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-elevated/95 pb-[var(--safe-b)] backdrop-blur-md lg:hidden" aria-label="التنقل" style={{ direction: 'rtl' }}>
+        <ul className="flex h-16">
+          {MOBILE_NAV_PRIMARY.map((n) => (
+            <li key={n.to} className="flex-1">
+              <NavLink to={n.to} end={n.end} className={({ isActive }) => cx('relative flex h-full flex-col items-center justify-center gap-1 text-[11px] font-medium', isActive ? 'text-brand' : 'text-muted')}>
+                <span className="relative">
+                  <n.icon className="h-5 w-5" />
+                  {n.badge && alerts.counts[n.badge] > 0 && (
+                    <span className="absolute -end-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-sale px-1 text-[10px] font-bold text-white ring-2 ring-elevated">{alerts.counts[n.badge]}</span>
+                  )}
+                </span>
+                {n.label}
+              </NavLink>
+            </li>
+          ))}
+          {/* Menu button to open full drawer */}
+          <li className="flex-1">
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="flex h-full w-full flex-col items-center justify-center gap-1 text-[11px] font-medium text-muted"
+            >
+              <Menu className="h-5 w-5" />
+              المزيد
+            </button>
+          </li>
+        </ul>
       </nav>
     </div>
   );

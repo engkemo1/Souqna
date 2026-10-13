@@ -331,7 +331,7 @@ export const messages = {
     'market.ownerCta': 'دخول أصحاب المحلات',
     'market.ownerDemo': 'جرّب لوحة التحكم',
     'market.why1': 'دفع آمن', 'market.why1b': 'جميع وسائل الدفع متاحة',
-    'market.why2': 'استبدال سهل', 'market.why2b': 'خلال 14 يوم من الاستلام',
+    'market.why2': 'استبدال سهل', 'market.why2b': 'خلال 3 أيام من الاستلام',
     'market.why3': 'منتجات محلية', 'market.why3b': 'من محلات حقيقية في بنها',
     'market.footer': 'طلة — أزياء من محلات بنها',
 

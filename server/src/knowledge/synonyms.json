@@ -41,7 +41,7 @@
     "tuxedo":      ["تاكسيدو", "توكسيدو", "تكسيدو", "بدله سواريه", "tuxedo", "tux", "smoking", "سموكنج"],
     "womens_suit": ["تايير", "تاييرات", "بدله حريمي", "طقم حريمي رسمي", "tailleur", "pantsuit", "women suit", "tayer", "tayeer"],
 
-    "jacket":   ["جاكيت", "جاكت", "جواكت", "jacket", "bomber", "jakit", "jaket", "جاكيت جلد"],
+    "jacket":   ["جاكيت", "جاكت", "جواكت", "jacket", "bomber", "jakit", "jaket", "جاكيت جلد", "جاكيت كوتش", "جاكت كوتش", "coach jacket"],
     "coat":     ["بالطو", "معطف", "كوت", "coat", "overcoat", "trench", "balto", "baltoo"],
     "cardigan": ["كارديجان", "كاردجان", "cardigan", "cardigen"],
     "shawl":    ["شال", "ستول", "شال سواريه", "shawl", "stole", "wrap", "shal"],

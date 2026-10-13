@@ -10,7 +10,9 @@ const WEAK_KEYS = new Set(['top', 'tunic', 'shoes_any', 'dress_any']);
 const GENERIC_KEYS = new Set(['trousers', 'jacket', 'shirt', 'tshirt']);
 // "wrap" can mean a shawl, but in catalogue names like "wrap jacket" it must
 // not override the explicit garment noun. Keep the alias for standalone wraps.
-const AMBIGUOUS_ALIASES = new Set(['shawl:wrap']);
+const AMBIGUOUS_ALIASES = new Set(['shawl:wrap', 'sneakers:كوتش', 'sneakers:coach']);
+const SHOE_KEYS = new Set(['sneakers', 'formal_shoes', 'loafers', 'heels_low', 'heels_high', 'flats', 'sandals', 'boots', 'slippers', 'sport_shoes', 'shoes_any']);
+const OUTERWEAR_WORDS = new Set(['جاكيت', 'جاكت', 'جواكت', 'jacket', 'bomber', 'معطف', 'بالطو', 'بليزر', 'blazer']);
 
 let aliasTable = null;
 function table(K) {
@@ -30,8 +32,10 @@ const hasToken = (set, tok) => tokenVariants(tok).some((v) => set.has(v));
 export function inferKey(text, K = loadKnowledge()) {
   const tokens = tokenize(norm(text)); const set = new Set(tokens);
   const pos = new Map(); tokens.forEach((t, i) => { for (const v of tokenVariants(t)) if (!pos.has(v)) pos.set(v, i); });
+  const hasOuterwear = [...OUTERWEAR_WORDS].some((w) => hasToken(set, w));
   let best = null;
   for (const row of table(K).rows) {
+    if (hasOuterwear && SHOE_KEYS.has(row.key)) continue;
     if (!row.tokens.every((t) => hasToken(set, t) || [...set].some((s) => tokenVariants(s).includes(t)))) continue;
     const first = Math.min(...row.tokens.map((t) => pos.get(t) ?? 99));
     const ambiguous = AMBIGUOUS_ALIASES.has(`${row.key}:${row.tokens.join(' ')}`) ? 4 : 0;

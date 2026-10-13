@@ -81,6 +81,7 @@ export default function StylistChat() {
   const end = useRef(null);
   const sendRef = useRef(null);
   const guidedStartRef = useRef(null);
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     const on = (e) => {
@@ -99,7 +100,8 @@ export default function StylistChat() {
   // answers: إجابة زرار سؤال ({ [questionId]: value })، و raw = النص اللي يظهر للعميل في الفقاعة
   const send = async (raw, answers = null) => {
     const content = String(raw ?? text).trim();
-    if ((!content && !photo) || busy) return;
+    if ((!content && !photo) || busy || sendingRef.current) return;
+    sendingRef.current = true;
     const image = photo; const image2 = photo2; const shown = content || (image2 ? t('stylist.compareMsg') : similar ? t('stylist.similarMsg') : t('stylist.photoMsg')); setSimilar(false);
     const next = [...msgs, { role: 'user', content: shown, photo: image, photo2: image2, answered: !!answers }];
     setMsgs(next); setQuestionAnswers({}); setText(''); setPhoto(null); setPhoto2(null); setBusy(true);
@@ -123,10 +125,22 @@ export default function StylistChat() {
       const completed = [...next, { role: 'assistant', error: errorMessage(t, e) }];
       setMsgs(completed);
       if (buyer) await saveChat(completed, session).catch(() => setHistoryError(true));
+    } finally {
+      sendingRef.current = false;
+      setBusy(false);
     }
-    setBusy(false);
   };
   sendRef.current = send;
+
+  const pickQuestionOption = (questions, question, option) => {
+    if (option.value === 'other') { document.querySelector('[data-moda-input]')?.focus(); return; }
+    if (busy || sendingRef.current) return;
+    const next = { ...questionAnswers, [question.id]: option.value };
+    const answered = questions.filter((q) => Object.hasOwn(next, q.id));
+    const sameValue = (left, right) => left === right || JSON.stringify(left) === JSON.stringify(right);
+    setQuestionAnswers(next);
+    sendRef.current?.(answered.map((q) => `${q.text} ${q.options.find((opt) => sameValue(opt.value, next[q.id]))?.label || ''}`.trim()).join('، '), next);
+  };
 
   const startGuidedLook = async () => {
     setMsgs([]); setSession(null); setQuestionAnswers({}); setText(''); setPhoto(null); setPhoto2(null);
@@ -303,11 +317,10 @@ export default function StylistChat() {
                       <div key={qq.id} className="mt-3">
                         <p className="mb-1.5 text-[13px] font-semibold">{qq.text}</p>
                         <div className="flex flex-wrap gap-2">
-                          {qq.options.map((o) => <button key={String(o.label)} type="button" aria-pressed={questionAnswers[qq.id] === o.value} onClick={() => (o.value === 'other' ? document.querySelector('[data-moda-input]')?.focus() : setQuestionAnswers((current) => ({ ...current, [qq.id]: o.value })))} className={cx('rounded-full border px-3.5 py-2 text-[13px] font-medium transition', questionAnswers[qq.id] === o.value ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong bg-elevated hover:border-brand hover:text-brand')}>{o.label}</button>)}
+                          {qq.options.map((o) => <button key={String(o.label)} type="button" aria-pressed={questionAnswers[qq.id] === o.value} onClick={() => pickQuestionOption(m.questions, qq, o)} className={cx('rounded-full border px-3.5 py-2 text-[13px] font-medium transition', questionAnswers[qq.id] === o.value ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong bg-elevated hover:border-brand hover:text-brand')}>{o.label}</button>)}
                         </div>
                       </div>
                     ))}
-                    {m.questions.every((q) => Object.hasOwn(questionAnswers, q.id)) && <button type="button" onClick={() => send(m.questions.map((q) => `${q.text} ${q.options.find((o) => o.value === questionAnswers[q.id])?.label || ''}`).join('، '), questionAnswers)} className="mt-3 rounded-full bg-btn px-4 py-2.5 text-sm font-semibold text-on-btn">{lang === 'ar' ? 'ورّيني الاقتراح' : 'Show my outfit'}</button>}
                   </>}
                   {!m.historyReadOnly && !m.error && m.looks?.length > 0 && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, ...(m.tips || []), ...(m.styleTips || [])].filter(Boolean).join(' — ')} productIds={(m.looks || []).map((look) => look.items?.[look.pick]?.id).filter((id) => id != null)} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason, productIds) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean), productIds)} t={t} />}
                 </div>

@@ -200,3 +200,23 @@ test('llm fallback: only vocabulary values are accepted', async () => {
   r = await runModa('qwerty zxcv blorp', { products: rows, now, llmExtract: broken });
   assert.equal(r.state, 'chat');
 });
+
+test('owned piece phrase prevents searching for it and coach jacket infers jacket', async () => {
+  const parsed = parseMessage('عندي قميص أزرق سماوي، عايز كوتشي يليق عليه');
+  assert.equal(parsed.ownedPieces[0]?.key, 'shirt');
+  assert.equal(parsed.ownedPieces[0]?.color, 'sky_blue');
+  assert.equal(parsed.garments[0]?.key, 'sneakers');
+  assert.equal(parsed.garments.length, 1);
+
+  const [coachJacket] = enrichAll([
+    { id: 21, name_ar: 'جاكيت كوتش مبطّن', name_en: 'Fleece-Lined Coach Jacket', department: 'men', price: 1479, stock: 5, track_stock: 1 },
+  ], K);
+  assert.equal(coachJacket.key, 'jacket');
+
+  const res = await runModa('عندي قميص أزرق سماوي، عايز كوتشي يليق عليه', { products: [coachJacket], now: new Date('2026-10-12T19:30:00+03:00') });
+  const missing = res.blocks?.tabs?.[0]?.missing || [];
+  assert.ok(missing.every((m) => m.key !== 'shirt'), 'owned shirt must not be in missing');
+  assert.ok(missing.some((m) => m.key === 'sneakers'), 'sneakers should be missing');
+  assert.match(missing[0].hint, /طلة/);
+});
+

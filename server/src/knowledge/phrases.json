@@ -69,7 +69,7 @@
    "أقل طقم لقيته كله بـ{total} جنيه، وده أعلى من ميزانيتك بـ{over} جنيه."
   ],
   "order_missing_button": "اطلبه",
-  "order_missing_hint": "مش متاح دلوقتي. تحب نبلّغ المحلات ونبلغك لو اتوفر؟",
+  "order_missing_hint": "مش متاح دلوقتي. تحب طلة تجيبهولك ونبلغك أول ما يتوفر؟",
   "clarify_audience": [
    "اللبس ده لمين؟"
   ],
@@ -257,7 +257,7 @@
    "You're welcome!"
   ],
   "order_missing_hint": [
-   "Not available now. Want us to notify you when it's back?"
+   "Not available now. Want Talla to source it for you and notify you as soon as it's in stock?"
   ],
   "alt_color": [
    "{wanted} isn't available in that exact colour, so I picked the closest"

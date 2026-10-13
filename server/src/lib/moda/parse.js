@@ -150,16 +150,25 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     const k = garmentEntries[i].key;
     if ((k === 'shoes_any' && hasKey(SHOE_KEYS)) || (k === 'dress_any' && hasKey(DRESS_KEYS))) garmentEntries.splice(i, 1);
   }
+  const OWNED_PREFIXES = new Set(['عندي', 'معايا', 'معي', 'لابس', 'لابسه', 'لابسة', 'اشتريت', 'شريت', 'جبت', 'have', 'own', 'bought', 'wearing']);
+  const NOT_OWNED_PREFIXES = new Set(['ماعنديش', 'معنديش', 'معيش', 'مش']);
   const seen = new Set();
   for (const g of garmentEntries) {
     if (seen.has(g.key)) continue; seen.add(g.key);
-    const col = nearest(colorEntries.filter((c) => !isNegated(c)), g, 2);
+    const col = nearest(colorEntries.filter((c) => !isNegated(c) && !c.used), g, 2);
     let mat = nearest(matEntries, g, 2);
     if (!mat) { // الخامة ممكن تكون جزء من اسم القطعة نفسه (جاكيت جلد)
       for (const t of tokenize(norm(g.text))) { for (const v of tokenVariants(t)) { const hit = (K.index.exact.get(v) || []).find((x) => x.group === 'material'); if (hit) { mat = { key: hit.key }; break; } } if (mat) break; }
     }
-    result.garments.push({ key: g.key, color: col?.key || null, material: mat?.key || null, text: g.text, position: g.start });
-    if (col) col.used = true;
+    const prevTokens = tokens.slice(Math.max(0, g.start - 2), g.start);
+    const isOwned = prevTokens.some((t) => OWNED_PREFIXES.has(t)) && !prevTokens.some((t) => NOT_OWNED_PREFIXES.has(t));
+    if (isOwned) {
+      result.ownedPieces.push({ key: g.key, color: col?.key || null, material: mat?.key || null, text: g.text });
+      if (col) col.used = true;
+    } else {
+      result.garments.push({ key: g.key, color: col?.key || null, material: mat?.key || null, text: g.text, position: g.start });
+      if (col) col.used = true;
+    }
   }
   // ألوان عامة مش ملتصقة بقطعة
   for (const c of colorEntries) {
@@ -170,8 +179,9 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   if (result.garments.length === 1 && !result.garments[0].color && result.colors.length === 1) { result.garments[0].color = result.colors[0]; result.colors = []; }
 
   /* ---------- مين من القطع ---------- */
-  if (personSet.size === 0 && result.garments.length) {
-    const g = new Set(result.garments.map((x) => GENDER_BY_KEY[x.key]).filter(Boolean));
+  const allGarmentPieces = [...result.garments, ...result.ownedPieces];
+  if (personSet.size === 0 && allGarmentPieces.length) {
+    const g = new Set(allGarmentPieces.map((x) => GENDER_BY_KEY[x.key]).filter(Boolean));
     if (g.size === 1) { const only = [...g][0]; personSet.add(only === 'women_hijab' ? 'women' : only); if (only === 'women_hijab') result.flags.hijabFromGarment = true; }
   }
   if (personSet.size === 0 && speaker && !result.kidsUnspecified) personSet.add(speaker === 'female' ? 'women' : 'men');
