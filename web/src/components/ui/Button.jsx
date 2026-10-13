@@ -4,8 +4,8 @@ import Spinner from './Spinner.jsx';
 import { cx } from './cx.js';
 
 const VARIANTS = {
-  primary: 'bg-btn text-on-btn border border-btn-outline hover:brightness-110 shadow-sm',
-  brand: 'bg-primary text-on-primary hover:brightness-110 shadow-sm',
+  primary: 'bg-btn text-white border border-transparent hover:brightness-110 shadow-sm',
+  brand: 'bg-primary text-white hover:brightness-110 shadow-sm',
   secondary: 'bg-surface text-fg border border-line hover:bg-fg/[0.06]',
   outline: 'bg-transparent text-fg border border-line-strong hover:bg-fg/[0.04] hover:border-fg/40',
   ghost: 'bg-transparent text-fg hover:bg-fg/[0.06]',

@@ -20,16 +20,16 @@
   --c-border: 228 231 236;
   --c-border-strong: 204 210 220;
   --c-primary: 242 107 56;
-  --c-on-primary: 20 33 61;
+  --c-on-primary: 255 255 255;
   --c-primary-ink: 178 63 29;
   --c-display: 20 33 61;
   --c-secondary: 236 239 244;
   --c-on-secondary: 20 33 61;
   --c-accent: 242 107 56;
-  --c-on-accent: 20 33 61;
+  --c-on-accent: 255 255 255;
   --c-button: 242 107 56;
-  --c-on-button: 20 33 61;
-  --c-button-outline: 20 33 61;
+  --c-on-button: 255 255 255;
+  --c-button-outline: transparent;
   --c-header: 255 255 255;
   --c-on-header: 20 33 61;
   --c-footer: 20 33 61;
@@ -46,53 +46,173 @@
 }
 
 @layer base {
-  html { @apply bg-canvas text-fg antialiased; text-rendering: optimizeLegibility; scroll-behavior: smooth; }
-  body { @apply font-sans text-base leading-normal bg-canvas text-fg; min-height: 100dvh; }
+  html {
+    @apply bg-canvas text-fg antialiased;
+    text-rendering: optimizeLegibility;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply font-sans text-base leading-normal bg-canvas text-fg;
+    min-height: 100dvh;
+  }
+
   /* Arabic must never be letter-spaced or fake-italicised: both break the joined letterforms. */
-  :lang(ar), :lang(ar) * { letter-spacing: 0 !important; }
-  :lang(ar) em, :lang(ar) i, :lang(ar) .italic { font-style: normal !important; }
-  h1, h2, h3, h4 { @apply text-fg font-bold leading-snug; text-wrap: balance; }
-  p { text-wrap: pretty; }
-  img { -webkit-user-drag: none; }
-  ::selection { background: rgb(var(--c-primary) / 0.18); }
-  :focus-visible { outline: 2px solid rgb(var(--c-ring)); outline-offset: 2px; border-radius: 6px; }
-  input, textarea, select, button { font: inherit; }
-  [dir='rtl'] .flip-rtl { transform: scaleX(-1); }
+  :lang(ar),
+  :lang(ar) * {
+    letter-spacing: 0 !important;
+  }
+
+  :lang(ar) em,
+  :lang(ar) i,
+  :lang(ar) .italic {
+    font-style: normal !important;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply text-fg font-bold leading-snug;
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  img {
+    -webkit-user-drag: none;
+  }
+
+  ::selection {
+    background: rgb(var(--c-primary) / 0.18);
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--c-ring));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    font: inherit;
+  }
+
+  [dir='rtl'] .flip-rtl {
+    transform: scaleX(-1);
+  }
+
   @media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
+
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
 @layer components {
-  .skeleton { @apply relative overflow-hidden bg-fg/[0.06] rounded-lg; }
+  .skeleton {
+    @apply relative overflow-hidden bg-fg/[0.06] rounded-lg;
+  }
+
   .skeleton::after {
-    content: ''; position: absolute; inset: 0; transform: translateX(-100%);
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
     background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.45), transparent);
     animation: shimmer 1.6s infinite;
   }
-  [dir='rtl'] .skeleton::after { transform: translateX(100%); animation-name: shimmer-rtl; }
-  .eyebrow { @apply text-2xs font-semibold uppercase tracking-[0.18em] text-muted; }
-  :lang(ar) .eyebrow { @apply tracking-normal text-xs; }
+
+  [dir='rtl'] .skeleton::after {
+    transform: translateX(100%);
+    animation-name: shimmer-rtl;
+  }
+
+  .eyebrow {
+    @apply text-2xs font-semibold uppercase tracking-[0.18em] text-muted;
+  }
+
+  :lang(ar) .eyebrow {
+    @apply tracking-normal text-xs;
+  }
+
   /* Keep horizontal rails from becoming nested vertical scroll areas on touch screens.
      The page owns vertical gestures; the rail only consumes horizontal movement. */
-  .scroll-x { @apply flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; overscroll-behavior-y: auto; }
-  .scroll-x::-webkit-scrollbar { display: none; }
-  .no-scrollbar { scrollbar-width: none; }
-  .no-scrollbar::-webkit-scrollbar { display: none; }
-  .tap { @apply min-h-[44px] min-w-[44px]; }
-  .card { @apply bg-elevated rounded-2xl border border-line; }
-  .pb-safe { padding-bottom: calc(var(--safe-b)); }
-  .tabular { font-variant-numeric: tabular-nums; }
-  .link-underline { background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat; transition: background-size .35s cubic-bezier(.22,1,.36,1); }
-  .link-underline:hover { background-size: 100% 1px; }
-  [dir='rtl'] .link-underline { background-position: 100% 100%; }
+  .scroll-x {
+    @apply flex overflow-x-auto overflow-y-hidden snap-x snap-mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: auto;
+  }
+
+  .scroll-x::-webkit-scrollbar {
+    display: none;
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .tap {
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .card {
+    @apply bg-elevated rounded-2xl border border-line;
+  }
+
+  .pb-safe {
+    padding-bottom: calc(var(--safe-b));
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .link-underline {
+    background: linear-gradient(currentColor, currentColor) 0 100% / 0 1px no-repeat;
+    transition: background-size .35s cubic-bezier(.22, 1, .36, 1);
+  }
+
+  .link-underline:hover {
+    background-size: 100% 1px;
+  }
+
+  [dir='rtl'] .link-underline {
+    background-position: 100% 100%;
+  }
 }
 
 @media (max-width: 639px) {
+
   /* Mandatory snapping can make a diagonal swipe feel trapped in a product rail. */
-  .scroll-x { scroll-snap-type: x proximity; }
+  .scroll-x {
+    scroll-snap-type: x proximity;
+  }
 }
 
-@keyframes shimmer-rtl { 100% { transform: translateX(-100%); } }
+@keyframes shimmer-rtl {
+  100% {
+    transform: translateX(-100%);
+  }
+}
 
-@keyframes shine { to { background-position: 200% center; } }
+@keyframes shine {
+  to {
+    background-position: 200% center;
+  }
+}

@@ -77,7 +77,7 @@ export default function MarketCheckout() {
   if (!cart.items.length) return <div className="min-h-dvh"><MarketHeader /><main className="container py-16 text-center"><ShoppingBag className="mx-auto h-10 w-10 text-muted" /><p className="mt-3 font-semibold">{ar ? 'سلة طلة فاضية' : 'Your marketplace basket is empty'}</p><Button to="/search" className="mt-5">{ar ? 'اكتشف المنتجات' : 'Explore products'}</Button></main></div>;
 
   return <div className="min-h-dvh"><MarketHeader /><main className="container max-w-6xl py-7 sm:py-10">
-    <Link to="/market-cart" className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-fg"><ArrowRight className="h-4 w-4" />{ar ? 'الرجوع للسلة' : 'Back to basket'}</Link>
+    <Link to="/market-cart" className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-fg"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" />{ar ? 'الرجوع للسلة' : 'Back to basket'}</Link>
     <h1 className="mb-7 font-display text-2xl font-bold sm:text-3xl">{ar ? 'إتمام طلب من كذا محل' : 'Checkout from multiple stores'}</h1>
     <div className="grid gap-8 lg:grid-cols-12">
       <form onSubmit={placeOrder} className="space-y-7 lg:col-span-7">

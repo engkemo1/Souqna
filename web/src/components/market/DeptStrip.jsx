@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 
 export const DEPT_EMOJI = {
@@ -63,7 +63,7 @@ export default function DeptStrip({ departments = [] }) {
         </div>
         <Link to="/search" className="inline-flex items-center gap-1.5 text-sm font-bold text-[#ea580c] transition hover:text-[#d94e08]">
           <span>{lang === 'ar' ? 'عرض الكل' : 'View all'}</span>
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowRight className="h-4 w-4 rtl:rotate-180" />
         </Link>
       </div>
 

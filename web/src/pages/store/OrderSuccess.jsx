@@ -87,7 +87,7 @@ export default function OrderSuccess() {
                 <PackageSearch className="h-5 w-5 text-brand" />
                 <p className="min-w-0 flex-1 text-sm font-semibold">{t('track.link')}</p>
                 <button type="button" onClick={() => { navigator.clipboard?.writeText(trackUrl(token)); toast({ title: t('common.copied') }); }} className="inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1.5 text-[13px] font-semibold hover:bg-fg/[0.05]"><Copy className="h-3.5 w-3.5" />{t('track.copyLink')}</button>
-                <Link to={`/track/${token}`} className="rounded-full bg-primary px-3.5 py-1.5 text-[13px] font-semibold text-on-primary">{t('track.open')}</Link>
+                <Link to={`/track/${token}`} className="rounded-full bg-primary px-3.5 py-1.5 text-[13px] font-semibold text-white">{t('track.open')}</Link>
               </div>
             </>
           )}

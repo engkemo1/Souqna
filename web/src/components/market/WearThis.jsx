@@ -1,4 +1,4 @@
-import { ArrowLeft, Camera } from 'lucide-react';
+import { ArrowRight, Camera } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 
 /** Upload an outfit photo and let the stylist find the closest real products in Banha stores. */
@@ -16,7 +16,7 @@ export default function WearThis({ className = '' }) {
             <span className="mt-1 block text-xs leading-relaxed text-muted sm:text-[13px]">{t('wear.sub')}</span>
           </span>
         </span>
-        <span className="relative mt-auto inline-flex w-fit items-center gap-2 rounded-xl bg-btn px-4 py-2.5 text-xs font-bold text-on-btn transition group-hover:brightness-95 sm:text-[13px]">{t('wear.cta')}<ArrowLeft className="h-4 w-4 rtl:-scale-x-100" /></span>
+        <span className="relative mt-auto inline-flex w-fit items-center gap-2 rounded-xl bg-btn px-4 py-2.5 text-xs font-bold text-white transition group-hover:brightness-95 sm:text-[13px]">{t('wear.cta')}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></span>
       </button>
     </section>
   );

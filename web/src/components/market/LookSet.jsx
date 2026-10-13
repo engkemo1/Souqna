@@ -13,7 +13,7 @@ import { cx } from '../ui/cx.js';
 function StoreCartLink({ slug, name, tr, t }) {
   const c = useCart(slug);
   if (!c.count) return null;
-  return <Link to={sp(slug, 'cart')} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-3.5 py-2 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t('stylist.cartOf', { s: tr(name), n: c.count })}</Link>;
+  return <Link to={sp(slug, 'cart')} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-3.5 py-2 text-[13px] font-bold text-white"><ShoppingBag className="h-4 w-4" />{t('stylist.cartOf', { s: tr(name), n: c.count })}</Link>;
 }
 
 function LookRow({ look, lang, tr, t, added, onAdd }) {
@@ -140,7 +140,7 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
           <p className="mt-0.5 text-base font-extrabold sm:text-lg">{totalLabel}{m.overBudget && <span className="ms-2 text-xs font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
-          <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t(m.state === 'partial' ? 'stylist.addAvailable' : 'stylist.addAll')}</button>
+          <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-white"><ShoppingBag className="h-4 w-4" />{t(m.state === 'partial' ? 'stylist.addAvailable' : 'stylist.addAll')}</button>
           {[...new Map(picks.map((p) => [p.store.slug, p.store.name])).entries()].map(([sl, nm]) => <StoreCartLink key={sl} slug={sl} name={nm} tr={tr} t={t} />)}
           <button type="button" onClick={shareLink} className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2.5 text-[13px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{t('stylist.share')}</button>
         </div>
@@ -149,7 +149,7 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
       {stickyCTA && <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 px-3 pt-3 shadow-[0_-8px_30px_rgba(0,0,0,.08)] backdrop-blur-md sm:px-6" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}>
         <div className="mx-auto flex max-w-7xl items-center gap-3">
           <div className="min-w-0 flex-1"><p className="text-[10px] font-semibold text-muted sm:text-xs">{ar ? 'إجمالي اللوك كامل' : 'Full look total'}</p><p className="truncate text-base font-extrabold text-brand sm:text-lg">{money(m.total)}</p></div>
-          <button type="button" onClick={() => startAdd(picks)} className="inline-flex min-h-12 flex-[1.6] items-center justify-center gap-2 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-on-btn sm:flex-none sm:px-8 sm:text-base"><ShoppingBag className="h-4 w-4" />{ar ? 'اشتري اللوك كامل' : 'Buy the full look'}</button>
+          <button type="button" onClick={() => startAdd(picks)} className="inline-flex min-h-12 flex-[1.6] items-center justify-center gap-2 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-white sm:flex-none sm:px-8 sm:text-base"><ShoppingBag className="h-4 w-4" />{ar ? 'اشتري اللوك كامل' : 'Buy the full look'}</button>
         </div>
       </div>}
       {quick && <QuickAddSheet slug={quick.queue[quick.i].store.slug} product={quick.queue[quick.i]} marketplace={marketplace} step={quick.queue.length > 1 ? `${quick.i + 1}/${quick.queue.length}` : ''} onAdded={nextAdd} onClose={() => setQuick(null)} />}

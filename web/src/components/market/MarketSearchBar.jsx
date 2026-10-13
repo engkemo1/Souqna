@@ -18,7 +18,7 @@ export default function MarketSearchBar({ initial = '', autoFocus, chips = true 
         <input type="search" value={term} onChange={(e) => setTerm(e.target.value)} autoFocus={autoFocus} enterKeyHint="search"
           placeholder={t('search.placeholder')} aria-label={t('search.placeholder')}
           className="h-14 w-full rounded-2xl border border-line-strong bg-elevated ps-12 pe-28 text-base shadow-soft outline-none transition placeholder:text-muted/80 focus:border-ring focus:shadow-ring" />
-        <button type="submit" className="absolute end-2 top-1/2 h-10 -translate-y-1/2 rounded-xl bg-btn px-5 text-sm font-semibold text-on-btn transition active:scale-95">{t('search.go')}</button>
+        <button type="submit" className="absolute end-2 top-1/2 h-10 -translate-y-1/2 rounded-xl bg-btn px-5 text-sm font-semibold text-white transition active:scale-95">{t('search.go')}</button>
       </form>
       {chips && (
         <Link to="/visual" className="mt-3 inline-flex h-11 items-center gap-2 rounded-full bg-secondary px-4 text-sm font-bold text-brand transition hover:brightness-95 active:scale-95">

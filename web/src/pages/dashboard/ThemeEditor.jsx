@@ -59,7 +59,7 @@ function LivePreview({ theme, store, products, device, lang }) {
         <div className="bg-secondary px-5 py-6 text-on-secondary">
           <p className="text-[9px] font-semibold tracking-[0.2em] opacity-70">{lang === 'ar' ? 'الموسم الجديد' : 'NEW SEASON'}</p>
           <p className="mt-1 font-display text-xl font-bold leading-tight">{t('theme.previewHero')}</p>
-          <span className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-btn-outline bg-btn px-3 py-1.5 text-xs font-semibold text-on-btn">{t('store.shopAll')}<ArrowRight className="h-3 w-3 rtl:-scale-x-100" /></span>
+          <span className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-btn-outline bg-btn px-3 py-1.5 text-xs font-semibold text-white">{t('store.shopAll')}<ArrowRight className="h-3 w-3 rtl:-scale-x-100" /></span>
           <span className="ms-2 inline-flex rounded-lg border border-line-strong px-3 py-1.5 text-xs font-semibold text-brand">{t('store.newArrivals')}</span>
         </div>
         <div className={cx('grid gap-3 p-3.5', mobile ? 'grid-cols-2' : 'grid-cols-3')}>
@@ -79,7 +79,7 @@ function LivePreview({ theme, store, products, device, lang }) {
           <div className="flex items-center justify-between rounded-xl border border-line bg-elevated p-2.5">
             <span className="text-xs text-muted">{t('cart.total')}</span><span className="text-xs font-semibold">{money(1598)}</span>
           </div>
-          <span className="mt-2 block rounded-lg border border-btn-outline bg-btn py-2 text-center text-xs font-semibold text-on-btn">{t('cart.checkout')}</span>
+          <span className="mt-2 block rounded-lg border border-btn-outline bg-btn py-2 text-center text-xs font-semibold text-white">{t('cart.checkout')}</span>
         </div>
         <div className="bg-footer px-4 py-4 text-on-footer">
           <p className="font-display text-sm font-bold">{tr(store.name)}</p>

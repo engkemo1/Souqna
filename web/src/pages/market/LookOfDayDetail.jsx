@@ -21,7 +21,7 @@ export default function LookOfDayDetail() {
     <div className="min-h-dvh bg-canvas">
       <MarketHeader />
       <main className="container max-w-[1336px] pb-32 pt-5 sm:pt-8">
-        <Link to="/" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-fg"><ArrowRight className="h-4 w-4" />{lang === 'ar' ? 'الرئيسية' : 'Home'}</Link>
+        <Link to="/" className="mb-4 inline-flex items-center gap-1.5 text-sm font-semibold text-muted hover:text-fg"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" />{lang === 'ar' ? 'الرئيسية' : 'Home'}</Link>
         {loading && <Skeleton className="h-80 w-full rounded-[28px]" />}
         {error && <ErrorState error={error} />}
         {data && !entry && <p className="rounded-2xl border border-line p-6 text-center text-muted">اللوك ده مش متاح حاليًا.</p>}
@@ -40,7 +40,7 @@ export default function LookOfDayDetail() {
               <p className="mt-5 text-sm text-muted">{lang === 'ar' ? `اختيارات ${assistantName}` : `Selected by ${assistantName}`}</p>
               <div className="mt-6 flex flex-wrap items-end justify-between gap-4 rounded-2xl border border-line bg-elevated/80 p-4">
                 <div><p className="text-xs font-semibold text-muted">{lang === 'ar' ? 'إجمالي القطع' : 'Look total'}</p><p className="mt-1 text-2xl font-extrabold text-brand">{formatMoney(total, lang)}</p></div>
-                <a href="#look-pieces" className="rounded-full bg-btn px-5 py-3 text-sm font-bold text-on-btn">{lang === 'ar' ? 'شوف القطع' : 'View pieces'}</a>
+                <a href="#look-pieces" className="rounded-full bg-btn px-5 py-3 text-sm font-bold text-white">{lang === 'ar' ? 'شوف القطع' : 'View pieces'}</a>
               </div>
             </div>
           </section>

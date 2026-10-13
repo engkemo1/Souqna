@@ -43,7 +43,7 @@ export default function StoreManage() {
           <p className="text-sm font-semibold">بتدير محل «{name}» من الأدمن — أي تعديل بيتحفظ على المحل فعلاً.</p>
           <span className="flex gap-2 text-[13px]">
             <a href={`/s/${slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 hover:bg-white/20"><ExternalLink className="h-3.5 w-3.5" />صفحة المحل</a>
-            <Link to="/admin/stores" className="inline-flex items-center gap-1 rounded-full bg-[#F26B38] px-3 py-1 font-semibold"><ArrowRight className="h-3.5 w-3.5" />رجوع للمحلات</Link>
+            <Link to="/admin/stores" className="inline-flex items-center gap-1 rounded-full bg-[#F26B38] px-3 py-1 font-semibold text-white"><ArrowRight className="h-3.5 w-3.5 rtl:rotate-0 ltr:rotate-180" />رجوع للمحلات</Link>
           </span>
         </div>
         <Outlet />

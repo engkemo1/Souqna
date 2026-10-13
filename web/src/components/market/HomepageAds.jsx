@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ArrowUpLeft, Megaphone } from 'lucide-react';
+import { ArrowUpRight, Megaphone } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 
@@ -29,7 +29,7 @@ export default function HomepageAds() {
                 <p className="max-w-2xl font-display text-2xl font-extrabold leading-tight sm:text-3xl">{title}</p>
                 {subtitle && <p className="mt-2 line-clamp-2 max-w-2xl text-sm leading-relaxed text-white/85 sm:text-base">{subtitle}</p>}
                 <span className="mt-4 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2.5 text-sm font-bold text-neutral-950 transition group-hover:bg-brand group-hover:text-white">
-                  {cta}<ArrowUpLeft className="h-4 w-4 rtl:-scale-x-100" />
+                  {cta}<ArrowUpRight className="h-4 w-4 rtl:-scale-x-100" />
                 </span>
               </div>
             </Link>

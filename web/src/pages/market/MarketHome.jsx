@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Store, CreditCard, RotateCcw, MapPin, Sparkles, Camera, MessageSquare, Users, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowLeft, ShoppingBag, Heart, User, Package } from 'lucide-react';
+import { Search, Store, CreditCard, RotateCcw, MapPin, Sparkles, Camera, MessageSquare, Users, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
@@ -283,7 +283,7 @@ export default function MarketHome() {
                 </span>
                 <span className="min-w-0"><b className="block truncate text-xs text-[#14213D]">{t('market.allStores')}</b><span className="mt-0.5 block text-[10px] text-muted">{lang === 'ar' ? 'محلات الملابس في بنها كلها في مكان واحد' : 'Banha clothing stores, all in one place'}</span></span>
               </span>
-              <ArrowLeft className="h-4 w-4 shrink-0 text-brand" />
+              <ArrowRight className="h-4 w-4 shrink-0 text-brand rtl:rotate-180" />
             </Link>
           </div>
 
@@ -349,7 +349,7 @@ export default function MarketHome() {
               <h2 className="mt-3 font-display text-2xl font-black text-[#14213D] sm:text-3xl">{t('market.allStores')}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted sm:text-base">{lang === 'ar' ? 'تصفّح المحلات، ادخل صفحة كل محل، وشوف المنتجات والعروض في مكان واحد.' : 'Browse local shops, open each store page, and see the products and offers in one place.'}</p>
             </div>
-            <Link to="/stores" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">{lang === 'ar' ? 'اكتشف كل المحلات' : 'Discover all stores'}<ArrowLeft className="h-4 w-4 rtl:-scale-x-100" /></Link>
+            <Link to="/stores" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">{lang === 'ar' ? 'اكتشف كل المحلات' : 'Discover all stores'}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {(base?.stores || []).slice(0, 3).map((store, i) => <StoreCard key={store.id} store={store} index={i} />)}

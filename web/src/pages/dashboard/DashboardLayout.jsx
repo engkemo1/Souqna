@@ -134,7 +134,7 @@ function MobileNav({ pending }) {
       <ul className="grid h-16 grid-cols-5">
         {items.map((it, i) => it.fab ? (
           <li key="fab" className="grid place-items-center">
-            <Link to="/dashboard/products/new" aria-label={t('dash.addProduct')} className="-mt-6 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-on-primary shadow-lift ring-4 ring-canvas transition active:scale-90">
+            <Link to="/dashboard/products/new" aria-label={t('dash.addProduct')} className="-mt-6 grid h-14 w-14 place-items-center rounded-2xl bg-primary text-white shadow-lift ring-4 ring-canvas transition active:scale-90">
               <Plus className="h-6 w-6" strokeWidth={2.5} />
             </Link>
           </li>
@@ -211,7 +211,7 @@ export default function DashboardLayout() {
       <MobileTop />
       <div className="md:ps-[76px] lg:ps-[264px]">
         {user.role === 'demo' && (
-          <div role="status" className="bg-btn px-4 py-2 text-center text-sm font-semibold text-on-btn">{t('dash.demoBanner')}</div>
+          <div role="status" className="bg-btn px-4 py-2 text-center text-sm font-semibold text-white">{t('dash.demoBanner')}</div>
         )}
         <main className="mx-auto w-full max-w-[1400px] px-4 pb-[calc(96px+var(--safe-b))] pt-5 sm:px-6 md:pb-12 md:pt-8 lg:px-8 xl:px-10">
           <Outlet />

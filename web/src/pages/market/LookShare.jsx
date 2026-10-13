@@ -37,8 +37,8 @@ export default function LookShare() {
             </div>
             {data.kind !== 'visual' && data.pieces.length > 0 && <p className="mt-4 text-[15px] font-bold">{t('stylist.total', { p: formatMoney(data.total, lang) })}</p>}
             {data.kind === 'visual'
-              ? <Link to="/visual" className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-btn px-5 py-2.5 text-[14px] font-bold text-on-btn"><Camera className="h-4 w-4" />{t('look.tryYours')}</Link>
-              : <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: t('look.askMore') } }))} className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-btn px-5 py-2.5 text-[14px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t('look.askModa')}</button>}
+              ? <Link to="/visual" className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-btn px-5 py-2.5 text-[14px] font-bold text-white"><Camera className="h-4 w-4" />{t('look.tryYours')}</Link>
+              : <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: t('look.askMore') } }))} className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-btn px-5 py-2.5 text-[14px] font-bold text-white"><ShoppingBag className="h-4 w-4" />{t('look.askModa')}</button>}
           </>
         )}
       </main>

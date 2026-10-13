@@ -56,7 +56,7 @@ export default function StoreHero() {
           {tr(store.tagline) && <p className="mt-3 max-w-xl text-lg text-white/80 sm:text-xl">{tr(store.tagline)}</p>}
           <div className="mt-8 flex flex-wrap gap-3">
             <Link to={sp(store.slug, 'shop')} className="group inline-flex items-center gap-2 rounded-full bg-white px-6 py-3.5 text-base font-semibold text-black transition hover:bg-white/90">
-              {ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4 transition group-hover:-translate-x-0.5 rtl:group-hover:translate-x-0.5" />
+              {ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4 transition group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />
             </Link>
             {tr(store.address) && (
               <a href={maps.open} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-white/30 bg-white/10 px-6 py-3.5 text-base font-semibold backdrop-blur transition hover:bg-white/20">
@@ -98,7 +98,7 @@ export function StoreIdentityBar() {
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Link to={sp(store.slug, 'shop')} className="inline-flex items-center gap-2 rounded-full bg-btn px-5 py-2.5 text-[14px] font-semibold text-on-btn">
+          <Link to={sp(store.slug, 'shop')} className="inline-flex items-center gap-2 rounded-full bg-btn px-5 py-2.5 text-[14px] font-semibold text-white">
             {ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4" />
           </Link>
           {tr(store.address) && (

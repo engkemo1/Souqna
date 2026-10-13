@@ -133,7 +133,7 @@ export function ConfirmDialog({ open, onClose, onConfirm, title, body, confirmLa
       footer={(
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className="h-11 rounded-xl px-5 font-semibold text-fg hover:bg-fg/[0.06]">{t('common.cancel')}</button>
-          <button type="button" onClick={onConfirm} disabled={loading} className={cx('h-11 rounded-xl px-5 font-semibold transition active:scale-[.97] disabled:opacity-60', danger ? 'bg-sale text-white' : 'bg-btn text-on-btn')}>
+          <button type="button" onClick={onConfirm} disabled={loading} className={cx('h-11 rounded-xl px-5 font-semibold transition active:scale-[.97] disabled:opacity-60', danger ? 'bg-sale text-white' : 'bg-btn text-white')}>
             {loading ? t('common.saving') : confirmLabel}
           </button>
         </div>

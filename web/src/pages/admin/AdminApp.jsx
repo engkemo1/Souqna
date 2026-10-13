@@ -186,8 +186,10 @@ function MobileDrawer({ open, onClose, alerts, onLogout, location }) {
       )}
       {/* Drawer panel - in RTL, start-0 = right side, slides from right */}
       <aside
+        aria-hidden={!open}
+        inert={!open ? '' : undefined}
         className={cx(
-          'fixed inset-y-0 end-0 z-50 flex w-[280px] flex-col border-s border-line bg-elevated transition-transform duration-300 ease-in-out lg:hidden',
+          'fixed inset-y-0 start-0 z-50 flex w-[280px] flex-col border-e border-line bg-elevated shadow-sheet transition-transform duration-300 ease-in-out lg:hidden',
           open ? 'translate-x-0' : 'translate-x-full',
         )}
         dir="rtl"

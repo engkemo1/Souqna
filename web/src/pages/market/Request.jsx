@@ -31,7 +31,7 @@ async function shrink(file, max = 1400) {
 
 function Shell({ children }) {
   const { t } = useI18n();
-  return <div className="min-h-dvh bg-canvas"><MarketHeader /><main className="container max-w-xl pb-16 pt-6 sm:pt-10"><Link to="/" className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-sm font-semibold hover:border-fg"><ArrowRight className="h-4 w-4" />{t('req.backMarket')}</Link>{children}</main></div>;
+  return <div className="min-h-dvh bg-canvas"><MarketHeader /><main className="container max-w-xl pb-16 pt-6 sm:pt-10"><Link to="/" className="mb-5 inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-sm font-semibold hover:border-fg"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" />{t('req.backMarket')}</Link>{children}</main></div>;
 }
 
 function Promise3() {
