@@ -8,9 +8,9 @@ export function BrandMark({ className, mono = false }) {
   const accent = mono ? 'currentColor' : '#FF8A5C';
   return (
     <svg viewBox="0 0 80 76" className={cx('h-8 w-auto shrink-0', className)} aria-hidden="true">
-      <path d="M8 10c17 0 29 6 37 24-7-5-13-7-20-7C14 27 9 20 8 10Z" fill={color} />
-      <path d="M72 10c-16 0-25 6-33 24 7-5 13-7 20-7 11 0 12-7 13-17Z" fill={accent} />
-      <path d="M40 37c-11 9-12 21-8 33 12-4 17-15 8-33Z" fill={mono ? 'currentColor' : '#D94A22'} />
+      <path d="M9 10c16 1 27 7 34 22-7-4-12-5-19-5C15 27 10 21 9 10Z" fill={color} />
+      <path d="M71 10c-16 1-27 7-34 22 7-4 12-5 19-5 9 0 14-6 15-17Z" fill={accent} />
+      <path d="M40 39c-9 8-11 18-8 29 10-3 15-12 12-22-1-3-2-5-4-7Z" fill={mono ? 'currentColor' : '#D94A22'} />
     </svg>
   );
 }
