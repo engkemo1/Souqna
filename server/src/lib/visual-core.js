@@ -135,6 +135,10 @@ export function rankConfident(queryVec, queryHist, candidates, { floor, window =
     }
     scored.push({ id: c.id, score });
   }
+  // a product can have several photos: it counts once, with its best-matching photo
+  const bestById = new Map();
+  for (const x of scored) if (!(bestById.get(x.id) >= x.score)) bestById.set(x.id, x.score);
+  if (bestById.size !== scored.length) { scored.length = 0; for (const [id, score] of bestById) scored.push({ id, score }); }
   scored.sort((a, b) => b.score - a.score);
   const best = scored[0]?.score;
   if (best === undefined || best < floor) return [];

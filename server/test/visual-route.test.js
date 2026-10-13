@@ -41,7 +41,7 @@ test('route returns grouped, serialised product cards for a close match and noMa
   insert('products', { store_id: q.get('SELECT id FROM stores').id, slug: 'black', name_ar: 'بنطلون أسود سليم', name_en: 'Slim black trousers', price: 829, status: 'active', track_stock: 0 });
   const pid = q.get('SELECT id FROM products').id;
   const e = await visual.embedImage(await solid(12, 12, 14), 'color-v1');
-  q.run('INSERT INTO product_vectors (product_id, media_id, model, vec) VALUES (?,?,?,?)', [pid, 1, e.model, toBlob(e.vec)]);
+  q.run('INSERT INTO visual_vectors (product_id, model, slot, media_id, vec) VALUES (?,?,?,?,?)', [pid, e.model, 'm1', 1, toBlob(e.vec)]);
   visual.invalidateVisualCache();
 
   const hit = await post(await solid(12, 12, 14), { type: 'bottoms' });

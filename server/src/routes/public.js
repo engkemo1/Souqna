@@ -128,14 +128,16 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
   const department = String(req.body?.department || '').replace(/[^a-z0-9_]/g, '');
   const type = String(req.body?.type || '').replace(/[^a-z0-9_]/g, ''); // optional: empty = detect the pieces automatically
   let found;
-  try { found = await searchByImage(req.file.buffer, { department, type, limit: 24 }); }
+  let timer;
+  const busy = new Promise((_, reject) => { timer = setTimeout(() => reject(new VisualProviderError('Visual search is busy, please try again in a moment.')), 25_000); timer.unref?.(); });
+  try { found = await Promise.race([searchByImage(req.file.buffer, { department, type, limit: 24 }), busy]); }
   catch (e) {
     if (e instanceof VisualProviderError) throw new AppError(e.status, e.code, e.message);
     throw new AppError(422, 'invalid_image', 'This file is not a supported image.');
-  }
+  } finally { clearTimeout(timer); }
   // Only genuinely similar products are returned (quality gate in searchByImage); an empty result is a valid, honest answer.
   logVisualSearch({ ip, model: found.model, department, groups: found.groups }); // demand log: what people look for and don't find
-  const ids = [...new Set(found.groups.flatMap((g) => g.items.map((x) => x.id)))];
+  const ids = [...new Set(found.groups.flatMap((g) => [...g.items, ...(g.similar || [])].map((x) => x.id)))];
   const byCard = new Map();
   if (ids.length) {
     const rows = q.all(
@@ -144,7 +146,7 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
     const ordered = ids.map((id) => byId.get(id)).filter(Boolean);
     serializeCards(ordered).forEach((c, i) => byCard.set(ordered[i].id, { ...c, store: { slug: ordered[i].store_slug, name: bi(ordered[i], 'store_name') } }));
   }
-  const groups = found.groups.map((g) => ({ type: g.type, label: g.label, confidence: g.confidence, items: g.items.map((x) => byCard.get(x.id)).filter(Boolean) }));
+  const groups = found.groups.map((g) => ({ type: g.type, label: g.label, confidence: g.confidence, items: g.items.map((x) => byCard.get(x.id)).filter(Boolean), similar: (g.similar || []).map((x) => byCard.get(x.id)).filter(Boolean) }));
   const withItems = groups.filter((g) => g.items.length);
   const first = withItems[0] || groups[0];
   res.json({ items: first?.items || [], total: withItems.reduce((n, g) => n + g.items.length, 0), groups, detected: found.detected, noMatch: withItems.length === 0 });

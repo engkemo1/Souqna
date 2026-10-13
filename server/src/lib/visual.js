@@ -58,13 +58,12 @@ export function saveVisualSettings({ enabled, model, dailyFree, minSimilarity })
 
 export function visualStatus() {
   const s = visualSettings();
-  const indexed = q.all('SELECT model, COUNT(*) AS c FROM product_vectors GROUP BY model').reduce((o, r) => ({ ...o, [r.model]: r.c }), {});
+  const indexed = q.all('SELECT model, COUNT(DISTINCT product_id) AS c FROM visual_vectors GROUP BY model').reduce((o, r) => ({ ...o, [r.model]: r.c }), {});
   const total = (q.get("SELECT COUNT(*) AS c FROM products WHERE status='active'")?.c) || 0;
   const model = settingModelName(s.model);
   const pending = q.get(`SELECT COUNT(*) AS c FROM products p
     JOIN product_media pm ON pm.product_id=p.id AND pm.is_primary=1
-    LEFT JOIN product_vectors v ON v.product_id=p.id
-    WHERE p.status='active' AND (v.product_id IS NULL OR v.media_id!=pm.media_id OR v.model!=?)`, [model])?.c || 0;
+    WHERE p.status='active' AND NOT EXISTS (SELECT 1 FROM visual_vectors v WHERE v.product_id=p.id AND v.model=? AND v.slot='m'||pm.media_id)`, [model])?.c || 0;
   const cs = clipStatus();
   return { ...s, indexed, total, pending, providers: { jina: { configured: Boolean(process.env.JINA_API_KEY) }, clip: { ...cs, available: !cs.error } } };
 }
@@ -124,6 +123,7 @@ async function jinaEmbed(buffer) {
   } finally { clearTimeout(timeout); }
 }
 const EMBEDDERS = { 'color-v1': colorEmbed, [JINA_MODEL]: jinaEmbed, [CLIP_MODEL_NAME]: clipEmbedImage };
+const CLIP_WAIT_MS = 4000;
 const settingModelName = (m) => (m === 'jina' ? JINA_MODEL : m === 'clip' ? CLIP_MODEL_NAME : 'color-v1');
 /** Admin-selected model. Never silently mix or fall back between incompatible vector spaces. */
 export async function activeModel() {
@@ -131,8 +131,13 @@ export async function activeModel() {
     if (!process.env.JINA_API_KEY) throw new VisualProviderError('Jina image search is selected but its API key is not configured.');
     return JINA_MODEL;
   }
-  // CLIP is "best effort": if it cannot load (package/model/RAM), visual search keeps working on the colour model.
-  if (visualSettings().model === 'clip' && await clipReady()) return CLIP_MODEL_NAME;
+  // CLIP is "best effort": while it loads (or if it cannot load: package / model / RAM) searches are answered by the colour model, whose
+  // vectors are always kept up to date next to CLIP's — a customer never waits on a model download and never gets an empty page because of it.
+  if (visualSettings().model === 'clip') {
+    if (clipStatus().loaded) return CLIP_MODEL_NAME;
+    const ready = await Promise.race([clipReady(), new Promise((r) => { const t = setTimeout(() => r(false), CLIP_WAIT_MS); t.unref?.(); })]);
+    if (ready) return CLIP_MODEL_NAME;
+  }
   return 'color-v1';
 }
 
@@ -142,37 +147,54 @@ export async function embedImage(buffer, model) {
   catch (e) { if (e instanceof VisualProviderError) throw e; throw new VisualProviderError('Could not analyze this image.', 422); }
 }
 
-/** Index products whose primary photo has no vector for the active model yet (or whose photo changed), and their colour histogram. */
+const MAX_IMAGES = 4; // photos indexed per product (primary first)
+async function mediaBytes(m) {
+  for (const f of ['md.jpg', 'sm.jpg', 'original.jpg']) { try { return await readMediaFile(m, f); } catch { /* try next */ } }
+  return null;
+}
+
+/**
+ * Index every active product's photos (up to MAX_IMAGES, primary first) for the active model — and always for the colour model, the safety
+ * net that answers searches while CLIP loads or if it is unavailable. Also keeps the primary photo's colour histogram (owner reports).
+ */
 export async function reindexPending(limit = 20, forceModel) {
-  const ACTIVE_MODEL = forceModel || await activeModel();
-  const rows = q.all(
-    `SELECT p.id AS product_id, m.*,
-            (v.product_id IS NULL OR v.media_id!=m.id OR v.model!=?) AS need_vec,
-            (c.product_id IS NULL OR c.media_id!=m.id) AS need_color
-       FROM products p
-       JOIN product_media pm ON pm.product_id=p.id AND pm.is_primary=1
-       JOIN media m ON m.id=pm.media_id
-       LEFT JOIN product_vectors v ON v.product_id=p.id
-       LEFT JOIN product_colors c ON c.product_id=p.id
-      WHERE p.status='active' AND (v.product_id IS NULL OR v.media_id!=m.id OR v.model!=? OR c.product_id IS NULL OR c.media_id!=m.id) LIMIT ?`, [ACTIVE_MODEL, ACTIVE_MODEL, limit]);
-  let done = 0;
-  for (const m of rows) {
-    try {
-      let buf = null;
-      for (const f of ['md.jpg', 'sm.jpg', 'original.jpg']) { try { buf = await readMediaFile(m, f); break; } catch { /* try next */ } }
-      if (!buf) continue;
-      if (m.need_vec) {
-        const e = await embedImage(buf, ACTIVE_MODEL);
-        q.run('INSERT INTO product_vectors (product_id, media_id, model, vec) VALUES (?,?,?,?) ON CONFLICT(product_id) DO UPDATE SET media_id=excluded.media_id, model=excluded.model, vec=excluded.vec', [m.product_id, m.id, e.model, toBlob(e.vec)]);
-      }
-      if (m.need_color) {
-        q.run('INSERT INTO product_colors (product_id, media_id, hist) VALUES (?,?,?) ON CONFLICT(product_id) DO UPDATE SET media_id=excluded.media_id, hist=excluded.hist', [m.product_id, m.id, toBlob(await colorDescriptor(buf))]);
-      }
-      done++;
-    } catch (e) { console.error('[visual] index failed for product', m.product_id, e.message); }
+  const active = forceModel || await activeModel();
+  const models = [...new Set([active, 'color-v1'])];
+  // photos that were removed / replaced no longer match anything
+  q.run("DELETE FROM visual_vectors WHERE slot LIKE 'm%' AND NOT EXISTS (SELECT 1 FROM product_media pm WHERE pm.product_id=visual_vectors.product_id AND pm.media_id=visual_vectors.media_id)");
+  let done = 0, remaining = false;
+  for (const model of models) {
+    const rows = q.all(
+      `SELECT pm.product_id AS product_id, m.* FROM products p
+         JOIN product_media pm ON pm.product_id=p.id JOIN media m ON m.id=pm.media_id
+        WHERE p.status='active'
+          AND (SELECT COUNT(*) FROM product_media o WHERE o.product_id=pm.product_id AND (o.is_primary>pm.is_primary OR (o.is_primary=pm.is_primary AND (o.position<pm.position OR (o.position=pm.position AND o.media_id<pm.media_id)))))<?
+          AND NOT EXISTS (SELECT 1 FROM visual_vectors v WHERE v.product_id=pm.product_id AND v.model=? AND v.slot='m'||pm.media_id)
+        ORDER BY pm.is_primary DESC LIMIT ?`, [MAX_IMAGES, model, limit]);
+    if (rows.length === limit) remaining = true;
+    for (const m of rows) {
+      try {
+        const buf = await mediaBytes(m); if (!buf) continue;
+        const e = await embedImage(buf, model);
+        const hist = await colorDescriptor(buf).catch(() => null);
+        q.run('INSERT OR REPLACE INTO visual_vectors (product_id, model, slot, media_id, vec, hist) VALUES (?,?,?,?,?,?)', [m.product_id, e.model, `m${m.id}`, m.id, toBlob(e.vec), hist ? toBlob(hist) : null]);
+        done++;
+      } catch (e) { console.error('[visual] index failed for product', m.product_id, e.message); }
+    }
   }
+  const colorRows = q.all(
+    `SELECT p.id AS product_id, m.* FROM products p JOIN product_media pm ON pm.product_id=p.id AND pm.is_primary=1 JOIN media m ON m.id=pm.media_id
+       LEFT JOIN product_colors c ON c.product_id=p.id WHERE p.status='active' AND (c.product_id IS NULL OR c.media_id!=m.id) LIMIT ?`, [limit]);
+  for (const m of colorRows) {
+    try {
+      const buf = await mediaBytes(m); if (!buf) continue;
+      q.run('INSERT INTO product_colors (product_id, media_id, hist) VALUES (?,?,?) ON CONFLICT(product_id) DO UPDATE SET media_id=excluded.media_id, hist=excluded.hist', [m.product_id, m.id, toBlob(await colorDescriptor(buf))]);
+      done++;
+    } catch (e) { console.error('[visual] colour index failed for product', m.product_id, e.message); }
+  }
+  if (colorRows.length === limit) remaining = true;
   if (done) invalidateVisualCache();
-  return { done, remaining: rows.length === limit };
+  return { done, remaining };
 }
 
 let timer = null, running = false;
@@ -198,16 +220,20 @@ let catalog = { at: 0, model: null, rows: [], centroids: new Map() };
 export function invalidateVisualCache() { catalog.at = 0; }
 function loadCatalog(model) {
   if (catalog.model === model && Date.now() - catalog.at < 30_000) return catalog;
-  const rows = q.all(
-    `SELECT v.product_id AS id, v.vec, c.hist, p.name_ar, p.name_en, p.department,
+  const vectors = q.all(
+    `SELECT v.product_id AS id, v.slot, v.vec, v.hist, COALESCE(pm.is_primary, 0) AS is_primary, p.name_ar, p.name_en, p.department,
             COALESCE(cat.name_ar || ' ' || cat.name_en, '') AS cat_text
-       FROM product_vectors v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id
-       LEFT JOIN product_colors c ON c.product_id=v.product_id
+       FROM visual_vectors v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id
+       LEFT JOIN product_media pm ON pm.product_id=v.product_id AND pm.media_id=v.media_id
        LEFT JOIN categories cat ON cat.id=p.category_id
-      WHERE v.model=? AND p.status='active' AND (p.track_stock=0 OR p.stock>0) AND s.status='active' AND s.hidden=0`, [model])
+      WHERE v.model=? AND p.status='active' AND (p.track_stock=0 OR p.stock>0) AND s.status='active' AND s.hidden=0
+      ORDER BY v.product_id, is_primary DESC, v.slot`, [model])
     .map((r) => ({ id: r.id, vec: fromBlob(r.vec), hist: r.hist ? fromBlob(r.hist) : null, department: r.department, family: visualProductFamily(r) }));
-  // "training": the catalogue's own labelled products become per-family centroids (used only by the CLIP classifier)
-  catalog = { at: Date.now(), model, rows, centroids: buildCentroids(rows) };
+  // `vectors`: every photo (search pool; a product counts once, via its best photo). `rows`: one per product (primary photo first) — used for
+  // "training": the catalogue's own labelled products become per-family centroids (used only by the CLIP classifier).
+  const seen = new Set(); const rows = [];
+  for (const v of vectors) if (!seen.has(v.id)) { seen.add(v.id); rows.push(v); }
+  catalog = { at: Date.now(), model, rows, vectors, centroids: buildCentroids(rows) };
   return catalog;
 }
 
@@ -227,19 +253,23 @@ export async function protosFor(model, cat) {
   return { text: textProtos.map, centroids: cat.centroids };
 }
 
+/** The «closest alternatives» list (shown under the exact matches, clearly labelled) goes this far below the match floor. */
+const SIMILAR_MARGIN = { clip: 0.15, jina: 0.10, color: 0.07 };
+const SIMILAR_MAX = 8;
+const similarFloorOf = (model, floor) => Math.max(0.4, floor - (model === CLIP_MODEL_NAME ? SIMILAR_MARGIN.clip : model === JINA_MODEL ? SIMILAR_MARGIN.jina : SIMILAR_MARGIN.color));
 const floorOf = (settings, model) => (model === CLIP_MODEL_NAME ? settings.minSimilarityByModel.clip : model === JINA_MODEL ? settings.minSimilarityByModel.jina : settings.minSimilarityByModel.color) / 100;
 
 /**
  * Finds what the customer's photo shows and returns ONLY genuinely similar products.
- *   → { model, detected: [{ type, label, confidence }], groups: [{ type, label, confidence, items: [{ id, score }] }] }
+ *   → { model, detected: [{ type, label, confidence }], groups: [{ type, label, confidence, items: [{ id, score }], similar: [{ id, score }] }] }
  * Without `type` (CLIP): pieces are detected automatically (an outfit photo yields top / bottom / shoes groups).
  * With `type`: only that family. A group with no item above the quality gate simply has an empty `items` list —
  * nothing weak is ever added as filler; the UI offers a sourcing request instead.
  */
-export async function searchByImage(buffer, { department = '', type = '', limit = 24 } = {}) {
+export async function searchByImage(buffer, { department = '', type = '', limit = 24, _model } = {}) {
   if (type && !visualTypeOptions().some((candidate) => candidate.key === type)) throw new VisualProviderError('Unknown item type.', 422);
   const settings = visualSettings();
-  const model = await activeModel();
+  const model = _model || await activeModel();
   const isClip = model === CLIP_MODEL_NAME;
   const floor = floorOf(settings, model);
 
@@ -248,13 +278,17 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
     try {
       regions = [];
       for (const crop of await cropRegions(buffer)) regions.push({ key: crop.key, vec: normalize(await clipEmbedImage(crop.buffer)), hist: await colorDescriptor(crop.buffer) });
-    } catch (e) { throw new VisualProviderError('Could not analyze this image.', 422); }
+    } catch (e) {
+      // CLIP failed on this photo (model error / out of memory): answer with the colour model instead of failing the customer
+      if (!_model) { console.error('[visual] CLIP failed, using colour model:', e.message); return searchByImage(buffer, { department, type, limit, _model: 'color-v1' }); }
+      throw new VisualProviderError('Could not analyze this image.', 422);
+    }
   } else {
     regions = [{ key: 'full', vec: (await embedImage(buffer, model)).vec, hist: null }];
   }
 
   const cat = loadCatalog(model);
-  const pool = department ? cat.rows.filter((r) => r.department === department) : cat.rows;
+  const pool = department ? cat.vectors.filter((r) => r.department === department) : cat.vectors;
   const histOf = (key) => regions.find((r) => r.key === key)?.hist || null;
 
   let detections;
@@ -270,10 +304,14 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
   const groups = detections.map((d) => {
     const cands = d.family ? pool.filter((r) => r.family === d.family) : pool;
     const best = rankConfident(d.vec, d.hist, cands, { floor: -Infinity, window: Infinity, limit: 1, useColor: isClip })[0]?.score ?? null;
+    const items = rankConfident(d.vec, d.hist, cands, { floor, limit, useColor: isClip });
+    // «closest alternatives»: same garment type, below the strict floor, never the same products as `items`; the UI labels them honestly
+    const shown = new Set(items.map((x) => x.id));
+    const similar = rankConfident(d.vec, d.hist, cands, { floor: similarFloorOf(model, floor), window: Infinity, limit: limit + SIMILAR_MAX, useColor: isClip })
+      .filter((x) => !shown.has(x.id)).slice(0, SIMILAR_MAX);
     return {
       type: d.family || '', label: FRIENDLY_AR[d.family] || '', confidence: Math.round(d.p * 100) / 100,
-      color: dominantColor(d.hist || wholeHist)?.key || '', best,
-      items: rankConfident(d.vec, d.hist, cands, { floor, limit, useColor: isClip }),
+      color: dominantColor(d.hist || wholeHist)?.key || '', best, items, similar,
     };
   });
   return { model, detected: groups.map(({ type: t, label, confidence }) => ({ type: t, label, confidence })), groups };

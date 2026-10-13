@@ -41,6 +41,12 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
            WHERE department IS NULL AND (SELECT LENGTH(s.departments) - LENGTH(REPLACE(s.departments, ',', '')) FROM stores s WHERE s.id = products.store_id) = 2`);
   const slcols = db.prepare('PRAGMA table_info(shared_looks)').all().map((c) => c.name);
   if (!slcols.includes('kind')) db.exec("ALTER TABLE shared_looks ADD COLUMN kind TEXT NOT NULL DEFAULT 'look'");
+  // visual search: one-time move of the old single-vector table into visual_vectors (multi-photo, multi-model)
+  if (!db.prepare('SELECT 1 FROM visual_vectors LIMIT 1').get() && db.prepare('SELECT 1 FROM product_vectors LIMIT 1').get()) {
+    db.exec(`INSERT OR IGNORE INTO visual_vectors (product_id, model, slot, media_id, vec, hist)
+             SELECT v.product_id, v.model, 'm' || v.media_id, v.media_id, v.vec, c.hist FROM product_vectors v LEFT JOIN product_colors c ON c.product_id = v.product_id`);
+    db.exec('DELETE FROM product_vectors');
+  }
   const ocols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!ocols.includes('delivery_by')) db.exec("ALTER TABLE orders ADD COLUMN delivery_by TEXT NOT NULL DEFAULT 'store'");
   if (!ocols.includes('handoff_at')) db.exec('ALTER TABLE orders ADD COLUMN handoff_at TEXT');

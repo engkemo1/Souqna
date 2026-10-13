@@ -20,3 +20,11 @@ if (!fs.existsSync(config.dbFile)) {
   }
 }
 await import('./index.js');
+
+// Photos still on the volume (e.g. the demo seed) move to Cloudflare R2 in the background, so the small volume only ever holds the database.
+// Needs the R2_* variables; does nothing without them. Safe to repeat (see lib/media-migrate.js).
+setTimeout(() => {
+  import('./lib/media-migrate.js').then((m) => m.moveLocalMediaToR2({ log: () => {} }))
+    .then((r) => { if (!r.skipped && (r.moved || r.recovered || r.stuck)) console.log(`[media→r2] moved ${r.moved}, re-marked ${r.recovered}${r.stuck ? `, ${r.stuck} waiting for free disk space` : ''}`); })
+    .catch((e) => console.warn('[media→r2] skipped:', e.message));
+}, 20_000).unref();

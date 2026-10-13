@@ -288,6 +288,19 @@ CREATE TABLE IF NOT EXISTS product_vectors (
   vec BLOB NOT NULL
 );
 
+-- Visual search vectors, one row per (product, model, slot): several catalogue photos per product ('m<mediaId>'), several models side by side
+-- (the colour model is always kept as a safety net), and later vectors learned from customers ('c<n>'). `hist` = colour histogram of that photo.
+CREATE TABLE IF NOT EXISTS visual_vectors (
+  product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  model TEXT NOT NULL,
+  slot TEXT NOT NULL,
+  media_id INTEGER,
+  vec BLOB NOT NULL,
+  hist BLOB,
+  PRIMARY KEY (product_id, model, slot)
+);
+CREATE INDEX IF NOT EXISTS idx_visual_vectors_model ON visual_vectors(model);
+
 -- Visual search: dominant-colour histogram of each product's primary photo (re-ranks / vetoes colour mismatches).
 CREATE TABLE IF NOT EXISTS product_colors (
   product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,

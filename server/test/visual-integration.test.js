@@ -25,7 +25,7 @@ async function seed() {
     insert('products', { store_id: store, slug: nameEn.toLowerCase().replace(/ /g, '-'), name_ar: name, name_en: nameEn, price: 500, status: 'active', track_stock: 0 });
     const id = q.get('SELECT id FROM products ORDER BY id DESC LIMIT 1').id;
     const e = await visual.embedImage(await solid(...colour), 'color-v1');
-    q.run('INSERT INTO product_vectors (product_id, media_id, model, vec) VALUES (?,?,?,?)', [id, 1, e.model, toBlob(e.vec)]);
+    q.run('INSERT INTO visual_vectors (product_id, model, slot, media_id, vec) VALUES (?,?,?,?,?)', [id, e.model, 'm1', 1, toBlob(e.vec)]);
     return id;
   };
   return { black: await mk('بنطلون أسود سليم', 'Slim black trousers', [12, 12, 14]), pink: await mk('بنطلون وردي', 'Pink trousers', [240, 130, 170]), tee: await mk('تيشيرت أبيض', 'White t-shirt', [245, 245, 245]) };

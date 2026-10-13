@@ -96,6 +96,9 @@ export default function VisualSearch() {
   const groups = (state.data?.groups || []).filter((g) => g.items.length);
   const current = groups[Math.min(active, Math.max(0, groups.length - 1))];
   const noMatch = Boolean(state.data) && groups.length === 0;
+  // «closest alternatives» (below the strict floor, same garment type): shown under the exact matches or under the sourcing offer
+  const similarSource = current ? current.similar || [] : (state.data?.groups || []).flatMap((g) => g.similar || []);
+  const similar = [...new Map(similarSource.map((p) => [`${p.store.slug}-${p.id}`, p])).values()].slice(0, 12);
   const detectedLabel = (state.data?.detected || []).map(groupLabel).find(Boolean) || '';
   const requestHref = `/request?from=visual&title=${encodeURIComponent(t('visual.requestTitle', { item: detectedLabel || t('visual.itemFallback') }))}`;
 
@@ -206,13 +209,23 @@ export default function VisualSearch() {
             <div className="mx-auto max-w-xl rounded-3xl border border-line bg-elevated p-6 text-center sm:p-8">
               <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-secondary text-brand"><PackagePlus className="h-6 w-6" /></span>
               <h2 className="mt-4 font-display text-xl font-bold">{t('visual.noMatchTitle')}</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">{t('visual.noMatchBody')}</p>
+              <p className="mt-2 text-sm leading-6 text-muted">{t(similar.length ? 'visual.noMatchBodySimilar' : 'visual.noMatchBody')}</p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
                 <Link to={requestHref} onClick={() => { visualHandoff.blob = blob; }} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-brand px-5 text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.98]"><PackagePlus className="h-4 w-4" />{t('visual.getIt')}</Link>
                 <Button variant="outline" onClick={() => input.current?.click()} icon={RefreshCcw}>{t('visual.again')}</Button>
                 {dept && <Button variant="outline" onClick={() => changeDept('')}>{t('visual.tryAllDepts')}</Button>}
               </div>
             </div>
+          )}
+          {similar.length > 0 && !state.loading && (
+            <section className="mt-12" aria-labelledby="similar-title">
+              <div className="mb-5"><h2 id="similar-title" className="font-display text-xl font-bold">{t('visual.similarTitle')}</h2><p className="mt-1 text-sm text-muted">{t('visual.similarSub')}</p></div>
+              <ProductGrid>{similar.map((p, i) => (
+                <div key={`similar-${p.store.slug}-${p.id}`} className="relative">
+                  <ProductCard product={p} slug={p.store.slug} index={i} showStore />
+                </div>
+              ))}</ProductGrid>
+            </section>
           )}
         </div>
       </main>

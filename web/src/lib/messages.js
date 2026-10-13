@@ -1,8 +1,8 @@
 /* Banha Outfit UI copy — Egyptian Arabic (default) + English. */
 export const messages = {
   ar: {
-    'app.name': 'بنها أوتفيت',
-    'app.tagline': 'أزياء من محلات بنها',
+    'app.name': 'طلة',
+    'app.tagline': 'أكثر من مجرد ملابس',
     'common.currency': 'ج.م',
     'common.retry': 'حاول تاني',
     'common.save': 'حفظ',
@@ -287,7 +287,7 @@ export const messages = {
     'visual.cta': 'صوّرها ولاقيها في بنها', 'visual.title': 'صوّرها ولاقيها في بنها', 'visual.sub': 'شفتي حاجة عجبتك على إنستجرام أو مع حد؟ صوّريها أو ارفعي صورتها، وهنوريكي أقرب المنتجات اللي موجودة فعلاً في محلات بنها بسعرها.',
     'visual.pick': 'صوّر أو ارفع صورة', 'visual.pickHint': 'JPG أو PNG — الصورة بتتحلل على السيرفر ومبتتخزنش', 'visual.searching': 'بندوّر في محلات بنها…', 'visual.searchingHint': 'بنقارن صورتك بالمنتجات المتاحة دلوقتي.', 'visual.results': 'لقينا {n} منتج ممكن يعجبك', 'visual.previewHint': 'النتايج الأقرب لصورتك — افتح أي منتج للتفاصيل.', 'visual.match': 'تشابه {p}%', 'visual.chooseType': 'إيه نوع القطعة اللي بتدوري عليها؟', 'visual.stepType': '١. اختار نوع القطعة الأول', 'visual.stepPhoto': '٢. صوّر أو ارفع صورة للقطعة', 'visual.chooseTypeFirst': 'اختاري نوع القطعة الأول عشان نستبعد الأنواع التانية', 'visual.departmentFilter': '٣. فلتر حسب القسم (اختياري)',
     'visual.none': 'ملقيناش منتج قريب المرة دي', 'visual.noneBody': 'جرّب تشيل فلتر القسم، أو تختار نوع قطعة تاني، أو ترفع صورة أوضح للقطعة لوحدها.', 'visual.again': 'جرّب صورة تانية', 'visual.allDepts': 'كل الأقسام', 'visual.tryAllDepts': 'شيل فلتر القسم', 'visual.changeType': 'غيّر نوع القطعة', 'visual.retry': 'دوّر تاني', 'visual.searchErrorTitle': 'البحث بالصورة ماكملش', 'visual.note': 'النتايج بتتحسّن كل ما المحلات تضيف منتجات أكتر.',
-    'visual.noMatchTitle': 'مش لاقيها عندنا؟ نوفرهالك بكل سهولة', 'visual.noMatchBody': 'ما بنعرضش حاجة مش شبهها عشان ماتضيعش وقتك. ابعتلنا صورتها ونوفرهالك ونعاينها قبل ما تستلمها، أو جرّب صورة تانية.', 'visual.getIt': 'نوفرهالك بكل سهولة', 'visual.requestTitle': '{item} زي اللي في الصورة', 'visual.itemFallback': 'قطعة', 'visual.detected': 'لقينا في صورتك:', 'visual.notThis': 'مش دي القطعة اللي قصدتها؟ اختار النوع أو القسم', 'visual.auto': 'تلقائي',
+    'visual.noMatchTitle': 'مش لاقيها عندنا؟ نوفرهالك بكل سهولة', 'visual.noMatchBody': 'ما بنعرضش حاجة مش شبهها عشان ماتضيعش وقتك. ابعتلنا صورتها ونوفرهالك ونعاينها قبل ما تستلمها، أو جرّب صورة تانية.', 'visual.noMatchBodySimilar': 'مفيش عندنا نفس القطعة بالظبط. ابعتلنا صورتها ونوفرهالك ونعاينها قبل ما تستلمها، أو شوف أقرب حاجات عندنا تحت.', 'visual.similarTitle': 'أقرب حاجات عندنا', 'visual.similarSub': 'مش نفس القطعة بالظبط، بس دي أقرب اللي موجود دلوقتي في محلات بنها.', 'visual.getIt': 'نوفرهالك بكل سهولة', 'visual.requestTitle': '{item} زي اللي في الصورة', 'visual.itemFallback': 'قطعة', 'visual.detected': 'لقينا في صورتك:', 'visual.notThis': 'مش دي القطعة اللي قصدتها؟ اختار النوع أو القسم', 'visual.auto': 'تلقائي',
     'visual.share': 'شارك النتيجة', 'visual.shareTitle': 'لقيت دول في محلات بنها', 'visual.shareText': 'لقيت حاجات شبه اللي في الصورة في محلات بنها 👇', 'visual.shareFailed': 'ماقدرناش نعمل لينك المشاركة دلوقتي', 'visual.paste': 'الصق صورة من الحافظة', 'visual.pasteEmpty': 'مفيش صورة في الحافظة', 'visual.dropHint': 'أو اسحب الصورة وسيبها هنا', 'visual.installTip': 'ثبّت بنها أوتفيت على موبايلك، وبعدها من إنستجرام أو واتساب اعمل Share لأي صورة واختار «بنها أوتفيت» وهنلاقيها لك فورًا.', 'visual.install': 'ثبّت التطبيق',
     'look.fromVisual': 'نتايج بحث بالصورة في بنها', 'look.visualTitle': 'لقيت دول في محلات بنها', 'look.tryYours': 'جرّب بصورتك',
     'error.rate_limited': 'بحثت كتير في وقت قصير. جرّب بعد شوية.',
@@ -996,8 +996,8 @@ export const messages = {
   },
 
   en: {
-    'app.name': 'Banha Outfit',
-    'app.tagline': 'Fashion from Banha stores',
+    'app.name': 'طلة',
+    'app.tagline': 'More than just clothes',
     'common.currency': 'EGP',
     'common.retry': 'Try again',
     'common.save': 'Save',
@@ -1282,7 +1282,7 @@ export const messages = {
     'visual.cta': 'Snap it, find it in Banha', 'visual.title': 'Snap it, find it in Banha', 'visual.sub': 'Saw something you love on Instagram or on someone else? Take or upload a photo and we will show the closest products really in Banha stores, with prices.',
     'visual.pick': 'Take or upload a photo', 'visual.pickHint': 'JPG or PNG — analysed on our server, never stored', 'visual.searching': 'Searching Banha stores…', 'visual.searchingHint': 'Comparing your photo with currently available products.', 'visual.results': 'Found {n} products you may like', 'visual.previewHint': 'Closest matches to your photo — open any item to see details.', 'visual.match': '{p}% match', 'visual.chooseType': 'What kind of item are you looking for?', 'visual.stepType': '1. Choose the item type first', 'visual.stepPhoto': '2. Take or upload a photo of the item', 'visual.chooseTypeFirst': 'Choose the item type first so other kinds are filtered out', 'visual.departmentFilter': '3. Filter by department (optional)',
     'visual.none': 'No close matches this time', 'visual.noneBody': 'Try removing the department filter, choosing another item type, or uploading a clearer photo of the item by itself.', 'visual.again': 'Try another photo', 'visual.allDepts': 'All departments', 'visual.tryAllDepts': 'Clear department filter', 'visual.changeType': 'Change item type', 'visual.retry': 'Search again', 'visual.searchErrorTitle': 'Visual search did not finish', 'visual.note': 'Results get better as stores add more products.',
-    'visual.noMatchTitle': "Can't find it here? We'll get it for you, easily", 'visual.noMatchBody': 'We only show real look-alikes so we never waste your time. Send us the photo, we will source it and inspect it before handover — or try another photo.', 'visual.getIt': 'Get it for me, easily', 'visual.requestTitle': '{item} like in my photo', 'visual.itemFallback': 'Item', 'visual.detected': 'Found in your photo:', 'visual.notThis': 'Not the piece you meant? Pick the type or department', 'visual.auto': 'Auto',
+    'visual.noMatchTitle': "Can't find it here? We'll get it for you, easily", 'visual.noMatchBody': 'We only show real look-alikes so we never waste your time. Send us the photo, we will source it and inspect it before handover — or try another photo.', 'visual.noMatchBodySimilar': 'We do not have this exact piece. Send us the photo and we will source it and inspect it before handover — or see the closest things we have below.', 'visual.similarTitle': 'Closest things we have', 'visual.similarSub': 'Not the exact piece, but the nearest items in Banha stores right now.', 'visual.getIt': 'Get it for me, easily', 'visual.requestTitle': '{item} like in my photo', 'visual.itemFallback': 'Item', 'visual.detected': 'Found in your photo:', 'visual.notThis': 'Not the piece you meant? Pick the type or department', 'visual.auto': 'Auto',
     'visual.share': 'Share results', 'visual.shareTitle': 'Found these in Banha stores', 'visual.shareText': 'Found look-alikes in Banha stores 👇', 'visual.shareFailed': 'Could not create the share link right now', 'visual.paste': 'Paste a photo from clipboard', 'visual.pasteEmpty': 'No photo on the clipboard', 'visual.dropHint': 'or drag a photo and drop it here', 'visual.installTip': 'Install Banha Outfit on your phone, then share any photo from Instagram or WhatsApp straight to «Banha Outfit» and we will find it for you.', 'visual.install': 'Install app',
     'look.fromVisual': 'Photo-search results in Banha', 'look.visualTitle': 'Found these in Banha stores', 'look.tryYours': 'Try with your photo',
     'error.rate_limited': 'Too many searches in a short time. Try again later.',
