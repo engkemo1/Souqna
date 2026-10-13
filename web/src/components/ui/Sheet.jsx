@@ -11,7 +11,18 @@ const ease = [0.22, 1, 0.36, 1];
 /** While the overlay animates out it must not swallow taps meant for the page underneath (e.g. re-opening the cart). */
 function Layer({ className, children }) {
   const present = useIsPresent();
-  return <div className={className} style={present ? undefined : { pointerEvents: 'none' }}>{children}</div>;
+  return (
+    <motion.div
+      className={className}
+      style={present ? undefined : { pointerEvents: 'none' }}
+      initial={false}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+    >
+      {children}
+    </motion.div>
+  );
 }
 
 /**
