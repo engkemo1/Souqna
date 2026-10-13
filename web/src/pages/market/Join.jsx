@@ -11,7 +11,7 @@ const ease = [0.22, 1, 0.36, 1];
 const up = (d = 0) => ({ initial: { opacity: 0, y: 28 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-60px' }, transition: { duration: 0.8, delay: d, ease } });
 const wa = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(SALES_WA_TEXT)}`;
 const waPhoto = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent('أهلاً، محتاج عرض سعر لتصوير منتجات محلي. عدد المنتجات تقريباً:')}`;
-const waReadyPhotos = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent('أهلاً، عندي صور منتجاتي جاهزة أو بتعامل مع مصور، وعايز أعرف خطوات فتح متجري على بنها أوتفيت.')}`;
+const waReadyPhotos = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent('أهلاً، عندي صور منتجاتي جاهزة أو بتعامل مع مصور، وعايز أعرف خطوات فتح متجري على طِلّة.')}`;
 const tel = `tel:${SALES_PHONE}`;
 
 const PERKS = [
@@ -74,7 +74,7 @@ function ModaPitch() {
 
 export default function Join() {
   const { data } = useApi('/marketplace');
-  useEffect(() => { document.title = 'افتح متجرك · بنها أوتفيت'; window.scrollTo(0, 0); }, []);
+  useEffect(() => { document.title = 'افتح متجرك · طِلّة'; window.scrollTo(0, 0); }, []);
 
   return (
     <div dir="rtl" className="min-h-dvh overflow-hidden bg-[#111111] text-[#FFF6EC]">
@@ -139,7 +139,7 @@ export default function Join() {
           <motion.div aria-hidden className="absolute -left-16 -top-16 h-72 w-72 rounded-full bg-[#FF5A1F]/25 blur-3xl" animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 7, repeat: Infinity }} />
           <div className="relative grid items-center gap-10 lg:grid-cols-5">
             <div className="lg:col-span-3">
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#FF5A1F]/40 bg-white/5 px-3.5 py-1.5 text-sm text-[#FF8A5C]"><Camera className="h-4 w-4" />خدمة جديدة من بنها أوتفيت</span>
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#FF5A1F]/40 bg-white/5 px-3.5 py-1.5 text-sm text-[#FF8A5C]"><Camera className="h-4 w-4" />خدمة جديدة من طِلّة</span>
               <h2 className="mt-5 font-display text-3xl font-bold leading-snug text-[#FFF6EC] sm:text-5xl">محتاج مساعدة في تصوير منتجاتك؟
                 <span className="block text-[#FF8A5C]">خدمة اختيارية على قد احتياجك</span></h2>
               <p className="mt-4 max-w-xl text-lg leading-relaxed text-[#FFF6EC]/75">لو بتصور بنفسك أو عندك مصور، كمّل بصورك عادي. ولو محتاج تصوير احترافي، فريقنا يقدر ييجي لمحلك ويجهز الصور لمتجرك.</p>

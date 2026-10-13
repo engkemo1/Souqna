@@ -32,7 +32,7 @@ export default function Buyers() {
                 <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 p-3 text-sm text-amber-900">
                   <span>الباسورد المؤقت (بيظهر مرة واحدة): <b dir="ltr" className="font-mono">{shown[b.id]}</b></span>
                   <Button size="xs" variant="outline" icon={Copy} onClick={() => navigator.clipboard?.writeText(shown[b.id])}>نسخ</Button>
-                  <Button size="xs" variant="outline" href={waLink(b.phone, `أهلاً ${b.name}، الباسورد المؤقت لحسابك في بنها أوتفيت: ${shown[b.id]} (غيّره بعد الدخول)`)} target="_blank" rel="noreferrer">ابعته واتساب</Button>
+                  <Button size="xs" variant="outline" href={waLink(b.phone, `أهلاً ${b.name}، الباسورد المؤقت لحسابك في طِلّة: ${shown[b.id]} (غيّره بعد الدخول)`)} target="_blank" rel="noreferrer">ابعته واتساب</Button>
                 </div>
               )}
             </li>

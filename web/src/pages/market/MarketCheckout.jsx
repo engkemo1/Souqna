@@ -74,7 +74,7 @@ export default function MarketCheckout() {
     }
   };
 
-  if (!cart.items.length) return <div className="min-h-dvh"><MarketHeader /><main className="container py-16 text-center"><ShoppingBag className="mx-auto h-10 w-10 text-muted" /><p className="mt-3 font-semibold">{ar ? 'سلة بنها أوتفيت فاضية' : 'Your marketplace basket is empty'}</p><Button to="/search" className="mt-5">{ar ? 'اكتشف المنتجات' : 'Explore products'}</Button></main></div>;
+  if (!cart.items.length) return <div className="min-h-dvh"><MarketHeader /><main className="container py-16 text-center"><ShoppingBag className="mx-auto h-10 w-10 text-muted" /><p className="mt-3 font-semibold">{ar ? 'سلة طِلّة فاضية' : 'Your marketplace basket is empty'}</p><Button to="/search" className="mt-5">{ar ? 'اكتشف المنتجات' : 'Explore products'}</Button></main></div>;
 
   return <div className="min-h-dvh"><MarketHeader /><main className="container max-w-6xl py-7 sm:py-10">
     <Link to="/market-cart" className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-fg"><ArrowRight className="h-4 w-4" />{ar ? 'الرجوع للسلة' : 'Back to basket'}</Link>

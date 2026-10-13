@@ -45,7 +45,7 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step, m
       marketCart.add({ productId: p.id, variantId: variant?.id ?? null, slug: p.slug, name: p.name, price: p.price, compareAt: p.compareAt,
         image: p.media?.[0] || product.image, color: color || null, colorName: selectedColor ? { ar: selectedColor.name_ar, en: selectedColor.name_en } : null,
         size: size && size !== 'One size' ? size : null }, product.store || { slug });
-      toast({ title: lang === 'ar' ? 'اتضاف لسلة بنها أوتفيت' : 'Added to Banha Outfit basket', tone: 'info', action: { label: lang === 'ar' ? 'افتح السلة' : 'Open basket', onClick: () => navigate('/market-cart') } });
+      toast({ title: lang === 'ar' ? 'اتضاف لسلة طِلّة' : 'Added to Tella basket', tone: 'info', action: { label: lang === 'ar' ? 'افتح السلة' : 'Open basket', onClick: () => navigate('/market-cart') } });
     } else add({ product: p, variant, color, size, fromEl: imgRef.current });
     if (onAdded) onAdded(); else onClose();
   };
@@ -54,7 +54,7 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step, m
     <Sheet open={!!product} onClose={onClose} title={product ? `${step ? `${step} · ` : ''}${tr(product.name)}` : ''} side="auto" desktop="center" size="lg"
       footer={p && (
         <Button full size="lg" disabled={available <= 0 && !needsSize} onClick={onAdd}>
-          {available <= 0 && !needsSize ? t('product.outOfStock') : marketplace ? (lang === 'ar' ? 'أضف لسلة بنها أوتفيت' : 'Add to Banha Outfit basket') : t('product.addToCart')}
+          {available <= 0 && !needsSize ? t('product.outOfStock') : marketplace ? (lang === 'ar' ? 'أضف لسلة طِلّة' : 'Add to Tella basket') : t('product.addToCart')}
         </Button>
       )}>
       {error ? <ErrorState error={error} onRetry={reload} compact /> : (

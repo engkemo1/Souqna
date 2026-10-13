@@ -104,7 +104,7 @@ export default function HomepageAds() {
   };
   return (
     <div>
-      <PageHeader title="إعلانات الرئيسية" subtitle="إعلانات بنها أوتفيت اللي تظهر للزبائن في الصفحة الرئيسية" actions={<Button icon={Plus} onClick={() => setEdit('new')}>إعلان جديد</Button>} />
+      <PageHeader title="إعلانات الرئيسية" subtitle="إعلانات طِلّة اللي تظهر للزبائن في الصفحة الرئيسية" actions={<Button icon={Plus} onClick={() => setEdit('new')}>إعلان جديد</Button>} />
       {error && !data ? <ErrorState error={error} onRetry={reload} /> : loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : !items.length ? (
         <EmptyState icon={Megaphone} title="مفيش إعلانات لسه" body="أضف إعلان بصورة ورابط داخلي، وحدد موعد ظهوره أو فعّله فورًا." action={<Button icon={Plus} onClick={() => setEdit('new')}>إضافة أول إعلان</Button>} />
       ) : <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">

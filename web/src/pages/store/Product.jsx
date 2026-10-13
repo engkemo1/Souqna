@@ -172,7 +172,7 @@ export default function Product() {
     marketCart.add({ productId: p.id, variantId: variant?.id ?? null, slug: p.slug, name: p.name, price: p.price, compareAt: p.compareAt,
       image: p.media?.[0] || p.image, color: color || null, colorName: selectedColor ? { ar: selectedColor.name_ar, en: selectedColor.name_en } : null,
       size: size && size !== 'One size' ? size : null, qty: Math.min(qty, available) }, store);
-    toast({ title: lang === 'ar' ? 'اتضاف لسلة بنها أوتفيت' : 'Added to Banha Outfit basket', tone: 'info', action: { label: lang === 'ar' ? 'افتحي السلة' : 'Open basket', onClick: () => nav('/market-cart') } });
+    toast({ title: lang === 'ar' ? 'اتضاف لسلة طِلّة' : 'Added to Tella basket', tone: 'info', action: { label: lang === 'ar' ? 'افتحي السلة' : 'Open basket', onClick: () => nav('/market-cart') } });
   };
 
   const share = async () => {
@@ -247,7 +247,7 @@ export default function Product() {
             <div className="flex-1"><AddButton state={addState} disabled={ctaDisabled} onClick={onAdd} label={ctaLabel} /></div>
           </div>
           <Button variant="outline" full className="mt-3" disabled={ctaDisabled} icon={ShoppingBag} onClick={onAddMarketplace}>
-            {lang === 'ar' ? 'أضف لسلة بنها أوتفيت' : 'Add to Banha Outfit basket'}
+            {lang === 'ar' ? 'أضف لسلة طِلّة' : 'Add to Tella basket'}
           </Button>
 
           <ProductAlerts product={p} store={store} />

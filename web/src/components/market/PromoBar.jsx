@@ -3,7 +3,7 @@ import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
 
-/** Banha Outfit's promoted coupon (set from the admin), shown above the marketplace. Tap to copy the code. */
+/** Tella's promoted coupon (set from the admin), shown above the marketplace. Tap to copy the code. */
 export default function PromoBar() {
   const { t, tr, lang } = useI18n();
   const { data } = useApi('/promo');

@@ -106,7 +106,7 @@ export function StoreHeader() {
           <IconButton to={sp(store.slug, 'favorites')} label={t('store.favorites')} icon={Heart} className="hidden lg:inline-grid" badge={<CountBadge n={favs.count} />} />
           <IconButton label={t('store.cart')} icon={ShoppingBag} onClick={cart.open} data-cart-target className="hidden lg:inline-grid" badge={<CountBadge n={cart.count} bumpKey={cart.bump} />} />
           <IconButton to={sp(store.slug, 'cart')} label={t('store.cart')} icon={ShoppingBag} data-cart-target className="lg:hidden" badge={<CountBadge n={cart.count} bumpKey={cart.bump} />} />
-          <IconButton to="/market-cart" label={isRtl ? 'سلة بنها أوتفيت' : 'Banha Outfit basket'} icon={ShoppingBag} badge={<CountBadge n={marketCart.count} />} />
+          <IconButton to="/market-cart" label={isRtl ? 'سلة طِلّة' : 'Tella basket'} icon={ShoppingBag} badge={<CountBadge n={marketCart.count} />} />
         </div>
       </div>
     </header>

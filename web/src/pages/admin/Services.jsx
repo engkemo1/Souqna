@@ -36,7 +36,7 @@ function Row({ r, onChanged }) {
       {r.notes && <p className="mt-2 rounded-lg bg-amber-50 p-2.5 text-sm text-amber-900">{r.notes}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         {phone && <Button size="xs" variant="outline" icon={Phone} href={`tel:${phone}`}><span dir="ltr">{phone}</span></Button>}
-        {phone && <Button size="xs" variant="outline" icon={MessageCircle} href={waLink(phone, `أهلاً ${r.store_name}، بخصوص طلب التصوير الاحترافي من بنها أوتفيت`)} target="_blank" rel="noreferrer">واتساب</Button>}
+        {phone && <Button size="xs" variant="outline" icon={MessageCircle} href={waLink(phone, `أهلاً ${r.store_name}، بخصوص طلب التصوير الاحترافي من طِلّة`)} target="_blank" rel="noreferrer">واتساب</Button>}
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {Object.entries(SERVICE_STATUS_AR).map(([s, label]) => <Button key={s} size="xs" variant={r.status === s ? 'primary' : 'outline'} loading={busy === s} onClick={() => r.status !== s && patch({ status: s }, s)}>{label}</Button>)}
