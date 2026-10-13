@@ -61,4 +61,21 @@ app.use(errorHandler);
 import('./db/index.js').then(({ q }) => q.run("UPDATE users SET role='demo' WHERE email=? AND role='owner'", [config.demoEmail]));
 import('./lib/backup.js').then((m) => m.startBackupSchedule());
 import('./lib/visual.js').then((m) => m.startVisualIndexer());
-app.listen(config.port, () => console.log(`Banha Outfit API ready on http://localhost:${config.port}`));
+export { app };
+
+// Allow boot.js to hand us an already-listening server (so the health-check
+// listener stays alive during the slow first-boot DB setup).
+export function startServer(existingServer) {
+  if (existingServer) {
+    // Reuse the existing bound socket — no new port needed.
+    existingServer.on('request', app);
+    console.log(`Banha Outfit API ready on http://localhost:${config.port}`);
+  } else {
+    app.listen(config.port, () => console.log(`Banha Outfit API ready on http://localhost:${config.port}`));
+  }
+}
+
+// When executed directly (not imported by boot.js) start normally.
+if (process.argv[1] && (await import('node:url')).fileURLToPath(import.meta.url) === process.argv[1]) {
+  startServer();
+}
