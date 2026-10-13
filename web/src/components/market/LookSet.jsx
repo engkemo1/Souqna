@@ -47,7 +47,7 @@ function LookRow({ look, lang, tr, t, added, onAdd }) {
 
 function ManualLookCards({ looks, lang, tr, t, added, onAdd }) {
   return (
-    <div className={cx('mx-auto mt-4 grid w-full grid-cols-1 justify-center gap-3 sm:grid-cols-2 sm:gap-4', looks.length <= 2 ? 'max-w-3xl' : 'max-w-5xl xl:grid-cols-3')}>
+    <div className={cx('mx-auto mt-4 grid w-full grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4', looks.length <= 2 ? 'max-w-5xl' : 'max-w-6xl xl:grid-cols-3')}>
       {looks.map((look, index) => {
         const p = look.items[0];
         if (!p) return null;
@@ -133,12 +133,17 @@ export default function LookSet({ data, name }) {
       {m.state === 'partial' && <p className="mt-3 inline-block rounded-full bg-secondary px-3 py-1 text-[12px] font-semibold text-muted">{ar ? 'جزء من الطقم متاح' : 'Part of the look is available'}</p>}
       {tabs && <div role="tablist" className="mt-4 grid grid-cols-2 gap-1 rounded-full bg-secondary p-1">{tabs.map((tb, i) => <button key={tb.id} type="button" role="tab" aria-selected={i === tab} onClick={() => setTab(i)} className={cx('rounded-full px-3 py-2 text-[13px] font-bold transition', i === tab ? 'bg-elevated shadow-sm' : 'text-muted')}>{tb.label} <span className="font-normal">· {Number(tb.subtotal) > 0 ? money(tb.subtotal) : (ar ? 'لسه مفيش قطع' : 'No items yet')}</span></button>)}</div>}
       {m.manual ? <><p className="mt-4 text-sm font-bold">قطع الأوتفيت المختارة</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} /></> : shownLooks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
-      <p className="mt-3 text-[13.5px] font-semibold">{totalLabel}{m.overBudget && <span className="ms-2 font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-4 py-2 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t(m.state === 'partial' ? 'stylist.addAvailable' : 'stylist.addAll')}</button>
-        {[...new Map(picks.map((p) => [p.store.slug, p.store.name])).entries()].map(([sl, nm]) => <StoreCartLink key={sl} slug={sl} name={nm} tr={tr} t={t} />)}
+      <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-line bg-canvas/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+        <div>
+          <p className="text-[11px] font-semibold text-muted">{ar ? 'إجمالي القطع المختارة' : 'Selected items total'}</p>
+          <p className="mt-0.5 text-base font-extrabold sm:text-lg">{totalLabel}{m.overBudget && <span className="ms-2 text-xs font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
+        </div>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t(m.state === 'partial' ? 'stylist.addAvailable' : 'stylist.addAll')}</button>
+          {[...new Map(picks.map((p) => [p.store.slug, p.store.name])).entries()].map(([sl, nm]) => <StoreCartLink key={sl} slug={sl} name={nm} tr={tr} t={t} />)}
+          <button type="button" onClick={shareLink} className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2.5 text-[13px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{t('stylist.share')}</button>
+        </div>
       </div>
-      <button type="button" onClick={shareLink} className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[13px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{t('stylist.share')}</button>
       {missing}
       {quick && <QuickAddSheet slug={quick.queue[quick.i].store.slug} product={quick.queue[quick.i]} step={quick.queue.length > 1 ? `${quick.i + 1}/${quick.queue.length}` : ''} onAdded={nextAdd} onClose={() => setQuick(null)} />}
     </>
