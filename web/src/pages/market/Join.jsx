@@ -10,7 +10,8 @@ import { SALES_PHONE, SALES_WHATSAPP, SALES_WA_TEXT } from '../../config/contact
 const ease = [0.22, 1, 0.36, 1];
 const up = (d = 0) => ({ initial: { opacity: 0, y: 28 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-60px' }, transition: { duration: 0.8, delay: d, ease } });
 const wa = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(SALES_WA_TEXT)}`;
-const waPhoto = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent('أهلاً، عايز أعرف أكتر عن خدمة التصوير الاحترافي لمنتجات محلي')}`;
+const waPhoto = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent('أهلاً، محتاج عرض سعر لتصوير منتجات محلي. عدد المنتجات تقريباً:')}`;
+const waReadyPhotos = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent('أهلاً، عندي صور منتجاتي جاهزة أو بتعامل مع مصور، وعايز أعرف خطوات فتح متجري على بنها أوتفيت.')}`;
 const tel = `tel:${SALES_PHONE}`;
 
 const PERKS = [
@@ -18,7 +19,7 @@ const PERKS = [
   { icon: BellRing, title: 'تعرف بكل طلب في ساعتها', body: 'أول ما زبون يطلب، يوصلك تنبيه على موبايلك فيه كل التفاصيل: اسمه وتليفونه وعنوانه والمقاس اللي اختاره.' },
   { icon: Smartphone, title: 'كل حاجة من موبايلك', body: 'ضيف منتج، غيّر سعر، تابع الطلبات والمخزون… من غير كمبيوتر.' },
   { icon: BarChart3, title: 'تقارير مبيعات', body: 'اعرف إيه اللي بيتباع أكتر، ومين أحسن عملائك، ومبيعاتك ماشية إزاي.' },
-  { icon: Palette, title: 'صور احترافية', body: 'صور منتجاتك بتظهر بجودة عالية وسريعة على أي موبايل.' },
+  { icon: Palette, title: 'التصوير وقت ما تحتاجه', body: 'عندك صور جاهزة؟ ارفعها بنفسك. ولو محتاج مساعدة، اطلب خدمة التصوير الاحترافي بشكل اختياري.' },
   { icon: Truck, title: 'دفع عند الاستلام', body: 'الزبون يطلب ويدفع لما يستلم، وإنت تركّز على البيع.' },
 ];
 const STEPS = [
@@ -139,27 +140,27 @@ export default function Join() {
           <div className="relative grid items-center gap-10 lg:grid-cols-5">
             <div className="lg:col-span-3">
               <span className="inline-flex items-center gap-2 rounded-full border border-[#FF5A1F]/40 bg-white/5 px-3.5 py-1.5 text-sm text-[#FF8A5C]"><Camera className="h-4 w-4" />خدمة جديدة من بنها أوتفيت</span>
-              <h2 className="mt-5 font-display text-3xl font-bold leading-snug text-[#FFF6EC] sm:text-5xl">محتاج تصوّر منتجاتك؟
-                <span className="block text-[#FF8A5C]">إحنا بنيجي لحد محلك</span></h2>
-              <p className="mt-4 max-w-xl text-lg leading-relaxed text-[#FFF6EC]/75">بنصوّر شغلك بصور عالية الدقة وبأسلوب احترافي، وننشرها على متجرك جاهزة. الصورة الحلوة هي اللي بتخلّي الزبون يطلب.</p>
+              <h2 className="mt-5 font-display text-3xl font-bold leading-snug text-[#FFF6EC] sm:text-5xl">محتاج مساعدة في تصوير منتجاتك؟
+                <span className="block text-[#FF8A5C]">خدمة اختيارية على قد احتياجك</span></h2>
+              <p className="mt-4 max-w-xl text-lg leading-relaxed text-[#FFF6EC]/75">لو بتصور بنفسك أو عندك مصور، كمّل بصورك عادي. ولو محتاج تصوير احترافي، فريقنا يقدر ييجي لمحلك ويجهز الصور لمتجرك.</p>
               <ul className="mt-6 grid gap-2.5 text-base text-[#FFF6EC]/85 sm:grid-cols-2">
-                {['بنوصلك لحد المحل في بنها', 'صور عالية الدقة بأسلوب احترافي', 'بنرفع الصور على متجرك', 'اشتراك بسيط جداً — بنجيلك في أي وقت', 'ولو عايزها مرة واحدة بس… زي ما تحب', 'اطلبها من لوحة محلك بضغطة'].map((x) => (
+                {['بنوصلك لحد المحل في بنها', 'صور عالية الدقة بأسلوب احترافي', 'بنرفع الصور على متجرك', 'اطلب جلسة واحدة من غير اشتراك', 'للطلبات المتكررة: باقة شهرية اختيارية بكمية متفق عليها', 'نعرفك بالسعر والميعاد قبل ما نبدأ'].map((x) => (
                   <li key={x} className="flex items-start gap-2"><Check className="mt-1 h-4 w-4 shrink-0 text-[#FF5A1F]" />{x}</li>
                 ))}
               </ul>
               <div className="mt-8 flex flex-wrap gap-4">
-                <GoldButton href={waPhoto} icon={MessageCircle} primary>اطلب التصوير على واتساب</GoldButton>
-                <GoldButton href="/dashboard/services" icon={Camera}>عندي محل معاكم؟ اطلبها من لوحتك</GoldButton>
+                <GoldButton href={waPhoto} icon={MessageCircle} primary>اطلب سعر جلسة تصوير</GoldButton>
+                <GoldButton href={waReadyPhotos} icon={Camera}>عندي الصور — عايز أفتح متجري</GoldButton>
               </div>
             </div>
             <div className="grid gap-4 lg:col-span-2">
-              {[['مرة واحدة', 'جلسة تصوير واحدة وقت ما تحب — من غير التزام.'], ['اشتراك شهري بسيط', 'بنجيلك في أي وقت تحتاجه ونصوّر كل جديد عندك.']].map(([t, b], i) => (
+              {[['طلب منفرد', 'حدد عدد المنتجات، وهنبعتلك السعر والميعاد قبل ما تأكد الطلب.'], ['باقة شهرية اختيارية', 'للتصوير المتكرر، بكمية وسعر نتفق عليهم مقدمًا.']].map(([t, b], i) => (
                 <motion.div key={t} {...up(0.1 + i * 0.1)} whileHover={{ y: -4 }} className="rounded-2xl border border-white/10 bg-white/[0.05] p-5">
                   <p className="font-display text-xl font-bold text-[#FFF6EC]">{t}</p>
                   <p className="mt-1.5 text-base text-[#FFF6EC]/65">{b}</p>
                 </motion.div>
               ))}
-              <p className="text-sm text-[#FFF6EC]/50">السعر بنتفق عليه بعد ما نعرف عدد المنتجات.</p>
+              <p className="text-sm text-[#FFF6EC]/50">التصوير مش شرط لفتح متجرك. مفيش أي تنفيذ أو التزام قبل موافقتك على السعر.</p>
             </div>
           </div>
         </motion.div>
