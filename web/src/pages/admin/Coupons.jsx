@@ -58,7 +58,7 @@ function CouponSheet({ coupon, onClose, onSaved }) {
           <Switch checked={f.first_order_only} onChange={(v) => setF({ ...f, first_order_only: v })} label="لأول طلب بس" description="العميل اللي طلب قبل كده (بنفس رقم التليفون) مش هيقدر يستخدمه" />
           <Switch checked={f.promoted} onChange={(v) => setF({ ...f, promoted: v })} label="اعرضه في الصفحة الرئيسية" description="شريط صغير فوق صفحة كل المحلات بيعلن عن الكود (كوبون واحد بس يتعرض)" />
           <Switch checked={f.active} onChange={(v) => setF({ ...f, active: v })} label="الكوبون مفعّل" />
-          <p className="rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900">الخصم ده على حساب بنها أوتفيت: المحل بياخد حقه كامل ولازم تعوّضه الفرق. كل طلب بيتسجل فيه قيمة الخصم عشان تحاسب المحلات.</p>
+          <p className="rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900">الخصم ده على حساب طلة: المحل بياخد حقه كامل ولازم تعوّضه الفرق. كل طلب بيتسجل فيه قيمة الخصم عشان تحاسب المحلات.</p>
         </form>
       )}
     </Sheet>
@@ -77,7 +77,7 @@ export default function Coupons() {
   const list = data?.items || [];
   return (
     <div>
-      <PageHeader title="الكوبونات" subtitle="أكواد خصم من بنها أوتفيت بتشتغل على كل المحلات (كوبونات المحل الواحد بيعملها صاحب المحل من لوحته)" actions={<Button icon={Plus} onClick={() => setEdit('new')}>كوبون جديد</Button>} />
+      <PageHeader title="الكوبونات" subtitle="أكواد خصم من طلة بتشتغل على كل المحلات (كوبونات المحل الواحد بيعملها صاحب المحل من لوحته)" actions={<Button icon={Plus} onClick={() => setEdit('new')}>كوبون جديد</Button>} />
       {loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : !list.length ? <EmptyState icon={Ticket} title="مفيش كوبونات" body="أضف أول كوبون، مثلاً خصم أول طلب." /> : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((c) => (

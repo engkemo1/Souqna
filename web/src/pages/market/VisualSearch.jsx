@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Camera, ClipboardPaste, ImagePlus, PackagePlus, RefreshCcw, Share2, Smartphone } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
-import { api } from '../../lib/api.js';
+import { api, upload } from '../../lib/api.js';
+import { expectedVisualMs, recordVisualMs } from '../../lib/visualTiming.js';
 import { useInstall } from '../../lib/pwa.js';
 import { useApi } from '../../lib/hooks.js';
 import { useDepartments } from '../../lib/departments.js';
@@ -10,6 +11,7 @@ import { visualHandoff } from '../../lib/visualHandoff.js';
 import { EN_LABELS } from '../../lib/visualLabels.js';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import Brand from '../../components/market/Brand.jsx';
+import SearchProgress from '../../components/market/SearchProgress.jsx';
 import StylistChat from '../../components/market/StylistChat.jsx';
 import ProductCard, { ProductCardSkeleton, ProductGrid } from '../../components/store/ProductCard.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -41,6 +43,7 @@ export default function VisualSearch() {
   const [state, setState] = useState({ loading: false, data: null, error: null });
   const input = useRef(null);
   const requestId = useRef(0);
+  const [prog, setProg] = useState({ upload: 0, analysisStart: 0, expected: 6000 });
   const deptRef = useRef('');
   const canPasteBtn = typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.read);
 
@@ -50,12 +53,17 @@ export default function VisualSearch() {
   const run = async (b, department, garmentType) => {
     const id = ++requestId.current;
     setState({ loading: true, data: null, error: null });
+    setProg({ upload: 0, analysisStart: 0, expected: expectedVisualMs() });
     try {
       const fd = new FormData(); fd.append('file', b, 'photo.jpg'); if (department) fd.append('department', department); if (garmentType) fd.append('type', garmentType);
-      const res = await fetch('/api/visual-search', { method: 'POST', body: fd });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw Object.assign(new Error('x'), { code: data?.error?.code });
-      if (id === requestId.current) { setActive(0); setState({ loading: false, data, error: null }); }
+      let started = 0;
+      const data = await upload('/visual-search', fd, (pct) => {
+        if (id !== requestId.current) return;
+        if (pct >= 100 && !started) { started = Date.now(); setProg((p) => ({ ...p, upload: 100, analysisStart: started })); }
+        else if (!started) setProg((p) => ({ ...p, upload: pct }));
+      });
+      if (!started) started = Date.now();
+      if (id === requestId.current) { recordVisualMs(Date.now() - started); setActive(0); setState({ loading: false, data, error: null }); }
     } catch (e) { if (id === requestId.current) setState({ loading: false, data: null, error: e }); }
   };
   const handleFile = async (file) => {
@@ -65,7 +73,7 @@ export default function VisualSearch() {
   };
   const pick = (e) => { const file = e.target.files?.[0]; e.target.value = ''; handleFile(file); };
 
-  // a photo shared straight from Instagram / WhatsApp / the gallery (installed app → Share → بنها أوتفيت)
+  // a photo shared straight from Instagram / WhatsApp / the gallery (installed app → Share → طلة)
   useEffect(() => {
     const token = sp.get('shared'); if (!token) return;
     (async () => {
@@ -132,7 +140,7 @@ export default function VisualSearch() {
               <img src={preview} alt="" className="h-24 w-24 shrink-0 rounded-2xl object-cover" />
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-semibold">{state.loading ? t('visual.searching') : state.error ? t('visual.searchErrorTitle') : groups.length ? t('visual.results', { n: state.data.total }) : state.data ? t('visual.noMatchTitle') : ''}</p>
-                <p className="mt-1 text-xs text-muted">{state.loading ? t('visual.searchingHint') : groups.length ? t('visual.previewHint') : ''}</p>
+                {state.loading ? <SearchProgress uploadPct={prog.upload} analysisStart={prog.analysisStart} expectedMs={prog.expected} /> : <p className="mt-1 text-xs text-muted">{groups.length ? t('visual.previewHint') : ''}</p>}
               </div>
               <Button variant="outline" icon={RefreshCcw} onClick={() => input.current?.click()}>{t('visual.again')}</Button>
             </div>

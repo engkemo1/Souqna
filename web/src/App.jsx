@@ -10,6 +10,7 @@ import RouteFallback from './components/RouteFallback.jsx';
 import NotFound from './pages/NotFound.jsx';
 
 const MarketHome = lazy(() => import('./pages/market/MarketHome.jsx'));
+const StoresDirectory = lazy(() => import('./pages/market/StoresDirectory.jsx'));
 const MarketSearch = lazy(() => import('./pages/market/MarketSearch.jsx'));
 const MarketCart = lazy(() => import('./pages/market/MarketCart.jsx'));
 const MarketCheckout = lazy(() => import('./pages/market/MarketCheckout.jsx'));
@@ -83,6 +84,7 @@ const router = createBrowserRouter([
     errorElement: <NotFound crashed />,
     children: [
       { path: '/', element: <MarketHome /> },
+      { path: '/stores', element: <StoresDirectory /> },
       { path: '/search', element: <MarketSearch /> },
       { path: '/market-cart', element: <MarketCart /> },
       { path: '/market-checkout', element: <MarketCheckout /> },

@@ -44,7 +44,7 @@ export default function Reports() {
                   <p className="font-semibold">{s.name}</p>
                   <p className="text-[13px] text-muted">{s.flags.map((f) => FLAG_AR[f]).join(' · ')}</p>
                 </div>
-                {s.phone && <a href={waLink(s.phone, `أهلاً ${s.owner || ''}، بنراجع الأداء على بنها أوتفيت وحبينا نطمن عليك.`)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm hover:bg-fg/[0.05]"><MessageCircle className="h-4 w-4" />واتساب</a>}
+                {s.phone && <a href={waLink(s.phone, `أهلاً ${s.owner || ''}، بنراجع الأداء على طلة وحبينا نطمن عليك.`)} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-full border border-line px-3 text-sm hover:bg-fg/[0.05]"><MessageCircle className="h-4 w-4" />واتساب</a>}
                 <Link to={`/admin/stores`} className="text-sm text-brand">المحلات</Link>
               </li>
             ))}

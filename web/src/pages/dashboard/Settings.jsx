@@ -53,7 +53,7 @@ function AutoCover({ onDone }) {
   };
   return (
     <button type="button" onClick={run} disabled={busy}
-      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-l from-[#FF8A5C] via-[#FF5A1F] to-[#C2410C] px-4 py-2.5 text-sm font-bold text-[#111] disabled:opacity-60">
+      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-l from-[#FF966F] via-[#F26B38] to-[#B84421] px-4 py-2.5 text-sm font-bold text-[#111] disabled:opacity-60">
       {busy ? 'بنصمم الـ cover…' : '✨ صمّملي cover فخم من منتجاتي'}
     </button>
   );

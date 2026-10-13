@@ -8,36 +8,36 @@
 @tailwind utilities;
 
 /* Platform default tokens (marketplace). Stores & dashboard override these via the Theme Engine. */
-/* Banha Outfit brand tokens (marketplace + platform screens).
-   Orange is the brand colour but is NOT used as text on white (3.1:1) — buttons are orange with
-   near-black labels (6:1), and "brand ink" (#C83705, 5:1) is the orange used for text/links. */
+/* Talla brand tokens: navy #14213D, orange #F26B38, and white. */
 :root {
-  --c-background: 255 249 242;
-  --c-surface: 255 240 227;
+  --brand-navy: #14213D;
+  --brand-orange: #F26B38;
+  --c-background: 255 255 255;
+  --c-surface: 244 245 247;
   --c-elevated: 255 255 255;
-  --c-text: 17 17 17;
-  --c-muted: 94 84 76;
-  --c-border: 240 226 211;
-  --c-border-strong: 214 193 172;
-  --c-primary: 255 90 31;
-  --c-on-primary: 17 17 17;
-  --c-primary-ink: 200 55 5;
-  --c-display: 242 78 18;
-  --c-secondary: 255 229 210;
-  --c-on-secondary: 17 17 17;
-  --c-accent: 255 90 31;
-  --c-on-accent: 17 17 17;
-  --c-button: 255 90 31;
-  --c-on-button: 17 17 17;
-  --c-button-outline: 214 66 12;
-  --c-header: 255 249 242;
-  --c-on-header: 17 17 17;
-  --c-footer: 17 17 17;
-  --c-on-footer: 255 246 236;
-  --c-footer-muted: 176 176 176;
+  --c-text: 20 33 61;
+  --c-muted: 91 101 119;
+  --c-border: 228 231 236;
+  --c-border-strong: 204 210 220;
+  --c-primary: 242 107 56;
+  --c-on-primary: 20 33 61;
+  --c-primary-ink: 178 63 29;
+  --c-display: 20 33 61;
+  --c-secondary: 236 239 244;
+  --c-on-secondary: 20 33 61;
+  --c-accent: 242 107 56;
+  --c-on-accent: 20 33 61;
+  --c-button: 242 107 56;
+  --c-on-button: 20 33 61;
+  --c-button-outline: 20 33 61;
+  --c-header: 255 255 255;
+  --c-on-header: 20 33 61;
+  --c-footer: 20 33 61;
+  --c-on-footer: 255 255 255;
+  --c-footer-muted: 194 202 214;
   --c-sale: 198 40 40;
   --c-success: 21 128 61;
-  --c-ring: 255 90 31;
+  --c-ring: 242 107 56;
 
   --header-h: 64px;
   --bottom-nav-h: 64px;

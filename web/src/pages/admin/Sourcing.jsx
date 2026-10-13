@@ -42,7 +42,7 @@ function Row({ r, onChanged }) {
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button size="xs" variant="outline" icon={Phone} href={`tel:${r.phone}`}><span dir="ltr">{r.phone}</span></Button>
-        <Button size="xs" variant="outline" icon={MessageCircle} href={waLink(r.phone, `أهلاً ${r.name}، بخصوص طلبك (${r.title}) من بنها أوتفيت. تابع الطلب من هنا: ${trackLink}`)} target="_blank" rel="noreferrer">واتساب</Button>
+        <Button size="xs" variant="outline" icon={MessageCircle} href={waLink(r.phone, `أهلاً ${r.name}، بخصوص طلبك (${r.title}) من طلة. تابع الطلب من هنا: ${trackLink}`)} target="_blank" rel="noreferrer">واتساب</Button>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
         {Object.entries(SRC_STATUS_AR).map(([s, label]) => <Button key={s} size="xs" variant={r.status === s ? 'primary' : 'outline'} loading={busy === s} onClick={() => r.status !== s && patch({ status: s }, s)}>{label}</Button>)}

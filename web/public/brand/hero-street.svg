@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" fill="none">
+  <defs>
+    <linearGradient id="sky" x2="0" y2="1"><stop stop-color="#f5f7f6"/><stop offset="1" stop-color="#e8e1d7"/></linearGradient>
+    <linearGradient id="street" x2="0" y2="1"><stop stop-color="#d6d0c6"/><stop offset="1" stop-color="#eee9e1"/></linearGradient>
+    <linearGradient id="leftBuilding" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d9d2c7"/><stop offset="1" stop-color="#9b9389"/></linearGradient>
+    <linearGradient id="rightBuilding" x1="1" y1="0" x2="0" y2="1"><stop stop-color="#d8d1c8"/><stop offset="1" stop-color="#aaa195"/></linearGradient>
+    <linearGradient id="glass" x2="0" y2="1"><stop stop-color="#c7d7d8"/><stop offset="1" stop-color="#7e9a9d"/></linearGradient>
+    <linearGradient id="warmGlass" x2="0" y2="1"><stop stop-color="#fff2dc"/><stop offset="1" stop-color="#d7b894"/></linearGradient>
+    <filter id="depth"><feGaussianBlur stdDeviation="9"/></filter>
+    <filter id="haze"><feGaussianBlur stdDeviation="24"/></filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#sky)"/>
+  <ellipse cx="974" cy="375" rx="440" ry="280" fill="#fffdf8" opacity=".78" filter="url(#haze)"/>
+
+  <!-- Modern city blocks recede toward the shopping street's vanishing point. -->
+  <path d="M0 90 580 185 850 510 0 715Z" fill="url(#leftBuilding)"/>
+  <path d="M1920 65 1340 180 1070 510 1920 710Z" fill="url(#rightBuilding)"/>
+  <path d="M0 510 822 505 850 742 0 880Z" fill="#817c74"/>
+  <path d="M1920 500 1098 505 1070 742 1920 880Z" fill="#77736d"/>
+
+  <!-- Upper floor windows and restrained architectural trim. -->
+  <g fill="#75878a" opacity=".76">
+    <path d="m70 183 125 21v121L70 302zM237 211l121 21v119l-121-21zM399 239l105 18v115l-105-18zM540 264l90 16v107l-90-16z"/>
+    <path d="m1850 160-125 24v121l125-23zM1684 192l-121 23v119l121-22zM1522 224l-105 20v115l105-20zM1380 251l-90 17v107l90-17z"/>
+  </g>
+  <g stroke="#eee9e1" stroke-width="10" opacity=".76">
+    <path d="M0 166 620 270M0 365 760 424M1920 146 1300 266M1920 354 1160 419"/>
+    <path d="M218 205v123M386 234v123M526 260v115M1702 188v123M1534 220v123M1394 247v115"/>
+  </g>
+
+  <!-- Ground-floor clothing boutiques on both sides, with glass displays and mannequins. -->
+  <path d="M0 470 835 492 844 729 0 855Z" fill="#eee9e0"/>
+  <path d="M1920 458 1085 492 1076 729 1920 850Z" fill="#eee9e0"/>
+  <path d="M0 474 832 497 830 535 0 512Z" fill="#283b50"/>
+  <path d="M1920 462 1088 497 1090 535 1920 507Z" fill="#283b50"/>
+  <g fill="#f8f4ed">
+    <path d="M96 481 246 485 246 522 96 517zM280 486 412 490 412 526 280 522zM445 490 565 493 565 530 445 527zM598 494 705 497 705 533 598 531z"/>
+    <path d="M1824 476 1674 483 1674 519 1824 513zM1640 484 1508 490 1508 526 1640 520zM1475 491 1355 496 1355 531 1475 527zM1322 497 1215 501 1215 535 1322 531z"/>
+  </g>
+  <g fill="url(#glass)" stroke="#f8f4ed" stroke-width="10">
+    <path d="m30 527 235 7v209L30 780zM285 535l183 5v183l-183-5zM486 540l145 4v164l-145-4zM648 544l139 4v144l-139-4z"/>
+    <path d="m1890 522-235 9v208l235 39zM1635 532l-183 6v183l183-5zM1434 538l-145 5v163l145-4zM1272 543l-139 4v144l139-4z"/>
+  </g>
+  <g fill="url(#warmGlass)" opacity=".82">
+    <path d="m48 549 197 6v166l-197-7zM302 552l149 4v145l-149-4zM503 556l112 3v126l-112-3zM665 559l105 3v107l-105-3z"/>
+    <path d="m1872 545-197 7v166l197 32zM1618 551l-149 5v145l149-4zM1417 556l-112 4v125l112-3zM1255 559l-105 3v107l105-3z"/>
+  </g>
+  <!-- Mannequins and hanging garments make the storefronts read clearly as clothing shops. -->
+  <g stroke="#f8f5ef" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" opacity=".96">
+    <path d="M103 594h38l13 18-7 17-8-4 5 74h-42l5-74-8 4-7-17zM169 602h35l12 16-7 16-8-4 5 67h-39l5-67-8 4-7-16z"/>
+    <path d="M335 588h34l12 16-7 15-8-4 4 62h-38l4-62-8 4-6-15zM530 586h31l11 15-6 14-7-3 4 55h-35l4-55-7 3-6-14z"/>
+    <path d="M1817 590h-38l-13 18 7 17 8-4-5 74h42l-5-74 8 4 7-17zM1751 598h-35l-12 16 7 16 8-4-5 67h39l-5-67 8 4 7-16z"/>
+    <path d="M1585 586h-34l-12 16 7 15 8-4-4 62h38l-4-62 8 4 6-15zM1390 584h-31l-11 15 6 14 7-3-4 55h35l-4-55 7 3 6-14z"/>
+  </g>
+  <g stroke="#fffaf2" stroke-width="5" opacity=".8">
+    <path d="M267 532v211M468 538v185M631 543v165M1653 529v214M1452 536v187M1289 542v166"/>
+  </g>
+  <g fill="#d97843">
+    <path d="M77 474h148l-7 14H84zM287 480h122l-5 13H292zM496 485h124l-4 12H500zM1695 469h148l-7 14h-137zM1511 476h122l-5 13h-112zM1300 483h124l-4 12h-116z"/>
+  </g>
+
+  <!-- Sidewalks, street, and converging paving lines create a walkable place to browse. -->
+  <path d="M0 850 826 700 1094 700 1920 845V1080H0Z" fill="url(#street)"/>
+  <path d="m0 838 824-145 15 33L0 891zM1920 833 1096 693l-15 33 839 164z" fill="#c9bfb2" opacity=".9"/>
+  <g stroke="#c4bbb0" stroke-width="5" opacity=".58">
+    <path d="M0 917 850 728M1920 914 1070 728M160 1080 900 714M1760 1080 1020 714"/>
+    <path d="M0 951h1920M0 1004h1920M0 1053h1920"/>
+  </g>
+  <g fill="#45535a" opacity=".62" filter="url(#depth)">
+    <ellipse cx="850" cy="820" rx="18" ry="7"/><ellipse cx="1073" cy="822" rx="19" ry="7"/>
+    <ellipse cx="704" cy="858" rx="26" ry="8"/><ellipse cx="1211" cy="859" rx="27" ry="8"/>
+  </g>
+  <g fill="#51616a" opacity=".65">
+    <circle cx="850" cy="767" r="10"/><path d="M842 778h17l8 47h-32z"/>
+    <circle cx="1073" cy="768" r="10"/><path d="M1064 780h18l8 47h-34z"/>
+    <circle cx="704" cy="800" r="12"/><path d="M693 814h22l10 59h-42z"/>
+    <circle cx="1211" cy="801" r="12"/><path d="M1200 815h22l10 59h-42z"/>
+  </g>
+  <rect width="1920" height="1080" fill="#fffaf3" opacity=".16"/>
+</svg>

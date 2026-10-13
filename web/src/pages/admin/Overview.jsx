@@ -38,12 +38,12 @@ export default function Overview() {
           <div style={{ height: 260 }} dir="ltr">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={data?.series || []} margin={{ top: 8, right: 12, left: 12, bottom: 0 }}>
-                <defs><linearGradient id="ovFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#FF5A1F" stopOpacity={0.28} /><stop offset="100%" stopColor="#FF5A1F" stopOpacity={0} /></linearGradient></defs>
+                <defs><linearGradient id="ovFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#F26B38" stopOpacity={0.28} /><stop offset="100%" stopColor="#F26B38" stopOpacity={0} /></linearGradient></defs>
                 <CartesianGrid vertical={false} stroke="rgb(var(--c-border))" />
                 <XAxis dataKey="date" tickFormatter={(d) => d.slice(5)} tickLine={false} axisLine={false} tick={{ fontSize: 12 }} />
                 <YAxis hide />
                 <Tooltip formatter={(v, n) => [n === 'sales' ? fmtMoney(v) : fmtNum(v), n === 'sales' ? 'المبيعات' : 'الطلبات']} labelFormatter={(l) => l} />
-                <Area type="monotone" dataKey="sales" stroke="#FF5A1F" strokeWidth={2.5} fill="url(#ovFill)" />
+                <Area type="monotone" dataKey="sales" stroke="#F26B38" strokeWidth={2.5} fill="url(#ovFill)" />
               </AreaChart>
             </ResponsiveContainer>
           </div>

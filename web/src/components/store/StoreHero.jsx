@@ -19,7 +19,7 @@ export default function StoreHero() {
   const Arrow = ar ? ArrowLeft : ArrowRight;
 
   return (
-    <section className="relative isolate overflow-hidden bg-[#111111] text-white">
+    <section className="relative isolate overflow-hidden bg-[#14213D] text-white">
       {store.cover && (
         <motion.div className="absolute inset-0 -z-10" initial={{ scale: 1.12 }} animate={{ scale: 1 }} transition={{ duration: 6, ease: 'easeOut' }}>
           <SmartImage media={store.cover} priority sizes="100vw" className="h-full w-full" imgClassName="h-full w-full object-cover" />

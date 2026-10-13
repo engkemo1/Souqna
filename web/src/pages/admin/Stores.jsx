@@ -75,7 +75,7 @@ function CreateSheet({ open, onClose, onDone, depts }) {
           </div>
           <div><p className="mb-2 text-sm font-medium">أقسام المحل (واحد أو أكتر)</p><DeptPicker depts={depts} value={f.departments} onChange={(v) => setF({ ...f, departments: v })} />{errs.departments && <p className="mt-1 text-sm text-sale">{errs.departments}</p>}</div>
           <div><p className="mb-2 text-sm font-medium">التوصيل</p>
-            <Segmented value={f.delivery_mode} onChange={(v) => setF({ ...f, delivery_mode: v })} options={[{ value: 'store', label: 'المحل بيوصّل' }, { value: 'platform', label: 'بنها أوتفيت توصّل' }]} />
+            <Segmented value={f.delivery_mode} onChange={(v) => setF({ ...f, delivery_mode: v })} options={[{ value: 'store', label: 'المحل بيوصّل' }, { value: 'platform', label: 'طلة توصّل' }]} />
           </div>
           <Switch checked={f.auto_whatsapp} onChange={(v) => setF({ ...f, auto_whatsapp: v })} label="إشعار واتساب تلقائي للمحل" description="يتطلب واتساب API متوصل" />
           <Button type="submit" full loading={busy}>إنشاء المحل + لينك التفعيل</Button>
@@ -157,7 +157,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
           </div>
           <div><p className="mb-2 text-sm font-medium">الأقسام</p><DeptPicker depts={depts} value={f.departments} onChange={(v) => setF({ ...f, departments: v })} /></div>
           <div><p className="mb-2 text-sm font-medium">التوصيل</p>
-            <Segmented value={f.delivery_mode} onChange={(v) => setF({ ...f, delivery_mode: v })} options={[{ value: 'store', label: 'المحل بيوصّل' }, { value: 'platform', label: 'بنها أوتفيت توصّل' }]} /></div>
+            <Segmented value={f.delivery_mode} onChange={(v) => setF({ ...f, delivery_mode: v })} options={[{ value: 'store', label: 'المحل بيوصّل' }, { value: 'platform', label: 'طلة توصّل' }]} /></div>
           <div className="space-y-3 rounded-2xl border border-line p-4">
             <Switch checked={!f.hidden} onChange={(v) => setF({ ...f, hidden: !v })} label="ظاهر في الصفحة الرئيسية" />
             <Switch checked={f.featured} onChange={(v) => setF({ ...f, featured: v })} label="محل مميز ★" />

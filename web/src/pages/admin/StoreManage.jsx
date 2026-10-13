@@ -39,11 +39,11 @@ export default function StoreManage() {
   return (
     <AuthContext.Provider value={auth}>
       <DashBaseContext.Provider value={`/admin/manage/${slug}`}>
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#111111] px-4 py-3 text-[#FFF6EC]">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-[#14213D] px-4 py-3 text-[#FFFFFF]">
           <p className="text-sm font-semibold">بتدير محل «{name}» من الأدمن — أي تعديل بيتحفظ على المحل فعلاً.</p>
           <span className="flex gap-2 text-[13px]">
             <a href={`/s/${slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 hover:bg-white/20"><ExternalLink className="h-3.5 w-3.5" />صفحة المحل</a>
-            <Link to="/admin/stores" className="inline-flex items-center gap-1 rounded-full bg-[#FF5A1F] px-3 py-1 font-semibold"><ArrowRight className="h-3.5 w-3.5" />رجوع للمحلات</Link>
+            <Link to="/admin/stores" className="inline-flex items-center gap-1 rounded-full bg-[#F26B38] px-3 py-1 font-semibold"><ArrowRight className="h-3.5 w-3.5" />رجوع للمحلات</Link>
           </span>
         </div>
         <Outlet />

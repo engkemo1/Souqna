@@ -44,12 +44,12 @@ export default function Services() {
       <PageHeader title={t('services.title')} subtitle={t('services.subtitle')} />
       <div className="grid gap-5 lg:grid-cols-5">
         <div className="space-y-5 lg:col-span-3">
-          <div className="relative overflow-hidden rounded-2xl bg-[#111111] p-6 text-[#FFF6EC] sm:p-8">
-            <span aria-hidden className="absolute -end-10 -top-10 h-44 w-44 rounded-full bg-[#FF5A1F]/30 blur-3xl" />
-            <p className="relative inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[13px] font-semibold text-[#FF8A5C]"><Sparkles className="h-3.5 w-3.5" />{t('services.badge')}</p>
+          <div className="relative overflow-hidden rounded-2xl bg-[#14213D] p-6 text-[#FFFFFF] sm:p-8">
+            <span aria-hidden className="absolute -end-10 -top-10 h-44 w-44 rounded-full bg-[#F26B38]/30 blur-3xl" />
+            <p className="relative inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1 text-[13px] font-semibold text-[#FF966F]"><Sparkles className="h-3.5 w-3.5" />{t('services.badge')}</p>
             <h2 className="relative mt-3 font-display text-2xl font-bold sm:text-3xl">{t('services.photoTitle')}</h2>
-            <p className="relative mt-2 max-w-xl text-[#FFF6EC]/75">{t('services.photoBody')}</p>
-            <ul className="relative mt-5 grid gap-2 sm:grid-cols-2">{perks.map((p) => <li key={p} className="flex items-start gap-2 text-sm"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#FF5A1F]" />{p}</li>)}</ul>
+            <p className="relative mt-2 max-w-xl text-[#FFFFFF]/75">{t('services.photoBody')}</p>
+            <ul className="relative mt-5 grid gap-2 sm:grid-cols-2">{perks.map((p) => <li key={p} className="flex items-start gap-2 text-sm"><Check className="mt-0.5 h-4 w-4 shrink-0 text-[#F26B38]" />{p}</li>)}</ul>
           </div>
 
           <Panel title={t('services.requestTitle')}>

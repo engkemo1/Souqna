@@ -71,8 +71,8 @@ export default function Overview() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-[#111111] p-5 text-white sm:p-6 lg:col-span-1">
-          <div className="pointer-events-none absolute -end-10 -top-10 h-40 w-40 rounded-full bg-[#FF5A1F]/25 blur-2xl" />
+          className="relative overflow-hidden rounded-2xl bg-[#14213D] p-5 text-white sm:p-6 lg:col-span-1">
+          <div className="pointer-events-none absolute -end-10 -top-10 h-40 w-40 rounded-full bg-[#F26B38]/25 blur-2xl" />
           <p className="relative text-sm font-medium text-white/70">{t('dash.todaySales')}</p>
           {!d ? <Skeleton className="mt-3 h-10 w-40 bg-white/10" /> : (
             <p className="relative mt-2 text-[34px] font-semibold sm:text-4xl"><AnimatedNumber value={d.today.sales} format={money} /></p>
@@ -80,7 +80,7 @@ export default function Overview() {
           <p className="relative mt-1 text-sm text-white/70">{d ? t('dash.todayOrders', { n: num(d.today.orders) }) : ' '}</p>
           {d?.today.pending > 0 && (
             <Link to="/dashboard/orders?status=pending" className="relative mt-5 flex items-center justify-between gap-3 rounded-xl bg-white/10 px-3.5 py-3 text-sm ring-1 ring-white/10 transition hover:bg-white/15">
-              <span className="flex items-center gap-2.5"><span className="relative grid h-8 w-8 place-items-center rounded-lg bg-[#FF5A1F] text-white"><BellRing className="h-4 w-4" /><span className="absolute -end-0.5 -top-0.5 h-2.5 w-2.5 animate-ping rounded-full bg-amber-300" /></span>{t('dash.pendingOrders', { n: d.today.pending })}</span>
+              <span className="flex items-center gap-2.5"><span className="relative grid h-8 w-8 place-items-center rounded-lg bg-[#F26B38] text-white"><BellRing className="h-4 w-4" /><span className="absolute -end-0.5 -top-0.5 h-2.5 w-2.5 animate-ping rounded-full bg-amber-300" /></span>{t('dash.pendingOrders', { n: d.today.pending })}</span>
               <ArrowUpRight className="h-4 w-4 shrink-0 rtl:-scale-x-100" />
             </Link>
           )}
@@ -106,7 +106,7 @@ export default function Overview() {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Panel className="lg:col-span-2" title={t('dash.salesOverview')}
-          action={<div className="hidden items-center gap-4 text-xs text-muted sm:flex"><span className="flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-[#FF5A1F]" />{t('dash.currentPeriod')}</span><span className="flex items-center gap-1.5"><span className="h-0 w-4 border-t-2 border-dashed border-[#B9B5AC]" />{t('dash.previousPeriod')}</span></div>}>
+          action={<div className="hidden items-center gap-4 text-xs text-muted sm:flex"><span className="flex items-center gap-1.5"><span className="h-2 w-4 rounded-full bg-[#F26B38]" />{t('dash.currentPeriod')}</span><span className="flex items-center gap-1.5"><span className="h-0 w-4 border-t-2 border-dashed border-[#B9B5AC]" />{t('dash.previousPeriod')}</span></div>}>
           {!d ? <Skeleton className="h-[260px] w-full" /> : <SalesAreaChart series={d.series} previous={d.previousSeries} height={desktop ? 300 : 230} />}
         </Panel>
 
