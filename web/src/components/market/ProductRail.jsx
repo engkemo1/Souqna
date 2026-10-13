@@ -1,10 +1,13 @@
 import { Link } from 'react-router-dom';
 import ProductCard, { ProductCardSkeleton } from '../store/ProductCard.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { useState } from 'react';
+import QuickAddSheet from '../store/QuickAddSheet.jsx';
 
 /** One horizontally-scrolling shelf of products ("Trending", "Deals", …). Renders nothing when empty. */
 export default function ProductRail({ title, items, loading, to, tone = '' }) {
   const { t } = useI18n();
+  const [quick, setQuick] = useState(null);
   if (!loading && !items?.length) return null;
   return (
     <section className={tone}>
@@ -17,11 +20,12 @@ export default function ProductRail({ title, items, loading, to, tone = '' }) {
           {loading ? Array.from({ length: 5 }, (_, i) => <div key={i} className="w-[46%] shrink-0 sm:w-[30%] lg:w-[22%] xl:w-[18%]"><ProductCardSkeleton /></div>) :
             items.map((p, i) => (
               <div key={p.id} className="w-[46%] shrink-0 snap-start sm:w-[30%] lg:w-[22%] xl:w-[18%]">
-                <ProductCard product={p} slug={p.store.slug} index={i} showStore />
+                <ProductCard product={p} slug={p.store.slug} index={i} showStore onQuickAdd={setQuick} />
               </div>
             ))}
         </div>
       </div>
+      <QuickAddSheet slug={quick?.store?.slug} product={quick} marketplace onClose={() => setQuick(null)} />
     </section>
   );
 }

@@ -12,9 +12,12 @@ import { useAddToCart } from './useAddToCart.js';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { sp } from '../../lib/store.jsx';
+import { useMarketCart } from '../../lib/cart.jsx';
+import { useToast } from '../ui/Toast.jsx';
+import { useNavigate } from 'react-router-dom';
 
-export default function QuickAddSheet({ slug, product, onClose, onAdded, step }) {
-  const { t, tr } = useI18n();
+export default function QuickAddSheet({ slug, product, onClose, onAdded, step, marketplace = false }) {
+  const { t, tr, lang } = useI18n();
   const { data, error, loading, reload } = useApi(product ? `/stores/${slug}/products/${product.slug}` : null);
   const p = data?.product;
   const [color, setColor] = useState(null);
@@ -22,6 +25,9 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step })
   const [sizeError, setSizeError] = useState(false);
   const imgRef = useRef(null);
   const add = useAddToCart(slug);
+  const marketCart = useMarketCart();
+  const toast = useToast();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!p) return;
@@ -34,7 +40,13 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step })
   const { variant, available, needsSize } = resolveVariant(p, color, size);
   const onAdd = () => {
     if (needsSize) { setSizeError(true); return; }
-    add({ product: p, variant, color, size, fromEl: imgRef.current });
+    if (marketplace) {
+      const selectedColor = p.colors?.find((c) => c.hex === color);
+      marketCart.add({ productId: p.id, variantId: variant?.id ?? null, slug: p.slug, name: p.name, price: p.price, compareAt: p.compareAt,
+        image: p.media?.[0] || product.image, color: color || null, colorName: selectedColor ? { ar: selectedColor.name_ar, en: selectedColor.name_en } : null,
+        size: size && size !== 'One size' ? size : null }, product.store || { slug });
+      toast({ title: lang === 'ar' ? 'اتضاف لسلة بنها أوتفيت' : 'Added to Banha Outfit basket', tone: 'info', action: { label: lang === 'ar' ? 'افتح السلة' : 'Open basket', onClick: () => navigate('/market-cart') } });
+    } else add({ product: p, variant, color, size, fromEl: imgRef.current });
     if (onAdded) onAdded(); else onClose();
   };
 
@@ -42,7 +54,7 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step })
     <Sheet open={!!product} onClose={onClose} title={product ? `${step ? `${step} · ` : ''}${tr(product.name)}` : ''} side="auto" desktop="center" size="lg"
       footer={p && (
         <Button full size="lg" disabled={available <= 0 && !needsSize} onClick={onAdd}>
-          {available <= 0 && !needsSize ? t('product.outOfStock') : t('product.addToCart')}
+          {available <= 0 && !needsSize ? t('product.outOfStock') : marketplace ? (lang === 'ar' ? 'أضف لسلة بنها أوتفيت' : 'Add to Banha Outfit basket') : t('product.addToCart')}
         </Button>
       )}>
       {error ? <ErrorState error={error} onRetry={reload} compact /> : (

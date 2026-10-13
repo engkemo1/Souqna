@@ -17,6 +17,7 @@ import { cx } from '../../components/ui/cx.js';
 import SearchFilters from '../../components/market/SearchFilters.jsx';
 import { api } from '../../lib/api.js';
 import RequestBanner from '../../components/market/RequestBanner.jsx';
+import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
 
 export default function MarketSearch() {
   const { t, lang } = useI18n();
@@ -33,6 +34,7 @@ export default function MarketSearch() {
   const { data, error, loading, reload } = useApi(`/search?${key}`);
   const [more, setMore] = useState({ key: '', items: [], page: 1 });
   const [busy, setBusy] = useState(false);
+  const [quick, setQuick] = useState(null);
   const items = [...(data?.items || []), ...(more.key === key ? more.items : [])];
   const page = more.key === key ? more.page : 1;
 
@@ -75,7 +77,7 @@ export default function MarketSearch() {
           <ProductGrid>{Array.from({ length: 8 }, (_, i) => <ProductCardSkeleton key={i} />)}</ProductGrid>
         ) : items.length ? (
           <>
-            <ProductGrid>{items.map((p, i) => <ProductCard key={`${p.store.slug}-${p.id}`} product={p} slug={p.store.slug} index={i} showStore />)}</ProductGrid>
+            <ProductGrid>{items.map((p, i) => <ProductCard key={`${p.store.slug}-${p.id}`} product={p} slug={p.store.slug} index={i} showStore onQuickAdd={setQuick} />)}</ProductGrid>
             {page < (data.pages || 1) && <div className="mt-10 text-center"><Button variant="outline" size="lg" loading={busy} onClick={loadMore}>{t('common.loadMore')}</Button></div>}
           </>
         ) : (
@@ -100,6 +102,7 @@ export default function MarketSearch() {
       </main>
       <footer className="container flex items-center justify-between border-t border-line py-8 text-sm text-muted"><Brand /><p>© {new Date().getFullYear()} {t('market.footer')}</p></footer>
       <StylistChat />
+      <QuickAddSheet slug={quick?.store?.slug} product={quick} marketplace onClose={() => setQuick(null)} />
     </div>
   );
 }
