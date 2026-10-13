@@ -21,12 +21,12 @@ async function walk(dir, base = dir) {
   return out;
 }
 
-/** true when the model is now present locally (restored from R2, or already complete). */
+/** → null when R2 has no copy, else { dtypes } (which ONNX variants were saved) once every file is present locally. */
 export async function restoreModel(cacheDir, modelId, store = defaultStore) {
-  if (!store.enabled()) return false;
+  if (!store.enabled()) return null;
   let manifest;
-  try { manifest = JSON.parse((await store.get(`${prefix(modelId)}/manifest.json`)).toString('utf8')); } catch { return false; } // not uploaded yet
-  if (!Array.isArray(manifest.files) || !manifest.files.length) return false;
+  try { manifest = JSON.parse((await store.get(`${prefix(modelId)}/manifest.json`)).toString('utf8')); } catch { return null; } // not uploaded yet
+  if (!Array.isArray(manifest.files) || !manifest.files.length) return null;
   const root = path.join(cacheDir, modelId);
   for (const f of manifest.files) {
     const dest = path.join(root, ...f.path.split('/'));
@@ -38,11 +38,11 @@ export async function restoreModel(cacheDir, modelId, store = defaultStore) {
     if (buf.length !== f.size) throw new Error(`size mismatch for ${f.path}`);
     await fs.writeFile(dest, buf);
   }
-  return true;
+  return { dtypes: manifest.dtypes || null };
 }
 
 /** Uploads every cached file of the model, then the manifest (last, so a half-finished upload is never "complete"). */
-export async function uploadModel(cacheDir, modelId, store = defaultStore) {
+export async function uploadModel(cacheDir, modelId, store = defaultStore, { dtypes = null } = {}) {
   if (!store.enabled()) return false;
   const root = path.join(cacheDir, modelId);
   const files = [];
@@ -52,6 +52,6 @@ export async function uploadModel(cacheDir, modelId, store = defaultStore) {
     files.push({ path: rel, size: buf.length });
   }
   if (!files.length) return false;
-  await store.put(`${prefix(modelId)}/manifest.json`, Buffer.from(JSON.stringify({ model: modelId, files, at: new Date().toISOString() })));
+  await store.put(`${prefix(modelId)}/manifest.json`, Buffer.from(JSON.stringify({ model: modelId, files, dtypes, at: new Date().toISOString() })));
   return true;
 }

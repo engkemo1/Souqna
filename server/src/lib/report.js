@@ -1,6 +1,7 @@
 /** Weekly merchant report: real numbers from the database + (optional) a short AI write-up in Egyptian Arabic. */
 import { q } from '../db/index.js';
 import { callLlm, providerReady, stylistSettings } from './stylist.js';
+import { unmetDemand, demandForOwnersEnabled } from './visual-demand.js';
 
 const day = (offset = 0) => new Date(Date.now() + 3 * 3600e3 - offset * 864e5).toISOString().slice(0, 10);
 const LOCAL = "date(created_at,'+3 hours')";
@@ -18,7 +19,8 @@ export function weeklyFacts(sid) {
     ORDER BY p.views DESC LIMIT 3`, [from]);
   const stale = q.val("SELECT COUNT(*) FROM orders WHERE store_id=? AND status='pending' AND created_at < datetime('now','-1 day')", [sid]);
   const rev = q.get("SELECT COUNT(*) AS n, COALESCE(AVG(rating),0) AS avg FROM reviews WHERE store_id=? AND status='published' AND created_at >= datetime('now','-7 days')", [sid]);
-  return { from, to: day(0), orders: cur.orders, sales: cur.sales, prevOrders: prev.orders, prevSales: prev.sales, cancelled, top, lowStock, viewedNoSale, stale, newReviews: rev.n, avgRating: Math.round(rev.avg * 10) / 10 };
+  const unmet = !demandForOwnersEnabled() ? [] : unmetDemand({ days: 7, limit: 3, storeId: sid }).map((x) => ({ item: `${x.label}${x.colorLabel ? ` ${x.colorLabel.ar}` : ''}`, people: x.people, have: x.have }));
+  return { from, to: day(0), unmet, orders: cur.orders, sales: cur.sales, prevOrders: prev.orders, prevSales: prev.sales, cancelled, top, lowStock, viewedNoSale, stale, newReviews: rev.n, avgRating: Math.round(rev.avg * 10) / 10 };
 }
 
 /** rule-based advice used when no AI provider is configured (and as the fallback when the call fails) */
@@ -27,6 +29,7 @@ export function ruleTips(f) {
   if (f.stale > 0) tips.push(`في ${f.stale} طلب معلّق من أكتر من يوم — راجعهم وكلّم العملاء قبل ما يتلغوا.`);
   if (f.lowStock.length) tips.push(`المخزون قارب يخلص في: ${f.lowStock.map((x) => `${x.name} (${x.stock})`).join('، ')} — جدّد قبل ما تتفوتك مبيعات.`);
   if (f.viewedNoSale.length) tips.push(`ناس بتتفرج على ${f.viewedNoSale.map((x) => x.name).join('، ')} ومحدش اشترى — جرّب خصم صغير أو صور أوضح أو مقاسات أكتر.`);
+  if (f.unmet?.length) tips.push(`ناس دوّرت بالصورة على ${f.unmet.map((x) => `${x.item} (${x.people})`).join('، ')} ومالقوش في بنها${f.unmet.some((x) => x.have) ? ' — عندك من النوع ده، شوف لو تقدر تضيف نفس الشكل أو اللون' : ' — لو بتبيع حاجة شبهها ضيفها بصور واضحة'}.`);
   if (f.top.length) tips.push(`أكتر حاجة بتتباع: ${f.top[0].name}. صوّرها تاني ورشّحها في الصفحة الرئيسية.`);
   if (f.orders === 0) tips.push('مفيش طلبات الأسبوع ده — فعّل توصيل نفس اليوم أو اعمل عرض لفترة محدودة وشارك لينك المتجر على واتساب.');
   if (f.cancelled > 0 && f.cancelled >= f.orders / 4) tips.push(`في ${f.cancelled} طلبات اتلغت — اتأكد من رقم العميل وأكد الطلب بمكالمة سريعة.`);

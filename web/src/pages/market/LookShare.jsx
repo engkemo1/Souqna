@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom';
-import { Sparkles, ShoppingBag } from 'lucide-react';
+import { Sparkles, ShoppingBag, Camera } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
@@ -21,8 +21,8 @@ export default function LookShare() {
         {error && <ErrorState error={error} />}
         {data && (
           <>
-            <p className="inline-flex items-center gap-1.5 text-[13px] font-bold text-brand"><Sparkles className="h-4 w-4" />{t('look.from')}</p>
-            <h1 className="mt-1 text-xl font-extrabold">{data.title || t('look.title')}</h1>
+            <p className="inline-flex items-center gap-1.5 text-[13px] font-bold text-brand">{data.kind === 'visual' ? <Camera className="h-4 w-4" /> : <Sparkles className="h-4 w-4" />}{data.kind === 'visual' ? t('look.fromVisual') : t('look.from')}</p>
+            <h1 className="mt-1 text-xl font-extrabold">{data.title || (data.kind === 'visual' ? t('look.visualTitle') : t('look.title'))}</h1>
             {!data.pieces.length && <p className="mt-6 text-muted">{t('look.gone')}</p>}
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
               {data.pieces.map((p) => (
@@ -35,8 +35,10 @@ export default function LookShare() {
                 </Link>
               ))}
             </div>
-            {data.pieces.length > 0 && <p className="mt-4 text-[15px] font-bold">{t('stylist.total', { p: formatMoney(data.total, lang) })}</p>}
-            <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: t('look.askMore') } }))} className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-btn px-5 py-2.5 text-[14px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t('look.askModa')}</button>
+            {data.kind !== 'visual' && data.pieces.length > 0 && <p className="mt-4 text-[15px] font-bold">{t('stylist.total', { p: formatMoney(data.total, lang) })}</p>}
+            {data.kind === 'visual'
+              ? <Link to="/visual" className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-btn px-5 py-2.5 text-[14px] font-bold text-on-btn"><Camera className="h-4 w-4" />{t('look.tryYours')}</Link>
+              : <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: t('look.askMore') } }))} className="mt-5 inline-flex items-center gap-1.5 rounded-full bg-btn px-5 py-2.5 text-[14px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t('look.askModa')}</button>}
           </>
         )}
       </main>

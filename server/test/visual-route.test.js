@@ -17,7 +17,7 @@ const visual = await import('../src/lib/visual.js');
 const { toBlob } = await import('../src/lib/visual-core.js');
 
 const solid = (r, g, b) => sharp({ create: { width: 96, height: 128, channels: 3, background: { r, g, b } } }).jpeg().toBuffer();
-const app = express(); app.use('/api', publicRoutes); app.use(errorHandler);
+const app = express(); app.use(express.json()); app.use('/api', publicRoutes); app.use(errorHandler);
 const server = await new Promise((res) => { const s = app.listen(0, () => res(s)); });
 const base = `http://127.0.0.1:${server.address().port}/api`;
 
@@ -54,6 +54,36 @@ test('route returns grouped, serialised product cards for a close match and noMa
   const miss = await post(await solid(30, 200, 40), { type: 'bottoms' });
   assert.equal(miss.body.noMatch, true);
   assert.deepEqual(miss.body.items, []);
+});
+
+test('Share-target: a photo shared from another app is handed to /visual exactly once', async () => {
+  const fd = new FormData(); fd.append('photo', new Blob([await solid(12, 12, 14)], { type: 'image/jpeg' }), 'shared.jpg');
+  const res = await fetch(`${base}/share-target`, { method: 'POST', body: fd, redirect: 'manual' });
+  assert.equal(res.status, 303);
+  const loc = res.headers.get('location');
+  assert.match(loc, /^\/visual\?shared=[\w-]{10,}$/);
+  const token = loc.split('=')[1];
+  const first = await fetch(`${base}/visual-search/shared/${token}`);
+  assert.equal(first.status, 200);
+  assert.equal(first.headers.get('content-type'), 'image/jpeg');
+  assert.ok((await first.arrayBuffer()).byteLength > 100);
+  assert.equal((await fetch(`${base}/visual-search/shared/${token}`)).status, 404, 'one-time pickup');
+  // no file / not an image → still a clean redirect, never an error page
+  const empty = await fetch(`${base}/share-target`, { method: 'POST', body: new FormData(), redirect: 'manual' });
+  assert.equal(empty.status, 303); assert.equal(empty.headers.get('location'), '/visual');
+  const bad = new FormData(); bad.append('photo', new Blob(['not an image'], { type: 'image/jpeg' }), 'x.jpg');
+  assert.equal((await fetch(`${base}/share-target`, { method: 'POST', body: bad, redirect: 'manual' })).headers.get('location'), '/visual');
+});
+
+test('Sharing the results creates a visual look link that the share page can load', async () => {
+  const pid = q.get('SELECT id FROM products').id;
+  const res = await fetch(`${base}/look-share`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'لقيت دول في محلات بنها', kind: 'visual', items: [{ id: pid, label: 'بناطيل وجينز' }, { id: 999999 }] }) });
+  assert.equal(res.status, 201);
+  const { token, url } = await res.json();
+  assert.equal(url, `/look/${token}`);
+  const look = await (await fetch(`${base}/look-share/${token}`)).json();
+  assert.equal(look.kind, 'visual');
+  assert.deepEqual(look.pieces.map((p) => [p.id, p.label]), [[pid, 'بناطيل وجينز']], 'unknown products are dropped');
 });
 
 test('type is optional now, and a bad type is a 422', async () => {

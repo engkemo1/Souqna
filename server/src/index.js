@@ -45,8 +45,9 @@ if (fs.existsSync(config.webDist)) {
       const m = look.pieces[0].image;
       const sz = m ? ([...m.sizes].sort((a, b) => a.width - b.width).find((x) => x.width >= 600) || m.sizes[m.sizes.length - 1]) : null;
       const img = m && sz ? `${m.base.startsWith('http') ? '' : origin}${m.base}/${sz.name}.jpg` : `${origin}/brand/app-icon.png`;
-      const title = `${look.title || 'لوك من بنها أوتفيت'} · ${look.pieces.length} قطع`;
-      const desc = `${look.pieces.map((p) => p.name.ar || p.name.en || p.name).join(' + ')} — ${look.total} ج.م`;
+      const visual = look.kind === 'visual';
+      const title = visual ? (look.title || 'لقيت دول في محلات بنها') : `${look.title || 'لوك من بنها أوتفيت'} · ${look.pieces.length} قطع`;
+      const desc = visual ? `${look.pieces.slice(0, 4).map((p) => `${p.name.ar || p.name.en || p.name} — ${p.price} ج.م`).join(' | ')}` : `${look.pieces.map((p) => p.name.ar || p.name.en || p.name).join(' + ')} — ${look.total} ج.م`;
       const tags = `<meta property="og:type" content="website" /><meta property="og:title" content="${esc(title)}" /><meta property="og:description" content="${esc(desc)}" /><meta property="og:image" content="${esc(img)}" /><meta property="og:url" content="${esc(origin + req.originalUrl)}" /><meta name="twitter:card" content="summary_large_image" />`;
       const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8').replace(/<title>.*?<\/title>/, `<title>${esc(title)}</title>${tags}`);
       res.set('Cache-Control', 'no-cache').type('html').send(html);

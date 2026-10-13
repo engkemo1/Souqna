@@ -83,7 +83,7 @@ export default function Join() {
         animate={{ opacity: [0.5, 0.9, 0.5], scale: [1, 1.08, 1] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }} />
 
       <header className="relative mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-        <Link to="/" className="flex items-center gap-2.5"><BrandMark /><span className="font-display text-xl font-bold text-[#FFF6EC]">بنها أوتفيت</span></Link>
+        <Link to="/" className="flex items-center gap-2.5" aria-label="طِلّة — أزياء من محلات بنها"><BrandMark /><span className="leading-none"><span className="block font-display text-xl font-bold text-[#FFF6EC]">طِلّة</span><span className="mt-1 block text-[10px] font-semibold text-[#FFF6EC]/65">أزياء من محلات بنها</span></span></Link>
         <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-[#FFF6EC]/70 hover:text-white">السوق <ArrowLeft className="h-4 w-4" /></Link>
       </header>
 

@@ -13,6 +13,7 @@ import { listDepartments, assertDepartments } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
+import { unmetDemand, demandTotals, demandForOwnersEnabled, setDemandForOwners } from '../lib/visual-demand.js';
 import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
@@ -444,6 +445,14 @@ r.put('/look-of-day', h((req, res) => {
 
 /* ---- visual search settings (on/off, model, free daily quota) ---- */
 r.get('/visual', h((_req, res) => res.json(visualStatus())));
+r.get('/visual/demand', h((req, res) => {
+  const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
+  res.json({ items: unmetDemand({ days, limit: 20 }), totals: demandTotals({ days }), ownersEnabled: demandForOwnersEnabled() });
+}));
+r.put('/visual/demand/owners', h((req, res) => {
+  const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
+  res.json({ ownersEnabled: setDemandForOwners(enabled) });
+}));
 r.put('/visual', h((req, res) => {
   const body = z.object({ enabled: z.boolean().optional(), model: z.enum(['color', 'jina', 'clip']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional(), minSimilarity: z.coerce.number().int().min(0).max(100).optional() }).parse(req.body);
   if (body.model === 'jina' && !process.env.JINA_API_KEY) throw new AppError(422, 'jina_key_required', 'أضف مفتاح JINA_API_KEY في Railway أولًا.');

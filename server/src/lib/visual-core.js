@@ -81,6 +81,22 @@ export async function colorDescriptor(buffer, centre = 0.6) {
   return hist.map((x) => x / sum);
 }
 
+/** Shopper-friendly names for the 16 colour bins (used in demand reports, never for ranking). */
+export const COLORS = [
+  { key: 'red', ar: 'أحمر', en: 'Red' }, { key: 'orange', ar: 'برتقالي / بيج', en: 'Orange / beige' }, { key: 'yellow', ar: 'أصفر', en: 'Yellow' },
+  { key: 'lime', ar: 'أخضر فاتح', en: 'Lime' }, { key: 'green', ar: 'أخضر', en: 'Green' }, { key: 'green', ar: 'أخضر', en: 'Green' },
+  { key: 'teal', ar: 'تركواز', en: 'Teal' }, { key: 'sky', ar: 'سماوي', en: 'Sky blue' }, { key: 'blue', ar: 'أزرق', en: 'Blue' },
+  { key: 'purple', ar: 'بنفسجي', en: 'Purple' }, { key: 'magenta', ar: 'فوشيا', en: 'Magenta' }, { key: 'pink', ar: 'وردي', en: 'Pink' },
+  { key: 'black', ar: 'أسود', en: 'Black' }, { key: 'charcoal', ar: 'رمادي غامق', en: 'Dark grey' }, { key: 'grey', ar: 'رمادي فاتح', en: 'Light grey' }, { key: 'white', ar: 'أبيض', en: 'White' },
+];
+export const colorByKey = (key) => COLORS.find((c) => c.key === key) || null;
+/** Dominant colour of a descriptor, or null when no single colour dominates. */
+export function dominantColor(hist, min = 0.3) {
+  if (!hist) return null;
+  let best = 0; for (let i = 1; i < hist.length; i++) if (hist[i] > hist[best]) best = i;
+  return hist[best] >= min ? COLORS[best] : null;
+}
+
 /** Neighbouring hues / neighbouring greys count as partly the same (beige ≈ cream, navy ≈ black). */
 function smooth(h) {
   const o = new Float32Array(COLOR_BINS);

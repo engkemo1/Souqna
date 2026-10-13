@@ -13,6 +13,7 @@ import { clampInt, nowIso, slugify } from '../lib/util.js';
 import { notifyOrderStatus, notifyPriceDrop, notifyFollowers } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { weeklyReport } from '../lib/report.js';
+import { unmetDemand, demandTotals, demandForOwnersEnabled } from '../lib/visual-demand.js';
 import { cairoNow } from '../lib/sameDay.js';
 import { triggerReindex } from '../lib/visual.js';
 import { describeProduct, invalidateModaCatalogue } from '../lib/stylist.js';
@@ -270,6 +271,9 @@ r.get('/overview', h((req, res) => {
     }),
   });
 }));
+
+/** "What are people looking for?" — pieces customers photographed and visual search could not match (market-wide), with how many the store already has. */
+r.get('/visual-demand', h((req, res) => { if (!demandForOwnersEnabled()) return res.json({ enabled: false, items: [], totals: null }); res.json({ enabled: true, items: unmetDemand({ days: 30, limit: 8, storeId: req.store.id }), totals: demandTotals({ days: 30 }) }); }));
 
 r.get('/report/weekly', h(async (req, res) => { res.json(await weeklyReport(req.store.id, { refresh: req.query.refresh === '1' })); }));
 

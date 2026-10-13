@@ -14,6 +14,7 @@ const uptime = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 864
 function VisualPanel() {
   const toast = useToast();
   const { data, reload } = useAdminApi('/visual');
+  const { data: dem, reload: reloadDem } = useAdminApi('/visual/demand');
   const [f, setF] = useState(null);
   const [busy, setBusy] = useState(false);
   if (data && !f) setF({ enabled: data.enabled, model: data.model, dailyFree: String(data.dailyFree), minSimilarity: String(data.minSimilarity) });
@@ -67,6 +68,18 @@ function VisualPanel() {
             <div key={k} className="flex justify-between gap-3"><dt className="text-muted">{k}</dt><dd className="font-medium" dir="auto">{v}</dd></div>
           ))}
         </dl>
+        {dem && (
+          <div className="border-t border-line pt-4">
+            <Switch checked={dem.ownersEnabled} onChange={async (v) => { try { await adminApi('/visual/demand/owners', { method: 'PUT', body: { enabled: v } }); toast({ title: v ? 'التقرير ظاهر لأصحاب المحلات' : 'التقرير مقفول عن أصحاب المحلات' }); reloadDem(); } catch (x) { toast({ tone: 'error', title: x.message }); } }} label="إظهار «الناس بتدوّر على إيه؟» لأصحاب المحلات" description="لما تفعّله بيظهر لكل صاحب محل كارت في لوحته وسطر في تقريره الأسبوعي بالقطع اللي الزباين بيدوّروا عليها ومش لاقينها. وهو دايمًا ظاهر لك هنا في الأدمن." />
+            <p className="mt-4 text-sm font-semibold">الأكثر طلبًا ومش موجود (آخر {dem.totals.days} يوم)</p>
+            <p className="mt-1 text-[12.5px] text-muted">{dem.totals.pieces} قطعة اتبحث عنها بالصورة من {dem.totals.people} زائر — اتلاقى ليها نتيجة: {dem.totals.found}، ماتلاقاش: {dem.totals.missed}، وطلبات «نوفرهالك» اللي جت من البحث بالصورة: {dem.totals.requests}.</p>
+            {dem.items.length ? (
+              <ul className="mt-2 divide-y divide-line text-sm">
+                {dem.items.map((x) => <li key={`${x.family}-${x.color}`} className="flex justify-between gap-3 py-1.5"><span>{x.label}{x.colorLabel ? ` · ${x.colorLabel.ar}` : ''}</span><span className="text-muted">{x.people} زائر · {x.searches} بحث</span></li>)}
+              </ul>
+            ) : <p className="mt-2 text-[12.5px] text-muted">لسه مفيش بيانات كفاية.</p>}
+          </div>
+        )}
       </div>
     </Panel>
   );

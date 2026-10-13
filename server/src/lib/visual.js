@@ -13,7 +13,7 @@ import { q } from '../db/index.js';
 import { readMediaFile } from './media.js';
 import { visualProductFamily, visualTypeOptions } from './visual-taxonomy.js';
 import { clipReady, clipStatus, clipEmbedImage, clipEmbedTexts, CLIP_MODEL_NAME } from './visual-clip.js';
-import { cropRegions, colorDescriptor, rankConfident, normalize, toBlob, fromBlob, FRIENDLY_AR } from './visual-core.js';
+import { cropRegions, colorDescriptor, rankConfident, normalize, toBlob, fromBlob, dominantColor, FRIENDLY_AR } from './visual-core.js';
 import { buildTextPrototypes, buildCentroids, detectItems, vectorForFamily } from './visual-classify.js';
 
 const GRID_W = 6, GRID_H = 8, HUE_BINS = 12;
@@ -266,10 +266,16 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
     detections = [{ family: type, p: 1, vec: regions[0].vec, hist: null }];
   }
 
-  const groups = detections.map((d) => ({
-    type: d.family || '', label: FRIENDLY_AR[d.family] || '', confidence: Math.round(d.p * 100) / 100,
-    items: rankConfident(d.vec, d.hist, d.family ? pool.filter((r) => r.family === d.family) : pool, { floor, limit, useColor: isClip }),
-  }));
+  const wholeHist = await colorDescriptor(buffer).catch(() => null); // colour naming for the demand log (all models)
+  const groups = detections.map((d) => {
+    const cands = d.family ? pool.filter((r) => r.family === d.family) : pool;
+    const best = rankConfident(d.vec, d.hist, cands, { floor: -Infinity, window: Infinity, limit: 1, useColor: isClip })[0]?.score ?? null;
+    return {
+      type: d.family || '', label: FRIENDLY_AR[d.family] || '', confidence: Math.round(d.p * 100) / 100,
+      color: dominantColor(d.hist || wholeHist)?.key || '', best,
+      items: rankConfident(d.vec, d.hist, cands, { floor, limit, useColor: isClip }),
+    };
+  });
   return { model, detected: groups.map(({ type: t, label, confidence }) => ({ type: t, label, confidence })), groups };
 }
 

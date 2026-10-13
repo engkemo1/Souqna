@@ -57,9 +57,9 @@ self.addEventListener('fetch', (e) => {
 
 self.addEventListener('push', (e) => {
   let d = {};
-  try { d = e.data ? e.data.json() : {}; } catch { d = { title: 'بنها أوتفيت', body: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'بنها أوتفيت', {
-    body: d.body || '', icon: '/brand/icon-192.png', badge: '/brand/badge-96.png', tag: d.tag || undefined, renotify: !!d.tag,
+  try { d = e.data ? e.data.json() : {}; } catch { d = { title: 'طِلّة', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'طِلّة', {
+    body: d.body || '', icon: '/brand/tella-192.png', badge: '/brand/badge-96.png', tag: d.tag || undefined, renotify: !!d.tag,
     dir: 'rtl', lang: 'ar', vibrate: [120, 60, 120], data: { url: d.url || '/dashboard/orders' },
   }));
 });

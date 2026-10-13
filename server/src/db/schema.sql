@@ -294,6 +294,22 @@ CREATE TABLE IF NOT EXISTS product_colors (
   hist BLOB NOT NULL
 );
 
+-- Visual search demand log: one row per detected piece of every photo search. No photo and no IP are stored —
+-- `visitor` is a daily-salted hash, only used to count distinct people. Powers the "what are people looking for?" reports.
+CREATE TABLE IF NOT EXISTS visual_searches (
+  id INTEGER PRIMARY KEY,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  visitor TEXT NOT NULL,
+  model TEXT NOT NULL,
+  family TEXT NOT NULL DEFAULT '',
+  color TEXT NOT NULL DEFAULT '',
+  department TEXT NOT NULL DEFAULT '',
+  found INTEGER NOT NULL,
+  results INTEGER NOT NULL DEFAULT 0,
+  best REAL
+);
+CREATE INDEX IF NOT EXISTS idx_visual_searches_found ON visual_searches(found, created_at);
+
 CREATE TABLE IF NOT EXISTS reviews (
   id INTEGER PRIMARY KEY,
   store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
@@ -376,5 +392,6 @@ CREATE TABLE IF NOT EXISTS shared_looks (
   token TEXT PRIMARY KEY,
   title TEXT NOT NULL DEFAULT '',
   items_json TEXT NOT NULL,
+  kind TEXT NOT NULL DEFAULT 'look',  -- 'look' (from Moda) | 'visual' (results of a photo search)
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );

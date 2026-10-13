@@ -14,6 +14,7 @@ import { sameDaySql, cairoNow } from '../lib/sameDay.js';
 import { buyerFromReq } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
+import { logVisualSearch } from '../lib/visual-demand.js';
 import { runStylist, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
 import { runModa } from '../lib/moda/engine.js';
 import { quote } from '../lib/cart.js';
@@ -133,6 +134,7 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
     throw new AppError(422, 'invalid_image', 'This file is not a supported image.');
   }
   // Only genuinely similar products are returned (quality gate in searchByImage); an empty result is a valid, honest answer.
+  logVisualSearch({ ip, model: found.model, department, groups: found.groups }); // demand log: what people look for and don't find
   const ids = [...new Set(found.groups.flatMap((g) => g.items.map((x) => x.id)))];
   const byCard = new Map();
   if (ids.length) {
@@ -146,6 +148,30 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
   const withItems = groups.filter((g) => g.items.length);
   const first = withItems[0] || groups[0];
   res.json({ items: first?.items || [], total: withItems.reduce((n, g) => n + g.items.length, 0), groups, detected: found.detected, noMatch: withItems.length === 0 });
+}));
+
+/* Web Share Target: «Share → بنها أوتفيت» from Instagram / WhatsApp / the gallery (installed PWA, see manifest.webmanifest).
+ * The shared photo is shrunk, kept in memory for 10 minutes and handed to /visual exactly once. Nothing is written to disk. */
+const sharedPhotos = new Map(); // token -> { buf, at }
+const SHARED_TTL = 600e3;
+r.post('/share-target', photoUpload.single('photo'), h(async (req, res) => {
+  let token = '';
+  try {
+    if (req.file) {
+      const buf = await sharp(req.file.buffer).rotate().resize(1000, 1000, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
+      for (const [k, v] of sharedPhotos) if (Date.now() - v.at > SHARED_TTL) sharedPhotos.delete(k);
+      if (sharedPhotos.size >= 20) sharedPhotos.delete(sharedPhotos.keys().next().value);
+      token = crypto.randomBytes(9).toString('base64url');
+      sharedPhotos.set(token, { buf, at: Date.now() });
+    }
+  } catch { token = ''; }
+  res.redirect(303, token ? `/visual?shared=${token}` : '/visual');
+}));
+r.get('/visual-search/shared/:token', h((req, res) => {
+  const v = sharedPhotos.get(req.params.token);
+  sharedPhotos.delete(req.params.token);
+  if (!v || Date.now() - v.at > SHARED_TTL) throw notFound('This shared photo has expired.');
+  res.set('Cache-Control', 'no-store').type('image/jpeg').send(v.buf);
 }));
 
 /* ---------------------------------------------------------- stylist chat ("مودة") */
@@ -221,12 +247,12 @@ r.post('/stylist/feedback', h((req, res) => {
 }));
 
 r.post('/look-share', h(async (req, res) => {
-  const b = z.object({ title: z.string().max(80).optional(), items: z.array(z.object({ id: z.number().int(), label: z.string().max(60).optional() })).min(1).max(12) }).parse(req.body);
+  const b = z.object({ title: z.string().max(80).optional(), kind: z.enum(['look', 'visual']).optional(), items: z.array(z.object({ id: z.number().int(), label: z.string().max(60).optional() })).min(1).max(12) }).parse(req.body);
   const valid = new Set(cardsByIds(b.items.map((i) => i.id)).map((c) => c.id));
   const items = b.items.filter((i) => valid.has(i.id));
   if (!items.length) throw badRequest('No valid products.');
   const token = randomBytes(6).toString('base64url');
-  q.run('INSERT INTO shared_looks(token,title,items_json) VALUES(?,?,?)', [token, (b.title || '').trim(), JSON.stringify(items)]);
+  q.run('INSERT INTO shared_looks(token,title,items_json,kind) VALUES(?,?,?,?)', [token, (b.title || '').trim(), JSON.stringify(items), b.kind || 'look']);
   res.status(201).json({ token, url: `/look/${token}` });
 }));
 
@@ -236,7 +262,7 @@ export function loadSharedLook(token) {
   let items = []; try { items = JSON.parse(row.items_json); } catch { /* empty */ }
   const cards = new Map(cardsByIds(items.map((i) => i.id)).map((c) => [c.id, c]));
   const pieces = items.map((i) => (cards.get(i.id) ? { label: i.label || '', ...cards.get(i.id) } : null)).filter(Boolean);
-  return { token, title: row.title, pieces, total: pieces.reduce((s, p) => s + p.price, 0) };
+  return { token, title: row.title, kind: row.kind || 'look', pieces, total: pieces.reduce((s, p) => s + p.price, 0) };
 }
 
 r.get('/look-share/:token', h(async (req, res) => {

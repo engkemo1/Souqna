@@ -60,7 +60,7 @@ export default function Login() {
         {error && !Object.keys(fe).length && <p role="alert" className="rounded-xl bg-sale/10 px-4 py-3 text-sm font-medium text-sale">{errorMessage(t, error)}</p>}
         <Button type="submit" full size="lg" loading={busy}>{t('auth.signIn')}</Button>
       </form>
-      <p className="mt-8 text-center text-sm text-muted">Banha Outfit · بنها أوتفيت</p>
+      <p className="mt-8 text-center text-sm text-muted">{t('app.name')} · {t('app.tagline')}</p>
     </AuthShell>
   );
 }

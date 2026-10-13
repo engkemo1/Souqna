@@ -37,6 +37,8 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   // Single-department stores: their products belong to that department.
   db.exec(`UPDATE products SET department = (SELECT TRIM(s.departments, ',') FROM stores s WHERE s.id = products.store_id)
            WHERE department IS NULL AND (SELECT LENGTH(s.departments) - LENGTH(REPLACE(s.departments, ',', '')) FROM stores s WHERE s.id = products.store_id) = 2`);
+  const slcols = db.prepare('PRAGMA table_info(shared_looks)').all().map((c) => c.name);
+  if (!slcols.includes('kind')) db.exec("ALTER TABLE shared_looks ADD COLUMN kind TEXT NOT NULL DEFAULT 'look'");
   const ocols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!ocols.includes('delivery_by')) db.exec("ALTER TABLE orders ADD COLUMN delivery_by TEXT NOT NULL DEFAULT 'store'");
   if (!ocols.includes('handoff_at')) db.exec('ALTER TABLE orders ADD COLUMN handoff_at TEXT');

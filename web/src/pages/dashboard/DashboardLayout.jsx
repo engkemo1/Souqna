@@ -47,7 +47,7 @@ function Sidebar({ pending }) {
     <aside className="fixed inset-y-0 start-0 z-30 hidden w-[76px] flex-col border-e border-line bg-elevated md:flex lg:w-[264px]">
       <div className="flex h-[72px] items-center gap-2.5 px-5 lg:px-6">
         <BrandMark className="h-8 w-auto" />
-        <span className="hidden font-display text-xl font-bold lg:block">{t('app.name')}</span>
+        <span className="hidden min-w-0 lg:block"><span className="block truncate font-display text-xl font-bold">{t('app.name')}</span><span className="mt-0.5 block truncate text-[10px] font-semibold text-muted">{t('app.tagline')}</span></span>
       </div>
       <div className="mx-3 mb-3 hidden rounded-2xl border border-line bg-surface p-3 lg:block">
         <div className="flex items-center gap-3">

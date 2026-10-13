@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Camera, ImagePlus, PackagePlus, RefreshCcw } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Camera, ClipboardPaste, ImagePlus, PackagePlus, RefreshCcw, Share2, Smartphone } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
+import { api } from '../../lib/api.js';
+import { useInstall } from '../../lib/pwa.js';
 import { useApi } from '../../lib/hooks.js';
 import { useDepartments } from '../../lib/departments.js';
 import { visualHandoff } from '../../lib/visualHandoff.js';
+import { EN_LABELS } from '../../lib/visualLabels.js';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import Brand from '../../components/market/Brand.jsx';
 import StylistChat from '../../components/market/StylistChat.jsx';
 import ProductCard, { ProductCardSkeleton, ProductGrid } from '../../components/store/ProductCard.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { errorMessage } from '../../components/ui/States.jsx';
+import { useToast } from '../../components/ui/Toast.jsx';
 import { cx } from '../../components/ui/cx.js';
 
 /** shrink big phone photos before upload (faster on mobile data, same search quality) */
@@ -22,14 +26,11 @@ async function shrink(file, max = 800) {
   return new Promise((res) => c.toBlob((b) => res(b || file), 'image/jpeg', 0.85));
 }
 
-const EN_LABELS = {
-  tops: 'Tops & shirts', bottoms: 'Pants & jeans', dresses: 'Dresses', suiting: 'Suits & tailoring',
-  outerwear: 'Jackets & coats', modest: 'Abayas, scarves & jalabiyas', shoes: 'Shoes', bags: 'Bags',
-  accessories: 'Accessories', sport: 'Sportswear', underwear_sleep: 'Sleepwear & underwear',
-};
-
 export default function VisualSearch() {
   const { t, lang } = useI18n();
+  const toast = useToast();
+  const install = useInstall();
+  const [sp, setSp] = useSearchParams();
   const { data: visualTypeData } = useApi('/visual-search/types');
   const { list, label } = useDepartments();
   const [blob, setBlob] = useState(null);
@@ -40,6 +41,8 @@ export default function VisualSearch() {
   const [state, setState] = useState({ loading: false, data: null, error: null });
   const input = useRef(null);
   const requestId = useRef(0);
+  const deptRef = useRef('');
+  const canPasteBtn = typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.read);
 
   useEffect(() => { document.title = `${t('visual.title')} · ${t('app.name')}`; }, [t]);
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
@@ -55,14 +58,39 @@ export default function VisualSearch() {
       if (id === requestId.current) { setActive(0); setState({ loading: false, data, error: null }); }
     } catch (e) { if (id === requestId.current) setState({ loading: false, data: null, error: e }); }
   };
-  const pick = async (e) => {
-    const file = e.target.files?.[0]; e.target.value = '';
-    if (!file) return;
+  const handleFile = async (file) => {
+    if (!file || !String(file.type || 'image/jpeg').startsWith('image/')) return;
     let b; try { b = await shrink(file); } catch { b = file; }
-    setBlob(b); setPreview(URL.createObjectURL(b)); setType(''); run(b, dept, '');
+    setBlob(b); setPreview(URL.createObjectURL(b)); setType(''); run(b, deptRef.current, '');
   };
+  const pick = (e) => { const file = e.target.files?.[0]; e.target.value = ''; handleFile(file); };
+
+  // a photo shared straight from Instagram / WhatsApp / the gallery (installed app → Share → بنها أوتفيت)
+  useEffect(() => {
+    const token = sp.get('shared'); if (!token) return;
+    (async () => {
+      try { const r = await fetch(`/api/visual-search/shared/${encodeURIComponent(token)}`); if (r.ok) await handleFile(await r.blob()); }
+      catch { /* the photo expired — the normal picker is still there */ }
+      setSp({}, { replace: true });
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // Ctrl/Cmd+V or long-press → paste anywhere on the page
+  useEffect(() => {
+    const onPaste = (e) => { const f = [...(e.clipboardData?.files || [])].find((x) => x.type.startsWith('image/')); if (f) { e.preventDefault(); handleFile(f); } };
+    window.addEventListener('paste', onPaste); return () => window.removeEventListener('paste', onPaste);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  const pasteFromClipboard = async () => {
+    try {
+      for (const item of await navigator.clipboard.read()) { const type = item.types.find((x) => x.startsWith('image/')); if (type) { handleFile(await item.getType(type)); return; } }
+      toast({ tone: 'error', title: t('visual.pasteEmpty') });
+    } catch { toast({ tone: 'error', title: t('visual.pasteEmpty') }); }
+  };
+  const onDrop = (e) => { e.preventDefault(); handleFile(e.dataTransfer?.files?.[0]); };
+
   const changeType = (value) => { setType(value); if (blob) run(blob, dept, value); };
-  const changeDept = (d) => { setDept(d); if (blob) run(blob, d, type); };
+  const changeDept = (d) => { setDept(d); deptRef.current = d; if (blob) run(blob, d, type); };
 
   const groupLabel = (g) => (lang === 'ar' ? g.label : (EN_LABELS[g.type] || g.label));
   const groups = (state.data?.groups || []).filter((g) => g.items.length);
@@ -70,6 +98,16 @@ export default function VisualSearch() {
   const noMatch = Boolean(state.data) && groups.length === 0;
   const detectedLabel = (state.data?.detected || []).map(groupLabel).find(Boolean) || '';
   const requestHref = `/request?from=visual&title=${encodeURIComponent(t('visual.requestTitle', { item: detectedLabel || t('visual.itemFallback') }))}`;
+
+  const share = async () => {
+    try {
+      const items = groups.flatMap((g) => g.items.slice(0, 4).map((p) => ({ id: p.id, label: groupLabel(g) }))).slice(0, 12);
+      const { url } = await api('/look-share', { method: 'POST', body: { title: t('visual.shareTitle'), kind: 'visual', items } });
+      const link = `${window.location.origin}${url}`;
+      if (navigator.share) { try { await navigator.share({ title: t('visual.shareTitle'), text: t('visual.shareText'), url: link }); return; } catch (e) { if (e?.name === 'AbortError') return; } }
+      window.open(`https://wa.me/?text=${encodeURIComponent(`${t('visual.shareText')} ${link}`)}`, '_blank', 'noopener');
+    } catch { toast({ tone: 'error', title: t('visual.shareFailed') }); }
+  };
 
   return (
     <div className="min-h-dvh">
@@ -82,7 +120,7 @@ export default function VisualSearch() {
 
           <input ref={input} type="file" accept="image/*" className="sr-only" onChange={pick} aria-label={t('visual.pick')} />
           {!preview ? (
-            <button type="button" onClick={() => input.current?.click()}
+            <button type="button" onClick={() => input.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}
               className="mt-8 flex w-full flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-line-strong bg-elevated px-6 py-12 transition hover:border-fg active:scale-[0.99] sm:py-14">
               <ImagePlus className="h-9 w-9 text-brand" /><span className="text-lg font-bold">{t('visual.pick')}</span><span className="text-sm text-muted">{t('visual.pickHint')}</span>
             </button>
@@ -94,6 +132,19 @@ export default function VisualSearch() {
                 <p className="mt-1 text-xs text-muted">{state.loading ? t('visual.searchingHint') : groups.length ? t('visual.previewHint') : ''}</p>
               </div>
               <Button variant="outline" icon={RefreshCcw} onClick={() => input.current?.click()}>{t('visual.again')}</Button>
+            </div>
+          )}
+          {!preview && (
+            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-muted">
+              {canPasteBtn && <button type="button" onClick={pasteFromClipboard} className="inline-flex items-center gap-1.5 font-semibold text-fg underline-offset-4 hover:underline"><ClipboardPaste className="h-4 w-4" />{t('visual.paste')}</button>}
+              <span>{t('visual.dropHint')}</span>
+            </div>
+          )}
+          {!preview && !install.installed && install.canPrompt && (
+            <div className="mt-5 flex items-center gap-3 rounded-2xl bg-secondary p-4 text-start">
+              <Smartphone className="h-6 w-6 shrink-0 text-brand" />
+              <p className="flex-1 text-[13.5px] leading-relaxed">{t('visual.installTip')}</p>
+              <Button variant="outline" onClick={install.install}>{t('visual.install')}</Button>
             </div>
           )}
         </div>
@@ -142,7 +193,7 @@ export default function VisualSearch() {
           {state.error && <div role="alert" className="mx-auto max-w-xl rounded-3xl border border-sale/20 bg-sale/5 p-6 text-center"><p className="font-semibold">{t('visual.searchErrorTitle')}</p><p className="mt-2 text-sm text-muted">{errorMessage(t, state.error)}</p><Button className="mt-4" onClick={() => blob && run(blob, dept, type)}>{t('visual.retry')}</Button></div>}
           {current && (
             <>
-              <div className="mb-5 flex flex-wrap items-end justify-between gap-2"><h2 className="font-display text-xl font-bold">{t('visual.results', { n: current.items.length })}{groupLabel(current) ? ` — ${groupLabel(current)}` : ''}</h2><p className="text-sm text-muted">{t('visual.previewHint')}</p></div>
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-2"><h2 className="font-display text-xl font-bold">{t('visual.results', { n: current.items.length })}{groupLabel(current) ? ` — ${groupLabel(current)}` : ''}</h2><div className="flex items-center gap-3"><p className="hidden text-sm text-muted sm:block">{t('visual.previewHint')}</p><Button variant="outline" icon={Share2} onClick={share}>{t('visual.share')}</Button></div></div>
               <ProductGrid>{current.items.map((p, i) => (
                 <div key={`${p.store.slug}-${p.id}`} className="relative">
                   <ProductCard product={p} slug={p.store.slug} index={i} showStore />
