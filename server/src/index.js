@@ -68,6 +68,8 @@ export { app };
 export function startServer(existingServer) {
   if (existingServer) {
     // Reuse the existing bound socket — no new port needed.
+    // the warm-up handler answers {status:'starting'} to every request — drop it, or it would keep answering first
+    existingServer.removeAllListeners('request');
     existingServer.on('request', app);
     console.log(`Banha Outfit API ready on http://localhost:${config.port}`);
   } else {
