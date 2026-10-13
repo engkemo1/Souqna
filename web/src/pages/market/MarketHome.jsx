@@ -1,74 +1,70 @@
-import { useDepartments } from '../../lib/departments.js';
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { motion, useScroll, useTransform } from 'framer-motion';
-import { Search, ArrowRight, Store, Banknote, RefreshCcw, MapPin, Sparkles, BarChart3, Smartphone, Palette } from 'lucide-react';
-import { useApi, useDebounced, useScrolled } from '../../lib/hooks.js';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Search, Store, CreditCard, RotateCcw, MapPin, Sparkles, Camera, MessageSquare, Users, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowLeft, ShoppingBag, Heart, User, Package } from 'lucide-react';
+import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
-import { formatNumber } from '../../lib/format.js';
+import { formatMoney } from '../../lib/format.js';
+import { sp } from '../../lib/store.jsx';
 import Brand from '../../components/market/Brand.jsx';
-import PromoBar from '../../components/market/PromoBar.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
-import MarketSearchBar from '../../components/market/MarketSearchBar.jsx';
 import StylistChat from '../../components/market/StylistChat.jsx';
+import ModaAvatar from '../../components/market/ModaAvatar.jsx';
 import WearThis from '../../components/market/WearThis.jsx';
 import RequestBanner from '../../components/market/RequestBanner.jsx';
 import LookOfDay from '../../components/market/LookOfDay.jsx';
-import HomepageAds from '../../components/market/HomepageAds.jsx';
+import StreetScene from '../../components/market/StreetScene.jsx';
+import { useDepartments } from '../../lib/departments.js';
 import DeptStrip from '../../components/market/DeptStrip.jsx';
 import ProductRail from '../../components/market/ProductRail.jsx';
-import StoreCard, { StoreCardSkeleton } from '../../components/market/StoreCard.jsx';
+import StoreCard from '../../components/market/StoreCard.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Button from '../../components/ui/Button.jsx';
-import { Select } from '../../components/ui/Field.jsx';
-import { EmptyState, ErrorState } from '../../components/ui/States.jsx';
-import LangToggle from '../../components/LangToggle.jsx';
-import Skeleton from '../../components/ui/Skeleton.jsx';
 import { cx } from '../../components/ui/cx.js';
 
-function HeroCollage({ stores }) {
-  const { lang } = useI18n();
-  const { scrollY } = useScroll();
-  const y1 = useTransform(scrollY, [0, 600], [0, -40]);
-  const y2 = useTransform(scrollY, [0, 600], [0, 30]);
-  const covers = stores.filter((s) => s.cover).slice(0, 3);
-  if (covers.length < 3) {
-    return <div className="grid grid-cols-2 gap-3"><Skeleton className="aspect-[4/5] rounded-3xl" /><Skeleton className="mt-10 aspect-[4/5] rounded-3xl" /></div>;
-  }
+const HERO_PROMPTS = [
+  { ar: 'إطلالة فرح', en: 'Wedding outfit', askAr: 'إطلالة كاملة لحضور فرح', askEn: 'Complete outfit for a wedding' },
+  { ar: 'طقم جامعة', en: 'University look', askAr: 'طقم مريح للجامعة', askEn: 'Comfortable university outfit' },
+  { ar: 'طقم شغل', en: 'Work outfit', askAr: 'إطلالة مناسبة للشغل', askEn: 'An outfit for work' },
+  { ar: 'ستايل رياضي', en: 'Sporty style', askAr: 'لبس رياضي كامل', askEn: 'Complete sporty look' },
+];
+
+function HeroStats({ stats = {}, lang }) {
+  const { t } = useI18n();
+  const items = [
+    [Users, t('market.stat.customersValue'), t('market.stat.customers')],
+    [Package, stats.products ? `+${new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US').format(stats.products)}` : '—', t('market.stat.products')],
+    [Store, t('market.stat.storesValue'), t('market.stat.stores')],
+    [Truck, t('market.stat.deliveryValue'), t('market.stat.delivery')],
+  ];
   return (
-    <div className="relative mx-auto aspect-[5/4] w-full max-w-xl">
-      <motion.div style={{ y: y1 }} className="absolute start-0 top-0 w-[58%]">
-        <motion.div initial={{ opacity: 0, y: 30, rotate: -2 }} animate={{ opacity: 1, y: 0, rotate: -2 }} transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}>
-          <Link to={`/s/${covers[0].slug}`} className="block overflow-hidden rounded-[28px] shadow-lift ring-1 ring-black/5"><SmartImage media={covers[0].cover} ratio="4 / 5" position="50% 100%" sizes="(min-width:1024px) 22vw, 50vw" priority /></Link>
-        </motion.div>
-      </motion.div>
-      <motion.div style={{ y: y2 }} className="absolute end-0 top-[12%] w-[50%]">
-        <motion.div initial={{ opacity: 0, y: 40, rotate: 3 }} animate={{ opacity: 1, y: 0, rotate: 3 }} transition={{ duration: 0.9, delay: 0.12, ease: [0.22, 1, 0.36, 1] }}>
-          <Link to={`/s/${covers[1].slug}`} className="block overflow-hidden rounded-[28px] shadow-lift ring-1 ring-black/5"><SmartImage media={covers[1].cover} ratio="4 / 5" position="50% 100%" sizes="(min-width:1024px) 20vw, 45vw" priority /></Link>
-        </motion.div>
-      </motion.div>
-      <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.9, delay: 0.24, ease: [0.22, 1, 0.36, 1] }}
-        className="absolute bottom-[-6%] start-[22%] hidden w-[46%] sm:block">
-        <Link to={`/s/${covers[2].slug}`} className="block overflow-hidden rounded-[28px] shadow-lift ring-4 ring-canvas"><SmartImage media={covers[2].cover} ratio="16 / 11" sizes="(min-width:1024px) 20vw, 45vw" /></Link>
-      </motion.div>
-      <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.6, type: 'spring', stiffness: 200, damping: 18 }}
-        className="absolute -bottom-2 end-[2%] hidden items-center gap-2.5 rounded-2xl bg-elevated px-3.5 py-2.5 shadow-lift ring-1 ring-line sm:flex">
-        <span className="grid h-9 w-9 place-items-center rounded-full bg-secondary text-brand"><MapPin className="h-[18px] w-[18px]" /></span>
-        <span className="text-sm font-semibold leading-tight">{lang === 'ar' ? 'بنها' : 'Banha'}<span className="block text-xs font-normal text-muted">{lang === 'ar' ? 'القليوبية، مصر' : 'Qalyubia, Egypt'}</span></span>
-      </motion.div>
+    <div className="grid grid-cols-2 divide-x divide-x-reverse divide-y divide-gray-100 rounded-2xl border border-line bg-white/95 py-3 shadow-[0_12px_35px_rgba(20,33,61,.06)] sm:grid-cols-4 sm:divide-y-0 sm:py-5">
+      {items.map(([Icon, value, label]) => <div key={label} className="flex items-center justify-center gap-2.5 px-2 py-3 text-center sm:gap-3.5 sm:px-4 sm:py-1">
+        <div className="hidden h-11 w-11 shrink-0 place-items-center rounded-full bg-[#f6f7f9] text-[#14213D] sm:grid"><Icon className="h-5 w-5" strokeWidth={1.75} /></div>
+        <div><p className="font-display text-base font-black text-[#14213D] sm:text-2xl" dir="ltr">{value}</p><p className="text-[10px] font-medium text-muted sm:text-xs">{label}</p></div>
+      </div>)}
     </div>
   );
 }
 
 function Why() {
   const { t } = useI18n();
-  const items = [[Banknote, t('market.why1'), t('market.why1b')], [RefreshCcw, t('market.why2'), t('market.why2b')], [Store, t('market.why3'), t('market.why3b')]];
+  const items = [
+    [CreditCard, t('market.why1'), t('market.why1b')],
+    [RotateCcw, t('market.why2'), t('market.why2b')],
+    [Store, t('market.why3'), t('market.why3b')],
+  ];
   return (
     <div className="grid gap-3 sm:grid-cols-3">
       {items.map(([Icon, a, b]) => (
-        <div key={a} className="flex items-center gap-3.5 rounded-2xl border border-line bg-elevated px-4 py-3.5">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-secondary text-brand"><Icon className="h-5 w-5" strokeWidth={1.75} /></span>
-          <div><p className="text-sm font-semibold">{a}</p><p className="text-[13px] text-muted">{b}</p></div>
+        <div key={a} className="flex items-center gap-3.5 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-xs">
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-orange-50 text-[#ea580c]">
+            <Icon className="h-5 w-5" strokeWidth={1.75} />
+          </span>
+          <div>
+            <p className="text-sm font-bold text-gray-900">{a}</p>
+            <p className="text-[13px] text-gray-500">{b}</p>
+          </div>
         </div>
       ))}
     </div>
@@ -77,68 +73,134 @@ function Why() {
 
 export default function MarketHome() {
   const { t, tr, lang } = useI18n();
-  const [term, setTerm] = useState('');
-  const [category, setCategory] = useState('all');
-  const [sort, setSort] = useState('featured');
-  const q = useDebounced(term.trim(), 250);
-  const path = useMemo(() => `/marketplace?${new URLSearchParams({ q, category, sort })}`, [q, category, sort]);
-  const { data, error, loading, reload } = useApi(path);
+  const location = useLocation();
+  const nav = useNavigate();
+  const [heroSearch, setHeroSearch] = useState('');
+  const [heroMode, setHeroMode] = useState('photo');
   const { data: base } = useApi('/marketplace?q=&category=all&sort=featured');
+  const { label: deptLabel } = useDepartments();
+  const deptLabels = Object.fromEntries(['women', 'men', 'kids', 'shoes', 'bags', 'sports', 'wedding_dress'].map((d) => [d, deptLabel(d)]));
   const showWearThis = base?.features?.stylist !== false;
 
   useEffect(() => { document.title = `${t('app.name')} · ${t('app.tagline')}`; }, [t]);
+  useEffect(() => {
+    const id = location.hash.slice(1);
+    if (!['stores', 'products'].includes(id)) return undefined;
+    const frame = window.requestAnimationFrame(() => document.getElementById(id)?.scrollIntoView({ behavior: 'instant', block: 'start' }));
+    return () => window.cancelAnimationFrame(frame);
+  }, [location.hash]);
 
-  const featured = (base?.stores || []).filter((s) => s.featured);
-  const { label: deptLabel } = useDepartments();
-  const cats = ['all', ...(base?.departments || []).map((d) => d.slug)];
-  const titleLines = t('market.heroTitle').split('\n');
+  const handleHeroSearchSubmit = (e) => {
+    e.preventDefault();
+    const qStr = heroSearch.trim();
+    nav(qStr ? `/search?${new URLSearchParams({ q: qStr })}` : '/search');
+  };
 
   return (
-    <div className="min-h-dvh">
-      <PromoBar />
+    <div className="min-h-dvh bg-[#faf9f7] [--c-primary:244_81_0] [--c-primary-ink:244_81_0] [--c-accent:244_81_0] [--c-ring:244_81_0] [--c-button:244_81_0]">
       <MarketHeader />
 
-      {/* hero */}
-      <section className="container grid items-center gap-12 pb-10 pt-8 sm:pb-12 sm:pt-14 lg:grid-cols-2 lg:gap-8 lg:pb-14 lg:pt-16">
-        <div className="min-w-0 max-w-xl">
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full bg-secondary px-3.5 py-1.5 text-[13px] font-semibold text-brand">
-            <Sparkles className="h-3.5 w-3.5" />{t('market.heroEyebrow')}
-          </motion.p>
-          <h1 className="mt-5 font-display text-[clamp(2.3rem,1.4rem+3.8vw,4.4rem)] font-bold leading-[1.04]">
-            {titleLines.map((l, i) => (
-              <motion.span key={i} className="block" initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.1, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}>
-                {i === titleLines.length - 1 ? <span className="text-display">{l}</span> : l}
-              </motion.span>
-            ))}
-          </h1>
-          <motion.p initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-5 text-[17px] leading-relaxed text-muted">{t('market.heroBody')}</motion.p>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.34 }} className="mt-7"><MarketSearchBar /></motion.div>
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="mt-6 flex flex-wrap gap-3">
-            <Button size="lg" href="#stores" iconEnd={ArrowRight}>{t('market.exploreStores')}</Button>
-            <Button size="lg" variant="outline" to="/join">{t('market.openStore')}</Button>
-          </motion.div>
-          <motion.dl initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.55 }} className="mt-10 grid max-w-md grid-cols-3 gap-4 border-t border-line pt-6">
-            {[[formatNumber(base?.stats.stores || 0, lang), t('market.stat.stores')], [formatNumber(base?.stats.products || 0, lang), t('market.stat.products')], [t('market.stat.deliveryValue'), t('market.stat.delivery')]].map(([v, l]) => (
-              <div key={l}><dt className="sr-only">{l}</dt><dd className="font-display text-2xl font-bold sm:text-3xl">{base ? v : <Skeleton className="h-7 w-12" />}</dd><dd className="mt-1 text-xs leading-snug text-muted sm:text-sm">{l}</dd></div>
-            ))}
-          </motion.dl>
+      {/* Hero */}
+      <section className="relative isolate overflow-hidden pt-6 sm:pt-10">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#FFEBDC] via-[#FFF5EC] to-[#FFF5EC]" />
+        <div aria-hidden="true" className="pointer-events-none absolute -start-24 top-10 h-80 w-80 rounded-full bg-brand/10 blur-3xl" />
+        <div className="container relative grid items-center gap-6 lg:grid-cols-2 lg:gap-12">
+          <div className="relative z-10 w-full min-w-0 max-w-2xl">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-4 py-2 text-[13px] font-bold text-brand">
+              <MapPin className="h-4 w-4" /><span>{lang === 'ar' ? 'اكتشف محلات الملابس في بنها' : 'Discover Banha clothing stores'}</span>
+            </motion.div>
+            <h1 className="mt-3 font-display text-[clamp(2.25rem,1.4rem+3vw,4.15rem)] font-black leading-[1.18] tracking-tight text-[#101d3a] sm:mt-4">
+              <span className="block">{t('market.heroTitle').split('\n')[0]}</span>
+              <span className="relative mt-1 inline-block pb-2 text-brand">{t('market.heroTitle').split('\n')[1]}<svg aria-hidden="true" viewBox="0 0 180 10" preserveAspectRatio="none" className="absolute bottom-0 end-0 h-2 w-[42%] text-brand"><path d="M2 6 C28 1 46 9 72 5 S124 2 178 5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg></span>
+            </h1>
+            <p className="mt-3 max-w-xl text-sm leading-7 text-[#43516a] sm:mt-4 sm:text-base sm:leading-8 lg:text-[18px]">{t('market.heroBody')}</p>
+
+            <div className="mt-5 grid grid-cols-2 gap-2.5 sm:hidden">
+              <Link to="/visual" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-brand px-3 py-3 text-sm font-bold text-white shadow-sm"><Camera className="h-5 w-5" />{t('market.searchByPhoto')}</Link>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: {} }))} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-brand/30 bg-white px-3 py-3 text-sm font-bold text-brand"><ModaAvatar src={base?.features?.stylistAvatar || null} size={28} ring={false} />{t('market.askStylist')}</button>
+            </div>
+            <div className="mt-5 flex gap-2.5">
+              <Link to="/stores" className="flex flex-1 items-center justify-center rounded-2xl bg-brand px-3 py-3.5 text-sm shadow-[0_10px_24px_-8px_rgba(244,81,0,.55)] font-bold text-white transition hover:brightness-95 sm:flex-none sm:px-7">{t('market.exploreStores')}</Link>
+              <Link to="/join" className="flex flex-1 items-center justify-center rounded-2xl border border-line bg-white px-3 py-3.5 text-sm font-bold text-[#14213D] transition hover:border-brand hover:text-brand sm:flex-none sm:px-7">{t('market.openStore')}</Link>
+            </div>
+
+            <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none lg:hidden">
+              {[
+                ['women', t('cat.women'), '/search?department=women'],
+                ['men', t('cat.men'), '/search?department=men'],
+                ['kids', t('cat.kids'), '/search?department=kids'],
+                ['shoes', t('cat.shoes'), '/search?department=shoes'],
+                ['bags', t('cat.bags'), '/search?department=bags'],
+              ].map(([slug, label, href]) => <Link key={slug} to={href} className="shrink-0 rounded-full border border-line bg-white px-3.5 py-2 text-xs font-semibold text-[#14213D]">{label}</Link>)}
+            </div>
+
+            <Link to="/stores" className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white bg-white/85 px-3.5 py-3 shadow-[0_8px_24px_rgba(20,33,61,.07)] backdrop-blur lg:hidden">
+              <span className="flex min-w-0 items-center gap-3">
+                <span className="flex -space-x-2 rtl:space-x-reverse">
+                  {(base?.stores || []).filter((store) => store.cover).slice(0, 3).map((store) => <SmartImage key={store.id} media={store.cover} alt={tr(store.name)} ratio="1 / 1" sizes="36px" className="h-9 w-9 rounded-full border-2 border-white" />)}
+                  <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-brand text-white"><Store className="h-4 w-4" /></span>
+                </span>
+                <span className="min-w-0"><b className="block truncate text-xs text-[#14213D]">{t('market.allStores')}</b><span className="mt-0.5 block text-[10px] text-muted">{lang === 'ar' ? 'محلات الملابس في بنها كلها في مكان واحد' : 'Banha clothing stores, all in one place'}</span></span>
+              </span>
+              <ArrowLeft className="h-4 w-4 shrink-0 text-brand" />
+            </Link>
+          </div>
+
+          <div className="relative hidden rounded-[28px] border border-white bg-white/90 p-5 shadow-[0_24px_60px_-24px_rgba(20,33,61,.28)] backdrop-blur sm:block lg:p-6">
+            <p className="mb-3 text-sm font-extrabold text-[#14213D]">{lang === 'ar' ? 'ابحث عن اللي في بالك' : 'Find what you have in mind'}</p>
+            <div className="grid grid-cols-3 gap-2 sm:grid sm:gap-3" aria-label={t('market.quickTry')}>
+              <button type="button" onClick={() => setHeroMode('photo')} aria-pressed={heroMode === 'photo'} className={cx('flex h-12 items-center justify-center gap-2 rounded-xl border px-2 text-xs font-bold transition sm:text-sm', heroMode === 'photo' ? 'border-brand bg-brand/5 text-brand' : 'border-line bg-white text-[#14213D] hover:border-brand hover:text-brand')}><Camera className="h-4 w-4" />{t('market.searchByPhoto')}</button>
+              <button type="button" onClick={() => setHeroMode('text')} aria-pressed={heroMode === 'text'} className={cx('flex h-12 items-center justify-center gap-2 rounded-xl border px-2 text-xs font-bold transition sm:text-sm', heroMode === 'text' ? 'border-brand bg-brand/5 text-brand' : 'border-line bg-white text-[#14213D] hover:border-brand hover:text-brand')}><Search className="h-4 w-4" />{t('market.searchByText')}</button>
+              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: {} }))} className="flex h-12 items-center justify-center gap-2 rounded-xl border border-line bg-white px-2 text-xs font-bold text-[#14213D] transition hover:border-brand hover:text-brand sm:text-sm"><ModaAvatar src={base?.features?.stylistAvatar || null} size={25} ring={false} />{t('market.askStylist')}</button>
+            </div>
+            {heroMode === 'text' ? (
+              <form onSubmit={handleHeroSearchSubmit} className="relative mt-3">
+                <input type="search" value={heroSearch} onChange={(e) => setHeroSearch(e.target.value)} placeholder={t('search.placeholder')} aria-label={t('search.placeholder')} className="h-14 w-full rounded-2xl border border-line bg-white ps-12 pe-24 text-sm shadow-xs outline-none transition placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/10 sm:text-base" />
+                <Search className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
+                <button type="submit" className="absolute end-2 top-1/2 h-10 -translate-y-1/2 rounded-xl bg-brand px-5 text-sm font-bold text-white transition hover:brightness-95">{t('search.go')}</button>
+              </form>
+            ) : (
+              <Link to="/visual" className="group mt-3 min-h-[148px] flex-col items-center justify-center flex rounded-2xl border border-dashed border-[#f45100]/35 bg-white/80 px-4 py-5 text-center shadow-[0_8px_24px_rgba(20,33,61,.04)] transition hover:border-brand hover:bg-brand/[0.03]">
+                <span className="grid h-11 w-11 place-items-center rounded-xl bg-brand/10 text-brand"><ImageIcon className="h-6 w-6" /></span>
+                <span className="mt-2 text-sm font-bold text-[#14213D]">{t('visual.pick')}</span>
+                <span className="mt-1 text-xs text-muted">{t('visual.pickHint')}</span>
+              </Link>
+            )}
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-semibold text-muted">{t('market.quickTry')}</p>
+              <div className="flex flex-wrap gap-2">
+                {HERO_PROMPTS.map((prompt) => <button key={prompt.ar} type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: lang === 'ar' ? prompt.askAr : prompt.askEn } }))} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-2 text-[11px] font-medium text-[#14213D] transition hover:border-brand hover:text-brand sm:text-xs"><Sparkles className="h-3.5 w-3.5 text-brand" />{lang === 'ar' ? prompt.ar : prompt.en}</button>)}
+              </div>
+            </div>
+          </div>
+
         </div>
-        <HeroCollage stores={featured.length >= 3 ? featured : base?.stores || []} />
+        <p className="container relative mt-5 text-center text-xs font-bold text-brand md:hidden">{lang === 'ar' ? '→ اسحب وتمشّى في الشارع' : 'Swipe to walk down the street →'}</p>
+        <div className="relative mt-3 overflow-x-auto scrollbar-none md:mt-8 md:overflow-visible">
+          <StreetScene lang={lang} labels={deptLabels} className="block h-auto w-[1100px] max-w-none md:w-full" />
+        </div>
       </section>
 
-      <HomepageAds />
-      <div className="container mt-8 sm:mt-10"><Why /></div>
-
-      {/* shop by department (every department, even ones with no store yet) */}
-      <div className="mt-10"><DeptStrip departments={base?.departments || []} /></div>
-      <LookOfDay />
-      <div className="container mt-8 grid gap-4 md:grid-cols-2">
+      {/* Put the two discovery helpers right after the hero so shoppers see them early. */}
+      <div className="container mt-5 grid gap-4 md:mt-7 md:grid-cols-2">
         {showWearThis && <WearThis className="h-full" />}
         <RequestBanner compact className={showWearThis ? 'h-full' : 'h-full md:col-span-2'} />
       </div>
 
+      {/* Stats Row */}
+      <section className="container mt-4 sm:mt-6">
+        <HeroStats stats={base?.stats || {}} lang={lang} />
+      </section>
+
+      {/* Why Strip */}
+      <div className="container mt-6 sm:mt-8"><Why /></div>
+
+      {/* shop by department (every department, even ones with no store yet) */}
+      <div className="mt-10"><DeptStrip departments={base?.departments || []} /></div>
+      <LookOfDay />
+
       {/* product shelves, Amazon-style */}
-      <div className="mt-6 border-y border-line bg-secondary/50">
+      <div id="products" className="mt-6 scroll-mt-32 border-y border-line bg-secondary/50">
         <ProductRail title={t('market.trending')} items={base?.trending} loading={!base} to="/search?sort=best" />
       </div>
       <ProductRail title={t('market.deals')} items={base?.deals} to="/search?sale=1" />
@@ -151,69 +213,40 @@ export default function MarketHome() {
         </div>
       ))}
 
-      {/* featured */}
-      <section className="mt-6 border-y border-line bg-elevated">
-       <div className="container py-12 sm:py-14">
-        <div className="mb-8 flex items-end justify-between"><h2 className="font-display text-display-sm font-bold">{t('market.featuredStores')}</h2></div>
-        <div className="grid gap-5 md:grid-cols-2 lg:gap-6">
-          {!base ? [0, 1].map((i) => <StoreCardSkeleton key={i} large />) : featured.slice(0, 2).map((s, i) => <StoreCard key={s.id} store={s} index={i} large />)}
-        </div>
-      </div>
-      </section>
-
-      {/* all stores with filters */}
-      <section id="stores" className="scroll-mt-20 border-b border-line bg-elevated">
-       <div className="container py-12 sm:py-14">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <h2 className="font-display text-display-sm font-bold">{t('market.allStores')}</h2>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="relative sm:w-72">
-              <Search className="pointer-events-none absolute start-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-muted" />
-              <input type="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder={t('market.searchStores')} aria-label={t('market.searchStores')}
-                className="h-11 w-full rounded-xl border border-line-strong bg-elevated ps-10 pe-3 text-base outline-none transition focus:border-ring focus:shadow-ring" />
+      {/* A small shop preview leads to a dedicated, searchable store directory. */}
+      <section id="stores" className="scroll-mt-32 border-y border-line bg-white">
+        <div className="container py-10 sm:py-14">
+          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <span className="inline-flex rounded-full bg-[#fff0e5] px-3 py-1 text-xs font-bold text-brand">{lang === 'ar' ? 'محلات محلية من بنها' : 'Local Banha shops'}</span>
+              <h2 className="mt-3 font-display text-2xl font-black text-[#14213D] sm:text-3xl">{t('market.allStores')}</h2>
+              <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted sm:text-base">{lang === 'ar' ? 'تصفّح المحلات، ادخل صفحة كل محل، وشوف منتجاته وعروضه في مكان واحد.' : 'Browse local shops, open each store page, and see its products and offers in one place.'}</p>
             </div>
-            <Select size="sm" value={sort} onChange={(e) => setSort(e.target.value)} className="sm:w-48 [&_select]:h-11" aria-label={t('common.sort')}>
-              {['featured', 'rating', 'newest', 'products'].map((s) => <option key={s} value={s}>{t(`market.sort.${s}`)}</option>)}
-            </Select>
+            <Link to="/stores" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-brand px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">{lang === 'ar' ? 'اكتشف كل المحلات' : 'Discover all stores'}<ArrowLeft className="h-4 w-4 rtl:-scale-x-100" /></Link>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {(base?.stores || []).slice(0, 3).map((store, i) => <StoreCard key={store.id} store={store} index={i} />)}
           </div>
         </div>
-        <div className="scroll-x -mx-4 mb-8 gap-2 px-4" role="tablist" aria-label={t('settings.category')}>
-          {cats.map((c) => (
-            <button key={c} type="button" role="tab" aria-selected={category === c} onClick={() => setCategory(c)}
-              className={cx('h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition', category === c ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>
-              {c === 'all' ? t('cat.all') : deptLabel(c)}
-            </button>
-          ))}
-        </div>
-        {error ? <ErrorState error={error} onRetry={reload} /> : loading && !data ? (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{Array.from({ length: 3 }, (_, i) => <StoreCardSkeleton key={i} />)}</div>
-        ) : data?.stores.length ? (
-          <div className={cx('grid gap-5 transition-opacity sm:grid-cols-2 lg:grid-cols-3 lg:gap-6', loading && 'opacity-60')}>
-            {data.stores.map((s, i) => <StoreCard key={s.id} store={s} index={i} />)}
-          </div>
-        ) : (
-          <EmptyState icon={Store} title={t('market.noStores')} body={t('market.noStoresBody')} action={<Button variant="outline" onClick={() => { setTerm(''); setCategory('all'); }}>{t('common.clearAll')}</Button>} />
-        )}
-       </div>
       </section>
 
       {/* owner CTA */}
       <section className="container mt-16">
-        <div className="relative overflow-hidden rounded-[32px] bg-[#111111] px-6 py-12 text-white sm:px-12 sm:py-16 lg:grid lg:grid-cols-2 lg:items-center lg:gap-12">
-          <div className="pointer-events-none absolute -end-24 -top-24 h-80 w-80 rounded-full bg-[#FF5A1F]/20 blur-3xl" />
+        <div className="relative overflow-hidden rounded-[32px] border border-brand/20 bg-gradient-to-br from-[#fff0e5] via-white to-white px-6 py-12 text-[#14213D] shadow-[0_18px_50px_rgba(20,33,61,.06)] sm:px-12 sm:py-16 lg:grid lg:grid-cols-2 lg:items-center lg:gap-12">
+          <div className="pointer-events-none absolute -end-24 -top-24 h-80 w-80 rounded-full bg-brand/10 blur-3xl" />
           <div className="relative">
-            <h2 className="font-display text-display-sm font-bold text-white">{t('market.ownerTitle')}</h2>
-            <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-white/75">{t('market.ownerBody')}</p>
+            <h2 className="font-display text-display-sm font-bold text-[#14213D]">{t('market.ownerTitle')}</h2>
+            <p className="mt-4 max-w-lg text-[17px] leading-relaxed text-[#43516a]">{t('market.ownerBody')}</p>
             <div className="mt-8 flex flex-wrap gap-3">
-              <Button size="lg" variant="white" to="/join">{t('market.openStore')}</Button>
-              <Button size="lg" to="/login?demo=1" className="!border-white/25 !bg-transparent !text-white hover:!bg-white/10" variant="outline">{t('market.ownerDemo')}</Button>
+              <Button size="lg" variant="primary" to="/join">{t('market.openStore')}</Button>
+              <Button size="lg" to="/login?demo=1" className="!border-line !bg-white !text-[#14213D] hover:!border-brand hover:!text-brand" variant="outline">{t('market.ownerDemo')}</Button>
             </div>
           </div>
           <ul className="relative mt-10 grid gap-3 sm:grid-cols-2 lg:mt-0">
             {[[Palette, t('auth.side1')], [Smartphone, t('auth.side2')], [BarChart3, t('auth.side3')], [Banknote, t('store.cod')]].map(([Icon, label]) => (
-              <li key={label} className="flex items-center gap-3 rounded-2xl bg-white/[0.06] p-4 ring-1 ring-white/10">
-                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/10 text-[#FF8A5C]"><Icon className="h-5 w-5" /></span>
-                <span className="text-sm font-medium text-white/90">{label}</span>
+              <li key={label} className="flex items-center gap-3 rounded-2xl border border-line bg-white p-4 shadow-sm">
+                <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#fff0e5] text-brand"><Icon className="h-5 w-5" /></span>
+                <span className="text-sm font-medium text-[#26344e]">{label}</span>
               </li>
             ))}
           </ul>
