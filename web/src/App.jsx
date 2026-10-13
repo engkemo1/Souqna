@@ -11,6 +11,9 @@ import NotFound from './pages/NotFound.jsx';
 
 const MarketHome = lazy(() => import('./pages/market/MarketHome.jsx'));
 const MarketSearch = lazy(() => import('./pages/market/MarketSearch.jsx'));
+const MarketCart = lazy(() => import('./pages/market/MarketCart.jsx'));
+const MarketCheckout = lazy(() => import('./pages/market/MarketCheckout.jsx'));
+const MarketOrderSuccess = lazy(() => import('./pages/market/MarketOrderSuccess.jsx'));
 const VisualSearch = lazy(() => import('./pages/market/VisualSearch.jsx'));
 const Login = lazy(() => import('./pages/auth/Login.jsx'));
 const Register = lazy(() => import('./pages/auth/Register.jsx'));
@@ -80,6 +83,9 @@ const router = createBrowserRouter([
     children: [
       { path: '/', element: <MarketHome /> },
       { path: '/search', element: <MarketSearch /> },
+      { path: '/market-cart', element: <MarketCart /> },
+      { path: '/market-checkout', element: <MarketCheckout /> },
+      { path: '/market-order-success', element: <MarketOrderSuccess /> },
       { path: '/visual', element: <VisualSearch /> },
       { path: '/login', element: <Login /> },
       { path: '/register', element: <Register /> },

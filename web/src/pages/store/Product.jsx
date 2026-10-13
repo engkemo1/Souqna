@@ -5,7 +5,7 @@ import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw
 import { useStore, sp } from '../../lib/store.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
-import { useFavorites } from '../../lib/cart.jsx';
+import { useFavorites, useMarketCart } from '../../lib/cart.jsx';
 import { formatNumber } from '../../lib/format.js';
 import Gallery from '../../components/store/Gallery.jsx';
 import VariantPicker, { resolveVariant } from '../../components/store/VariantPicker.jsx';
@@ -101,7 +101,9 @@ function ProductSkeleton() {
 
 export default function Product() {
   const { pslug } = useParams();
+  const nav = useNavigate();
   const { store } = useStore();
+  const marketCart = useMarketCart();
   const { t, tr, lang } = useI18n();
   const { data, error, loading, reload } = useApi(`/stores/${store.slug}/products/${pslug}`);
   const favs = useFavorites(store.slug);
@@ -161,6 +163,16 @@ export default function Product() {
       setAddState('done');
       setTimeout(() => setAddState('idle'), 1600);
     }, 280);
+  };
+
+  const onAddMarketplace = () => {
+    if (needsSize) { setSizeError(true); return; }
+    if (available <= 0) return;
+    const selectedColor = p.colors?.find((x) => x.hex === color);
+    marketCart.add({ productId: p.id, variantId: variant?.id ?? null, slug: p.slug, name: p.name, price: p.price, compareAt: p.compareAt,
+      image: p.media?.[0] || p.image, color: color || null, colorName: selectedColor ? { ar: selectedColor.name_ar, en: selectedColor.name_en } : null,
+      size: size && size !== 'One size' ? size : null, qty: Math.min(qty, available) }, store);
+    toast({ title: lang === 'ar' ? 'اتضاف لسلة بنها أوتفيت' : 'Added to Banha Outfit basket', tone: 'info', action: { label: lang === 'ar' ? 'افتحي السلة' : 'Open basket', onClick: () => nav('/market-cart') } });
   };
 
   const share = async () => {
@@ -234,6 +246,9 @@ export default function Product() {
             <QtyStepper value={qty} onChange={setQty} max={Math.max(1, Math.min(20, available || 1))} label={t('product.quantity')} />
             <div className="flex-1"><AddButton state={addState} disabled={ctaDisabled} onClick={onAdd} label={ctaLabel} /></div>
           </div>
+          <Button variant="outline" full className="mt-3" disabled={ctaDisabled} icon={ShoppingBag} onClick={onAddMarketplace}>
+            {lang === 'ar' ? 'أضف لسلة بنها أوتفيت' : 'Add to Banha Outfit basket'}
+          </Button>
 
           <ProductAlerts product={p} store={store} />
 

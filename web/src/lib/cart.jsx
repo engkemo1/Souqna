@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState, useEffect } 
 
 const CartContext = createContext(null);
 const KEY = 'souqna.carts.v1';
+const MARKET_KEY = 'souqna.market-cart.v1';
 const FAV = 'souqna.favorites.v1';
 
 const load = (k) => { try { return JSON.parse(localStorage.getItem(k)) || {}; } catch { return {}; } };
@@ -9,15 +10,37 @@ const persist = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } 
 
 export function CartProvider({ children }) {
   const [carts, setCarts] = useState(() => load(KEY));
+  const [marketCart, setMarketCart] = useState(() => load(MARKET_KEY));
   const [favs, setFavs] = useState(() => load(FAV));
   const [drawer, setDrawer] = useState({ open: false, slug: null });
   const [bump, setBump] = useState(0);
 
   useEffect(() => persist(KEY, carts), [carts]);
+  useEffect(() => persist(MARKET_KEY, marketCart), [marketCart]);
   useEffect(() => persist(FAV, favs), [favs]);
 
-  const value = useMemo(() => ({ carts, setCarts, favs, setFavs, drawer, setDrawer, bump, setBump }), [carts, favs, drawer, bump]);
+  const value = useMemo(() => ({ carts, setCarts, marketCart, setMarketCart, favs, setFavs, drawer, setDrawer, bump, setBump }), [carts, marketCart, favs, drawer, bump]);
   return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+}
+
+export function useMarketCart() {
+  const ctx = useContext(CartContext);
+  const items = Object.values(ctx.marketCart || {});
+  const count = items.reduce((sum, line) => sum + line.qty, 0);
+  const subtotal = items.reduce((sum, line) => sum + line.qty * line.price, 0);
+  const add = useCallback((line, store) => {
+    const key = `${store.slug}:${line.productId}:${line.variantId || 0}`;
+    ctx.setMarketCart((cart) => {
+      const existing = cart[key];
+      return { ...cart, [key]: existing
+        ? { ...existing, qty: Math.min(20, existing.qty + (line.qty || 1)) }
+        : { ...line, key, storeSlug: store.slug, storeName: store.name, qty: line.qty || 1, addedAt: Date.now() } };
+    });
+  }, [ctx]);
+  const updateQty = useCallback((key, qty) => ctx.setMarketCart((cart) => ({ ...cart, [key]: { ...cart[key], qty: Math.max(1, Math.min(20, qty)) } })), [ctx]);
+  const remove = useCallback((key) => ctx.setMarketCart((cart) => { const next = { ...cart }; delete next[key]; return next; }), [ctx]);
+  const clear = useCallback(() => ctx.setMarketCart({}), [ctx]);
+  return { items, count, subtotal, add, updateQty, remove, clear };
 }
 
 const lineKey = (productId, variantId) => `${productId}:${variantId || 0}`;

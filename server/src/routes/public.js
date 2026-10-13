@@ -532,6 +532,58 @@ r.post('/stores/:slug/orders', h((req, res) => {
   res.status(201).json({ order: result });
 }));
 
+const marketplaceOrderSchema = orderSchema.omit({ coupon: true, items: true }).extend({
+  stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems })).min(1).max(20),
+});
+
+// A single marketplace checkout is recorded as one independently managed order per store.
+r.post('/marketplace/orders', h((req, res) => {
+  const body = marketplaceOrderSchema.parse(req.body);
+  if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
+  const result = tx(() => {
+    const prepared = body.stores.map(({ slug, items }) => {
+      const store = loadStore(slug);
+      const qt = quote(store, items);
+      if (qt.hasErrors) throw new AppError(409, 'cart_changed', 'Some items are no longer available.', { slug, lines: qt.lines });
+      return { store, qt };
+    });
+    const now = nowIso();
+    return prepared.map(({ store, qt }) => {
+      let customer = q.get('SELECT * FROM customers WHERE store_id=? AND phone=?', [store.id, body.phone]);
+      if (!customer) {
+        const id = insert('customers', { store_id: store.id, name: body.name, phone: body.phone, governorate: body.governorate, city: body.city, address: body.address, created_at: now });
+        customer = { id };
+      }
+      q.run('UPDATE customers SET name=?, governorate=?, city=?, address=?, orders_count=orders_count+1, total_spent=total_spent+?, last_order_at=? WHERE id=?',
+        [body.name, body.governorate, body.city, body.address, qt.total, now, customer.id]);
+      const seq = q.val('SELECT COUNT(*) FROM orders WHERE store_id=?', [store.id]) + 10001;
+      const number = `${store.code}-${seq}`;
+      const trackToken = crypto.randomBytes(12).toString('base64url');
+      const orderId = insert('orders', {
+        store_id: store.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
+        governorate: body.governorate, city: body.city, address: body.address, notes: body.notes,
+        status: 'pending', delivery_by: store.delivery_mode === 'platform' ? 'platform' : 'store', subtotal: qt.subtotal, discount: 0, shipping: qt.shipping, total: qt.total,
+        platform_discount: 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
+      });
+      for (const line of qt.lines) {
+        insert('order_items', { order_id: orderId, product_id: line.productId, variant_id: line.variantId, name_ar: line.name.ar, name_en: line.name.en, media_id: line.mediaId, color: line.color, size: line.size, price: line.price, qty: line.qty });
+        if (line.variantId) q.run('UPDATE variants SET stock=MAX(0, stock-?) WHERE id=?', [line.qty, line.variantId]);
+        q.run('UPDATE products SET stock=MAX(0, stock-?), sold_count=sold_count+? WHERE id=?', [line.qty, line.qty, line.productId]);
+      }
+      insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
+      return { orderId, number, trackToken, total: qt.total, storeSlug: store.slug, store: { ar: store.name_ar, en: store.name_en } };
+    });
+  });
+  for (const order of result) {
+    const store = loadStore(order.storeSlug);
+    // Store notifications are best-effort, after all sub-orders have committed atomically.
+    if (store.auto_whatsapp) sendNewOrderAlert(store, order.orderId).catch((e) => console.error(`[whatsapp] ${order.number} failed: ${e.message}`));
+    notifyStore(store.id, { title: `طلب جديد 🛍️ ${order.number}`, body: `${body.name} · ${order.total} ج.م`, url: `/dashboard/orders/${order.orderId}`, tag: `order-${order.orderId}` });
+    if (store.delivery_mode === 'platform') notifyPlatformDelivery(order.orderId, order.number);
+  }
+  res.status(201).json({ orders: result.map(({ orderId, ...order }) => order) });
+}));
+
 /** The platform coupon promoted on the marketplace home (if any). */
 r.get('/promo', h((_req, res) => {
   const d = new Date().toISOString().slice(0, 10);

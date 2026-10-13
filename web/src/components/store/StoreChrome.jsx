@@ -5,7 +5,7 @@ import { BrandMark } from '../market/Brand.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Heart, ShoppingBag, Home, LayoutGrid, ChevronLeft, ChevronRight, MapPin, Phone, Instagram, Facebook, Star, Truck, RefreshCcw, Banknote, Store } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
-import { useCart, useFavorites } from '../../lib/cart.jsx';
+import { useCart, useFavorites, useMarketCart } from '../../lib/cart.jsx';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useScrollDirection, useScrolled } from '../../lib/hooks.js';
 import { formatMoney } from '../../lib/format.js';
@@ -60,6 +60,7 @@ export function StoreHeader() {
   const { store, categories } = useStore();
   const { t, tr, isRtl } = useI18n();
   const cart = useCart(store.slug);
+  const marketCart = useMarketCart();
   const favs = useFavorites(store.slug);
   const hidden = useScrollDirection();
   const scrolled = useScrolled(40);
@@ -104,6 +105,7 @@ export function StoreHeader() {
           <IconButton to={sp(store.slug, 'favorites')} label={t('store.favorites')} icon={Heart} className="hidden lg:inline-grid" badge={<CountBadge n={favs.count} />} />
           <IconButton label={t('store.cart')} icon={ShoppingBag} onClick={cart.open} data-cart-target className="hidden lg:inline-grid" badge={<CountBadge n={cart.count} bumpKey={cart.bump} />} />
           <IconButton to={sp(store.slug, 'cart')} label={t('store.cart')} icon={ShoppingBag} data-cart-target className="lg:hidden" badge={<CountBadge n={cart.count} bumpKey={cart.bump} />} />
+          <IconButton to="/market-cart" label={isRtl ? 'سلة بنها أوتفيت' : 'Banha Outfit basket'} icon={ShoppingBag} badge={<CountBadge n={marketCart.count} />} />
         </div>
       </div>
     </header>
