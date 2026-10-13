@@ -125,22 +125,27 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
   if (!req.file) throw new AppError(422, 'validation_failed', 'Pick a photo.', { file: 'required' });
   hits.set(ip, [...recent, now]);
   const department = String(req.body?.department || '').replace(/[^a-z0-9_]/g, '');
-  const type = String(req.body?.type || '').replace(/[^a-z0-9_]/g, '');
-  if (!visualTypeOptions().some((item) => item.key === type)) throw new AppError(422, 'visual_type_required', 'Choose what kind of item you want to find.');
-  let top;
-  try { top = await searchByImage(req.file.buffer, { department, type, limit: 24 }); }
+  const type = String(req.body?.type || '').replace(/[^a-z0-9_]/g, ''); // optional: empty = detect the pieces automatically
+  let found;
+  try { found = await searchByImage(req.file.buffer, { department, type, limit: 24 }); }
   catch (e) {
     if (e instanceof VisualProviderError) throw new AppError(e.status, e.code, e.message);
     throw new AppError(422, 'invalid_image', 'This file is not a supported image.');
   }
-  if (!top.length) return res.json({ items: [], total: 0 });
-  const rows = q.all(
-    `SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id WHERE p.id IN (${top.map(() => '?').join(',')})`, top.map((t) => t.id));
-  const byId = new Map(rows.map((x) => [x.id, x]));
-  const ordered = top.map((t) => byId.get(t.id)).filter(Boolean);
-  // Cosine scores rank candidates; they are not calibrated match probabilities.
-  const items = serializeCards(ordered).map((c, i) => ({ ...c, store: { slug: ordered[i].store_slug, name: bi(ordered[i], 'store_name') } }));
-  res.json({ items, total: items.length });
+  // Only genuinely similar products are returned (quality gate in searchByImage); an empty result is a valid, honest answer.
+  const ids = [...new Set(found.groups.flatMap((g) => g.items.map((x) => x.id)))];
+  const byCard = new Map();
+  if (ids.length) {
+    const rows = q.all(
+      `SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id WHERE p.id IN (${ids.map(() => '?').join(',')})`, ids);
+    const byId = new Map(rows.map((x) => [x.id, x]));
+    const ordered = ids.map((id) => byId.get(id)).filter(Boolean);
+    serializeCards(ordered).forEach((c, i) => byCard.set(ordered[i].id, { ...c, store: { slug: ordered[i].store_slug, name: bi(ordered[i], 'store_name') } }));
+  }
+  const groups = found.groups.map((g) => ({ type: g.type, label: g.label, confidence: g.confidence, items: g.items.map((x) => byCard.get(x.id)).filter(Boolean) }));
+  const withItems = groups.filter((g) => g.items.length);
+  const first = withItems[0] || groups[0];
+  res.json({ items: first?.items || [], total: withItems.reduce((n, g) => n + g.items.length, 0), groups, detected: found.detected, noMatch: withItems.length === 0 });
 }));
 
 /* ---------------------------------------------------------- stylist chat ("مودة") */

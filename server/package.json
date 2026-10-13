@@ -7,7 +7,7 @@
     "start": "node --no-warnings --env-file-if-exists=../.env src/index.js",
     "test:stylist": "node --test src/lib/stylist-ranking.test.js",
     "test:moda": "node --test test/moda.test.js",
-    "test:visual": "node --test test/visual-taxonomy.test.js",
+    "test:visual": "node --test test/visual-taxonomy.test.js test/visual-search.test.js test/visual-integration.test.js test/visual-route.test.js test/visual-model-store.test.js",
     "test:buyer-chats": "node --test test/buyer-chats.test.js",
     "test:market-cart": "node --test test/marketplace-cart.test.js",
     "evaluate:stylist": "node src/scripts/evaluate-stylist.js",
@@ -18,7 +18,9 @@
     "backup": "node --no-warnings --env-file-if-exists=../.env src/scripts/backup.js",
     "admin-totp": "node --no-warnings --env-file-if-exists=../.env src/scripts/admin-totp.js",
     "set-password": "node --no-warnings --env-file-if-exists=../.env src/scripts/set-password.js",
-    "reprocess-media": "node --no-warnings --env-file-if-exists=../.env src/scripts/reprocess-media.js"
+    "reprocess-media": "node --no-warnings --env-file-if-exists=../.env src/scripts/reprocess-media.js",
+    "train:visual": "node --no-warnings --env-file-if-exists=../.env src/scripts/train-visual.js",
+    "model:prefetch": "node --no-warnings --env-file-if-exists=../.env src/scripts/download-clip-model.js"
   },
   "dependencies": {
     "@souqna/shared": "1.0.0",
@@ -32,5 +34,8 @@
     "sharp": "^0.33.5",
     "web-push": "^3.6.7",
     "zod": "^3.24.1"
+  },
+  "optionalDependencies": {
+    "@huggingface/transformers": "^3.8.1"
   }
 }

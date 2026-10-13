@@ -287,6 +287,13 @@ CREATE TABLE IF NOT EXISTS product_vectors (
   vec BLOB NOT NULL
 );
 
+-- Visual search: dominant-colour histogram of each product's primary photo (re-ranks / vetoes colour mismatches).
+CREATE TABLE IF NOT EXISTS product_colors (
+  product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE,
+  media_id INTEGER NOT NULL,
+  hist BLOB NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS reviews (
   id INTEGER PRIMARY KEY,
   store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,

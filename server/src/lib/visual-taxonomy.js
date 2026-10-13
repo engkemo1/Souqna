@@ -1,10 +1,11 @@
 import { loadKnowledge } from './moda/knowledge.js';
 import { inferKey } from './moda/products.js';
+import { FRIENDLY_AR } from './visual-core.js';
 
 export function visualTypeOptions(K = loadKnowledge()) {
   return Object.entries(K.taxonomy.families).map(([key, family]) => ({
     key,
-    ar: family.ar,
+    ar: FRIENDLY_AR[key] || family.ar,
     itemKeys: family.items.filter((item) => !item.virtual).map((item) => item.key),
   })).filter((family) => family.itemKeys.length);
 }

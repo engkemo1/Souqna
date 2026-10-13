@@ -1,5 +1,7 @@
 FROM node:22-slim
 WORKDIR /app
+# CLIP model files are NOT baked in and need no volume: they are pulled from Cloudflare R2 into this temporary folder at start-up.
+ENV MODEL_CACHE_DIR=/app/.model-cache
 COPY package*.json ./
 COPY shared ./shared
 COPY server ./server

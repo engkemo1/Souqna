@@ -28,7 +28,10 @@ function VisualPanel() {
   const idx = data.indexed || {};
   const P = data.providers || {};
   const jinaReady = Boolean(P.jina?.configured);
+  const clipReady = P.clip?.available !== false;
+  const clipIndexed = Object.entries(idx).filter(([k]) => k.startsWith('clip:')).reduce((n, [, v]) => n + v, 0);
   const OPTS = [
+    ['clip', 'رؤية حاسوبية مجانية (CLIP) — الأفضل', 'مجاني بالكامل ومن غير مفتاح API. بيفهم نوع القطعة (قميص/بنطلون/جزمة…)، بيكتشف كذا قطعة في صورة اللبس الكاملة، وبيتعلم من منتجات بنها نفسها. بيشتغل على سيرفرنا والصور مش بتخرج برّه. محتاج حوالي 400MB رام، ولو ماقدرش يتحمّل بيرجع للألوان أوتوماتيك.', clipReady],
     ['color', 'مقارنة الألوان والشكل', 'مجاني وبيخلي الصور داخل سيرفر بنها. مناسب للألوان والتشابه العام، لكنه مش بيفهم نوع القطعة بدقة.', true],
     ['jina', 'فهم بصري ذكي (Jina)', 'يقارن الصورة بمعناها البصري، وده الاختيار الأفضل لتقليل نتائج الملابس غير المشابهة. يحتاج مفتاح Jina.', jinaReady],
   ];
@@ -37,6 +40,7 @@ function VisualPanel() {
       <button type="button" disabled={!available} onClick={() => setF({ ...f, model: id, minSimilarity: String(data.minSimilarityByModel?.[id] ?? f.minSimilarity) })} aria-pressed={f.model === id}
         className={`rounded-xl border p-3 text-start transition disabled:cursor-not-allowed disabled:opacity-60 ${f.model === id ? 'border-fg bg-secondary' : 'border-line-strong hover:border-fg'}`}>
         <p className="font-semibold">{title}</p><p className="mt-0.5 text-[12.5px] text-muted">{body}</p>
+        {id === 'clip' && !available && <p className="mt-1.5 text-[12px] font-medium text-sale">النموذج مش قادر يتحمّل دلوقتي ({P.clip?.error}) — البحث شغال بمقارنة الألوان لحد ما يتصلح.</p>}
         {id === 'jina' && !available && <p className="mt-1.5 text-[12px] font-medium text-sale">أضف <span dir="ltr">JINA_API_KEY</span> في Railway لتفعيل الاختيار.</p>}
       </button>
     );
@@ -52,13 +56,13 @@ function VisualPanel() {
         </div>
         <label className="block max-w-xs"><span className="mb-1.5 block text-sm font-medium">أقل درجة تشابه لقبول النتيجة</span>
           <Input type="number" dir="ltr" min={0} max={100} step={1} value={f.minSimilarity} onChange={(e) => setF({ ...f, minSimilarity: e.target.value })} className="text-start" />
-          <span className="mt-1 block text-[12px] text-muted">دي درجة مقارنة فنية وليست نسبة دقة مضمونة. رفعها يقلل النتائج الضعيفة؛ لو مفيش منتج يعدّيها هنقول إن مفيش حاجة قريبة. القيم الافتراضية محافظة، وراجعها بصور بحث حقيقية قبل ما تقللها.</span></label>
+          <span className="mt-1 block text-[12px] text-muted">دي درجة مقارنة فنية وليست نسبة دقة مضمونة. رفعها يقلل النتائج الضعيفة؛ لو مفيش منتج يعدّيها منعرضش حاجة، ونعرض للعميل زر «نجيبهالك من برّه». لمعايرتها على منتجاتك الحقيقية شغّل على السيرفر: npm run train:visual -w server</span></label>
         <label className="block max-w-xs"><span className="mb-1.5 block text-sm font-medium">عمليات بحث مجانية لكل زائر في اليوم</span>
           <Input type="number" dir="ltr" min={0} max={1000} value={f.dailyFree} onChange={(e) => setF({ ...f, dailyFree: e.target.value })} className="text-start" />
           <span className="mt-1 block text-[12px] text-muted">0 = من غير حد. ده الأساس لو حبينا نعمل باقة مدفوعة بعدين.</span></label>
         <div className="flex flex-wrap items-center gap-3"><Button onClick={save} loading={busy} disabled={!dirty || !Number.isFinite(Number(f.minSimilarity)) || Number(f.minSimilarity) < 0 || Number(f.minSimilarity) > 100}>حفظ</Button>{dirty && <span className="text-[13px] text-muted">في تغييرات لسه ما اتحفظتش</span>}</div>
         <dl className="grid gap-2 border-t border-line pt-4 text-sm sm:grid-cols-2">
-          {[['مفهرس بمقارنة الألوان', idx['color-v1'] || 0], ['مفهرس بالتحليل الذكي', idx['jina-embeddings-v5-omni-nano'] || 0], ['منتجات تنتظر الفهرسة', data.pending || 0], ['إجمالي المنتجات النشطة', data.total],
+          {[['مفهرس بالرؤية الحاسوبية (CLIP)', clipIndexed], ['مفهرس بمقارنة الألوان', idx['color-v1'] || 0], ['مفهرس بالتحليل الذكي', idx['jina-embeddings-v5-omni-nano'] || 0], ['منتجات تنتظر الفهرسة', data.pending || 0], ['إجمالي المنتجات النشطة', data.total],
             ['حالة مفتاح Jina', jinaReady ? 'متصل' : 'غير مضاف']].map(([k, v]) => (
             <div key={k} className="flex justify-between gap-3"><dt className="text-muted">{k}</dt><dd className="font-medium" dir="auto">{v}</dd></div>
           ))}

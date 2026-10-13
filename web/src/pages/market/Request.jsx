@@ -13,6 +13,7 @@ import { Field, Input, Textarea, Select } from '../../components/ui/Field.jsx';
 import { ErrorState, errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { SALES_WHATSAPP } from '../../config/contact.js';
+import { visualHandoff } from '../../lib/visualHandoff.js';
 import { cx } from '../../components/ui/cx.js';
 
 const CK = 'bo.request.contact';
@@ -48,7 +49,11 @@ function RequestForm() {
   const toast = useToast();
   const saved = useRef(loadContact()).current;
   const [f, setF] = useState({ title: sp.get('title') || '', details: '', link: '', size: '', color: '', budget: '', name: saved.name || '', phone: saved.phone || '', governorate: saved.governorate || 'Qalyubia', city: saved.city || '', address: saved.address || '' });
-  const [photo, setPhoto] = useState(null);
+  const [photo, setPhoto] = useState(() => {
+    // coming from «صوّرها ولاقيها»: reuse the customer's search photo so they don't have to upload it again
+    const b = sp.get('from') === 'visual' ? visualHandoff.blob : null; visualHandoff.blob = null;
+    return b ? new File([b], 'item.jpg', { type: 'image/jpeg' }) : null;
+  });
   const [preview, setPreview] = useState('');
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState({});

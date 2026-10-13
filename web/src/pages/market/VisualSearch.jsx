@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, ImagePlus, RefreshCcw } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Camera, ImagePlus, PackagePlus, RefreshCcw } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { useDepartments } from '../../lib/departments.js';
+import { visualHandoff } from '../../lib/visualHandoff.js';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import Brand from '../../components/market/Brand.jsx';
 import StylistChat from '../../components/market/StylistChat.jsx';
@@ -20,6 +22,12 @@ async function shrink(file, max = 800) {
   return new Promise((res) => c.toBlob((b) => res(b || file), 'image/jpeg', 0.85));
 }
 
+const EN_LABELS = {
+  tops: 'Tops & shirts', bottoms: 'Pants & jeans', dresses: 'Dresses', suiting: 'Suits & tailoring',
+  outerwear: 'Jackets & coats', modest: 'Abayas, scarves & jalabiyas', shoes: 'Shoes', bags: 'Bags',
+  accessories: 'Accessories', sport: 'Sportswear', underwear_sleep: 'Sleepwear & underwear',
+};
+
 export default function VisualSearch() {
   const { t, lang } = useI18n();
   const { data: visualTypeData } = useApi('/visual-search/types');
@@ -27,10 +35,10 @@ export default function VisualSearch() {
   const [blob, setBlob] = useState(null);
   const [preview, setPreview] = useState('');
   const [dept, setDept] = useState('');
-  const [type, setType] = useState('');
-  const [state, setState] = useState({ loading: false, items: null, error: null });
+  const [type, setType] = useState(''); // '' = detect automatically
+  const [active, setActive] = useState(0);
+  const [state, setState] = useState({ loading: false, data: null, error: null });
   const input = useRef(null);
-  const typeSection = useRef(null);
   const requestId = useRef(0);
 
   useEffect(() => { document.title = `${t('visual.title')} · ${t('app.name')}`; }, [t]);
@@ -38,28 +46,30 @@ export default function VisualSearch() {
 
   const run = async (b, department, garmentType) => {
     const id = ++requestId.current;
-    setState({ loading: true, items: null, error: null });
+    setState({ loading: true, data: null, error: null });
     try {
-      const fd = new FormData(); fd.append('file', b, 'photo.jpg'); if (department) fd.append('department', department); fd.append('type', garmentType);
+      const fd = new FormData(); fd.append('file', b, 'photo.jpg'); if (department) fd.append('department', department); if (garmentType) fd.append('type', garmentType);
       const res = await fetch('/api/visual-search', { method: 'POST', body: fd });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw Object.assign(new Error('x'), { code: data?.error?.code });
-      if (id === requestId.current) setState({ loading: false, items: data.items || [], error: null });
-    } catch (e) { if (id === requestId.current) setState({ loading: false, items: null, error: e }); }
+      if (id === requestId.current) { setActive(0); setState({ loading: false, data, error: null }); }
+    } catch (e) { if (id === requestId.current) setState({ loading: false, data: null, error: e }); }
   };
   const pick = async (e) => {
     const file = e.target.files?.[0]; e.target.value = '';
     if (!file) return;
     let b; try { b = await shrink(file); } catch { b = file; }
-    setBlob(b); setPreview(URL.createObjectURL(b)); if (type) run(b, dept, type);
+    setBlob(b); setPreview(URL.createObjectURL(b)); setType(''); run(b, dept, '');
   };
   const changeType = (value) => { setType(value); if (blob) run(blob, dept, value); };
-  const changeDept = (d) => { setDept(d); if (blob && type) run(blob, d, type); };
-  const typeLabels = lang === 'ar' ? {} : {
-    tops: 'Tops', bottoms: 'Bottoms', dresses: 'Dresses & one-piece', suiting: 'Suits & tailoring',
-    outerwear: 'Jackets & coats', modest: 'Modest wear', shoes: 'Shoes', bags: 'Bags',
-    accessories: 'Accessories', sport: 'Sportswear', underwear_sleep: 'Underwear & sleepwear',
-  };
+  const changeDept = (d) => { setDept(d); if (blob) run(blob, d, type); };
+
+  const groupLabel = (g) => (lang === 'ar' ? g.label : (EN_LABELS[g.type] || g.label));
+  const groups = (state.data?.groups || []).filter((g) => g.items.length);
+  const current = groups[Math.min(active, Math.max(0, groups.length - 1))];
+  const noMatch = Boolean(state.data) && groups.length === 0;
+  const detectedLabel = (state.data?.detected || []).map(groupLabel).find(Boolean) || '';
+  const requestHref = `/request?from=visual&title=${encodeURIComponent(t('visual.requestTitle', { item: detectedLabel || t('visual.itemFallback') }))}`;
 
   return (
     <div className="min-h-dvh">
@@ -70,60 +80,89 @@ export default function VisualSearch() {
           <h1 className="mt-4 font-display text-[clamp(1.8rem,1.2rem+2.4vw,2.8rem)] font-bold leading-tight">{t('visual.title')}</h1>
           <p className="mt-3 text-[16px] leading-relaxed text-muted">{t('visual.sub')}</p>
 
-          <div ref={typeSection} className="mt-6 rounded-3xl border border-line bg-elevated p-4 sm:p-5">
-            <p className="mb-3 text-sm font-semibold">{t('visual.stepType')}</p>
-            <div className="flex flex-wrap justify-center gap-2" role="group" aria-label={t('visual.chooseType')}>
-              {(visualTypeData?.types || []).map((option) => (
-                <button key={option.key} type="button" aria-pressed={type === option.key} onClick={() => changeType(option.key)}
-                  className={cx('rounded-full border px-3.5 py-2 text-sm font-medium transition', type === option.key ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>
-                  {lang === 'ar' ? option.ar : (typeLabels[option.key] || option.key)}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <input ref={input} type="file" accept="image/*" className="sr-only" onChange={pick} aria-label={t('visual.pick')} />
-          <p className="mb-2 mt-4 text-sm font-semibold">{t('visual.stepPhoto')}</p>
           {!preview ? (
-            <button type="button" disabled={!type} onClick={() => input.current?.click()}
-              className="mt-3 flex w-full flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-line-strong bg-elevated px-6 py-10 transition hover:border-fg active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60 sm:py-12">
-              <ImagePlus className="h-9 w-9 text-brand" /><span className="text-lg font-bold">{t('visual.pick')}</span><span className="text-sm text-muted">{type ? t('visual.pickHint') : t('visual.chooseTypeFirst')}</span>
+            <button type="button" onClick={() => input.current?.click()}
+              className="mt-8 flex w-full flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-line-strong bg-elevated px-6 py-12 transition hover:border-fg active:scale-[0.99] sm:py-14">
+              <ImagePlus className="h-9 w-9 text-brand" /><span className="text-lg font-bold">{t('visual.pick')}</span><span className="text-sm text-muted">{t('visual.pickHint')}</span>
             </button>
           ) : (
             <div className="mt-7 flex items-center gap-4 rounded-3xl border border-line bg-elevated p-3 text-start">
               <img src={preview} alt="" className="h-24 w-24 shrink-0 rounded-2xl object-cover" />
-              <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{state.loading ? t('visual.searching') : state.error ? t('visual.searchErrorTitle') : state.items?.length ? t('visual.results', { n: state.items.length }) : state.items ? t('visual.none') : ''}</p><p className="mt-1 text-xs text-muted">{state.loading ? t('visual.searchingHint') : state.items?.length ? t('visual.previewHint') : ''}</p></div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">{state.loading ? t('visual.searching') : state.error ? t('visual.searchErrorTitle') : groups.length ? t('visual.results', { n: state.data.total }) : state.data ? t('visual.noMatchTitle') : ''}</p>
+                <p className="mt-1 text-xs text-muted">{state.loading ? t('visual.searchingHint') : groups.length ? t('visual.previewHint') : ''}</p>
+              </div>
               <Button variant="outline" icon={RefreshCcw} onClick={() => input.current?.click()}>{t('visual.again')}</Button>
             </div>
           )}
         </div>
 
-        {preview && type && (
-          <section className="mx-auto mt-6 max-w-5xl rounded-3xl border border-line bg-elevated p-4 sm:p-5">
-            <p className="mb-3 text-sm font-semibold">{t('visual.departmentFilter')}</p>
-            <div className="flex flex-wrap justify-center gap-2" role="tablist" aria-label={t('visual.departmentFilter')}>
-            {[{ slug: '', name: t('visual.allDepts') }, ...list.map((d) => ({ slug: d.slug, name: label(d.slug) }))].map((d) => (
-              <button key={d.slug} type="button" role="tab" aria-selected={dept === d.slug} onClick={() => changeDept(d.slug)}
-                className={cx('h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition', dept === d.slug ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>{d.name}</button>
-            ))}
+        {preview && !state.loading && (groups.length > 1 || type) && (
+          <section className="mx-auto mt-6 max-w-5xl">
+            <div className="flex flex-wrap justify-center gap-2" role="tablist" aria-label={t('visual.detected')}>
+              {groups.length > 1 && <span className="self-center text-sm font-semibold text-muted">{t('visual.detected')}</span>}
+              {groups.length > 1 && groups.map((g, i) => (
+                <button key={g.type || i} type="button" role="tab" aria-selected={current === g} onClick={() => setActive(i)}
+                  className={cx('rounded-full border px-4 py-2 text-sm font-semibold transition', current === g ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>
+                  {groupLabel(g)} <span className="opacity-70">({g.items.length})</span>
+                </button>
+              ))}
             </div>
           </section>
+        )}
+
+        {preview && !state.loading && (
+          <details className="mx-auto mt-5 max-w-5xl rounded-3xl border border-line bg-elevated p-4 sm:p-5" open={Boolean(type)}>
+            <summary className="cursor-pointer text-sm font-semibold">{t('visual.notThis')}</summary>
+            <div className="mt-3 flex flex-wrap justify-center gap-2" role="group" aria-label={t('visual.chooseType')}>
+              <button type="button" aria-pressed={!type} onClick={() => changeType('')}
+                className={cx('rounded-full border px-3.5 py-2 text-sm font-medium transition', !type ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>{t('visual.auto')}</button>
+              {(visualTypeData?.types || []).map((option) => (
+                <button key={option.key} type="button" aria-pressed={type === option.key} onClick={() => changeType(option.key)}
+                  className={cx('rounded-full border px-3.5 py-2 text-sm font-medium transition', type === option.key ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>
+                  {lang === 'ar' ? option.ar : (EN_LABELS[option.key] || option.key)}
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 border-t border-line pt-4">
+              <p className="mb-2 text-center text-sm font-semibold">{t('visual.departmentFilter')}</p>
+              <div className="flex flex-wrap justify-center gap-2" role="tablist" aria-label={t('visual.departmentFilter')}>
+                {[{ slug: '', name: t('visual.allDepts') }, ...list.map((d) => ({ slug: d.slug, name: label(d.slug) }))].map((d) => (
+                  <button key={d.slug} type="button" role="tab" aria-selected={dept === d.slug} onClick={() => changeDept(d.slug)}
+                    className={cx('h-10 shrink-0 rounded-full border px-4 text-sm font-medium transition', dept === d.slug ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>{d.name}</button>
+                ))}
+              </div>
+            </div>
+          </details>
         )}
 
         <div className="mx-auto mt-8 max-w-6xl">
           {state.loading && <ProductGrid>{Array.from({ length: 8 }, (_, i) => <ProductCardSkeleton key={i} />)}</ProductGrid>}
           {state.error && <div role="alert" className="mx-auto max-w-xl rounded-3xl border border-sale/20 bg-sale/5 p-6 text-center"><p className="font-semibold">{t('visual.searchErrorTitle')}</p><p className="mt-2 text-sm text-muted">{errorMessage(t, state.error)}</p><Button className="mt-4" onClick={() => blob && run(blob, dept, type)}>{t('visual.retry')}</Button></div>}
-          {state.items && (state.items.length ? (
+          {current && (
             <>
-              <div className="mb-5 flex flex-wrap items-end justify-between gap-2"><h2 className="font-display text-xl font-bold">{t('visual.results', { n: state.items.length })}</h2><p className="text-sm text-muted">{t('visual.previewHint')}</p></div>
-              <ProductGrid>{state.items.map((p, i) => (
+              <div className="mb-5 flex flex-wrap items-end justify-between gap-2"><h2 className="font-display text-xl font-bold">{t('visual.results', { n: current.items.length })}{groupLabel(current) ? ` — ${groupLabel(current)}` : ''}</h2><p className="text-sm text-muted">{t('visual.previewHint')}</p></div>
+              <ProductGrid>{current.items.map((p, i) => (
                 <div key={`${p.store.slug}-${p.id}`} className="relative">
                   <ProductCard product={p} slug={p.store.slug} index={i} showStore />
                 </div>
               ))}</ProductGrid>
               <p className="mt-8 text-center text-sm text-muted">{t('visual.note')}</p>
             </>
-          ) : <div className="mx-auto max-w-xl rounded-3xl border border-line bg-elevated p-6 text-center sm:p-8"><span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-secondary text-brand"><Camera className="h-6 w-6" /></span><h2 className="mt-4 font-display text-xl font-bold">{t('visual.none')}</h2><p className="mt-2 text-sm leading-6 text-muted">{t('visual.noneBody')}</p><div className="mt-5 flex flex-wrap justify-center gap-2"><Button variant="outline" disabled={!dept} onClick={() => changeDept('')}>{t('visual.tryAllDepts')}</Button><Button variant="outline" onClick={() => { typeSection.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}>{t('visual.changeType')}</Button><Button onClick={() => input.current?.click()} icon={RefreshCcw}>{t('visual.again')}</Button></div></div>)}
+          )}
+          {noMatch && (
+            <div className="mx-auto max-w-xl rounded-3xl border border-line bg-elevated p-6 text-center sm:p-8">
+              <span className="mx-auto grid h-12 w-12 place-items-center rounded-full bg-secondary text-brand"><PackagePlus className="h-6 w-6" /></span>
+              <h2 className="mt-4 font-display text-xl font-bold">{t('visual.noMatchTitle')}</h2>
+              <p className="mt-2 text-sm leading-6 text-muted">{t('visual.noMatchBody')}</p>
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                <Link to={requestHref} onClick={() => { visualHandoff.blob = blob; }} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-brand px-5 text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.98]"><PackagePlus className="h-4 w-4" />{t('visual.getIt')}</Link>
+                <Button variant="outline" onClick={() => input.current?.click()} icon={RefreshCcw}>{t('visual.again')}</Button>
+                {dept && <Button variant="outline" onClick={() => changeDept('')}>{t('visual.tryAllDepts')}</Button>}
+              </div>
+            </div>
+          )}
         </div>
       </main>
       <footer className="container flex items-center justify-between border-t border-line py-8 text-sm text-muted"><Brand /><p>© {new Date().getFullYear()} {t('market.footer')}</p></footer>
