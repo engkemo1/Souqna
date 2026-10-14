@@ -27,6 +27,7 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   if (!cols.includes('logo_color')) db.exec("ALTER TABLE stores ADD COLUMN logo_color TEXT NOT NULL DEFAULT '#1B1B1B'");
   if (!cols.includes('same_day_date')) db.exec('ALTER TABLE stores ADD COLUMN same_day_date TEXT');
   if (!cols.includes('same_day_until')) db.exec("ALTER TABLE stores ADD COLUMN same_day_until TEXT NOT NULL DEFAULT '18:00'");
+  if (!cols.includes('customization_json')) db.exec("ALTER TABLE stores ADD COLUMN customization_json TEXT NOT NULL DEFAULT '{}'");
   db.exec("UPDATE stores SET departments=',' || category || ',' WHERE departments='' AND category NOT IN ('mixed','')");
   const mcols = db.prepare('PRAGMA table_info(media)').all().map((c) => c.name);
   if (!mcols.includes('remote')) db.exec('ALTER TABLE media ADD COLUMN remote INTEGER NOT NULL DEFAULT 0');
@@ -35,6 +36,8 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   const pcols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!pcols.includes('department')) db.exec('ALTER TABLE products ADD COLUMN department TEXT');
   if (!pcols.includes('style_level')) db.exec('ALTER TABLE products ADD COLUMN style_level INTEGER'); // درجة الرسمية 1-5 اللي صاحب المحل حددها لمودة (فاضي = تلقائي)
+  if (!pcols.includes('badge_text')) db.exec('ALTER TABLE products ADD COLUMN badge_text TEXT'); // شارة مخصصة على كارت المنتج (مثلاً: قطن مصري 100%)
+  if (!pcols.includes('badge_tone')) db.exec('ALTER TABLE products ADD COLUMN badge_tone TEXT');
   if (!pcols.includes('audience')) db.exec('ALTER TABLE products ADD COLUMN audience TEXT'); // الفئة: men|women|boys|girls|kids|unisex (فاضي = مستنتج من الاسم)
   if (!pcols.includes('moda_key')) db.exec('ALTER TABLE products ADD COLUMN moda_key TEXT'); // نوع القطعة الصريح لمحرك مودة (فاضي = تلقائي)
   // Single-department stores: their products belong to that department.

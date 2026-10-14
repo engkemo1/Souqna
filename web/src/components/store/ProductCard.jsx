@@ -9,6 +9,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { useFavorites } from '../../lib/cart.jsx';
 import { useToast } from '../ui/Toast.jsx';
 import { sp } from '../../lib/store.jsx';
+import { useDesign, GRID_CLASS } from '../../lib/design.js';
 import { cx } from '../ui/cx.js';
 import SameDayBadge from './SameDayBadge.jsx';
 
@@ -22,6 +23,10 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
   const [popKey, setPopKey] = useState(0);
   const href = sp(slug, `p/${p.slug}`);
   const out = p.stock === 'out';
+  const { card } = useDesign();
+  const imgR = card === 'flat' ? 'rounded-none' : card === 'bordered' ? 'rounded-md' : 'rounded-2xl';
+  const wrap = card === 'soft' ? 'rounded-3xl bg-surface p-2.5' : card === 'bordered' ? 'rounded-lg p-2 ring-1 ring-line' : '';
+  const tone = { brand: 'bg-primary text-on-primary', sale: 'bg-sale text-white', dark: 'bg-neutral-900 text-white', gold: 'bg-amber-400 text-neutral-900', green: 'bg-emerald-600 text-white' }[p.badge?.tone] || 'bg-primary text-on-primary';
 
   const toggleFav = (e) => {
     e.preventDefault();
@@ -37,9 +42,9 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: '0px 0px -40px 0px' }}
       transition={{ duration: 0.5, delay: Math.min(index % 4, 3) * 0.06, ease: [0.22, 1, 0.36, 1] }}
-      className="group relative flex min-w-0 flex-col"
+      className={cx('group relative flex min-w-0 flex-col', wrap)}
     >
-      <Link to={href} className="relative block overflow-hidden rounded-2xl bg-surface focus-visible:shadow-ring" aria-label={tr(p.name)}>
+      <Link to={href} className={cx('relative block overflow-hidden bg-surface focus-visible:shadow-ring', imgR)} aria-label={tr(p.name)}>
         <SmartImage
           media={p.image}
           alt={tr(p.name)}
@@ -61,6 +66,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
 
         {/* badges */}
         <div className="pointer-events-none absolute start-2.5 top-2.5 flex flex-col items-start gap-1.5 sm:start-3 sm:top-3">
+          {p.badge && <span className={cx('rounded-full px-2 py-0.5 text-xs font-bold', tone)}>{p.badge.text}</span>}
           {p.discount > 0 && <span className="rounded-full bg-sale px-2 py-0.5 text-xs font-bold text-white tabular sm:text-xs">-{p.discount}%</span>}
           {p.sameDay && !out && <SameDayBadge />}
           {p.isNew && !out && <span className="rounded-full bg-neutral-900/85 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur sm:text-xs">{t('product.new')}</span>}
@@ -130,5 +136,6 @@ export function ProductCardSkeleton() {
 }
 
 export function ProductGrid({ children, className }) {
-  return <div className={cx('grid grid-cols-2 gap-x-3 gap-y-7 sm:gap-x-5 sm:gap-y-10 md:grid-cols-3 xl:grid-cols-4', className)}>{children}</div>;
+  const { grid } = useDesign();
+  return <div className={cx('grid', GRID_CLASS[grid] || GRID_CLASS.cozy, className)}>{children}</div>;
 }

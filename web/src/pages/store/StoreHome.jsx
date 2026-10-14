@@ -16,6 +16,12 @@ import SmartImage from '../../components/ui/SmartImage.jsx';
 import { ErrorState } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
+import StoreStoryCard from '../../components/store/StoreStoryCard.jsx';
+import FreeShippingBar from '../../components/store/FreeShippingBar.jsx';
+import FlashBanner from '../../components/store/FlashBanner.jsx';
+import TickerStrip from '../../components/store/TickerStrip.jsx';
+import { HeroSplit, HeroCompact } from '../../components/store/HeroVariants.jsx';
+import { useDesign } from '../../lib/design.js';
 
 export function SectionHeader({ title, eyebrow, to, className = '' }) {
   const { t } = useI18n();
@@ -58,7 +64,37 @@ function ProductRail({ items, slug, onQuickAdd, loading }) {
 function CategoryTiles() {
   const { store, categories } = useStore();
   const { tr, t } = useI18n();
+  const { cat } = useDesign();
   if (!categories.length) return null;
+  if (cat === 'circles') {
+    return (
+      <section className="container mt-14 sm:mt-20">
+        <SectionHeader title={t('store.shopByCategory')} />
+        <div className="scroll-x -mx-4 gap-5 px-4 sm:mx-0 sm:flex sm:flex-wrap sm:justify-center sm:gap-8 sm:px-0">
+          {categories.map((c) => (
+            <Link key={c.id} to={sp(store.slug, `shop?category=${c.slug}`)} className="group flex w-24 shrink-0 flex-col items-center gap-2 text-center sm:w-32">
+              <span className="block w-full overflow-hidden rounded-full ring-2 ring-accent/60 ring-offset-2 ring-offset-canvas"><SmartImage media={c.image} ratio="1 / 1" sizes="128px" imgClassName="group-hover:scale-[1.06] duration-700" /></span>
+              <span className="line-clamp-2 text-[13px] font-semibold sm:text-sm">{tr(c.name)}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+    );
+  }
+  if (cat === 'list') {
+    return (
+      <section className="container mt-14 sm:mt-20">
+        <SectionHeader title={t('store.shopByCategory')} />
+        <div className="flex flex-wrap gap-2.5">
+          {categories.map((c) => (
+            <Link key={c.id} to={sp(store.slug, `shop?category=${c.slug}`)} className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-[15px] font-semibold ring-1 ring-line-strong transition hover:bg-btn hover:text-white">
+              {tr(c.name)}<span className="text-xs font-normal opacity-60">{c.count}</span>
+            </Link>
+          ))}
+        </div>
+      </section>
+    );
+  }
   return (
     <section className="container mt-14 sm:mt-20">
       <SectionHeader title={t('store.shopByCategory')} />
@@ -125,46 +161,105 @@ export default function StoreHome() {
   const { data, error, loading, reload } = useApi(`/stores/${store.slug}/home`);
   const [quick, setQuick] = useState(null);
 
-  return (
-    <PageTransition>
-      {(() => {
-        // The owner chooses: cover, slider, or auto (slider when there are active banners, cover otherwise).
-        const useSlider = store.heroMode === 'cover' ? false : banners.length > 0;
-        return useSlider ? (<><HeroSlider banners={banners} slug={store.slug} /><StoreIdentityBar /></>) : <StoreHero />;
-      })()}
+  const customization = store?.customization || {};
+  const hidden = new Set(customization.hiddenSections || []);
+  const design = useDesign();
+  const explicitOrder = Array.isArray(customization.sectionsOrder) && customization.sectionsOrder.length > 0 ? customization.sectionsOrder : null;
+  const STANDARD = ['hero', 'free_shipping', 'trust', 'new_arrivals', 'categories', 'best_sellers', 'offers', 'on_sale', 'story', 'visit'];
+  // الترتيب: اللي صاحب المحل حدده، وإلا ترتيب القالب. ticker/flash اختيارية: بتظهر بس لو موجودة في الترتيب.
+  const allSections = [...new Set([...(explicitOrder || design.sections), ...STANDARD])];
 
-      <div className="container mt-8 sm:mt-12"><TrustStrip /></div>
+  const renderSection = (key) => {
+    if (hidden.has(key)) return null;
 
-      {error ? <div className="container"><ErrorState error={error} onRetry={reload} /></div> : (
-        <>
-          <section className="container mt-14 sm:mt-20">
+    switch (key) {
+      case 'hero': {
+        const hasBanners = banners.length > 0;
+        const sliderHero = (<><HeroSlider banners={banners} slug={store.slug} /><StoreIdentityBar /></>);
+        let node;
+        if (design.hero === 'cover') node = <StoreHero />;
+        else if (design.hero === 'slider') node = hasBanners ? sliderHero : <StoreHero />;
+        else if (design.hero === 'split') node = <HeroSplit banners={banners} />;
+        else if (design.hero === 'compact') node = hasBanners ? (<><HeroCompact /><HeroSlider banners={banners} slug={store.slug} /></>) : <HeroCompact />;
+        else node = (store.heroMode === 'cover' ? false : hasBanners) ? sliderHero : <StoreHero />;
+        return <div key="hero">{node}</div>;
+      }
+
+      case 'ticker':
+        return <div key="ticker"><TickerStrip /></div>;
+
+      case 'flash':
+        return <FlashBanner key="flash" />;
+
+      case 'free_shipping':
+        return (
+          <div key="free_shipping" className="container mt-4 sm:mt-6">
+            <FreeShippingBar />
+          </div>
+        );
+
+      case 'trust':
+        return (
+          <div key="trust" className="container mt-8 sm:mt-12">
+            <TrustStrip />
+          </div>
+        );
+
+      case 'new_arrivals':
+        return (
+          <section key="new_arrivals" className="container mt-14 sm:mt-20">
             <SectionHeader eyebrow={tr(store.name)} title={t('store.newArrivals')} to={sp(store.slug, 'shop?sort=newest')} />
             <ProductRail items={data?.newArrivals || []} slug={store.slug} onQuickAdd={setQuick} loading={loading && !data} />
           </section>
+        );
 
-          <CategoryTiles />
+      case 'categories':
+        return <CategoryTiles key="categories" />;
 
-          {(loading || data?.bestSellers?.length > 0) && (
-            <section className="container mt-14 sm:mt-20">
-              <SectionHeader title={t('store.bestSellers')} to={sp(store.slug, 'shop?sort=best')} />
-              <ProductRail items={data?.bestSellers || []} slug={store.slug} onQuickAdd={setQuick} loading={loading && !data} />
-            </section>
-          )}
+      case 'best_sellers':
+        if (!loading && (!data?.bestSellers || data.bestSellers.length === 0)) return null;
+        return (
+          <section key="best_sellers" className="container mt-14 sm:mt-20">
+            <SectionHeader title={t('store.bestSellers')} to={sp(store.slug, 'shop?sort=best')} />
+            <ProductRail items={data?.bestSellers || []} slug={store.slug} onQuickAdd={setQuick} loading={loading && !data} />
+          </section>
+        );
 
-          <OfferBand />
+      case 'offers':
+        return <OfferBand key="offers" />;
 
-          {data?.onSale?.length > 0 && (
-            <section className="container mt-14 sm:mt-20">
-              <SectionHeader title={t('store.onSale')} to={sp(store.slug, 'shop?sale=1')} />
-              <ProductGrid>
-                {data.onSale.slice(0, 8).map((p, i) => <ProductCard key={p.id} product={p} slug={store.slug} onQuickAdd={setQuick} index={i} />)}
-              </ProductGrid>
-            </section>
-          )}
-        </>
+      case 'on_sale':
+        if (!data?.onSale || data.onSale.length === 0) return null;
+        return (
+          <section key="on_sale" className="container mt-14 sm:mt-20">
+            <SectionHeader title={t('store.onSale')} to={sp(store.slug, 'shop?sale=1')} />
+            <ProductGrid>
+              {data.onSale.slice(0, 8).map((p, i) => (
+                <ProductCard key={p.id} product={p} slug={store.slug} onQuickAdd={setQuick} index={i} />
+              ))}
+            </ProductGrid>
+          </section>
+        );
+
+      case 'story':
+        return <StoreStoryCard key="story" />;
+
+      case 'visit':
+        return <VisitCard key="visit" />;
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <PageTransition>
+      {error ? (
+        <div className="container mt-12"><ErrorState error={error} onRetry={reload} /></div>
+      ) : (
+        allSections.map(renderSection)
       )}
       <QuickAddSheet slug={store.slug} product={quick} onClose={() => setQuick(null)} />
-      <VisitCard />
     </PageTransition>
   );
 }

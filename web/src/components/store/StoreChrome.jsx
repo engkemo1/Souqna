@@ -3,7 +3,8 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { mapsLinks } from './VisitCard.jsx';
 import { BrandMark } from '../market/Brand.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Heart, ShoppingBag, Home, LayoutGrid, ChevronLeft, ChevronRight, MapPin, Phone, Instagram, Facebook, Star, Truck, RefreshCcw, Banknote, Store } from 'lucide-react';
+import { SEASONS } from '@souqna/shared/layout';
+import { Search, Heart, ShoppingBag, Home, LayoutGrid, ChevronLeft, ChevronRight, MapPin, Phone, Instagram, Facebook, Star, Truck, RefreshCcw, Banknote, Store, ShieldCheck, Sparkles, Clock, Award } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useCart, useFavorites, useMarketCart } from '../../lib/cart.jsx';
 import { useStore, sp } from '../../lib/store.jsx';
@@ -27,32 +28,76 @@ export function CountBadge({ n, bumpKey }) {
   );
 }
 
+const MONO_PALETTES = [
+  { bg: 'bg-gradient-to-br from-amber-500/15 via-rose-500/10 to-orange-500/20 text-[#c2410c] border-amber-200/60' },
+  { bg: 'bg-gradient-to-br from-blue-500/15 via-indigo-500/10 to-sky-500/20 text-[#1d4ed8] border-blue-200/60' },
+  { bg: 'bg-gradient-to-br from-purple-500/15 via-pink-500/10 to-rose-500/20 text-[#7e22ce] border-purple-200/60' },
+  { bg: 'bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-cyan-500/20 text-[#047857] border-emerald-200/60' },
+  { bg: 'bg-gradient-to-br from-stone-800 via-slate-900 to-black text-amber-100 border-stone-700' },
+];
+
 export function StoreLogo({ store, size = 36, className }) {
-  const initials = store.logoInitials || (store.name?.ar || store.name?.en || store.code || '').trim().replace(/\s+/g, '').slice(0, 2);
+  const nameStr = (store.name?.ar || store.name?.en || store.code || '').trim();
+  const initials = store.logoInitials || nameStr.replace(/\s+/g, '').slice(0, 2);
+  const hash = Math.abs(nameStr.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0));
+  const palette = MONO_PALETTES[hash % MONO_PALETTES.length];
+
   return store.logo ? (
     <SmartImage media={store.logo} ratio="1 / 1" sizes={`${size * 2}px`} className={cx('shrink-0 rounded-full ring-1 ring-black/5', className)} />
   ) : (
-    <span className={cx('grid shrink-0 place-items-center rounded-full font-display text-sm font-bold text-white', className)} style={{ width: size, height: size, backgroundColor: store.logoColor || undefined }}>{initials}</span>
+    <span
+      className={cx(
+        'grid shrink-0 place-items-center rounded-full font-display font-black tracking-wider shadow-xs border transition-transform duration-300',
+        palette.bg,
+        className
+      )}
+      style={{ width: size, height: size, fontSize: Math.max(12, Math.round(size * 0.32)) }}
+    >
+      {initials}
+    </span>
   );
 }
 
 export function AnnouncementBar() {
   const { store, offers } = useStore();
   const { t, tr, lang } = useI18n();
-  const items = [
+  const custom = store?.customization?.announcement;
+
+  if (custom && custom.enabled === false) {
+    return null;
+  }
+
+  const customText = (lang === 'ar' ? custom?.text_ar : custom?.text_en) || custom?.text_ar || custom?.text_en;
+  const season = SEASONS[store?.customization?.design?.season];
+  const seasonText = season ? (lang === 'ar' ? season.announce_ar : season.announce_en) : '';
+  const items = custom?.enabled && customText ? [
+    customText,
+    t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) }),
+    ...offers.slice(0, 1).map((o) => `${t('store.useCode')} ${o.code} — ${tr(o.title)}`),
+  ] : [
+    ...(seasonText ? [seasonText] : []),
     t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) }),
     ...offers.slice(0, 2).map((o) => `${t('store.useCode')} ${o.code} — ${tr(o.title)}`),
     t('store.cod'),
   ];
   const [i, setI] = useState(0);
   useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % items.length), 4200); return () => clearInterval(id); }, [items.length]);
+
+  const content = (
+    <AnimatePresence mode="wait" initial={false}>
+      <motion.p key={i} initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -14, opacity: 0 }} transition={{ duration: 0.35 }} className="absolute inset-0 grid place-items-center truncate px-4">
+        {items[i]}
+      </motion.p>
+    </AnimatePresence>
+  );
+
   return (
     <div className="relative h-9 overflow-hidden bg-footer text-center text-[13px] font-medium text-on-footer" aria-live="off">
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.p key={i} initial={{ y: 14, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -14, opacity: 0 }} transition={{ duration: 0.35 }} className="absolute inset-0 grid place-items-center truncate px-4">
-          {items[i]}
-        </motion.p>
-      </AnimatePresence>
+      {custom?.link ? (
+        <a href={custom.link} className="block h-full w-full hover:underline">
+          {content}
+        </a>
+      ) : content}
     </div>
   );
 }
@@ -153,11 +198,41 @@ export function BottomNav() {
 export function TrustStrip({ className }) {
   const { t, lang } = useI18n();
   const { store } = useStore();
-  const items = [
+  const customBadges = store?.customization?.trustBadges;
+
+  if (customBadges && customBadges.enabled === false) {
+    return null;
+  }
+
+  const ICON_MAP = {
+    truck: Truck,
+    banknote: Banknote,
+    cash: Banknote,
+    refresh: RefreshCcw,
+    repeat: RefreshCcw,
+    shield: ShieldCheck,
+    sparkles: Sparkles,
+    clock: Clock,
+    award: Award,
+  };
+
+  const defaultItems = [
     { icon: Truck, title: t('store.delivery'), body: t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) }) },
     { icon: Banknote, title: t('store.cod'), body: t('market.why1b') },
     { icon: RefreshCcw, title: t('store.exchange'), body: t('market.why2b') },
   ];
+
+  const items = (customBadges?.items && customBadges.items.length > 0)
+    ? customBadges.items.map((it) => {
+        const Icon = ICON_MAP[it.icon] || Truck;
+        const title = (lang === 'ar' ? it.title_ar : it.title_en) || it.title_ar || it.title_en;
+        const body = (lang === 'ar' ? it.desc_ar : it.desc_en) || it.desc_ar || it.desc_en;
+        return { icon: Icon, title, body };
+      }).filter((it) => it.title)
+    : defaultItems;
+
+  if (!items.length) return null;
+
   return (
     <div className={cx('grid grid-cols-1 divide-y divide-line rounded-[24px] ring-1 ring-line sm:grid-cols-3 sm:divide-x sm:divide-y-0 rtl:sm:divide-x-reverse', className)}>
       {items.map((it) => (

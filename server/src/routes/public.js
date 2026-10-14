@@ -15,7 +15,7 @@ import { buyerFromReq } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
 import { logVisualSearch } from '../lib/visual-demand.js';
-import { runStylist, modaBrain, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
+import { runStylist, modaBrain, modaCurator, modaUnderstander, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
 import { runModa } from '../lib/moda/engine.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
 import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
@@ -271,6 +271,8 @@ r.get('/visual-search/shared/:token', h((req, res) => {
 /* ---------------------------------------------------------- stylist chat ("مودة") */
 const chatHits = new Map();
 const brainHits = new Map();
+const curatorHits = new Map();
+const understandHits = new Map();
 function modaCatalogRows() {
   return q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en,
       COALESCE(c.name_ar || ' ' || c.name_en, '') AS cat_text
@@ -330,7 +332,17 @@ r.post('/stylist', h(async (req, res) => {
       const cap = Number(process.env.MODA_BRAIN_DAILY ?? 40); const inner = brain;
       brain = async (a) => { const k = `${ip}`; const hits = (brainHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; brainHits.set(k, [...hits, Date.now()]); return inner(a); };
     }
-    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain });
+    let curator = modaCurator();
+    if (curator) {
+      const cap = Number(process.env.MODA_CURATOR_DAILY ?? 30); const inner = curator;
+      curator = async (a) => { const k = `${ip}`; const hits = (curatorHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; curatorHits.set(k, [...hits, Date.now()]); return inner(a); };
+    }
+    let understand = modaUnderstander();
+    if (understand) {
+      const cap = Number(process.env.MODA_UNDERSTAND_DAILY ?? 150); const inner = understand;
+      understand = async (a) => { const k = `${ip}`; const hits = (understandHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; understandHits.set(k, [...hits, Date.now()]); return inner(a); };
+    }
+    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand });
     return res.json(modaClientResponse(result));
   }
   catch (e) { if (e.code === 'stylist_no_vision') throw new AppError(422, 'stylist_no_vision', 'Photos need the Anthropic provider.'); if (e.code === 'stylist_bad_image') throw new AppError(422, 'stylist_bad_image', 'Unsupported image.'); if (e.code === 'stylist_unavailable') throw new AppError(503, 'stylist_unavailable', 'The stylist is unavailable right now.'); throw e; }

@@ -79,3 +79,51 @@ test('greetings, "are you an AI / Gemini?" and a Latin brand word inside Arabic 
   assert.equal(parseMessage('عايز hoodie اسود').lang, 'ar');
   assert.equal((await runModa('انتي GEMINI ؟ طيب', opts)).say.match(/[a-z]{4,}/i), null, 'reply stays Arabic');
 });
+
+test('مدى الميزانية: "من X ل Y" و"بين X و Y" الحد الأقصى هو الميزانية', () => {
+  for (const [msg, lo, hi] of [['عايز تيشرت اسود من 200 ل 1000', 200, 1000], ['عايز تيشرت بين 500 و 1500 جنيه', 500, 1500], ['تيشرت من 300 لحد 800', 300, 800]]) {
+    const b = parseMessage(msg).budget;
+    assert.equal(b.value, hi, msg); assert.equal(b.min, lo, msg);
+  }
+  assert.equal(parseMessage('تيشرت لحد 400 جنيه').budget.value, 400);
+  assert.equal(parseMessage('تيشرت لحد 400 جنيه').budget.min, undefined);
+});
+
+test('خطوبة: الكوتشي مش بديل لحذاء رسمي، واللابل بيتسمّى باسم القطعة الحقيقي', async () => {
+  const { runModa } = await import('../src/lib/moda/engine.js');
+  const { enrichAll } = await import('../src/lib/moda/products.js');
+  const sneaker = { id: 9001, name_en: 'Desert For Men D2057/1 - Basic Lace-Up Leather Sneakers', moda_key: 'formal_shoes', price: 1000, stock: 5, gender: 'men', store_slug: 's', slug: 'x', cat_text: 'shoes' };
+  const wm = { temp_c: 23, feels_like_c: 23, rain_pct: 2 };
+  const res = await runModa([{ role: 'user', content: 'أنا رايح خطوبة بالليل ميزانيتي لحد 1000 جنيه' }], { products: enrichAll([sneaker]), weatherMock: wm });
+  const ids = (res.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.id));
+  assert.ok(!ids.includes(9001));
+});
+
+test('كوتشي أبيض/أسود ساده مقبول مع طقم كلاسيك في الخطوبة، والملون أو الرياضي لأ', async () => {
+  const { runModa } = await import('../src/lib/moda/engine.js');
+  const { enrichAll, isMinimalSneaker } = await import('../src/lib/moda/products.js');
+  assert.equal(isMinimalSneaker('sneakers', 'Leather Sneakers', ['white']), true);
+  assert.equal(isMinimalSneaker('sneakers', 'Running Sneakers', ['white']), false);
+  assert.equal(isMinimalSneaker('sneakers', 'Printed Sneakers', ['black']), false);
+  assert.equal(isMinimalSneaker('sneakers', 'Leather Sneakers', ['red']), false);
+  const SHOES = new Set(['sneakers', 'formal_shoes', 'loafers', 'sport_shoes']);
+  const fx = enrichAll(JSON.parse((await import('node:fs')).readFileSync(new URL('../test-fixtures/occasion-catalog.json', import.meta.url), 'utf8')).products).filter((p) => !SHOES.has(p.key));
+  const mk = (id, name, color) => ({ id, name_en: name, moda_key: 'sneakers', price: 600, stock: 5, gender: 'men', store_slug: 's', slug: `s${id}`, cat_text: 'shoes', colors_json: JSON.stringify([{ name_en: color }]) });
+  const wm = { temp_c: 23, feels_like_c: 23, rain_pct: 2 };
+  const ask = [{ role: 'user', content: 'أنا رايح خطوبة بالليل، عايز طقم لحد 5000 جنيه' }];
+  const shoeIds = async (extra) => { const r = await runModa(ask, { products: [...fx, ...enrichAll(extra)], weatherMock: wm }); return (r.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.id)); };
+  assert.equal(enrichAll([mk(9100, 'Clean Leather Sneakers', 'white')])[0].minimalSneaker, true);
+  assert.ok((await shoeIds([mk(9100, 'Clean Leather Sneakers', 'white')])).includes(9100));
+  assert.ok(!(await shoeIds([mk(9101, 'Running Sneakers Neon', 'red')])).includes(9101));
+});
+
+test('لما كوتشي ساده بيتختار لمناسبة رسمية، الرد بيوضّح ليه', async () => {
+  const { runModa } = await import('../src/lib/moda/engine.js');
+  const { enrichAll } = await import('../src/lib/moda/products.js');
+  const SHOES = new Set(['sneakers', 'formal_shoes', 'loafers', 'sport_shoes']);
+  const fx = enrichAll(JSON.parse((await import('node:fs')).readFileSync(new URL('../test-fixtures/occasion-catalog.json', import.meta.url), 'utf8')).products).filter((p) => !SHOES.has(p.key));
+  const sn = enrichAll([{ id: 9200, name_en: 'Clean Leather Sneakers', moda_key: 'sneakers', price: 600, stock: 5, gender: 'men', store_slug: 's', slug: 's9200', cat_text: 'shoes', colors_json: JSON.stringify([{ name_en: 'white' }]) }]);
+  const r = await runModa([{ role: 'user', content: 'أنا رايح خطوبة بالليل، عايز طقم لحد 5000 جنيه' }], { products: [...fx, ...sn], weatherMock: { temp_c: 23, feels_like_c: 23, rain_pct: 2 } });
+  assert.match(r.say, /مفيش جزمة رسمية متاحة/);
+  assert.match(r.say, /تحب أدورلك جزمة رسمية/);
+});

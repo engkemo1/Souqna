@@ -54,6 +54,7 @@ const Settings = lazy(() => import('./pages/dashboard/Settings.jsx'));
 const Services = lazy(() => import('./pages/dashboard/Services.jsx'));
 const Reviews = lazy(() => import('./pages/dashboard/Reviews.jsx'));
 const ThemeEditor = lazy(() => import('./pages/dashboard/ThemeEditor.jsx'));
+const StoreDesigner = lazy(() => import('./pages/dashboard/StoreDesigner.jsx'));
 const AdminApp = lazy(() => import('./pages/admin/AdminApp.jsx'));
 const AdminOverview = lazy(() => import('./pages/admin/Overview.jsx'));
 const AdminStores = lazy(() => import('./pages/admin/Stores.jsx'));
@@ -140,6 +141,7 @@ const router = createBrowserRouter([
           { path: 'services', element: <Services /> },
           { path: 'reviews', element: <Reviews /> },
           { path: 'theme', element: <ThemeEditor /> },
+          { path: 'design', element: <StoreDesigner /> },
           { path: 'more', element: <More /> },
           { path: '*', element: <Navigate to="/dashboard" replace /> },
         ],

@@ -6,7 +6,7 @@
     "dev": "node --watch --no-warnings --env-file-if-exists=../.env src/index.js",
     "start": "node --no-warnings --env-file-if-exists=../.env src/index.js",
     "test:stylist": "node --test src/lib/stylist-ranking.test.js",
-    "test:moda": "node --test test/moda.test.js test/moda-quality.test.js test/moda-brain.test.js test/product-types.test.js",
+    "test:moda": "node --test test/moda.test.js test/moda-quality.test.js test/moda-brain.test.js test/moda-curate.test.js test/moda-understand.test.js test/product-types.test.js",
     "test:visual": "node --test test/visual-taxonomy.test.js test/visual-search.test.js test/visual-integration.test.js test/visual-route.test.js test/visual-model-store.test.js test/visual-demand.test.js test/visual-eval.test.js test/visual-testset.test.js test/visual-multi.test.js",
     "test:search": "node --test test/search-upgrade.test.js",
     "test:media": "node --test test/media-migrate.test.js",

@@ -101,7 +101,7 @@ function Showcase({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, 
         ))}
       </div>
       <div className="min-w-0">
-        <p className="mb-2 text-sm font-extrabold">{ar ? `قطع اللوك (${picks.length})` : `Pieces in this look (${picks.length})`}</p>
+        <p className="mb-2 text-sm font-extrabold">{picks.length === 1 ? (ar ? 'القطعة المقترحة' : 'Suggested piece') : (ar ? `قطع اللوك (${picks.length})` : `Pieces in this look (${picks.length})`)}</p>
         <ul className="divide-y divide-line rounded-2xl border border-line bg-elevated">
           {picks.map(({ label, p }) => (
             <li key={p.id} className="flex items-center gap-3 p-2.5">
@@ -120,12 +120,12 @@ function Showcase({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, 
         </ul>
         <div className="mt-3 rounded-2xl border border-brand/20 bg-brand/5 p-3.5">
           <div className="flex items-end justify-between gap-3">
-            <p className="text-[12px] font-semibold text-muted">{ar ? 'إجمالي اللوك' : 'Look total'}</p>
+            <p className="text-[12px] font-semibold text-muted">{picks.length === 1 ? (ar ? 'سعر القطعة' : 'Item price') : (ar ? 'إجمالي اللوك' : 'Look total')}</p>
             <p className="text-2xl font-black text-brand">{formatMoney(total, lang)}</p>
           </div>
-          <button type="button" onClick={onAddAll} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-btn text-[15px] font-extrabold text-white shadow-[0_10px_24px_-10px_rgba(244,81,0,.6)] transition hover:brightness-95 active:scale-[.99]"><ShoppingBag className="h-5 w-5" />{ar ? 'أضف اللوك كامل للسلة' : 'Add the full look to cart'}</button>
+          <button type="button" onClick={onAddAll} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-btn text-[15px] font-extrabold text-white shadow-[0_10px_24px_-10px_rgba(244,81,0,.6)] transition hover:brightness-95 active:scale-[.99]"><ShoppingBag className="h-5 w-5" />{picks.length === 1 ? t('stylist.addPick') : (ar ? 'أضف اللوك كامل للسلة' : 'Add the full look to cart')}</button>
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={onShare} className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[12.5px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{t('stylist.share')}</button>
+            <button type="button" onClick={onShare} className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[12.5px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{picks.length === 1 ? t('stylist.shareItem') : t('stylist.share')}</button>
             {storeLinks}
           </div>
         </div>
@@ -145,7 +145,7 @@ function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare
   return (
     <div className="mt-5">
       <div className="mb-2 flex items-center justify-between gap-3">
-        <p className="text-sm font-extrabold sm:text-base">{ar ? `القطع المستخدمة في الإطلالة (${picks.length})` : `Pieces in this look (${picks.length})`}</p>
+        <p className="text-sm font-extrabold sm:text-base">{picks.length === 1 ? (ar ? 'القطعة المقترحة' : 'Suggested piece') : (ar ? `القطع المستخدمة في الإطلالة (${picks.length})` : `Pieces in this look (${picks.length})`)}</p>
       </div>
       <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
         {picks.map(({ label, p }) => (
@@ -173,10 +173,10 @@ function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare
       </ul>
       <div className="mt-3 flex flex-wrap items-stretch gap-2">
         <button type="button" onClick={onAddAll} className="flex h-14 w-full min-w-0 items-center justify-between sm:w-auto sm:flex-1 gap-3 rounded-2xl bg-btn px-4 text-white shadow-[0_12px_26px_-12px_rgba(244,81,0,.65)] transition hover:brightness-95 active:scale-[.99] sm:px-5">
-          <span className="flex items-center gap-2 text-[14px] font-extrabold sm:text-[15px]"><ShoppingBag className="h-5 w-5" />{ar ? 'أضف الإطلالة كاملة للسلة' : 'Add the full look to basket'}</span>
+          <span className="flex items-center gap-2 text-[14px] font-extrabold sm:text-[15px]"><ShoppingBag className="h-5 w-5" />{picks.length === 1 ? t('stylist.addPick') : (ar ? 'أضف الإطلالة كاملة للسلة' : 'Add the full look to basket')}</span>
           <span className="shrink-0 border-s border-white/40 ps-3 text-[15px] font-black">{formatMoney(total, lang)}</span>
         </button>
-        <button type="button" onClick={onShare} className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl border border-line-strong bg-elevated px-4 sm:h-14 sm:flex-none text-[13px] font-bold transition hover:border-fg"><Share2 className="h-4 w-4" />{t('stylist.share')}</button>
+        <button type="button" onClick={onShare} className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl border border-line-strong bg-elevated px-4 sm:h-14 sm:flex-none text-[13px] font-bold transition hover:border-fg"><Share2 className="h-4 w-4" />{picks.length === 1 ? t('stylist.shareItem') : t('stylist.share')}</button>
       </div>
       {storeLinks && storeLinks.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{storeLinks}</div>}
     </div>
@@ -213,8 +213,8 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
   </div>;
   if (!m.looks?.length) return <>{advice}{missing}</>;
   const money = (n) => formatMoney(n, lang);
-  const totalLabel = m.state === 'partial' ? t('stylist.availableTotal', { p: money(m.total) }) : t('stylist.total', { p: money(m.total) });
   const picks = m.looks.map((l) => l.items[l.pick]).filter(Boolean);
+  const totalLabel = picks.length === 1 ? t('stylist.totalItem', { p: money(m.total) }) : m.state === 'partial' ? t('stylist.availableTotal', { p: money(m.total) }) : t('stylist.total', { p: money(m.total) });
   const ShowComp = showcase === 'cards' ? CardsBlock : Showcase;
   const startAdd = (items) => setQuick({ queue: items, i: 0 });
   const nextAdd = () => {
@@ -251,9 +251,9 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
           <p className="mt-0.5 text-base font-extrabold sm:text-lg">{totalLabel}{m.overBudget && <span className="ms-2 text-xs font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
-          <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-white"><ShoppingBag className="h-4 w-4" />{t(m.state === 'partial' ? 'stylist.addAvailable' : 'stylist.addAll')}</button>
+          <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-white"><ShoppingBag className="h-4 w-4" />{t(picks.length === 1 ? 'stylist.addPick' : m.state === 'partial' ? 'stylist.addAvailable' : 'stylist.addAll')}</button>
           {[...new Map(picks.map((p) => [p.store.slug, p.store.name])).entries()].map(([sl, nm]) => <StoreCartLink key={sl} slug={sl} name={nm} tr={tr} t={t} />)}
-          <button type="button" onClick={shareLink} className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2.5 text-[13px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{t('stylist.share')}</button>
+          <button type="button" onClick={shareLink} className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2.5 text-[13px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{picks.length === 1 ? t('stylist.shareItem') : t('stylist.share')}</button>
         </div>
       </div>
       </>

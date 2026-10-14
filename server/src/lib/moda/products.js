@@ -12,6 +12,7 @@ const GENERIC_KEYS = new Set(['trousers', 'jacket', 'shirt', 'tshirt']);
 // not override the explicit garment noun. Keep the alias for standalone wraps.
 const AMBIGUOUS_ALIASES = new Set(['shawl:wrap', 'sneakers:كوتش', 'sneakers:coach']);
 const SHOE_KEYS = new Set(['sneakers', 'formal_shoes', 'loafers', 'heels_low', 'heels_high', 'flats', 'sandals', 'boots', 'slippers', 'sport_shoes', 'shoes_any']);
+const SNEAKER_NAME_RE = /(sneaker|trainers?\b|running shoe|sport shoe|كوتش|كوتشي|حذاء رياضي|جزمه رياضه|جزمة رياضة)/i;
 const OUTERWEAR_WORDS = new Set(['جاكيت', 'جاكت', 'جواكت', 'jacket', 'bomber', 'معطف', 'بالطو', 'بليزر', 'blazer']);
 
 let aliasTable = null;
@@ -112,12 +113,31 @@ export function colorKeysOf(row, K = loadKnowledge()) {
   return [...new Set(keys)];
 }
 
+const SPORTY_RE = /(running|runner|sport|training|trainer|jog|basket|football|hiking|air\s?max|mesh|knit|neon|chunky|print|printed|logo|pattern|camo|glitter|multi|colou?rful|metallic|platform|طباعة|مطبوع|مطبع|مزخرف|ملون|لامع|رياضي|رياضة|ركض|جري|تدريب)/i;
+const MINIMAL_COLORS = new Set(['white', 'off_white', 'black', 'cream']);
+/** كوتشي كلاسيك ساده (أبيض أو أسود، من غير طباعة أو لوجو كبير، مش رياضي) ينفع مع طقم كلاسيك في المناسبات. */
+export function isMinimalSneaker(key, name, colorKeys) {
+  return key === 'sneakers' && !SPORTY_RE.test(name || '') && Boolean(colorKeys?.length) && colorKeys.length <= 2 && colorKeys.every((c) => MINIMAL_COLORS.has(c));
+}
+
 /** يضيف حقول مودة لصف المنتج (بدون تعديل الأصل). */
 export function enrichProduct(row, K = loadKnowledge()) {
   const name = `${row.name_ar || ''} ${row.name_en || ''}`;
   const explicitItem = K.items.get(row.moda_key);
   const explicitKey = explicitItem && !explicitItem.virtual ? row.moda_key : null;
   let key = explicitKey || inferKey(name, K);
+  // مطابقة مزدوجة: الاسم + النوع المحفوظ.
+  // - نفس العائلة ومختلفين (مثلاً "Sneakers" متصنّف "حذاء رسمي"): الاسم هو اللي يكسب.
+  // - عائلتين مختلفتين (اسم بيقول بنطلون والنوع قميص): بنعلّم typeConflict ومنسّق الذكاء الاصطناعي مش بيستخدمه.
+  let typeConflict = false;
+  if (explicitKey) {
+    const byName = inferKey(name, K);
+    if (byName && byName !== explicitKey) {
+      if (K.items.get(byName)?.family === K.items.get(explicitKey)?.family) key = byName; else typeConflict = true;
+    }
+  }
+  // كلمات الكوتشي في الاسم حاسمة: أي حذاء اسمه كوتشي/sneakers/running يتصنّف كوتشي مهما كان النوع المحفوظ.
+  if (key && SHOE_KEYS.has(key) && key !== 'sneakers' && SNEAKER_NAME_RE.test(name)) { key = 'sneakers'; typeConflict = false; }
   if (!key) key = inferKey(`${row.cat_text || ''}`, K);
   const desc = `${row.description_ar || ''}`;
   if (key === 'dress_any') {
@@ -133,7 +153,7 @@ export function enrichProduct(row, K = loadKnowledge()) {
   const materials = fabricTokens(K, `${name} ${desc}`);
   const isSleeveless = hasAny(K, name, ['بدون اكمام', 'sleeveless', 'مكشوف', 'strapless']);
   return {
-    ...row, key, formality, gender: inferGender(row, key, K), colorKeys: colorKeysOf(row, K), materials, inStock,
+    ...row, key, typeConflict, minimalSneaker: isMinimalSneaker(key, name, colorKeysOf(row, K)), formality, gender: inferGender(row, key, K), colorKeys: colorKeysOf(row, K), materials, inStock,
     sleeveless: isSleeveless, price: Number(row.price) || 0, popularity: Math.min(2.5, Number(row.sold_count || 0) / 24) + (Number(row.rating || 0) >= 4.3 ? 0.5 : 0),
   };
 }

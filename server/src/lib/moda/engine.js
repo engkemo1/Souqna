@@ -5,6 +5,7 @@
  */
 import { loadKnowledge } from './knowledge.js';
 import { parseMessage } from './parse.js';
+import { applyUnderstanding, rulesConfident } from './understand.js';
 import { enrichAll } from './products.js';
 import { planOutfit } from './plan.js';
 import { respond, pick } from './respond.js';
@@ -72,7 +73,7 @@ const mergeFromSession = (cur, prev) => {
 
 export async function runModa(messages, opts = {}) {
   const K = loadKnowledge();
-  const { products = [], profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, brain = null, fetcher, assistantName = null } = opts;
+  const { products = [], profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, brain = null, curator = null, understand = null, fetcher, assistantName = null } = opts;
   const text = lastUserText(messages);
   const dow = cairoParts(now).dow;
   const seed = `${text}|${session?.turn || 0}`;
@@ -90,6 +91,14 @@ export async function runModa(messages, opts = {}) {
     const faq = matchFaq(text);
     const say = faq ? faqAnswer(faq, { lang, name: typeof assistantName === 'string' ? assistantName : assistantName?.[lang] }) : null;
     if (say) return { state: 'chat', intent: 'faq', faq, say, tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
+  }
+
+  // ---------- فهم الموديل أولاً (اختياري): Gemini/Claude يحوّل الرسالة لبيانات، والكود بيتحقق، والقواعد تكمّل ----------
+  if (typeof understand === 'function' && !(answers && Object.keys(answers).length) && !session?.pending && parsed.intent === 'shop' && text.trim().length >= 8 && !rulesConfident(parsed, text)) {
+    try {
+      const u = await understand({ text, parsed });
+      if (u) parsed = applyUnderstanding(parsed, u);
+    } catch { /* نكمل بالقواعد */ }
   }
 
   // ---------- دمج مع الجلسة ----------
@@ -179,6 +188,16 @@ export async function runModa(messages, opts = {}) {
     }
   }
 
+  // منسّق الذكاء الاصطناعي: بيرشّح الطقم من منتجاتنا الحقيقية الأول، وأي قطعة ناقصة بيقترحها من بره كزرار "اطلبه".
+  // أي فشل/رد غلط/تعدّي ميزانية = نكمل بترشيح القواعد.
+  let curated = false;
+  if (typeof curator === 'function' && plan.context && ['full', 'alternatives', 'partial', 'over_budget'].includes(plan.state) && !plan.ask?.length) {
+    try {
+      const cp = await curator({ plan, rows, parsed, adv, eventTime, K, lang, assistantName: typeof assistantName === 'string' ? assistantName : assistantName?.[lang] });
+      if (cp) { plan = cp; curated = true; }
+    } catch { /* نكمل بالقواعد */ }
+  }
+
   // Finish every clarification before showing picks. Questions should not be
   // buried after a partial or low-confidence product result.
   const needsClarificationFirst = Boolean(plan.ask?.length) && plan.state !== 'none';
@@ -196,5 +215,5 @@ export async function runModa(messages, opts = {}) {
     turn: (session?.turn || 0) + 1, parsed: { ...parsed, advice: null }, pending: plan.state === 'clarify' || Boolean(plan.ask?.length), pendingQuestion: plan.ask?.[0] || null, shown: [...new Set([...(session?.shown || []), ...shown])].slice(-60),
     lastState: plan.state, lastTotal: needsClarificationFirst ? (session?.lastTotal ?? null) : (plan.total ?? null), lastBudgetUsed: needsClarificationFirst ? (session?.lastBudgetUsed ?? null) : (plan.budget ?? plan.total ?? null),
   };
-  return { ...res, session: nextSession, parsed, weatherSource: weather.source === 'met_norway' ? 'met_norway' : null, debug: { eventTime, weather: adv } };
+  return { ...res, session: nextSession, parsed, weatherSource: weather.source === 'met_norway' ? 'met_norway' : null, curated, debug: { eventTime, weather: adv } };
 }

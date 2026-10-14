@@ -1,5 +1,6 @@
 import { decodeDepartments } from '@souqna/shared';
 import { buildTheme } from '@souqna/shared';
+import { SEASONS, BADGE_TONES } from '@souqna/shared/layout';
 import { q, json } from '../db/index.js';
 import { mediaMap, getMedia, serializeMedia } from './media.js';
 import { sameDayActive, cairoNow } from './sameDay.js';
@@ -41,10 +42,14 @@ export function serializeStore(s, { withTheme = true } = {}) {
     sameDay: sameDayActive(s),
     sameDayUntil: sameDayActive(s) ? s.same_day_until : null,
     sameDaySet: s.same_day_date === cairoNow().date, // owner UI: already switched on today (even if the cut-off has passed)
+    customization: json(s.customization_json, {}),
   };
   if (withTheme) {
-    const t = buildTheme(json(s.theme_json, {}));
-    out.theme = { input: t.input, cssVars: t.cssVars, dark: t.dark };
+    // سكن الموسم (رمضان/العيد/…): ألوانه بتتركّب فوق ثيم المحل وقت تفعيله، وثيم المحل المحفوظ ما بيتغيّرش.
+    const season = SEASONS[json(s.customization_json, {}).design?.season];
+    const own = buildTheme(json(s.theme_json, {}));
+    const t = season ? buildTheme({ ...json(s.theme_json, {}), ...season.palette }) : own;
+    out.theme = { input: own.input, cssVars: t.cssVars, dark: t.dark }; // input = ألوان المحل نفسها (المحرر بيحفظها)، cssVars = اللي بيتعرض فعلًا (مع سكن الموسم)
   }
   return out;
 }
@@ -98,6 +103,7 @@ export function serializeCards(rows) {
       ratingCount: p.rating_count,
       categoryId: p.category_id,
       sameDay: !!sd.get(p.store_id),
+      badge: p.badge_text ? { text: p.badge_text, tone: BADGE_TONES.includes(p.badge_tone) ? p.badge_tone : 'brand' } : null,
     };
   });
 }

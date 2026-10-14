@@ -221,3 +221,12 @@
     background-position: 200% center;
   }
 }
+/* ---- قوالب المتجر ---- */
+[data-type='light'] :is(h1, h2, h3, .font-display) { font-weight: 500; }
+[data-type='bold'] :is(h1, h2, h3, .font-display) { font-weight: 700; }
+[data-type='bold'] h2:lang(en) { text-transform: uppercase; letter-spacing: -0.01em; }
+@keyframes ticker-scroll { from { transform: translateX(0); } to { transform: translateX(-25%); } }
+[dir='rtl'] .ticker-track { animation-name: ticker-scroll-rtl; }
+@keyframes ticker-scroll-rtl { from { transform: translateX(0); } to { transform: translateX(25%); } }
+.ticker-track { animation: ticker-scroll 28s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }

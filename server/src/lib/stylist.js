@@ -11,6 +11,8 @@ import { listDepartments } from './departments.js';
 import { serializeCards, bi } from './serialize.js';
 import { runModa } from './moda/engine.js';
 import { makeBrain } from './moda/brain.js';
+import { makeCurator } from './moda/curate.js';
+import { makeUnderstander } from './moda/understand.js';
 import { loadKnowledge } from './moda/knowledge.js';
 import { makeLlmExtract } from './moda/llm.js';
 import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates, slotOwnerLabel, cleanSay } from './stylist-ranking.js';
@@ -28,6 +30,15 @@ const cfToken = () => process.env.CF_AI_TOKEN || '';
 const geminiKey = () => process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
 export const providerReady = { anthropic: () => !!anthropicKey(), cloudflare: () => !!(cfAccount() && cfToken()), gemini: () => !!geminiKey() };
 let lastError = '';
+
+export async function testProvider(provider) {
+  if (!providerReady[provider]?.()) return { provider, ok: false, error: 'not configured (missing key in Variables)' };
+  const t = Date.now();
+  try {
+    const out = await callLlm(provider, 'You are a helpful assistant. Reply in Egyptian Arabic, one short sentence.', [{ role: 'user', content: 'ازيك؟ قولي جملة قصيرة بالعامية المصرية.' }]);
+    return { provider, ok: true, ms: Date.now() - t, reply: String(out).slice(0, 200) };
+  } catch (e) { return { provider, ok: false, ms: Date.now() - t, error: String(e.message || e).slice(0, 300) }; }
+}
 
 export function stylistSettings() {
   const m = { ...DEF, ...Object.fromEntries(q.all("SELECT key, value FROM app_settings WHERE key LIKE 'stylist_%'").map((r) => [r.key, r.value])) };
@@ -49,7 +60,7 @@ export function saveStylistSettings({ enabled, provider, dailyFree, nameAr, name
   if (nameEn) put('stylist_name_en', nameEn.slice(0, 20));
   return stylistSettings();
 }
-export const stylistStatus = () => ({ ...stylistSettings(), providers: { anthropic: { configured: providerReady.anthropic() }, cloudflare: { configured: providerReady.cloudflare() } }, lastError, model: process.env.STYLIST_MODEL || 'claude-haiku-4-5' });
+export const stylistStatus = () => ({ ...stylistSettings(), providers: { anthropic: { configured: providerReady.anthropic() }, cloudflare: { configured: providerReady.cloudflare() }, gemini: { configured: providerReady.gemini() } }, lastError, model: process.env.STYLIST_MODEL || 'claude-haiku-4-5' });
 
 function readStylistTraining() {
   try {
@@ -495,12 +506,45 @@ export const modaEngineEnabled = () => (process.env.STYLIST_ENGINE || 'moda') !=
 
 
 /** عقل مودة (موديل لغة): بيرجّع دالة أو null لو مفيش مزوّد AI متظبط. المحرك بيشتغل من غيره عادي. */
+function modaChainCall() {
+  if (process.env.MODA_BRAIN === '0') return null;
+  const chain = ['anthropic', 'gemini', 'cloudflare'].filter((k) => providerReady[k]());
+  if (!chain.length) return null;
+  return async (system, msgs) => {
+    let last;
+    for (const k of chain) { try { return await callLlm(k, system, msgs); } catch (e) { last = e; lastError = String(e.message || e).slice(0, 200); } }
+    throw last;
+  };
+}
+
+/** سلسلة المزوّدين (Claude ← Gemini ← Cloudflare) كدالة (system, messages) → نص. null لو مفيش مزوّد. */
+export const llmChain = () => modaChainCall();
+
+/** منسّق الطقم بالموديل (Gemini/Claude): بيرشّح من المنتجات الحقيقية ويقترح الناقص من بره. null لو مفيش مزوّد أو MODA_CURATOR=0. */
+export function modaCurator() {
+  if (process.env.MODA_CURATOR === '0') return null;
+  const callFn = modaChainCall();
+  return callFn ? makeCurator(callFn) : null;
+}
+
+/** فاهم الرسالة بالموديل (Gemini/Claude): بيحوّلها لبيانات منظمة قبل القواعد. null لو مفيش مزوّد أو MODA_UNDERSTAND=0. */
+export function modaUnderstander() {
+  if (process.env.MODA_UNDERSTAND === '0') return null;
+  const callFn = modaChainCall();
+  return callFn ? makeUnderstander(callFn) : null;
+}
+
 export function modaBrain() {
   if (process.env.MODA_BRAIN === '0') return null;
-  // الترتيب حسب جودة العامية المصرية: Claude ثم Gemini (مجاني) ثم Cloudflare (مجاني، الأضعف)
-  const use = providerReady.anthropic() ? 'anthropic' : providerReady.gemini() ? 'gemini' : providerReady.cloudflare() ? 'cloudflare' : null;
-  if (!use) return null;
-  return makeBrain((system, msgs) => callLlm(use, system, msgs), { training: (text) => stylistTrainingPrompt(text) });
+  // الترتيب حسب جودة العامية المصرية: Claude ثم Gemini (مجاني) ثم Cloudflare (مجاني، الأضعف). لو واحد فشل (رصيد خلص/حد يومي) نجرّب اللي بعده.
+  const chain = ['anthropic', 'gemini', 'cloudflare'].filter((k) => providerReady[k]());
+  if (!chain.length) return null;
+  const callFn = async (system, msgs) => {
+    let last;
+    for (const k of chain) { try { return await callLlm(k, system, msgs); } catch (e) { last = e; lastError = String(e.message || e).slice(0, 200); } }
+    throw last;
+  };
+  return makeBrain(callFn, { training: (text) => stylistTrainingPrompt(text) });
 }
 
 /** يرجّع نفس شكل الرد القديم + الحقول الجديدة (state, tabs, questions, session). */

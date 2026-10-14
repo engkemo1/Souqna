@@ -120,6 +120,8 @@ function scoreProduct(p, slot, ctx) {
   return s;
 }
 
+const CASUAL_ONLY = new Set(['sneakers', 'sport_shoes', 'slippers']);
+
 /** يجيب المرشحين لـ slot عند مستوى تخفيف معين. */
 function candidatesAt(slot, lvl, aud, products, ctx) {
   const { K, fTargetRange, role, context, userAvoid, lookAvoidHard } = ctx;
@@ -128,6 +130,8 @@ function candidatesAt(slot, lvl, aud, products, ctx) {
   for (const p of products) {
     if (!p.key || !keys.has(p.key)) continue;
     if (!p.inStock) continue;
+    // مناسبة رسمية (خطوبة/فرح…): الكوتشي والجزم الرياضي والشبشب مش بدائل مقبولة إلا لو العميل طلبها بنفسه
+    if (CASUAL_ONLY.has(p.key) && fTargetRange && fTargetRange[0] >= 4 && !slot.keys.includes(p.key) && !p.minimalSneaker) continue;
     if (p.key === 'jalabiya' && !slot.explicit) continue;
     if (!genderOK(aud, p.gender)) continue;
     if (aud === 'women_hijab' && p.sleeveless) continue;
@@ -140,7 +144,7 @@ function candidatesAt(slot, lvl, aud, products, ctx) {
     if (lookAvoidHard && cols.some((c) => lookAvoidHard.includes(c))) continue;
     if (fTargetRange && p.formality != null) {
       const [lo, hi] = fTargetRange; const d = p.formality < lo ? lo - p.formality : p.formality > hi ? p.formality - hi : 0;
-      if (d > lvl.fd) continue;
+      if (d > (p.minimalSneaker ? Math.max(lvl.fd, 3) : lvl.fd)) continue;
     }
     out.push(p);
   }

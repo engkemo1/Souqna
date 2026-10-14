@@ -14,7 +14,7 @@ import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled, setDemandForOwners } from '../lib/visual-demand.js';
-import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
+import { testProvider, stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
@@ -312,6 +312,10 @@ r.get('/resources', h(async (_req, res) => {
 
 /* ---- stylist chat settings ---- */
 r.get('/stylist', h((_req, res) => res.json(stylistStatus())));
+r.get('/stylist/test/:provider', h(async (req, res) => {
+  if (!['anthropic', 'gemini', 'cloudflare'].includes(req.params.provider)) throw new AppError(400, 'bad_provider', 'Unknown provider');
+  res.json(await testProvider(req.params.provider));
+}));
 r.put('/stylist', h((req, res) => {
   const b = z.object({ enabled: z.boolean().optional(), provider: z.enum(['anthropic', 'cloudflare']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional(), nameAr: z.string().trim().min(2).max(20).optional(), nameEn: z.string().trim().min(2).max(20).optional() }).parse(req.body);
   const current = stylistStatus().provider;

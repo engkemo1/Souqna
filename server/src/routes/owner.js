@@ -20,6 +20,8 @@ import { cairoNow } from '../lib/sameDay.js';
 import { triggerReindex } from '../lib/visual.js';
 import { describeProduct, invalidateModaCatalogue } from '../lib/stylist.js';
 import { loadKnowledge } from '../lib/moda/knowledge.js';
+import { normalizeDesignPatch, BADGE_TONES } from '@souqna/shared/layout';
+import { designSuggestion } from '../lib/store-designer.js';
 import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMediaFile } from '../lib/media.js';
 import {
   serializeStore, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi, stockStatus,
@@ -133,6 +135,78 @@ r.put('/store/theme', h((req, res) => {
 r.post('/store/theme/preview', h((req, res) => {
   const t = buildTheme(req.body || {});
   res.json({ theme: { input: t.input, cssVars: t.cssVars, dark: t.dark }, report: t.report, checks: t.checks });
+}));
+
+r.put('/store/customization', h((req, res) => {
+  const schema = z.object({
+    announcement: z.object({
+      enabled: z.boolean().default(false),
+      text_ar: z.string().trim().max(160).default(''),
+      text_en: z.string().trim().max(160).default(''),
+      link: z.string().trim().max(200).default(''),
+    }).optional(),
+    freeShippingBar: z.object({
+      enabled: z.boolean().default(true),
+    }).optional(),
+    trustBadges: z.object({
+      enabled: z.boolean().default(true),
+      items: z.array(z.object({
+        icon: z.string().trim().max(30).default('truck'),
+        title_ar: z.string().trim().max(60).default(''),
+        title_en: z.string().trim().max(60).default(''),
+        desc_ar: z.string().trim().max(100).default(''),
+        desc_en: z.string().trim().max(100).default(''),
+      })).max(4).optional(),
+    }).optional(),
+    story: z.object({
+      enabled: z.boolean().default(false),
+      title_ar: z.string().trim().max(80).default(''),
+      title_en: z.string().trim().max(80).default(''),
+      text_ar: z.string().trim().max(800).default(''),
+      text_en: z.string().trim().max(800).default(''),
+      image: z.string().trim().max(400).default(''),
+      instagram: z.string().trim().max(80).default(''),
+      tiktok: z.string().trim().max(80).default(''),
+      facebook: z.string().trim().max(80).default(''),
+    }).optional(),
+    sectionsOrder: z.array(z.string().max(40)).max(16).optional(),
+    hiddenSections: z.array(z.string().max(40)).max(16).optional(),
+  }).passthrough();
+
+  const body = schema.parse(req.body);
+  const current = json(req.store.customization_json, {});
+  const merged = { ...current, ...body };
+  q.run('UPDATE stores SET customization_json=? WHERE id=?', [JSON.stringify(merged), req.store.id]);
+  const s = q.get('SELECT * FROM stores WHERE id=?', [req.store.id]);
+  res.json({ store: serializeStore(s), customization: merged });
+}));
+
+/* ---- مصمّم المتجر: قالب + موسم + عدّاد عروض + واتساب ذكي (كله اختياري وبيتخزّن جنب إعدادات التخصيص) ---- */
+r.put('/store/design', h((req, res) => {
+  const patch = normalizeDesignPatch(req.body || {});
+  const current = json(req.store.customization_json, {});
+  const merged = { ...current };
+  if (patch.design) merged.design = { ...(current.design || {}), ...patch.design };
+  if (patch.flash) merged.flash = patch.flash;
+  if (patch.whatsapp) merged.whatsapp = patch.whatsapp;
+  q.run('UPDATE stores SET customization_json=? WHERE id=?', [JSON.stringify(merged), req.store.id]);
+  const s = q.get('SELECT * FROM stores WHERE id=?', [req.store.id]);
+  res.json({ store: serializeStore(s), customization: merged });
+}));
+
+// اقتراح تصميم بالذكاء الاصطناعي (Gemini/Claude لو متظبط، وإلا قواعد بسيطة). بيقترح بس — صاحب المحل هو اللي بيطبّق.
+r.post('/store/design/ai', h(async (req, res) => {
+  const b = z.object({ kind: z.string().trim().max(40).optional().default(''), vibe: z.string().trim().max(40).optional().default(''), note: z.string().trim().max(300).optional().default('') }).parse(req.body || {});
+  res.json(await designSuggestion({ store: serializeStore(req.store, { withTheme: false }), ...b }));
+}));
+
+r.post('/store/story/image', upload.single('file'), h(async (req, res) => {
+  if (!req.file) throw badRequest('no_file', 'Please choose an image.');
+  const m = await processImage(req.file.buffer, { storeId: req.store.id, kind: 'banner' });
+  q.run('UPDATE media SET attached=1 WHERE id=?', [m.id]);
+  const sm = serializeMedia(m);
+  const url = sm.urls.lg || sm.urls.md || sm.urls.original;
+  res.json({ image: url, media: sm });
 }));
 
 // Auto-designed luxury cover: dark gradient in the store's colour + its best product photos in gold-framed cards.
@@ -423,7 +497,7 @@ r.get('/products/:id', h((req, res) => {
   res.json({
     product: {
       ...serializeProductDetail(p),
-      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '', audience: p.audience || '', ...suggestTypeFor(p),
+      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '', audience: p.audience || '', badgeText: p.badge_text || '', badgeTone: p.badge_tone || '', ...suggestTypeFor(p),
       compareAt: p.compare_at_price, sold: p.sold_count, views: p.views,
     },
   });
@@ -465,6 +539,8 @@ const productSchema = z.object({
   department: z.string().max(31).nullable().optional(),
   style_level: z.number().int().min(1).max(5).nullable().optional(),
   moda_key: z.string().max(80).nullable().optional(),
+  badge_text: z.string().trim().max(24).nullable().optional(),
+  badge_tone: z.string().max(12).nullable().optional(),
   status: z.enum(['active', 'draft', 'archived']).default('active'),
   featured: z.boolean().optional().default(false),
   is_new: z.boolean().optional().default(false),
@@ -500,7 +576,7 @@ function saveProduct(storeId, data, existing) {
     const row = {
       name_ar: data.name_ar, name_en: data.name_en || data.name_ar, description_ar: data.description_ar, description_en: data.description_en,
       price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null,
-      category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, data.department, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
+      category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, data.department, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };

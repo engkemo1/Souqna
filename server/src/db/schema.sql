@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS stores (
   logo_media_id INTEGER, cover_media_id INTEGER,
   logo_initials TEXT NOT NULL DEFAULT '', logo_color TEXT NOT NULL DEFAULT '#1B1B1B',
   theme_json TEXT NOT NULL DEFAULT '{}',
+  customization_json TEXT NOT NULL DEFAULT '{}',
   rating REAL NOT NULL DEFAULT 0, rating_count INTEGER NOT NULL DEFAULT 0,
   featured INTEGER NOT NULL DEFAULT 0,
   offer_badge_ar TEXT, offer_badge_en TEXT,

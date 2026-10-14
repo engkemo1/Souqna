@@ -28,7 +28,7 @@ const PRESET_COLORS = [
 
 const EMPTY = {
   name_ar: '', name_en: '', description_ar: '', description_en: '', price: '', compare_at_price: '', cost: '', sku: '',
-  category_id: '', audience: '', moda_key: '', style_level: '', status: 'active', featured: false, is_new: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
+  category_id: '', audience: '', moda_key: '', style_level: '', badge_text: '', badge_tone: 'brand', status: 'active', featured: false, is_new: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
   media: [], seo_title: '', seo_description: '',
 };
 const STYLE_LEVELS = [['1', 'بيتي'], ['2', 'كاجوال'], ['3', 'شيك'], ['4', 'رسمي'], ['5', 'سواريه']];
@@ -44,7 +44,7 @@ function fromProduct(p) {
     ...EMPTY,
     name_ar: p.name.ar, name_en: p.name.en && p.name.en !== p.name.ar ? p.name.en : '', description_ar: p.description.ar || '', description_en: p.description.en || '',
     price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '',
-    category_id: p.categoryId ? String(p.categoryId) : '', audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', status: p.status, featured: p.featured, is_new: p.isNewFlag,
+    category_id: p.categoryId ? String(p.categoryId) : '', audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', badge_text: p.badgeText || '', badge_tone: p.badgeTone || 'brand', status: p.status, featured: p.featured, is_new: p.isNewFlag,
     colors: p.colors, sizes: p.sizes, matrix, variantIds: ids, track_stock: p.trackStock, stock: p.stockCount, low_stock_at: p.lowStockAt,
     media: p.media, seo_title: p.seo.title || '', seo_description: p.seo.description || '',
   };
@@ -59,7 +59,7 @@ function toPayload(f) {
   return {
     name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en,
     price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, cost: f.cost ? Number(f.cost) : null,
-    sku: f.sku || null, category_id: f.category_id ? Number(f.category_id) : null, audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, status: f.status, featured: f.featured, is_new: f.is_new,
+    sku: f.sku || null, category_id: f.category_id ? Number(f.category_id) : null, audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, badge_text: f.badge_text.trim() || null, badge_tone: f.badge_text.trim() ? f.badge_tone : null, status: f.status, featured: f.featured, is_new: f.is_new,
     colors: f.colors, sizes: f.sizes, variants, track_stock: f.track_stock, stock: Number(f.stock || 0), low_stock_at: Number(f.low_stock_at || 0),
     media: f.media.map((m) => m.id), primary_media_id: f.media[0]?.id ?? null, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
   };
@@ -490,6 +490,18 @@ export default function ProductEditor() {
             <Field label={L('مناسب لإيه؟ (بيساعد مودة ترشّحه للمناسبة الصح)', 'Dress code (helps the stylist match occasions)')} optional={t('common.optional')} hint={styleDefault ? L(`لو سيبتها، بنفترض: ${styleDefault}`, undefined) : undefined}>
               <div className="flex flex-wrap gap-2" role="group">
                 {[['', L('تلقائي', 'Auto')], ...STYLE_LEVELS].map(([v, label]) => <button key={v} type="button" aria-pressed={f.style_level === v} onClick={() => set({ style_level: v })} className={chipCls(f.style_level === v)}>{label}</button>)}
+              </div>
+            </Field>
+            <Field label={L('شارة مميزة على المنتج', 'Highlight badge')} optional={t('common.optional')} hint={L('جملة قصيرة تظهر على صورة المنتج: "قطن مصري 100%"، "الأكثر طلبًا"، "آخر قطعتين".', 'A short label shown on the product photo.')}>
+              <div className="space-y-2.5">
+                <Input maxLength={24} value={f.badge_text} onChange={(e) => set({ badge_text: e.target.value })} placeholder={L('مثلاً: الأكثر طلبًا', 'e.g. Best seller')} />
+                {f.badge_text.trim() && (
+                  <div className="flex flex-wrap items-center gap-2" role="group">
+                    {[['brand', L('لون المحل', 'Store colour'), 'bg-primary text-on-primary'], ['sale', L('أحمر', 'Red'), 'bg-sale text-white'], ['dark', L('أسود', 'Black'), 'bg-neutral-900 text-white'], ['gold', L('ذهبي', 'Gold'), 'bg-amber-400 text-neutral-900'], ['green', L('أخضر', 'Green'), 'bg-emerald-600 text-white']].map(([v, label, cls]) => (
+                      <button key={v} type="button" aria-pressed={f.badge_tone === v} onClick={() => set({ badge_tone: v })} className={cx('rounded-full px-3 py-1.5 text-xs font-bold transition active:scale-95', cls, f.badge_tone === v ? 'ring-2 ring-fg ring-offset-2 ring-offset-canvas' : 'opacity-70')}>{label}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             </Field>
             <div className="space-y-4 border-t border-line pt-5">

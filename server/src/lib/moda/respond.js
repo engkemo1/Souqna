@@ -31,7 +31,7 @@ function tabLabel(aud, persons, P) {
 
 const itemCard = (K, pk) => {
   const p = pk.product;
-  return { id: p.id, key: p.key, label: itemAr(K, pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null };
+  return { id: p.id, key: p.key, label: itemAr(K, p.key || pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null };
 };
 
 /** بيحوّل plan → رد. opts: { seed, lang } */
@@ -85,12 +85,13 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   }
 
   // ---------- مقدمة حسب الحالة ----------
+  const single = plan.people.flatMap((p) => p.picks).length === 1 && !(plan.missing || []).length;
   let intro;
   if (plan.altFor?.length) intro = say('intro_alt_look', { missing: joinAr(plan.altFor.map((k) => itemAr(K, k))), occasionFor });
   else if (plan.state === 'none') intro = say('intro_none');
   else if (plan.state === 'partial') intro = say(couple ? 'intro_partial_couple' : plan.context ? 'intro_partial' : 'intro_partial_item', { occasion, occasionFor, missing: joinAr((plan.missing || []).map((m) => `${itemAr(K, m.base)}${m.material ? ` ${K.synonyms.materials[m.material]?.[0] || m.material}` : ''}`)) });
   else if (plan.state === 'alternatives') intro = `${say('intro_alternatives')} ${relaxedTexts.join(' ')}`.trim();
-  else if (plan.state === 'over_budget') intro = say('over_budget', { total: nf(plan.total), budget: nf(plan.budget), over: nf(plan.over) });
+  else if (plan.state === 'over_budget') intro = say(single ? 'over_budget_item' : 'over_budget', { total: nf(plan.total), budget: nf(plan.budget), over: nf(plan.over) });
   else intro = say(couple ? 'intro_full_couple' : plan.context ? 'intro_full' : 'intro_item', { occasion, occasionFor, palette: paletteAr });
   parts.push(intro);
 
@@ -115,13 +116,21 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
       else if (himHasPrice && !herHasPrice) parts.push(say('total_line_couple_him_only', { him: nf(him.subtotal) }));
       else if (himHasPrice && herHasPrice) parts.push(say('total_line_couple', { him: nf(him.subtotal), her: nf(her.subtotal), total: nf(plan.total) }));
     } else if (Number(plan.total) > 0) parts.push(say(plan.people.flatMap((p) => p.picks).length === 1 ? 'total_line_item' : 'total_line', { total: nf(plan.total) }));
-    if (plan.budget && plan.total <= plan.budget && Number(plan.total) > 0) parts.push(say('within_budget', { budget: nf(plan.budget) }));
+    if (plan.budget && plan.total <= plan.budget && Number(plan.total) > 0) {
+      // لو في قطع ناقصة، "جوه الميزانية" مضللة: القطع الناقصة هتزود التكلفة.
+      if (plan.state === 'partial' && (plan.missing || []).length) {
+        if (plan.total >= plan.budget * 0.5) parts.push(say('partial_budget_warn', { total: nf(plan.total), budget: nf(plan.budget), left: nf(Math.max(0, plan.budget - plan.total)) }));
+      } else parts.push(say('within_budget', { budget: nf(plan.budget) }));
+    }
   } else if (plan.state === 'over_budget') {
-    parts.push(say('total_line', { total: nf(plan.total) }), say('over_hint'));
+    if (!single) parts.push(say('total_line', { total: nf(plan.total) }));
+    parts.push(say(single ? 'over_hint_item' : 'over_hint'));
   }
   if (plan.dropped?.length) parts.push(say('dropped_optional', { dropped: joinAr([...new Set(plan.dropped)].map((k) => itemAr(K, k))) }));
   const swapped = plan.people.flatMap((p) => p.picks.filter((x) => x.relaxed === 'budget').map((x) => itemAr(K, x.slotKey)));
   if (swapped.length) parts.push(say('budget_swap', { slot: joinAr(swapped) }));
+  const formalSneaker = plan.people.some((pe) => pe.picks.some((pk) => pk.product?.minimalSneaker && (['formal_shoes', 'loafers'].includes(pk.slotKey) || (pk.product?.key === 'sneakers' && plan.context && (K.contexts.get(plan.context)?.formality?.[0] || 0) >= 4))));
+  if (formalSneaker) parts.push(say('minimal_sneaker_note'));
 
   // ---------- جو ووقت ----------
   const tips = [];
@@ -146,7 +155,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   const tabs = plan.people.map((pe) => ({
     id: pe.aud, label: tabLabel(pe.aud, plan.persons, { ...P }), look: pe.look?.name_ar || null,
     items: pe.picks.map((pk) => itemCard(K, pk)), subtotal: pe.subtotal,
-    missing: pe.missing.map((m) => ({ key: m.base, material: m.material, label: itemAr(K, m.base), button: P.order_missing_button, hint: pick(P.order_missing_hint, `${seed}:hint`), payload: { type: 'request_item', key: m.base, material: m.material, color: m.color, audience: pe.aud } })),
+    missing: pe.missing.map((m) => ({ key: m.base, material: m.material, label: m.title || itemAr(K, m.base), button: P.order_missing_button, hint: pick(P.order_missing_hint, `${seed}:hint`), payload: { type: 'request_item', key: m.base, material: m.material, color: m.color, audience: pe.aud } })),
   }));
 
   const questions = condolence ? [] : (plan.ask || []).slice(0, 1).map((a) => buildQuestion(K, a, L)).filter(Boolean);

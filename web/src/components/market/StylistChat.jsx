@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Send, Mic, MicOff, Loader2, Camera, ThumbsUp, ThumbsDown, RotateCcw, History, Plus, Trash2 } from 'lucide-react';
+import { X, Send, Mic, MicOff, Loader2, Check, Camera, ThumbsUp, ThumbsDown, RotateCcw, History, Plus, Trash2 } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
@@ -55,6 +55,28 @@ function ModaFeedback({ question, reply, items, productIds, t, onRated }) {
 }
 
 /** Floating shopping assistant: chat in text or voice, answers come with real products from Banha stores. */
+/** خطوات التحليل أثناء الانتظار: العميل يشوف مودة بتعمل إيه بدل ما يستنى قدام "بفكّر…". */
+function AnalysisSteps({ t }) {
+  const steps = ['stylist.step1', 'stylist.step2', 'stylist.step3', 'stylist.step4', 'stylist.step5'];
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setI((n) => Math.min(n + 1, steps.length - 1)), 2300);
+    return () => clearInterval(id);
+  }, []);
+  return (
+    <div role="status" aria-live="polite" className="max-w-[90%] rounded-2xl rounded-ss-sm bg-secondary px-3.5 py-3 text-[13.5px]">
+      <ul className="space-y-1.5">
+        {steps.slice(0, i + 1).map((k, n) => (
+          <li key={k} className={cx('flex items-center gap-2 transition-opacity', n < i ? 'text-muted' : 'font-medium')}>
+            {n < i ? <Check className="h-4 w-4 shrink-0 text-brand" /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
+            <span>{t(k)}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function StylistChat() {
   const { t, tr, lang, assistantName: name } = useI18n();
   const { buyer } = useBuyer();
@@ -325,7 +347,7 @@ export default function StylistChat() {
                   {!m.historyReadOnly && !m.error && m.looks?.length > 0 && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, ...(m.tips || []), ...(m.styleTips || [])].filter(Boolean).join(' — ')} productIds={(m.looks || []).map((look) => look.items?.[look.pick]?.id).filter((id) => id != null)} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason, productIds) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean), productIds)} t={t} />}
                 </div>
               ))}
-              {busy && <div className="flex items-center gap-2 text-sm text-muted"><Loader2 className="h-4 w-4 animate-spin" />{t('stylist.thinking')}</div>}
+              {busy && <AnalysisSteps t={t} />}
               <div ref={end} />
             </div>)}
 

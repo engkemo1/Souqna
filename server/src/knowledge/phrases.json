@@ -80,9 +80,19 @@
   "within_budget": [
    "وده جوه ميزانيتك ({budget} جنيه)."
   ],
+  "partial_budget_warn": [
+   "خد بالك: القطع المتاحة لوحدها خدت {total} جنيه من ميزانيتك ({budget} جنيه)، والباقي ({left} جنيه) غالبًا مش هيكفي للقطع الناقصة. لو ميزانيتك مرنة قولّي، أو أرخّص لك المتاح."
+  ],
   "over_budget": [
    "الطقم زاد عن ميزانيتك ({budget} جنيه) بـ{over} جنيه. تحب أرخّصه؟",
    "أقل طقم لقيته كله بـ{total} جنيه، وده أعلى من ميزانيتك بـ{over} جنيه."
+  ],
+  "minimal_sneaker_note": [
+   "الكوتشي هنا ساده علشان مفيش جزمة رسمية متاحة حاليًا، وبيمشي مع الطقم الكلاسيك في المناسبة دي. تحب أدورلك جزمة رسمية؟"
+  ],
+  "over_budget_item": [
+   "القطعة دي بـ{total} جنيه، وده أعلى من ميزانيتك ({budget} جنيه) بـ{over} جنيه.",
+   "أقل سعر لقيته للقطعة {total} جنيه، يعني أعلى من ميزانيتك بـ{over} جنيه."
   ],
   "order_missing_button": "اطلبه",
   "order_missing_hint": "مش متاح دلوقتي. تحب طلة تجيبهولك ونبلغك أول ما يتوفر؟",
@@ -187,6 +197,9 @@
   "dropped_optional": [
    "شيلت {dropped} علشان الميزانية، وتقدر تضيفها بعدين."
   ],
+  "over_hint_item": [
+   "لو تحب أدورلك على بديل أرخص، أو تزود الميزانية شوية، قولي."
+  ],
   "over_hint": [
    "لو تحب أقلل الأشخاص أو القطع، أو تزود الميزانية، قولي."
   ],
@@ -238,6 +251,15 @@
   ],
   "within_budget": [
    "That's within your {budget} EGP budget."
+  ],
+  "partial_budget_warn": [
+   "Heads up: the available pieces alone take {total} EGP of your {budget} EGP budget, so the remaining {left} EGP likely won't cover the missing pieces. Tell me if your budget is flexible, or I can pick cheaper options."
+  ],
+  "minimal_sneaker_note": [
+   "The sneakers here are plain (white or black, no prints) and pair well with a classic suit at this occasion, as long as they are clean leather."
+  ],
+  "over_budget_item": [
+   "This item is {total} EGP, which is {over} EGP over your {budget} EGP budget. Want a cheaper alternative?"
   ],
   "over_budget": [
    "This comes to {total} EGP, which is {over} EGP over your {budget} EGP budget. Want a cheaper version?"

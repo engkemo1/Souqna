@@ -197,6 +197,20 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     let pick = nums.amounts.find((a) => a.currencyNear) || nums.amounts.find((a) => [1, 2, 3].some((d) => marker.has(tokens[a.index - d]))) || nums.amounts[0];
     const perItem = K.synonyms.budget_words.per_item_markers.map(norm).some((m) => n.includes(m));
     result.budget = { value: pick.value, kind: perItem ? 'per_item' : 'total' };
+    // مدى سعري: "من 200 ل 1000" / "بين 500 و 1500" → الحد الأقصى هو الميزانية، والأدنى بيتسجل في min
+    for (let k = 0; k + 1 < nums.amounts.length; k += 1) {
+      const a = nums.amounts[k]; const b = nums.amounts[k + 1];
+      const mid = tokens.slice(a.index + 1, b.index).filter((x) => !['الف', 'الاف', 'k'].includes(x));
+      const lead = tokens[a.index - 1];
+      const strong = mid.length && mid.every((x) => ['ل', 'الى', 'الي', 'لحد', 'حتي', 'حتى', 'to', 'until', 'till', '-'].includes(x));
+      const weak = mid.length && mid.every((x) => ['و', 'and'].includes(x)) && ['بين', 'between'].includes(lead);
+      const dash = !mid.length && ['من', 'بين', 'from', 'between'].includes(lead);
+      if (strong || weak || dash) {
+        const lo = Math.min(a.value, b.value); const hi = Math.max(a.value, b.value);
+        result.budget = { value: hi, min: lo, kind: perItem ? 'per_item' : 'total' };
+        break;
+      }
+    }
   }
 
   /* ---------- الوقت والموسم ---------- */
