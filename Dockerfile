@@ -1,5 +1,6 @@
 FROM node:22-slim
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
 # Litestream: streams the SQLite database to Cloudflare R2 and restores it on start-up (no volume needed).
 COPY --from=litestream/litestream:0.3.13 /usr/local/bin/litestream /usr/local/bin/litestream
 # CLIP model files are NOT baked in and need no volume: they are pulled from Cloudflare R2 into this temporary folder at start-up.
