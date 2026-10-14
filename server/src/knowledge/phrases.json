@@ -37,7 +37,23 @@
   ],
   "intro_none": [
    "ملقتش منتجات مناسبة للطلب ده في محلات بنها دلوقتي. تقدر تطلب القطع الناقصة من المحلات أو تجرّب وصف أدق.",
-   "مفيش منتجات تكوّن الطقم المطلوب متاحة حاليًا. ممكن ندوّر على لون أو نوع تاني."
+   "مفيش حاجة مطابقة للطلب ده متاحة حاليًا. ممكن تجرّب لون أو نوع تاني، أو تطلب القطعة من المحلات."
+  ],
+  "total_line_item": [
+   "السعر: {total} جنيه."
+  ],
+  "intro_alt_look": [
+   "{missing} مش متاح دلوقتي في المحلات، وده أقرب اللي أقدر أرشحهولك {occasionFor} من المتاح. وتقدر تطلب {missing} من هنا ونبلغك أول ما يتوفر."
+  ],
+  "intro_item": [
+   "دي أنسب اختيارات لقيتها لطلبك.",
+   "اخترتلك الأقرب لطلبك من المتاح دلوقتي."
+  ],
+  "intro_partial_item": [
+   "لقيت جزء من طلبك، ولسه مش متاح: {missing}. اللي لقيته تحت."
+  ],
+  "no_look": [
+   "لسه معنديش تركيبة جاهزة لـ{occasion}. قولي القطع اللي محتاجها (مثلًا: قميص وبنطلون وحذاء) وأرشحلك من محلات بنها."
   ],
   "relaxed_labels": {
    "color": "غيّرت اللون لقريب منه",
@@ -95,8 +111,8 @@
    "محتاج أعرف حاجة بسيطة علشان أرشحلك صح:"
   ],
   "didnt_understand": [
-   "مفهمتش قصدك بالظبط. تقصد تدور على لبس لمناسبة ولا بتسأل عن حاجة معينة؟",
-   "ممكن توضحلي أكتر؟ قولي المناسبة أو القطعة اللي عايزها."
+   "مفهمتش قصدك بالظبط. اكتب القطعة اللي بتدور عليها (مثلًا: جاكيت أسود) أو المناسبة (مثلًا: فرح أو شغل) وأرشحلك.",
+   "ممكن توضحلي أكتر؟ قولي القطعة أو المناسبة، زي «كوتشي أبيض» أو «لبس للشغل»."
   ],
   "skip_taste_ack": [
    "تمام، هظبطها على ذوق عام وتقدر تعدّل بعدين."
@@ -202,6 +218,21 @@
   "intro_none": [
    "I couldn't find a good match in the stores right now. Want me to widen the budget or colour?"
   ],
+  "total_line_item": [
+   "Price: {total} EGP."
+  ],
+  "intro_alt_look": [
+   "{missing} isn't available in the stores right now, so here is the closest I can suggest {occasionFor} from what's in stock. You can request {missing} below and we'll tell you when it arrives."
+  ],
+  "intro_item": [
+   "Here are the closest matches I found for your request."
+  ],
+  "intro_partial_item": [
+   "I found part of your request. Not currently available: {missing}."
+  ],
+  "no_look": [
+   "I don't have a ready, reviewed outfit for {occasion} yet. Tell me the pieces you need (for example: a shirt, trousers and shoes) and I'll pick them from Banha stores."
+  ],
   "total_line": [
    "Total: {total} EGP."
   ],
@@ -233,7 +264,7 @@
    "What color would you like?"
   ],
   "didnt_understand": [
-   "I didn't quite get that. Is this for an occasion, or are you looking for a specific piece?"
+   "I didn't quite get that. Tell me the piece you're after (for example: a black jacket) or the occasion (a wedding, work) and I'll suggest something."
   ],
   "fallback_unavailable": [
    "Something went wrong on my side. Please try again in a moment."

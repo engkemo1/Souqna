@@ -25,6 +25,8 @@ function Toggle({ checked, onChange, children }) {
 const PRICE_BANDS = [[0, 200], [200, 500], [500, 1000], [1000, 2000], [2000, 0]];
 
 /** Amazon-style filter column: department, price, deal/new/stock/rating toggles and store. State lives in the URL. */
+const AUDIENCE_LABEL = { men: ['رجالي', 'Men'], women: ['حريمي', 'Women'], boys: ['ولادي', 'Boys'], girls: ['بناتي', 'Girls'], kids: ['أطفال', 'Kids'], unisex: ['للجنسين', 'Unisex'] };
+
 export default function SearchFilters({ params, set, facets, departments, label, activeCount, onClear }) {
   const { t, lang } = useI18n();
   const [min, setMin] = useState(params.get('min') || '');
@@ -42,7 +44,7 @@ export default function SearchFilters({ params, set, facets, departments, label,
     <div className="text-fg">
       <Group title={t('search.department')}>
         <ul className="space-y-0.5">
-          {[{ slug: '' }, ...departments].filter((d) => !d.slug || d.slug === dept || (deptCount.get(d.slug) || 0) > 0).map((d) => {
+          {[{ slug: '' }, ...departments].filter((d) => !d.slug || d.slug === dept || ((deptCount.get(d.slug) || 0) > 0 && !(facets?.audiences?.length > 1 && ['men', 'women', 'kids'].includes(d.slug)))).map((d) => {
             const n = d.slug ? deptCount.get(d.slug) || 0 : [...deptCount.values()].reduce((a, b) => a + b, 0);
             const on = dept === d.slug;
             return (
@@ -57,6 +59,18 @@ export default function SearchFilters({ params, set, facets, departments, label,
           })}
         </ul>
       </Group>
+
+      {facets?.audiences?.length > 1 && (
+        <Group title={lang === 'ar' ? 'لمين؟' : 'For'}>
+          <div className="flex flex-wrap gap-1.5">
+            {facets.audiences.map((a) => {
+              const on = params.get('audience') === a.key;
+              return <button key={a.key} type="button" aria-pressed={on} onClick={() => set({ audience: on ? '' : a.key, category: '' })}
+                className={cx('inline-flex h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm transition', on ? 'border-fg bg-fg font-semibold text-canvas' : 'border-line-strong hover:border-fg')}>{AUDIENCE_LABEL[a.key]?.[lang === 'ar' ? 0 : 1] || a.key}<span className={cx('text-xs', on ? 'text-canvas/70' : 'text-muted')}>{formatNumber(a.n, lang)}</span></button>;
+            })}
+          </div>
+        </Group>
+      )}
 
       {facets?.categories?.length > 0 && (
         <Group title={t('search.category')}>

@@ -10,6 +10,7 @@ const HERO_KEYS = new Set(['dress_party', 'dress_evening', 'dress_casual', 'dres
 const GUEST_CONTEXTS = new Set(['engagement_guest', 'wedding_guest', 'katb_kitab']);
 const DRESSY_ACCESSORY = new Set(['tie', 'bow_tie', 'pocket_square']);
 const FABRIC_KEYS = new Set(['tops', 'bottoms', 'dresses', 'suiting', 'modest']);
+const LEISURE_CONTEXTS = new Set(['sahel_beach', 'sport', 'home', 'condolence', 'travel']);
 const AUD_WEIGHT = { men: 1, women: 1, women_hijab: 1, boys: 0.6, girls: 0.6 };
 
 const genderOK = (aud, g) => {
@@ -168,7 +169,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
       if (!list.length) continue;
       const cap = personBudget ? (personBudget * slot.share) / 100 * 1.3 : null;
       const sctx = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fR ? (fR[0] + fR[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], budgetCap: cap, learnedPreferences: env.learnedPreferences };
-      const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => b.s - a.s || a.p.price - b.p.price);
+      const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => (parsed.flags?.cheapest ? a.p.price - b.p.price || b.s - a.s : b.s - a.s || a.p.price - b.p.price));
       chosen = { lvl, li, ranked };
       break;
     }
@@ -280,7 +281,7 @@ export function planOutfit(parsed, products, env = {}) {
     if (parsed.genderHint === 'female') persons = ['women']; else if (parsed.genderHint === 'male') persons = ['men'];
     else if (profile.audience) persons = [profile.audience];
   }
-  if (!persons.length) return { ...base, state: 'clarify', ask: ['audience', ...(parsed.context ? [] : ['occasion'])], persons: [] };
+  if (!persons.length) return { ...base, state: 'clarify', ask: ['audience', ...(parsed.context || parsed.garments.length || (parsed.ownedPieces || []).length ? [] : ['occasion'])], persons: [] };
   const context = parsed.contextEffective || null; const role = parsed.role || 'guest';
   const hasGarments = parsed.garments.length > 0; const hasOwned = (parsed.ownedPieces || []).length > 0;
   if (!context && !hasGarments && !hasOwned) return { ...base, state: 'clarify', ask: ['occasion'], persons };
@@ -299,7 +300,14 @@ export function planOutfit(parsed, products, env = {}) {
   const perPerson = persons.map((aud) => {
     const hasExplicit = parsed.garments.some((g) => keyFits(aud, g.key)) && !(persons.length > 1 && !parsed.garments.some((g) => keyFits(aud, g.key) && (WOMEN_KEYS.has(g.key) || MEN_KEYS.has(g.key))));
     let cands = context ? lookCandidates(aud, context, K, parsed, role) : lookForOwned(aud, parsed, K);
-    if (!cands.length && context) cands = K.outfits.looks.filter((l) => l.status !== 'draft' && l.audience.includes(aud)).map((l) => ({ look: l, t: 0 })).sort((a, b) => Math.abs(a.look.formality - 3) - Math.abs(b.look.formality - 3));
+    // No approved look for this occasion: borrow one only if it is about as formal AND not a leisure-only look
+    // (a beach outfit must never answer a work request). Otherwise say so honestly (state 'no_look') instead of guessing.
+    if (!cands.length && context && !hasExplicit) {
+      const [lo, hi] = cr || [2, 4]; const mid = (lo + hi) / 2;
+      cands = K.outfits.looks
+        .filter((l) => l.status !== 'draft' && l.audience.includes(aud) && Math.abs(l.formality - mid) <= 1 && (LEISURE_CONTEXTS.has(context) || !l.contexts.every((c) => LEISURE_CONTEXTS.has(c))))
+        .map((l) => ({ look: l, t: 0 })).sort((a, b) => Math.abs(a.look.formality - mid) - Math.abs(b.look.formality - mid));
+    }
     if (hasExplicit || !cands.length) return [fillPerson(aud, parsed, null, products, K, envC, pBudget(aud), null)];
     const fills = cands.map((c) => ({ ...fillPerson(aud, parsed, c.look, products, K, envC, pBudget(aud), null), t: c.t }));
     fills.sort((a, b) => cmp([...rankFill(a, tgt), -a.t], [...rankFill(b, tgt), -b.t]));
@@ -344,7 +352,8 @@ export function planOutfit(parsed, products, env = {}) {
   const missing = fills.flatMap((f) => f.missing.map((m) => ({ ...m, aud: f.aud })));
   const relaxed = fills.flatMap((f) => f.relaxed.map((r) => ({ ...r, aud: f.aud })));
   let state;
-  if (!anyPicks) state = 'none';
+  if (!anyPicks && context && !hasGarments && fills.every((f) => f.mode === 'none')) state = 'no_look';
+  else if (!anyPicks) state = 'none';
   else if (budget && over > 0) state = 'over_budget';
   else if (missing.length) state = 'partial';
   else if (relaxed.length) state = 'alternatives';
@@ -353,9 +362,9 @@ export function planOutfit(parsed, products, env = {}) {
   const slotTotal = fills.reduce((t, f) => t + f.slotsCount, 0);
   // Gather every recommendation-critical detail in the same clarification turn.
   // Moda must not reveal a provisional look between these answers.
-  if (!budget && !parsed.flags?.budgetFlexible && (persons.length > 1 || slotTotal > 2) && state !== 'none') asks.push('budget');
-  if (context && !parsed.daypart && (K.contexts.get(context)?.formality?.[1] || 0) >= 4 && state !== 'none') asks.push('time_if_dressy');
-  if (parsed.garments.length === 1 && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && state !== 'none') asks.push('color_preference');
+  if (!budget && !parsed.flags?.budgetFlexible && (persons.length > 1 || slotTotal > 2) && state !== 'none' && state !== 'no_look') asks.push('budget');
+  if (context && !parsed.daypart && (K.contexts.get(context)?.formality?.[1] || 0) >= 4 && state !== 'none' && state !== 'no_look') asks.push('time_if_dressy');
+  if (parsed.garments.length === 1 && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && !parsed.flags?.cheapest && state !== 'none' && state !== 'no_look') asks.push('color_preference');
 
   const palette = [];
   for (const f of fills) for (const p of f.picks) { const c = primary(p.product); if (c && !palette.includes(c) && !['black', 'white'].includes(c) || (c && palette.length < 1 && !palette.includes(c))) palette.push(c); }

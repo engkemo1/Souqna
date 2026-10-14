@@ -50,3 +50,21 @@ export function backfillDepartments() {
   }
   return n;
 }
+
+/** المنتجات القديمة (من غير نوع/فئة صريحين): نملى النوع والفئة من الاسم لما التخمين يكون واضح، عشان فلاتر البحث تشتغل عليها. المحلات بتراجعها من محرر المنتج (بيقترح نفس القيمة). */
+export async function backfillProductTypes() {
+  const { enrichProduct } = await import('./moda/products.js');
+  const { loadKnowledge } = await import('./moda/knowledge.js');
+  const K = loadKnowledge();
+  let n = 0;
+  const rows = q.all("SELECT p.*, (SELECT c.name_ar || char(32) || c.name_en FROM categories c WHERE c.id=p.category_id) AS cat_text FROM products p WHERE p.moda_key IS NULL AND p.audience IS NULL LIMIT 20000");
+  for (const row of rows) {
+    try {
+      const e = enrichProduct(row, K);
+      const item = e.key && K.items.get(e.key);
+      if (!item || item.virtual) continue;
+      q.run('UPDATE products SET moda_key=?, audience=? WHERE id=?', [e.key, e.gender || 'unisex', row.id]); n++;
+    } catch { /* نكمل */ }
+  }
+  return n;
+}

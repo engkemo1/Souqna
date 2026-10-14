@@ -63,6 +63,11 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
     return { state: 'clarify', intent: 'shop', say: text, questions, blocks: null, ask: asks };
   }
 
+  if (plan.state === 'no_look') {
+    const ctxName = String(K.contexts.get(plan.context)?.ar || '').replace(/\s*\(.*?\)\s*/g, ' ').split('/')[0].trim() || (L === 'en' ? 'this occasion' : 'المناسبة دي');
+    return { state: 'no_look', intent: 'shop', say: say('no_look', { occasion: ctxName }), tips: [], styleTips: [], questions: [], blocks: null, missing: [], relaxed: [] };
+  }
+
   const ctxAr = plan.context ? (K.contexts.get(plan.context)?.ar || '') : '';
   const occasion = String(ctxAr).replace(/\s*\(.*?\)\s*/g, ' ').split('/')[0].trim() || 'المناسبة';
   const occasionForAr = { engagement_guest: 'للخطوبة', engagement_self: 'لخطوبتك', katb_kitab: 'لكتب الكتاب', wedding_guest: 'للفرح', wedding_self: 'لفرحك', graduation: 'للتخرج', family_gathering: 'للمة العيلة', birthday_party: 'لعيد الميلاد', date_night: 'لخروجة أو عشا', work_formal: 'للشغل', work_casual: 'للشغل' };
@@ -81,11 +86,12 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
 
   // ---------- مقدمة حسب الحالة ----------
   let intro;
-  if (plan.state === 'none') intro = say('intro_none');
-  else if (plan.state === 'partial') intro = say(couple ? 'intro_partial_couple' : 'intro_partial', { occasion, occasionFor, missing: joinAr((plan.missing || []).map((m) => `${itemAr(K, m.base)}${m.material ? ` ${K.synonyms.materials[m.material]?.[0] || m.material}` : ''}`)) });
+  if (plan.altFor?.length) intro = say('intro_alt_look', { missing: joinAr(plan.altFor.map((k) => itemAr(K, k))), occasionFor });
+  else if (plan.state === 'none') intro = say('intro_none');
+  else if (plan.state === 'partial') intro = say(couple ? 'intro_partial_couple' : plan.context ? 'intro_partial' : 'intro_partial_item', { occasion, occasionFor, missing: joinAr((plan.missing || []).map((m) => `${itemAr(K, m.base)}${m.material ? ` ${K.synonyms.materials[m.material]?.[0] || m.material}` : ''}`)) });
   else if (plan.state === 'alternatives') intro = `${say('intro_alternatives')} ${relaxedTexts.join(' ')}`.trim();
   else if (plan.state === 'over_budget') intro = say('over_budget', { total: nf(plan.total), budget: nf(plan.budget), over: nf(plan.over) });
-  else intro = say(couple ? 'intro_full_couple' : 'intro_full', { occasion, occasionFor, palette: paletteAr });
+  else intro = say(couple ? 'intro_full_couple' : plan.context ? 'intro_full' : 'intro_item', { occasion, occasionFor, palette: paletteAr });
   parts.push(intro);
 
   if (condolence) {
@@ -108,7 +114,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
       } else if (!himHasPrice && herHasPrice) parts.push(say('total_line_couple_her_only', { her: nf(her.subtotal) }));
       else if (himHasPrice && !herHasPrice) parts.push(say('total_line_couple_him_only', { him: nf(him.subtotal) }));
       else if (himHasPrice && herHasPrice) parts.push(say('total_line_couple', { him: nf(him.subtotal), her: nf(her.subtotal), total: nf(plan.total) }));
-    } else if (Number(plan.total) > 0) parts.push(say('total_line', { total: nf(plan.total) }));
+    } else if (Number(plan.total) > 0) parts.push(say(plan.people.flatMap((p) => p.picks).length === 1 ? 'total_line_item' : 'total_line', { total: nf(plan.total) }));
     if (plan.budget && plan.total <= plan.budget && Number(plan.total) > 0) parts.push(say('within_budget', { budget: nf(plan.budget) }));
   } else if (plan.state === 'over_budget') {
     parts.push(say('total_line', { total: nf(plan.total) }), say('over_hint'));

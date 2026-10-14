@@ -9,6 +9,11 @@ import { enrichAll } from './products.js';
 import { planOutfit } from './plan.js';
 import { respond, pick } from './respond.js';
 import { guardResponse } from './guard.js';
+import { matchFaq, faqAnswer } from './faq.js';
+import { norm } from './text.js';
+
+/** "طب ممكن ألبس إيه؟ / فيه بديل؟ / حاجة تانية" بعد رد ما لقاش المطلوب: العميل بيطلب بدائل لنفس المناسبة. */
+const ALT_RE = /(البس|ألبس|الاقي|اجيب|اشتري|اختار)( [^ ]+){0,3} (ايه|اي|ايش)( |$)|(^| )(بديل|بدائل|البديل|حاجه تانيه|حاجات تانيه|مفيش غيره|ايه المتاح|ايه الموجود|ايه اللي موجود)( |$)/;
 import { cairoParts, resolveEventTime, getWeather, weatherAdvice } from './time.js';
 
 const enrichedCache = new WeakMap();
@@ -67,7 +72,7 @@ const mergeFromSession = (cur, prev) => {
 
 export async function runModa(messages, opts = {}) {
   const K = loadKnowledge();
-  const { products = [], profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, fetcher, assistantName = null } = opts;
+  const { products = [], profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, brain = null, fetcher, assistantName = null } = opts;
   const text = lastUserText(messages);
   const dow = cairoParts(now).dow;
   const seed = `${text}|${session?.turn || 0}`;
@@ -80,11 +85,21 @@ export async function runModa(messages, opts = {}) {
     return { ...res, session: { turn: 1 }, parsed };
   }
 
+  // ---------- أسئلة الخدمة (مين أنت، فين طلبي، الشحن، الدفع…) — مش طلب لبس ----------
+  if (!(answers && Object.keys(answers).length) && !session?.pending && !parsed.garments.length && !parsed.context) {
+    const faq = matchFaq(text);
+    const say = faq ? faqAnswer(faq, { lang, name: typeof assistantName === 'string' ? assistantName : assistantName?.[lang] }) : null;
+    if (say) return { state: 'chat', intent: 'faq', faq, say, tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
+  }
+
   // ---------- دمج مع الجلسة ----------
   const hasAnswers = answers && Object.keys(answers).length;
-  const continuing = session?.parsed && (session.pending || parsed.intent === 'followup' || hasAnswers || (parsed.intent === 'shop' && !parsed.persons.length && !parsed.garments.length && session.parsed.persons?.length));
+  const wasUnknown = parsed.intent === 'unknown' && !hasAnswers;
+  const altRequest = parsed.intent === 'unknown' && !hasAnswers && Boolean(session?.parsed?.context) && ALT_RE.test(norm(text));
+  const continuing = session?.parsed && (altRequest || session.pending || parsed.intent === 'followup' || hasAnswers || (parsed.intent === 'shop' && !parsed.persons.length && !parsed.garments.length && session.parsed.persons?.length));
   if (hasAnswers) parsed = applyAnswers({ ...parsed, intent: 'shop' }, answers, K);
   if (continuing && (parsed.intent === 'shop' || parsed.intent === 'followup' || parsed.intent === 'unknown')) { parsed = mergeFromSession(parsed, session.parsed); parsed.intent = 'shop'; }
+  if (altRequest) parsed = { ...parsed, garments: [], flags: { ...parsed.flags, altRequest: true } }; // اعرض تركيبة المناسبة بالمتاح بدل ما نكرر الطلب الناقص
   if (session?.pendingQuestion === 'budget' && /مش فارق|مش فارقة|براحتك|من غير ميزانية|any budget|flexible/i.test(parsed.normalized || '')) {
     parsed.budget = { value: null, kind: 'total' };
     parsed.flags = { ...parsed.flags, budgetFlexible: true };
@@ -104,7 +119,28 @@ export async function runModa(messages, opts = {}) {
   if (parsed.followup === 'show_more') excludeIds = session?.shown || [];
 
   // ---------- فهم احتياطي بالموديل المجاني (اختياري) ----------
-  if (parsed.intent === 'unknown' && typeof llmExtract === 'function') {
+  // ---------- عقل الموديل (اختياري): يجاوب أي سؤال ويسأل سؤال واحد، أو يستخرج المطلوب ----------
+  let brainUsed = false;
+  const callBrain = async (facts = null) => {
+    if (typeof brain !== 'function') return null;
+    try { return await brain({ messages, rows: ensureEnriched(products, K), assistantName: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], lang, userBudget: parsed.budget?.value || null, facts, text }); } catch { return null; }
+  };
+  if (wasUnknown && !altRequest && typeof brain === 'function') {
+    const b = await callBrain();
+    if (b) {
+      const slots = { persons: b.persons.length ? b.persons : parsed.persons, context: b.context || parsed.context, garments: b.garments.length ? b.garments.map((key) => ({ key, color: null, material: null, text: key, position: 0 })) : parsed.garments };
+      const enough = slots.persons.length || slots.context || slots.garments.length;
+      const merged = { ...parsed, ...slots, contextEffective: slots.context || parsed.contextEffective, colors: b.colors.length ? b.colors : parsed.colors, budget: b.budget ? { value: b.budget, kind: 'total' } : parsed.budget };
+      if (b.ready && enough) { parsed = { ...merged, intent: 'shop', flags: { ...parsed.flags, brain: true } }; brainUsed = true; }
+      else if (b.reply) {
+        const res = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
+        const keep = enough ? { ...merged, intent: 'shop', advice: null } : (session?.parsed || null);
+        return { ...res, say: b.reply, intent: 'brain', session: { ...(session || {}), turn: (session?.turn || 0) + 1, ...(keep ? { parsed: keep, pending: Boolean(enough) } : {}) }, parsed };
+      }
+    }
+  }
+
+  if (parsed.intent === 'unknown' && !brain && typeof llmExtract === 'function') {
     try {
       const ex = await llmExtract(text);
       const valid = (list, set) => (Array.isArray(list) ? list.filter((x) => set.has(x)) : []);
@@ -133,17 +169,32 @@ export async function runModa(messages, opts = {}) {
   let plan = planOutfit(parsed, excludeIds.length ? rows.filter((p) => !excludeIds.includes(p.id)) : rows, { adv, eventTime, profile, K });
   if (excludeIds.length && plan.state === 'none') plan = planOutfit(parsed, rows, { adv, eventTime, profile, K });
 
+  // المطلوب بالاسم مش متاح بس المناسبة معروفة: نجرّب تركيبة المناسبة بالمتاح ونسيب زرار "اطلبه" للقطعة الناقصة
+  if (plan.state === 'none' && parsed.context && parsed.garments.length) {
+    const alt = planOutfit({ ...parsed, garments: [] }, rows, { adv, eventTime, profile, K });
+    if (['full', 'alternatives', 'partial', 'over_budget'].includes(alt.state) && alt.people.some((p) => p.picks.length)) {
+      const wanted = plan.missing.map((m) => m.base);
+      alt.people.forEach((person) => { const orig = plan.people.find((o) => o.aud === person.aud) || plan.people[0]; person.missing = [...(orig?.missing || []), ...person.missing.filter((m) => !(orig?.missing || []).some((o) => o.base === m.base))]; });
+      plan = { ...alt, missing: [...plan.missing, ...alt.missing.filter((m) => !wanted.includes(m.base))], altFor: wanted };
+    }
+  }
+
   // Finish every clarification before showing picks. Questions should not be
   // buried after a partial or low-confidence product result.
   const needsClarificationFirst = Boolean(plan.ask?.length) && plan.state !== 'none';
   let res = respond(needsClarificationFirst ? { ...plan, state: 'clarify' } : plan, { seed, lang, profile, assistantName });
+  if (typeof brain === 'function' && ['none', 'no_look', 'partial'].includes(plan.state) && !needsClarificationFirst) {
+    const avail = [...new Set((plan.people || []).flatMap((p) => p.picks.map((x) => x.product.key)).filter(Boolean))];
+    const b = await callBrain({ result: plan.state, requested: parsed.garments.map((x) => x.key), occasion: parsed.context || null, missing: (plan.missing || []).map((m) => m.base).filter(Boolean), availableAlternativeTypes: avail, note: 'Say honestly what is not available, mention the closest alternatives shown below your reply, and ask ONE short question to refine (budget, style or colour).' });
+    if (b?.reply) { res = { ...res, say: b.reply, brainReply: true }; brainUsed = true; }
+  }
   const g = guardResponse(res, { lang });
   if (!g.ok) res = { ...res, say: pick(K.phrases.ar.fallback_generic, seed), guard: g.problems };
 
   const shown = !needsClarificationFirst && plan.people ? plan.people.flatMap((p) => p.picks.map((x) => x.product.id)) : [];
   const nextSession = {
     turn: (session?.turn || 0) + 1, parsed: { ...parsed, advice: null }, pending: plan.state === 'clarify' || Boolean(plan.ask?.length), pendingQuestion: plan.ask?.[0] || null, shown: [...new Set([...(session?.shown || []), ...shown])].slice(-60),
-    lastTotal: needsClarificationFirst ? (session?.lastTotal ?? null) : (plan.total ?? null), lastBudgetUsed: needsClarificationFirst ? (session?.lastBudgetUsed ?? null) : (plan.budget ?? plan.total ?? null),
+    lastState: plan.state, lastTotal: needsClarificationFirst ? (session?.lastTotal ?? null) : (plan.total ?? null), lastBudgetUsed: needsClarificationFirst ? (session?.lastBudgetUsed ?? null) : (plan.budget ?? plan.total ?? null),
   };
   return { ...res, session: nextSession, parsed, weatherSource: weather.source === 'met_norway' ? 'met_norway' : null, debug: { eventTime, weather: adv } };
 }

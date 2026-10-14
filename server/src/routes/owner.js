@@ -5,6 +5,8 @@ import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartme
 import { q, tx, insert, update, json } from '../db/index.js';
 import { config } from '../config.js';
 import { assertDepartments, inferDepartment } from '../lib/departments.js';
+import { productTypeTree, deriveDepartment, audienceOrNull, AUDIENCE_KEYS } from '../lib/product-types.js';
+import { inferGender, inferKey } from '../lib/moda/products.js';
 import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { requireOwner } from '../lib/auth.js';
@@ -27,6 +29,7 @@ const r = Router();
 // Store-owner JWT, or — when mounted under /api/admin/stores/:slug/as — the platform admin acting on that store (key-checked upstream).
 r.use((req, res, next) => (req.adminStore ? next() : requireOwner(req, res, next)));
 
+r.get('/product-types', h((_req, res) => res.json(productTypeTree())));
 r.get('/moda-types', h((_req, res) => {
   const K = loadKnowledge();
   res.json({ items: [...K.items.entries()].filter(([, item]) => !item.virtual).map(([key, item]) => ({ key, label: item.ar, family: item.family })) });
@@ -420,7 +423,7 @@ r.get('/products/:id', h((req, res) => {
   res.json({
     product: {
       ...serializeProductDetail(p),
-      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '',
+      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '', audience: p.audience || '', ...suggestTypeFor(p),
       compareAt: p.compare_at_price, sold: p.sold_count, views: p.views,
     },
   });
@@ -428,16 +431,30 @@ r.get('/products/:id', h((req, res) => {
 
 const colorSchema = z.object({ name_ar: z.string().trim().min(1).max(30), name_en: z.string().trim().min(1).max(30), hex: z.string().regex(/^#[0-9a-fA-F]{6}$/) });
 /** A product's department must be one the store sells in; single-department stores default to it. */
-function productDepartment(storeId, wanted, text = '') {
+function productDepartment(storeId, wanted, text = '', modaKey = null, audience = null) {
   const mine = decodeDepartments(q.val('SELECT departments FROM stores WHERE id=?', [storeId]));
+  if (!wanted && modaKey) wanted = deriveDepartment(modaKey, audienceOrNull(audience), mine) || null; // من النوع والفئة: صاحب المحل مش محتاج يختار القسم
   if (wanted) { if (!mine.includes(wanted)) throw badRequest('invalid_department', 'Pick one of your store departments.'); return wanted; }
   if (mine.length === 1) return mine[0];
   return inferDepartment(text, mine); // multi-department store: best guess from the name; the editor asks for it explicitly, this is the safety net
 }
 
+/** للمنتجات القديمة اللي معندهاش نوع/فئة: اقتراح من الاسم عشان المحرر يبدأ بقيمة معقولة بدل خانة فاضية. */
+function suggestTypeFor(p) {
+  try {
+    const K = loadKnowledge();
+    const text = `${p.name_ar || ''} ${p.name_en || ''}`;
+    const key = p.moda_key || inferKey(text, K);
+    const item = key && K.items.get(key);
+    const g = inferGender({ name_ar: p.name_ar, name_en: p.name_en, cat_text: '', department: p.department }, key, K);
+    return { suggestedModaKey: item && !item.virtual && !p.moda_key ? key : '', suggestedAudience: p.audience ? '' : g };
+  } catch { return {}; }
+}
+
 const productSchema = z.object({
   name_ar: z.string().trim().min(2, 'required').max(120),
-  name_en: z.string().trim().min(2, 'required').max(120),
+  name_en: z.string().trim().max(120).optional().default(''), // اختياري: لو فاضي بنستخدم الاسم العربي
+  audience: z.string().max(12).nullable().optional(),
   description_ar: z.string().trim().max(4000).optional().default(''),
   description_en: z.string().trim().max(4000).optional().default(''),
   price: z.coerce.number().int().min(1, 'price_required').max(1_000_000),
@@ -481,9 +498,9 @@ function saveProduct(storeId, data, existing) {
     const variants = data.variants.filter((v) => v.color || v.size);
     const stock = variants.length ? variants.reduce((s, v) => s + v.stock, 0) : data.stock;
     const row = {
-      name_ar: data.name_ar, name_en: data.name_en, description_ar: data.description_ar, description_en: data.description_en,
+      name_ar: data.name_ar, name_en: data.name_en || data.name_ar, description_ar: data.description_ar, description_en: data.description_en,
       price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null,
-      category_id: data.category_id || null, department: productDepartment(storeId, data.department, `${data.name_ar} ${data.name_en}`), style_level: data.style_level ?? null, moda_key: data.moda_key || null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
+      category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, data.department, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };
@@ -492,7 +509,7 @@ function saveProduct(storeId, data, existing) {
       id = existing.id;
       update('products', id, row);
     } else {
-      id = insert('products', { ...row, store_id: storeId, slug: uniqueSlug(storeId, data.name_en) });
+      id = insert('products', { ...row, store_id: storeId, slug: uniqueSlug(storeId, data.name_en || data.name_ar) });
     }
     // media: order as sent, primary flagged
     q.run('DELETE FROM product_media WHERE product_id=?', [id]);

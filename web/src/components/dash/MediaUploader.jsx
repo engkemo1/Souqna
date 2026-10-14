@@ -35,7 +35,7 @@ async function compress(file) {
 function Tips({ t }) {
   const base = useDashBase();
   return (
-    <details className="mb-3 rounded-2xl border border-line bg-secondary/40 p-4 text-sm [&_summary::-webkit-details-marker]:hidden" open>
+    <details className="mb-3 rounded-2xl border border-line bg-secondary/40 p-4 text-sm [&_summary::-webkit-details-marker]:hidden">
       <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold"><Lightbulb className="h-4 w-4 text-brand" />{t('editor.tipsTitle')}</summary>
       <ul className="mt-3 list-disc space-y-1.5 ps-5 text-[13.5px] leading-relaxed text-muted marker:text-brand">
         {[1, 2, 3, 4, 5].map((n) => <li key={n}>{t(`editor.tip${n}`)}</li>)}

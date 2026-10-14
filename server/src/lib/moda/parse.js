@@ -210,6 +210,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   const seasons = entriesOf(matches, 'season').map((e) => e.key);
   if (seasons.length) result.season = seasons[0];
   result.taste = [...new Set(entriesOf(matches, 'taste').map((e) => e.key))];
+  if (intents.includes('cheaper') && result.garments.length) result.flags.cheapest = true;
   const fl = entriesOf(matches, 'advice').some((e) => e.key === 'full_look');
   result.fullLook = fl;
 
@@ -230,7 +231,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   const hasContent = result.garments.length || result.context || result.budget || result.persons.length;
   if (has('reset')) result.followup = 'reset';
   else if (has('show_more') && !result.garments.length) result.followup = 'show_more';
-  else if (has('cheaper')) result.followup = 'cheaper';
+  else if (has('cheaper') && !result.garments.length && !result.context) result.followup = 'cheaper'; // "أقل سعر تيشيرت" is a product request, not "cheaper than before"
   else if (!hasContent && has('yes') && tokens.length <= 3) result.followup = 'yes';
   else if (!hasContent && has('no') && tokens.length <= 3) result.followup = 'no';
 

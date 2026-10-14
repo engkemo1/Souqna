@@ -80,14 +80,15 @@ const MEN_KEYS = new Set(['suit', 'tuxedo', 'tie', 'bow_tie', 'pocket_square', '
 
 /** الفئة اللي المنتج ليها: men | women | boys | girls | kids | unisex */
 export function inferGender(row, key, K = loadKnowledge()) {
+  if (['men', 'women', 'boys', 'girls', 'kids', 'unisex'].includes(row.audience)) return row.audience; // اختيار صاحب المحل الصريح يغلب التخمين
   const text = `${row.name_ar || ''} ${row.name_en || ''} ${row.cat_text || ''}`;
   if (hasAny(K, text, KIDS_GIRL)) return 'girls';
   if (hasAny(K, text, KIDS_BOY)) return 'boys';
   if (hasAny(K, text, KIDS_BOTH) || row.department === 'kids') return 'kids';
   if (hasAny(K, text, MEN_WORDS)) return 'men';
   if (hasAny(K, text, WOMEN_WORDS)) return 'women';
-  if (['women', 'hijab', 'abaya', 'wedding_dresses'].includes(row.department)) return 'women';
-  if (['men', 'wedding_suits'].includes(row.department)) return 'men';
+  if (['women', 'hijab', 'abaya', 'wedding_dress'].includes(row.department)) return 'women';
+  if (['men', 'wedding_suit'].includes(row.department)) return 'men';
   if (row.department === 'jalabiya') return key === 'jalabiya' ? 'unisex' : 'unisex';
   if (WOMEN_KEYS.has(key)) return 'women';
   if (MEN_KEYS.has(key)) return 'men';

@@ -118,7 +118,7 @@ function DeptSheet({ dept, onClose, onSaved }) {
             <Field label="الترتيب" hint="الأصغر يظهر الأول"><Input type="number" dir="ltr" min={0} value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value })} /></Field>
           </div>
           {isNew ? <p className="rounded-xl bg-secondary px-3 py-2 text-[13px] text-muted">تقدر ترفع صورة القسم بعد ما تضيفه (تعديل ← صورة القسم).</p> : <DeptPhoto dept={dept} onSaved={onSaved} />}
-          <div><p className="mb-2 text-sm font-medium">المقاسات الخاصة بالقسم</p><SizesEditor value={f.sizes} onChange={(sizes) => setF({ ...f, sizes })} />
+          <div><p className="mb-2 text-sm font-medium">مقاسات احتياطية للقسم (المقاسات الأساسية بتيجي من نوع المنتج)</p><SizesEditor value={f.sizes} onChange={(sizes) => setF({ ...f, sizes })} />
             <p className="mt-2 text-[13px] text-muted">دي المقاسات اللي بتظهر لصاحب المحل جاهزة وهو بيضيف منتج في المحل اللي فيه القسم ده.</p></div>
           {!isNew && <Switch checked={f.active} onChange={(v) => setF({ ...f, active: v })} label="القسم مفعّل" description="لو اتقفل مش هيظهر للمحلات الجديدة ولا في الفلتر" />}
         </form>
@@ -140,7 +140,7 @@ export default function Departments() {
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
   return (
     <div>
-      <PageHeader title="الأقسام" subtitle="الأقسام اللي المحلات بتختار منها (شنط، ملابس، أطفال، كوتشيات…) ومقاسات كل قسم" actions={<Button icon={Plus} onClick={() => setEdit('new')}>قسم جديد</Button>} />
+      <PageHeader title="الأقسام" subtitle="الأقسام اللي بتظهر للعملاء وبتختار منها المحلات اللي بتبيعه. القسم والمقاسات بتتحدد تلقائي لكل منتج من (الفئة ← النوع) اللي صاحب المحل بيختاره." actions={<Button icon={Plus} onClick={() => setEdit('new')}>قسم جديد</Button>} />
       {loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : !list.length ? <EmptyState title="مفيش أقسام" body="أضف أول قسم." /> : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((d) => (

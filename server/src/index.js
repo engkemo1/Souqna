@@ -60,7 +60,7 @@ app.use(errorHandler);
 
 import('./db/index.js').then(({ q }) => q.run("UPDATE users SET role='demo' WHERE email=? AND role='owner'", [config.demoEmail]));
 import('./lib/backup.js').then((m) => m.startBackupSchedule());
-import('./lib/departments.js').then((m) => { const n = m.backfillDepartments(); if (n) console.log(`[departments] filled ${n} product(s) without a department`); });
+import('./lib/departments.js').then(async (m) => { const n = m.backfillDepartments(); if (n) console.log(`[departments] filled ${n} product(s) without a department`); const t = await m.backfillProductTypes(); if (t) console.log(`[types] inferred type/audience for ${t} product(s)`); });
 import('./lib/visual.js').then((m) => m.startVisualIndexer());
 export { app };
 

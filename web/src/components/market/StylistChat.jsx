@@ -252,7 +252,7 @@ export default function StylistChat() {
           onClick={() => setOpen(true)}
           dir="ltr"
           aria-label={lang === 'ar' ? `اسأل ${name}؟` : `Ask ${name}?`}
-          className="fixed bottom-4 left-4 z-40 inline-flex h-[52px] items-center gap-2.5 rounded-full bg-[#ea580c] p-1.5 pe-5 text-[15px] font-bold text-white shadow-[0_4px_20px_rgba(234,88,12,0.45)] transition hover:bg-[#d94e08] hover:shadow-[0_6px_26px_rgba(234,88,12,0.55)] active:scale-95 sm:bottom-6 sm:left-6"
+          className="fixed bottom-[calc(84px+env(safe-area-inset-bottom))] left-4 z-40 md:bottom-4 inline-flex h-[52px] items-center gap-2.5 rounded-full bg-[#ea580c] p-1.5 pe-5 text-[15px] font-bold text-white shadow-[0_4px_20px_rgba(234,88,12,0.45)] transition hover:bg-[#d94e08] hover:shadow-[0_6px_26px_rgba(234,88,12,0.55)] active:scale-95 sm:bottom-6 sm:left-6"
         >
           {/* Always use our moda.webp avatar with clean ring */}
           <span className="flex h-[40px] w-[40px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white/90 shadow-xs">
@@ -315,7 +315,7 @@ export default function StylistChat() {
                   {i === msgs.length - 1 && m.questions?.length > 0 && !busy && <>
                     {m.questions.map((qq) => (
                       <div key={qq.id} className="mt-3">
-                        <p className="mb-1.5 text-[13px] font-semibold">{qq.text}</p>
+                        {String(m.say || m.content || '').trim() !== String(qq.text || '').trim() && <p className="mb-1.5 text-[13px] font-semibold">{qq.text}</p>}
                         <div className="flex flex-wrap gap-2">
                           {qq.options.map((o) => <button key={String(o.label)} type="button" aria-pressed={questionAnswers[qq.id] === o.value} onClick={() => pickQuestionOption(m.questions, qq, o)} className={cx('rounded-full border px-3.5 py-2 text-[13px] font-medium transition', questionAnswers[qq.id] === o.value ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong bg-elevated hover:border-brand hover:text-brand')}>{o.label}</button>)}
                         </div>

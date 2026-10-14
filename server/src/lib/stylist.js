@@ -10,6 +10,7 @@ import { q, tx } from '../db/index.js';
 import { listDepartments } from './departments.js';
 import { serializeCards, bi } from './serialize.js';
 import { runModa } from './moda/engine.js';
+import { makeBrain } from './moda/brain.js';
 import { loadKnowledge } from './moda/knowledge.js';
 import { makeLlmExtract } from './moda/llm.js';
 import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates, slotOwnerLabel, cleanSay } from './stylist-ranking.js';
@@ -24,7 +25,8 @@ const STYLIST_FEEDBACK_KEY = 'moda_feedback';
 const anthropicKey = () => process.env.ANTHROPIC_API_KEY || '';
 const cfAccount = () => process.env.CF_ACCOUNT_ID || process.env.R2_ACCOUNT_ID || '';
 const cfToken = () => process.env.CF_AI_TOKEN || '';
-export const providerReady = { anthropic: () => !!anthropicKey(), cloudflare: () => !!(cfAccount() && cfToken()) };
+const geminiKey = () => process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+export const providerReady = { anthropic: () => !!anthropicKey(), cloudflare: () => !!(cfAccount() && cfToken()), gemini: () => !!geminiKey() };
 let lastError = '';
 
 export function stylistSettings() {
@@ -298,6 +300,21 @@ function stylistTrainingPrompt(query) {
 
 /* ---------------- LLM ---------------- */
 export async function callLlm(provider, system, messages) {
+  if (provider === 'gemini') {
+    // Google AI Studio (مجاني بحدود يومية): أقوى بكتير من Llama في العامية المصرية
+    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+    const res = await fetch(`${process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta'}/models/${model}:generateContent`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': geminiKey() },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }] })),
+        generationConfig: { temperature: 0.5, maxOutputTokens: 900, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
+      }), signal: AbortSignal.timeout(25000),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(`Gemini ${res.status}: ${JSON.stringify(j.error || j).slice(0, 160)}`);
+    return (j.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join('');
+  }
   if (provider === 'anthropic') {
     const res = await fetch(process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': anthropicKey(), 'anthropic-version': '2023-06-01' },
@@ -475,6 +492,16 @@ function modaCatalogue() {
   return rows;
 }
 export const modaEngineEnabled = () => (process.env.STYLIST_ENGINE || 'moda') !== 'legacy';
+
+
+/** عقل مودة (موديل لغة): بيرجّع دالة أو null لو مفيش مزوّد AI متظبط. المحرك بيشتغل من غيره عادي. */
+export function modaBrain() {
+  if (process.env.MODA_BRAIN === '0') return null;
+  // الترتيب حسب جودة العامية المصرية: Claude ثم Gemini (مجاني) ثم Cloudflare (مجاني، الأضعف)
+  const use = providerReady.anthropic() ? 'anthropic' : providerReady.gemini() ? 'gemini' : providerReady.cloudflare() ? 'cloudflare' : null;
+  if (!use) return null;
+  return makeBrain((system, msgs) => callLlm(use, system, msgs), { training: (text) => stylistTrainingPrompt(text) });
+}
 
 /** يرجّع نفس شكل الرد القديم + الحقول الجديدة (state, tabs, questions, session). */
 export async function runModaStylist(messages, { profile, session, answers, imageText = '', assistantName = stylistSettings().name } = {}) {

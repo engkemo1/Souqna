@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Plus, X, Check, Eye, Info, Package, Sparkles, Loader2 } from 'lucide-react';
+import { ChevronDown, Plus, X, Check, Eye, Info, Package, Sparkles, Loader2, Search, Pencil, Circle } from 'lucide-react';
 import { onColor } from '@souqna/shared/theme';
 import { useApi, useIsDesktop, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
-import { useDepartments } from '../../lib/departments.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import { useDashBase } from '../../lib/dashBase.js';
@@ -20,27 +19,22 @@ import { EmptyState, ErrorState, errorMessage, fieldErrors } from '../../compone
 import { useToast } from '../../components/ui/Toast.jsx';
 import { cx } from '../../components/ui/cx.js';
 
-const SIZE_SETS = [
-  ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'],
-  ['28', '30', '32', '34', '36', '38', '40', '42'],
-  ['36', '37', '38', '39', '40', '41', '42', '43', '44', '45'], // shoes (EU)
-  ['0-3M', '3-6M', '6-12M', '1Y', '2Y', '3Y', '4Y', '6Y', '8Y', '10Y', '12Y', '14Y'], // kids
-  ['52', '54', '56', '58', '60'], // abaya / jalabiya length
-  ['Free size', 'One size'],
-];
 const PRESET_COLORS = [
   ['#1C1C1E', 'أسود', 'Black'], ['#F4F3EF', 'أبيض', 'White'], ['#8E9096', 'رمادي', 'Grey'], ['#1F2B4D', 'كحلي', 'Navy'], ['#30558F', 'أزرق', 'Blue'],
   ['#B3343A', 'أحمر', 'Red'], ['#6E2433', 'نبيتي', 'Burgundy'], ['#3F7A55', 'أخضر', 'Green'], ['#4E5A3A', 'زيتي', 'Olive'], ['#D9C6A5', 'بيج', 'Beige'],
   ['#7A5634', 'بني', 'Brown'], ['#E2C044', 'أصفر', 'Yellow'], ['#E07A3A', 'برتقالي', 'Orange'], ['#6C4E8C', 'بنفسجي', 'Purple'], ['#E8A5B5', 'بينك', 'Pink'],
 ];
 
+
 const EMPTY = {
   name_ar: '', name_en: '', description_ar: '', description_en: '', price: '', compare_at_price: '', cost: '', sku: '',
-  category_id: '', department: '', moda_key: '', style_level: '', status: 'active', featured: false, is_new: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
+  category_id: '', audience: '', moda_key: '', style_level: '', status: 'active', featured: false, is_new: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
   media: [], seo_title: '', seo_description: '',
 };
+const STYLE_LEVELS = [['1', 'بيتي'], ['2', 'كاجوال'], ['3', 'شيك'], ['4', 'رسمي'], ['5', 'سواريه']];
 
 const vkey = (c, s) => `${c || '-'}|${s || '-'}`;
+const nz = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ًٌٍَُِّْ]/g, '').trim();
 
 function fromProduct(p) {
   const matrix = {};
@@ -48,9 +42,9 @@ function fromProduct(p) {
   for (const v of p.variants) { matrix[vkey(v.color, v.size)] = v.stock; ids[vkey(v.color, v.size)] = v.id; }
   return {
     ...EMPTY,
-    name_ar: p.name.ar, name_en: p.name.en, description_ar: p.description.ar || '', description_en: p.description.en || '',
+    name_ar: p.name.ar, name_en: p.name.en && p.name.en !== p.name.ar ? p.name.en : '', description_ar: p.description.ar || '', description_en: p.description.en || '',
     price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '',
-    category_id: p.categoryId ? String(p.categoryId) : '', department: p.department || '', moda_key: p.modaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', status: p.status, featured: p.featured, is_new: p.isNewFlag,
+    category_id: p.categoryId ? String(p.categoryId) : '', audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', status: p.status, featured: p.featured, is_new: p.isNewFlag,
     colors: p.colors, sizes: p.sizes, matrix, variantIds: ids, track_stock: p.trackStock, stock: p.stockCount, low_stock_at: p.lowStockAt,
     media: p.media, seo_title: p.seo.title || '', seo_description: p.seo.description || '',
   };
@@ -65,31 +59,80 @@ function toPayload(f) {
   return {
     name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en,
     price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, cost: f.cost ? Number(f.cost) : null,
-    sku: f.sku || null, category_id: f.category_id ? Number(f.category_id) : null, department: f.department || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, status: f.status, featured: f.featured, is_new: f.is_new,
+    sku: f.sku || null, category_id: f.category_id ? Number(f.category_id) : null, audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, status: f.status, featured: f.featured, is_new: f.is_new,
     colors: f.colors, sizes: f.sizes, variants, track_stock: f.track_stock, stock: Number(f.stock || 0), low_stock_at: Number(f.low_stock_at || 0),
     media: f.media.map((m) => m.id), primary_media_id: f.media[0]?.id ?? null, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
   };
 }
 
-/* --------------------------------------------------------------- sections */
+/* --------------------------------------------------------------- building blocks */
 
-function Section({ id, title, children, collapsible, open, onToggle, done }) {
+function Card({ id, step, title, hint, done, children, className }) {
   return (
-    <section id={id} className="scroll-mt-24 rounded-2xl border border-line bg-elevated">
-      {collapsible ? (
-        <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start">
-          <span className="flex items-center gap-2.5 text-base font-semibold">{done && <span className="grid h-5 w-5 place-items-center rounded-full bg-success text-white"><Check className="h-3 w-3" strokeWidth={3} /></span>}{title}</span>
-          <ChevronDown className={cx('h-5 w-5 text-muted transition-transform', open && 'rotate-180')} />
-        </button>
-      ) : <h2 className="px-5 pt-5 text-base font-semibold sm:px-6">{title}</h2>}
-      <AnimatePresence initial={false}>
-        {(!collapsible || open) && (
-          <motion.div initial={collapsible ? { height: 0, opacity: 0 } : false} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }} className="overflow-hidden">
-            <div className={cx('px-5 pb-5 sm:px-6 sm:pb-6', collapsible ? 'pt-1' : 'pt-4')}>{children}</div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <section id={id} className={cx('scroll-mt-24 rounded-2xl border bg-elevated transition-colors', done ? 'border-line' : 'border-line', className)}>
+      <header className="flex items-center gap-3 px-5 pt-5 sm:px-6">
+        <span className={cx('grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-bold tabular', done ? 'bg-success text-white' : 'bg-fg/[0.07] text-muted')}>{done ? <Check className="h-4 w-4" strokeWidth={3} /> : step}</span>
+        <div className="min-w-0"><h2 className="text-base font-semibold leading-tight">{title}</h2>{hint && <p className="mt-0.5 text-[13px] text-muted">{hint}</p>}</div>
+      </header>
+      <div className="px-5 pb-5 pt-4 sm:px-6 sm:pb-6">{children}</div>
     </section>
+  );
+}
+
+const chipCls = (on) => cx('inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg');
+
+/** اختيار نوع المنتج على طريقة Amazon: الفئة (لمين؟) ← ابحث أو تصفح الأنواع. من النوع بنحدد القسم والمقاسات تلقائي. */
+function TypePicker({ tree, audience, typeKey, onChange, error, suggested }) {
+  const { lang } = useI18n();
+  const L = (ar, en) => (lang === 'ar' ? ar : en);
+  const [q, setQ] = useState('');
+  const [fam, setFam] = useState('all');
+  const [open, setOpen] = useState(!typeKey);
+  useEffect(() => { setOpen(!typeKey); }, [typeKey]);
+  if (!tree) return <Skeleton className="h-32 rounded-xl" />;
+  const found = tree.families.flatMap((f) => f.types.map((t) => ({ ...t, family: f }))).find((t) => t.key === typeKey);
+  const aud = tree.audiences.find((a) => a.key === audience);
+  const term = nz(q);
+  const list = tree.families.map((f) => ({ ...f, types: f.types.filter((t) => (!audience || t.audiences.includes(audience)) && (!term || nz(t.ar).includes(term))) })).filter((f) => f.types.length && (fam === 'all' || fam === f.key || term));
+  const pickAudience = (key) => { const cur = found; onChange({ audience: key, moda_key: cur && !cur.audiences.includes(key) ? '' : typeKey }); };
+  return (
+    <div className="space-y-4">
+      <div>
+        <p className="mb-2 text-sm font-medium">{L('المنتج لمين؟', 'Who is it for?')}</p>
+        <div className="flex flex-wrap gap-2" role="group">
+          {tree.audiences.map((a) => <button key={a.key} type="button" aria-pressed={audience === a.key} onClick={() => pickAudience(a.key)} className={chipCls(audience === a.key)}>{lang === 'ar' ? a.ar : a.en}</button>)}
+        </div>
+      </div>
+      {found && !open ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-secondary/40 px-4 py-3">
+          <div className="min-w-0"><p className="text-[13px] text-muted">{[aud?.ar, found.family.ar].filter(Boolean).join(' › ')}</p><p className="truncate text-base font-semibold">{found.ar}</p>{suggested && <p className="mt-0.5 text-[12.5px] text-amber-700">{L('اقتراح من اسم المنتج — راجعه', 'Suggested from the name — please check')}</p>}</div>
+          <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-brand hover:bg-brand/10"><Pencil className="h-3.5 w-3.5" />{L('تغيير', 'Change')}</button>
+        </div>
+      ) : !audience ? (
+        <p className="rounded-xl bg-secondary/50 px-4 py-3 text-sm text-muted">{L('اختار الفئة الأول وهتظهرلك الأنواع المناسبة.', 'Pick who it is for first and the matching types will show.')}</p>
+      ) : (
+        <div className="space-y-3">
+          <div className="relative"><Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><Input value={q} onChange={(e) => setQ(e.target.value)} className="ps-10" placeholder={L('ابحث عن النوع: قميص، جزمة، فستان…', 'Search type: shirt, shoes, dress…')} aria-label={L('بحث في الأنواع', 'Search types')} /></div>
+          {!term && (
+            <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+              {[{ key: 'all', ar: L('الكل', 'All') }, ...tree.families.filter((f) => f.types.some((t) => t.audiences.includes(audience)))].map((f) => <button key={f.key} type="button" onClick={() => setFam(f.key)} className={cx('h-8 shrink-0 rounded-full px-3.5 text-[13px] font-semibold transition', fam === f.key ? 'bg-brand text-white' : 'bg-fg/[0.06] text-muted hover:text-fg')}>{f.ar}</button>)}
+            </div>
+          )}
+          <div className="max-h-[22rem] space-y-4 overflow-y-auto rounded-xl pe-1">
+            {list.length === 0 && <p className="py-6 text-center text-sm text-muted">{L('مفيش نوع بالاسم ده. جرّب كلمة تانية أو اتصفح الأقسام.', 'No type matches. Try another word or browse.')}</p>}
+            {list.map((f) => (
+              <div key={f.key}>
+                {(fam === 'all' || term) && <p className="mb-1.5 text-[12.5px] font-semibold text-muted">{f.ar}</p>}
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {f.types.map((t) => <button key={t.key} type="button" onClick={() => { onChange({ moda_key: t.key }); setOpen(false); setQ(''); }} className={cx('min-h-[2.75rem] rounded-xl border px-3 py-2 text-start text-sm font-medium transition active:scale-[0.98]', typeKey === t.key ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{t.ar}</button>)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {error && <p role="alert" className="text-[13px] font-medium text-sale">{error}</p>}
+    </div>
   );
 }
 
@@ -125,81 +168,70 @@ function ColorPicker({ open, onClose, onAdd, existing }) {
   );
 }
 
-/** Size rows come from the store's departments (managed by the platform team); legacy presets are the fallback. */
-function useSizeSets() {
-  const { store } = useAuth();
-  const { list, label } = useDepartments();
-  return useMemo(() => {
-    const mine = (store?.departments || []).map((s) => list.find((d) => d.slug === s)).filter((d) => d?.sizes?.length);
-    const rows = []; const seen = new Set();
-    for (const d of mine) {
-      const key = d.sizes.join('|');
-      if (seen.has(key)) { rows.find((r) => r.key === key).label += ` · ${label(d.slug)}`; continue; }
-      seen.add(key); rows.push({ key, label: label(d.slug), sizes: d.sizes });
-    }
-    return rows.length ? rows : SIZE_SETS.map((sizes, i) => ({ key: String(i), label: '', sizes }));
-  }, [store?.departments, list, label]);
-}
 
-function VariantsEditor({ f, set }) {
-  const { t, tr } = useI18n();
-  const sizeSets = useSizeSets();
+function VariantsEditor({ f, set, sizeKind, typeChosen }) {
+  const { t, tr, lang } = useI18n();
+  const L = (ar, en) => (lang === 'ar' ? ar : en);
   const [picker, setPicker] = useState(false);
   const [customSize, setCustomSize] = useState('');
   const [fill, setFill] = useState('');
   const toggleSize = (s) => set({ sizes: f.sizes.includes(s) ? f.sizes.filter((x) => x !== s) : [...f.sizes, s] });
+  const toggleColor = ([hex, ar, en]) => set({ colors: f.colors.some((c) => c.hex.toUpperCase() === hex) ? f.colors.filter((c) => c.hex.toUpperCase() !== hex) : [...f.colors, { hex, name_ar: ar, name_en: en }] });
   const rows = f.colors.length ? f.colors : [null];
   const cols = f.sizes.length ? f.sizes : [null];
   const total = rows.reduce((sum, c) => sum + cols.reduce((s2, s) => s2 + Number(f.matrix[vkey(c?.hex, s)] || 0), 0), 0);
   const setCell = (c, s, v) => set({ matrix: { ...f.matrix, [vkey(c?.hex, s)]: v.replace(/\D/g, '') } });
-  const hasMatrix = f.colors.length || f.sizes.length;
+  const hasMatrix = (f.colors.length || f.sizes.length) && f.track_stock;
+  const kindSizes = sizeKind?.sizes || [];
+  const extra = f.sizes.filter((s) => !kindSizes.includes(s));
+  const noSizes = typeChosen && sizeKind && kindSizes.length === 0;
+  const customColors = f.colors.filter((c) => !PRESET_COLORS.some(([h]) => h === c.hex.toUpperCase()));
 
   return (
     <div className="space-y-6">
       <div>
-        <p className="mb-2.5 text-sm font-medium">{t('editor.colors')}</p>
-        <div className="flex flex-wrap gap-2">
-          {f.colors.map((c) => (
-            <span key={c.hex} className="inline-flex h-10 items-center gap-2 rounded-full border border-line-strong ps-1.5 pe-1 text-sm font-medium">
-              <span className="h-7 w-7 rounded-full ring-1 ring-inset ring-black/10" style={{ background: c.hex }} />
-              {tr({ ar: c.name_ar, en: c.name_en })}
-              <button type="button" onClick={() => set({ colors: f.colors.filter((x) => x.hex !== c.hex) })} aria-label={t('common.delete')} className="grid h-8 w-8 place-items-center rounded-full text-muted hover:bg-fg/[0.06] hover:text-sale"><X className="h-4 w-4" /></button>
-            </span>
+        <p className="mb-2.5 text-sm font-medium">{t('editor.colors')} <span className="font-normal text-muted">· {L('اختار كل الألوان المتاحة', 'tick every colour you have')}</span></p>
+        <div className="flex flex-wrap gap-2.5">
+          {PRESET_COLORS.map((p) => {
+            const on = f.colors.some((c) => c.hex.toUpperCase() === p[0]);
+            return (
+              <button key={p[0]} type="button" onClick={() => toggleColor(p)} aria-pressed={on} title={lang === 'ar' ? p[1] : p[2]} className="flex w-14 flex-col items-center gap-1 text-[11.5px] text-muted">
+                <span className={cx('grid h-10 w-10 place-items-center rounded-full ring-1 ring-inset ring-black/10 transition active:scale-90', on && 'ring-2 ring-offset-2 ring-fg ring-offset-elevated')} style={{ background: p[0] }}>{on && <Check className="h-4 w-4" style={{ color: onColor(p[0]) }} strokeWidth={3} />}</span>
+                <span className={cx('w-full truncate text-center', on && 'font-semibold text-fg')}>{lang === 'ar' ? p[1] : p[2]}</span>
+              </button>
+            );
+          })}
+          {customColors.map((c) => (
+            <button key={c.hex} type="button" onClick={() => set({ colors: f.colors.filter((x) => x.hex !== c.hex) })} className="flex w-14 flex-col items-center gap-1 text-[11.5px] font-semibold text-fg" aria-label={t('common.delete')}>
+              <span className="grid h-10 w-10 place-items-center rounded-full ring-2 ring-offset-2 ring-fg ring-offset-elevated" style={{ background: c.hex }}><X className="h-4 w-4" style={{ color: onColor(c.hex) }} strokeWidth={3} /></span>
+              <span className="w-full truncate text-center">{tr({ ar: c.name_ar, en: c.name_en })}</span>
+            </button>
           ))}
-          <button type="button" onClick={() => setPicker(true)} className="inline-flex h-10 items-center gap-1.5 rounded-full border border-dashed border-line-strong px-4 text-sm font-semibold text-brand hover:border-primary"><Plus className="h-4 w-4" />{t('editor.addColor')}</button>
+          <button type="button" onClick={() => setPicker(true)} className="flex w-14 flex-col items-center gap-1 text-[11.5px] font-semibold text-brand"><span className="grid h-10 w-10 place-items-center rounded-full border border-dashed border-line-strong"><Plus className="h-4 w-4" /></span>{L('لون تاني', 'Other')}</button>
         </div>
       </div>
 
-      <div>
-        <p className="mb-2.5 text-sm font-medium">{t('editor.sizes')}</p>
-        <div className="space-y-2.5">
-          {sizeSets.map((row) => (
-            <div key={row.key}>
-              {row.label && <p className="mb-1.5 text-[13px] font-medium text-muted">{row.label}</p>}
-              <div className="flex flex-wrap gap-2">
-              {row.sizes.map((s) => {
-                const on = f.sizes.includes(s);
-                return <button key={s} type="button" onClick={() => toggleSize(s)} aria-pressed={on} className={cx('h-10 min-w-[3rem] rounded-xl border px-3 text-sm font-semibold transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{s}</button>;
-              })}
-              </div>
-            </div>
-          ))}
-          <form className="flex max-w-xs gap-2" onSubmit={(e) => { e.preventDefault(); const s = customSize.trim(); if (s && !f.sizes.includes(s)) set({ sizes: [...f.sizes, s] }); setCustomSize(''); }}>
+      {noSizes ? (
+        <p className="rounded-xl bg-secondary/50 px-4 py-3 text-sm text-muted">{L('النوع ده من غير مقاسات — اكتب الكمية بس.', 'This type has no sizes — just enter the quantity.')}</p>
+      ) : (
+        <div>
+          <p className="mb-2.5 text-sm font-medium">{t('editor.sizes')} {sizeKind && <span className="font-normal text-muted">· {sizeKind.ar}</span>}</p>
+          {!typeChosen && <p className="mb-2 text-[13px] text-amber-700">{L('اختار نوع المنتج فوق عشان تظهرلك المقاسات المناسبة له.', 'Pick the product type above to see its sizes.')}</p>}
+          <div className="flex flex-wrap gap-2">
+            {kindSizes.map((s) => { const on = f.sizes.includes(s); return <button key={s} type="button" onClick={() => toggleSize(s)} aria-pressed={on} className={cx('h-10 min-w-[3rem] rounded-xl border px-3 text-sm font-semibold transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{s}</button>; })}
+            {extra.map((s) => <button key={s} type="button" onClick={() => toggleSize(s)} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-fg bg-fg px-3 text-sm font-semibold text-canvas">{s}<X className="h-3.5 w-3.5" /></button>)}
+          </div>
+          <form className="mt-2.5 flex max-w-xs gap-2" onSubmit={(e) => { e.preventDefault(); const s = customSize.trim(); if (s && !f.sizes.includes(s)) set({ sizes: [...f.sizes, s] }); setCustomSize(''); }}>
             <Input size="sm" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder={t('editor.customSize')} maxLength={12} />
             <Button type="submit" size="sm" variant="outline" icon={Plus} aria-label={t('common.add')} />
           </form>
-          {f.sizes.filter((s) => !sizeSets.some((r) => r.sizes.includes(s))).length > 0 && (
-            <div className="flex flex-wrap gap-2">{f.sizes.filter((s) => !sizeSets.some((r) => r.sizes.includes(s))).map((s) => (
-              <button key={s} type="button" onClick={() => toggleSize(s)} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-fg bg-fg px-3 text-sm font-semibold text-canvas">{s}<X className="h-3.5 w-3.5" /></button>
-            ))}</div>
-          )}
         </div>
-      </div>
+      )}
 
       {hasMatrix ? (
         <div>
           <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm font-medium">{t('editor.variantMatrix')} <span className="text-muted">· {t('editor.totalStock', { n: total })}</span></p>
+            <p className="text-sm font-medium">{L('الكمية المتاحة', 'Quantity in stock')} <span className="text-muted">· {t('editor.totalStock', { n: total })}</span></p>
             <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); const m = {}; rows.forEach((c) => cols.forEach((s) => { m[vkey(c?.hex, s)] = fill; })); set({ matrix: m }); }}>
               <Input size="sm" inputMode="numeric" value={fill} onChange={(e) => setFill(e.target.value.replace(/\D/g, ''))} className="w-20" aria-label={t('editor.fillAll')} placeholder="0" />
               <Button type="submit" size="sm" variant="secondary">{t('editor.fillAll')}</Button>
@@ -235,6 +267,7 @@ function VariantsEditor({ f, set }) {
   );
 }
 
+
 /* --------------------------------------------------------------- page */
 
 export default function ProductEditor() {
@@ -242,28 +275,42 @@ export default function ProductEditor() {
   const { id } = useParams();
   const isNew = !id;
   const { t, tr, lang } = useI18n();
+  const L = (ar, en) => (lang === 'ar' ? ar : en);
   const { store } = useAuth();
-  const depts = useDepartments();
-  const multiDept = (store?.departments?.length || 0) > 1;
   const toast = useToast();
   const navigate = useNavigate();
   const desktop = useIsDesktop();
   const { data, error, loading, reload } = useApi(isNew ? null : `/owner/products/${id}`, { keepPrevious: false });
   const { data: cats } = useApi('/owner/categories');
-  const { data: modaTypes } = useApi('/owner/moda-types');
+  const { data: tree } = useApi('/owner/product-types');
   const [f, setF] = useState(EMPTY);
   const [initial, setInitial] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
-  const [open, setOpen] = useState({ basic: true, images: true });
-  const [step, setStep] = useState(0);
+  const [suggested, setSuggested] = useState(false);
+  const [showEn, setShowEn] = useState(false);
+  const [adv, setAdv] = useState(false);
+  const nameRef = useRef(null);
 
   useEffect(() => {
-    if (data?.product) { const x = fromProduct(data.product); setF(x); setInitial(x); }
-    if (isNew) { setF(EMPTY); setInitial(EMPTY); }
+    if (data?.product) {
+      const x = fromProduct(data.product); setF(x); setInitial(x);
+      setSuggested(Boolean((!data.product.audience && data.product.suggestedAudience) || (!data.product.modaKey && data.product.suggestedModaKey)));
+      setShowEn(Boolean(x.name_en || x.description_en));
+    }
+    if (isNew) { setF(EMPTY); setInitial(EMPTY); setSuggested(false); }
   }, [data, isNew]);
 
-  const set = (patch) => setF((x) => ({ ...x, ...patch }));
+  const set = (patch) => {
+    setF((x) => ({ ...x, ...patch }));
+    if ('audience' in patch || 'moda_key' in patch) setSuggested(false);
+    setErrors((e) => { const n = { ...e }; for (const k of Object.keys(patch)) { delete n[k]; if (k === 'audience' || k === 'moda_key') delete n.type; } return n; });
+  };
+  const types = useMemo(() => (tree ? tree.families.flatMap((fm) => fm.types.map((ty) => ({ ...ty, family: fm }))) : []), [tree]);
+  const type = types.find((ty) => ty.key === f.moda_key) || null;
+  const sizeKind = tree && type ? tree.sizeKinds[type.sizeKind[f.audience || 'unisex']] : null;
+  const styleDefault = type?.style ? STYLE_LEVELS.find(([v]) => Number(v) === type.style)?.[1] : null;
+
   const [aiBusy, setAiBusy] = useState(false);
   const aiFill = async () => {
     const first = f.media[0]; if (!first || aiBusy) return;
@@ -272,51 +319,49 @@ export default function ProductEditor() {
       const { suggestion: a } = await api('/owner/ai/product', { method: 'POST', body: { mediaId: first.id, hint: f.name_ar || undefined } });
       const patch = {};
       if (!f.name_ar.trim() && a.name_ar) patch.name_ar = a.name_ar;
-      if (!f.name_en.trim() && a.name_en) patch.name_en = a.name_en;
+      if (!f.name_en.trim() && a.name_en) { patch.name_en = a.name_en; setShowEn(true); }
       if (!f.description_ar.trim() && a.description_ar) patch.description_ar = a.description_ar;
       if (!f.description_en.trim() && a.description_en) patch.description_en = a.description_en;
       if (!f.colors.length && a.colors?.length) patch.colors = a.colors.map((n) => PRESET_COLORS.find((p) => p[2] === n)).filter(Boolean).map(([hex, ar, en]) => ({ hex, name_ar: ar, name_en: en }));
-      if (!f.sizes.length && a.size_kind) { const i = ['clothes', 'pants', 'shoes', 'kids', 'length', 'free'].indexOf(a.size_kind); if (i >= 0) patch.sizes = SIZE_SETS[i].slice(0, i === 5 ? 1 : undefined); }
-      if (multiDept && !f.department && a.department) patch.department = a.department;
+      if (!f.audience && a.department) { const m = { men: 'men', women: 'women', kids: 'kids' }[a.department]; if (m) patch.audience = m; }
       set(patch); toast({ title: t('editor.aiFilled') });
     } catch (err) { toast({ tone: 'error', title: errorMessage(t, err) }); }
     setAiBusy(false);
   };
+
   const dirty = useMemo(() => JSON.stringify(toPayload(f)) !== JSON.stringify(toPayload(initial)), [f, initial]);
   const blocker = useBlocker(({ currentLocation, nextLocation }) => dirty && !saving && currentLocation.pathname !== nextLocation.pathname);
 
-  const validate = () => {
+  const validate = (status) => {
     const e = {};
     if (f.name_ar.trim().length < 2) e.name_ar = t('field.required');
-    if (f.name_en.trim().length < 2) e.name_en = t('field.required');
     if (!Number(f.price)) e.price = t('field.price_required');
     if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
-    if (multiDept && !f.department) e.department = t('editor.departmentRequired');
-    if (!f.media.length && f.status === 'active') e.media = t('editor.needImage');
+    if (status === 'active' && !(f.audience && f.moda_key)) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
+    if (!f.media.length && status === 'active') e.media = t('editor.needImage');
     setErrors(e);
     return e;
   };
 
-  const save = async () => {
-    const e = validate();
+  const save = async (statusOverride) => {
+    const status = statusOverride || f.status;
+    const e = validate(status);
     if (Object.keys(e).length) {
-      const firstSection = e.department && !e.name_ar && !e.name_en ? 'basic' : e.media ? 'images' : e.price || e.compare_at_price ? 'pricing' : 'basic';
-      setOpen((o) => ({ ...o, [firstSection]: true }));
-      if (!desktop && isNew) setStep(STEPS.findIndex((s) => s.id === firstSection));
-      setTimeout(() => document.getElementById(firstSection)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60);
-      toast({ tone: 'error', title: t('error.validation_failed') });
+      const first = e.media ? 'images' : e.type ? 'type' : e.name_ar ? 'name' : 'pricing';
+      setTimeout(() => { document.getElementById(first)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (first === 'name') nameRef.current?.focus({ preventScroll: true }); }, 60);
+      toast({ tone: 'error', title: Object.values(e)[0] || t('error.validation_failed') });
       return;
     }
     setSaving(true);
     try {
-      const r = await api(isNew ? '/owner/products' : `/owner/products/${id}`, { method: isNew ? 'POST' : 'PUT', body: toPayload(f) });
+      const r = await api(isNew ? '/owner/products' : `/owner/products/${id}`, { method: isNew ? 'POST' : 'PUT', body: toPayload({ ...f, status }) });
       invalidate('/owner/products');
       invalidate('/owner/overview');
       invalidate(`/stores/${store.slug}`);
-      setInitial(f);
-      toast({ title: isNew ? t('editor.created') : t('editor.saved'), image: r.product.media?.[0] ? `${r.product.media[0].base}/thumb.webp` : undefined });
+      setInitial({ ...f, status });
+      toast({ title: isNew ? (status === 'draft' ? L('اتحفظ كمسودة', 'Saved as draft') : t('editor.created')) : t('editor.saved'), image: r.product.media?.[0] ? `${r.product.media[0].base}/thumb.webp` : undefined });
       if (isNew) navigate(`${base}/products/${r.product.id}`, { replace: true });
-      else { const x = fromProduct({ ...data.product, ...r.product, cost: f.cost ? Number(f.cost) : null, status: f.status, featured: f.featured, isNewFlag: f.is_new, categoryId: f.category_id ? Number(f.category_id) : null, department: f.department }); setF(x); setInitial(x); }
+      else { const x = fromProduct({ ...data.product, ...r.product, audience: f.audience, cost: f.cost ? Number(f.cost) : null, status, featured: f.featured, isNewFlag: f.is_new, categoryId: f.category_id ? Number(f.category_id) : null }); setF(x); setInitial(x); }
     } catch (err) {
       const fe = fieldErrors(t, err);
       setErrors(fe);
@@ -331,192 +376,169 @@ export default function ProductEditor() {
   }
 
   const margin = f.cost && f.price ? Math.round(((f.price - f.cost) / f.price) * 100) : null;
-  const S = {
-    basic: (
-      <div className="grid gap-4 sm:grid-cols-2">
-        {f.media.length > 0 && (
-          <button type="button" onClick={aiFill} disabled={aiBusy} className="flex items-center justify-center gap-2 rounded-xl border border-brand/40 bg-brand/5 px-4 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-60 sm:col-span-2">
-            {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{t('editor.aiFill')}
-          </button>
-        )}
-        <Field label={t('editor.nameAr')} error={errors.name_ar}><Input dir="rtl" value={f.name_ar} onChange={(e) => set({ name_ar: e.target.value })} /></Field>
-        <Field label={t('editor.nameEn')} error={errors.name_en}><Input dir="ltr" value={f.name_en} onChange={(e) => set({ name_en: e.target.value })} /></Field>
-        {multiDept && (
-          <Field label={t('editor.department')} hint={t('editor.departmentHint')} error={errors.department} className="sm:col-span-2">
-            <div className="flex flex-wrap gap-2" role="group">
-              {store.departments.map((d) => <button key={d} type="button" aria-pressed={f.department === d} onClick={() => set({ department: d })}
-                className={cx('h-10 rounded-full border px-4 text-sm font-medium transition active:scale-95', f.department === d ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{depts.label(d)}</button>)}
-            </div>
-          </Field>
-        )}
-        <Field label="نوع القطعة عند مودة" hint="اختياري. اختاره لو الاسم أو تصنيف المحل ممكن يتفهم غلط؛ النوع هنا يغلب التخمين من الاسم والتصنيف." optional={t('common.optional')} className="sm:col-span-2">
-          <Select value={f.moda_key} onChange={(e) => set({ moda_key: e.target.value })}>
-            <option value="">تلقائي من اسم المنتج وتصنيف المحل</option>
-            {(modaTypes?.items || []).map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
-          </Select>
-        </Field>
-        <Field label="درجة الرسمية (بتساعد مودة ترشّحها للمناسبة الصح)" hint="سيبها تلقائي لو مش متأكد. درجة الرسمية بتتحدد جوه نطاق نوع القطعة؛ الكوتشي أو البنطلون الرياضي مش هيتحولوا لرسمي بسبب الدرجة وحدها." optional={t('common.optional')} className="sm:col-span-2">
-          <div className="flex flex-wrap gap-2" role="group">
-            {[['', 'تلقائي'], ['1', '1 · بيتي'], ['2', '2 · كاجوال'], ['3', '3 · شيك'], ['4', '4 · رسمي / نص رسمي'], ['5', '5 · سواريه / رسمي جدًا']].map(([v, label]) => <button key={v} type="button" aria-pressed={f.style_level === v} onClick={() => set({ style_level: v })}
-              className={cx('h-10 rounded-full border px-4 text-sm font-medium transition active:scale-95', f.style_level === v ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{label}</button>)}
-          </div>
-        </Field>
-        <Field label={t('editor.descAr')} optional={t('common.optional')}><Textarea dir="rtl" rows={4} value={f.description_ar} onChange={(e) => set({ description_ar: e.target.value })} /></Field>
-        <Field label={t('editor.descEn')} optional={t('common.optional')}><Textarea dir="ltr" rows={4} value={f.description_en} onChange={(e) => set({ description_en: e.target.value })} /></Field>
-      </div>
-    ),
-    images: <MediaUploader value={f.media} onChange={(media) => { set({ media }); if (media.length) setErrors((x) => ({ ...x, media: undefined })); }} error={errors.media} />,
-    pricing: (
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Field label={t('editor.price')} error={errors.price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.price} onChange={(e) => set({ price: e.target.value.replace(/\D/g, '') })} /></Field>
-        <Field label={t('editor.compareAt')} hint={!errors.compare_at_price ? t('editor.compareHint') : undefined} error={errors.compare_at_price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.compare_at_price} onChange={(e) => set({ compare_at_price: e.target.value.replace(/\D/g, '') })} /></Field>
-        <Field label={t('editor.cost')} hint={t('editor.costHint')} optional={t('common.optional')}><Input inputMode="numeric" suffix={t('common.currency')} value={f.cost} onChange={(e) => set({ cost: e.target.value.replace(/\D/g, '') })} /></Field>
-        {(margin != null || (f.compare_at_price && Number(f.compare_at_price) > Number(f.price))) && (
-          <div className="flex flex-wrap gap-2 sm:col-span-3">
-            {margin != null && <span className="rounded-full bg-secondary px-3 py-1.5 text-sm font-medium text-brand">{t('editor.margin')}: {margin}% · {t('editor.profit')}: {formatMoney(f.price - f.cost, lang)}</span>}
-            {f.compare_at_price && Number(f.compare_at_price) > Number(f.price) && <span className="rounded-full bg-sale/10 px-3 py-1.5 text-sm font-semibold text-sale">-{Math.round((1 - f.price / f.compare_at_price) * 100)}%</span>}
-          </div>
-        )}
-      </div>
-    ),
-    variants: (
-      <div className="space-y-6">
-        <VariantsEditor f={f} set={set} />
-        <div className="grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
-          <Switch label={t('editor.trackStock')} checked={f.track_stock} onChange={(v) => set({ track_stock: v })} />
-          {!f.colors.length && !f.sizes.length && f.track_stock && <Field label={t('editor.stock')}><Input inputMode="numeric" value={f.stock} onChange={(e) => set({ stock: e.target.value.replace(/\D/g, '') })} /></Field>}
-          {f.track_stock && <Field label={t('editor.lowStockAt')}><Input inputMode="numeric" value={f.low_stock_at} onChange={(e) => set({ low_stock_at: e.target.value.replace(/\D/g, '') })} /></Field>}
-          <Field label={t('editor.sku')} optional={t('common.optional')}><Input dir="ltr" value={f.sku} onChange={(e) => set({ sku: e.target.value })} /></Field>
-        </div>
-      </div>
-    ),
-    publishing: (
-      <div className="space-y-5">
-        <Field label={t('editor.status')}>
-          <Segmented value={f.status} onChange={(s) => set({ status: s })} className="w-full [&>button]:flex-1" options={['active', 'draft'].map((s) => ({ value: s, label: t(`products.status.${s}`) }))} />
-        </Field>
-        <Field label={t('editor.category')}>
-          <Select value={f.category_id} onChange={(e) => set({ category_id: e.target.value })}>
-            <option value="">{t('editor.noCategory')}</option>
-            {cats?.items.map((c) => <option key={c.id} value={c.id}>{tr(c.name)}</option>)}
-          </Select>
-        </Field>
-        <Switch label={t('editor.featured')} description={t('editor.featuredHint')} checked={f.featured} onChange={(v) => set({ featured: v })} />
-        <Switch label={t('editor.markNew')} description={t('editor.markNewHint')} checked={f.is_new} onChange={(v) => set({ is_new: v })} />
-      </div>
-    ),
-    seo: (
-      <div className="space-y-4">
-        <Field label={t('editor.seoTitle')} hint={`${(f.seo_title || f.name_en).length}/70`}><Input value={f.seo_title} maxLength={70} placeholder={tr({ ar: f.name_ar, en: f.name_en })} onChange={(e) => set({ seo_title: e.target.value })} /></Field>
-        <Field label={t('editor.seoDesc')} hint={`${(f.seo_description || '').length}/170`}><Textarea rows={3} maxLength={170} value={f.seo_description} placeholder={tr({ ar: f.description_ar, en: f.description_en }).slice(0, 160)} onChange={(e) => set({ seo_description: e.target.value })} /></Field>
-        <div className="rounded-xl border border-line p-4" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-          <p className="mb-2 text-xs font-semibold text-muted">{t('editor.seoPreview')}</p>
-          <p className="truncate text-xs text-emerald-800" dir="ltr">banhalook.app › s › {store.slug} › p</p>
-          <p className="mt-0.5 truncate text-lg leading-snug text-[#1a0dab]">{f.seo_title || tr({ ar: f.name_ar, en: f.name_en }) || '—'} · {tr(store.name)}</p>
-          <p className="mt-0.5 line-clamp-2 text-sm text-muted">{f.seo_description || tr({ ar: f.description_ar, en: f.description_en }) || '—'}</p>
-        </div>
-      </div>
-    ),
-  };
+  const done = { images: f.media.length > 0, type: !!(f.audience && f.moda_key), name: f.name_ar.trim().length >= 2, pricing: Number(f.price) > 0 };
+  const steps = [['images', L('الصور', 'Photos')], ['type', L('النوع', 'Type')], ['name', L('الاسم', 'Name')], ['pricing', L('السعر', 'Price')]];
+  const doneCount = steps.filter(([k]) => done[k]).length;
+  const goTo = (k) => document.getElementById(k)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
 
-  const STEPS = [
-    { id: 'images', title: t('editor.images') },
-    { id: 'basic', title: t('editor.basic') },
-    { id: 'pricing', title: t('editor.pricing') },
-    { id: 'variants', title: t('editor.variants') },
-    { id: 'publishing', title: t('editor.publishing') },
-    { id: 'seo', title: t('editor.seo') },
-  ];
-  const doneMap = { images: f.media.length > 0, basic: f.name_ar && f.name_en, pricing: Number(f.price) > 0, variants: true, publishing: true, seo: !!(f.seo_title || f.seo_description) };
   const header = (
-    <PageHeader back={`${base}/products`} title={isNew ? t('editor.new') : tr({ ar: f.name_ar, en: f.name_en }) || t('editor.edit')}
+    <PageHeader back={`${base}/products`} title={isNew ? t('editor.new') : tr({ ar: f.name_ar, en: f.name_en || f.name_ar }) || t('editor.edit')}
       subtitle={!isNew && dirty ? <span className="inline-flex items-center gap-1.5 text-amber-700"><span className="h-2 w-2 rounded-full bg-amber-500" />{t('editor.unsaved')}</span> : null}
       actions={(
         <div className="hidden gap-2 md:flex">
           {!isNew && data?.product && <Button variant="outline" icon={Eye} href={`/s/${store.slug}/p/${data.product.slug}`} target="_blank" rel="noreferrer">{t('editor.preview')}</Button>}
-          <Button onClick={save} loading={saving} disabled={!isNew && !dirty}>{isNew ? t('editor.publish') : t('editor.save')}</Button>
+          {isNew && <Button variant="outline" onClick={() => save('draft')} disabled={saving}>{L('حفظ كمسودة', 'Save draft')}</Button>}
+          <Button onClick={() => save()} loading={saving} disabled={!isNew && !dirty}>{isNew ? t('editor.publish') : t('editor.save')}</Button>
         </div>
       )} />
   );
 
-  /* ---------- mobile, new product → guided steps ---------- */
-  if (!desktop && isNew) {
-    const cur = STEPS[step];
-    const last = step === STEPS.length - 1;
-    return (
-      <div className="pb-24">
-        {header}
-        <div className="mb-5">
-          <div className="mb-2 flex items-center justify-between text-sm"><span className="font-semibold">{cur.title}</span><span className="text-muted tabular">{t('editor.stepOf', { n: step + 1, total: STEPS.length })}</span></div>
-          <div className="flex gap-1.5">{STEPS.map((s, i) => <button key={s.id} type="button" onClick={() => setStep(i)} aria-label={s.title} className={cx('h-1.5 flex-1 rounded-full transition-colors', i <= step ? 'bg-primary' : 'bg-fg/10')} />)}</div>
-        </div>
-        <AnimatePresence mode="wait" initial={false}>
-          <motion.div key={cur.id} id={cur.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} transition={{ duration: 0.25 }}
-            className="rounded-2xl border border-line bg-elevated p-5">{S[cur.id]}</motion.div>
-        </AnimatePresence>
-        <div className="fixed inset-x-0 bottom-[calc(64px+var(--safe-b))] z-20 flex gap-3 border-t border-line bg-elevated/95 px-4 py-3 backdrop-blur-md">
-          {step > 0 && <Button variant="outline" onClick={() => setStep(step - 1)}>{t('common.back')}</Button>}
-          {last ? <Button full onClick={save} loading={saving}>{t('editor.publish')}</Button> : <Button full onClick={() => setStep(step + 1)}>{t('common.next')}</Button>}
-        </div>
-        <LeaveGuard blocker={blocker} t={t} />
-      </div>
-    );
-  }
+  const progress = (
+    <div className="mb-4 flex items-center gap-2 overflow-x-auto rounded-2xl border border-line bg-elevated px-3 py-2.5">
+      {steps.map(([k, label], i) => (
+        <button key={k} type="button" onClick={() => goTo(k)} className={cx('inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold transition', done[k] ? 'bg-success/10 text-success' : 'bg-fg/[0.06] text-muted hover:text-fg')}>
+          {done[k] ? <Check className="h-3.5 w-3.5" strokeWidth={3} /> : <Circle className="h-3 w-3" />}{i + 1}. {label}
+        </button>
+      ))}
+      <span className="ms-auto shrink-0 ps-2 text-[12.5px] text-muted tabular">{doneCount}/{steps.length}</span>
+    </div>
+  );
 
-  /* ---------- mobile edit → collapsible ---------- */
-  if (!desktop) {
-    return (
-      <div className="pb-24">
-        {header}
-        <div className="space-y-3">
-          {STEPS.map((s) => (
-            <Section key={s.id} id={s.id} title={s.title} collapsible open={!!open[s.id]} done={doneMap[s.id]} onToggle={() => setOpen((o) => ({ ...o, [s.id]: !o[s.id] }))}>{S[s.id]}</Section>
-          ))}
-        </div>
-        <AnimatePresence>
-          {dirty && (
-            <motion.div initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }} className="fixed inset-x-0 bottom-[calc(64px+var(--safe-b))] z-20 flex gap-3 border-t border-line bg-elevated/95 px-4 py-3 backdrop-blur-md">
-              <Button variant="outline" onClick={() => setF(initial)}>{t('editor.discard')}</Button>
-              <Button full onClick={save} loading={saving}>{t('editor.save')}</Button>
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <LeaveGuard blocker={blocker} t={t} />
+  const publishCard = (
+    <Card id="publish" step={6} title={L('النشر', 'Publishing')} done={false}>
+      <div className="space-y-5">
+        <Field label={t('editor.status')}>
+          <Segmented value={f.status} onChange={(s) => set({ status: s })} className="w-full [&>button]:flex-1" options={['active', 'draft'].map((s) => ({ value: s, label: t(`products.status.${s}`) }))} />
+        </Field>
+        {cats?.items?.length > 0 && (
+          <Field label={L('المجموعة في متجرك', 'Collection in your store')} optional={t('common.optional')} hint={L('بترتّب منتجاتك في صفحة المحل (زي: هوديز، شتوي).', 'Groups products on your store page.')}>
+            <Select value={f.category_id} onChange={(e) => set({ category_id: e.target.value })}>
+              <option value="">{L('من غير مجموعة', 'No collection')}</option>
+              {cats.items.map((c) => <option key={c.id} value={c.id}>{tr(c.name)}</option>)}
+            </Select>
+          </Field>
+        )}
+        <Switch label={t('editor.featured')} description={t('editor.featuredHint')} checked={f.featured} onChange={(v) => set({ featured: v })} />
+        <Switch label={t('editor.markNew')} description={t('editor.markNewHint')} checked={f.is_new} onChange={(v) => set({ is_new: v })} />
       </div>
-    );
-  }
+    </Card>
+  );
 
-  /* ---------- desktop: organised sections + sticky side ---------- */
-  return (
-    <div className="pb-24">
-      {header}
-      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
-        <div className="min-w-0 space-y-5">
-          <Section id="basic" title={t('editor.basic')}>{S.basic}</Section>
-          <Section id="images" title={t('editor.images')}>{S.images}</Section>
-          <Section id="pricing" title={t('editor.pricing')}>{S.pricing}</Section>
-          <Section id="variants" title={`${t('editor.variants')} & ${t('editor.inventory')}`}>{S.variants}</Section>
-          <Section id="seo" title={t('editor.seo')}>{S.seo}</Section>
-        </div>
-        <div className="grid gap-5 md:grid-cols-2 xl:sticky xl:top-6 xl:block xl:space-y-5">
-          <Section id="publishing" title={t('editor.publishing')}>{S.publishing}</Section>
-          {f.media[0] && (
-            <div className="overflow-hidden rounded-2xl border border-line bg-elevated">
-              <img src={`${f.media[0].base}/sm.webp`} alt="" className="aspect-[4/5] w-full object-cover" style={{ backgroundColor: f.media[0].color }} />
-              <div className="p-4"><p className="truncate font-medium">{tr({ ar: f.name_ar, en: f.name_en }) || '—'}</p>
-                <p className="mt-1 font-semibold tabular">{f.price ? formatMoney(f.price, lang) : '—'}{f.compare_at_price && <span className="ms-2 text-sm font-normal text-muted line-through">{formatMoney(f.compare_at_price, lang)}</span>}</p></div>
+  const main = (
+    <div className="min-w-0 space-y-4">
+      <Card id="images" step={1} title={L('صور المنتج', 'Product photos')} hint={L('أول صورة هي الغلاف. الصور الواضحة بتبيع أكتر.', 'The first photo is the cover.')} done={done.images}>
+        <MediaUploader value={f.media} onChange={(media) => { set({ media }); if (media.length) setErrors((x) => ({ ...x, media: undefined })); }} error={errors.media} />
+        {f.media.length > 0 && (
+          <button type="button" onClick={aiFill} disabled={aiBusy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/40 bg-brand/5 px-4 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-60">
+            {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{L('املا الاسم والوصف والألوان تلقائيًا من الصورة', 'Fill name, description and colours from the photo')}
+          </button>
+        )}
+      </Card>
+
+      <Card id="type" step={2} title={L('إيه المنتج؟', 'What is it?')} hint={L('اختار الفئة والنوع مرة واحدة، وإحنا نظبط القسم والمقاسات.', 'Pick it once — we set the department and sizes.')} done={done.type}>
+        <TypePicker tree={tree} audience={f.audience} typeKey={f.moda_key} suggested={suggested} error={errors.type} onChange={set} />
+      </Card>
+
+      <Card id="name" step={3} title={L('الاسم والوصف', 'Name & description')} done={done.name}>
+        <div className="space-y-4">
+          <Field label={L('اسم المنتج', 'Product name')} error={errors.name_ar} hint={type ? L(`مثال: ${type.ar} ${f.colors[0] ? f.colors[0].name_ar : 'أسود'} قطن`, undefined) : undefined}>
+            <Input ref={nameRef} dir="rtl" value={f.name_ar} onChange={(e) => set({ name_ar: e.target.value })} maxLength={120} />
+          </Field>
+          <Field label={L('وصف قصير', 'Short description')} optional={t('common.optional')} hint={L('الخامة، الاستخدام، أي تفصيلة مهمة.', 'Fabric, use, any key detail.')}>
+            <Textarea dir="rtl" rows={3} value={f.description_ar} onChange={(e) => set({ description_ar: e.target.value })} />
+          </Field>
+          {showEn ? (
+            <div className="grid gap-4 rounded-xl border border-line bg-secondary/30 p-4 sm:grid-cols-2">
+              <Field label={t('editor.nameEn')} optional={t('common.optional')} error={errors.name_en}><Input dir="ltr" value={f.name_en} onChange={(e) => set({ name_en: e.target.value })} /></Field>
+              <Field label={t('editor.descEn')} optional={t('common.optional')}><Textarea dir="ltr" rows={2} value={f.description_en} onChange={(e) => set({ description_en: e.target.value })} /></Field>
             </div>
-          )}
-          <p className="flex gap-2 text-[13px] text-muted"><Info className="h-4 w-4 shrink-0" />{t('editor.imagesHint')}</p>
+          ) : <button type="button" onClick={() => setShowEn(true)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"><Plus className="h-4 w-4" />{L('إضافة اسم ووصف بالإنجليزي (اختياري)', 'Add English name & description (optional)')}</button>}
         </div>
+      </Card>
+
+      <Card id="pricing" step={4} title={t('editor.pricing')} done={done.pricing}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t('editor.price')} error={errors.price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.price} onChange={(e) => set({ price: e.target.value.replace(/\D/g, '') })} /></Field>
+          <Field label={t('editor.compareAt')} optional={t('common.optional')} hint={!errors.compare_at_price ? t('editor.compareHint') : undefined} error={errors.compare_at_price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.compare_at_price} onChange={(e) => set({ compare_at_price: e.target.value.replace(/\D/g, '') })} /></Field>
+          {f.compare_at_price && Number(f.compare_at_price) > Number(f.price) && <div className="sm:col-span-2"><span className="rounded-full bg-sale/10 px-3 py-1.5 text-sm font-semibold text-sale">-{Math.round((1 - f.price / f.compare_at_price) * 100)}%</span></div>}
+        </div>
+      </Card>
+
+      <Card id="variants" step={5} title={L('الألوان والمقاسات والكمية', 'Colours, sizes & stock')} done={f.colors.length > 0 || f.sizes.length > 0 || Number(f.stock) > 0}>
+        <div className="space-y-6">
+          <VariantsEditor f={f} set={set} sizeKind={sizeKind} typeChosen={!!type} />
+          <div className="grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
+            <Switch label={t('editor.trackStock')} checked={f.track_stock} onChange={(v) => set({ track_stock: v })} />
+            {!f.colors.length && !f.sizes.length && f.track_stock && <Field label={t('editor.stock')}><Input inputMode="numeric" value={f.stock} onChange={(e) => set({ stock: e.target.value.replace(/\D/g, '') })} /></Field>}
+          </div>
+        </div>
+      </Card>
+
+      <section className="rounded-2xl border border-line bg-elevated">
+        <button type="button" onClick={() => setAdv((v) => !v)} aria-expanded={adv} className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start sm:px-6">
+          <span><span className="text-base font-semibold">{L('إعدادات متقدمة', 'Advanced')}</span><span className="ms-2 text-[13px] text-muted">{L('التكلفة، الكود، الاستخدام، محركات البحث', 'Cost, SKU, use, SEO')}</span></span>
+          <ChevronDown className={cx('h-5 w-5 text-muted transition-transform', adv && 'rotate-180')} />
+        </button>
+        {adv && (
+          <div className="space-y-5 border-t border-line px-5 pb-6 pt-5 sm:px-6">
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label={t('editor.cost')} hint={t('editor.costHint')} optional={t('common.optional')}><Input inputMode="numeric" suffix={t('common.currency')} value={f.cost} onChange={(e) => set({ cost: e.target.value.replace(/\D/g, '') })} /></Field>
+              <Field label={t('editor.sku')} optional={t('common.optional')}><Input dir="ltr" value={f.sku} onChange={(e) => set({ sku: e.target.value })} /></Field>
+              {f.track_stock && <Field label={t('editor.lowStockAt')}><Input inputMode="numeric" value={f.low_stock_at} onChange={(e) => set({ low_stock_at: e.target.value.replace(/\D/g, '') })} /></Field>}
+              {margin != null && <p className="rounded-xl bg-secondary px-3 py-2 text-sm font-medium text-brand sm:col-span-3">{t('editor.margin')}: {margin}% · {t('editor.profit')}: {formatMoney(f.price - f.cost, lang)}</p>}
+            </div>
+            <Field label={L('مناسب لإيه؟ (بيساعد مودة ترشّحه للمناسبة الصح)', 'Dress code (helps the stylist match occasions)')} optional={t('common.optional')} hint={styleDefault ? L(`لو سيبتها، بنفترض: ${styleDefault}`, undefined) : undefined}>
+              <div className="flex flex-wrap gap-2" role="group">
+                {[['', L('تلقائي', 'Auto')], ...STYLE_LEVELS].map(([v, label]) => <button key={v} type="button" aria-pressed={f.style_level === v} onClick={() => set({ style_level: v })} className={chipCls(f.style_level === v)}>{label}</button>)}
+              </div>
+            </Field>
+            <div className="space-y-4 border-t border-line pt-5">
+              <p className="text-sm font-semibold">{t('editor.seo')}</p>
+              <Field label={t('editor.seoTitle')} hint={`${(f.seo_title || f.name_ar).length}/70`}><Input value={f.seo_title} maxLength={70} placeholder={f.name_ar} onChange={(e) => set({ seo_title: e.target.value })} /></Field>
+              <Field label={t('editor.seoDesc')} hint={`${(f.seo_description || '').length}/170`}><Textarea rows={3} maxLength={170} value={f.seo_description} placeholder={f.description_ar.slice(0, 160)} onChange={(e) => set({ seo_description: e.target.value })} /></Field>
+            </div>
+          </div>
+        )}
+      </section>
+    </div>
+  );
+
+  const side = (
+    <div className="space-y-4 xl:sticky xl:top-6">
+      {publishCard}
+      {f.media[0] && (
+        <div className="overflow-hidden rounded-2xl border border-line bg-elevated">
+          <img src={`${f.media[0].base}/sm.webp`} alt="" className="aspect-[4/5] w-full object-cover" style={{ backgroundColor: f.media[0].color }} />
+          <div className="p-4"><p className="truncate font-medium">{f.name_ar || '—'}</p>
+            <p className="mt-1 font-semibold tabular">{f.price ? formatMoney(f.price, lang) : '—'}{f.compare_at_price && <span className="ms-2 text-sm font-normal text-muted line-through">{formatMoney(f.compare_at_price, lang)}</span>}</p></div>
+        </div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="pb-28">
+      {header}
+      {progress}
+      <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
+        {main}
+        {side}
       </div>
       <AnimatePresence>
-        {dirty && !isNew && (
+        {(isNew || dirty) && !desktop && (
+          <motion.div initial={{ y: 80 }} animate={{ y: 0 }} exit={{ y: 80 }} className="fixed inset-x-0 bottom-[calc(64px+var(--safe-b))] z-20 flex gap-3 border-t border-line bg-elevated/95 px-4 py-3 backdrop-blur-md">
+            {isNew ? <Button variant="outline" onClick={() => save('draft')} disabled={saving}>{L('مسودة', 'Draft')}</Button> : <Button variant="outline" onClick={() => setF(initial)}>{t('editor.discard')}</Button>}
+            <Button full onClick={() => save()} loading={saving}>{isNew ? t('editor.publish') : t('editor.save')}</Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {dirty && !isNew && desktop && (
           <motion.div initial={{ y: 80, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 80, opacity: 0 }}
             className="fixed bottom-6 start-1/2 z-30 flex -translate-x-1/2 items-center gap-4 rounded-2xl bg-neutral-900 py-2.5 pe-2.5 ps-5 text-white shadow-lift rtl:translate-x-1/2 lg:start-[calc(50%+132px)]">
             <span className="text-sm font-medium">{t('editor.unsaved')}</span>
             <button type="button" onClick={() => setF(initial)} className="h-10 rounded-xl px-4 text-sm font-semibold text-white/80 hover:bg-white/10">{t('editor.discard')}</button>
-            <Button variant="white" size="sm" onClick={save} loading={saving}>{t('common.save')}</Button>
+            <Button variant="white" size="sm" onClick={() => save()} loading={saving}>{t('common.save')}</Button>
           </motion.div>
         )}
       </AnimatePresence>

@@ -15,8 +15,10 @@ import { buyerFromReq } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
 import { logVisualSearch } from '../lib/visual-demand.js';
-import { runStylist, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
+import { runStylist, modaBrain, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
 import { runModa } from '../lib/moda/engine.js';
+import { AUDIENCE_KEYS } from '../lib/product-types.js';
+import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert, notifyPlatformDelivery } from '../lib/whatsapp.js';
@@ -129,7 +131,10 @@ r.get('/search', h((req, res) => {
   if (rating === '1') where.push('p.rating >= 4');
   if (req.query.same_day === '1') { const sd = sameDaySql(); where.push(sd.sql); params.push(...sd.params); }
   // facets (counts per department / per store) are computed with every filter EXCEPT their own
-  const catKey = normText(String(req.query.category || '').slice(0, 60));
+  const rawCat = String(req.query.category || '').slice(0, 60);
+  const KN = loadModaKnowledge();
+  const typeKey = /^[a-z_]{2,30}$/.test(rawCat) && KN.items.has(rawCat) && !KN.items.get(rawCat).virtual ? rawCat : ''; // نوع المنتج (قميص/جينز…) أو اسم مجموعة قديمة
+  const catKey = typeKey ? '' : normText(rawCat);
   const catClause = catKey ? `EXISTS (SELECT 1 FROM categories c WHERE c.id=p.category_id AND ${NORM('c.name_ar')}=?)` : null;
   const baseWhere = [...where]; const baseParams = [...params];
   if (catClause) { baseWhere.push(catClause); baseParams.push(catKey); } // department / store counts respect the chosen category
@@ -138,8 +143,12 @@ r.get('/search', h((req, res) => {
   const facetFrom = (extra, extraParams) => ({ sql: `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${[...baseWhere, ...extra].join(' AND ')}`, params: [...baseParams, ...extraParams] });
   if (deptSlug) { where.push('p.department=?'); params.push(deptSlug); }
   if (storeSlug) { where.push('s.slug=?'); params.push(storeSlug); }
-  const noCat = { where: [...where], params: [...params] }; // the category facet ignores its own filter
+  const preAud = { where: [...where], params: [...params] }; // the audience facet ignores its own filter
+  const audKey = AUDIENCE_KEYS.has(String(req.query.audience || '')) ? String(req.query.audience) : '';
+  if (audKey) { where.push('p.audience=?'); params.push(audKey); }
+  const noCat = { where: [...where], params: [...params] }; // the category / type facet ignores its own filter
   if (catClause) { where.push(catClause); params.push(catKey); }
+  if (typeKey) { where.push('p.moda_key=?'); params.push(typeKey); }
   const preVariant = { where: [...where], params: [...params] }; // facets for size/colour ignore their own filter
   if (sizes) {
     const list = String(sizes).split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12);
@@ -167,11 +176,19 @@ r.get('/search', h((req, res) => {
   const fs2 = facetFrom(deptSlug ? ['p.department=?'] : [], deptSlug ? [deptSlug] : []);
   const stores = q.all(`SELECT s.slug AS slug, s.name_ar AS name_ar, s.name_en AS name_en, COUNT(*) AS n ${fs2.sql} GROUP BY s.id ORDER BY n DESC LIMIT 12`, fs2.params)
     .map((x) => ({ slug: x.slug, name: { ar: x.name_ar, en: x.name_en }, n: x.n }));
+  const audiences = q.all(`SELECT p.audience AS key, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preAud.where.join(' AND ')} AND p.audience IS NOT NULL GROUP BY p.audience ORDER BY n DESC`, preAud.params);
+  const typeRows = q.all(`SELECT p.moda_key AS key, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE ${noCat.where.join(' AND ')} AND p.moda_key IS NOT NULL GROUP BY p.moda_key ORDER BY n DESC LIMIT 16`, noCat.params);
+  const typeFacet = typeRows.filter((t) => KN.items.get(t.key)).map((t) => {
+    const top = q.get(`SELECT p.* FROM products p JOIN stores s ON s.id=p.store_id WHERE ${noCat.where.join(' AND ')} AND p.moda_key=? ORDER BY p.featured DESC, p.sold_count DESC LIMIT 1`, [...noCat.params, t.key]);
+    const ar = String(KN.items.get(t.key).ar).replace(/\s*\(.*?\)\s*/g, '').split(' / ')[0].trim();
+    return { key: t.key, name: { ar, en: ar }, n: t.n, image: top ? serializeCards([top])[0]?.image || null : null };
+  });
   const catRows = q.all(`SELECT c.name_ar AS name_ar, c.name_en AS name_en, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id JOIN categories c ON c.id=p.category_id WHERE ${noCat.where.join(' AND ')} GROUP BY ${NORM('c.name_ar')} ORDER BY n DESC LIMIT 14`, noCat.params);
-  const categories = catRows.map((c) => {
+  const legacyCategories = catRows.map((c) => {
     const top = q.get(`SELECT p.* FROM products p JOIN stores s ON s.id=p.store_id JOIN categories c ON c.id=p.category_id WHERE ${noCat.where.join(' AND ')} AND ${NORM('c.name_ar')}=? ORDER BY p.featured DESC, p.sold_count DESC LIMIT 1`, [...noCat.params, normText(c.name_ar)]);
     return { key: normText(c.name_ar), name: { ar: c.name_ar, en: c.name_en || c.name_ar }, n: c.n, image: top ? serializeCards([top])[0]?.image || null : null };
   });
+  const categories = typeFacet.length >= 1 || typeKey ? typeFacet : legacyCategories; // أنواع المنتجات لما تكون متاحة، وإلا مجموعات المحلات القديمة
   const fromV = `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')}`;
   const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'One size', 'Free size'];
   const facetSizes = q.all(`SELECT v.size AS size, COUNT(DISTINCT p.id) AS n FROM variants v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')} AND v.stock>0 AND v.size IS NOT NULL AND v.size<>'' GROUP BY v.size`, preVariant.params)
@@ -182,7 +199,7 @@ r.get('/search', h((req, res) => {
   }
   const facetColors = [...colorMap.values()].sort((a, b) => b.n - a.n).slice(0, 16);
   cache(res, 20);
-  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories } });
+  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences } });
 }));
 
 /* ---------------------------------------------------------- visual search: "snap it, find it in Banha" */
@@ -253,6 +270,7 @@ r.get('/visual-search/shared/:token', h((req, res) => {
 
 /* ---------------------------------------------------------- stylist chat ("مودة") */
 const chatHits = new Map();
+const brainHits = new Map();
 function modaCatalogRows() {
   return q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en,
       COALESCE(c.name_ar || ' ' || c.name_en, '') AS cat_text
@@ -261,7 +279,7 @@ function modaCatalogRows() {
     ORDER BY p.featured DESC, p.sold_count DESC, p.id DESC LIMIT 5000`);
 }
 function modaClientResponse(result) {
-  const base = { intent: result.intent || (result.state === 'chat' ? 'chat' : 'shop'), state: result.state, say: result.say, tips: result.tips || [], styleTips: result.styleTips || [], questions: result.questions || [], session: result.session };
+  const base = { intent: result.intent === 'brain' ? 'chat' : result.intent || (result.state === 'chat' ? 'chat' : 'shop'), state: result.state, say: result.say, tips: result.tips || [], styleTips: result.styleTips || [], questions: result.questions || [], session: result.session };
   if (!result.blocks) return { ...base, looks: [], total: 0, weatherSource: result.weatherSource || null };
   const cards = new Map(cardsByIds(result.blocks.tabs.flatMap((tab) => tab.items.map((item) => item.id))).map((card) => [card.id, card]));
   const tabs = result.blocks.tabs.map((tab) => ({
@@ -306,7 +324,13 @@ r.post('/stylist', h(async (req, res) => {
     const messages = body.startLook
       ? [{ role: 'user', content: body.lang === 'en' ? 'I want a complete outfit' : 'رشحلي إطلالة كاملة' }]
       : body.messages;
-    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name });
+    // موديل اللغة (لو متظبط) بيجاوب الأسئلة الحرة ويسأل — بحد يومي لكل عميل، وبعده المحرك بقواعده
+    let brain = modaBrain();
+    if (brain) {
+      const cap = Number(process.env.MODA_BRAIN_DAILY ?? 40); const inner = brain;
+      brain = async (a) => { const k = `${ip}`; const hits = (brainHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; brainHits.set(k, [...hits, Date.now()]); return inner(a); };
+    }
+    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain });
     return res.json(modaClientResponse(result));
   }
   catch (e) { if (e.code === 'stylist_no_vision') throw new AppError(422, 'stylist_no_vision', 'Photos need the Anthropic provider.'); if (e.code === 'stylist_bad_image') throw new AppError(422, 'stylist_bad_image', 'Unsupported image.'); if (e.code === 'stylist_unavailable') throw new AppError(503, 'stylist_unavailable', 'The stylist is unavailable right now.'); throw e; }

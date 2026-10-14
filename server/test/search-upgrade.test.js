@@ -54,6 +54,20 @@ test('marketplace search: size/colour filters + facets, relevance, suggestions, 
     assert.equal((await get('/search?colors=zz')).total, 3);
     // sorts do not error
     for (const sort of ['best', 'discount', 'rating', 'price_asc', 'newest', 'bogus']) assert.equal((await get(`/search?sort=${sort}`)).total, 3);
+    // audience + product-type facets (Amazon-style): set explicit type/audience and filter by them
+    const { q: dbq } = await import('../src/db/index.js');
+    dbq.run("UPDATE products SET audience='women', moda_key='sneakers' WHERE name_en='Running Shoe'");
+    dbq.run("UPDATE products SET audience='men', moda_key='jacket' WHERE name_en IN ('Coach Jacket','Leather Jacket')");
+    const typed = await get('/search?q=');
+    assert.deepEqual(typed.facets.audiences.map((a) => [a.key, a.n]).sort(), [['men', 2], ['women', 1]]);
+    assert.deepEqual(typed.facets.categories.map((c) => [c.key, c.n]).sort(), [['jacket', 2], ['sneakers', 1]]);
+    const women = await get('/search?audience=women');
+    assert.equal(women.total, 1); assert.equal(women.items[0].name.ar, 'كوتشي جري');
+    assert.deepEqual(women.facets.categories.map((c) => c.key), ['sneakers'], 'type facet respects the audience filter');
+    assert.equal(women.facets.audiences.length, 2, 'audience facet ignores its own filter');
+    assert.equal((await get('/search?category=jacket')).total, 2);
+    assert.equal((await get('/search?category=jacket&audience=women')).total, 0);
+    assert.equal((await get('/search?audience=zzz')).total, 3, 'unknown audience is ignored');
     // category facet + filter (facet ignores its own filter) and new-arrivals window
     const cats = await get('/search?department=men');
     assert.ok(Array.isArray(cats.facets.categories));
