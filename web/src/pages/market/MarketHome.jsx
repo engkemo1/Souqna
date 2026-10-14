@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Search, Store, CreditCard, RotateCcw, MapPin, Sparkles, Camera, MessageSquare, Users, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package } from 'lucide-react';
@@ -13,7 +13,9 @@ import ModaAvatar from '../../components/market/ModaAvatar.jsx';
 import WearThis from '../../components/market/WearThis.jsx';
 import RequestBanner from '../../components/market/RequestBanner.jsx';
 import LookOfDay from '../../components/market/LookOfDay.jsx';
-import StreetScene from '../../components/market/StreetScene.jsx';
+// the illustrated street is heavy SVG: load it in its own chunk so the first paint of the page is not delayed
+const StreetScene = lazy(() => import('../../components/market/StreetScene.jsx'));
+const streetFallback = <div aria-hidden="true" className="h-[360px] w-full sm:h-[440px] lg:h-[540px]" style={{ background: 'linear-gradient(180deg,#FFF5EC 0%,#FFE8D4 45%,#FFF2E6 100%)' }} />;
 import { useDepartments } from '../../lib/departments.js';
 import DeptStrip from '../../components/market/DeptStrip.jsx';
 import ProductRail from '../../components/market/ProductRail.jsx';
@@ -178,7 +180,7 @@ export default function MarketHome() {
 
         </div>
         <div className="relative mt-6 md:mt-8">
-          <StreetScene lang={lang} labels={deptLabels} counts={deptCounts} />
+          <Suspense fallback={streetFallback}><StreetScene lang={lang} labels={deptLabels} counts={deptCounts} /></Suspense>
         </div>
       </section>
 

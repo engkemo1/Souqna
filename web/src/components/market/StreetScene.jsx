@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -449,38 +449,67 @@ const VEHICLES = [
   { kind: 'tuk', right: true, dur: 52, phase: 0.35 }, { kind: 'scooter', right: true, dur: 34, phase: 0.8 },
   { kind: 'tuk', right: false, dur: 58, phase: 0.7 }, { kind: 'van', right: false, dur: 50, phase: 0.3 }, { kind: 'van', right: true, dur: 64, phase: 0.62 },
 ];
-function Drive({ right, dur, phase, children }) {
+/* Everything that moves across the whole street lives OUTSIDE the big SVG, in tiny layers the browser animates on the GPU
+   (transform only) — so the 2.7k-node street is painted once and never again. */
+const VB_Y0 = 30; const VB_H = 640;
+const box = (x, y, w, h) => ({ position: 'absolute', left: `${(x / W) * 100}%`, top: `${((y - VB_Y0) / VB_H) * 100}%`, width: `${(w / W) * 100}%`, height: `${(h / VB_H) * 100}%`, pointerEvents: 'none' });
+
+function Vehicles() {
   const a = -260; const b = W + 160;
+  return VEHICLES.map((v, i) => {
+    const from = v.right ? a : b; const to = v.right ? b : a;
+    return (
+      <div key={i} aria-hidden="true" className="st-drive" style={{ ...box(-100, 652 - 110, 200, 122), '--from': `${from / 2}%`, '--to': `${to / 2}%`, '--dd': `${v.dur}s`, '--dl': `${-v.dur * v.phase}s` }}>
+        <div className="st-rattle h-full w-full">
+          <svg viewBox={`-100 ${652 - 110} 200 122`} className="block h-full w-full overflow-visible">
+            {v.kind === 'tuk' ? <Tuktuk x={0} flip={v.right} /> : v.kind === 'van' ? <Van x={0} flip={v.right} /> : <Scooter x={0} flip={!v.right} />}
+          </svg>
+        </div>
+      </div>
+    );
+  });
+}
+
+const BIRDS = [[260, 110, 70, -14, 14, 24], [1010, 92, 60, 14, 17, 20], [1330, 126, 50, -12, 12, 16]];
+function Sky() {
+  const clouds = Array.from({ length: Math.ceil(W / 520) }, (_, i) => ({ x: 120 + i * 520 + ((i * 97) % 120), y: 62 + ((i * 41) % 36), d: 30 + ((i * 7) % 20), dir: i % 2 ? -1 : 1 }));
   return (
-    <g className="st-drive" style={{ '--from': `${right ? a : b}px`, '--to': `${right ? b : a}px`, '--dd': `${dur}s`, '--dl': `${-dur * phase}s` }}>
-      <g className="st-rattle">{children}</g>
-    </g>
+    <>
+      <div aria-hidden="true" className="st-breathe-h" style={box(W - 190 - 86, 130 - 86, 172, 172)}>
+        <svg viewBox="0 0 172 172" className="block h-full w-full"><circle cx="86" cy="86" r="86" fill="#FFD2A8" opacity="0.28" /><circle cx="86" cy="86" r="46" fill="#FFC592" opacity="0.85" /></svg>
+      </div>
+      {clouds.map((c, i) => (
+        <div key={i} aria-hidden="true" className="st-drift" style={{ ...box(c.x - 62, c.y - 6, 134, 40), '--dx': `${(60 * c.dir / 134) * 100}%`, '--dd': `${c.d}s`, '--dl': `${-i * 5}s` }}>
+          <svg viewBox="0 0 134 40" className="block h-full w-full" fill="#FFFFFF" opacity="0.85"><ellipse cx="62" cy="26" rx="62" ry="14" /><ellipse cx="98" cy="14" rx="36" ry="14" /></svg>
+        </div>
+      ))}
+      {[0, 1100, 2200].filter((dx) => dx < W - 400).flatMap((dx) => BIRDS.map(([x, y, mv, dy, dur, w], k) => (
+        <div key={`${dx}-${k}`} aria-hidden="true" className="st-drift" style={{ ...box(x + dx, y - 9, 28, 12), '--dx': `${(mv / 28) * 100}%`, '--dy': `${(dy / 12) * 100}%`, '--dd': `${dur}s`, '--dl': `${-k * 3}s` }}>
+          <svg viewBox="-2 -9 28 12" className="block h-full w-full overflow-visible" fill="none" stroke={NAVY} strokeWidth="1.8" strokeLinecap="round" opacity="0.55"><path d={`M0 0 q${w / 4} -7 ${w / 2} 0 q${w / 4} -7 ${w / 2} 0`} /></svg>
+        </div>
+      )))}
+    </>
   );
 }
 
-function Birds() {
-  return (
-    <g fill="none" stroke={NAVY} strokeWidth="1.8" strokeLinecap="round" opacity="0.55">
-      <g><path d="M0 0 q6 -7 12 0 q6 -7 12 0" /><animateTransform attributeName="transform" type="translate" values="260 110; 330 96; 260 110" dur="14s" repeatCount="indefinite" /></g>
-      <g><path d="M0 0 q5 -6 10 0 q5 -6 10 0" /><animateTransform attributeName="transform" type="translate" values="1010 92; 1070 106; 1010 92" dur="17s" repeatCount="indefinite" /></g>
-      <g><path d="M0 0 q4 -5 8 0 q4 -5 8 0" /><animateTransform attributeName="transform" type="translate" values="1330 126; 1380 114; 1330 126" dur="12s" repeatCount="indefinite" /></g>
-    </g>
-  );
-}
-
-function Skyline({ gRef }) {
+function Skyline() {
   const tints = ['#F7DFCB', '#F1D6C0', '#EDCFB8'];
   const blocks = [];
-  for (let x = -1300, i = 0; x < W; i += 1) { const w = 110 + ((i * 37) % 60); blocks.push([x, 96 + ((i * 53) % 40), w]); x += w - 6; }
-  const mosques = [Math.round(W * 0.22), Math.round(W * 0.7), -500];
+  for (let x = 0, i = 0; x < W; i += 1) { const w = 34 * (3 + ((i * 7) % 3)); blocks.push([x, 96 + 36 * ((i * 5) % 3), w, i]); x += w; }
+  const mosques = [Math.round(W * 0.22), Math.round(W * 0.7)];
   return (
-    <g ref={gRef} style={{ willChange: 'transform' }}>
-      {blocks.map(([x, top, w], i) => (
+    <g>
+      <defs>
+        {[0, 1, 2].map((k) => (
+          <pattern key={k} id={`st-win${k}`} x="10" y="110" width="136" height="108" patternUnits="userSpaceOnUse">
+            {Array.from({ length: 12 }, (_, n) => { const r = Math.floor(n / 4); const c = n % 4; const lit = (r * 3 + c + k) % 4 === 0; return <rect key={n} x={c * 34} y={r * 36} width="14" height="20" rx="2" fill={lit ? '#FFE9B8' : '#FFFFFF'} opacity={lit ? 0.95 : 0.55} />; })}
+          </pattern>
+        ))}
+      </defs>
+      {blocks.map(([x, top, w, i]) => (
         <g key={i}>
           <rect x={x} y={top} width={w} height={480 - top} fill={tints[i % 3]} />
-          {Array.from({ length: Math.floor((480 - top - 60) / 36) }, (_, r) => Array.from({ length: Math.floor(w / 34) }, (_, c) => (
-            <rect key={`${r}-${c}`} x={x + 10 + c * 34} y={top + 14 + r * 36} width="14" height="20" rx="2" fill={(r * 3 + c + i) % 4 === 0 ? '#FFE9B8' : '#FFFFFF'} opacity={(r * 3 + c + i) % 4 === 0 ? 0.95 : 0.55} />
-          )))}
+          <rect x={x} y={top + 4} width={w - 6} height={480 - top - 64} fill={`url(#st-win${i % 3})`} />
         </g>
       ))}
       {mosques.map((mx) => (
@@ -524,92 +553,29 @@ const PEOPLE = [
   { top: '#FFFFFF', bottom: NAVY, hair: '#2B2B33', bag: NAVY },
 ];
 
-/** The whole street scrolls sideways (drag, swipe, arrows): every department has its own shop, and the shop shows how much is inside. */
-export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', className = '' }) {
+const COLORS = [ORANGE, NAVY, '#FFC9A3'];
+const N_SWAG = Math.ceil((W + 20) / 540); const SWAG_L = (W + 20) / N_SWAG;
+const SWAGS = Array.from({ length: N_SWAG }, (_, k) => [-10 + k * SWAG_L, -10 + (k + 1) * SWAG_L, 92, 34]);
+
+/** the whole illustration — memoised so scrolling (arrow state, hint) never re-renders its ~2k nodes */
+const Art = memo(function Art({ lang, labels, counts }) {
   const ar = lang === 'ar';
-  const ref = useRef(null);
-  const drag = useRef(null);
-  const [edge, setEdge] = useState({ start: true, end: false });
-  const [moved, setMoved] = useState(false);
-  const svgRef = useRef(null);
-  const skyRef = useRef(null);
-  const skyRef2 = useRef(null);
-  const update = () => {
-    const el = ref.current; if (!el) return;
-    const svg = svgRef.current;
-    if (svg) { const t = `translateX(${(0.4 * el.scrollLeft) / (svg.clientHeight / 640 || 1)}px)`; if (skyRef.current) skyRef.current.style.transform = t; if (skyRef2.current) skyRef2.current.style.transform = t; }
-    const max = el.scrollWidth - el.clientWidth; const pos = Math.abs(el.scrollLeft);
-    setEdge({ start: pos < 6, end: pos > max - 6 });
-    if (pos > 40) setMoved(true);
-  };
-  useEffect(() => { update(); window.addEventListener('resize', update); return () => window.removeEventListener('resize', update); }, []);
-  const go = (dir) => ref.current?.scrollBy({ left: dir * Math.max(360, ref.current.clientWidth * 0.7), behavior: 'smooth' });
-  const onDown = (e) => { if (e.pointerType !== 'mouse') return; drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; };
-  const onMove = (e) => { const d = drag.current; if (!d) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 5) d.moved = true; if (d.moved) ref.current.scrollLeft = d.left + dx; };
-  const onUp = () => { setTimeout(() => { drag.current = null; }, 0); };
-  const onClickCapture = (e) => { if (drag.current?.moved) { e.preventDefault(); e.stopPropagation(); } };
-
-  const colors = [ORANGE, NAVY, '#FFC9A3'];
-  const nSwag = Math.ceil((W + 20) / 540); const L = (W + 20) / nSwag;
-  const swags = Array.from({ length: nSwag }, (_, k) => [-10 + k * L, -10 + (k + 1) * L, 92, 34]);
-  const clouds = Array.from({ length: Math.ceil((W + 1300) / 520) }, (_, i) => ({ x: -1300 + 120 + i * 520 + ((i * 97) % 120), y: 62 + ((i * 41) % 36), d: 30 + ((i * 7) % 20), dir: i % 2 ? -1 : 1 }));
-
+  const colors = COLORS; const swags = SWAGS;
   return (
-    <div className={cx('relative', className)}>
-      <div
-        ref={ref} dir="rtl" onScroll={update} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onClickCapture={onClickCapture}
-        className="no-scrollbar scrollbar-none cursor-grab overflow-x-auto overscroll-x-contain active:cursor-grabbing"
-        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-      >
-        <svg ref={svgRef} viewBox={`0 30 ${W} 640`} role="img" aria-label={ar ? 'شارع محلات الملابس في بنها' : 'A street of clothing shops in Banha'} style={{ aspectRatio: `${W} / 640` }} className="block h-[360px] w-auto max-w-none select-none sm:h-[440px] lg:h-[540px]">
-          <style>{`
-@media (prefers-reduced-motion: no-preference){
-.st-flap{transform-origin:50% 0;transform-box:fill-box;animation:st-flap 4s ease-in-out infinite alternate}
-@keyframes st-flap{from{transform:skewX(-1.2deg)}to{transform:skewX(1.2deg)}}
-.st-wave{transform-origin:50% 0;transform-box:fill-box;animation:st-wave 3s ease-in-out infinite alternate}
-@keyframes st-wave{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}
-.st-glow{animation:st-glow 3.5s ease-in-out infinite alternate}
-@keyframes st-glow{from{opacity:.25}to{opacity:.8}}
-.st-sway{transform-origin:50% 100%;transform-box:fill-box;animation:st-sway 5s ease-in-out infinite alternate}
-@keyframes st-sway{from{transform:rotate(-1.6deg)}to{transform:rotate(1.6deg)}}
-.st-walk{animation:st-walk var(--wd,12s) ease-in-out var(--wl,0s) infinite alternate}
-@keyframes st-walk{from{transform:translateX(-28px)}to{transform:translateX(28px)}}
-.st-step{animation:st-step .55s ease-in-out infinite alternate}
-@keyframes st-step{from{transform:translateY(0)}to{transform:translateY(-2.5px)}}
-.st-bob{animation:st-bob 3s ease-in-out infinite alternate}
-@keyframes st-bob{from{transform:translateY(0)}to{transform:translateY(-4px)}}
-.st-drive{animation:st-drive var(--dd,24s) linear var(--dl,0s) infinite}
-@keyframes st-drive{from{transform:translateX(var(--from))}to{transform:translateX(var(--to))}}
-.st-rattle{animation:st-rattle .3s ease-in-out infinite alternate}
-@keyframes st-rattle{from{transform:translateY(0)}to{transform:translateY(-1.2px)}}
-.st-wag{transform-origin:0% 100%;transform-box:fill-box;animation:st-wag .6s ease-in-out infinite alternate}
-@keyframes st-wag{from{transform:rotate(-14deg)}to{transform:rotate(16deg)}}
-.st-breathe{transform-origin:50% 50%;transform-box:fill-box;animation:st-breathe 6s ease-in-out infinite alternate}
-@keyframes st-breathe{from{transform:scale(1)}to{transform:scale(1.1)}}
-.st-pulse{transform-origin:50% 50%;transform-box:fill-box;animation:st-pulse 1.8s ease-in-out infinite alternate}
-@keyframes st-pulse{from{transform:scale(1)}to{transform:scale(1.18)}}
-.st-in{animation:st-in .7s ease-out both;animation-delay:var(--id,0s)}
-@keyframes st-in{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
-}
-`}</style>
+        <div className="relative shrink-0 select-none overflow-hidden [--h:360px] sm:[--h:440px] lg:[--h:540px]" style={{ height: 'var(--h)', width: `calc(var(--h) * ${W / VB_H})`, background: 'linear-gradient(180deg,#FFF5EC 0%,#FFE8D4 45%,#FFF2E6 100%)' }}>
+        <Sky />
+        <svg viewBox={`0 ${VB_Y0} ${W} ${VB_H}`} role="img" aria-label={ar ? 'شارع محلات الملابس في بنها' : 'A street of clothing shops in Banha'} className="st-main absolute inset-0 block h-full w-full">
           <defs>
-            <linearGradient id="st-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFF5EC" /><stop offset="0.45" stopColor="#FFE8D4" /><stop offset="1" stopColor="#FFF2E6" /></linearGradient>
             <radialGradient id="st-lamp" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#FFD9A8" stopOpacity="0.8" /><stop offset="1" stopColor="#FFD9A8" stopOpacity="0" /></radialGradient>
           </defs>
-          <rect x="0" y="30" width={W} height="640" fill="url(#st-sky)" />
-          <circle className="st-breathe" cx={W - 190} cy="130" r="86" fill="#FFD2A8" opacity="0.28" /><circle cx={W - 190} cy="130" r="46" fill="#FFC592" opacity="0.85" />
-          <g ref={skyRef} fill="#FFFFFF" opacity="0.85" style={{ willChange: 'transform' }}>
-            {clouds.map((c, i) => <g key={i}><ellipse cx={c.x} cy={c.y + 20} rx="62" ry="14" /><ellipse cx={c.x + 36} cy={c.y + 8} rx="36" ry="14" /><animateTransform attributeName="transform" type="translate" values={`0 0; ${60 * c.dir} 0; 0 0`} dur={`${c.d}s`} repeatCount="indefinite" /></g>)}
-          </g>
-          {[0, 1100, 2200].filter((dx) => dx < W - 400).map((dx) => <g key={dx} transform={`translate(${dx},0)`}><Birds /></g>)}
-          <Skyline gRef={skyRef2} />
+          <Skyline />
 
           {SHOPS.map((shop, index) => <Shop key={shop.dept} index={index} shop={shop} label={labels[shop.dept] || (ar ? shop.ar : shop.en)} lang={lang} count={typeof counts[shop.dept] === 'number' ? counts[shop.dept] : undefined} />)}
 
           {swags.map(([x0, x1, y0, sag], si) => (
             <g key={si}>
               <path d={`M${x0} ${y0} Q${(x0 + x1) / 2} ${y0 + sag * 2} ${x1} ${y0}`} fill="none" stroke={NAVY} strokeWidth="1.6" opacity="0.45" />
-              {swag(x0, x1, y0, sag, 17, colors).map((f, i) => <path key={i} className="st-wave" style={{ animationDelay: `${-(i % 7) * 0.35}s` }} d={`M${f.x - 9} ${f.y} L${f.x + 9} ${f.y} L${f.x} ${f.y + 24} Z`} fill={f.c} />)}
+              {[0, 1, 2].map((ph) => <g key={ph} className="st-flutter" style={{ animationDelay: `${-ph * 0.55}s` }}>{swag(x0, x1, y0, sag, 17, colors).filter((_, i) => i % 3 === ph).map((f, i) => <path key={i} d={`M${f.x - 9} ${f.y} L${f.x + 9} ${f.y} L${f.x} ${f.y + 24} Z`} fill={f.c} />)}</g>)}
             </g>
           ))}
 
@@ -635,8 +601,94 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
           <g className="st-bob"><path d={`M${SHOPS[2].x + 94} 482 Q${SHOPS[2].x + 98} 500 ${SHOPS[2].x + 88} 520`} stroke="#9AA3B2" strokeWidth="1" fill="none" /><ellipse cx={SHOPS[2].x + 94} cy="472" rx="9" ry="11" fill={ORANGE} /></g>
           </g>
 
-          {VEHICLES.map((v, i) => <Drive key={i} {...v}>{v.kind === 'tuk' ? <Tuktuk x={0} flip={v.right} /> : v.kind === 'van' ? <Van x={0} flip={v.right} /> : <Scooter x={0} flip={!v.right} />}</Drive>)}
         </svg>
+        <Vehicles />
+        </div>
+  );
+}, (p, n) => p.lang === n.lang && JSON.stringify(p.labels) === JSON.stringify(n.labels) && JSON.stringify(p.counts) === JSON.stringify(n.counts));
+
+/** The whole street scrolls sideways (drag, swipe, arrows): every department has its own shop, and the shop shows how much is inside. */
+export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', className = '' }) {
+  const ar = lang === 'ar';
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const [edge, setEdge] = useState({ start: true, end: false });
+  const [moved, setMoved] = useState(false);
+  const rootRef = useRef(null);
+  const update = () => {
+    const el = ref.current; if (!el) return;
+    const pos = Math.abs(el.scrollLeft); const start = pos < 6; const end = pos > el.scrollWidth - el.clientWidth - 6;
+    setEdge((p) => (p.start === start && p.end === end ? p : { start, end })); // no re-render while the value is unchanged
+    if (pos > 40) setMoved(true);
+  };
+  useEffect(() => { update(); window.addEventListener('resize', update, { passive: true }); return () => window.removeEventListener('resize', update); }, []);
+  const go = (dir) => ref.current?.scrollBy({ left: dir * Math.max(360, ref.current.clientWidth * 0.7), behavior: 'smooth' });
+  useEffect(() => {
+    const root = rootRef.current; const scroller = ref.current; if (!root || !scroller) return undefined;
+    // low-end / data-saver devices keep only the GPU-composited motion (vehicles, clouds, birds, sun)
+    const nav = navigator; const lite = !!(nav.connection && nav.connection.saveData) || (nav.deviceMemory && nav.deviceMemory <= 2) || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 2);
+    root.dataset.lite = lite ? '1' : '0';
+    if (!('IntersectionObserver' in window)) return undefined;
+    // 1) pause everything while the street is off-screen vertically
+    const whole = new IntersectionObserver(([e]) => { root.dataset.paused = e.isIntersecting ? '0' : '1'; }, { threshold: 0 });
+    whole.observe(root);
+    // 2) inside the scroller only animate what is actually in view (a phone sees ~2 of the 14 shops)
+    const part = new IntersectionObserver((entries) => { for (const e of entries) e.target.style.animationPlayState = e.isIntersecting ? 'running' : 'paused'; }, { root: scroller, rootMargin: '0px 160px 0px 160px' });
+    scroller.querySelectorAll('.st-flap,.st-wave,.st-glow,.st-sway,.st-walk,.st-step,.st-bob,.st-wag,.st-pulse,.st-flutter').forEach((n) => part.observe(n));
+    return () => { whole.disconnect(); part.disconnect(); };
+  }, []);
+  const onDown = (e) => { if (e.pointerType !== 'mouse') return; drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; };
+  const onMove = (e) => { const d = drag.current; if (!d) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 5) d.moved = true; if (d.moved) ref.current.scrollLeft = d.left + dx; };
+  const onUp = () => { setTimeout(() => { drag.current = null; }, 0); };
+  const onClickCapture = (e) => { if (drag.current?.moved) { e.preventDefault(); e.stopPropagation(); } };
+
+
+  return (
+    <div ref={rootRef} className={cx('st-root relative', className)} data-paused="0" data-lite="0">
+      <style>{`
+@media (prefers-reduced-motion: no-preference){
+.st-flap{transform-origin:50% 0;transform-box:fill-box;animation:st-flap 4s ease-in-out infinite alternate}
+@keyframes st-flap{from{transform:skewX(-1.2deg)}to{transform:skewX(1.2deg)}}
+.st-wave{transform-origin:50% 0;transform-box:fill-box;animation:st-wave 3s ease-in-out infinite alternate}
+@keyframes st-wave{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}
+.st-glow{animation:st-glow 3.5s ease-in-out infinite alternate}
+@keyframes st-glow{from{opacity:.25}to{opacity:.8}}
+.st-sway{transform-origin:50% 100%;transform-box:fill-box;animation:st-sway 5s ease-in-out infinite alternate}
+@keyframes st-sway{from{transform:rotate(-1.6deg)}to{transform:rotate(1.6deg)}}
+.st-walk{animation:st-walk var(--wd,12s) ease-in-out var(--wl,0s) infinite alternate}
+@keyframes st-walk{from{transform:translateX(-28px)}to{transform:translateX(28px)}}
+.st-step{animation:st-step .55s ease-in-out infinite alternate}
+@keyframes st-step{from{transform:translateY(0)}to{transform:translateY(-2.5px)}}
+.st-bob{animation:st-bob 3s ease-in-out infinite alternate}
+@keyframes st-bob{from{transform:translateY(0)}to{transform:translateY(-4px)}}
+.st-rattle{animation:st-rattle .3s ease-in-out infinite alternate}
+@keyframes st-rattle{from{transform:translateY(0)}to{transform:translateY(-1.2px)}}
+.st-wag{transform-origin:0% 100%;transform-box:fill-box;animation:st-wag .6s ease-in-out infinite alternate}
+@keyframes st-wag{from{transform:rotate(-14deg)}to{transform:rotate(16deg)}}
+.st-breathe{transform-origin:50% 50%;transform-box:fill-box;animation:st-breathe 6s ease-in-out infinite alternate}
+@keyframes st-breathe{from{transform:scale(1)}to{transform:scale(1.1)}}
+.st-pulse{transform-origin:50% 50%;transform-box:fill-box;animation:st-pulse 1.8s ease-in-out infinite alternate}
+@keyframes st-pulse{from{transform:scale(1)}to{transform:scale(1.18)}}
+.st-in{animation:st-in .7s ease-out both;animation-delay:var(--id,0s)}
+@keyframes st-in{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+.st-drift{animation:st-drift var(--dd,30s) ease-in-out var(--dl,0s) infinite alternate}
+@keyframes st-drift{from{transform:translate3d(0,0,0)}to{transform:translate3d(var(--dx,0),var(--dy,0),0)}}
+.st-drive{animation:st-drive2 var(--dd,40s) linear var(--dl,0s) infinite}
+@keyframes st-drive2{from{transform:translate3d(var(--from),0,0)}to{transform:translate3d(var(--to),0,0)}}
+.st-breathe-h{transform-origin:50% 50%;animation:st-breathe-h 6s ease-in-out infinite alternate}
+@keyframes st-breathe-h{from{transform:scale(1)}to{transform:scale(1.1)}}
+.st-flutter{animation:st-flutter 1.6s ease-in-out infinite alternate}
+@keyframes st-flutter{from{transform:translateY(-1.4px)}to{transform:translateY(1.4px)}}
+.st-root[data-paused="1"] *{animation-play-state:paused!important}
+.st-root[data-lite="1"] svg.st-main *{animation:none!important}
+}
+`}</style>
+      <div
+        ref={ref} dir="rtl" onScroll={update} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onClickCapture={onClickCapture}
+        className="no-scrollbar scrollbar-none cursor-grab overflow-x-auto overscroll-x-contain active:cursor-grabbing"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        <Art lang={lang} labels={labels} counts={counts} />
       </div>
 
       {/* edge fades + arrows */}
