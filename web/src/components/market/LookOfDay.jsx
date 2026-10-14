@@ -42,8 +42,8 @@ export default function LookOfDay() {
           </div>
         </div>
         <div className="px-4 pb-5 sm:px-6 sm:pb-7">
-          {e.say && <p className="flex items-start gap-2 rounded-2xl border border-brand/15 bg-brand/5 px-4 py-3 text-[14px] leading-relaxed sm:text-[15px]"><Sparkles className="mt-1 h-4 w-4 shrink-0 text-brand" />{e.say}</p>}
-          <div key={`${e.audience || e.persona || 'look'}-${e.age || ''}-${e.occasion || ''}-${tab}`}><LookSet data={e} name={name} /></div>
+          {e.say && <p className="flex items-start gap-2 rounded-xl border border-brand/15 bg-brand/5 px-3 py-2 text-[13px] leading-relaxed sm:text-sm"><Sparkles className="mt-1 h-4 w-4 shrink-0 text-brand" />{e.say}</p>}
+          <div key={`${e.audience || e.persona || 'look'}-${e.age || ''}-${e.occasion || ''}-${tab}`}><LookSet data={e} name={name} showcase /></div>
           <Link to={`/look-of-day/${tab}`} className="mt-4 inline-flex items-center gap-2 rounded-full border border-brand/40 px-4 py-2.5 text-sm font-bold text-brand transition hover:bg-brand hover:text-white"><span>{lang === 'ar' ? 'شوف صفحة اللوك كاملة' : 'View the full look'}</span><ArrowRight className="h-4 w-4 rtl:rotate-180" /></Link>
         </div>
       </div>

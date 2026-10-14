@@ -366,13 +366,13 @@ function ModaTrainingPanel() {
 
 const LOOK_OCCASIONS = ['أوتفيت خروجة', 'أوتفيت مقابلة شغل', 'أوتفيت سهرة', 'أوتفيت خطوبة', 'أوتفيت كتب كتاب', 'أوتفيت فرح', 'أوتفيت مناسبة خاصة', 'أوتفيت خروجة أطفال', 'أوتفيت عيد أطفال'];
 const LOOK_PIECE_SUGGESTIONS = ['تيشيرت', 'قميص', 'بنطلون', 'فستان', 'جاكيت', 'حذاء', 'شنطة', 'كاب (إكسسوار)', 'طاقية (إكسسوار)'];
-const blankOutfit = () => ({ audience: 'women', age: '', occasion: '', say: '', tips: '', pieces: [] });
+const blankOutfit = () => ({ audience: 'women', age: '', occasion: '', say: '', tips: '', coverImage: '', images: [], pieces: [] });
 function lookOfDayForm(data) {
   const manual = data.manual || {};
   return {
     mode: data.mode || 'ai',
-    manual: { coverImage: manual.coverImage || '', title: manual.title || '', description: manual.description || '', badge: manual.badge || '', outfits: (manual.outfits || []).map((outfit) => ({
-      audience: outfit.audience || 'women', age: outfit.age || '', say: outfit.say || '', tips: outfit.tips || '', occasion: outfit.occasion || '',
+    manual: { showOthers: !!manual.showOthers, coverImage: manual.coverImage || '', title: manual.title || '', description: manual.description || '', badge: manual.badge || '', outfits: (manual.outfits || []).map((outfit) => ({
+      audience: outfit.audience || 'women', age: outfit.age || '', say: outfit.say || '', tips: outfit.tips || '', occasion: outfit.occasion || '', coverImage: '', images: (outfit.images?.length ? outfit.images : [outfit.coverImage]).filter(Boolean),
       pieces: (outfit.pieces || []).map((piece) => ({ label: piece.label || '', productId: piece.product ? piece.productId : null, product: piece.product || null })),
     })) },
   };
@@ -455,9 +455,9 @@ function LookOfDayPanel() {
   }));
   const save = async () => {
     setBusy(true);
-    const manual = { coverImage: f.manual.coverImage, title: f.manual.title.trim(), description: f.manual.description.trim(), badge: f.manual.badge.trim(), outfits: manualOutfits.filter((outfit) => outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).length >= 2)
+    const manual = { showOthers: !!f.manual.showOthers, coverImage: f.manual.coverImage, title: f.manual.title.trim(), description: f.manual.description.trim(), badge: f.manual.badge.trim(), outfits: manualOutfits.filter((outfit) => outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).length >= 2)
       .map((outfit) => ({
-        audience: outfit.audience, age: outfit.age.trim(), say: outfit.say.trim(), tips: outfit.tips.trim(), occasion: outfit.occasion.trim(),
+        audience: outfit.audience, age: outfit.age.trim(), say: outfit.say.trim(), tips: outfit.tips.trim(), occasion: outfit.occasion.trim(), coverImage: (outfit.images || [])[0] || '', images: outfit.images || [],
         pieces: outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).map((piece) => ({ label: piece.label.trim(), productId: Number(piece.productId) })),
       })) };
     try {
@@ -550,15 +550,16 @@ function LookOfDayPanel() {
           <div className="space-y-4 border-t border-line pt-4">
             <p className="text-sm text-muted">ضيف عدة أوتفيتات كاملة لليوم. لكل طقم اختار الفئة (حريمي، رجالي أو أطفال)، والعمر لو مناسب، والمناسبة، ثم اختار القطع المتناسقة من منتجات المحلات. الكاب والطاقية ضمن الإكسسوارات.</p>
             <section className="grid gap-3 rounded-2xl border border-line bg-canvas/60 p-3 sm:grid-cols-2 sm:p-4">
-              <div className="sm:col-span-2"><p className="font-semibold">شكل صفحة اللوك</p><p className="mt-1 text-xs text-muted">الصورة اختيارية؛ لو مفيش صورة هنستخدم صورة أول منتج تلقائيًا.</p></div>
+              <div className="sm:col-span-2"><p className="font-semibold">شكل صفحة اللوك</p><p className="mt-1 text-xs text-muted">صورة الشخص اللابس الأوتفيت بترفعها لكل أوتفيت من جواه. الصورة هنا اختيارية وبتتستخدم للأوتفيتات اللي ملهاش صورة.</p></div>
               <label className="block"><span className="mb-1 block text-xs font-medium text-muted">عنوان الصفحة</span><Input value={f.manual.title} maxLength={100} onChange={(e) => setF((x) => ({ ...x, manual: { ...x.manual, title: e.target.value } }))} placeholder="لوك النهارده" /></label>
               <label className="block"><span className="mb-1 block text-xs font-medium text-muted">شارة صغيرة</span><Input value={f.manual.badge} maxLength={40} onChange={(e) => setF((x) => ({ ...x, manual: { ...x.manual, badge: e.target.value } }))} placeholder="الأكثر طلبًا ✨" /></label>
               <label className="block sm:col-span-2"><span className="mb-1 block text-xs font-medium text-muted">وصف الصفحة</span><Textarea rows={2} value={f.manual.description} maxLength={240} onChange={(e) => setF((x) => ({ ...x, manual: { ...x.manual, description: e.target.value } }))} placeholder="قطع متناسقة اختيرت بعناية من محلات بنها" /></label>
               <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
                 {f.manual.coverImage ? <img src={f.manual.coverImage} alt="" className="h-20 w-28 rounded-xl object-cover" /> : <div className="grid h-20 w-28 place-items-center rounded-xl bg-secondary text-xs text-muted">صورة أول منتج</div>}
-                <label className="inline-flex cursor-pointer items-center rounded-full border border-line-strong px-3.5 py-2 text-[13px] font-semibold hover:border-fg">{busy ? 'جاري الرفع…' : 'رفع صورة للهيرو'}<input type="file" accept="image/*" hidden disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; setBusy(true); try { const result = await adminUpload('/look-of-day/image', file); setF((x) => ({ ...x, manual: { ...x.manual, coverImage: result.image } })); toast({ title: 'اترفعت الصورة؛ احفظ الإعداد لنشرها' }); } catch (x) { toast({ tone: 'error', title: x.message }); } setBusy(false); }} /></label>
+                <label className="inline-flex cursor-pointer items-center rounded-full border border-line-strong px-3.5 py-2 text-[13px] font-semibold hover:border-fg">{busy ? 'جاري الرفع…' : 'رفع صورة عامة'}<input type="file" accept="image/*" hidden disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; setBusy(true); try { const result = await adminUpload('/look-of-day/image', file); setF((x) => ({ ...x, manual: { ...x.manual, coverImage: result.image } })); toast({ title: 'اترفعت الصورة؛ احفظ الإعداد لنشرها' }); } catch (x) { toast({ tone: 'error', title: x.message }); } setBusy(false); }} /></label>
                 {f.manual.coverImage && <button type="button" onClick={() => setF((x) => ({ ...x, manual: { ...x.manual, coverImage: '' } }))} className="text-sm font-semibold text-sale">استخدم صورة المنتج بدلها</button>}
               </div>
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-line bg-elevated p-3 text-sm font-semibold sm:col-span-2"><input type="checkbox" className="h-4 w-4 accent-[#F45100]" checked={!!f.manual.showOthers} onChange={(e) => setF((x) => ({ ...x, manual: { ...x.manual, showOthers: e.target.checked } }))} />أظهر قسم "إطلالات أخرى قد تعجبك" أسفل صفحة اللوك</label>
             </section>
             <datalist id="look-of-day-occasions">{LOOK_OCCASIONS.map((occasion) => <option key={occasion} value={occasion} />)}</datalist>
             <datalist id="look-of-day-pieces">{LOOK_PIECE_SUGGESTIONS.map((piece) => <option key={piece} value={piece} />)}</datalist>
@@ -574,6 +575,20 @@ function LookOfDayPanel() {
                   <div className="grid min-w-0 gap-3 sm:grid-cols-2">
                     <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">تعليق المساعد الذكي (اختياري)</span><Input value={outfit.say} maxLength={700} onChange={(e) => changeOutfit(outfitIndex, (x) => ({ ...x, say: e.target.value }))} /></label>
                     <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">نصيحة تنسيق (اختياري)</span><Textarea rows={2} value={outfit.tips} maxLength={300} onChange={(e) => changeOutfit(outfitIndex, (x) => ({ ...x, tips: e.target.value }))} /></label>
+                  </div>
+                  <div className="rounded-xl border border-dashed border-line-strong bg-elevated p-3">
+                    <p className="text-sm font-semibold">صور شخص لابس الأوتفيت ({(outfit.images || []).length}/6)</p>
+                    <p className="mt-0.5 text-xs text-muted">ارفع كذا صورة زي ما تحب (زوايا مختلفة مثلًا). الأولى هي الأساسية والباقي بيظهروا كصور مصغّرة في صفحة اللوك. الأفضل صور طولية (٤:٥)، وبيتكتب عليها "صورة توضيحية" تلقائيًا.</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {(outfit.images || []).map((img, imgIndex) => (
+                        <div key={img} className="relative">
+                          <img src={img} alt="" className="h-24 w-[72px] rounded-xl object-cover" />
+                          {imgIndex === 0 && <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-black/55 text-center text-[10px] font-bold text-white">الأساسية</span>}
+                          <button type="button" aria-label="حذف الصورة" onClick={() => changeOutfit(outfitIndex, (x) => ({ ...x, images: x.images.filter((_, i) => i !== imgIndex) }))} className="absolute -end-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-sale text-white shadow"><Trash2 className="h-3 w-3" /></button>
+                        </div>
+                      ))}
+                      {(outfit.images || []).length < 6 && <label className="grid h-24 w-[72px] cursor-pointer place-items-center rounded-xl border border-line-strong px-1 text-center text-[12px] font-semibold hover:border-fg">{busy ? '…' : '+ صورة'}<input type="file" accept="image/*" multiple hidden disabled={busy} onChange={async (e) => { const files = [...(e.target.files || [])].slice(0, 6 - (outfit.images || []).length); e.target.value = ''; if (!files.length) return; setBusy(true); try { const urls = []; for (const file of files) { const result = await adminUpload('/look-of-day/image', file); urls.push(result.image); } changeOutfit(outfitIndex, (x) => ({ ...x, images: [...(x.images || []), ...urls].slice(0, 6) })); toast({ title: 'اترفعت الصور؛ احفظ الإعداد لنشرها' }); } catch (x) { toast({ tone: 'error', title: x.message }); } setBusy(false); }} /></label>}
+                    </div>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-semibold">قطع الأوتفيت</p>

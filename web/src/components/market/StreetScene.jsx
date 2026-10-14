@@ -1,4 +1,8 @@
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+
+const cx = (...a) => a.filter(Boolean).join(' ');
 
 /**
  * Hero illustration: a wide street of clothing shops, drawn in the brand's language (the scalloped awning from the logo).
@@ -9,44 +13,64 @@ import { Link } from 'react-router-dom';
 const NAVY = '#14213D';
 const ORANGE = '#F45100';
 const SKIN = '#EBCBB1';
-const W = 1600;
-
-const SHOPS = [
-  { x: 40, top: 168, wall: '#FFF8F0', dept: 'women', ar: 'حريمي', en: 'Women', awning: [ORANGE, '#FFFFFF'], kind: 'dress', sale: true, roof: 'tank' },
-  { x: 266, top: 140, wall: '#EAF1FA', dept: 'men', ar: 'رجالي', en: 'Men', awning: [NAVY, '#FFFFFF'], kind: 'suit', roof: 'antenna' },
-  { x: 492, top: 176, wall: '#FDEBDD', dept: 'kids', ar: 'أطفال', en: 'Kids', awning: [ORANGE, '#FFFFFF'], kind: 'kids', roof: 'flag' },
-  { x: 718, top: 150, wall: '#EEF4EC', dept: 'shoes', ar: 'كوتشيات', en: 'Shoes', awning: [NAVY, '#FFFFFF'], kind: 'shoes', sale: true, roof: 'plant' },
-  { x: 944, top: 172, wall: '#FFF3E3', dept: 'bags', ar: 'شنط', en: 'Bags', awning: [ORANGE, '#FFFFFF'], kind: 'bag', roof: 'tank' },
-  { x: 1170, top: 144, wall: '#E9EEF7', dept: 'sports', ar: 'رياضة', en: 'Sports', awning: [NAVY, '#FFFFFF'], kind: 'sport', roof: 'antenna' },
-  { x: 1396, top: 164, wall: '#FFF7F1', dept: 'wedding_dress', ar: 'فساتين فرح', en: 'Bridal', awning: [ORANGE, '#FFFFFF'], kind: 'bride', sale: true, roof: 'flag' },
+const SHOP_W = 180;
+const STEP = 226;
+const MARGIN = 40;
+const TOPS = [168, 140, 176, 150, 172, 144, 164, 152, 170, 142, 166, 148, 174, 146];
+const WALLS = ['#FFF8F0', '#EAF1FA', '#FDEBDD', '#EEF4EC', '#FFF3E3', '#E9EEF7', '#FFF7F1'];
+const ROOFS = ['tank', 'antenna', 'flag', 'plant'];
+/** every department of the marketplace gets its own shop; the order is the order the shopper walks (right → left in Arabic) */
+const DEPTS = [
+  ['women', 'حريمي', 'Women', 'dress', true], ['men', 'رجالي', 'Men', 'suit'], ['kids', 'أطفال', 'Kids', 'kids'], ['shoes', 'كوتشيات', 'Shoes', 'shoes', true],
+  ['bags', 'شنط', 'Bags', 'bag'], ['hijab', 'طرح وحجاب', 'Hijab', 'hijab'], ['abaya', 'عبايات', 'Abayas', 'abaya', true], ['jalabiya', 'جلاليب', 'Jalabiyas', 'jalabiya'],
+  ['denim', 'جينز', 'Denim', 'denim'], ['sports', 'رياضة', 'Sports', 'sport', true], ['accessories', 'إكسسوارات', 'Accessories', 'acc'], ['underwear', 'ملابس داخلية', 'Underwear', 'under'],
+  ['wedding_dress', 'فساتين فرح', 'Bridal', 'bride', true], ['wedding_suit', 'بدل أفراح', 'Suits', 'groom'],
 ];
+const N = DEPTS.length;
+const W = MARGIN * 2 + N * STEP - (STEP - SHOP_W);
+const SHOPS = DEPTS.map(([dept, ar, en, kind, sale], i) => ({
+  x: W - MARGIN - SHOP_W - i * STEP, top: TOPS[i % TOPS.length], wall: WALLS[i % WALLS.length], dept, ar, en, kind, sale,
+  awning: i % 2 === 0 ? [ORANGE, '#FFFFFF'] : [NAVY, '#FFFFFF'], roof: ROOFS[i % ROOFS.length],
+}));
+/** x of the pavement gap between shop i and shop i+1 */
+const gapX = (i) => SHOPS[i].x - (STEP - SHOP_W) / 2;
 
 function Awning({ colors, y }) {
   const n = 6, w = 192 / n, r = w / 2;
   return (
     <g transform={`translate(-6,${y})`}>
-      <rect x="0" y="-2" width="192" height="14" rx="3" fill={colors[0]} />
-      {Array.from({ length: n }, (_, i) => (
-        <path key={i} d={`M${i * w} 10H${(i + 1) * w}V34A${r} ${r} 0 0 1 ${i * w} 34Z`} fill={colors[i % 2]} />
-      ))}
+      <g className="st-flap" style={{ animationDelay: `${-(y % 9) * 0.45}s` }}>
+        <rect x="0" y="-2" width="192" height="14" rx="3" fill={colors[0]} />
+        {Array.from({ length: n }, (_, i) => (
+          <path key={i} d={`M${i * w} 10H${(i + 1) * w}V34A${r} ${r} 0 0 1 ${i * w} 34Z`} fill={colors[i % 2]} />
+        ))}
+      </g>
       <ellipse cx="96" cy="64" rx="86" ry="6" fill={NAVY} opacity="0.07" />
     </g>
   );
 }
 
-function Window({ wy, kind, sale }) {
+function Rail({ kind, wy }) {
+  const y = wy + 20;
+  if (['bag', 'acc', 'under'].includes(kind)) return null;
+  const line = <line x1="26" y1={y} x2="102" y2={y} stroke="#9AA3B2" strokeWidth="2" strokeLinecap="round" />;
+  if (kind === 'hijab') return <g>{line}{['#F45100', '#14213D', '#F9B58F', '#6C7A99'].map((c, i) => <g key={i} transform={`translate(${34 + i * 20},${y})`}><path d="M0 0 L-3 3" stroke="#9AA3B2" strokeWidth="1.5" /><rect x="-6" y="3" width="12" height="28" rx="4" fill={c} /><path d="M-6 12 H6 M-6 20 H6" stroke="#FFFFFF" strokeWidth="1" opacity="0.5" /></g>)}</g>;
+  if (kind === 'abaya') return <g>{line}{[0, 1, 2].map((i) => <g key={i} transform={`translate(${40 + i * 24},${y})`}><path d="M-8 4 L8 4 L11 56 L-11 56 Z" fill="#23232B" /><rect x="-1.5" y="4" width="3" height="52" fill="#E0B25A" opacity="0.8" /></g>)}</g>;
+  if (kind === 'jalabiya') return <g>{line}{[0, 1, 2].map((i) => <g key={i} transform={`translate(${40 + i * 24},${y})`}><path d="M-8 4 L8 4 L11 56 L-11 56 Z" fill={['#FFFFFF', '#EADBCB', '#D9DEE8'][i]} stroke="#D9DEE8" strokeWidth="1" /><path d="M0 4 V24" stroke="#C9CBD4" strokeWidth="1" /></g>)}</g>;
+  if (kind === 'denim') return <g>{line}{['#3E6FB0', '#2C4F86', '#7FA3D6', '#14213D'].map((c, i) => <g key={i} transform={`translate(${34 + i * 20},${y})`}><path d="M-7 3 H7 L8 22 L4.5 46 H0.6 L0 22 L-0.6 46 H-4.5 L-8 22 Z" fill={c} /></g>)}</g>;
+  return <g>{line}{['#F45100', '#14213D', '#F9B58F', '#6C7A99'].map((c, i) => (
+    <g key={i} transform={`translate(${34 + i * 20},${y})`}><path d="M0 0 L-3 3" stroke="#9AA3B2" strokeWidth="1.5" /><path d="M-9 6 L-4 3 L0 6 L4 3 L9 6 L7 12 L5 11 L5 24 L-5 24 L-5 11 L-7 12 Z" fill={c} opacity="0.92" /></g>
+  ))}</g>;
+}
+
+function Window({ wy, kind, sale, soon }) {
   const h = 440 - wy;
   const garments = ['#F45100', '#14213D', '#F9B58F', '#6C7A99'];
   return (
     <g>
       <rect x="14" y={wy} width="100" height={h} rx="5" fill="#FFF6EC" />
       <rect x="14" y="430" width="100" height="10" fill="#EADBCB" />
-      <line x1="26" y1={wy + 20} x2="102" y2={wy + 20} stroke="#9AA3B2" strokeWidth="2" strokeLinecap="round" />
-      {garments.map((c, i) => (
-        <g key={i} transform={`translate(${34 + i * 20},${wy + 20})`}>
-          <path d="M0 0 L-3 3" stroke="#9AA3B2" strokeWidth="1.5" /><path d="M-9 6 L-4 3 L0 6 L4 3 L9 6 L7 12 L5 11 L5 24 L-5 24 L-5 11 L-7 12 Z" fill={c} opacity="0.92" />
-        </g>
-      ))}
+      <Rail kind={kind} wy={wy} />
       {kind === 'dress' && (
         <g>
           <ellipse cx="64" cy="437" rx="22" ry="4" fill="#C9CBD4" /><rect x="62" y="414" width="4" height="23" fill="#C9CBD4" />
@@ -111,24 +135,84 @@ function Window({ wy, kind, sale }) {
           <g transform="translate(96,418)"><path d="M0 0 L-4 -10 M0 0 L4 -10 M0 0 L0 -12" stroke="#6E9D80" strokeWidth="1.5" /><circle cx="-4" cy="-12" r="3" fill={ORANGE} /><circle cx="4" cy="-12" r="3" fill="#F9B58F" /><circle cx="0" cy="-14" r="3" fill={ORANGE} /></g>
         </g>
       )}
+      {kind === 'hijab' && (
+        <g>
+          <circle cx="64" cy="346" r="8.5" fill={SKIN} />
+          <path d="M49 348 Q49 329 64 329 Q79 329 79 348 L86 376 Q64 368 42 376 Z" fill={NAVY} />
+          <circle cx="64" cy="347" r="7.2" fill={SKIN} />
+          <path d="M47 376 Q64 370 81 376 L85 432 L43 432 Z" fill="#F9B58F" /><rect x="61" y="376" width="6" height="56" fill="#FFFFFF" opacity="0.5" />
+          <ellipse cx="53" cy="437" rx="9" ry="3" fill="#C9CBD4" /><ellipse cx="75" cy="437" rx="9" ry="3" fill="#C9CBD4" />
+        </g>
+      )}
+      {kind === 'abaya' && (
+        <g>
+          <path d="M50 348 Q50 330 64 330 Q78 330 78 348 L84 372 L44 372 Z" fill="#23232B" /><circle cx="64" cy="347" r="7.2" fill={SKIN} />
+          <path d="M48 372 L80 372 L90 436 L38 436 Z" fill="#23232B" /><rect x="61.5" y="372" width="5" height="64" fill="#E0B25A" opacity="0.85" /><path d="M48 392 H80" stroke="#E0B25A" strokeWidth="1.6" opacity="0.8" />
+          <ellipse cx="64" cy="437" rx="22" ry="3" fill="#C9CBD4" />
+        </g>
+      )}
+      {kind === 'jalabiya' && (
+        <g>
+          <circle cx="64" cy="344" r="9" fill={SKIN} /><path d="M55 340 Q64 330 73 340 Z" fill="#FFFFFF" stroke="#D9DEE8" strokeWidth="1" />
+          <rect x="61" y="351" width="6" height="6" fill={SKIN} />
+          <path d="M47 358 Q64 352 81 358 L88 436 L40 436 Z" fill="#FFFFFF" stroke="#D9DEE8" strokeWidth="1.5" /><path d="M64 357 V396" stroke="#D9DEE8" strokeWidth="1.5" /><circle cx="64" cy="366" r="1.6" fill={NAVY} /><circle cx="64" cy="378" r="1.6" fill={NAVY} />
+          <ellipse cx="64" cy="437" rx="24" ry="3" fill="#C9CBD4" />
+        </g>
+      )}
+      {kind === 'denim' && (
+        <g>
+          <circle cx="64" cy="344" r="9" fill={SKIN} /><rect x="61" y="351" width="6" height="6" fill={SKIN} />
+          <path d="M48 358 Q64 352 80 358 L82 392 L46 392 Z" fill="#FFFFFF" stroke="#E4E7EE" strokeWidth="1" />
+          <rect x="46" y="390" width="36" height="6" fill="#2C4F86" /><rect x="60" y="390" width="8" height="6" rx="1" fill="#E0B25A" />
+          <path d="M46 396 H82 L80 434 H66 L64 410 L62 434 H48 Z" fill="#3E6FB0" /><path d="M64 396 V410" stroke="#2C4F86" strokeWidth="1.5" />
+        </g>
+      )}
+      {kind === 'acc' && (
+        <g>
+          <rect x="20" y="398" width="88" height="5" rx="2" fill="#B9AA97" /><rect x="20" y="430" width="88" height="5" rx="2" fill="#B9AA97" />
+          <path d="M32 372 Q48 404 64 372" stroke="#E0B25A" strokeWidth="2.4" fill="none" /><circle cx="48" cy="394" r="3.6" fill={ORANGE} />
+          <rect x="74" y="378" width="6" height="22" rx="2" fill={NAVY} /><circle cx="77" cy="388" r="8" fill="#FFFFFF" stroke={NAVY} strokeWidth="2" /><path d="M77 388 V383 M77 388 L81 390" stroke={NAVY} strokeWidth="1.2" />
+          <circle cx="34" cy="422" r="7" fill="none" stroke={NAVY} strokeWidth="2" /><circle cx="50" cy="422" r="7" fill="none" stroke={NAVY} strokeWidth="2" /><path d="M41 422 H43" stroke={NAVY} strokeWidth="2" />
+          <rect x="68" y="414" width="22" height="16" rx="3" fill={ORANGE} /><rect x="76" y="410" width="6" height="5" rx="1" fill={NAVY} />
+          <circle cx="98" cy="424" r="5" fill="#F9B58F" />
+        </g>
+      )}
+      {kind === 'under' && (
+        <g>
+          <rect x="20" y="386" width="88" height="5" rx="2" fill="#B9AA97" /><rect x="20" y="410" width="88" height="5" rx="2" fill="#B9AA97" /><rect x="20" y="434" width="88" height="5" rx="2" fill="#B9AA97" />
+          {[['#FFFFFF', 0], ['#F9B58F', 1], [NAVY, 2], ['#6C7A99', 3]].map(([c, i]) => <g key={i}><rect x={26 + i * 22} y="372" width="18" height="14" rx="2" fill={c} stroke="#E4E7EE" strokeWidth="0.8" /><rect x={26 + i * 22} y="394" width="18" height="16" rx="2" fill={c} stroke="#E4E7EE" strokeWidth="0.8" opacity="0.9" /></g>)}
+          {[ORANGE, '#FFFFFF', NAVY].map((c, i) => <rect key={i} x={30 + i * 28} y="420" width="20" height="14" rx="2" fill={c} stroke="#E4E7EE" strokeWidth="0.8" />)}
+        </g>
+      )}
+      {kind === 'groom' && (
+        <g>
+          <circle cx="64" cy="342" r="9" fill={SKIN} /><rect x="61" y="349" width="6" height="6" fill={SKIN} />
+          <path d="M47 358 Q64 352 81 358 L85 402 L43 402 Z" fill="#1B1B22" /><path d="M58 356 L64 374 L70 356 Z" fill="#FFFFFF" />
+          <path d="M58 363 L64 366 L70 363 L70 370 L64 367 L58 370 Z" fill={ORANGE} />
+          <circle cx="64" cy="380" r="1.4" fill="#FFFFFF" /><circle cx="64" cy="388" r="1.4" fill="#FFFFFF" />
+          <rect x="49" y="402" width="14" height="32" fill="#1B1B22" /><rect x="65" y="402" width="14" height="32" fill="#1B1B22" />
+          <ellipse cx="56" cy="436" rx="9" ry="3" fill="#0E0E12" /><ellipse cx="72" cy="436" rx="9" ry="3" fill="#0E0E12" />
+        </g>
+      )}
       <rect x="14" y={wy} width="100" height={h} rx="5" fill="none" stroke={NAVY} strokeWidth="4" />
       <path d={`M24 ${wy + 6} L58 ${wy + 6} L30 ${wy + 90} L24 ${wy + 90} Z`} fill="#FFFFFF" opacity="0.28" />
       <path d={`M66 ${wy + 6} L78 ${wy + 6} L50 ${wy + 90} L38 ${wy + 90} Z`} fill="#FFFFFF" opacity="0.2" />
-      {sale && <g transform={`translate(98,${wy + 22})`}><circle r="11" fill={ORANGE} /><text y="4" textAnchor="middle" fontSize="12" fontWeight="800" fill="#FFFFFF">%</text></g>}
+      {sale && <g transform={`translate(98,${wy + 22})`}><circle className="st-pulse" r="11" fill={ORANGE} /><text y="4" textAnchor="middle" fontSize="12" fontWeight="800" fill="#FFFFFF">%</text></g>}
+      {soon && <rect x="14" y={wy} width="100" height={h} rx="5" fill={NAVY} opacity="0.38" />}
       <rect x="14" y="440" width="100" height="40" rx="3" fill={NAVY} opacity="0.92" /><rect x="14" y="440" width="100" height="4" fill={ORANGE} />
     </g>
   );
 }
 
 
-function Door({ dy, lang }) {
+function Door({ dy, lang, soon }) {
   return (
     <g>
       <rect x="124" y={dy} width="42" height={480 - dy} rx="4" fill="#FFF6EC" stroke={NAVY} strokeWidth="4" />
       <rect x="130" y={dy + 8} width="30" height={480 - dy - 38} rx="2" fill="#DCEAF4" />
       <path d={`M132 ${dy + 10} L146 ${dy + 10} L132 ${dy + 52} Z`} fill="#FFFFFF" opacity="0.5" />
       <circle cx="132" cy={dy + 92} r="2.6" fill={ORANGE} />
-      <rect x="136" y={dy + 22} width="22" height="11" rx="2.5" fill={NAVY} /><text x="147" y={dy + 30.4} textAnchor="middle" fontSize="6.5" fontWeight="800" fill="#FFFFFF" className="font-display">{lang === 'ar' ? 'مفتوح' : 'OPEN'}</text>
+      <rect x="136" y={dy + 22} width="22" height="11" rx="2.5" fill={NAVY} /><text x="147" y={dy + 30.4} textAnchor="middle" fontSize="6.5" fontWeight="800" fill="#FFFFFF" className="font-display">{soon ? (lang === 'ar' ? 'قريبًا' : 'SOON') : (lang === 'ar' ? 'مفتوح' : 'OPEN')}</text>
       <rect x="127" y="474" width="36" height="6" rx="3" fill={ORANGE} opacity="0.85" />
     </g>
   );
@@ -141,35 +225,41 @@ function Roof({ kind, y }) {
   return <g transform={`translate(40,${y})`}><path d="M-16 0 L16 0 L12 -14 L-12 -14 Z" fill={ORANGE} /><ellipse cx="-6" cy="-24" rx="7" ry="13" fill="#8FB9A0" transform="rotate(-18 -6 -16)" /><ellipse cx="7" cy="-26" rx="7" ry="14" fill="#A7C9B3" transform="rotate(16 7 -16)" /><ellipse cx="0" cy="-30" rx="6" ry="14" fill="#8FB9A0" /></g>;
 }
 
-function Shop({ shop, label, lang }) {
+function Shop({ shop, label, lang, count, index = 0 }) {
   const { x, top, wall, awning, kind, dept, sale, roof } = shop;
   const awY = top + 76, wy = top + 140, dy = top + 150;
+  const known = typeof count === 'number';
+  const soon = known && count === 0;
+  const countLabel = !known ? '' : soon ? (lang === 'ar' ? 'قريبًا' : 'Soon') : `${new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US').format(count)} ${lang === 'ar' ? 'منتج' : 'items'}`;
   return (
-    <Link to={`/search?department=${dept}`} aria-label={label} className="group cursor-pointer outline-none">
-      <g transform={`translate(${x},0)`}>
+    <Link to={`/search?department=${dept}`} aria-label={known ? `${label} — ${countLabel}` : label} className="group cursor-pointer outline-none">
+      <g transform={`translate(${x},0)`}><g className="st-in" style={{ '--id': `${0.05 + index * 0.07}s` }}>
         <Roof kind={roof} y={top} />
         <rect x="0" y={top} width="180" height={480 - top} fill={wall} />
         <rect x="0" y={top} width="180" height="12" fill={NAVY} opacity="0.16" />
         <rect x="0" y={top + 12} width="180" height="3" fill="#FFFFFF" opacity="0.7" />
         <rect x="150" y={top + 82} width="22" height="14" rx="2" fill="#FFFFFF" opacity="0.9" stroke="#C9CBD4" strokeWidth="1.2" /><path d={`M154 ${top + 86}H168M154 ${top + 90}H168`} stroke="#C9CBD4" strokeWidth="1.2" />
         <g className="transition-transform duration-300 ease-out group-hover:-translate-y-1 group-focus-visible:-translate-y-1">
-          {[26, 90, 154].map((lx) => <g key={lx}><path d={`M${lx} ${top + 22} v-6 h8`} stroke={NAVY} strokeWidth="2" fill="none" /><circle cx={lx + 8} cy={top + 16} r="3.2" fill="#FFE2B8" /><circle cx={lx + 8} cy={top + 16} r="9" fill="#FFD9A8" opacity="0.35" /></g>)}
+          {[26, 90, 154].map((lx) => <g key={lx}><path d={`M${lx} ${top + 22} v-6 h8`} stroke={NAVY} strokeWidth="2" fill="none" /><circle cx={lx + 8} cy={top + 16} r="3.2" fill={soon ? '#C9CBD4' : '#FFE2B8'} />{!soon && <circle className="st-glow" style={{ animationDelay: `${-(lx % 5) * 0.6}s` }} cx={lx + 8} cy={top + 16} r="9" fill="#FFD9A8" />}</g>)}
           <rect x="14" y={top + 24} width="152" height="40" rx="9" fill={NAVY} />
           <rect x="18" y={top + 28} width="144" height="32" rx="6" fill="none" stroke="#FFFFFF" strokeWidth="1" opacity="0.3" />
           <circle cx="28" cy={top + 44} r="3.5" fill={ORANGE} /><circle cx="152" cy={top + 44} r="3.5" fill={ORANGE} />
           <text x="90" y={top + 51} textAnchor="middle" fontSize={label.length > 9 ? 17 : 22} fontWeight="800" fill="#FFFFFF" className="font-display">{label}</text>
           <Awning colors={awning} y={awY} />
         </g>
-        <Window wy={wy} kind={kind} sale={sale} />
-        <Door dy={dy} lang={lang} />
-      </g>
+        <Window wy={wy} kind={kind} sale={sale && !soon} soon={soon} />
+        <Door dy={dy} lang={lang} soon={soon} />
+        {/* the shop's stock, written on its stall board: a shopper sees which shops have a lot to look at */}
+        {known && <g transform="translate(64,460)"><rect x="-38" y="-9" width="76" height="18" rx="9" fill={soon ? '#6C7A99' : ORANGE} /><text y="4.5" textAnchor="middle" fontSize="11" fontWeight="800" fill="#FFFFFF" className="font-display">{countLabel}</text></g>}
+      </g></g>
     </Link>
   );
 }
 
-function Person({ x, s = 1, top, bottom, hair, woman, bag, flip = false }) {
-  return (
+function Person({ x, s = 1, top, bottom, hair, woman, bag, flip = false, still = false }) {
+  const body = (
     <g transform={`translate(${x},550) scale(${flip ? -s : s},${s})`}>
+      <g className="st-step" style={{ animationDelay: `${-(x % 7) * 0.08}s` }}>
       <ellipse cx="0" cy="3" rx="24" ry="4.5" fill={NAVY} opacity="0.12" />
       {woman ? (
         <g>
@@ -195,8 +285,11 @@ function Person({ x, s = 1, top, bottom, hair, woman, bag, flip = false }) {
           <path d="M14 -46 L36 -46 L33 -22 L17 -22 Z" fill={bag} /><rect x="20" y="-38" width="10" height="3" rx="1.5" fill="#FFFFFF" opacity="0.85" />
         </g>
       )}
+      </g>
     </g>
   );
+  if (still) return body;
+  return <g className="st-walk" style={{ '--wd': `${9 + (x % 6)}s`, '--wl': `${-(x % 11)}s` }}>{body}</g>;
 }
 
 function Plant({ x }) {
@@ -216,8 +309,10 @@ function Tree({ x, y = 552 }) {
     <g transform={`translate(${x},${y})`}>
       <ellipse cx="0" cy="2" rx="26" ry="5" fill={NAVY} opacity="0.12" />
       <rect x="-4" y="-92" width="8" height="92" rx="3" fill="#8A6B55" />
+      <g className="st-sway" style={{ animationDelay: `${-(x % 13) * 0.4}s` }}>
       <circle cx="-18" cy="-104" r="26" fill="#9CC3A8" /><circle cx="18" cy="-108" r="28" fill="#A7C9B3" /><circle cx="0" cy="-130" r="30" fill="#8FB9A0" /><circle cx="-6" cy="-92" r="22" fill="#86B496" />
       <circle cx="-14" cy="-120" r="4" fill="#FFFFFF" opacity="0.25" /><circle cx="20" cy="-96" r="3" fill="#FFFFFF" opacity="0.2" />
+      </g>
     </g>
   );
 }
@@ -225,7 +320,7 @@ function Tree({ x, y = 552 }) {
 function Lamp({ x, name, lang }) {
   return (
     <g>
-      <circle cx={x} cy="232" r="34" fill="url(#st-lamp)" opacity="0.7" />
+      <circle className="st-glow" cx={x} cy="232" r="34" fill="url(#st-lamp)" />
       <rect x={x - 3} y="250" width="6" height="298" rx="3" fill={NAVY} /><rect x={x - 12} y="540" width="24" height="9" rx="4" fill={NAVY} />
       <path d={`M${x - 10} 240 L${x + 10} 240 L${x + 6} 222 L${x - 6} 222 Z`} fill={NAVY} /><rect x={x - 7} y="228" width="14" height="10" rx="2" fill="#FFE2B8" />
       {name && (
@@ -291,7 +386,7 @@ function Cat({ x }) {
   return (
     <g transform={`translate(${x},550)`}>
       <ellipse cx="0" cy="1" rx="14" ry="3" fill={NAVY} opacity="0.12" />
-      <path d="M-10 0 Q-14 -14 -4 -18 L-4 -26 L0 -22 L6 -22 L10 -26 L10 -16 Q16 -8 12 0 Z" fill="#F9B58F" /><path d="M12 -2 Q26 -2 24 -16" stroke="#F9B58F" strokeWidth="4" fill="none" strokeLinecap="round" />
+      <path d="M-10 0 Q-14 -14 -4 -18 L-4 -26 L0 -22 L6 -22 L10 -26 L10 -16 Q16 -8 12 0 Z" fill="#F9B58F" /><path className="st-wag" d="M12 -2 Q26 -2 24 -16" stroke="#F9B58F" strokeWidth="4" fill="none" strokeLinecap="round" />
       <circle cx="-1" cy="-18" r="1.3" fill={NAVY} /><circle cx="5" cy="-18" r="1.3" fill={NAVY} />
     </g>
   );
@@ -313,6 +408,21 @@ function Tuktuk({ x, flip }) {
   );
 }
 
+/** a vehicle that drives the whole length of the street, forever, in the direction it faces */
+const VEHICLES = [
+  { kind: 'tuk', right: false, dur: 46, phase: 0.1 }, { kind: 'scooter', right: false, dur: 30, phase: 0.55 },
+  { kind: 'tuk', right: true, dur: 52, phase: 0.35 }, { kind: 'scooter', right: true, dur: 34, phase: 0.8 },
+  { kind: 'tuk', right: false, dur: 58, phase: 0.7 },
+];
+function Drive({ right, dur, phase, children }) {
+  const a = -260; const b = W + 160;
+  return (
+    <g className="st-drive" style={{ '--from': `${right ? a : b}px`, '--to': `${right ? b : a}px`, '--dd': `${dur}s`, '--dl': `${-dur * phase}s` }}>
+      <g className="st-rattle">{children}</g>
+    </g>
+  );
+}
+
 function Birds() {
   return (
     <g fill="none" stroke={NAVY} strokeWidth="1.8" strokeLinecap="round" opacity="0.55">
@@ -323,11 +433,13 @@ function Birds() {
   );
 }
 
-function Skyline() {
+function Skyline({ gRef }) {
   const tints = ['#F7DFCB', '#F1D6C0', '#EDCFB8'];
-  const blocks = [[0, 118, 130], [130, 96, 150], [270, 126, 120], [420, 104, 140], [600, 124, 110], [940, 100, 130], [1080, 130, 110], [1210, 110, 150], [1380, 122, 110], [1500, 98, 100]];
+  const blocks = [];
+  for (let x = -1300, i = 0; x < W; i += 1) { const w = 110 + ((i * 37) % 60); blocks.push([x, 96 + ((i * 53) % 40), w]); x += w - 6; }
+  const mosques = [Math.round(W * 0.22), Math.round(W * 0.7), -500];
   return (
-    <g>
+    <g ref={gRef} style={{ willChange: 'transform' }}>
       {blocks.map(([x, top, w], i) => (
         <g key={i}>
           <rect x={x} y={top} width={w} height={480 - top} fill={tints[i % 3]} />
@@ -336,12 +448,25 @@ function Skyline() {
           )))}
         </g>
       ))}
-      {/* mosque: a landmark that says "this is a real neighbourhood" */}
-      <g>
-        <rect x="1158" y="70" width="16" height="100" fill="#F5DCC7" /><rect x="1153" y="96" width="26" height="6" rx="2" fill="#E6C8AE" />
-        <path d="M1158 70 L1166 44 L1174 70 Z" fill="#E6C8AE" /><circle cx="1166" cy="41" r="3.4" fill={ORANGE} />
-        <rect x="1040" y="118" width="112" height="70" fill="#F3D9C4" /><path d="M1050 118 Q1096 62 1142 118 Z" fill="#E9CDB6" /><rect x="1094.5" y="52" width="3" height="20" fill="#E9CDB6" /><circle cx="1096" cy="50" r="3.4" fill={ORANGE} />
-      </g>
+      {mosques.map((mx) => (
+        <g key={mx}>
+          <rect x={mx + 118} y="70" width="16" height="100" fill="#F5DCC7" /><rect x={mx + 113} y="96" width="26" height="6" rx="2" fill="#E6C8AE" />
+          <path d={`M${mx + 118} 70 L${mx + 126} 44 L${mx + 134} 70 Z`} fill="#E6C8AE" /><circle cx={mx + 126} cy="41" r="3.4" fill={ORANGE} />
+          <rect x={mx} y="118" width="112" height="70" fill="#F3D9C4" /><path d={`M${mx + 10} 118 Q${mx + 56} 62 ${mx + 102} 118 Z`} fill="#E9CDB6" /><rect x={mx + 54.5} y="52" width="3" height="20" fill="#E9CDB6" /><circle cx={mx + 56} cy="50" r="3.4" fill={ORANGE} />
+        </g>
+      ))}
+    </g>
+  );
+}
+
+function Scooter({ x, flip }) {
+  return (
+    <g transform={`translate(${x},650) scale(${flip ? -1 : 1},1)`}>
+      <ellipse cx="34" cy="2" rx="40" ry="4.5" fill={NAVY} opacity="0.14" />
+      <rect x="-6" y="-58" width="34" height="26" rx="4" fill={ORANGE} /><path d="M2 -45 H20" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" /><path d="M2 -38 H14" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+      <path d="M26 -34 L40 -34 L52 -24 L60 -24 L62 -14 L12 -14 L16 -34 Z" fill={NAVY} />
+      <path d="M52 -24 L50 -48 L60 -48" stroke={NAVY} strokeWidth="3" fill="none" strokeLinecap="round" /><circle cx="42" cy="-40" r="5" fill={SKIN} /><path d="M37 -38 Q42 -48 47 -38 Z" fill={ORANGE} />
+      <circle cx="12" cy="-8" r="9" fill={NAVY} /><circle cx="12" cy="-8" r="3.5" fill="#C9CBD4" /><circle cx="58" cy="-8" r="9" fill={NAVY} /><circle cx="58" cy="-8" r="3.5" fill="#C9CBD4" />
     </g>
   );
 }
@@ -355,61 +480,135 @@ function swag(x0, x1, y0, sag, n, colors) {
   });
 }
 
-export default function StreetScene({ labels = {}, lang = 'ar', className = '' }) {
+const PEOPLE = [
+  { top: ORANGE, bottom: '#33466B', hair: '#2B2B33', woman: true, bag: NAVY },
+  { top: '#33466B', bottom: NAVY, hair: '#3A2A22', bag: ORANGE, flip: true },
+  { top: '#FFFFFF', bottom: '#6C7A99', hair: '#6B3F2A', woman: true, bag: ORANGE },
+  { top: '#6C7A99', bottom: NAVY, hair: '#2B2B33', flip: true },
+  { top: NAVY, bottom: '#F9B58F', hair: '#3A2A22', woman: true, bag: ORANGE, flip: true },
+  { top: '#FFFFFF', bottom: NAVY, hair: '#2B2B33', bag: NAVY },
+];
+
+/** The whole street scrolls sideways (drag, swipe, arrows): every department has its own shop, and the shop shows how much is inside. */
+export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', className = '' }) {
+  const ar = lang === 'ar';
+  const ref = useRef(null);
+  const drag = useRef(null);
+  const [edge, setEdge] = useState({ start: true, end: false });
+  const [moved, setMoved] = useState(false);
+  const svgRef = useRef(null);
+  const skyRef = useRef(null);
+  const skyRef2 = useRef(null);
+  const update = () => {
+    const el = ref.current; if (!el) return;
+    const svg = svgRef.current;
+    if (svg) { const t = `translateX(${(0.4 * el.scrollLeft) / (svg.clientHeight / 640 || 1)}px)`; if (skyRef.current) skyRef.current.style.transform = t; if (skyRef2.current) skyRef2.current.style.transform = t; }
+    const max = el.scrollWidth - el.clientWidth; const pos = Math.abs(el.scrollLeft);
+    setEdge({ start: pos < 6, end: pos > max - 6 });
+    if (pos > 40) setMoved(true);
+  };
+  useEffect(() => { update(); window.addEventListener('resize', update); return () => window.removeEventListener('resize', update); }, []);
+  const go = (dir) => ref.current?.scrollBy({ left: dir * Math.max(360, ref.current.clientWidth * 0.7), behavior: 'smooth' });
+  const onDown = (e) => { if (e.pointerType !== 'mouse') return; drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; };
+  const onMove = (e) => { const d = drag.current; if (!d) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 5) d.moved = true; if (d.moved) ref.current.scrollLeft = d.left + dx; };
+  const onUp = () => { setTimeout(() => { drag.current = null; }, 0); };
+  const onClickCapture = (e) => { if (drag.current?.moved) { e.preventDefault(); e.stopPropagation(); } };
+
   const colors = [ORANGE, NAVY, '#FFC9A3'];
-  const swags = [[-10, 540, 92, 34], [540, 1070, 92, 34], [1070, 1610, 92, 34]];
+  const nSwag = Math.ceil((W + 20) / 540); const L = (W + 20) / nSwag;
+  const swags = Array.from({ length: nSwag }, (_, k) => [-10 + k * L, -10 + (k + 1) * L, 92, 34]);
+  const clouds = Array.from({ length: Math.ceil((W + 1300) / 520) }, (_, i) => ({ x: -1300 + 120 + i * 520 + ((i * 97) % 120), y: 62 + ((i * 41) % 36), d: 30 + ((i * 7) % 20), dir: i % 2 ? -1 : 1 }));
+
   return (
-    <svg viewBox="0 30 1600 640" role="img" aria-label={lang === 'ar' ? 'شارع محلات الملابس في بنها' : 'A street of clothing shops in Banha'} className={className}>
-      <defs>
-        <linearGradient id="st-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFF5EC" /><stop offset="0.45" stopColor="#FFE8D4" /><stop offset="1" stopColor="#FFF2E6" /></linearGradient>
-        <radialGradient id="st-lamp" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#FFD9A8" stopOpacity="0.8" /><stop offset="1" stopColor="#FFD9A8" stopOpacity="0" /></radialGradient>
-      </defs>
-      <rect x="0" y="30" width={W} height="640" fill="url(#st-sky)" />
-      <circle cx="170" cy="130" r="86" fill="#FFD2A8" opacity="0.28" /><circle cx="170" cy="130" r="46" fill="#FFC592" opacity="0.85" />
-      <g fill="#FFFFFF" opacity="0.85">
-        <g><ellipse cx="520" cy="84" rx="62" ry="14" /><ellipse cx="556" cy="72" rx="36" ry="14" /><animateTransform attributeName="transform" type="translate" values="0 0; 70 0; 0 0" dur="38s" repeatCount="indefinite" /></g>
-        <g><ellipse cx="1280" cy="70" rx="70" ry="15" /><ellipse cx="1318" cy="57" rx="38" ry="15" /><animateTransform attributeName="transform" type="translate" values="0 0; -80 0; 0 0" dur="46s" repeatCount="indefinite" /></g>
-        <g><ellipse cx="930" cy="62" rx="48" ry="11" /><ellipse cx="956" cy="52" rx="26" ry="10" /><animateTransform attributeName="transform" type="translate" values="0 0; 50 0; 0 0" dur="30s" repeatCount="indefinite" /></g>
-      </g>
-      <Birds />
-      <Skyline />
+    <div className={cx('relative', className)}>
+      <div
+        ref={ref} dir="rtl" onScroll={update} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onClickCapture={onClickCapture}
+        className="scrollbar-none cursor-grab overflow-x-auto overscroll-x-contain active:cursor-grabbing"
+      >
+        <svg ref={svgRef} viewBox={`0 30 ${W} 640`} role="img" aria-label={ar ? 'شارع محلات الملابس في بنها' : 'A street of clothing shops in Banha'} style={{ aspectRatio: `${W} / 640` }} className="block h-[360px] w-auto max-w-none select-none sm:h-[440px] lg:h-[540px]">
+          <style>{`
+@media (prefers-reduced-motion: no-preference){
+.st-flap{transform-origin:50% 0;transform-box:fill-box;animation:st-flap 4s ease-in-out infinite alternate}
+@keyframes st-flap{from{transform:skewX(-1.2deg)}to{transform:skewX(1.2deg)}}
+.st-wave{transform-origin:50% 0;transform-box:fill-box;animation:st-wave 3s ease-in-out infinite alternate}
+@keyframes st-wave{from{transform:rotate(-7deg)}to{transform:rotate(7deg)}}
+.st-glow{animation:st-glow 3.5s ease-in-out infinite alternate}
+@keyframes st-glow{from{opacity:.25}to{opacity:.8}}
+.st-sway{transform-origin:50% 100%;transform-box:fill-box;animation:st-sway 5s ease-in-out infinite alternate}
+@keyframes st-sway{from{transform:rotate(-1.6deg)}to{transform:rotate(1.6deg)}}
+.st-walk{animation:st-walk var(--wd,12s) ease-in-out var(--wl,0s) infinite alternate}
+@keyframes st-walk{from{transform:translateX(-28px)}to{transform:translateX(28px)}}
+.st-step{animation:st-step .55s ease-in-out infinite alternate}
+@keyframes st-step{from{transform:translateY(0)}to{transform:translateY(-2.5px)}}
+.st-bob{animation:st-bob 3s ease-in-out infinite alternate}
+@keyframes st-bob{from{transform:translateY(0)}to{transform:translateY(-4px)}}
+.st-drive{animation:st-drive var(--dd,24s) linear var(--dl,0s) infinite}
+@keyframes st-drive{from{transform:translateX(var(--from))}to{transform:translateX(var(--to))}}
+.st-rattle{animation:st-rattle .3s ease-in-out infinite alternate}
+@keyframes st-rattle{from{transform:translateY(0)}to{transform:translateY(-1.2px)}}
+.st-wag{transform-origin:0% 100%;transform-box:fill-box;animation:st-wag .6s ease-in-out infinite alternate}
+@keyframes st-wag{from{transform:rotate(-14deg)}to{transform:rotate(16deg)}}
+.st-breathe{transform-origin:50% 50%;transform-box:fill-box;animation:st-breathe 6s ease-in-out infinite alternate}
+@keyframes st-breathe{from{transform:scale(1)}to{transform:scale(1.1)}}
+.st-pulse{transform-origin:50% 50%;transform-box:fill-box;animation:st-pulse 1.8s ease-in-out infinite alternate}
+@keyframes st-pulse{from{transform:scale(1)}to{transform:scale(1.18)}}
+.st-in{animation:st-in .7s ease-out both;animation-delay:var(--id,0s)}
+@keyframes st-in{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+}
+`}</style>
+          <defs>
+            <linearGradient id="st-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFF5EC" /><stop offset="0.45" stopColor="#FFE8D4" /><stop offset="1" stopColor="#FFF2E6" /></linearGradient>
+            <radialGradient id="st-lamp" cx="50%" cy="50%" r="50%"><stop offset="0" stopColor="#FFD9A8" stopOpacity="0.8" /><stop offset="1" stopColor="#FFD9A8" stopOpacity="0" /></radialGradient>
+          </defs>
+          <rect x="0" y="30" width={W} height="640" fill="url(#st-sky)" />
+          <circle className="st-breathe" cx={W - 190} cy="130" r="86" fill="#FFD2A8" opacity="0.28" /><circle cx={W - 190} cy="130" r="46" fill="#FFC592" opacity="0.85" />
+          <g ref={skyRef} fill="#FFFFFF" opacity="0.85" style={{ willChange: 'transform' }}>
+            {clouds.map((c, i) => <g key={i}><ellipse cx={c.x} cy={c.y + 20} rx="62" ry="14" /><ellipse cx={c.x + 36} cy={c.y + 8} rx="36" ry="14" /><animateTransform attributeName="transform" type="translate" values={`0 0; ${60 * c.dir} 0; 0 0`} dur={`${c.d}s`} repeatCount="indefinite" /></g>)}
+          </g>
+          {[0, 1100, 2200].filter((dx) => dx < W - 400).map((dx) => <g key={dx} transform={`translate(${dx},0)`}><Birds /></g>)}
+          <Skyline gRef={skyRef2} />
 
-      {SHOPS.map((shop) => <Shop key={shop.dept} shop={shop} label={labels[shop.dept] || (lang === 'ar' ? shop.ar : shop.en)} lang={lang} />)}
+          {SHOPS.map((shop, index) => <Shop key={shop.dept} index={index} shop={shop} label={labels[shop.dept] || (ar ? shop.ar : shop.en)} lang={lang} count={typeof counts[shop.dept] === 'number' ? counts[shop.dept] : undefined} />)}
 
-      {/* bunting across the street: the market is celebrating */}
-      {swags.map(([x0, x1, y0, sag], si) => (
-        <g key={si}>
-          <path d={`M${x0} ${y0} Q${(x0 + x1) / 2} ${y0 + sag * 2} ${x1} ${y0}`} fill="none" stroke={NAVY} strokeWidth="1.6" opacity="0.45" />
-          {swag(x0, x1, y0, sag, 17, colors).map((f, i) => <path key={i} d={`M${f.x - 9} ${f.y} L${f.x + 9} ${f.y} L${f.x} ${f.y + 24} Z`} fill={f.c} />)}
-        </g>
-      ))}
+          {swags.map(([x0, x1, y0, sag], si) => (
+            <g key={si}>
+              <path d={`M${x0} ${y0} Q${(x0 + x1) / 2} ${y0 + sag * 2} ${x1} ${y0}`} fill="none" stroke={NAVY} strokeWidth="1.6" opacity="0.45" />
+              {swag(x0, x1, y0, sag, 17, colors).map((f, i) => <path key={i} className="st-wave" style={{ animationDelay: `${-(i % 7) * 0.35}s` }} d={`M${f.x - 9} ${f.y} L${f.x + 9} ${f.y} L${f.x} ${f.y + 24} Z`} fill={f.c} />)}
+            </g>
+          ))}
 
-      {/* pavement, curb, road */}
-      <rect y="480" width={W} height="86" fill="#EFE5D8" />
-      {Array.from({ length: 27 }, (_, i) => <rect key={i} x={i * 62 - 10} y="480" width="2" height="86" fill="#D9CCBC" opacity="0.7" />)}
-      <rect y="514" width={W} height="2" fill="#D9CCBC" opacity="0.7" />
-      <rect y="566" width={W} height="12" fill="#D2C5B4" /><rect y="566" width={W} height="3" fill="#FFFFFF" opacity="0.5" />
-      <rect y="578" width={W} height="92" fill="#C9C0B4" />
-      {Array.from({ length: 15 }, (_, i) => <rect key={i} x={i * 112 + 24} y="618" width="58" height="5" rx="2.5" fill="#F7F0E4" />)}
+          <rect y="480" width={W} height="86" fill="#EFE5D8" />
+          {Array.from({ length: Math.ceil(W / 62) + 1 }, (_, i) => <rect key={i} x={i * 62 - 10} y="480" width="2" height="86" fill="#D9CCBC" opacity="0.7" />)}
+          <rect y="514" width={W} height="2" fill="#D9CCBC" opacity="0.7" />
+          <rect y="566" width={W} height="12" fill="#D2C5B4" /><rect y="566" width={W} height="3" fill="#FFFFFF" opacity="0.5" />
+          <rect y="578" width={W} height="92" fill="#C9C0B4" />
+          {Array.from({ length: Math.ceil(W / 112) }, (_, i) => <rect key={i} x={i * 112 + 24} y="618" width="58" height="5" rx="2.5" fill="#F7F0E4" />)}
 
-      <Tree x={469} /><Tree x={921} /><Tree x={1373} />
-      <Lamp x={243} lang={lang} /><Lamp x={695} name lang={lang} /><Lamp x={1147} lang={lang} />
-      <Plant x={20} /><Plant x={1580} /><Plant x={410} /><Plant x={1030} />
+          {SHOPS.slice(0, -1).map((_, i) => (i % 2 === 0 ? <Tree key={`t${i}`} x={gapX(i)} /> : <Lamp key={`l${i}`} x={gapX(i)} name={i === 3} lang={lang} />))}
+          <Plant x={W - 16} /><Plant x={16} />
+          {[2, 6, 10].map((i) => <Plant key={`p${i}`} x={SHOPS[i].x + 150} />)}
 
-      <Rack x={96} /><SaleBoard x={800} lang={lang} /><Bench x={1262} /><Bin x={1100} /><Cat x={1052} />
+          <Rack x={SHOPS[0].x + 92} />
+          {[3, 9].map((i) => <SaleBoard key={`s${i}`} x={SHOPS[i].x + 92} lang={lang} />)}
+          <Bench x={SHOPS[7].x + 100} /><Bin x={SHOPS[10].x + 96} /><Cat x={SHOPS[4].x + 104} />
 
-      {/* shoppers */}
-      <Person x={190} s={1.08} top={ORANGE} bottom="#33466B" hair="#2B2B33" woman bag={NAVY} />
-      <Person x={348} s={1.12} top="#33466B" bottom={NAVY} hair="#3A2A22" bag={ORANGE} flip />
-      <Person x={600} s={1.04} top="#FFFFFF" bottom="#6C7A99" hair="#6B3F2A" woman bag={ORANGE} />
-      <Person x={552} s={0.62} top={ORANGE} bottom={NAVY} hair="#2B2B33" woman />
-      <g stroke="#9AA3B2" strokeWidth="1" fill="none"><path d="M566 482 Q570 500 560 520" /></g><ellipse cx="566" cy="472" rx="9" ry="11" fill={ORANGE} /><path d="M566 483 l-2 4 h4 z" fill={ORANGE} />
-      <Person x={1000} s={1.1} top="#6C7A99" bottom={NAVY} hair="#2B2B33" flip />
-      <Person x={1312} s={1.04} top={NAVY} bottom="#F9B58F" hair="#3A2A22" woman bag={ORANGE} flip />
-      <Person x={1500} s={1.08} top="#FFFFFF" bottom={NAVY} hair="#2B2B33" bag={NAVY} />
-      <Person x={1548} s={1.0} top={ORANGE} bottom="#6C7A99" hair="#6B3F2A" woman />
+          {SHOPS.map((s, i) => (i % 3 === 2 ? null : <Person key={`pp${i}`} x={s.x + (i % 2 ? 122 : 150)} s={0.98 + ((i * 3) % 5) * 0.03} {...PEOPLE[i % PEOPLE.length]} />))}
+          <g className="st-walk" style={{ '--wd': '13s', '--wl': '-3s' }}>
+            <Person still x={SHOPS[2].x + 128} s={1.04} top="#FFFFFF" bottom="#6C7A99" hair="#6B3F2A" woman bag={ORANGE} />
+            <Person still x={SHOPS[2].x + 80} s={0.62} top={ORANGE} bottom={NAVY} hair="#2B2B33" woman />
+          <g className="st-bob"><path d={`M${SHOPS[2].x + 94} 482 Q${SHOPS[2].x + 98} 500 ${SHOPS[2].x + 88} 520`} stroke="#9AA3B2" strokeWidth="1" fill="none" /><ellipse cx={SHOPS[2].x + 94} cy="472" rx="9" ry="11" fill={ORANGE} /></g>
+          </g>
 
-      <Tuktuk x={330} /><Tuktuk x={1180} flip />
-    </svg>
+          {VEHICLES.map((v, i) => <Drive key={i} {...v}>{v.kind === 'tuk' ? <Tuktuk x={0} flip={v.right} /> : <Scooter x={0} flip={!v.right} />}</Drive>)}
+        </svg>
+      </div>
+
+      {/* edge fades + arrows */}
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 start-0 w-12" style={{ background: 'linear-gradient(to right, rgba(255,245,236,.85), transparent)' }} />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-0 w-12" style={{ background: 'linear-gradient(to left, rgba(255,245,236,.85), transparent)' }} />
+      <button type="button" onClick={() => go(-1)} disabled={edge.end} aria-label={ar ? 'المحلات التالية' : 'Next shops'} className="absolute left-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#14213D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronLeft className="h-5 w-5" /></button>
+      <button type="button" onClick={() => go(1)} disabled={edge.start} aria-label={ar ? 'المحلات السابقة' : 'Previous shops'} className="absolute right-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#14213D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronRight className="h-5 w-5" /></button>
+      <p className={cx('pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-brand shadow-md transition-opacity duration-500', moved && 'opacity-0')}>{ar ? `${SHOPS.length} محل في شارع واحد — اسحب وتمشّى` : `${SHOPS.length} shops on one street — drag to walk`}</p>
+    </div>
   );
 }

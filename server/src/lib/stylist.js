@@ -634,6 +634,12 @@ function readManualLooks() {
   catch { return {}; }
 }
 
+function manualImages(outfit, manual = {}) {
+  const own = [...(Array.isArray(outfit.images) ? outfit.images : []), outfit.coverImage].map((x) => String(x || '')).filter(Boolean);
+  const list = own.length ? own : [String(manual.coverImage || '')].filter(Boolean);
+  return [...new Set(list)].slice(0, 6);
+}
+
 function storedManualOutfits(raw = readManualLooks()) {
   if (Array.isArray(raw.outfits)) return raw.outfits;
   // Preserve manually curated outfits saved by the earlier two-persona settings.
@@ -687,10 +693,10 @@ export function lookOfDayAdminSettings() {
   const approved = readEntrySetting(LOOK_OF_DAY_APPROVED_KEY);
   const hydrateEntries = (entries) => (Array.isArray(entries) ? entries : []).map(revalidate).filter(Boolean);
   return { mode: lookOfDayMode(), manual: {
-    coverImage: String(raw.coverImage || ''), title: String(raw.title || ''), description: String(raw.description || ''), badge: String(raw.badge || ''),
+    showOthers: !!raw.showOthers, coverImage: String(raw.coverImage || ''), title: String(raw.title || ''), description: String(raw.description || ''), badge: String(raw.badge || ''),
     outfits: outfits.map((outfit) => ({
     audience: ['women', 'men', 'kids'].includes(outfit.audience) ? outfit.audience : 'women',
-    age: String(outfit.age || ''), say: String(outfit.say || ''), tips: String(outfit.tips || ''), occasion: String(outfit.occasion || ''),
+    age: String(outfit.age || ''), say: String(outfit.say || ''), tips: String(outfit.tips || ''), occasion: String(outfit.occasion || ''), coverImage: String(outfit.coverImage || ''), images: manualImages(outfit),
     pieces: (Array.isArray(outfit.pieces) ? outfit.pieces : []).map((piece) => {
       const productId = Number(piece.productId);
       return { label: String(piece.label || ''), productId, product: products.get(productId) || null };
@@ -723,7 +729,7 @@ function buildManualLookEntries() {
       audience, age: String(outfit.age || '').slice(0, 40), occasion: String(outfit.occasion || '').slice(0, 80),
       say: String(outfit.say || '').slice(0, 700), tips: String(outfit.tips || '').slice(0, 300),
       looks, total: looks.reduce((sum, look) => sum + look.items[0].price, 0), budget: null, overBudget: false, manual: true,
-      coverImage: String(manual.coverImage || ''), title: String(manual.title || ''), description: String(manual.description || ''), badge: String(manual.badge || ''),
+      images: manualImages(outfit, manual), coverImage: manualImages(outfit, manual)[0] || '', title: String(manual.title || ''), description: String(manual.description || ''), badge: String(manual.badge || ''),
     };
   }).filter(Boolean);
 }
@@ -838,7 +844,7 @@ export async function lookOfDay() {
   const day = cairoDay();
   const mode = lookOfDayMode();
   if (mode === 'off') return { day, entries: [] };
-  if (mode === 'manual') return { day, entries: buildManualLookEntries() };
+  if (mode === 'manual') return { day, entries: buildManualLookEntries(), showOthers: !!readManualLooks().showOthers };
   // AI-generated looks remain private until a platform admin approves them.
   let approved = null;
   try { approved = JSON.parse(q.get('SELECT value FROM app_settings WHERE key=?', [LOOK_OF_DAY_APPROVED_KEY])?.value || 'null'); } catch { /* invalid approval */ }
