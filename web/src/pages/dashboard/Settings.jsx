@@ -47,14 +47,14 @@ function AutoCover({ onDone }) {
     try {
       const r = await api('/owner/store/cover/auto', { method: 'POST' });
       onDone(r.media);
-      toast({ title: 'اتعمل cover جديد لمتجرك ✨' });
+      toast({ title: 'اتعمل غلاف جديد لمتجرك' });
     } catch (e) { toast({ tone: 'error', title: e.message || 'حصلت مشكلة' }); }
     setBusy(false);
   };
   return (
     <button type="button" onClick={run} disabled={busy}
       className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-l from-[#FF966F] via-[#F26B38] to-[#B84421] px-4 py-2.5 text-sm font-bold text-[#111] disabled:opacity-60">
-      {busy ? 'بنصمم الـ cover…' : '✨ صمّملي cover فخم من منتجاتي'}
+      {busy ? 'بنصمم الـ cover…' : 'صمّملي غلافًا أنيقًا من منتجاتي'}
     </button>
   );
 }

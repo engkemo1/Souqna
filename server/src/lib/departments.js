@@ -12,3 +12,41 @@ export function assertDepartments(list) {
   const ok = new Set(q.all('SELECT slug FROM departments WHERE active=1').map((d) => d.slug));
   if (!Array.isArray(list) || !list.length || !list.every((d) => ok.has(d))) throw new AppError(422, 'validation_failed', 'Pick at least one valid department.', { departments: 'departments_required' });
 }
+
+// Keyword hints (Arabic is matched after normalising أ/إ/آ, ة and ى). Order matters: the first department the store sells that matches wins.
+const HINTS = [
+  ['wedding_dress', ['فستان زفاف', 'فستان فرح', 'wedding dress', 'bridal']],
+  ['wedding_suit', ['بدله زفاف', 'بدله فرح', 'tuxedo', 'wedding suit', 'groom']],
+  ['shoes', ['كوتش', 'حذاء', 'جزمه', 'صندل', 'بوت', 'سليبر', 'shoe', 'sneaker', 'sandal', 'boot', 'loafer', 'slipper']],
+  ['bags', ['شنطه', 'حقيبه', 'محفظه', 'bag', 'backpack', 'wallet', 'purse']],
+  ['hijab', ['طرحه', 'حجاب', 'ايشارب', 'hijab', 'scarf', 'shawl']],
+  ['abaya', ['عبايه', 'abaya']],
+  ['jalabiya', ['جلابيه', 'جلاليب', 'galabiya', 'jalabiya', 'kaftan']],
+  ['underwear', ['ملابس داخليه', 'بوكسر', 'سوتيان', 'lingerie', 'underwear', 'boxer', 'bra ']],
+  ['kids', ['اطفال', 'طفل', 'ولادي', 'بناتي', 'كيدز', 'kids', 'toddler', 'baby', 'boys', 'girls']],
+  ['sports', ['رياضي', 'تراك', 'جيم', 'sport', 'training', 'gym', 'jersey', 'activewear']],
+  ['denim', ['جينز', 'denim', 'jeans']],
+  ['women', ['حريمي', 'نسائي', 'فستان', 'بلوزه', 'تنوره', 'جيبه', 'women', 'ladies', 'dress', 'blouse', 'skirt']],
+  ['men', ['رجالي', 'شبابي', 'men', 'mens', "men's", 'gents']],
+];
+const norm = (x) => String(x || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ـ/g, '');
+
+/** Best-guess department for a product from its text, limited to the departments the store sells. Returns null when unsure. */
+export function inferDepartment(text, allowed) {
+  const t = norm(text);
+  for (const [slug, words] of HINTS) if (allowed.includes(slug) && words.some((w) => t.includes(norm(w)))) return slug;
+  return null;
+}
+
+/** Fills the department of legacy products in multi-department stores (only when a confident guess exists). */
+export function backfillDepartments() {
+  let n = 0;
+  for (const s of q.all("SELECT id, departments FROM stores WHERE LENGTH(departments) - LENGTH(REPLACE(departments, ',', '')) > 2")) {
+    const allowed = s.departments.split(',').filter(Boolean);
+    for (const p of q.all('SELECT p.id, p.name_ar, p.name_en, c.name_ar AS cat_ar, c.name_en AS cat_en FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.store_id=? AND p.department IS NULL', [s.id])) {
+      const d = inferDepartment(`${p.name_ar} ${p.name_en} ${p.cat_ar || ''} ${p.cat_en || ''}`, allowed);
+      if (d) { q.run('UPDATE products SET department=? WHERE id=?', [d, p.id]); n++; }
+    }
+  }
+  return n;
+}

@@ -55,9 +55,6 @@ export default function Overview() {
   return (
     <PageTransition>
       <AppAlertsCard hideWhenDone className="mb-6" />
-      <SameDayCard className="mb-6" />
-      <WeeklyReportCard className="mb-6" />
-      <DemandCard className="mb-6" />
       {/* greeting + today */}
       <div className="mb-6 flex flex-col gap-5 sm:mb-8 lg:flex-row lg:items-end lg:justify-between">
         <div>
@@ -131,6 +128,13 @@ export default function Overview() {
             </>
           )}
         </Panel>
+      </div>
+
+      {/* secondary cards sit under the numbers an owner opens the dashboard for */}
+      <div className="mt-6 space-y-6">
+        <SameDayCard />
+        <WeeklyReportCard />
+        <DemandCard />
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">

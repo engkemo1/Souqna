@@ -30,7 +30,7 @@ function SmartImage({ media, alt, sizes = '100vw', ratio, fit = 'cover', priorit
           <source type="image/webp" srcSet={srcSet(media, 'webp')} sizes={sizes} />
           <img
             ref={ref}
-            src={`${media.base}/${media.sizes.at(-1).name}.jpg`}
+            src={`${media.base}/original.jpg`}
             srcSet={srcSet(media, 'jpg')}
             sizes={sizes}
             width={media.w}

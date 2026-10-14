@@ -44,7 +44,7 @@ if (fs.existsSync(config.webDist)) {
       const origin = `${req.protocol}://${req.get('host')}`;
       const m = look.pieces[0].image;
       const sz = m ? ([...m.sizes].sort((a, b) => a.width - b.width).find((x) => x.width >= 600) || m.sizes[m.sizes.length - 1]) : null;
-      const img = m && sz ? `${m.base.startsWith('http') ? '' : origin}${m.base}/${sz.name}.jpg` : `${origin}/brand/app-icon.png`;
+      const img = m && sz ? `${m.base.startsWith('http') ? '' : origin}${m.base}/original.jpg` : `${origin}/brand/app-icon.png`;
       const visual = look.kind === 'visual';
       const title = visual ? (look.title || 'لقيت دول في محلات بنها') : `${look.title || 'لوك من بنها أوتفيت'} · ${look.pieces.length} قطع`;
       const desc = visual ? `${look.pieces.slice(0, 4).map((p) => `${p.name.ar || p.name.en || p.name} — ${p.price} ج.م`).join(' | ')}` : `${look.pieces.map((p) => p.name.ar || p.name.en || p.name).join(' + ')} — ${look.total} ج.م`;
@@ -60,6 +60,7 @@ app.use(errorHandler);
 
 import('./db/index.js').then(({ q }) => q.run("UPDATE users SET role='demo' WHERE email=? AND role='owner'", [config.demoEmail]));
 import('./lib/backup.js').then((m) => m.startBackupSchedule());
+import('./lib/departments.js').then((m) => { const n = m.backfillDepartments(); if (n) console.log(`[departments] filled ${n} product(s) without a department`); });
 import('./lib/visual.js').then((m) => m.startVisualIndexer());
 export { app };
 

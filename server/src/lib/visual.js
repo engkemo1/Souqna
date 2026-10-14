@@ -149,7 +149,7 @@ export async function embedImage(buffer, model) {
 
 const MAX_IMAGES = 4; // photos indexed per product (primary first)
 async function mediaBytes(m) {
-  for (const f of ['md.jpg', 'sm.jpg', 'original.jpg']) { try { return await readMediaFile(m, f); } catch { /* try next */ } }
+  for (const f of ['md.jpg', 'md.webp', 'sm.jpg', 'sm.webp', 'original.jpg']) { try { return await readMediaFile(m, f); } catch { /* try next */ } }
   return null;
 }
 
@@ -243,7 +243,7 @@ export const loadVisualCatalog = (model) => loadCatalog(model);
 export async function readPrimaryImage(productId) {
   const m = q.get('SELECT m.* FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=? AND pm.is_primary=1', [productId]);
   if (!m) return null;
-  for (const f of ['md.jpg', 'sm.jpg', 'original.jpg']) { try { return await readMediaFile(m, f); } catch { /* try next */ } }
+  for (const f of ['md.jpg', 'md.webp', 'sm.jpg', 'sm.webp', 'original.jpg']) { try { return await readMediaFile(m, f); } catch { /* try next */ } }
   return null;
 }
 

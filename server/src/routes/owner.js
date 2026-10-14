@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartments } from '@souqna/shared';
 import { q, tx, insert, update, json } from '../db/index.js';
 import { config } from '../config.js';
-import { assertDepartments } from '../lib/departments.js';
+import { assertDepartments, inferDepartment } from '../lib/departments.js';
 import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { requireOwner } from '../lib/auth.js';
@@ -160,7 +160,7 @@ r.post('/store/cover/auto', h(async (req, res) => {
     const m = getMedia(id);
     if (!m) continue;
     let src = null;
-    for (const f of ['lg.jpg', 'md.jpg', 'original.jpg']) { try { src = await readMediaFile(m, f); break; } catch { /* try next size */ } }
+    for (const f of ['lg.jpg', 'lg.webp', 'md.jpg', 'md.webp', 'original.jpg']) { try { src = await readMediaFile(m, f); break; } catch { /* try next size */ } }
     if (!src) continue;
     const card = await sharp(src).resize(cardW, cardH, { fit: 'cover', position: 'attention' }).composite([{ input: mask, blend: 'dest-in' }, { input: frame }]).png().toBuffer();
     const left = W - 96 - (i + 1) * cardW - i * gap;
@@ -346,7 +346,7 @@ r.post('/ai/product', h(async (req, res) => {
   const day = new Date().toISOString().slice(0, 10); const key = `${req.store.id}:${day}`;
   const used = aiHits.get(key) || 0;
   if (used >= 40) throw new AppError(429, 'rate_limited', 'Daily AI limit reached for this store.');
-  let src; for (const f of ['md.jpg', 'sm.jpg', 'original.jpg']) { try { src = await readMediaFile(m, f); break; } catch { /* next */ } }
+  let src; for (const f of ['md.jpg', 'md.webp', 'sm.jpg', 'sm.webp', 'original.jpg']) { try { src = await readMediaFile(m, f); break; } catch { /* next */ } }
   if (!src) throw notFound('Image');
   try {
     const suggestion = await describeProduct(src, { hint: b.hint, departments: decodeDepartments(req.store.departments) });
@@ -428,10 +428,11 @@ r.get('/products/:id', h((req, res) => {
 
 const colorSchema = z.object({ name_ar: z.string().trim().min(1).max(30), name_en: z.string().trim().min(1).max(30), hex: z.string().regex(/^#[0-9a-fA-F]{6}$/) });
 /** A product's department must be one the store sells in; single-department stores default to it. */
-function productDepartment(storeId, wanted) {
+function productDepartment(storeId, wanted, text = '') {
   const mine = decodeDepartments(q.val('SELECT departments FROM stores WHERE id=?', [storeId]));
   if (wanted) { if (!mine.includes(wanted)) throw badRequest('invalid_department', 'Pick one of your store departments.'); return wanted; }
-  return mine.length === 1 ? mine[0] : null;
+  if (mine.length === 1) return mine[0];
+  return inferDepartment(text, mine); // multi-department store: best guess from the name; the editor asks for it explicitly, this is the safety net
 }
 
 const productSchema = z.object({
@@ -482,7 +483,7 @@ function saveProduct(storeId, data, existing) {
     const row = {
       name_ar: data.name_ar, name_en: data.name_en, description_ar: data.description_ar, description_en: data.description_en,
       price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null,
-      category_id: data.category_id || null, department: productDepartment(storeId, data.department), style_level: data.style_level ?? null, moda_key: data.moda_key || null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
+      category_id: data.category_id || null, department: productDepartment(storeId, data.department, `${data.name_ar} ${data.name_en}`), style_level: data.style_level ?? null, moda_key: data.moda_key || null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };

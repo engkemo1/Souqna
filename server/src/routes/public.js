@@ -5,7 +5,7 @@ import multer from 'multer';
 import sharp from 'sharp';
 import { listDepartments } from '../lib/departments.js';
 import { z } from 'zod';
-import { q, tx, insert } from '../db/index.js';
+import { q, tx, insert, json } from '../db/index.js';
 import { randomBytes } from 'node:crypto';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { clampInt, nowIso } from '../lib/util.js';
@@ -64,8 +64,34 @@ const SYNONYMS = {
   تيشيرت: ['tshirt', 'تي شيرت', 't-shirt'], بنطلون: ['بنطال', 'pants', 'jeans', 'جينز'], جينز: ['jeans', 'بنطلون'], اطفال: ['كيدز', 'kids', 'طفل'], طفل: ['اطفال', 'kids'],
 };
 
+/** Autocomplete for the search box: product names (prefix matches first), departments and stores. Cheap, cached, no personal data. */
+r.get('/search/suggest', h((req, res) => {
+  const term = normText(String(req.query.q || '').slice(0, 40));
+  if (term.length < 2) { cache(res, 60); return res.json({ products: [], departments: [], stores: [] }); }
+  const like = `%${term}%`; const starts = `${term}%`;
+  const products = q.all(
+    `SELECT p.name_ar, p.name_en, s.slug AS store_slug, s.name_ar AS store_ar, s.name_en AS store_en,
+            (CASE WHEN ${NORM('p.name_ar')} LIKE ? OR ${NORM('p.name_en')} LIKE ? THEN 0 ELSE 1 END) AS rank
+     FROM products p JOIN stores s ON s.id=p.store_id
+     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (${NORM('p.name_ar')} LIKE ? OR ${NORM('p.name_en')} LIKE ?)
+     ORDER BY rank, p.sold_count DESC LIMIT 40`, [starts, starts, like, like]);
+  const seen = new Set(); const names = [];
+  for (const p of products) {
+    const key = normText(p.name_ar);
+    if (seen.has(key)) continue; seen.add(key);
+    names.push({ name: { ar: p.name_ar, en: p.name_en } });
+    if (names.length >= 6) break;
+  }
+  const departments = q.all(`SELECT d.slug, d.name_ar, d.name_en FROM departments d WHERE d.active=1 AND (${NORM('d.name_ar')} LIKE ? OR ${NORM('d.name_en')} LIKE ? OR d.slug LIKE ?) LIMIT 3`, [like, like, like])
+    .map((d) => ({ slug: d.slug, name: { ar: d.name_ar, en: d.name_en } }));
+  const stores = q.all(`SELECT s.slug, s.name_ar, s.name_en FROM stores s WHERE s.status='active' AND s.hidden=0 AND (${NORM('s.name_ar')} LIKE ? OR ${NORM('s.name_en')} LIKE ?) LIMIT 3`, [like, like])
+    .map((x) => ({ slug: x.slug, name: { ar: x.name_ar, en: x.name_en } }));
+  cache(res, 30);
+  res.json({ products: names, departments, stores });
+}));
+
 r.get('/search', h((req, res) => {
-  const { q: term = '', department = '', store = '', sort = 'relevance', min, max, page = '1', sale, new: isNew, in_stock: inStock, rating, ids } = req.query;
+  const { q: term = '', department = '', store = '', sort = 'relevance', min, max, page = '1', sale, new: isNew, in_stock: inStock, rating, ids, sizes, colors } = req.query;
   const tokens = normText(String(term).slice(0, 80)).split(/\s+/).filter(Boolean).slice(0, 6);
   const where = ["p.status='active'", "s.status='active'", 's.hidden=0']; const params = [];
   if (ids) {
@@ -73,6 +99,15 @@ r.get('/search', h((req, res) => {
     if (!list.length) return res.json({ items: [], total: 0, page: 1, pages: 1, price: { min: 0, max: 0 }, facets: { departments: [], stores: [] } });
     where.push(`p.id IN (${list.map(() => '?').join(',')})`);
     params.push(...list);
+  }
+  // relevance: a hit in the product name beats a synonym hit, which beats a description hit; the department/category match adds weight
+  // (so searching "كوتشي" ranks shoes above a "coach jacket").
+  const scoreSql = []; const scoreParams = [];
+  for (const tk of tokens) {
+    const exact = `%${tk}%`;
+    scoreSql.push(`(CASE WHEN ${NORM('p.name_ar')} LIKE ? OR ${NORM('p.name_en')} LIKE ? THEN 10 ELSE 0 END)`, `(CASE WHEN EXISTS (SELECT 1 FROM departments d WHERE p.department=d.slug AND (${NORM('d.name_ar')} LIKE ? OR ${NORM('d.name_en')} LIKE ? OR d.slug LIKE ?)) THEN 8 ELSE 0 END)`,
+      `(CASE WHEN EXISTS (SELECT 1 FROM categories c WHERE c.id=p.category_id AND (${NORM('c.name_ar')} LIKE ? OR ${NORM('c.name_en')} LIKE ?)) THEN 5 ELSE 0 END)`);
+    scoreParams.push(exact, exact, exact, exact, exact, exact, exact);
   }
   for (const tk of tokens) {
     const alts = [...new Set([tk, ...(SYNONYMS[tk] || []).map(normText)])];
@@ -89,22 +124,42 @@ r.get('/search', h((req, res) => {
   if (min) { where.push('p.price >= ?'); params.push(clampInt(min, 0, 1e7, 0)); }
   if (max) { where.push('p.price <= ?'); params.push(clampInt(max, 0, 1e7, 1e7)); }
   if (sale === '1') where.push('p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price');
-  if (isNew === '1') where.push("(p.is_new=1 OR p.created_at >= datetime('now','-30 days'))");
+  if (isNew) { const days = isNew === '1' ? 30 : [7, 30, 90].includes(Number(isNew)) ? Number(isNew) : 0; if (days) where.push(`(p.is_new=1 OR p.created_at >= datetime('now','-${days} days'))`); }
   if (inStock === '1') where.push('(p.track_stock=0 OR p.stock>0)');
   if (rating === '1') where.push('p.rating >= 4');
   if (req.query.same_day === '1') { const sd = sameDaySql(); where.push(sd.sql); params.push(...sd.params); }
   // facets (counts per department / per store) are computed with every filter EXCEPT their own
+  const catKey = normText(String(req.query.category || '').slice(0, 60));
+  const catClause = catKey ? `EXISTS (SELECT 1 FROM categories c WHERE c.id=p.category_id AND ${NORM('c.name_ar')}=?)` : null;
   const baseWhere = [...where]; const baseParams = [...params];
+  if (catClause) { baseWhere.push(catClause); baseParams.push(catKey); } // department / store counts respect the chosen category
   const deptSlug = String(department).replace(/[^a-z0-9_]/g, '');
   const storeSlug = String(store).replace(/[^a-z0-9_-]/gi, '');
   const facetFrom = (extra, extraParams) => ({ sql: `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${[...baseWhere, ...extra].join(' AND ')}`, params: [...baseParams, ...extraParams] });
   if (deptSlug) { where.push('p.department=?'); params.push(deptSlug); }
   if (storeSlug) { where.push('s.slug=?'); params.push(storeSlug); }
-  const order = { relevance: 'p.featured DESC, p.sold_count DESC, p.id DESC', price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: 'p.created_at DESC', best: 'p.sold_count DESC' }[sort] || 'p.sold_count DESC';
+  const noCat = { where: [...where], params: [...params] }; // the category facet ignores its own filter
+  if (catClause) { where.push(catClause); params.push(catKey); }
+  const preVariant = { where: [...where], params: [...params] }; // facets for size/colour ignore their own filter
+  if (sizes) {
+    const list = String(sizes).split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12);
+    if (list.length) { where.push(`EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND v.size IN (${list.map(() => '?').join(',')}))`); params.push(...list); }
+  }
+  if (colors) {
+    const list = String(colors).split(',').map((x) => x.trim().toUpperCase()).filter((x) => /^#[0-9A-F]{3,8}$/.test(x)).slice(0, 12);
+    if (list.length) { where.push(`EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND UPPER(v.color) IN (${list.map(() => '?').join(',')}))`); params.push(...list); }
+  }
+  const rel = scoreSql.length ? `(${scoreSql.join(' + ')}) DESC, ` : '';
+  const orderParams = [];
+  const order = {
+    relevance: `${rel}p.featured DESC, p.sold_count DESC, p.id DESC`, price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: 'p.created_at DESC', best: 'p.sold_count DESC',
+    discount: '(1.0*p.price/COALESCE(p.compare_at_price,p.price)) ASC, p.sold_count DESC', rating: 'p.rating DESC, p.rating_count DESC, p.sold_count DESC',
+  }[sort] || 'p.sold_count DESC';
+  if (sort === 'relevance' || !['price_asc', 'price_desc', 'newest', 'best', 'discount', 'rating'].includes(sort)) orderParams.push(...scoreParams);
   const limit = ids ? 100 : 24; const pg = clampInt(page, 1, 1000, 1);
   const from = `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${where.join(' AND ')}`;
   const total = q.val(`SELECT COUNT(*) ${from}`, params);
-  const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en ${from} ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, limit, (pg - 1) * limit]);
+  const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en ${from} ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, ...orderParams, limit, (pg - 1) * limit]);
   const items = serializeCards(rows).map((c, i) => ({ ...c, store: { slug: rows[i].store_slug, name: bi(rows[i], 'store_name') } }));
   const price = q.get(`SELECT MIN(p.price) AS min, MAX(p.price) AS max ${from}`, params);
   const fd = facetFrom(storeSlug ? ['s.slug=?'] : [], storeSlug ? [storeSlug] : []);
@@ -112,8 +167,22 @@ r.get('/search', h((req, res) => {
   const fs2 = facetFrom(deptSlug ? ['p.department=?'] : [], deptSlug ? [deptSlug] : []);
   const stores = q.all(`SELECT s.slug AS slug, s.name_ar AS name_ar, s.name_en AS name_en, COUNT(*) AS n ${fs2.sql} GROUP BY s.id ORDER BY n DESC LIMIT 12`, fs2.params)
     .map((x) => ({ slug: x.slug, name: { ar: x.name_ar, en: x.name_en }, n: x.n }));
+  const catRows = q.all(`SELECT c.name_ar AS name_ar, c.name_en AS name_en, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id JOIN categories c ON c.id=p.category_id WHERE ${noCat.where.join(' AND ')} GROUP BY ${NORM('c.name_ar')} ORDER BY n DESC LIMIT 14`, noCat.params);
+  const categories = catRows.map((c) => {
+    const top = q.get(`SELECT p.* FROM products p JOIN stores s ON s.id=p.store_id JOIN categories c ON c.id=p.category_id WHERE ${noCat.where.join(' AND ')} AND ${NORM('c.name_ar')}=? ORDER BY p.featured DESC, p.sold_count DESC LIMIT 1`, [...noCat.params, normText(c.name_ar)]);
+    return { key: normText(c.name_ar), name: { ar: c.name_ar, en: c.name_en || c.name_ar }, n: c.n, image: top ? serializeCards([top])[0]?.image || null : null };
+  });
+  const fromV = `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')}`;
+  const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'One size', 'Free size'];
+  const facetSizes = q.all(`SELECT v.size AS size, COUNT(DISTINCT p.id) AS n FROM variants v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')} AND v.stock>0 AND v.size IS NOT NULL AND v.size<>'' GROUP BY v.size`, preVariant.params)
+    .sort((a, b) => { const ia = sizeOrder.indexOf(a.size), ib = sizeOrder.indexOf(b.size); return ia === -1 && ib === -1 ? (Number(a.size) - Number(b.size) || String(a.size).localeCompare(String(b.size))) : (ia === -1 ? 1 : ib === -1 ? -1 : ia - ib); }).slice(0, 30);
+  const colorMap = new Map();
+  for (const row of q.all(`SELECT p.colors_json AS cj ${fromV} LIMIT 600`, preVariant.params)) {
+    for (const c of json(row.cj, [])) { const hex = String(c.hex || '').toUpperCase(); if (hex) { const e = colorMap.get(hex) || { hex, name: c.name || null, n: 0 }; e.n++; colorMap.set(hex, e); } }
+  }
+  const facetColors = [...colorMap.values()].sort((a, b) => b.n - a.n).slice(0, 16);
   cache(res, 20);
-  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores } });
+  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories } });
 }));
 
 /* ---------------------------------------------------------- visual search: "snap it, find it in Banha" */
@@ -391,9 +460,11 @@ r.get('/stores/:slug/products', h((req, res) => {
     params.push(s.id, String(category));
   }
   if (term) {
-    const like = `%${String(term).slice(0, 60)}%`;
-    where.push('(p.name_ar LIKE ? OR p.name_en LIKE ? OR p.description_en LIKE ? OR p.description_ar LIKE ?)');
-    params.push(like, like, like, like);
+    for (const tk of normText(String(term).slice(0, 60)).split(/\s+/).filter(Boolean).slice(0, 5)) {
+      const alts = [...new Set([tk, ...(SYNONYMS[tk] || []).map(normText)])];
+      where.push(`(${alts.map(() => `${NORM('p.name_ar')} LIKE ? OR ${NORM('p.name_en')} LIKE ? OR ${NORM('p.description_ar')} LIKE ? OR ${NORM('p.description_en')} LIKE ?`).join(' OR ')})`);
+      for (const a of alts) { const like = `%${a}%`; params.push(like, like, like, like); }
+    }
   }
   if (sale === '1') where.push('p.compare_at_price > p.price');
   if (min) { where.push('p.price >= ?'); params.push(clampInt(min, 0, 1e7, 0)); }

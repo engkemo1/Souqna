@@ -1,3 +1,4 @@
+import SuggestInput, { saveRecent } from './SuggestInput.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { Search, Heart, User, ShoppingBag, ChevronDown, Menu, X, Flame } from 'lucide-react';
@@ -50,9 +51,9 @@ export default function MarketHeader() {
         {/* Brand */}
         <Brand />
 
-        <form role="search" onSubmit={(event) => { event.preventDefault(); const value = query.trim(); navigate(value ? `/search?${new URLSearchParams({ q: value })}` : '/search'); }} className="relative mx-4 hidden max-w-xl flex-1 md:block">
+        <form role="search" onSubmit={(event) => { event.preventDefault(); const value = query.trim(); saveRecent(value); navigate(value ? `/search?${new URLSearchParams({ q: value })}` : '/search'); }} className="relative mx-4 hidden max-w-xl flex-1 md:block">
           <Search className="pointer-events-none absolute end-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t('search.placeholder')} aria-label={t('search.placeholder')} className="h-11 w-full rounded-full border-0 bg-[#f2f2f2] ps-4 pe-11 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-brand/20" />
+          <SuggestInput value={query} onChange={setQuery} inputProps={{ placeholder: t('search.placeholder'), 'aria-label': t('search.placeholder') }} className="h-11 w-full rounded-full border-0 bg-[#f2f2f2] ps-4 pe-11 text-sm outline-none transition focus:bg-white focus:ring-2 focus:ring-brand/20" />
         </form>
 
         {/* Action icons & owner CTA */}

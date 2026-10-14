@@ -19,6 +19,8 @@ const streetFallback = <div aria-hidden="true" className="h-[360px] w-full sm:h-
 import { useDepartments } from '../../lib/departments.js';
 import DeptStrip from '../../components/market/DeptStrip.jsx';
 import ProductRail from '../../components/market/ProductRail.jsx';
+import RecentlyViewed from '../../components/market/RecentlyViewed.jsx';
+import StoreStrip from '../../components/market/StoreStrip.jsx';
 import StoreCard from '../../components/market/StoreCard.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -200,6 +202,7 @@ export default function MarketHome() {
 
       {/* shop by department: right under the trust strip (secure payment · easy exchange · local products) */}
       <div className="mt-8 sm:mt-10"><DeptStrip departments={base?.departments || []} /></div>
+      <StoreStrip stores={base?.stores || []} />
       <LookOfDay />
 
       {/* product shelves */}
@@ -210,6 +213,7 @@ export default function MarketHome() {
       <div className="border-y border-line bg-secondary/50">
         <ProductRail title={t('market.newArrivals')} items={base?.newest} to="/search?sort=newest" />
       </div>
+      <RecentlyViewed />
       {(base?.deptRails || []).map((r, i) => (
         <div key={r.slug} className={i % 2 === 0 ? '' : 'border-y border-line bg-secondary/50'}>
           <ProductRail title={t('market.topIn', { d: r.name?.[lang] || r.name?.ar })} items={r.items} to={`/search?department=${r.slug}`} />

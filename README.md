@@ -155,3 +155,13 @@ Each store picks one or many departments (women, men, kids, shoes, bags, hijab, 
 Set `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL` and every new photo is uploaded to R2 (the volume keeps only the database). Photos already on the volume keep working; move them with `npm run media:to-r2 -w server` (safe to re-run, frees the disk space). Deleting a photo or a store also deletes it from R2.
 
 The admin System page shows the filesystem mounted for the database and the app process memory. For account-wide Cloudflare R2 usage, set `CF_R2_METRICS_TOKEN` to an API token with Workers R2 Storage Read permission; the account id comes from `CF_ACCOUNT_ID` or `R2_ACCOUNT_ID`. Cloudflare notes that account metrics can lag recent changes. This server disk measurement is not the Railway volume quota; check Railway Metrics for plan limits.
+
+## Persistence on Cloudflare (no volume needed)
+- **Photos** -> R2 bucket (`R2_*`). **Database** -> a private R2 bucket (`BACKUP_R2_BUCKET`, must differ from `R2_BUCKET`) through **Litestream** (`server/start.sh`, `server/litestream.yml`).
+- On every start with an empty disk the container restores the newest database from R2 (and aborts instead of silently falling back to demo data if R2 errors); while running, every change is streamed to R2 within ~5 s, with 6-hourly snapshots kept for 72 h. The daily gzip backup (`db/souqna-DATE.db.gz`) stays as a second copy.
+- Required env on Railway: `NODE_ENV=production`, `JWT_SECRET`, `ADMIN_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_PUBLIC_URL`, `BACKUP_R2_BUCKET`. The R2 API token needs write access to both buckets.
+- Migrating existing data: deploy with these variables while the old volume still holds the data, confirm `litestream/souqna/` appears in the backup bucket, run `npm run media:to-r2 -w server` for old photos, then remove the volume.
+
+## Photo size (R2 space)
+- New uploads are stored as WebP renditions (thumb/sm/md/lg) plus one `original.jpg` (q82). The old JPEG rendition ladder is gone: about -50% bytes per photo with an SSIM change under 0.005 (measured on real catalogue photos, not visible).
+- Existing photos: `npm run media:optimize -w server` is a **dry run** (prints the saving, changes nothing). `npm run media:optimize -w server -- --apply` re-encodes the WebP renditions (only when smaller) and deletes the now-unused JPEG renditions. `original.jpg` is never touched. Safe to re-run; on the demo set it takes ~13 minutes and saves ~40% (258 MB -> 153 MB).

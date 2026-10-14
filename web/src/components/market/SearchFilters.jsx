@@ -22,6 +22,8 @@ function Toggle({ checked, onChange, children }) {
   );
 }
 
+const PRICE_BANDS = [[0, 200], [200, 500], [500, 1000], [1000, 2000], [2000, 0]];
+
 /** Amazon-style filter column: department, price, deal/new/stock/rating toggles and store. State lives in the URL. */
 export default function SearchFilters({ params, set, facets, departments, label, activeCount, onClear }) {
   const { t, lang } = useI18n();
@@ -32,12 +34,15 @@ export default function SearchFilters({ params, set, facets, departments, label,
   const dept = params.get('department') || '';
   const applyPrice = (e) => { e?.preventDefault(); set({ min: min && Number(min) > 0 ? String(Math.floor(Number(min))) : '', max: max && Number(max) > 0 ? String(Math.floor(Number(max))) : '' }); };
   const flag = (k) => params.get(k) === '1';
+  const list = (k) => (params.get(k) || '').split(',').filter(Boolean);
+  const toggleIn = (k, v) => { const cur = list(k); set({ [k]: (cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v]).join(',') }); };
+  const chosenSizes = list('sizes'); const chosenColors = list('colors');
 
   return (
     <div className="text-fg">
       <Group title={t('search.department')}>
         <ul className="space-y-0.5">
-          {[{ slug: '' }, ...departments].map((d) => {
+          {[{ slug: '' }, ...departments].filter((d) => !d.slug || d.slug === dept || (deptCount.get(d.slug) || 0) > 0).map((d) => {
             const n = d.slug ? deptCount.get(d.slug) || 0 : [...deptCount.values()].reduce((a, b) => a + b, 0);
             const on = dept === d.slug;
             return (
@@ -53,7 +58,37 @@ export default function SearchFilters({ params, set, facets, departments, label,
         </ul>
       </Group>
 
+      {facets?.categories?.length > 0 && (
+        <Group title={t('search.category')}>
+          <ul className="space-y-0.5">
+            {facets.categories.map((c) => {
+              const on = params.get('category') === c.key;
+              return (
+                <li key={c.key}>
+                  <button type="button" aria-pressed={on} onClick={() => set({ category: on ? '' : c.key })}
+                    className={cx('flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-start text-sm transition', on ? 'bg-secondary font-bold' : 'hover:bg-secondary/60')}>
+                    <span className="truncate">{c.name[lang] || c.name.ar}</span><span className="text-xs text-muted">{formatNumber(c.n, lang)}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Group>
+      )}
+
       <Group title={t('search.price')}>
+        <ul className="mb-3 space-y-0.5">
+          {PRICE_BANDS.map(([lo, hi]) => {
+            const on = (params.get('min') || '') === (lo ? String(lo) : '') && (params.get('max') || '') === (hi ? String(hi) : '');
+            const text = !lo ? t('search.under', { n: formatNumber(hi, lang) }) : !hi ? t('search.above', { n: formatNumber(lo, lang) }) : `${formatNumber(lo, lang)} – ${formatNumber(hi, lang)}`;
+            return (
+              <li key={`${lo}-${hi}`}>
+                <button type="button" aria-pressed={on} onClick={() => set({ min: on || !lo ? '' : String(lo), max: on || !hi ? '' : String(hi) })}
+                  className={cx('w-full rounded-lg px-2.5 py-2 text-start text-sm transition', on ? 'bg-secondary font-bold' : 'hover:bg-secondary/60')}>{text}</button>
+              </li>
+            );
+          })}
+        </ul>
         <form onSubmit={applyPrice} className="flex items-center gap-2">
           <input type="number" inputMode="numeric" min="0" value={min} onChange={(e) => setMin(e.target.value)} placeholder={t('search.min')} aria-label={t('search.min')}
             className="h-10 w-full min-w-0 rounded-lg border border-line-strong bg-elevated px-3 text-base outline-none focus:border-ring" />
@@ -64,10 +99,46 @@ export default function SearchFilters({ params, set, facets, departments, label,
         </form>
       </Group>
 
+      {(facets?.sizes?.length > 0 || chosenSizes.length > 0) && (
+        <Group title={t('search.size')}>
+          <div className="flex flex-wrap gap-2">
+            {[...new Map([...(facets?.sizes || []), ...chosenSizes.map((z) => ({ size: z }))].map((x) => [x.size, x])).values()].map((x) => {
+              const on = chosenSizes.includes(x.size);
+              return <button key={x.size} type="button" aria-pressed={on} onClick={() => toggleIn('sizes', x.size)} className={cx('h-10 min-w-11 rounded-lg border px-3 text-sm font-semibold transition', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>{x.size}</button>;
+            })}
+          </div>
+        </Group>
+      )}
+
+      {(facets?.colors?.length > 0 || chosenColors.length > 0) && (
+        <Group title={t('search.color')}>
+          <div className="flex flex-wrap gap-2.5">
+            {[...new Map([...(facets?.colors || []), ...chosenColors.map((h) => ({ hex: h }))].map((x) => [x.hex, x])).values()].map((c) => {
+              const on = chosenColors.includes(c.hex);
+              return <button key={c.hex} type="button" aria-pressed={on} aria-label={c.name || c.hex} title={c.name || c.hex} onClick={() => toggleIn('colors', c.hex)}
+                className={cx('relative grid h-9 w-9 place-items-center rounded-full border-2 transition', on ? 'border-fg' : 'border-line-strong hover:border-fg')}><span className="block h-6 w-6 rounded-full border border-black/10" style={{ background: c.hex }} />{on && <Check className="absolute h-3.5 w-3.5 mix-blend-difference text-white" strokeWidth={3} />}</button>;
+            })}
+          </div>
+        </Group>
+      )}
+
+      <Group title={t('search.newArrivals')}>
+        <ul className="space-y-0.5">
+          {['7', '30', '90'].map((d) => {
+            const on = params.get('new') === d || (d === '30' && params.get('new') === '1');
+            return (
+              <li key={d}>
+                <button type="button" aria-pressed={on} onClick={() => set({ new: on ? '' : d })}
+                  className={cx('w-full rounded-lg px-2.5 py-2 text-start text-sm transition', on ? 'bg-secondary font-bold' : 'hover:bg-secondary/60')}>{t('search.lastDays', { n: formatNumber(Number(d), lang) })}</button>
+              </li>
+            );
+          })}
+        </ul>
+      </Group>
+
       <Group title={t('search.options')}>
         <Toggle checked={flag('same_day')} onChange={(v) => set({ same_day: v ? '1' : '' })}>{t('sameday.filter')}</Toggle>
         <Toggle checked={flag('sale')} onChange={(v) => set({ sale: v ? '1' : '' })}>{t('search.onSale')}</Toggle>
-        <Toggle checked={flag('new')} onChange={(v) => set({ new: v ? '1' : '' })}>{t('search.newOnly')}</Toggle>
         <Toggle checked={flag('in_stock')} onChange={(v) => set({ in_stock: v ? '1' : '' })}>{t('search.inStock')}</Toggle>
         <Toggle checked={flag('rating')} onChange={(v) => set({ rating: v ? '1' : '' })}>{t('search.rating4')}</Toggle>
       </Group>

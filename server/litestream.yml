@@ -1,0 +1,16 @@
+# Continuous replication of the SQLite database to a PRIVATE Cloudflare R2 bucket.
+# Values come from env vars (see .env.example). The bucket must NOT be the public photo bucket.
+dbs:
+  - path: ${DB_FILE}
+    replicas:
+      - type: s3
+        bucket: ${BACKUP_R2_BUCKET}
+        path: litestream/souqna
+        endpoint: https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com
+        region: auto
+        force-path-style: true
+        access-key-id: ${LS_KEY_ID}
+        secret-access-key: ${LS_SECRET}
+        sync-interval: 5s
+        snapshot-interval: 6h
+        retention: 72h

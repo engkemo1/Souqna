@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import sharp from 'sharp';
+import { pickPerson } from '../src/lib/visual-person.js';
 import {
   softmax, cosine, normalize, rankConfident, colorDescriptor, colorSimilarity, regionKeysFor, cropRegions, RANK,
 } from '../src/lib/visual-core.js';
@@ -25,6 +26,25 @@ test('cropRegions returns decodable crops for an outfit photo', async () => {
   const crops = await cropRegions(photo);
   assert.deepEqual(crops.map((c) => c.key), ['full', 'upper', 'lower', 'feet']);
   for (const c of crops) { const m = await sharp(c.buffer).metadata(); assert.ok(m.width > 8 && m.height > 8); }
+});
+
+test('a standing person in a wide studio shot is cropped to top / bottom / feet, a tight landscape garment is not', async () => {
+  const person = await sharp({ create: { width: 1600, height: 900, channels: 3, background: '#f2f2f2' } })
+    .composite([{ input: await sharp({ create: { width: 380, height: 880, channels: 3, background: '#111111' } }).png().toBuffer(), left: 610, top: 10 }]).jpeg().toBuffer();
+  assert.deepEqual((await cropRegions(person)).map((c) => c.key), ['full', 'upper', 'lower', 'feet']);
+  assert.deepEqual((await cropRegions(await solid(30, 30, 30, 1600, 900))).map((c) => c.key), ['full']);
+});
+
+test('busy background: the person detector provides the box when the background heuristic cannot', async () => {
+  const noise = Buffer.alloc(800 * 600 * 3); for (let i = 0; i < noise.length; i++) noise[i] = (i * 2654435761 >>> 7) & 255;
+  const busy = await sharp(noise, { raw: { width: 800, height: 600, channels: 3 } }).jpeg().toBuffer();
+  assert.deepEqual((await cropRegions(busy)).map((c) => c.key), ['full']); // no detector: unchanged behaviour
+  const keys = (await cropRegions(busy, { detect: async () => [0.35, 0, 0.65, 1] })).map((c) => c.key);
+  assert.deepEqual(keys, ['full', 'upper', 'lower', 'feet']);
+  assert.deepEqual((await cropRegions(busy, { detect: async () => { throw new Error('model down'); } })).map((c) => c.key), ['full']);
+  assert.deepEqual(pickPerson([{ label: 'dog', score: 0.9, box: { xmin: 0, ymin: 0, xmax: 1, ymax: 1 } }, { label: 'person', score: 0.4, box: { xmin: 0, ymin: 0, xmax: 1, ymax: 1 } }]), null);
+  const box = pickPerson([{ label: 'person', score: 0.9, box: { xmin: 0.4, ymin: 0.1, xmax: 0.6, ymax: 0.9 } }]);
+  assert.ok(box && box[0] < 0.4 && box[2] > 0.6);
 });
 
 test('colour descriptor: same colour ≈ 1, black vs pink ≈ 0, navy is close to black', async () => {

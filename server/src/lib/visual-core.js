@@ -38,17 +38,58 @@ export function regionKeysFor(width, height) {
   return height / Math.max(1, width) >= 1.3 ? ['full', 'upper', 'lower', 'feet'] : ['full'];
 }
 
+/**
+ * Where the person/garment sits inside the frame, as [left, top, right, bottom] fractions — or null when the photo is
+ * already tightly framed or the background is too busy to tell. A wide studio shot of a standing person is mostly
+ * empty backdrop; without this the outfit would be read as one garment instead of top + bottom + shoes.
+ */
+export async function subjectBox(buffer) {
+  const N = 96;
+  const { data, info } = await sharp(buffer).rotate().resize(N, N, { fit: 'inside' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width: w, height: h } = info;
+  const at = (x, y) => { const i = (y * w + x) * 3; return [data[i], data[i + 1], data[i + 2]]; };
+  const edge = Math.max(2, Math.round(Math.min(w, h) * 0.05));
+  const samples = [];
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (x < edge || y < edge || x >= w - edge || y >= h - edge) samples.push(at(x, y));
+  const median = (c) => { const a = samples.map((p) => p[c]).sort((p, q) => p - q); return a[a.length >> 1]; };
+  const bg = [median(0), median(1), median(2)];
+  const dist = (p) => Math.max(Math.abs(p[0] - bg[0]), Math.abs(p[1] - bg[1]), Math.abs(p[2] - bg[2]));
+  if (samples.filter((p) => dist(p) > 40).length / samples.length > 0.25) return null; // busy / varied background
+  const cols = new Array(w).fill(0); const rows = new Array(h).fill(0); let fg = 0;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (dist(at(x, y)) > 40) { cols[x]++; rows[y]++; fg++; }
+  if (fg / (w * h) < 0.02) return null;
+  const first = (arr, min) => arr.findIndex((v) => v >= min);
+  const last = (arr, min) => { for (let i = arr.length - 1; i >= 0; i--) if (arr[i] >= min) return i; return -1; };
+  const x0 = first(cols, Math.max(2, h * 0.03)), x1 = last(cols, Math.max(2, h * 0.03));
+  const y0 = first(rows, Math.max(2, w * 0.015)), y1 = last(rows, Math.max(2, w * 0.015));
+  if (x0 < 0 || y0 < 0 || x1 <= x0 || y1 <= y0) return null;
+  const m = 0.04;
+  return [Math.max(0, x0 / w - m), Math.max(0, y0 / h - m), Math.min(1, (x1 + 1) / w + m), Math.min(1, (y1 + 1) / h + m)];
+}
+
 /** Returns [{ key, buffer }] — JPEG buffers, already rotated by EXIF. */
 export async function cropRegions(buffer) {
   const rotated = await sharp(buffer).rotate().jpeg({ quality: 90 }).toBuffer();
-  const { width, height } = await sharp(rotated).metadata();
+  let { width, height } = await sharp(rotated).metadata();
+  let base = rotated;
+  let keys = regionKeysFor(width, height);
+  // A standing person inside a wide/roomy frame: work on the person, not on the empty backdrop around them.
+  const box = await subjectBox(rotated).catch(() => null);
+  if (box) {
+    const left = Math.round(box[0] * width), top = Math.round(box[1] * height);
+    const w = Math.min(width - left, Math.round((box[2] - box[0]) * width)), h = Math.min(height - top, Math.round((box[3] - box[1]) * height));
+    if (w >= 64 && h >= 64 && h / w >= 1.3 && (w * h) / (width * height) < 0.85) {
+      base = await sharp(rotated).extract({ left, top, width: w, height: h }).jpeg({ quality: 90 }).toBuffer();
+      width = w; height = h; keys = ['full', 'upper', 'lower', 'feet'];
+    }
+  }
   const out = [];
-  for (const key of regionKeysFor(width, height)) {
-    if (key === 'full') { out.push({ key, buffer: rotated }); continue; }
+  for (const key of keys) {
+    if (key === 'full') { out.push({ key, buffer: base }); continue; }
     const [l, t, r, b] = REGION_BOXES[key];
     const left = Math.round(l * width), top = Math.round(t * height);
     const w = Math.max(8, Math.round((r - l) * width)), h = Math.max(8, Math.round((b - t) * height));
-    out.push({ key, buffer: await sharp(rotated).extract({ left, top, width: Math.min(w, width - left), height: Math.min(h, height - top) }).jpeg({ quality: 90 }).toBuffer() });
+    out.push({ key, buffer: await sharp(base).extract({ left, top, width: Math.min(w, width - left), height: Math.min(h, height - top) }).jpeg({ quality: 90 }).toBuffer() });
   }
   return out;
 }

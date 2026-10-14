@@ -23,7 +23,7 @@ function BannerPicture({ banner, priority, isRtl }) {
         <source media="(max-width: 639px)" srcSet={srcSet(m, 'jpg')} sizes="100vw" />
         <source type="image/webp" srcSet={srcSet(d, 'webp')} sizes="100vw" />
         <img
-          src={`${d.base}/${d.sizes.at(-1).name}.jpg`}
+          src={`${d.base}/original.jpg`}
           srcSet={srcSet(d, 'jpg')}
           sizes="100vw"
           alt=""

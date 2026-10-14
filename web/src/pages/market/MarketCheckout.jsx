@@ -78,7 +78,7 @@ export default function MarketCheckout() {
 
   return <div className="min-h-dvh"><MarketHeader /><main className="container max-w-6xl py-7 sm:py-10">
     <Link to="/market-cart" className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-fg"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" />{ar ? 'الرجوع للسلة' : 'Back to basket'}</Link>
-    <h1 className="mb-7 font-display text-2xl font-bold sm:text-3xl">{ar ? 'إتمام طلب من كذا محل' : 'Checkout from multiple stores'}</h1>
+    <h1 className="mb-7 font-display text-2xl font-bold sm:text-3xl">{groups.length > 1 ? (ar ? `إتمام الطلب من ${groups.length} محلات` : `Checkout from ${groups.length} stores`) : (ar ? 'إتمام الطلب' : 'Checkout')}</h1>
     <div className="grid gap-8 lg:grid-cols-12">
       <form onSubmit={placeOrder} className="space-y-7 lg:col-span-7">
         <section className="rounded-3xl border border-line bg-elevated p-5 sm:p-6"><h2 className="mb-5 font-semibold">{ar ? 'بيانات التوصيل' : 'Delivery details'}</h2><div className="grid gap-4 sm:grid-cols-2">
@@ -91,7 +91,7 @@ export default function MarketCheckout() {
         </div></section>
         <section className="flex items-center gap-4 rounded-3xl border-2 border-fg bg-elevated p-4"><Banknote className="h-6 w-6 shrink-0" /><span><strong className="block">{ar ? 'الدفع عند الاستلام' : 'Cash on delivery'}</strong><span className="text-sm text-muted">{ar ? 'هتدفعي لكل طلب عند استلام شحنته.' : 'Pay for each store order when its package arrives.'}</span></span></section>
         {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
-        <Button type="submit" size="lg" full loading={busy} disabled={!quotes || hasErrors}>{ar ? `تأكيد ${groups.length} طلب · ${formatMoney(total, lang)}` : `Confirm ${groups.length} orders · ${formatMoney(total, lang)}`}</Button>
+        <Button type="submit" size="lg" full loading={busy} disabled={!quotes || hasErrors}>{groups.length > 1 ? (ar ? `تأكيد ${groups.length} طلبات · ${formatMoney(total, lang)}` : `Confirm ${groups.length} orders · ${formatMoney(total, lang)}`) : (ar ? `تأكيد الطلب · ${formatMoney(total, lang)}` : `Place order · ${formatMoney(total, lang)}`)}</Button>
         <p className="flex items-center justify-center gap-2 text-xs text-muted"><Lock className="h-3.5 w-3.5" />{ar ? 'كل محل هيستلم طلبه ويديره بشكل منفصل.' : 'Each store receives and manages its own order.'}</p>
       </form>
       <aside className="h-fit rounded-3xl border border-line bg-elevated p-5 sm:p-6 lg:sticky lg:top-24 lg:col-span-5"><h2 className="mb-5 flex items-center gap-2 font-semibold"><ShoppingBag className="h-5 w-5" />{ar ? 'ملخص الطلبات' : 'Order summary'}</h2>

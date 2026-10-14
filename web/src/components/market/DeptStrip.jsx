@@ -9,11 +9,11 @@ export const DEPT_EMOJI = {
 };
 
 const UNSPLASH = {
-  women: 'photo-1567966456076-905a50a06d8c', men: 'photo-1602810316693-3667c854239a', kids: 'photo-1622218286192-95f6a20083c7', shoes: 'photo-1560769629-975ec94e6a86',
+  women: 'photo-1640923160720-35dddb6348ab', men: 'photo-1602810316693-3667c854239a', kids: 'photo-1758782213532-bbb5fd89885e', shoes: 'photo-1560769629-975ec94e6a86',
   bags: 'photo-1652427019217-3ded1a356f10', hijab: 'photo-1550546094-9835463f9f71', abaya: 'photo-1772474500365-c2c520545f44', jalabiya: 'photo-1616147147027-60d49d3582c4',
   underwear: 'photo-1713881630214-82c44407cf25', wedding_dress: 'photo-1770866381183-0429c19d59df', wedding_suit: 'photo-1606216769783-a7dbe227a17f', sports: 'photo-1540254597053-3901b858d40f',
   denim: 'photo-1602293589930-45aad59ba3ab', accessories: 'photo-1606760227091-3dd870d97f1d',
-  perfume_makeup: 'photo-1592945403244-b3fbafd7f539', care: 'photo-1556228720-195a672e8a03',
+  perfume_makeup: 'photo-1705899853374-d91c048b81d2', care: 'photo-1556228720-195a672e8a03',
 };
 const unsplash = (slug) => (UNSPLASH[slug] ? `https://images.unsplash.com/${UNSPLASH[slug]}?auto=format&fit=crop&w=240&h=240&q=70` : null);
 
@@ -32,7 +32,7 @@ export const DEFAULT_DEPTS = [
   { slug: 'sports', name: { ar: 'رياضي', en: 'Sports' } },
 ];
 
-/** Department photo: uploaded from the admin → default Unsplash photo → emoji. */
+/** Department photo: admin upload → curated Unsplash photo → emoji. */
 function DeptThumb({ slug, image }) {
   const sources = [image, unsplash(slug)].filter(Boolean);
   const [stage, setStage] = useState(0);

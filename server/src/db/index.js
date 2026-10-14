@@ -8,7 +8,7 @@ import { config } from '../config.js';
 fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
 
 export const db = new DatabaseSync(config.dbFile);
-db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON;');
+db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
 // Lightweight migrations for databases created by earlier versions.
 {

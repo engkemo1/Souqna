@@ -54,7 +54,7 @@ export async function weeklyReport(sid, { refresh = false } = {}) {
   }
   if (!summary) {
     const d = facts.prevSales ? Math.round(((facts.sales - facts.prevSales) / facts.prevSales) * 100) : null;
-    summary = `الأسبوع ده: ${facts.orders} طلب بمبيعات ${facts.sales} ج.م${d === null ? '' : d >= 0 ? ` (زيادة ${d}% عن الأسبوع اللي قبله)` : ` (نقص ${Math.abs(d)}% عن الأسبوع اللي قبله)`}.`;
+    summary = `الأسبوع ده: ${facts.orders} طلب بمبيعات ${Number(facts.sales).toLocaleString('en-US')} ج.م${d === null ? '' : d >= 0 ? ` (زيادة ${d}% عن الأسبوع اللي قبله)` : ` (نقص ${Math.abs(d)}% عن الأسبوع اللي قبله)`}.`;
   }
   const rep = { facts, summary, tips, ai };
   cache.set(key, rep);

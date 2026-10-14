@@ -26,6 +26,7 @@ import Button, { IconButton } from '../../components/ui/Button.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
+import { rememberViewed } from '../../lib/recentlyViewed.js';
 
 function Accordion({ title, children, defaultOpen }) {
   const [open, setOpen] = useState(!!defaultOpen);
@@ -119,6 +120,7 @@ export default function Product() {
   const galleryRef = useRef(null);
   const ctaRef = useRef(null);
   const [ctaVisible, setCtaVisible] = useState(true);
+  useEffect(() => { if (p?.id) rememberViewed(p.id); }, [p?.id]);
 
   useEffect(() => {
     if (!p) return;
