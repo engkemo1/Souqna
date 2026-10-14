@@ -86,8 +86,20 @@ export function useCart(slug) {
 
 export function useFavorites(slug) {
   const ctx = useContext(CartContext);
-  const ids = ctx.favs[slug] || [];
+  const allIds = useMemo(() => [...new Set(Object.values(ctx.favs || {}).flat().map(Number).filter(Boolean))], [ctx.favs]);
+  const ids = slug ? (ctx.favs[slug] || []) : allIds;
   const toggle = useCallback((id) => {
+    if (!slug) {
+      // If no slug is specified, find the store that has this id and remove it
+      ctx.setFavs((f) => {
+        const next = { ...f };
+        for (const [s, list] of Object.entries(next)) {
+          if (list.includes(id)) next[s] = list.filter((x) => x !== id);
+        }
+        return next;
+      });
+      return false;
+    }
     let added = false;
     ctx.setFavs((f) => {
       const list = f[slug] || [];
@@ -96,5 +108,35 @@ export function useFavorites(slug) {
     });
     return !ids.includes(id);
   }, [ctx, slug, ids]);
-  return { ids, has: (id) => ids.includes(id), toggle, count: ids.length };
+  return { ids, has: (id) => (slug ? ids.includes(id) : allIds.includes(id)), toggle, count: ids.length };
+}
+
+export function useMarketFavorites() {
+  const ctx = useContext(CartContext);
+  const favs = ctx.favs || {};
+  const items = useMemo(() => {
+    const list = [];
+    for (const [slug, ids] of Object.entries(favs)) {
+      if (Array.isArray(ids)) {
+        for (const id of ids) list.push({ slug, id: Number(id) });
+      }
+    }
+    return list;
+  }, [favs]);
+  const ids = useMemo(() => [...new Set(items.map((x) => x.id))], [items]);
+  const remove = useCallback((id, storeSlug) => {
+    ctx.setFavs((f) => {
+      if (storeSlug) {
+        const list = f[storeSlug] || [];
+        return { ...f, [storeSlug]: list.filter((x) => x !== id) };
+      }
+      const next = { ...f };
+      for (const [s, list] of Object.entries(next)) {
+        if (list.includes(id)) next[s] = list.filter((x) => x !== id);
+      }
+      return next;
+    });
+  }, [ctx]);
+  const clear = useCallback(() => ctx.setFavs({}), [ctx]);
+  return { items, ids, count: ids.length, remove, clear };
 }

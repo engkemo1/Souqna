@@ -65,9 +65,15 @@ const SYNONYMS = {
 };
 
 r.get('/search', h((req, res) => {
-  const { q: term = '', department = '', store = '', sort = 'relevance', min, max, page = '1', sale, new: isNew, in_stock: inStock, rating } = req.query;
+  const { q: term = '', department = '', store = '', sort = 'relevance', min, max, page = '1', sale, new: isNew, in_stock: inStock, rating, ids } = req.query;
   const tokens = normText(String(term).slice(0, 80)).split(/\s+/).filter(Boolean).slice(0, 6);
   const where = ["p.status='active'", "s.status='active'", 's.hidden=0']; const params = [];
+  if (ids) {
+    const list = String(ids).split(',').map(Number).filter(Boolean).slice(0, 100);
+    if (!list.length) return res.json({ items: [], total: 0, page: 1, pages: 1, price: { min: 0, max: 0 }, facets: { departments: [], stores: [] } });
+    where.push(`p.id IN (${list.map(() => '?').join(',')})`);
+    params.push(...list);
+  }
   for (const tk of tokens) {
     const alts = [...new Set([tk, ...(SYNONYMS[tk] || []).map(normText)])];
     const ors = [];
@@ -95,7 +101,7 @@ r.get('/search', h((req, res) => {
   if (deptSlug) { where.push('p.department=?'); params.push(deptSlug); }
   if (storeSlug) { where.push('s.slug=?'); params.push(storeSlug); }
   const order = { relevance: 'p.featured DESC, p.sold_count DESC, p.id DESC', price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: 'p.created_at DESC', best: 'p.sold_count DESC' }[sort] || 'p.sold_count DESC';
-  const limit = 24; const pg = clampInt(page, 1, 1000, 1);
+  const limit = ids ? 100 : 24; const pg = clampInt(page, 1, 1000, 1);
   const from = `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${where.join(' AND ')}`;
   const total = q.val(`SELECT COUNT(*) ${from}`, params);
   const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en ${from} ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, limit, (pg - 1) * limit]);
