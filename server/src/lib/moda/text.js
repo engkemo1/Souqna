@@ -36,7 +36,7 @@ export function detectLanguage(raw) {
   const ar = (s.match(/[؀-ۿ]/g) || []).length;
   const lat = (s.match(/[a-zA-Z]/g) || []).length;
   if (ar === 0 && lat === 0) return 'ar';
-  if (ar >= lat) return 'ar';
+  if (ar >= lat || (ar >= 3 && lat <= ar * 3)) return 'ar'; // كلمة إنجليزي واحدة (اسم موديل/براند) جوه جملة عربي ما تقلبش اللغة
   if (lat > 0 && /[a-z][2356789]|[2356789][a-z]/i.test(s)) return 'franco';
   return 'en';
 }

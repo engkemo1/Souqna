@@ -582,7 +582,7 @@ function LookOfDayPanel() {
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {(outfit.images || []).map((img, imgIndex) => (
                         <div key={img} className="relative">
-                          <img src={img} alt="" className="h-24 w-[72px] rounded-xl object-cover" />
+                          <img src={img} alt="" className="h-24 w-[72px] rounded-xl object-cover object-top bg-secondary" />
                           {imgIndex === 0 && <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-black/55 text-center text-[10px] font-bold text-white">الأساسية</span>}
                           <button type="button" aria-label="حذف الصورة" onClick={() => changeOutfit(outfitIndex, (x) => ({ ...x, images: x.images.filter((_, i) => i !== imgIndex) }))} className="absolute -end-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full bg-sale text-white shadow"><Trash2 className="h-3 w-3" /></button>
                         </div>

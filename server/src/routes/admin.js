@@ -15,7 +15,7 @@ import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled, setDemandForOwners } from '../lib/visual-demand.js';
 import { stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
-import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage } from '../lib/deptImage.js';
+import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
 import { verifyTotp } from '../lib/totp.js';
@@ -735,7 +735,7 @@ r.patch('/departments/:id', h((req, res) => {
 const deptUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
 r.post('/look-of-day/image', deptUpload.single('file'), h(async (req, res) => {
   if (!req.file) throw new AppError(422, 'validation_failed', 'Pick an image.', { file: 'required' });
-  res.json({ image: await saveHomepageAdImage(req.file.buffer) });
+  res.json({ image: await saveLookOfDayImage(req.file.buffer) });
 }));
 r.post('/departments/:id/image', deptUpload.single('file'), h(async (req, res) => {
   const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);

@@ -71,3 +71,11 @@ test('site-help questions (how to order, seller dashboard, joining, about, safet
   for (const [text, faq] of Object.entries(cases)) { const res = await runModa(text, opts); assert.equal(res.faq, faq, text); assert.ok(res.say.length > 40); assert.doesNotMatch(res.say, /\d{8,}/); }
   for (const t of ['عايز اطلب جاكيت', 'عايز جزمه سودا', 'كوتشي ابيض', 'قميص ازرق', 'بدلة للفرح', 'عايز اشتري شنطه']) assert.equal(matchFaq(t), null, t);
 });
+
+test('greetings, "are you an AI / Gemini?" and a Latin brand word inside Arabic never produce an off-topic or English reply', async () => {
+  for (const t of ['اي الاخبار', 'ايه الاخبار', 'عامل ايه', 'اخبارك ايه']) { const r = await runModa(t, opts); assert.equal(r.faq, 'howareyou', t); assert.match(r.say, /الحمد لله/); }
+  for (const t of ['انتي GEMINI ؟', 'انت chatgpt', 'انتي بشر', 'موديل ايه انتي']) { const r = await runModa(t, opts); assert.equal(r.faq, 'about_ai', t); assert.match(r.say, /الذكاء الاصطناعي/); assert.doesNotMatch(r.say, /^I /); }
+  assert.equal((await runModa('اخبار مصر ايه', opts)).faq, 'offtopic');
+  assert.equal(parseMessage('عايز hoodie اسود').lang, 'ar');
+  assert.equal((await runModa('انتي GEMINI ؟ طيب', opts)).say.match(/[a-z]{4,}/i), null, 'reply stays Arabic');
+});

@@ -21,12 +21,12 @@ export default function LookStage({ entry, avatar = null, headingAs: Heading = '
   return (
   <section className="grid gap-3 sm:gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
     <div className="relative order-1 min-h-[420px] overflow-hidden rounded-[28px] border border-line bg-secondary shadow-sm sm:min-h-[520px] lg:order-2 lg:min-h-[680px]">
-      {cur ? <img key={cur} src={cur} alt={title} className="absolute inset-0 h-full w-full object-cover" /> : <Collage entry={entry} title={title} />}
+      {cur ? <img key={cur} src={cur} alt={title} className="absolute inset-0 h-full w-full object-cover object-top" /> : <Collage entry={entry} title={title} />}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/5" />
       {entry.badge && <span className="absolute start-4 top-4 rounded-full bg-elevated/95 px-3.5 py-1.5 text-[13px] font-bold text-brand shadow-sm"><Sparkles className="me-1 inline h-4 w-4" />{entry.badge}</span>}
       <div className="absolute inset-x-4 bottom-4 flex flex-wrap items-end justify-between gap-2">
         {gallery.length > 1 && <div className="absolute inset-x-0 bottom-16 flex justify-center gap-2 px-4">
-          {gallery.map((g, i) => <button key={g} type="button" onClick={() => setShot(i)} aria-label={`${lang === 'ar' ? 'صورة' : 'Photo'} ${i + 1}`} aria-current={g === cur} className={`h-14 w-11 overflow-hidden rounded-lg border-2 bg-white/80 shadow transition sm:h-16 sm:w-12 ${g === cur ? 'border-white scale-105' : 'border-white/40 opacity-80 hover:opacity-100'}`}><img src={g} alt="" className="h-full w-full object-cover" loading="lazy" /></button>)}
+          {gallery.map((g, i) => <button key={g} type="button" onClick={() => setShot(i)} aria-label={`${lang === 'ar' ? 'صورة' : 'Photo'} ${i + 1}`} aria-current={g === cur} className={`h-14 w-11 overflow-hidden rounded-lg border-2 bg-white/80 shadow transition sm:h-16 sm:w-12 ${g === cur ? 'border-white scale-105' : 'border-white/40 opacity-80 hover:opacity-100'}`}><img src={g} alt="" className="h-full w-full object-cover object-top" loading="lazy" /></button>)}
         </div>}
         <p className="flex flex-wrap gap-x-3 gap-y-1 text-[15px] font-extrabold leading-tight text-white drop-shadow sm:text-lg">{tags.map((x) => <span key={x}>#{x}</span>)}</p>
         {cur && <span className="rounded-full bg-black/40 px-2.5 py-1 text-[10.5px] font-semibold text-white/90 backdrop-blur">{lang === 'ar' ? 'صورة توضيحية للإطلالة' : 'Illustrative image'}</span>}
