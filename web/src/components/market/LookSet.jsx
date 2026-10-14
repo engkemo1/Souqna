@@ -142,11 +142,6 @@ function Showcase({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, 
 function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, storeLinks }) {
   const ar = lang === 'ar';
   const picks = looks.map((l) => ({ label: l.label, p: l.items[l.pick] })).filter((x) => x.p);
-  const ask = (text) => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: text } }));
-  const cheaper = Math.max(500, Math.round((total * 0.75) / 100) * 100);
-  const chips = ar
-    ? [[`أرخص من ${cheaper} ج`, `عدّل اللوك ده بحيث الإجمالي يبقى أقل من ${cheaper} جنيه`], ['غيّر الحذاء', 'غيّر الحذاء في اللوك ده'], ['ألوان أهدى', 'غيّر ألوان اللوك ده لألوان أهدى'], ['ضيف إكسسوار', 'ضيف إكسسوار يناسب اللوك ده']]
-    : [[`Under ${cheaper} EGP`, `Adjust this look so the total is under ${cheaper} EGP`], ['Change shoes', 'Change the shoes in this look'], ['Calmer colours', 'Change this look to calmer colours'], ['Add an accessory', 'Add an accessory that suits this look']];
   return (
     <div className="mt-5">
       <div className="mb-2 flex items-center justify-between gap-3">
@@ -184,10 +179,6 @@ function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare
         <button type="button" onClick={onShare} className="inline-flex h-12 flex-1 items-center justify-center gap-1.5 rounded-2xl border border-line-strong bg-elevated px-4 sm:h-14 sm:flex-none text-[13px] font-bold transition hover:border-fg"><Share2 className="h-4 w-4" />{t('stylist.share')}</button>
       </div>
       {storeLinks && storeLinks.length > 0 && <div className="mt-2 flex flex-wrap gap-2">{storeLinks}</div>}
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="text-[12px] font-semibold text-muted">{ar ? 'اطلب من مودة:' : 'Ask Moda:'}</span>
-        {chips.map(([label, text]) => <button key={label} type="button" onClick={() => ask(text)} className="rounded-full border border-line bg-elevated px-3 py-1.5 text-[12px] font-semibold transition hover:border-brand hover:text-brand">{label}</button>)}
-      </div>
     </div>
   );
 }

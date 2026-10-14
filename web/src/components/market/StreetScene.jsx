@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const cx = (...a) => a.filter(Boolean).join(' ');
 
@@ -494,7 +493,6 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
   const ar = lang === 'ar';
   const ref = useRef(null);
   const drag = useRef(null);
-  const [edge, setEdge] = useState({ start: true, end: false });
   const [moved, setMoved] = useState(false);
   const svgRef = useRef(null);
   const skyRef = useRef(null);
@@ -503,12 +501,9 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
     const el = ref.current; if (!el) return;
     const svg = svgRef.current;
     if (svg) { const t = `translateX(${(0.4 * el.scrollLeft) / (svg.clientHeight / 640 || 1)}px)`; if (skyRef.current) skyRef.current.style.transform = t; if (skyRef2.current) skyRef2.current.style.transform = t; }
-    const max = el.scrollWidth - el.clientWidth; const pos = Math.abs(el.scrollLeft);
-    setEdge({ start: pos < 6, end: pos > max - 6 });
-    if (pos > 40) setMoved(true);
+    if (Math.abs(el.scrollLeft) > 40) setMoved(true);
   };
   useEffect(() => { update(); window.addEventListener('resize', update); return () => window.removeEventListener('resize', update); }, []);
-  const go = (dir) => ref.current?.scrollBy({ left: dir * Math.max(360, ref.current.clientWidth * 0.7), behavior: 'smooth' });
   const onDown = (e) => { if (e.pointerType !== 'mouse') return; drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; };
   const onMove = (e) => { const d = drag.current; if (!d) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 5) d.moved = true; if (d.moved) ref.current.scrollLeft = d.left + dx; };
   const onUp = () => { setTimeout(() => { drag.current = null; }, 0); };
@@ -606,8 +601,6 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
       {/* edge fades + arrows */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 start-0 w-12" style={{ background: 'linear-gradient(to right, rgba(255,245,236,.85), transparent)' }} />
       <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-0 w-12" style={{ background: 'linear-gradient(to left, rgba(255,245,236,.85), transparent)' }} />
-      <button type="button" onClick={() => go(-1)} disabled={edge.end} aria-label={ar ? 'المحلات التالية' : 'Next shops'} className="absolute left-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#14213D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronLeft className="h-5 w-5" /></button>
-      <button type="button" onClick={() => go(1)} disabled={edge.start} aria-label={ar ? 'المحلات السابقة' : 'Previous shops'} className="absolute right-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#14213D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronRight className="h-5 w-5" /></button>
       <p className={cx('pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-brand shadow-md transition-opacity duration-500', moved && 'opacity-0')}>{ar ? `${SHOPS.length} محل في شارع واحد — اسحب وتمشّى` : `${SHOPS.length} shops on one street — drag to walk`}</p>
     </div>
   );
