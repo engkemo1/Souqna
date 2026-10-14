@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const cx = (...a) => a.filter(Boolean).join(' ');
 
@@ -391,6 +392,19 @@ function Cat({ x }) {
   );
 }
 
+/** brand text that stays readable when its vehicle is mirrored */
+function Mark({ x, y, flip, size, fill, children, weight = 800 }) {
+  return <g transform={`translate(${x},${y}) scale(${flip ? -1 : 1},1)`}><text className="font-display" textAnchor="middle" fontSize={size} fontWeight={weight} fill={fill}>{children}</text></g>;
+}
+function Pennant({ x, y, h = 20, color = ORANGE, delay = 0 }) {
+  return (
+    <g>
+      <rect x={x - 0.8} y={y - h} width="1.6" height={h} fill={NAVY} />
+      <g className="st-wave" style={{ animationDelay: `${delay}s` }}><path d={`M${x + 0.8} ${y - h} L${x + 19} ${y - h + 6} L${x + 0.8} ${y - h + 12} Z`} fill={color} /><circle cx={x + 6} cy={y - h + 6} r="2" fill="#FFFFFF" /></g>
+    </g>
+  );
+}
+
 function Tuktuk({ x, flip }) {
   return (
     <g transform={`translate(${x},652) scale(${flip ? -1 : 1},1)`}>
@@ -399,10 +413,32 @@ function Tuktuk({ x, flip }) {
       <path d="M-2 -70 Q36 -84 76 -70 L74 -64 Q36 -76 0 -64 Z" fill={NAVY} />
       <path d="M0 -44 Q2 -60 20 -62 L26 -62 L26 -40 Z" fill="#DCEAF4" stroke={NAVY} strokeWidth="2" />
       <path d="M-4 -14 Q-6 -34 8 -40 L28 -42 L74 -42 Q82 -40 82 -26 L82 -14 Z" fill={ORANGE} />
-      <rect x="30" y="-40" width="40" height="12" rx="3" fill="#FFFFFF" opacity="0.9" />
+      <rect x="30" y="-40" width="40" height="12" rx="3" fill="#FFFFFF" opacity="0.95" />
+      <Mark x={50} y={-30.5} flip={flip} size={10.5} fill={ORANGE}>طلّة</Mark>
+      <path d="M30 -27 H70" stroke={NAVY} strokeWidth="1.2" opacity="0.5" />
+      <Pennant x={5} y={-72} h={22} delay={-0.6} />
       <circle cx="2" cy="-30" r="3.4" fill="#FFE2B8" />
       <circle cx="8" cy="-8" r="9" fill={NAVY} /><circle cx="8" cy="-8" r="3.5" fill="#C9CBD4" />
       <circle cx="68" cy="-8" r="9" fill={NAVY} /><circle cx="68" cy="-8" r="3.5" fill="#C9CBD4" />
+    </g>
+  );
+}
+
+function Van({ x, flip }) {
+  return (
+    <g transform={`translate(${x},652) scale(${flip ? -1 : 1},1)`}>
+      <ellipse cx="14" cy="2" rx="68" ry="5.5" fill={NAVY} opacity="0.15" />
+      <rect x="-20" y="-76" width="92" height="62" rx="5" fill={NAVY} />
+      <rect x="-20" y="-34" width="92" height="8" fill={ORANGE} />
+      <Mark x={26} y={-48} flip={flip} size={25} fill="#FFFFFF">طلّة</Mark>
+      <Mark x={26} y={-38.5} flip={flip} size={7.5} fill="#FFC9A3" weight={700}>توصيل من محلات بنها</Mark>
+      <path d="M-22 -14 L-22 -42 Q-22 -48 -17 -50 L-46 -50 Q-56 -50 -62 -36 L-66 -26 Q-68 -14 -66 -14 Z" fill={ORANGE} />
+      <path d="M-50 -45 L-58 -31 L-26 -31 L-26 -45 Z" fill="#DCEAF4" stroke={NAVY} strokeWidth="1.5" />
+      <rect x="-69" y="-22" width="4" height="6" rx="1.5" fill="#FFE2B8" />
+      <rect x="-72" y="-16" width="96" height="4" rx="2" fill={NAVY} opacity="0.85" />
+      <Pennant x={-38} y={-50} h={22} delay={-1.1} />
+      <circle cx="-46" cy="-8" r="10" fill={NAVY} /><circle cx="-46" cy="-8" r="4" fill="#C9CBD4" />
+      <circle cx="46" cy="-8" r="10" fill={NAVY} /><circle cx="46" cy="-8" r="4" fill="#C9CBD4" />
     </g>
   );
 }
@@ -411,7 +447,7 @@ function Tuktuk({ x, flip }) {
 const VEHICLES = [
   { kind: 'tuk', right: false, dur: 46, phase: 0.1 }, { kind: 'scooter', right: false, dur: 30, phase: 0.55 },
   { kind: 'tuk', right: true, dur: 52, phase: 0.35 }, { kind: 'scooter', right: true, dur: 34, phase: 0.8 },
-  { kind: 'tuk', right: false, dur: 58, phase: 0.7 },
+  { kind: 'tuk', right: false, dur: 58, phase: 0.7 }, { kind: 'van', right: false, dur: 50, phase: 0.3 }, { kind: 'van', right: true, dur: 64, phase: 0.62 },
 ];
 function Drive({ right, dur, phase, children }) {
   const a = -260; const b = W + 160;
@@ -462,7 +498,7 @@ function Scooter({ x, flip }) {
   return (
     <g transform={`translate(${x},650) scale(${flip ? -1 : 1},1)`}>
       <ellipse cx="34" cy="2" rx="40" ry="4.5" fill={NAVY} opacity="0.14" />
-      <rect x="-6" y="-58" width="34" height="26" rx="4" fill={ORANGE} /><path d="M2 -45 H20" stroke="#FFFFFF" strokeWidth="3" strokeLinecap="round" /><path d="M2 -38 H14" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" opacity="0.8" />
+      <rect x="-6" y="-58" width="34" height="26" rx="4" fill={ORANGE} /><Mark x={11} y={-40.5} flip={flip} size={12} fill="#FFFFFF">طلّة</Mark><path d="M-1 -35 H23" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.7" /><Pennant x={-2} y={-58} h={18} color={NAVY} />
       <path d="M26 -34 L40 -34 L52 -24 L60 -24 L62 -14 L12 -14 L16 -34 Z" fill={NAVY} />
       <path d="M52 -24 L50 -48 L60 -48" stroke={NAVY} strokeWidth="3" fill="none" strokeLinecap="round" /><circle cx="42" cy="-40" r="5" fill={SKIN} /><path d="M37 -38 Q42 -48 47 -38 Z" fill={ORANGE} />
       <circle cx="12" cy="-8" r="9" fill={NAVY} /><circle cx="12" cy="-8" r="3.5" fill="#C9CBD4" /><circle cx="58" cy="-8" r="9" fill={NAVY} /><circle cx="58" cy="-8" r="3.5" fill="#C9CBD4" />
@@ -493,6 +529,7 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
   const ar = lang === 'ar';
   const ref = useRef(null);
   const drag = useRef(null);
+  const [edge, setEdge] = useState({ start: true, end: false });
   const [moved, setMoved] = useState(false);
   const svgRef = useRef(null);
   const skyRef = useRef(null);
@@ -501,9 +538,12 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
     const el = ref.current; if (!el) return;
     const svg = svgRef.current;
     if (svg) { const t = `translateX(${(0.4 * el.scrollLeft) / (svg.clientHeight / 640 || 1)}px)`; if (skyRef.current) skyRef.current.style.transform = t; if (skyRef2.current) skyRef2.current.style.transform = t; }
-    if (Math.abs(el.scrollLeft) > 40) setMoved(true);
+    const max = el.scrollWidth - el.clientWidth; const pos = Math.abs(el.scrollLeft);
+    setEdge({ start: pos < 6, end: pos > max - 6 });
+    if (pos > 40) setMoved(true);
   };
   useEffect(() => { update(); window.addEventListener('resize', update); return () => window.removeEventListener('resize', update); }, []);
+  const go = (dir) => ref.current?.scrollBy({ left: dir * Math.max(360, ref.current.clientWidth * 0.7), behavior: 'smooth' });
   const onDown = (e) => { if (e.pointerType !== 'mouse') return; drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; };
   const onMove = (e) => { const d = drag.current; if (!d) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 5) d.moved = true; if (d.moved) ref.current.scrollLeft = d.left + dx; };
   const onUp = () => { setTimeout(() => { drag.current = null; }, 0); };
@@ -518,7 +558,8 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
     <div className={cx('relative', className)}>
       <div
         ref={ref} dir="rtl" onScroll={update} onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerLeave={onUp} onClickCapture={onClickCapture}
-        className="scrollbar-none cursor-grab overflow-x-auto overscroll-x-contain active:cursor-grabbing"
+        className="no-scrollbar scrollbar-none cursor-grab overflow-x-auto overscroll-x-contain active:cursor-grabbing"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         <svg ref={svgRef} viewBox={`0 30 ${W} 640`} role="img" aria-label={ar ? 'شارع محلات الملابس في بنها' : 'A street of clothing shops in Banha'} style={{ aspectRatio: `${W} / 640` }} className="block h-[360px] w-auto max-w-none select-none sm:h-[440px] lg:h-[540px]">
           <style>{`
@@ -594,13 +635,15 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
           <g className="st-bob"><path d={`M${SHOPS[2].x + 94} 482 Q${SHOPS[2].x + 98} 500 ${SHOPS[2].x + 88} 520`} stroke="#9AA3B2" strokeWidth="1" fill="none" /><ellipse cx={SHOPS[2].x + 94} cy="472" rx="9" ry="11" fill={ORANGE} /></g>
           </g>
 
-          {VEHICLES.map((v, i) => <Drive key={i} {...v}>{v.kind === 'tuk' ? <Tuktuk x={0} flip={v.right} /> : <Scooter x={0} flip={!v.right} />}</Drive>)}
+          {VEHICLES.map((v, i) => <Drive key={i} {...v}>{v.kind === 'tuk' ? <Tuktuk x={0} flip={v.right} /> : v.kind === 'van' ? <Van x={0} flip={v.right} /> : <Scooter x={0} flip={!v.right} />}</Drive>)}
         </svg>
       </div>
 
       {/* edge fades + arrows */}
       <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 start-0 w-12" style={{ background: 'linear-gradient(to right, rgba(255,245,236,.85), transparent)' }} />
       <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-0 w-12" style={{ background: 'linear-gradient(to left, rgba(255,245,236,.85), transparent)' }} />
+      <button type="button" onClick={() => go(-1)} disabled={edge.end} aria-label={ar ? 'المحلات التالية' : 'Next shops'} className="absolute left-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#14213D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronLeft className="h-5 w-5" /></button>
+      <button type="button" onClick={() => go(1)} disabled={edge.start} aria-label={ar ? 'المحلات السابقة' : 'Previous shops'} className="absolute right-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#14213D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronRight className="h-5 w-5" /></button>
       <p className={cx('pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-brand shadow-md transition-opacity duration-500', moved && 'opacity-0')}>{ar ? `${SHOPS.length} محل في شارع واحد — اسحب واتمشّى` : `${SHOPS.length} shops on one street — drag to walk`}</p>
     </div>
   );
