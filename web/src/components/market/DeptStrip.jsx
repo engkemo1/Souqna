@@ -1,54 +1,13 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Sparkles } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
+import SmartImage from '../ui/SmartImage.jsx';
 
 export const DEPT_EMOJI = {
   women: '👗', men: '👔', kids: '🧒', shoes: '👟', bags: '👜', hijab: '🧕', abaya: '🥻', jalabiya: '👘',
   underwear: '🩲', wedding_dress: '👰', wedding_suit: '🤵', sports: '🏃', denim: '👖', accessories: '💍',
   perfume_makeup: '💄', care: '✨',
-};
-
-/** Curated high-resolution studio & flat-lay photography for fashion departments */
-const UNSPLASH = {
-  women: 'photo-1490481651871-ab68de25d43d',         // Luxury chic beige outfit flat-lay
-  men: 'photo-1489987707025-afc232f7ea0f',           // Crisp folded linen shirt & trousers flat-lay
-  kids: 'photo-1622290291468-a28f7a7dc6a8',          // Clean pastel baby & kids clothing flat-lay
-  shoes: 'photo-1549298916-b41d501d3772',          // Iconic clean sneakers floating studio shot
-  bags: 'photo-1584917865442-de89df76afd3',           // Premium leather handbag on soft studio backdrop
-  hijab: 'photo-1576995853123-5a10305d93c0',          // Modest elegant hijab & scarf portrait
-  abaya: 'photo-1584273143981-41c073dfe8f8',          // Luxury modern abaya & modest fashion
-  jalabiya: 'photo-1598033129183-c4f50c736f10',       // Crisp tailored modern thobe / jalabiya
-  underwear: 'photo-1608256246200-53e635b5b65f',      // Aesthetic comfy loungewear & sleepwear flat-lay
-  wedding_dress: 'photo-1519741497674-611481863552',  // Stunning haute couture bridal wedding gown
-  wedding_suit: 'photo-1594938298603-c8148c4dae35',   // Sharp luxury tailored tuxedo & bowtie
-  sports: 'photo-1517838277536-f5f99be501cd',         // Modern active sportswear & gym outfit
-  denim: 'photo-1541099649105-f69ad21f3246',          // Stack of premium classic denim jeans
-  accessories: 'photo-1523275335684-37898b6baf30',    // Minimalist luxury watch & fashion accessories
-  perfume_makeup: 'photo-1522335789203-aabd1fc54bc9', // Luxury perfume bottle & designer cosmetics
-  care: 'photo-1556228720-195a672e8a03',           // Premium organic skincare & beauty essentials
-};
-
-const unsplash = (slug) => (UNSPLASH[slug] ? `https://images.unsplash.com/${UNSPLASH[slug]}?auto=format&fit=crop&w=480&h=480&q=80` : null);
-
-/** Department specific soft studio stage color palettes (Amazon & Editorial style) */
-const DEPT_STYLES = {
-  women: { stage: 'bg-[#FDF2F4] border-pink-100', badge: 'bg-rose-50 text-rose-700' },
-  men: { stage: 'bg-[#F7F4EE] border-amber-100/70', badge: 'bg-stone-100 text-stone-700' },
-  kids: { stage: 'bg-[#F0FDF8] border-teal-100', badge: 'bg-teal-50 text-teal-700' },
-  shoes: { stage: 'bg-[#FFF7ED] border-orange-100', badge: 'bg-orange-50 text-orange-700' },
-  bags: { stage: 'bg-[#FAF5F0] border-amber-100', badge: 'bg-amber-50 text-amber-800' },
-  hijab: { stage: 'bg-[#FDF4FF] border-purple-100', badge: 'bg-purple-50 text-purple-700' },
-  abaya: { stage: 'bg-[#F8FAFC] border-slate-200/80', badge: 'bg-slate-100 text-slate-800' },
-  jalabiya: { stage: 'bg-[#FAF8F5] border-stone-200/80', badge: 'bg-stone-100 text-stone-800' },
-  underwear: { stage: 'bg-[#FDF2F8] border-pink-100', badge: 'bg-pink-50 text-pink-700' },
-  wedding_dress: { stage: 'bg-[#FFFDF7] border-amber-100', badge: 'bg-amber-50 text-amber-800' },
-  wedding_suit: { stage: 'bg-[#F3F4F6] border-slate-200', badge: 'bg-slate-100 text-slate-800' },
-  sports: { stage: 'bg-[#EFF6FF] border-blue-100', badge: 'bg-blue-50 text-blue-700' },
-  denim: { stage: 'bg-[#F0F7FF] border-sky-100', badge: 'bg-sky-50 text-sky-800' },
-  accessories: { stage: 'bg-[#F9F7F5] border-stone-200/70', badge: 'bg-stone-100 text-stone-800' },
-  perfume_makeup: { stage: 'bg-[#FFF1F2] border-rose-100', badge: 'bg-rose-50 text-rose-700' },
-  care: { stage: 'bg-[#F0FDF4] border-emerald-100', badge: 'bg-emerald-50 text-emerald-800' },
 };
 
 export const DEFAULT_DEPTS = [
@@ -70,108 +29,158 @@ export const DEFAULT_DEPTS = [
   { slug: 'care', name: { ar: 'عنايات', en: 'Care' } },
 ];
 
-/** Department Photo Card */
-function DeptCard({ dept, lang, fmt }) {
-  const [imgFailed, setImgFailed] = useState(false);
-  const src = !imgFailed ? (dept.image || unsplash(dept.slug)) : null;
-  const style = DEPT_STYLES[dept.slug] || { stage: 'bg-[#F9FAFB] border-gray-100', badge: 'bg-gray-100 text-gray-700' };
-  const deptName = dept.name?.[lang] || dept.name?.ar || dept.slug;
+/** صور افتراضية للأقسام (لو الأدمن ما رفعش صورة). بتتغير من لوحة الإدارة > الأقسام. */
+const DEFAULT_IMG = {
+  women: 'photo-1485230895905-ec40ba36b9bc', men: 'photo-1617137984095-74e4e5e3613f', kids: 'photo-1519238263530-99bdd11df2ea',
+  shoes: 'photo-1560769629-975ec94e6a86', bags: 'photo-1590874103328-eac38a683ce7', hijab: 'photo-1609357605129-26f69add5d6e',
+  abaya: 'photo-1583391733956-6c78276477e2', jalabiya: 'photo-1509631179647-0177331693ae', underwear: 'photo-1588850561407-ed78c282e89b',
+  wedding_dress: 'photo-1594552072238-b8a33785b261', wedding_suit: 'photo-1593032465175-481ac7f401a0', sports: 'photo-1518310383802-640c2de311b2',
+  denim: 'photo-1541099649105-f69ad21f3246', accessories: 'photo-1535632066927-ab7c9ab60908', perfume_makeup: 'photo-1522337360788-8b13dee7a37e',
+  care: 'photo-1556228720-195a672e8a03',
+};
+const defaultImg = (slug) => (DEFAULT_IMG[slug] ? `https://images.unsplash.com/${DEFAULT_IMG[slug]}?q=80&w=800&auto=format&fit=crop` : null);
 
+/** لون هوية لكل قسم (باستيل واضح مش باهت) + اسم اللون + لون النص الثانوي. */
+const STAGE = {
+  women: ['#F7D9DE', '#A5495E', 'وردي'], men: ['#EEDFCB', '#7D6446', 'رملي'], kids: ['#D6EEDD', '#3F8A5E', 'نعناعي'], shoes: ['#FBE2A6', '#9A6410', 'كهرماني'],
+  bags: ['#F2D9C4', '#8A5A33', 'جملي'], hijab: ['#E6DDF3', '#6B4F97', 'لافندر'], abaya: ['#DDE1E8', '#464F5E', 'رمادي هادي'], jalabiya: ['#EBE3D3', '#7A6747', 'كريمي'],
+  underwear: ['#F8DCEA', '#A44A77', 'روز'], wedding_dress: ['#F6EAD0', '#8F6F2E', 'شامبانيا'], wedding_suit: ['#D9DFE8', '#3D4C60', 'رمادي أزرق'],
+  sports: ['#D4E5F7', '#2F6AA6', 'أزرق سما'], denim: ['#D2E1F0', '#32608C', 'دنيم'], accessories: ['#EADFD6', '#7A5F4B', 'بيج دافي'],
+  perfume_makeup: ['#F7D8D8', '#9A4A50', 'بودرة'], care: ['#D5EBDD', '#3E7F58', 'أخضر هادي'],
+};
+const FALLBACK_STAGE = ['#ECEEF1', '#5B6470', ''];
+
+/** تبويبات سريعة: العميل يختصر الطريق لقسمه من غير ما يدوّر. */
+const GROUPS = [
+  { id: 'all', ar: 'كل الأقسام', en: 'All' },
+  { id: 'her', ar: 'ليها', en: 'Her', slugs: ['women', 'hijab', 'abaya', 'wedding_dress', 'underwear', 'perfume_makeup'] },
+  { id: 'him', ar: 'ليه', en: 'Him', slugs: ['men', 'jalabiya', 'wedding_suit', 'sports', 'denim'] },
+  { id: 'kids', ar: 'للأطفال', en: 'Kids', slugs: ['kids'] },
+  { id: 'extras', ar: 'كوتشيات وشنط وإكسسوار', en: 'Shoes & more', slugs: ['shoes', 'bags', 'accessories', 'care'] },
+];
+
+/* ---------- لون الكارت من المنتج نفسه ---------- */
+const hexToRgb = (h) => { const m = /^#?([0-9a-f]{6})$/i.exec(h || ''); if (!m) return null; const n = parseInt(m[1], 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+const toHex = (c) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('')}`;
+const mixWhite = (rgb, k) => rgb.map((v) => v + (255 - v) * k);
+const sat = ([r, g, b]) => { const mx = Math.max(r, g, b); const mn = Math.min(r, g, b); return mx === 0 ? 0 : (mx - mn) / mx; };
+/** باستيل مشتق من اللون الغالب في صورة القسم؛ لو الصورة أبيض/رمادي (مفيش لون) بنرجع للون القسم الثابت. */
+function pastelOf(color) {
+  const rgb = hexToRgb(color);
+  if (!rgb || sat(rgb) < 0.14 || Math.min(...rgb) > 225) return null;
+  return toHex(mixWhite(rgb, 0.72));
+}
+const tintCache = new Map();
+/** للصور اللي الأدمن رفعها (URL): بنقرا لونها الغالب مرة واحدة من نفس الموقع. */
+function useImageTint(url) {
+  const [tint, setTint] = useState(() => (url ? tintCache.get(url) : null) || null);
+  useEffect(() => {
+    if (!url || tintCache.has(url)) { if (url) setTint(tintCache.get(url)); return undefined; }
+    let dead = false; const img = new Image(); img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas'); c.width = 16; c.height = 16; const x = c.getContext('2d', { willReadFrequently: true });
+        x.drawImage(img, 0, 0, 16, 16); const d = x.getImageData(0, 0, 16, 16).data; let r = 0; let g = 0; let b = 0; let n = 0;
+        for (let k = 0; k < d.length; k += 4) { const px = [d[k], d[k + 1], d[k + 2]]; if (sat(px) < 0.18 || Math.min(...px) > 235) continue; r += px[0]; g += px[1]; b += px[2]; n += 1; }
+        const v = n > 8 ? pastelOf(toHex([r / n, g / n, b / n])) : null; tintCache.set(url, v); if (!dead) setTint(v);
+      } catch { tintCache.set(url, null); }
+    };
+    img.onerror = () => tintCache.set(url, null);
+    img.src = url;
+    return () => { dead = true; };
+  }, [url]);
+  return tint;
+}
+
+function DeptCard({ dept, lang, fmt, priority }) {
+  const [step, setStep] = useState(0); // 0: صورة الأدمن/الافتراضية  1: صورة منتج حقيقي  2: إيموجي
+  const [fallbackBg, accent, colorName] = STAGE[dept.slug] || FALLBACK_STAGE;
+  const url = dept.image || defaultImg(dept.slug);
+  const imgTint = useImageTint(dept.image); // صورة الأدمن: لون الكارت من لونها الغالب
+  const bg = (dept.image && imgTint) || fallbackBg;
+  const name = dept.name?.[lang] || dept.name?.ar || dept.slug;
+  const mode = step === 0 && url ? 'url' : step <= 1 && dept.cover ? 'cover' : 'emoji';
   return (
-    <Link
-      to={`/search?department=${dept.slug}`}
-      className="group relative flex flex-col items-center"
-    >
-      {/* Studio Stage Canvas */}
+    <Link to={`/search?department=${dept.slug}`} className="group block focus:outline-none" aria-label={name}>
       <div
-        className={`relative aspect-[4/5] w-full overflow-hidden rounded-2xl border ${style.stage} p-2.5 sm:p-3 shadow-[0_3px_12px_rgba(20,33,61,0.03)] transition-all duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-[0_12px_28px_rgba(20,33,61,0.1)] group-hover:border-brand/40`}
+        className="relative flex aspect-[4/5] flex-col overflow-hidden rounded-[26px] ring-1 ring-black/5 shadow-[0_6px_18px_-10px_rgba(20,33,61,.25)] transition duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-[0_20px_34px_-16px_rgba(20,33,61,.4)] group-focus-visible:ring-2 group-focus-visible:ring-brand"
+        style={{ backgroundColor: bg }}
       >
-        <div className="relative h-full w-full overflow-hidden rounded-xl">
-          {src ? (
-            <img
-              src={src}
-              alt={deptName}
-              loading="lazy"
-              onError={() => setImgFailed(true)}
-              className="h-full w-full object-cover object-center transition-transform duration-500 ease-out group-hover:scale-110"
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-4xl">
-              {DEPT_EMOJI[dept.slug] || '🛍️'}
-            </div>
+        <div className="relative min-h-0 flex-1 overflow-hidden">
+          {mode === 'url' && (
+            <img src={url} alt="" loading={priority ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer" onError={() => setStep(1)} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
           )}
-          {/* Subtle soft gradient scrim for depth */}
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+          {mode === 'cover' && (
+            <SmartImage media={dept.cover} alt="" className="h-full w-full transition-transform duration-500 group-hover:scale-105" sizes="(min-width:1024px) 16vw, (min-width:640px) 25vw, 46vw" />
+          )}
+          {mode === 'emoji' && <div className="grid h-full w-full place-items-center text-6xl" aria-hidden="true">{DEPT_EMOJI[dept.slug] || '🛍️'}</div>}
+          {/* الصورة بتذوب في لون الكارت */}
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-2/5" style={{ background: `linear-gradient(to top, ${bg}, ${bg}00)` }} />
         </div>
-
-        {/* Product count tag */}
-        {dept.products > 0 && (
-          <span
-            className={`absolute end-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide shadow-xs backdrop-blur-xs transition-transform group-hover:scale-105 ${style.badge}`}
-          >
-            {fmt(dept.products)}
-          </span>
-        )}
-      </div>
-
-      {/* Typography Label */}
-      <div className="mt-2.5 w-full px-1 text-center">
-        <span className="block truncate text-xs font-black tracking-tight text-[#14213D] transition-colors duration-200 group-hover:text-brand sm:text-sm">
-          {deptName}
-        </span>
-        {dept.products > 0 && (
-          <span className="mt-0.5 block text-[11px] font-medium text-gray-500 group-hover:text-brand/80">
-            {fmt(dept.products)} {lang === 'ar' ? 'منتج' : 'items'}
-          </span>
-        )}
+        <div className="relative px-3.5 pb-3.5 pt-0.5">
+          <div className="flex items-end justify-between gap-2">
+            <p className="min-w-0 truncate text-lg font-black leading-tight text-fg sm:text-xl">{name}</p>
+            {dept.products > 0 && (
+              <span className="shrink-0 rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-extrabold tabular-nums shadow-sm" style={{ color: accent }}>
+                {fmt(dept.products)} {lang === 'ar' ? 'منتج' : 'items'}
+              </span>
+            )}
+          </div>
+          {lang === 'ar' && colorName && <p className="mt-0.5 text-[10.5px] font-bold tracking-wide" style={{ color: accent, opacity: 0.8 }}>{colorName}</p>}
+        </div>
       </div>
     </Link>
   );
 }
 
-/** Show every department together with rich Amazon-grade visual presentation */
 export default function DeptStrip({ departments = [] }) {
   const { t, lang } = useI18n();
-  const list = departments.length > 0 ? departments : DEFAULT_DEPTS;
-  const totalProducts = list.reduce((sum, d) => sum + (d.products || 0), 0);
+  const [group, setGroup] = useState('all');
   const fmt = (n) => new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US').format(n);
+
+  // الأقسام الفاضية طريق مسدود للعميل، فنخبيها (لو كل الأقسام فاضية نعرضها كلها)
+  const list = useMemo(() => {
+    const all = departments.length ? departments : DEFAULT_DEPTS;
+    const live = all.filter((d) => (d.products || 0) > 0);
+    return live.length ? live : all;
+  }, [departments]);
+  const totalProducts = list.reduce((s, d) => s + (d.products || 0), 0);
+  const tabs = GROUPS.filter((g) => g.id === 'all' || list.some((d) => g.slugs.includes(d.slug)));
+  const active = tabs.find((g) => g.id === group) || tabs[0];
+  const shown = active.id === 'all' ? list : list.filter((d) => active.slugs.includes(d.slug));
 
   return (
     <section aria-label={t('market.shopByDept')} className="container mt-6">
-      {/* Header with Title and View All */}
-      <div className="mb-5 flex items-end justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="font-display text-2xl font-black text-gray-900 sm:text-3xl">
-              {t('market.shopByDept')}
-            </h2>
-            <span className="hidden items-center gap-1 rounded-full bg-orange-50 px-2.5 py-0.5 text-xs font-bold text-brand sm:inline-flex">
-              <Sparkles className="h-3.5 w-3.5" />
-              {lang === 'ar' ? 'تشكيلة مميزة' : 'Curated'}
-            </span>
-          </div>
+      <div className="mb-4 flex items-end justify-between gap-3">
+        <div className="min-w-0">
+          <h2 className="font-display text-2xl font-black text-fg sm:text-3xl">{t('market.shopByDept')}</h2>
           {totalProducts > 0 && (
-            <p className="mt-1 text-xs font-medium text-gray-500 sm:text-sm">
-              {lang === 'ar'
-                ? `اكتشف أكثر من ${fmt(totalProducts)} منتج متوفر في ${fmt(list.length)} قسم مختلف`
-                : `Browse over ${fmt(totalProducts)} items across ${fmt(list.length)} departments`}
+            <p className="mt-1 text-xs font-medium text-muted sm:text-sm">
+              {lang === 'ar' ? `${fmt(totalProducts)} منتج متوفر في ${fmt(list.length)} قسم` : `${fmt(totalProducts)} items across ${fmt(list.length)} departments`}
             </p>
           )}
         </div>
-        <Link
-          to="/search"
-          className="group inline-flex items-center gap-1.5 rounded-full border border-orange-200/70 bg-orange-50/50 px-4 py-2 text-xs font-bold text-[#ea580c] transition hover:border-[#ea580c] hover:bg-[#ea580c] hover:text-white sm:text-sm"
-        >
-          <span>{lang === 'ar' ? 'تصفح كل الأقسام' : 'View all'}</span>
-          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 rtl:rotate-180 rtl:group-hover:-translate-x-0.5" />
+        <Link to="/search" className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-4 py-2 text-xs font-bold transition hover:border-brand hover:text-brand sm:text-sm">
+          <span>{t('market.seeAll')}</span>
+          <ArrowRight className="h-4 w-4 rtl:rotate-180" />
         </Link>
       </div>
 
-      {/* Grid: 3 cols on mobile, 4 on sm, 6 on md, 7 or 8 on lg */}
-      <div className="grid grid-cols-3 gap-3 pb-2 pt-1 sm:grid-cols-4 sm:gap-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8">
-        {list.map((d) => (
-          <DeptCard key={d.slug} dept={d} lang={lang} fmt={fmt} />
-        ))}
+      {tabs.length > 2 && (
+        <div role="tablist" aria-label={t('market.shopByDept')} className="scroll-x -mx-4 mb-4 gap-2 px-4">
+          {tabs.map((g) => (
+            <button
+              key={g.id} type="button" role="tab" aria-selected={g.id === active.id} onClick={() => setGroup(g.id)}
+              className={`shrink-0 snap-start rounded-full border px-4 py-2 text-[13px] font-bold transition ${g.id === active.id ? 'border-fg bg-fg text-white' : 'border-line-strong bg-elevated text-fg hover:border-fg'}`}
+            >
+              {lang === 'ar' ? g.ar : g.en}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6">
+        {shown.map((d, i) => <DeptCard key={d.slug} dept={d} lang={lang} fmt={fmt} priority={i < 4} />)}
       </div>
     </section>
   );
