@@ -15,6 +15,8 @@ import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled, setDemandForOwners } from '../lib/visual-demand.js';
 import { testProvider, stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
+import { llmChain } from '../lib/stylist.js';
+import { adminModaPrompts, saveModaPrompts, resetModaPrompts, suggestPrompts } from '../lib/modaPrompts.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage } from '../lib/deptImage.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
@@ -406,23 +408,39 @@ r.post('/stylist/feedback/:id/lesson', h((req, res) => {
 }));
 
 /* ---- look of the day: AI-picked, manually curated, or hidden ---- */
+// صور اللوك بتترفع على /look-of-day/ (saveLookOfDayImage) والقديمة على /homepage-ads/، الاتنين مقبولين.
+const lookImageOk = (value) => !value || /\/(look-of-day|homepage-ads)\//.test(value);
 const lookPieceSchema = z.object({ label: z.string().trim().min(1).max(50), productId: z.coerce.number().int().positive() });
 const lookOutfitSchema = z.object({
   audience: z.enum(['women', 'men', 'kids']),
   age: z.string().trim().max(40).optional().default(''),
   say: z.string().max(700).optional().default(''),
   tips: z.string().max(300).optional().default(''),
-  coverImage: z.string().trim().max(500).optional().default('').refine((value) => !value || value.includes('/homepage-ads/'), 'Invalid look image.'),
-  images: z.array(z.string().trim().max(500).refine((value) => !value || value.includes('/homepage-ads/'), 'Invalid look image.')).max(6).optional().default([]),
+  coverImage: z.string().trim().max(500).optional().default('').refine(lookImageOk, 'Invalid look image.'),
+  images: z.array(z.string().trim().max(500).refine(lookImageOk, 'Invalid look image.')).max(6).optional().default([]),
   occasion: z.string().trim().min(2).max(80),
   pieces: z.array(lookPieceSchema).min(2).max(8),
 });
 const manualLookSchema = z.object({
   showOthers: z.boolean().optional().default(false),
   outfits: z.array(lookOutfitSchema).max(12).default([]),
-  coverImage: z.string().trim().max(500).optional().default('').refine((value) => !value || value.includes('/homepage-ads/'), 'Invalid look image.'), title: z.string().trim().max(100).optional().default(''),
+  coverImage: z.string().trim().max(500).optional().default('').refine(lookImageOk, 'Invalid look image.'), title: z.string().trim().max(100).optional().default(''),
   description: z.string().trim().max(240).optional().default(''), badge: z.string().trim().max(40).optional().default(''),
 });
+/* ---- اقتراحات مودة الجاهزة: الأزرار السريعة + الرسائل المثال ---- */
+const promptsSchema = z.object({
+  hero: z.array(z.object({ ar: z.string().max(60), en: z.string().max(80).optional().default(''), askAr: z.string().max(300), askEn: z.string().max(300).optional().default('') })).max(8),
+  chips: z.array(z.object({ ar: z.string().max(300), en: z.string().max(300).optional().default('') })).max(6),
+});
+r.get('/moda-prompts', h((_req, res) => res.json(adminModaPrompts())));
+r.put('/moda-prompts', h((req, res) => res.json(saveModaPrompts(promptsSchema.parse(req.body)))));
+r.delete('/moda-prompts', h((_req, res) => res.json(resetModaPrompts())));
+r.post('/moda-prompts/ai-suggest', h(async (_req, res) => {
+  const call = llmChain();
+  if (!call) throw new AppError(503, 'stylist_unavailable', 'الذكاء الاصطناعي مش متاح دلوقتي.');
+  try { res.json(await suggestPrompts(call)); }
+  catch { throw new AppError(502, 'ai_failed', 'الذكاء الاصطناعي ماطلعش اقتراحات سليمة. جرّب تاني.'); }
+}));
 r.get('/look-of-day', h((_req, res) => res.json(lookOfDayAdminSettings())));
 r.get('/look-of-day/products', h((req, res) => res.json({ items: searchLookOfDayProducts(req.query.q) })));
 r.post('/look-of-day/ai-proposal', h(async (_req, res) => {

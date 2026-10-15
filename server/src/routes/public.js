@@ -17,6 +17,7 @@ import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError }
 import { logVisualSearch } from '../lib/visual-demand.js';
 import { runStylist, modaBrain, modaCurator, modaUnderstander, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
 import { runModa } from '../lib/moda/engine.js';
+import { getModaPrompts } from '../lib/modaPrompts.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
 import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
@@ -300,6 +301,8 @@ function modaClientResponse(result) {
     weatherSource: result.weatherSource || null,
   };
 }
+
+r.get('/stylist/prompts', h((_req, res) => { res.set('Cache-Control', 'public, max-age=60'); res.json(getModaPrompts()); }));
 
 r.post('/stylist', h(async (req, res) => {
   const st = stylistSettings();

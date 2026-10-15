@@ -618,6 +618,80 @@ function LookOfDayPanel() {
   );
 }
 
+/* اقتراحات مودة الجاهزة: الأزرار السريعة في الرئيسية + الرسائل المثال في أول الشات. بتتعدّل من هنا أو المساعد الذكي يقترحها. */
+const stripFlag = ({ understood, ...rest }) => rest;
+function ModaPromptsPanel() {
+  const toast = useToast();
+  const { data, reload } = useAdminApi('/moda-prompts');
+  const [f, setF] = useState(null);
+  const [busy, setBusy] = useState('');
+  if (data && !f) setF({ hero: data.hero.map(stripFlag), chips: data.chips.map(stripFlag) });
+  if (!data || !f) return <Panel title="الاقتراحات الجاهزة"><Skeleton className="h-40 w-full" /></Panel>;
+  const dirty = JSON.stringify(f) !== JSON.stringify({ hero: data.hero.map(stripFlag), chips: data.chips.map(stripFlag) });
+  const run = async (key, fn, okTitle) => {
+    setBusy(key);
+    try { await fn(); if (okTitle) toast({ title: okTitle }); } catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy('');
+  };
+  const save = () => run('save', async () => { await adminApi('/moda-prompts', { method: 'PUT', body: f }); setF(null); reload(); }, 'اتحفظت الاقتراحات');
+  const reset = () => run('reset', async () => { await adminApi('/moda-prompts', { method: 'DELETE' }); setF(null); reload(); }, 'رجعت الاقتراحات الافتراضية');
+  const suggest = () => run('ai', async () => {
+    const next = await adminApi('/moda-prompts/ai-suggest', { method: 'POST', body: {} });
+    setF({ hero: (next.hero || []).slice(0, data.limits.hero), chips: (next.chips || []).slice(0, data.limits.chips) });
+  }, 'المساعد اقترح قايمة جديدة. راجعها وبعدين اضغط حفظ');
+  const setHero = (i, patch) => setF((c) => ({ ...c, hero: c.hero.map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
+  const setChip = (i, patch) => setF((c) => ({ ...c, chips: c.chips.map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
+  const warn = (flag) => !dirty && flag === false && <p className="mt-1 text-xs text-sale">مودة مش هتفهم الرسالة دي (مفيش فيها مناسبة أو قطعة واضحة). عدّلها.</p>;
+  return (
+    <Panel title="الاقتراحات الجاهزة" subtitle="الأزرار السريعة في الصفحة الرئيسية والرسائل المثال اللي بتظهر في أول الشات" className="lg:col-span-2">
+      <div className="space-y-6">
+        <section className="space-y-3">
+          <div>
+            <p className="font-semibold">الأزرار السريعة (الصفحة الرئيسية)</p>
+            <p className="text-xs text-muted">الزرار له اسم قصير، والرسالة هي اللي بتتبعت لمودة لما الزبون يدوس عليه. اذكر فيها مناسبة أو قطعة واضحة (فرح، جامعة، شغل، كوتشي...).</p>
+          </div>
+          {f.hero.map((p, i) => (
+            <div key={i} className="space-y-2 rounded-xl border border-line bg-elevated p-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="block"><span className="mb-1 block text-xs font-medium text-muted">اسم الزرار (عربي)</span><Input value={p.ar} maxLength={40} onChange={(e) => setHero(i, { ar: e.target.value })} /></label>
+                <label className="block"><span className="mb-1 block text-xs font-medium text-muted">اسم الزرار (إنجليزي)</span><Input dir="ltr" value={p.en} maxLength={60} onChange={(e) => setHero(i, { en: e.target.value })} className="text-start" /></label>
+                <label className="block"><span className="mb-1 block text-xs font-medium text-muted">الرسالة اللي تتبعت (عربي)</span><Input value={p.askAr} maxLength={250} onChange={(e) => setHero(i, { askAr: e.target.value })} /></label>
+                <label className="block"><span className="mb-1 block text-xs font-medium text-muted">الرسالة (إنجليزي)</span><Input dir="ltr" value={p.askEn} maxLength={250} onChange={(e) => setHero(i, { askEn: e.target.value })} className="text-start" /></label>
+              </div>
+              {warn(data.hero[i]?.understood)}
+              <button type="button" aria-label="حذف الزرار" onClick={() => setF((c) => ({ ...c, hero: c.hero.filter((_, k) => k !== i) }))} className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-sale"><Trash2 className="h-3.5 w-3.5" />حذف</button>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" icon={Plus} disabled={f.hero.length >= data.limits.hero} onClick={() => setF((c) => ({ ...c, hero: [...c.hero, { ar: '', en: '', askAr: '', askEn: '' }] }))}>إضافة زرار</Button>
+        </section>
+        <section className="space-y-3">
+          <div>
+            <p className="font-semibold">الرسائل المثال (أول الشات)</p>
+            <p className="text-xs text-muted">جمل كاملة زي اللي الزبون هيكتبها: لمين، المناسبة، قطعة عنده، أو ميزانية.</p>
+          </div>
+          {f.chips.map((c, i) => (
+            <div key={i} className="space-y-2 rounded-xl border border-line bg-elevated p-3">
+              <div className="grid gap-2 sm:grid-cols-2">
+                <label className="block"><span className="mb-1 block text-xs font-medium text-muted">الرسالة (عربي)</span><Input value={c.ar} maxLength={250} onChange={(e) => setChip(i, { ar: e.target.value })} /></label>
+                <label className="block"><span className="mb-1 block text-xs font-medium text-muted">الرسالة (إنجليزي)</span><Input dir="ltr" value={c.en} maxLength={250} onChange={(e) => setChip(i, { en: e.target.value })} className="text-start" /></label>
+              </div>
+              {warn(data.chips[i]?.understood)}
+              <button type="button" aria-label="حذف الرسالة" onClick={() => setF((x) => ({ ...x, chips: x.chips.filter((_, k) => k !== i) }))} className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-sale"><Trash2 className="h-3.5 w-3.5" />حذف</button>
+            </div>
+          ))}
+          <Button size="sm" variant="outline" icon={Plus} disabled={f.chips.length >= data.limits.chips} onClick={() => setF((x) => ({ ...x, chips: [...x.chips, { ar: '', en: '' }] }))}>إضافة رسالة</Button>
+        </section>
+        <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
+          <Button onClick={save} loading={busy === 'save'} disabled={!dirty || !!busy}>حفظ الاقتراحات</Button>
+          <Button variant="outline" icon={Sparkles} onClick={suggest} loading={busy === 'ai'} disabled={!!busy}>اقتراح بالمساعد الذكي</Button>
+          {data.custom && <Button variant="outline" onClick={reset} loading={busy === 'reset'} disabled={!!busy}>رجّع الافتراضي</Button>}
+          {dirty && <span className="text-[13px] text-muted">في تغييرات لسه ما اتحفظتش</span>}
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 function BackupPanel({ data, reload }) {
   const toast = useToast();
   const [busy, setBusy] = useState('');
@@ -765,6 +839,7 @@ export default function System() {
           {section === 'visual' && <VisualPanel />}
           {section === 'moda' && <>
           <StylistPanel />
+          <ModaPromptsPanel />
           <ModaTestLabPanel />
           <ModaTrainingPanel />
           <LookOfDayPanel />

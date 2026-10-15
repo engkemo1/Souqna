@@ -79,6 +79,7 @@ function AnalysisSteps({ t }) {
 
 export default function StylistChat() {
   const { t, tr, lang, assistantName: name } = useI18n();
+  const { data: promptCfg } = useApi('/stylist/prompts'); // الرسائل المثال بتتظبط من الأدمن
   const { buyer } = useBuyer();
   const { data: feat } = useApi('/marketplace?q=&category=all&sort=featured');
   const avatar = feat?.features?.stylistAvatar || null;
@@ -265,7 +266,7 @@ export default function StylistChat() {
     delete nextProfile.dislikedProductIds;
     setProfile(nextProfile); store.set('moda.profile', nextProfile);
   };
-  const chips = [t('stylist.chip1'), t('stylist.chip2'), t('stylist.chip3')];
+  const chips = promptCfg ? promptCfg.chips.map((c) => (lang === 'ar' ? c.ar : c.en)) : [t('stylist.chip1'), t('stylist.chip2'), t('stylist.chip3')];
   return (
     <>
       {!open && (
@@ -322,7 +323,7 @@ export default function StylistChat() {
                 <div>
                   <div className="mb-4 grid place-items-center"><ModaAvatar src={avatar} size={128} thinking={busy} tilt living /></div>
                   <div className="flex items-end gap-2"><div className="max-w-[95%] rounded-2xl rounded-ss-sm bg-secondary px-4 py-3 text-[15px] leading-relaxed">{t('stylist.hello', { n: name })}</div></div>
-                  <p className="mt-4 text-xs font-semibold text-muted">{t('stylist.tryAsking', { n: name })}</p>
+                  {chips.length > 0 && <p className="mt-4 text-xs font-semibold text-muted">{t('stylist.tryAsking', { n: name })}</p>}
                   <div className="mt-2 flex flex-wrap gap-2">{chips.map((c) => <button key={c} type="button" onClick={() => send(c)} className="rounded-2xl border border-line-strong bg-elevated px-3.5 py-2.5 text-start text-[13px] font-medium leading-relaxed transition hover:border-brand hover:bg-brand/5">{c}</button>)}</div>
                   {!buyer && <p className="mt-5 text-center text-xs text-muted"><Link to="/account" onClick={() => setOpen(false)} className="font-semibold text-brand underline">{t('stylist.signInForHistory')}</Link></p>}
                 </div>

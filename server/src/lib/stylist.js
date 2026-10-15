@@ -310,22 +310,36 @@ function stylistTrainingPrompt(query) {
 }
 
 /* ---------------- LLM ---------------- */
-export async function callLlm(provider, system, messages) {
-  if (provider === 'gemini') {
-    // Google AI Studio (مجاني بحدود يومية): أقوى بكتير من Llama في العامية المصرية
-    const model = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
-    const res = await fetch(`${process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta'}/models/${model}:generateContent`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': geminiKey() },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: system }] },
-        contents: messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }] })),
-        generationConfig: { temperature: 0.5, maxOutputTokens: 900, responseMimeType: 'application/json', thinkingConfig: { thinkingBudget: 0 } },
-      }), signal: AbortSignal.timeout(25000),
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(`Gemini ${res.status}: ${JSON.stringify(j.error || j).slice(0, 160)}`);
-    return (j.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join('');
+/* Gemini (Google AI Studio، مجاني بحدود يومية). جوجل بتسحب الموديلات القديمة (404)، فبنجرّب GEMINI_MODEL ثم آخر موديل اشتغل ثم البدائل، ونتذكر اللي اشتغل. */
+let geminiGoodModel = null;
+const GEMINI_FALLBACKS = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+async function callGemini(system, messages) {
+  const base = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta';
+  const models = [...new Set([process.env.GEMINI_MODEL, geminiGoodModel, ...GEMINI_FALLBACKS].filter(Boolean))];
+  const contents = messages.map((m) => ({ role: m.role === 'assistant' ? 'model' : 'user', parts: [{ text: typeof m.content === 'string' ? m.content : JSON.stringify(m.content) }] }));
+  let lastErr = null;
+  for (const model of models) {
+    for (const thinking of [true, false]) {
+      const res = await fetch(`${base}/models/${model}:generateContent`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': geminiKey() },
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: system }] }, contents,
+          generationConfig: { temperature: 0.5, maxOutputTokens: 900, responseMimeType: 'application/json', ...(thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+        }), signal: AbortSignal.timeout(25000),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) { geminiGoodModel = model; return (j.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join(''); }
+      lastErr = new Error(`Gemini ${res.status} (${model}): ${JSON.stringify(j.error || j).slice(0, 160)}`);
+      if (res.status === 400 && thinking && /think/i.test(JSON.stringify(j.error || j))) continue; // الموديل مبيقبلش thinkingBudget → نعيد من غيره
+      if (res.status === 404) break; // الموديل اتسحب → الموديل اللي بعده
+      throw lastErr; // 429/403/5xx: مش مشكلة اسم موديل، السلسلة الأكبر (Claude/Cloudflare) هتتصرف
+    }
   }
+  throw lastErr || new Error('Gemini: no model available');
+}
+
+export async function callLlm(provider, system, messages) {
+  if (provider === 'gemini') return callGemini(system, messages);
   if (provider === 'anthropic') {
     const res = await fetch(process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': anthropicKey(), 'anthropic-version': '2023-06-01' },

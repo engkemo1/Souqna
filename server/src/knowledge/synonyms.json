@@ -106,14 +106,14 @@
     "graduation":      ["تخرج", "حفل تخرج", "graduation", "takharog", "takharrug", "5orog tkharog", "takhrog"],
     "birthday_party":  ["عيد ميلاد", "حفله", "حفلة", "بيرثداي", "birthday", "party", "b-day", "3eed meelad", "3id milad", "haflet", "hafla"],
     "condolence":      ["عزاء", "عزا", "جنازه", "وفاه", "condolence", "funeral", "3aza", "3azaa", "3azzaa", "mat3am"],
-    "sport":           ["جيم", "رياضه", "تمارين", "جري", "gym", "workout", "sport", "running", "gym wear", "reyada", "tamareen", "gem"],
+    "sport":           ["جيم", "رياضه", "تمارين", "رياضي", "رياضى", "رياضية", "لبس رياضي", "ملابس رياضية", "هدوم رياضي", "هدوم رياضة", "لبس رياضه", "رياضيه", "جري", "gym", "workout", "sport", "running", "gym wear", "reyada", "tamareen", "gem"],
     "home":            ["في البيت", "قعده", "بيت", "لبس بيت", "at home", "home wear", "loungewear", "lounge", "fel beit", "fel bet", "labs beit"]
   },
 
   "audiences": {
     "men":         ["انا راجل", "رجالي", "ولادي", "للرجاله", "ليا انا راجل", "men", "man", "male", "mens", "for him", "rgaly", "regali", "regaly", "ragel", "ana ragel", "lel regala"],
     "women":       ["انا ست", "حريمي", "بناتي", "للبنات", "ليا انا ست", "women", "woman", "female", "womens", "for her", "7areemy", "harimi", "7arimi", "banaty", "lel banat", "ana set", "ana bent"],
-    "women_hijab": ["محجبه", "محجبة", "حجاب", "ليا انا محجبه", "hijabi", "veiled", "muhajaba", "mohagaba", "ana mo7agaba", "mohagabah", "ana mohagaba", "mo7agaba"],
+    "women_hijab": ["محجبات", "للمحجبات", "حريمي محجبات", "hijab fashion", "محجبه", "محجبة", "حجاب", "ليا انا محجبه", "hijabi", "veiled", "muhajaba", "mohagaba", "ana mo7agaba", "mohagabah", "ana mohagaba", "mo7agaba"],
     "girls":       ["بنتي", "بنت صغيره", "طفله", "اطفال بنات", "girl", "girls", "baby girl", "binty", "benty", "tefla", "tefl banat", "banoty"],
     "boys":        ["ابني", "ولد صغير", "طفل", "اطفال ولاد", "boy", "boys", "baby boy", "ebny", "ebni", "ibny", "tefl awlad", "walad", "walady"]
   },

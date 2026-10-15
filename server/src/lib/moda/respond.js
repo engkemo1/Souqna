@@ -70,7 +70,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
 
   const ctxAr = plan.context ? (K.contexts.get(plan.context)?.ar || '') : '';
   const occasion = String(ctxAr).replace(/\s*\(.*?\)\s*/g, ' ').split('/')[0].trim() || 'المناسبة';
-  const occasionForAr = { engagement_guest: 'للخطوبة', engagement_self: 'لخطوبتك', katb_kitab: 'لكتب الكتاب', wedding_guest: 'للفرح', wedding_self: 'لفرحك', graduation: 'للتخرج', family_gathering: 'للمة العيلة', birthday_party: 'لعيد الميلاد', date_night: 'لخروجة أو عشا', work_formal: 'للشغل', work_casual: 'للشغل' };
+  const occasionForAr = { engagement_guest: 'للخطوبة', engagement_self: 'لخطوبتك', katb_kitab: 'لكتب الكتاب', wedding_guest: 'للفرح', wedding_self: 'لفرحك', graduation: 'للتخرج', family_gathering: 'للمة العيلة', birthday_party: 'لعيد الميلاد', date_night: 'لخروجة أو عشا', work_formal: 'للشغل', work_casual: 'للشغل', university: 'للجامعة', sport: 'للرياضة', casual_outing: 'للخروجة', travel: 'للسفر', eid: 'للعيد', ramadan_iftar: 'لإفطار رمضان', sahel_beach: 'للساحل' };
   const occasionFor = L === 'en' ? occasion : (occasionForAr[plan.context] || `لـ${occasion}`);
   const paletteAr = joinAr((plan.palette || []).map((c) => colorAr(K, c)));
   const couple = plan.people.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
@@ -93,6 +93,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   else if (plan.state === 'alternatives') intro = `${say('intro_alternatives')} ${relaxedTexts.join(' ')}`.trim();
   else if (plan.state === 'over_budget') intro = say(single ? 'over_budget_item' : 'over_budget', { total: nf(plan.total), budget: nf(plan.budget), over: nf(plan.over) });
   else intro = say(couple ? 'intro_full_couple' : plan.context ? 'intro_full' : 'intro_item', { occasion, occasionFor, palette: paletteAr });
+  if (!paletteAr && L !== 'en') intro = intro.replace(/\s*[:،]?\s*(بألوان|ألوان)\s*(متناسقة مع بعض)?\s*(?=[.،])/g, '');
   parts.push(intro);
 
   if (condolence) {
@@ -129,7 +130,9 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   if (plan.dropped?.length) parts.push(say('dropped_optional', { dropped: joinAr([...new Set(plan.dropped)].map((k) => itemAr(K, k))) }));
   const swapped = plan.people.flatMap((p) => p.picks.filter((x) => x.relaxed === 'budget').map((x) => itemAr(K, x.slotKey)));
   if (swapped.length) parts.push(say('budget_swap', { slot: joinAr(swapped) }));
-  const formalSneaker = plan.people.some((pe) => pe.picks.some((pk) => pk.product?.minimalSneaker && (['formal_shoes', 'loafers'].includes(pk.slotKey) || (pk.product?.key === 'sneakers' && plan.context && (K.contexts.get(plan.context)?.formality?.[0] || 0) >= 4))));
+  // ملاحظة الكوتشي الرسمي بتظهر بس لو المناسبة نفسها رسمية (خطوبة/فرح/تخرج...). في الجامعة والخروجات الكوتشي طبيعي ومفيش داعي لتبرير.
+  const dressyOccasion = !!plan.context && (K.contexts.get(plan.context)?.formality?.[0] || 0) >= 4;
+  const formalSneaker = dressyOccasion && plan.people.some((pe) => pe.picks.some((pk) => pk.product?.minimalSneaker && (['formal_shoes', 'loafers'].includes(pk.slotKey) || pk.product?.key === 'sneakers')));
   if (formalSneaker) parts.push(say('minimal_sneaker_note'));
 
   // ---------- جو ووقت ----------

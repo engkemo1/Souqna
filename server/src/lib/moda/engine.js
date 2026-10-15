@@ -71,6 +71,24 @@ const mergeFromSession = (cur, prev) => {
   return m;
 };
 
+/** قطع مذكورة في نص (حسب قاموس المرادفات) وغير موجودة في مجموعة المسموح بيها. بنعتبر البنطلون/الشينو والجزمة/اللوفر مجموعة واحدة. */
+const EQUIV = [['trousers', 'chinos'], ['shirt', 'polo'], ['formal_shoes', 'loafers']];
+export function strayGarments(K, text, allowedKeys) {
+  const allowed = new Set(allowedKeys);
+  for (const g of EQUIV) if (g.some((k) => allowed.has(k))) g.forEach((k) => allowed.add(k));
+  const toks = norm(text).split(' ').filter(Boolean);
+  const hay = new Set([` ${toks.join(' ')} `, ` ${toks.map((t) => t.replace(/^[وبلف](?=.{3,})/, '')).join(' ')} `]);
+  const found = new Set();
+  const extra = { boots: ['بوتس'] };
+  for (const [key, aliases] of Object.entries(K.synonyms.garments)) {
+    if (allowed.has(key)) continue;
+    for (const a of [...aliases, ...(extra[key] || [])]) {
+      const n = norm(a); if (n.length < 3) continue;
+      if ([...hay].some((h) => h.includes(` ${n} `))) { found.add(key); break; }
+    }
+  }
+  return [...found];
+}
 export async function runModa(messages, opts = {}) {
   const K = loadKnowledge();
   const { products = [], profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, brain = null, curator = null, understand = null, fetcher, assistantName = null } = opts;
@@ -188,10 +206,11 @@ export async function runModa(messages, opts = {}) {
     }
   }
 
+  // (طلب قطعة معينة زي "كوتشي يليق على قميصي" مش طلب طقم: المنسّق ما بيتدخلش عشان ما يضيفش قطع ما طلبهاش العميل)
   // منسّق الذكاء الاصطناعي: بيرشّح الطقم من منتجاتنا الحقيقية الأول، وأي قطعة ناقصة بيقترحها من بره كزرار "اطلبه".
   // أي فشل/رد غلط/تعدّي ميزانية = نكمل بترشيح القواعد.
   let curated = false;
-  if (typeof curator === 'function' && plan.context && ['full', 'alternatives', 'partial', 'over_budget'].includes(plan.state) && !plan.ask?.length) {
+  if (typeof curator === 'function' && plan.context && !(parsed.garments || []).length && ['full', 'alternatives', 'partial', 'over_budget'].includes(plan.state) && !plan.ask?.length) {
     try {
       const cp = await curator({ plan, rows, parsed, adv, eventTime, K, lang, assistantName: typeof assistantName === 'string' ? assistantName : assistantName?.[lang] });
       if (cp) { plan = cp; curated = true; }
@@ -205,7 +224,11 @@ export async function runModa(messages, opts = {}) {
   if (typeof brain === 'function' && ['none', 'no_look', 'partial'].includes(plan.state) && !needsClarificationFirst) {
     const avail = [...new Set((plan.people || []).flatMap((p) => p.picks.map((x) => x.product.key)).filter(Boolean))];
     const b = await callBrain({ result: plan.state, requested: parsed.garments.map((x) => x.key), occasion: parsed.context || null, missing: (plan.missing || []).map((m) => m.base).filter(Boolean), availableAlternativeTypes: avail, note: 'Say honestly what is not available, mention the closest alternatives shown below your reply, and ask ONE short question to refine (budget, style or colour).' });
-    if (b?.reply) { res = { ...res, say: b.reply, brainReply: true }; brainUsed = true; }
+    // رد الموديل ما يتقبلش لو بيذكر قطع مش في النتيجة (مثلاً هودي/جينز/بوتس وإحنا عارضين بنطلون وكوتشي).
+    const planKeys = new Set([...avail, ...(plan.missing || []).map((m) => m.base), ...parsed.garments.map((x) => x.key), ...(plan.people || []).flatMap((p) => p.picks.flatMap((x) => String(x.slotKey || '').split('|')))].filter(Boolean));
+    const stray = b?.reply ? [...strayGarments(K, b.reply, planKeys), ...(!avail.length && /(هتلاقي|هتلاقى|هتلاقو|ستجد|you'll find|you will find).{0,40}(تحت|below)/i.test(b.reply) ? ['claims_items_below'] : [])] : [];
+    if (b?.reply && !stray.length) { res = { ...res, say: b.reply, brainReply: true }; brainUsed = true; }
+    else if (b?.reply) res = { ...res, brainRejected: stray };
   }
   const g = guardResponse(res, { lang });
   if (!g.ok) res = { ...res, say: pick(K.phrases.ar.fallback_generic, seed), guard: g.problems };

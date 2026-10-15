@@ -22,6 +22,7 @@ export function understandPrompt(K = loadKnowledge()) {
     `context: one of ${ctx.join(', ')} or null. Use *_self (engagement_self, wedding_self) only when the customer himself/herself is the bride/groom; otherwise *_guest.`,
     `garments: the pieces explicitly asked for; "type" from: ${garments.join(', ')}; "color" from: ${colors.join(', ')} or null. Distinguish shoe kinds carefully (sneakers vs formal shoes vs loafers vs heels vs sandals) and never map a sneaker to a formal shoe.`,
     'budget: only if the customer states money limits. {"max":number,"min":number|null,"kind":"total"|"per_item"}. A range like "من 200 ل 1000" or "between 500 and 1500" means min=200,max=1000 (max is the limit). "لحد 1000" / "up to 1000" means max=1000,min=null. "ألف" = 1000, "ألفين" = 2000, "5k" = 5000. Never invent a budget.',
+    'Never guess an occasion the customer did not mention: if they only ask for one piece (e.g. sneakers to go with a shirt they already own), leave context null and list only that piece in garments.',
     'daypart: "day" or "night" only if stated (بالليل, الصبح, الضهر, evening…), else null.',
     'Never output values outside these lists. Leave unknown fields empty/null.',
   ].join('\n');

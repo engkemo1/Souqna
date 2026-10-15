@@ -32,27 +32,27 @@
    "type": "single",
    "options": [
     {
-     "label": "ليا (راجل)",
+     "label": "رجالي",
      "value": "men"
     },
     {
-     "label": "ليا (ست)",
+     "label": "حريمي",
      "value": "women"
     },
     {
-     "label": "ليا (محجبة)",
+     "label": "محجبات",
      "value": "women_hijab"
     },
     {
-     "label": "ليا ولخطيبي/ـتي",
+     "label": "كوبل (إحنا الاتنين)",
      "value": "couple"
     },
     {
-     "label": "أولاد",
+     "label": "أطفال",
      "value": "kids"
     },
     {
-     "label": "لعيلة كاملة",
+     "label": "عيلة كاملة",
      "value": "family"
     }
    ],
@@ -64,10 +64,10 @@
    "en": {
     "text": "Who is this for?",
     "options": {
-     "men": "Me (man)",
-     "women": "Me (woman)",
-     "women_hijab": "Me (hijabi)",
-     "couple": "Me and my partner",
+     "men": "Men",
+     "women": "Women",
+     "women_hijab": "Hijab fashion",
+     "couple": "Couple (both of us)",
      "kids": "Kids",
      "family": "The whole family"
     }
@@ -78,15 +78,15 @@
    "type": "multi",
    "options": [
     {
-     "label": "راجل",
+     "label": "رجالي",
      "value": "men"
     },
     {
-     "label": "ست",
+     "label": "حريمي",
      "value": "women"
     },
     {
-     "label": "ست محجبة",
+     "label": "محجبات",
      "value": "women_hijab"
     }
    ],

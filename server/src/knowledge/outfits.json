@@ -110,14 +110,14 @@
       "slots": [["shirt|polo", 1, 22], ["chinos|trousers", 1, 32], ["loafers|sneakers", 1, 36], ["belt", 0, 5], ["watch", 0, 5]],
       "colors": ["navy", "beige", "olive", "white"], "avoid_colors": [],
       "tip_ar": "بنطلون شينو مع قميص أو بولو، وحذاء جلد أو كوتشي جلد نظيف.",
-      "status": "draft", "src": ["youm7_work"] },
+      "status": "reviewed", "src": ["youm7_work"] },
 
     { "id": "m_casual", "audience": ["men"], "contexts": ["casual_outing", "university", "travel", "family_gathering"],
       "name_ar": "كاجوال يومي", "formality": 2, "taste": ["relaxed", "modern", "minimal"],
       "slots": [["tshirt|polo|shirt", 1, 22], ["jeans|chinos", 1, 33], ["sneakers", 1, 35], ["jacket|hoodie", 0, 10]],
       "colors": ["black", "white", "navy", "grey", "olive"], "avoid_colors": [],
       "tip_ar": "تيشيرت أو بولو + جينز + كوتشي نضيف. جاكيت خفيف فوقه لو الجو بارد.",
-      "status": "draft", "src": [] },
+      "status": "reviewed", "src": [] },
 
     { "id": "m_eid", "audience": ["men"], "contexts": ["eid", "ramadan_iftar"],
       "name_ar": "لبس العيد", "formality": 3, "taste": ["modern", "relaxed", "classic"],
@@ -141,7 +141,7 @@
     { "id": "m_sport", "audience": ["men"], "contexts": ["sport"],
       "name_ar": "رياضة", "formality": 1, "taste": ["relaxed"],
       "slots": [["sport_top|tshirt", 1, 25], ["sport_bottom|shorts|joggers", 1, 30], ["sport_shoes|sneakers", 1, 40], ["socks", 0, 5]],
-      "colors": [], "avoid_colors": [], "tip_ar": "خامة بتشرب العرق وحذاء مناسب للنشاط.", "status": "draft", "src": [] },
+      "colors": [], "avoid_colors": [], "tip_ar": "خامة بتشرب العرق وحذاء مناسب للنشاط.", "status": "reviewed", "src": [] },
 
 
     { "id": "w_eng_party_dress", "audience": ["women"], "contexts": ["engagement_guest", "katb_kitab", "wedding_guest", "graduation"],
@@ -236,7 +236,7 @@
     { "id": "w_sport", "audience": ["women", "women_hijab"], "contexts": ["sport"],
       "name_ar": "رياضة", "formality": 1, "taste": ["relaxed"],
       "slots": [["sport_top|tshirt", 1, 25], ["sport_bottom|leggings|joggers", 1, 30], ["sport_shoes|sneakers", 1, 40], ["socks", 0, 5]],
-      "colors": [], "avoid_colors": [], "tip_ar": "للمحجبات: توب طويل أو أكمام طويلة وليجنز مريح.", "status": "draft", "src": [] },
+      "colors": [], "avoid_colors": [], "tip_ar": "للمحجبات: توب طويل أو أكمام طويلة وليجنز مريح.", "status": "reviewed", "src": [] },
 
 
     { "id": "h_eng_abaya", "audience": ["women_hijab"], "contexts": ["engagement_guest", "katb_kitab", "wedding_guest", "graduation"],

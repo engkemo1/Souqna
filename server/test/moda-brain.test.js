@@ -78,3 +78,43 @@ test('POST /stylist with a Workers-AI-compatible endpoint: free-form question an
   const b = await post('ايه الفرق بين الحرير والبوليستر'); assert.equal(calls, 1); assert.ok(b.say.length > 5);
   srv.close(); ai.close();
 });
+
+test('Gemini provider: request shape and parsing (fake endpoint)', async () => {
+  const { createServer } = await import('node:http');
+  let got;
+  const srv = createServer((req, res) => { let b = ''; req.on('data', (c) => { b += c; }); req.on('end', () => { got = { url: req.url, key: req.headers['x-goog-api-key'], body: JSON.parse(b) }; res.setHeader('content-type', 'application/json'); res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"reply":"أهلا بيك"}' }] } }] })); }); });
+  await new Promise((r) => srv.listen(0, r));
+  process.env.GEMINI_API_BASE = `http://127.0.0.1:${srv.address().port}/v1beta`; process.env.GEMINI_API_KEY = 'k';
+  const os = await import('node:os'); const { randomUUID } = await import('node:crypto');
+  process.env.DB_FILE = path.join(os.tmpdir(), `souqna-gem-${randomUUID()}.db`); process.env.JWT_SECRET = `gem-${randomUUID()}`;
+  const { callLlm, providerReady } = await import('../src/lib/stylist.js');
+  assert.equal(providerReady.gemini(), true);
+  const out = await callLlm('gemini', 'SYS', [{ role: 'user', content: 'أهلا' }, { role: 'assistant', content: 'هلا' }, { role: 'user', content: 'ازيك' }]);
+  assert.match(out, /أهلا بيك/); assert.equal(got.key, 'k'); assert.match(got.url, /generateContent/);
+  assert.equal(got.body.systemInstruction.parts[0].text, 'SYS'); assert.deepEqual(got.body.contents.map((c) => c.role), ['user', 'model', 'user']);
+  srv.close();
+});
+
+test('Gemini: موديل اتسحب (404) → بنجرّب اللي بعده ونفتكر اللي اشتغل، وthinkingBudget المرفوض بيتعاد من غيره', async () => {
+  const { createServer } = await import('node:http');
+  const seen = [];
+  const srv = createServer((req, res) => {
+    let b = ''; req.on('data', (c) => { b += c; }); req.on('end', () => {
+      const model = /models\/([^:]+):/.exec(req.url)[1]; const body = JSON.parse(b); seen.push(`${model}${body.generationConfig.thinkingConfig ? '+t' : ''}`);
+      res.setHeader('content-type', 'application/json');
+      if (model === 'gemini-2.5-flash-old') { res.statusCode = 404; return res.end(JSON.stringify({ error: { code: 404, message: 'This model is no longer available' } })); }
+      if (model === 'gemini-3.8-flash' && body.generationConfig.thinkingConfig) { res.statusCode = 400; return res.end(JSON.stringify({ error: { code: 400, message: 'thinking budget is not supported' } })); }
+      res.end(JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] } }] }));
+    });
+  });
+  await new Promise((r) => srv.listen(0, r));
+  process.env.GEMINI_API_BASE = `http://127.0.0.1:${srv.address().port}/v1beta`; process.env.GEMINI_API_KEY = 'k'; process.env.GEMINI_MODEL = 'gemini-2.5-flash-old';
+  const os = await import('node:os'); const { randomUUID } = await import('node:crypto');
+  process.env.DB_FILE = path.join(os.tmpdir(), `souqna-gem2-${randomUUID()}.db`); process.env.JWT_SECRET = `gem2-${randomUUID()}`;
+  const { callLlm } = await import('../src/lib/stylist.js');
+  assert.equal(await callLlm('gemini', 'S', [{ role: 'user', content: 'x' }]), '{"ok":true}');
+  assert.deepEqual(seen, ['gemini-2.5-flash-old+t', 'gemini-3.8-flash+t', 'gemini-3.8-flash']);
+  seen.length = 0; await callLlm('gemini', 'S', [{ role: 'user', content: 'x' }]);
+  assert.equal(seen[0], 'gemini-2.5-flash-old+t'); // الأولوية لـ GEMINI_MODEL المتظبط، وبعدين اللي اشتغل قبل كده
+  delete process.env.GEMINI_MODEL; srv.close();
+});

@@ -82,6 +82,8 @@ export default function MarketHome() {
   const [heroSearch, setHeroSearch] = useState('');
   const [heroMode, setHeroMode] = useState('photo');
   const { data: base } = useApi('/marketplace?q=&category=all&sort=featured');
+  const { data: promptCfg } = useApi('/stylist/prompts'); // الأزرار السريعة بتتظبط من الأدمن؛ الافتراضي HERO_PROMPTS لو الطلب فشل
+  const heroPrompts = promptCfg?.hero || HERO_PROMPTS;
   const { label: deptLabel } = useDepartments();
   const STREET_DEPTS = ['women', 'men', 'kids', 'shoes', 'bags', 'hijab', 'abaya', 'jalabiya', 'denim', 'sports', 'accessories', 'underwear', 'wedding_dress', 'wedding_suit'];
   const deptLabels = Object.fromEntries(STREET_DEPTS.map((d) => [d, deptLabel(d)]));
@@ -173,9 +175,9 @@ export default function MarketHome() {
               </Link>
             )}
             <div className="mt-4">
-              <p className="mb-2 text-xs font-semibold text-muted">{t('market.quickTry')}</p>
+              {heroPrompts.length > 0 && <p className="mb-2 text-xs font-semibold text-muted">{t('market.quickTry')}</p>}
               <div className="flex flex-wrap gap-2">
-                {HERO_PROMPTS.map((prompt) => <button key={prompt.ar} type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: lang === 'ar' ? prompt.askAr : prompt.askEn } }))} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-2 text-[11px] font-medium text-[#14213D] transition hover:border-brand hover:text-brand sm:text-xs"><Sparkles className="h-3.5 w-3.5 text-brand" />{lang === 'ar' ? prompt.ar : prompt.en}</button>)}
+                {heroPrompts.map((prompt) => <button key={prompt.ar} type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: lang === 'ar' ? prompt.askAr : prompt.askEn } }))} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-white px-3 py-2 text-[11px] font-medium text-[#14213D] transition hover:border-brand hover:text-brand sm:text-xs"><Sparkles className="h-3.5 w-3.5 text-brand" />{lang === 'ar' ? prompt.ar : prompt.en}</button>)}
               </div>
             </div>
           </div>

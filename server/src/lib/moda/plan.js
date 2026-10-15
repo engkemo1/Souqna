@@ -11,6 +11,8 @@ const GUEST_CONTEXTS = new Set(['engagement_guest', 'wedding_guest', 'katb_kitab
 const DRESSY_ACCESSORY = new Set(['tie', 'bow_tie', 'pocket_square']);
 const FABRIC_KEYS = new Set(['tops', 'bottoms', 'dresses', 'suiting', 'modest']);
 const LEISURE_CONTEXTS = new Set(['sahel_beach', 'sport', 'home', 'condolence', 'travel']);
+// وصفات مرتبطة بمناسبة موسمية بعينها (عيد/إفطار): ماتتستلفش كبديل لمناسبة تانية (مثلاً الجامعة).
+const EVENT_ONLY_CONTEXTS = new Set(['eid', 'ramadan_iftar']);
 const AUD_WEIGHT = { men: 1, women: 1, women_hijab: 1, boys: 0.6, girls: 0.6 };
 
 const genderOK = (aud, g) => {
@@ -309,7 +311,7 @@ export function planOutfit(parsed, products, env = {}) {
     if (!cands.length && context && !hasExplicit) {
       const [lo, hi] = cr || [2, 4]; const mid = (lo + hi) / 2;
       cands = K.outfits.looks
-        .filter((l) => l.status !== 'draft' && l.audience.includes(aud) && Math.abs(l.formality - mid) <= 1 && (LEISURE_CONTEXTS.has(context) || !l.contexts.every((c) => LEISURE_CONTEXTS.has(c))))
+        .filter((l) => l.status !== 'draft' && l.audience.includes(aud) && Math.abs(l.formality - mid) <= 1 && (LEISURE_CONTEXTS.has(context) || !l.contexts.every((c) => LEISURE_CONTEXTS.has(c))) && (EVENT_ONLY_CONTEXTS.has(context) || !l.contexts.every((c) => EVENT_ONLY_CONTEXTS.has(c))))
         .map((l) => ({ look: l, t: 0 })).sort((a, b) => Math.abs(a.look.formality - mid) - Math.abs(b.look.formality - mid));
     }
     if (hasExplicit || !cands.length) return [fillPerson(aud, parsed, null, products, K, envC, pBudget(aud), null)];

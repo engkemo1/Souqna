@@ -61,3 +61,11 @@ test('every shoe kind is told apart by name (formal, derby, loafer, boot, flat, 
   const cases = { 'Classic Oxford Leather Shoes': 'formal_shoes', 'حذاء ديربي': 'formal_shoes', 'لوفر جلد': 'loafers', 'Chelsea Boots': 'boots', 'Flat Ballerina Shoes': 'flats', 'سليبر بيت': 'slippers', 'Running Shoes Nike': 'sneakers', 'كوتشي ابيض جلد': 'sneakers', 'Block Heel Sandals': 'heels_low', 'صندل جلد رجالي': 'sandals' };
   for (const [n, k] of Object.entries(cases)) assert.equal(key(n), k, n);
 });
+
+test('طلب قطعة واحدة (كوتشي يليق على قميصي) ما بيشغّلش المنسّق ومفيش قطع زيادة', async () => {
+  let called = 0;
+  const cur = async () => { called += 1; return null; };
+  const res = await runModa('عندي قميص أزرق سماوي، عايز كوتشي أبيض يليق عليه', { ...base, curator: cur });
+  assert.equal(called, 0);
+  assert.ok(!(res.blocks?.tabs || []).some((t) => (t.missing || []).length));
+});
