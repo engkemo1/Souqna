@@ -30,6 +30,9 @@ export const DEFAULT_DEPARTMENTS = [
   { slug: 'sports', ar: 'رياضي', en: 'Sportswear', sizes: S_CLOTHES },
   { slug: 'denim', ar: 'جينز', en: 'Denim', sizes: S_JEANS },
   { slug: 'accessories', ar: 'إكسسوارات', en: 'Accessories', sizes: ['Free size'] },
+  { slug: 'perfume_makeup', ar: 'عطور ومكياج', en: 'Perfume & Makeup', sizes: ['Free size'] },
+  { slug: 'care', ar: 'عنايات', en: 'Care', sizes: ['Free size'] },
+  { slug: 'maternity', ar: 'حوامل', en: 'Maternity', sizes: S_CLOTHES },
 ];
 export const DEPT_SLUG_RE = /^[a-z][a-z0-9_]{1,30}$/;
 export const encodeDepartments = (list) => `,${[...new Set(list)].filter((d) => DEPT_SLUG_RE.test(d)).join(',')},`;

@@ -74,6 +74,18 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
     const ins = db.prepare('INSERT OR IGNORE INTO departments (slug, name_ar, name_en, sizes_json, sort) VALUES (?,?,?,?,?)');
     DEFAULT_DEPARTMENTS.forEach((d, i) => ins.run(d.slug, d.ar, d.en, JSON.stringify(d.sizes), i));
   }
+  // أقسام اتضافت بعد أول إطلاق (عطور ومكياج، عنايات، حوامل) وكانت ظاهرة في الموقع بس: بتتضاف مرة واحدة عشان تظهر في الأدمن. لو الأدمن حذفها ما بترجعش.
+  try {
+    if (!db.prepare("SELECT 1 FROM app_settings WHERE key='departments_added_v2'").get()) {
+      const ins2 = db.prepare('INSERT OR IGNORE INTO departments (slug, name_ar, name_en, sizes_json, sort) VALUES (?,?,?,?,?)');
+      let next = db.prepare('SELECT COALESCE(MAX(sort), -1) + 1 AS n FROM departments').get().n;
+      for (const slug of ['perfume_makeup', 'care', 'maternity']) {
+        const d = DEFAULT_DEPARTMENTS.find((x) => x.slug === slug);
+        if (d) ins2.run(d.slug, d.ar, d.en, JSON.stringify(d.sizes), next++);
+      }
+      db.prepare("INSERT OR IGNORE INTO app_settings (key, value) VALUES ('departments_added_v2', '1')").run();
+    }
+  } catch { /* الجدول لسه مش جاهز: هنحاول في التشغيل الجاي */ }
 }
 
 const cache = new Map();
