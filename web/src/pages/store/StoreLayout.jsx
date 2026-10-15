@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Outlet, useLocation, useParams } from 'react-router-dom';
 import { Store } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
@@ -10,6 +10,7 @@ import { StoreHeader, BottomNav, StoreFooter, AnnouncementBar } from '../../comp
 import CartDrawer from '../../components/store/CartDrawer.jsx';
 import SmartWhatsApp from '../../components/store/SmartWhatsApp.jsx';
 import { resolveDesign } from '@souqna/shared/layout';
+import { buildTheme } from '@souqna/shared/theme';
 import { HeroSkeleton } from '../../components/store/HeroSlider.jsx';
 import { ProductCardSkeleton, ProductGrid } from '../../components/store/ProductCard.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
@@ -20,7 +21,23 @@ export default function StoreLayout() {
   const { slug } = useParams();
   const { pathname } = useLocation();
   const { t, tr } = useI18n();
-  const { data, error, reload } = useApi(`/stores/${slug}`);
+  const { data: apiData, error, reload } = useApi(`/stores/${slug}`);
+  // وضع المعاينة الحية: لما المتجر يتفتح جوه مصمّم المتجر (?preview=design) بيسمع إعدادات التصميم الغير محفوظة ويرسمها فورًا.
+  const isPreview = typeof window !== 'undefined' && window.parent !== window && new URLSearchParams(window.location.search).get('preview') === 'design';
+  const [preview, setPreview] = useState(null);
+  useEffect(() => {
+    if (!isPreview) return undefined;
+    const on = (e) => { if (e.origin === window.location.origin && e.data?.type === 'souqna-design-preview') setPreview(e.data.payload || null); };
+    window.addEventListener('message', on);
+    window.parent.postMessage({ type: 'souqna-design-ready' }, window.location.origin);
+    return () => window.removeEventListener('message', on);
+  }, [isPreview, !!apiData]); // eslint-disable-line react-hooks/exhaustive-deps
+  const data = useMemo(() => {
+    if (!apiData || !preview) return apiData;
+    const cz = apiData.store.customization || {};
+    const theme = preview.palette ? buildTheme(preview.palette) : apiData.store.theme;
+    return { ...apiData, store: { ...apiData.store, theme, customization: { ...cz, design: preview.design || cz.design, sectionsOrder: preview.sectionsOrder || cz.sectionsOrder, hiddenSections: preview.hiddenSections || cz.hiddenSections, flash: preview.flash || cz.flash } } };
+  }, [apiData, preview]);
   useTheme(data?.store?.theme?.cssVars);
 
   // Warm the chunks of the pages a shopper reaches next, so tapping the cart/product never waits on (or fails to fetch) a lazy bundle.
@@ -31,7 +48,7 @@ export default function StoreLayout() {
   }, [!!data]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!data) return;
+    if (!data || isPreview) return;
     const key = `souqna.visit.${slug}`;
     try {
       if (sessionStorage.getItem(key)) return;

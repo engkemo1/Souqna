@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Check, ChevronUp, ChevronDown, Sparkles, ExternalLink, Wand2, Eye, EyeOff } from 'lucide-react';
-import { THEME_PRESETS } from '@souqna/shared/theme';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Check, ChevronUp, ChevronDown, Sparkles, ExternalLink, Wand2, Eye, EyeOff, Shirt, Smartphone } from 'lucide-react';
+import { THEME_PRESETS, mix } from '@souqna/shared/theme';
 import {
   TEMPLATES, TEMPLATE_IDS, SEASONS, SEASON_IDS, CARD_STYLES, CAT_STYLES, GRID_STYLES, HERO_STYLES, TYPE_STYLES,
   SECTION_IDS, OPTIONAL_SECTIONS, resolveDesign, completeness,
@@ -38,36 +38,129 @@ const STANDARD = SECTION_IDS.filter((s) => !OPTIONAL_SECTIONS.includes(s));
 
 const chip = (on) => cx('inline-flex min-h-10 items-center rounded-full border px-4 text-sm font-medium transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg');
 
-/** رسمة مصغّرة بألوان القالب: بتوضّح شكل الغلاف والتصنيفات والكروت من غير ما نحمّل المتجر كله. */
+/** معاينة مصغّرة للقالب: بتترسم من إعدادات القالب نفسها (الغلاف، ترتيب الأقسام، شكل التصنيفات والكروت، الخط) بألوانه، فتبان كأنها صفحة متجر حقيقية. */
 function Thumb({ tpl, palette }) {
   const p = palette;
-  const r = { round: 8, flat: 0, soft: 12, bordered: 4 }[tpl.card];
-  const card = (i) => (
-    <span key={i} style={{ background: p.secondary, borderRadius: r, border: tpl.card === 'bordered' ? `1px solid ${p.text}33` : 'none', padding: tpl.card === 'soft' ? 3 : 0 }} className="block flex-1">
-      <span className="block aspect-[4/5]" style={{ background: `${p.primary}33`, borderRadius: tpl.card === 'soft' ? 8 : r }} />
-      <span className="mt-1 block h-1 w-3/4 rounded" style={{ background: `${p.text}55` }} />
+  const ink = p.text;
+  const soft = (c, t) => mix(c, p.background, t);
+  const photo = (i = 0) => ({ background: `linear-gradient(${150 + i * 25}deg, ${soft(p.primary, 0.78)}, ${soft(p.accent, 0.62)})` });
+  const radius = { round: 7, flat: 0, soft: 10, bordered: 3 }[tpl.card];
+  const bar = (w, o = 0.55, h = 3) => <span className="block rounded-full" style={{ width: w, height: h, background: ink, opacity: o }} />;
+  const weight = tpl.type === 'bold' ? 4 : tpl.type === 'light' ? 2 : 3;
+  const cols = tpl.grid === 'dense' ? 4 : tpl.grid === 'airy' ? 2 : 3;
+  const btn = (w = 22) => <span className="block rounded-full" style={{ width: w, height: 6, background: p.button }} />;
+
+  const product = (i, sale) => (
+    <span key={i} className="relative block min-w-0 flex-1" style={{ background: tpl.card === 'soft' ? p.secondary : 'transparent', borderRadius: radius, border: tpl.card === 'bordered' ? `1px solid ${ink}2e` : 'none', padding: tpl.card === 'soft' || tpl.card === 'bordered' ? 2 : 0 }}>
+      <span className="grid aspect-[4/5] place-items-center" style={{ ...photo(i), borderRadius: tpl.card === 'soft' ? 7 : radius }}><Shirt style={{ width: 11, height: 11, color: p.background, opacity: 0.7 }} /></span>
+      {sale && <span className="absolute start-0.5 top-0.5 rounded-sm px-[3px] text-[5px] font-bold leading-[8px] text-white" style={{ background: '#be2626' }}>-30%</span>}
+      <span className="mt-[3px] block"><span className="block h-[2px] w-4/5 rounded-full" style={{ background: ink, opacity: 0.5 }} /><span className="mt-[2px] block h-[2px] w-2/5 rounded-full" style={{ background: p.accent }} /></span>
     </span>
   );
-  const cards = Array.from({ length: tpl.grid === 'dense' ? 4 : tpl.grid === 'airy' ? 2 : 3 }, (_, i) => card(i));
-  return (
-    <span className="block overflow-hidden rounded-lg ring-1 ring-black/10" style={{ background: p.background }}>
-      <span className="block h-2" style={{ background: p.footer }} />
-      {tpl.hero === 'split' ? (
-        <span className="flex h-12" style={{ background: p.secondary }}><span className="flex flex-1 flex-col justify-center gap-1 px-2"><span className="h-1.5 w-3/4 rounded" style={{ background: p.text }} /><span className="h-1 w-1/2 rounded" style={{ background: `${p.text}77` }} /></span><span className="w-1/2" style={{ background: `${p.primary}55` }} /></span>
-      ) : tpl.hero === 'compact' ? (
-        <span className="flex h-5 items-center gap-1 px-2" style={{ background: p.primary }}><span className="h-2.5 w-2.5 rounded-full" style={{ background: p.background }} /><span className="h-1 w-1/3 rounded" style={{ background: p.background }} /></span>
-      ) : (
-        <span className="relative block h-12" style={{ background: p.primary }}><span className="absolute inset-x-2 bottom-1.5 h-1.5 w-1/2 rounded" style={{ background: p.background }} /></span>
-      )}
-      <span className="block p-1.5">
-        {tpl.cat === 'circles' ? <span className="mb-1.5 flex justify-center gap-1.5">{[0, 1, 2, 3].map((i) => <span key={i} className="h-3.5 w-3.5 rounded-full" style={{ background: p.accent }} />)}</span>
-          : tpl.cat === 'list' ? <span className="mb-1.5 flex gap-1">{[0, 1, 2].map((i) => <span key={i} className="h-2.5 w-7 rounded-full" style={{ border: `1px solid ${p.text}55` }} />)}</span>
-            : <span className="mb-1.5 flex gap-1">{[0, 1, 2].map((i) => <span key={i} className="h-5 flex-1 rounded" style={{ background: `${p.primary}44` }} />)}</span>}
-        <span className="flex gap-1">{cards}</span>
+  const products = (key, sale) => (
+    <span key={key} className="block px-1.5">
+      <span className="mb-1 flex items-center justify-between">{bar(weight * 9, 0.85, weight)}{bar(8, 0.3, 2)}</span>
+      <span className="flex gap-1">{Array.from({ length: cols }, (_, i) => product(i, sale && i === 0))}</span>
+    </span>
+  );
+  const hero = () => {
+    if (tpl.hero === 'split') {
+      return (
+        <span key="hero" className="flex h-[58px]" style={{ background: p.secondary }}>
+          <span className="flex flex-1 flex-col justify-center gap-1 px-2">{bar('80%', 0.9, weight + 1)}{bar('55%', 0.4, 2)}{btn()}</span>
+          <span className="grid w-[46%] place-items-center" style={photo(1)}><Shirt style={{ width: 18, height: 18, color: p.background, opacity: 0.6 }} /></span>
+        </span>
+      );
+    }
+    if (tpl.hero === 'compact') {
+      return (
+        <span key="hero" className="flex h-[22px] items-center justify-between px-2" style={{ background: p.primary }}>
+          <span className="block rounded-full" style={{ width: '45%', height: 3, background: p.background, opacity: 0.9 }} />
+          <span className="block rounded-full" style={{ width: 18, height: 6, background: p.accent }} />
+        </span>
+      );
+    }
+    return (
+      <span key="hero" className="relative block h-[62px]" style={{ background: `linear-gradient(120deg, ${p.primary}, ${soft(p.accent, 0.35)})` }}>
+        <span className="absolute inset-x-2 bottom-2 flex flex-col gap-1">
+          <span className="block rounded-full" style={{ width: '62%', height: weight + 2, background: p.background, opacity: 0.95 }} />
+          <span className="block rounded-full" style={{ width: '38%', height: 2, background: p.background, opacity: 0.6 }} />
+          <span className="block rounded-full" style={{ width: 24, height: 6, background: p.background }} />
+        </span>
+        {tpl.hero === 'slider' && <span className="absolute inset-x-0 bottom-0.5 flex justify-center gap-[3px]">{[0, 1, 2].map((i) => <span key={i} className="block rounded-full" style={{ width: i === 0 ? 8 : 3, height: 3, background: p.background, opacity: i === 0 ? 1 : 0.5 }} />)}</span>}
       </span>
+    );
+  };
+  const categories = () => (
+    <span key="categories" className="block px-1.5">
+      {tpl.cat === 'circles' ? <span className="flex justify-around">{[0, 1, 2, 3].map((i) => <span key={i} className="grid h-[17px] w-[17px] place-items-center rounded-full" style={{ ...photo(i), boxShadow: `0 0 0 1.5px ${p.accent}` }} />)}</span>
+        : tpl.cat === 'list' ? <span className="flex gap-1">{[26, 20, 24].map((w, i) => <span key={i} className="block rounded-full" style={{ width: w, height: 8, border: `1px solid ${ink}55`, background: i === 0 ? ink : 'transparent', opacity: i === 0 ? 0.85 : 1 }} />)}</span>
+          : <span className="flex gap-1">{[0, 1, 2].map((i) => <span key={i} className="relative block h-[26px] flex-1 overflow-hidden" style={{ ...photo(i), borderRadius: radius }}><span className="absolute inset-x-1 bottom-1 block rounded-full" style={{ height: 2, background: p.background }} /></span>)}</span>}
+    </span>
+  );
+  const block = (id) => {
+    switch (id) {
+      case 'hero': return hero();
+      case 'ticker': return <span key={id} className="flex h-[9px] items-center gap-2 overflow-hidden px-1" style={{ background: p.accent }}>{[0, 1, 2, 3, 4].map((i) => <span key={i} className="block shrink-0 rounded-full" style={{ width: 16, height: 2, background: p.background, opacity: 0.9 }} />)}</span>;
+      case 'free_shipping': return <span key={id} className="mx-1.5 block rounded-full p-[3px]" style={{ background: p.secondary }}><span className="block h-[3px] w-3/5 rounded-full" style={{ background: p.accent }} /></span>;
+      case 'flash': return <span key={id} className="mx-1.5 flex items-center justify-between rounded px-1.5 py-1" style={{ background: p.footer }}>{bar(26, 0.9, 3)}<span className="flex gap-[2px]">{[0, 1, 2].map((i) => <span key={i} className="block rounded-sm" style={{ width: 7, height: 8, background: p.accent }} />)}</span></span>;
+      case 'trust': return <span key={id} className="mx-1.5 flex justify-around py-0.5">{[0, 1, 2].map((i) => <span key={i} className="flex items-center gap-[3px]"><span className="block h-[6px] w-[6px] rounded-full" style={{ background: p.accent }} />{bar(14, 0.4, 2)}</span>)}</span>;
+      case 'categories': return categories();
+      case 'new_arrivals': case 'best_sellers': return products(id, false);
+      case 'on_sale': return products(id, true);
+      case 'offers': return <span key={id} className="mx-1.5 block rounded px-2 py-1" style={{ border: `1px dashed ${p.accent}`, background: soft(p.accent, 0.9) }}>{bar('45%', 0.8, 3)}</span>;
+      case 'story': return <span key={id} className="mx-1.5 flex gap-1.5"><span className="block h-[26px] w-[34%]" style={{ ...photo(2), borderRadius: radius }} /><span className="flex flex-1 flex-col justify-center gap-[3px]">{bar('70%', 0.8, 3)}{bar('95%', 0.35, 2)}{bar('85%', 0.35, 2)}</span></span>;
+      case 'visit': return <span key={id} className="mx-1.5 block h-[18px] rounded" style={{ background: p.secondary, border: `1px solid ${ink}1f` }} />;
+      default: return null;
+    }
+  };
+  const shown = tpl.sections.slice(0, 7);
+  return (
+    <span className="block aspect-[3/4] overflow-hidden rounded-lg ring-1 ring-black/10" style={{ background: p.background }}>
+      <span className="flex h-[15px] items-center justify-between px-1.5" style={{ background: p.header, borderBottom: `1px solid ${ink}18` }}>
+        <span className="block rounded-sm" style={{ width: 14, height: 6, background: p.primary }} />
+        <span className="flex gap-[3px]">{[0, 1, 2].map((i) => <span key={i} className="block rounded-full" style={{ width: 5, height: 5, background: ink, opacity: 0.35 }} />)}</span>
+      </span>
+      <span className="flex flex-col gap-[7px] pb-2">{shown.map((id) => block(id))}</span>
     </span>
   );
 }
+
+/** معاينة حية: متجرك الحقيقي جوه إطار موبايل، وبيتحدّث فورًا مع كل اختيار من غير حفظ. بتتبعت الإعدادات للإطار بـ postMessage (StoreLayout بيسمعها). */
+function LivePreview({ slug, payload, L, onClose }) {
+  const ref = useRef(null);
+  const [ready, setReady] = useState(0);
+  useEffect(() => {
+    const on = (e) => { if (e.origin === window.location.origin && e.data?.type === 'souqna-design-ready' && e.source === ref.current?.contentWindow) setReady((n) => n + 1); };
+    window.addEventListener('message', on);
+    return () => window.removeEventListener('message', on);
+  }, []);
+  useEffect(() => {
+    if (!ready || !ref.current?.contentWindow) return undefined;
+    const id = setTimeout(() => ref.current?.contentWindow?.postMessage({ type: 'souqna-design-preview', payload }, window.location.origin), 120);
+    return () => clearTimeout(id);
+  }, [ready, payload]);
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <div className="flex w-full items-center justify-between">
+        <p className="text-sm font-bold">{L('معاينة حية', 'Live preview')}</p>
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" to={`/s/${slug}`} target="_blank"><ExternalLink className="h-3.5 w-3.5" />{L('فتح المتجر', 'Open store')}</Button>
+          {onClose && <Button size="sm" variant="outline" onClick={onClose}>{L('إغلاق', 'Close')}</Button>}
+        </div>
+      </div>
+      <div className="relative w-[320px] max-w-full rounded-[2.4rem] bg-fg p-[9px] shadow-[0_24px_60px_-24px_rgba(20,33,61,.5)]">
+        <span className="absolute left-1/2 top-[14px] z-10 h-[5px] w-16 -translate-x-1/2 rounded-full bg-canvas/25" />
+        <div className="relative overflow-hidden rounded-[1.9rem] bg-white" style={{ height: 600 }}>
+          {!ready && <div className="absolute inset-0 grid place-items-center bg-white text-xs text-muted">{L('جاري تحميل المعاينة…', 'Loading preview…')}</div>}
+          <iframe ref={ref} title="store preview" src={`/s/${slug}?preview=design`} className="h-full w-full border-0" />
+        </div>
+      </div>
+      <p className="max-w-[320px] text-center text-[12px] leading-relaxed text-muted">{L('بتتغير فورًا وإنت بتختار. مفيش حاجة بتتنشر لحد ما تدوس حفظ.', 'Updates instantly as you choose. Nothing is published until you save.')}</p>
+    </div>
+  );
+}
+
 
 function CompletenessMeter({ store, L }) {
   const c = completeness(store);
@@ -100,6 +193,7 @@ export default function StoreDesigner() {
   const [dirty, setDirty] = useState(false);
   const [busy, setBusy] = useState(false);
   const [ai, setAi] = useState({ kind: '', vibe: '', note: '', busy: false, result: null });
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -118,6 +212,12 @@ export default function StoreDesigner() {
   }, [data]);
 
   const resolved = useMemo(() => (design ? resolveDesign({ design }) : null), [design]);
+  // اللي بيتبعت للمعاينة الحية: الشكل + ترتيب الأقسام + الألوان (موسم > قالب/ألوان مختارة > ألوان المحل الحالية)
+  const previewPayload = useMemo(() => {
+    if (!design || !data) return null;
+    const palette = (design.season && SEASONS[design.season]?.palette) || (applyPreset && THEME_PRESETS[applyPreset]) || null;
+    return { design, sectionsOrder: order, hiddenSections: [...hidden], palette, flash };
+  }, [design, data, order, hidden, applyPreset, flash]);
   if (error) return <ErrorState error={error} onRetry={reload} />;
   if (!design || !flash || !wa || !resolved) return <div className="space-y-4"><Skeleton className="h-8 w-60" /><Skeleton className="h-64 rounded-2xl" /><Skeleton className="h-64 rounded-2xl" /></div>;
 
@@ -184,7 +284,9 @@ export default function StoreDesigner() {
     <PageTransition className="pb-28">
       <PageHeader title={L('مصمّم المتجر', 'Store designer')} subtitle={L('اختار شكل متجرك وظبّطه بنفسك. كل حاجة اختيارية وتقدر ترجع للشكل الأصلي في أي وقت.', 'Pick a look and fine-tune it. Everything is optional.')}
         actions={<div className="hidden gap-2 md:flex"><Button variant="outline" to={`/s/${store.slug}`} target="_blank"><ExternalLink className="h-4 w-4" />{L('شوف متجرك', 'View store')}</Button><Button onClick={save} loading={busy} disabled={!dirty}>{L('حفظ', 'Save')}</Button></div>} />
-      <div className="space-y-5">
+      <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="min-w-0 space-y-5">
+        <div className="xl:hidden"><Button variant="outline" full onClick={() => setShowPreview(true)}><Smartphone className="h-4 w-4" />{L('معاينة حية للمتجر', 'Live store preview')}</Button></div>
         <CompletenessMeter store={data.store} L={L} />
 
         <Panel title={L('مودة تصمّم متجرك', 'Moda designs your store')} subtitle={L('احكيلها نوع محلك والإحساس اللي عايزه، وهي تقترح قالب وألوان وجمل جاهزة بالعامية. إنت اللي بتقرر وتعدّل.', 'Tell Moda your store type and vibe; she suggests a template, colours and copy.')}>
@@ -207,7 +309,7 @@ export default function StoreDesigner() {
         </Panel>
 
         <Panel title={L('اختار قالب', 'Choose a template')} subtitle={L('كل قالب بيغيّر الغلاف وترتيب الأقسام وشكل التصنيفات والكروت والكثافة. ألوانك مش بتتغير إلا لو وافقت.', 'Each template changes hero, section order, categories, cards and density.')}>
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-4">
             {TEMPLATE_IDS.map((id) => {
               const t = TEMPLATES[id]; const on = design.template === id;
               return (
@@ -279,6 +381,9 @@ export default function StoreDesigner() {
           </div>
         </Panel>
       </div>
+      <aside className="hidden xl:block"><div className="sticky top-4 rounded-3xl border border-line bg-elevated p-4"><LivePreview slug={store.slug} payload={previewPayload} L={L} /></div></aside>
+      </div>
+      {showPreview && <div className="fixed inset-0 z-50 overflow-y-auto bg-canvas/95 p-4 backdrop-blur xl:hidden"><LivePreview slug={store.slug} payload={previewPayload} L={L} onClose={() => setShowPreview(false)} /></div>}
 
       <div className="fixed inset-x-0 bottom-[calc(64px+var(--safe-b))] z-20 flex gap-3 border-t border-line bg-elevated/95 px-4 py-3 backdrop-blur-md md:hidden">
         <Button variant="outline" to={`/s/${store.slug}`} target="_blank"><ExternalLink className="h-4 w-4" /></Button>
