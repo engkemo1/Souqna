@@ -13,7 +13,7 @@ export function requireOwner(req, _res, next) {
     const { sub } = jwt.verify(token, config.jwtSecret);
     const user = q.get('SELECT id, name, email, role FROM users WHERE id=?', [sub]);
     if (!user) throw new Error('no user');
-    if (user.role === 'disabled') return next(new AppError(403, 'account_disabled', 'This account is disabled. Contact Banha Outfit.'));
+    if (user.role === 'disabled') return next(new AppError(403, 'account_disabled', 'This account is disabled. Contact Twist.'));
     if (user.role === 'demo' && !['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.path !== '/store/theme/preview') {
       return next(new AppError(403, 'demo_readonly', 'This is a demo store — changes are disabled.'));
     }

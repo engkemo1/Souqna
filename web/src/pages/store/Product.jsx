@@ -5,6 +5,7 @@ import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw
 import { useStore, sp } from '../../lib/store.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { exchangeLabel, exchangeSentence } from '../../lib/returns.js';
 import { useFavorites, useMarketCart } from '../../lib/cart.jsx';
 import { formatNumber } from '../../lib/format.js';
 import Gallery from '../../components/store/Gallery.jsx';
@@ -174,7 +175,7 @@ export default function Product() {
     marketCart.add({ productId: p.id, variantId: variant?.id ?? null, slug: p.slug, name: p.name, price: p.price, compareAt: p.compareAt,
       image: p.media?.[0] || p.image, color: color || null, colorName: selectedColor ? { ar: selectedColor.name_ar, en: selectedColor.name_en } : null,
       size: size && size !== 'One size' ? size : null, qty: Math.min(qty, available) }, store);
-    toast({ title: lang === 'ar' ? 'اتضاف لسلة طلة' : 'Added to Talla basket', tone: 'info', action: { label: lang === 'ar' ? 'افتحي السلة' : 'Open basket', onClick: () => nav('/market-cart') } });
+    toast({ title: lang === 'ar' ? 'اتضاف لسلة Twist' : 'Added to Twist basket', tone: 'info', action: { label: lang === 'ar' ? 'افتحي السلة' : 'Open basket', onClick: () => nav('/market-cart') } });
   };
 
   const share = async () => {
@@ -249,7 +250,7 @@ export default function Product() {
             <div className="flex-1"><AddButton state={addState} disabled={ctaDisabled} onClick={onAdd} label={ctaLabel} /></div>
           </div>
           <Button variant="outline" full className="mt-3" disabled={ctaDisabled} icon={ShoppingBag} onClick={onAddMarketplace}>
-            {lang === 'ar' ? 'أضف لسلة طلة' : 'Add to Talla basket'}
+            {lang === 'ar' ? 'أضف لسلة Twist' : 'Add to Twist basket'}
           </Button>
 
           <ProductAlerts product={p} store={store} />
@@ -258,7 +259,7 @@ export default function Product() {
             {p.sameDay && <li className="flex items-center gap-3 font-semibold text-emerald-800"><Truck className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('sameday.productLine', { time: new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(`2000-01-01T${store.sameDayUntil || '18:00'}:00`)) })}</li>}
             <li className="flex items-center gap-3"><Truck className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.delivery')}</li>
             <li className="flex items-center gap-3"><Banknote className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.cod')}</li>
-            <li className="flex items-center gap-3"><RefreshCcw className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.exchange')}</li>
+            {exchangeLabel(t, store) && <li className="flex items-center gap-3"><RefreshCcw className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{exchangeLabel(t, store)}</li>}
           </ul>
 
           <div className="mt-6 border-t border-line">
@@ -270,7 +271,7 @@ export default function Product() {
                 {p.sizes.length > 0 && <><dt>{t('product.size')}</dt><dd className="font-medium text-fg">{p.sizes.join(' · ')}</dd></>}
               </dl>
             </Accordion>
-            <Accordion title={t('product.shipping')}><p>{t('product.shippingBody')}</p></Accordion>
+            <Accordion title={t('product.shipping')}><p>{t('product.shippingBody', { ex: exchangeSentence(t, store) }).trim()}</p></Accordion>
           </div>
         </section>
       </div>

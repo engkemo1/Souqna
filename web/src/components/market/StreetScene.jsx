@@ -10,14 +10,14 @@ const cx = (...a) => a.filter(Boolean).join(' ');
  * department's products), the people are shoppers walking the street, the lamp-post plaque is the street's name.
  * Pure SVG: no photos, scales to any width.
  */
-const NAVY = '#14213D';
-const ORANGE = '#F45100';
+const NAVY = '#03244D';
+const ORANGE = '#F8620A';
 const SKIN = '#EBCBB1';
 const SHOP_W = 180;
 const STEP = 226;
 const MARGIN = 40;
 const TOPS = [168, 140, 176, 150, 172, 144, 164, 152, 170, 142, 166, 148, 174, 146];
-const WALLS = ['#FFF8F0', '#EAF1FA', '#FDEBDD', '#EEF4EC', '#FFF3E3', '#E9EEF7', '#FFF7F1'];
+const WALLS = ['#F8FAFD', '#EAF1FA', '#F1F5FB', '#EEF4F0', '#F4F7FC', '#E9EEF7', '#F6F9FD'];
 const ROOFS = ['tank', 'antenna', 'flag', 'plant'];
 /** every department of the marketplace gets its own shop; the order is the order the shopper walks (right → left in Arabic) */
 const DEPTS = [
@@ -54,22 +54,22 @@ function Rail({ kind, wy }) {
   const y = wy + 20;
   if (['bag', 'acc', 'under'].includes(kind)) return null;
   const line = <line x1="26" y1={y} x2="102" y2={y} stroke="#9AA3B2" strokeWidth="2" strokeLinecap="round" />;
-  if (kind === 'hijab') return <g>{line}{['#F45100', '#14213D', '#F9B58F', '#6C7A99'].map((c, i) => <g key={i} transform={`translate(${34 + i * 20},${y})`}><path d="M0 0 L-3 3" stroke="#9AA3B2" strokeWidth="1.5" /><rect x="-6" y="3" width="12" height="28" rx="4" fill={c} /><path d="M-6 12 H6 M-6 20 H6" stroke="#FFFFFF" strokeWidth="1" opacity="0.5" /></g>)}</g>;
+  if (kind === 'hijab') return <g>{line}{['#F8620A', '#03244D', '#F9B58F', '#6C7A99'].map((c, i) => <g key={i} transform={`translate(${34 + i * 20},${y})`}><path d="M0 0 L-3 3" stroke="#9AA3B2" strokeWidth="1.5" /><rect x="-6" y="3" width="12" height="28" rx="4" fill={c} /><path d="M-6 12 H6 M-6 20 H6" stroke="#FFFFFF" strokeWidth="1" opacity="0.5" /></g>)}</g>;
   if (kind === 'abaya') return <g>{line}{[0, 1, 2].map((i) => <g key={i} transform={`translate(${40 + i * 24},${y})`}><path d="M-8 4 L8 4 L11 56 L-11 56 Z" fill="#23232B" /><rect x="-1.5" y="4" width="3" height="52" fill="#E0B25A" opacity="0.8" /></g>)}</g>;
-  if (kind === 'jalabiya') return <g>{line}{[0, 1, 2].map((i) => <g key={i} transform={`translate(${40 + i * 24},${y})`}><path d="M-8 4 L8 4 L11 56 L-11 56 Z" fill={['#FFFFFF', '#EADBCB', '#D9DEE8'][i]} stroke="#D9DEE8" strokeWidth="1" /><path d="M0 4 V24" stroke="#C9CBD4" strokeWidth="1" /></g>)}</g>;
-  if (kind === 'denim') return <g>{line}{['#3E6FB0', '#2C4F86', '#7FA3D6', '#14213D'].map((c, i) => <g key={i} transform={`translate(${34 + i * 20},${y})`}><path d="M-7 3 H7 L8 22 L4.5 46 H0.6 L0 22 L-0.6 46 H-4.5 L-8 22 Z" fill={c} /></g>)}</g>;
-  return <g>{line}{['#F45100', '#14213D', '#F9B58F', '#6C7A99'].map((c, i) => (
+  if (kind === 'jalabiya') return <g>{line}{[0, 1, 2].map((i) => <g key={i} transform={`translate(${40 + i * 24},${y})`}><path d="M-8 4 L8 4 L11 56 L-11 56 Z" fill={['#FFFFFF', '#DCE3EE', '#D9DEE8'][i]} stroke="#D9DEE8" strokeWidth="1" /><path d="M0 4 V24" stroke="#C9CBD4" strokeWidth="1" /></g>)}</g>;
+  if (kind === 'denim') return <g>{line}{['#3E6FB0', '#2C4F86', '#7FA3D6', '#03244D'].map((c, i) => <g key={i} transform={`translate(${34 + i * 20},${y})`}><path d="M-7 3 H7 L8 22 L4.5 46 H0.6 L0 22 L-0.6 46 H-4.5 L-8 22 Z" fill={c} /></g>)}</g>;
+  return <g>{line}{['#F8620A', '#03244D', '#F9B58F', '#6C7A99'].map((c, i) => (
     <g key={i} transform={`translate(${34 + i * 20},${y})`}><path d="M0 0 L-3 3" stroke="#9AA3B2" strokeWidth="1.5" /><path d="M-9 6 L-4 3 L0 6 L4 3 L9 6 L7 12 L5 11 L5 24 L-5 24 L-5 11 L-7 12 Z" fill={c} opacity="0.92" /></g>
   ))}</g>;
 }
 
 function Window({ wy, kind, sale, soon }) {
   const h = 440 - wy;
-  const garments = ['#F45100', '#14213D', '#F9B58F', '#6C7A99'];
+  const garments = ['#F8620A', '#03244D', '#F9B58F', '#6C7A99'];
   return (
     <g>
       <rect x="14" y={wy} width="100" height={h} rx="5" fill="#FFF6EC" />
-      <rect x="14" y="430" width="100" height="10" fill="#EADBCB" />
+      <rect x="14" y="430" width="100" height="10" fill="#DCE3EE" />
       <Rail kind={kind} wy={wy} />
       {kind === 'dress' && (
         <g>
@@ -98,7 +98,7 @@ function Window({ wy, kind, sale, soon }) {
       )}
       {kind === 'shoes' && (
         <g>
-          <rect x="20" y="384" width="88" height="5" rx="2" fill="#B9AA97" /><rect x="20" y="424" width="88" height="5" rx="2" fill="#B9AA97" />
+          <rect x="20" y="384" width="88" height="5" rx="2" fill="#9AA6B8" /><rect x="20" y="424" width="88" height="5" rx="2" fill="#9AA6B8" />
           {[0, 1, 2].map((i) => (
             <g key={i} transform={`translate(${28 + i * 29},${384})`}>
               <path d="M0 0 L0 -14 Q10 -16 14 -8 L24 -6 Q27 -5 27 0 Z" fill={[ORANGE, NAVY, '#F9B58F'][i]} /><rect x="-1" y="-2" width="29" height="3" rx="1.5" fill="#FFFFFF" />
@@ -110,7 +110,7 @@ function Window({ wy, kind, sale, soon }) {
       )}
       {kind === 'bag' && (
         <g>
-          <rect x="20" y="398" width="88" height="5" rx="2" fill="#B9AA97" /><rect x="20" y="430" width="88" height="5" rx="2" fill="#B9AA97" />
+          <rect x="20" y="398" width="88" height="5" rx="2" fill="#9AA6B8" /><rect x="20" y="430" width="88" height="5" rx="2" fill="#9AA6B8" />
           <path d="M30 398 L26 372 L54 372 L50 398 Z" fill={ORANGE} /><path d="M33 372 Q40 358 47 372" stroke={ORANGE} strokeWidth="3" fill="none" /><rect x="34" y="382" width="12" height="3" rx="1.5" fill="#FFFFFF" />
           <rect x="62" y="378" width="34" height="20" rx="4" fill={NAVY} /><path d="M66 378 Q79 364 92 378" stroke={NAVY} strokeWidth="2.5" fill="none" /><circle cx="79" cy="388" r="2.6" fill="#F9B58F" />
           <path d="M28 430 L84 430 L80 410 L32 410 Z" fill="#F9B58F" /><rect x="52" y="418" width="8" height="4" rx="2" fill={NAVY} />
@@ -130,8 +130,8 @@ function Window({ wy, kind, sale, soon }) {
         <g>
           <circle cx="64" cy="344" r="9" fill={SKIN} /><path d="M54 340 Q64 328 74 340 L84 396 Q64 384 44 396 Z" fill="#FFFFFF" opacity="0.55" />
           <rect x="61" y="351" width="6" height="6" fill={SKIN} />
-          <path d="M52 358 L76 358 L72 384 L98 434 L30 434 L56 384 Z" fill="#FFFFFF" stroke="#E4D8CA" strokeWidth="1.5" /><rect x="55" y="381" width="18" height="4" rx="2" fill={ORANGE} />
-          <path d="M44 420 Q64 428 84 420" stroke="#E4D8CA" strokeWidth="1.2" fill="none" />
+          <path d="M52 358 L76 358 L72 384 L98 434 L30 434 L56 384 Z" fill="#FFFFFF" stroke="#DCE3EE" strokeWidth="1.5" /><rect x="55" y="381" width="18" height="4" rx="2" fill={ORANGE} />
+          <path d="M44 420 Q64 428 84 420" stroke="#DCE3EE" strokeWidth="1.2" fill="none" />
           <g transform="translate(96,418)"><path d="M0 0 L-4 -10 M0 0 L4 -10 M0 0 L0 -12" stroke="#6E9D80" strokeWidth="1.5" /><circle cx="-4" cy="-12" r="3" fill={ORANGE} /><circle cx="4" cy="-12" r="3" fill="#F9B58F" /><circle cx="0" cy="-14" r="3" fill={ORANGE} /></g>
         </g>
       )}
@@ -169,7 +169,7 @@ function Window({ wy, kind, sale, soon }) {
       )}
       {kind === 'acc' && (
         <g>
-          <rect x="20" y="398" width="88" height="5" rx="2" fill="#B9AA97" /><rect x="20" y="430" width="88" height="5" rx="2" fill="#B9AA97" />
+          <rect x="20" y="398" width="88" height="5" rx="2" fill="#9AA6B8" /><rect x="20" y="430" width="88" height="5" rx="2" fill="#9AA6B8" />
           <path d="M32 372 Q48 404 64 372" stroke="#E0B25A" strokeWidth="2.4" fill="none" /><circle cx="48" cy="394" r="3.6" fill={ORANGE} />
           <rect x="74" y="378" width="6" height="22" rx="2" fill={NAVY} /><circle cx="77" cy="388" r="8" fill="#FFFFFF" stroke={NAVY} strokeWidth="2" /><path d="M77 388 V383 M77 388 L81 390" stroke={NAVY} strokeWidth="1.2" />
           <circle cx="34" cy="422" r="7" fill="none" stroke={NAVY} strokeWidth="2" /><circle cx="50" cy="422" r="7" fill="none" stroke={NAVY} strokeWidth="2" /><path d="M41 422 H43" stroke={NAVY} strokeWidth="2" />
@@ -179,7 +179,7 @@ function Window({ wy, kind, sale, soon }) {
       )}
       {kind === 'under' && (
         <g>
-          <rect x="20" y="386" width="88" height="5" rx="2" fill="#B9AA97" /><rect x="20" y="410" width="88" height="5" rx="2" fill="#B9AA97" /><rect x="20" y="434" width="88" height="5" rx="2" fill="#B9AA97" />
+          <rect x="20" y="386" width="88" height="5" rx="2" fill="#9AA6B8" /><rect x="20" y="410" width="88" height="5" rx="2" fill="#9AA6B8" /><rect x="20" y="434" width="88" height="5" rx="2" fill="#9AA6B8" />
           {[['#FFFFFF', 0], ['#F9B58F', 1], [NAVY, 2], ['#6C7A99', 3]].map(([c, i]) => <g key={i}><rect x={26 + i * 22} y="372" width="18" height="14" rx="2" fill={c} stroke="#E4E7EE" strokeWidth="0.8" /><rect x={26 + i * 22} y="394" width="18" height="16" rx="2" fill={c} stroke="#E4E7EE" strokeWidth="0.8" opacity="0.9" /></g>)}
           {[ORANGE, '#FFFFFF', NAVY].map((c, i) => <rect key={i} x={30 + i * 28} y="420" width="20" height="14" rx="2" fill={c} stroke="#E4E7EE" strokeWidth="0.8" />)}
         </g>
@@ -326,7 +326,7 @@ function Lamp({ x, name, lang }) {
       {name && (
         <g>
           <rect x={x - 38} y="262" width="76" height="28" rx="7" fill={NAVY} /><rect x={x - 35} y="265" width="70" height="22" rx="5" fill="none" stroke="#FFFFFF" strokeWidth="1" opacity="0.5" />
-          <text x={x + 8} y="281" textAnchor="middle" fontSize="13" fontWeight="800" fill="#FFFFFF" className="font-display">{lang === 'ar' ? 'شارع طلة' : 'Talla St.'}</text>
+          <text x={x + 8} y="281" textAnchor="middle" fontSize="13" fontWeight="800" fill="#FFFFFF" className="font-display">Twist</text>
           <path d={`M${x - 29} 276 Q${x - 22} 268 ${x - 15} 276 Q${x - 22} 284 ${x - 29} 276 Z`} fill="#FFFFFF" /><circle cx={x - 22} cy="276" r="2.6" fill={ORANGE} />
         </g>
       )}
@@ -414,7 +414,7 @@ function Tuktuk({ x, flip }) {
       <path d="M0 -44 Q2 -60 20 -62 L26 -62 L26 -40 Z" fill="#DCEAF4" stroke={NAVY} strokeWidth="2" />
       <path d="M-4 -14 Q-6 -34 8 -40 L28 -42 L74 -42 Q82 -40 82 -26 L82 -14 Z" fill={ORANGE} />
       <rect x="30" y="-40" width="40" height="12" rx="3" fill="#FFFFFF" opacity="0.95" />
-      <Mark x={50} y={-30.5} flip={flip} size={10.5} fill={ORANGE}>طلّة</Mark>
+      <Mark x={50} y={-30.5} flip={flip} size={10.5} fill={ORANGE}>Twist</Mark>
       <path d="M30 -27 H70" stroke={NAVY} strokeWidth="1.2" opacity="0.5" />
       <Pennant x={5} y={-72} h={22} delay={-0.6} />
       <circle cx="2" cy="-30" r="3.4" fill="#FFE2B8" />
@@ -430,7 +430,7 @@ function Van({ x, flip }) {
       <ellipse cx="14" cy="2" rx="68" ry="5.5" fill={NAVY} opacity="0.15" />
       <rect x="-20" y="-76" width="92" height="62" rx="5" fill={NAVY} />
       <rect x="-20" y="-34" width="92" height="8" fill={ORANGE} />
-      <Mark x={26} y={-48} flip={flip} size={25} fill="#FFFFFF">طلّة</Mark>
+      <Mark x={26} y={-48} flip={flip} size={25} fill="#FFFFFF">Twist</Mark>
       <Mark x={26} y={-38.5} flip={flip} size={7.5} fill="#FFC9A3" weight={700}>توصيل من محلات بنها</Mark>
       <path d="M-22 -14 L-22 -42 Q-22 -48 -17 -50 L-46 -50 Q-56 -50 -62 -36 L-66 -26 Q-68 -14 -66 -14 Z" fill={ORANGE} />
       <path d="M-50 -45 L-58 -31 L-26 -31 L-26 -45 Z" fill="#DCEAF4" stroke={NAVY} strokeWidth="1.5" />
@@ -493,7 +493,7 @@ function Sky() {
 }
 
 function Skyline() {
-  const tints = ['#F7DFCB', '#F1D6C0', '#EDCFB8'];
+  const tints = ['#DCE5F1', '#D3DEEC', '#CAD7E8'];
   const blocks = [];
   for (let x = 0, i = 0; x < W; i += 1) { const w = 34 * (3 + ((i * 7) % 3)); blocks.push([x, 96 + 36 * ((i * 5) % 3), w, i]); x += w; }
   const mosques = [Math.round(W * 0.22), Math.round(W * 0.7)];
@@ -514,9 +514,9 @@ function Skyline() {
       ))}
       {mosques.map((mx) => (
         <g key={mx}>
-          <rect x={mx + 118} y="70" width="16" height="100" fill="#F5DCC7" /><rect x={mx + 113} y="96" width="26" height="6" rx="2" fill="#E6C8AE" />
-          <path d={`M${mx + 118} 70 L${mx + 126} 44 L${mx + 134} 70 Z`} fill="#E6C8AE" /><circle cx={mx + 126} cy="41" r="3.4" fill={ORANGE} />
-          <rect x={mx} y="118" width="112" height="70" fill="#F3D9C4" /><path d={`M${mx + 10} 118 Q${mx + 56} 62 ${mx + 102} 118 Z`} fill="#E9CDB6" /><rect x={mx + 54.5} y="52" width="3" height="20" fill="#E9CDB6" /><circle cx={mx + 56} cy="50" r="3.4" fill={ORANGE} />
+          <rect x={mx + 118} y="70" width="16" height="100" fill="#E3EAF4" /><rect x={mx + 113} y="96" width="26" height="6" rx="2" fill="#C9D6E8" />
+          <path d={`M${mx + 118} 70 L${mx + 126} 44 L${mx + 134} 70 Z`} fill="#C9D6E8" /><circle cx={mx + 126} cy="41" r="3.4" fill={ORANGE} />
+          <rect x={mx} y="118" width="112" height="70" fill="#E0E8F3" /><path d={`M${mx + 10} 118 Q${mx + 56} 62 ${mx + 102} 118 Z`} fill="#CFDBEB" /><rect x={mx + 54.5} y="52" width="3" height="20" fill="#CFDBEB" /><circle cx={mx + 56} cy="50" r="3.4" fill={ORANGE} />
         </g>
       ))}
     </g>
@@ -527,7 +527,7 @@ function Scooter({ x, flip }) {
   return (
     <g transform={`translate(${x},650) scale(${flip ? -1 : 1},1)`}>
       <ellipse cx="34" cy="2" rx="40" ry="4.5" fill={NAVY} opacity="0.14" />
-      <rect x="-6" y="-58" width="34" height="26" rx="4" fill={ORANGE} /><Mark x={11} y={-40.5} flip={flip} size={12} fill="#FFFFFF">طلّة</Mark><path d="M-1 -35 H23" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.7" /><Pennant x={-2} y={-58} h={18} color={NAVY} />
+      <rect x="-6" y="-58" width="34" height="26" rx="4" fill={ORANGE} /><Mark x={11} y={-40.5} flip={flip} size={12} fill="#FFFFFF">Twist</Mark><path d="M-1 -35 H23" stroke="#FFFFFF" strokeWidth="1.4" opacity="0.7" /><Pennant x={-2} y={-58} h={18} color={NAVY} />
       <path d="M26 -34 L40 -34 L52 -24 L60 -24 L62 -14 L12 -14 L16 -34 Z" fill={NAVY} />
       <path d="M52 -24 L50 -48 L60 -48" stroke={NAVY} strokeWidth="3" fill="none" strokeLinecap="round" /><circle cx="42" cy="-40" r="5" fill={SKIN} /><path d="M37 -38 Q42 -48 47 -38 Z" fill={ORANGE} />
       <circle cx="12" cy="-8" r="9" fill={NAVY} /><circle cx="12" cy="-8" r="3.5" fill="#C9CBD4" /><circle cx="58" cy="-8" r="9" fill={NAVY} /><circle cx="58" cy="-8" r="3.5" fill="#C9CBD4" />
@@ -562,7 +562,7 @@ const Art = memo(function Art({ lang, labels, counts }) {
   const ar = lang === 'ar';
   const colors = COLORS; const swags = SWAGS;
   return (
-        <div className="relative shrink-0 select-none overflow-hidden [--h:360px] sm:[--h:440px] lg:[--h:540px]" style={{ height: 'var(--h)', width: `calc(var(--h) * ${W / VB_H})`, background: 'linear-gradient(180deg,#FFF5EC 0%,#FFE8D4 45%,#FFF2E6 100%)' }}>
+        <div className="relative shrink-0 select-none overflow-hidden [--h:360px] sm:[--h:440px] lg:[--h:540px]" style={{ height: 'var(--h)', width: `calc(var(--h) * ${W / VB_H})`, background: 'linear-gradient(180deg,#F6F9FD 0%,#EEF3FA 50%,#F4F7FB 100%)' }}>
         <Sky />
         <svg viewBox={`0 ${VB_Y0} ${W} ${VB_H}`} role="img" aria-label={ar ? 'شارع محلات الملابس في بنها' : 'A street of clothing shops in Banha'} className="st-main absolute inset-0 block h-full w-full">
           <defs>
@@ -579,12 +579,12 @@ const Art = memo(function Art({ lang, labels, counts }) {
             </g>
           ))}
 
-          <rect y="480" width={W} height="86" fill="#EFE5D8" />
-          {Array.from({ length: Math.ceil(W / 62) + 1 }, (_, i) => <rect key={i} x={i * 62 - 10} y="480" width="2" height="86" fill="#D9CCBC" opacity="0.7" />)}
-          <rect y="514" width={W} height="2" fill="#D9CCBC" opacity="0.7" />
-          <rect y="566" width={W} height="12" fill="#D2C5B4" /><rect y="566" width={W} height="3" fill="#FFFFFF" opacity="0.5" />
-          <rect y="578" width={W} height="92" fill="#C9C0B4" />
-          {Array.from({ length: Math.ceil(W / 112) }, (_, i) => <rect key={i} x={i * 112 + 24} y="618" width="58" height="5" rx="2.5" fill="#F7F0E4" />)}
+          <rect y="480" width={W} height="86" fill="#E6EAF0" />
+          {Array.from({ length: Math.ceil(W / 62) + 1 }, (_, i) => <rect key={i} x={i * 62 - 10} y="480" width="2" height="86" fill="#CBD3DE" opacity="0.7" />)}
+          <rect y="514" width={W} height="2" fill="#CBD3DE" opacity="0.7" />
+          <rect y="566" width={W} height="12" fill="#C3CCD9" /><rect y="566" width={W} height="3" fill="#FFFFFF" opacity="0.5" />
+          <rect y="578" width={W} height="92" fill="#B7C0CE" />
+          {Array.from({ length: Math.ceil(W / 112) }, (_, i) => <rect key={i} x={i * 112 + 24} y="618" width="58" height="5" rx="2.5" fill="#F1F4F9" />)}
 
           {SHOPS.slice(0, -1).map((_, i) => (i % 2 === 0 ? <Tree key={`t${i}`} x={gapX(i)} /> : <Lamp key={`l${i}`} x={gapX(i)} name={i === 3} lang={lang} />))}
           <Plant x={W - 16} /><Plant x={16} />
@@ -692,10 +692,10 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
       </div>
 
       {/* edge fades + arrows */}
-      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 start-0 w-12" style={{ background: 'linear-gradient(to right, rgba(255,245,236,.85), transparent)' }} />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-0 w-12" style={{ background: 'linear-gradient(to left, rgba(255,245,236,.85), transparent)' }} />
-      <button type="button" onClick={() => go(-1)} disabled={edge.end} aria-label={ar ? 'المحلات التالية' : 'Next shops'} className="absolute left-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#14213D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronLeft className="h-5 w-5" /></button>
-      <button type="button" onClick={() => go(1)} disabled={edge.start} aria-label={ar ? 'المحلات السابقة' : 'Previous shops'} className="absolute right-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#14213D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronRight className="h-5 w-5" /></button>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 start-0 w-12" style={{ background: 'linear-gradient(to right, rgba(246,249,253,.95), transparent)' }} />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 end-0 w-12" style={{ background: 'linear-gradient(to left, rgba(246,249,253,.95), transparent)' }} />
+      <button type="button" onClick={() => go(-1)} disabled={edge.end} aria-label={ar ? 'المحلات التالية' : 'Next shops'} className="absolute left-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#03244D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronLeft className="h-5 w-5" /></button>
+      <button type="button" onClick={() => go(1)} disabled={edge.start} aria-label={ar ? 'المحلات السابقة' : 'Previous shops'} className="absolute right-3 top-1/2 hidden h-11 w-11 -translate-y-1/2 place-items-center rounded-full bg-white text-[#03244D] shadow-lg ring-1 ring-black/5 transition hover:bg-brand hover:text-white disabled:pointer-events-none disabled:opacity-0 md:grid"><ChevronRight className="h-5 w-5" /></button>
       <p className={cx('pointer-events-none absolute bottom-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/95 px-4 py-2 text-xs font-bold text-brand shadow-md transition-opacity duration-500', moved && 'opacity-0')}>{ar ? `${SHOPS.length} محل في شارع واحد — اسحب واتمشّى` : `${SHOPS.length} shops on one street — drag to walk`}</p>
     </div>
   );

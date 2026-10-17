@@ -73,7 +73,7 @@ export default function VisualSearch() {
   };
   const pick = (e) => { const file = e.target.files?.[0]; e.target.value = ''; handleFile(file); };
 
-  // a photo shared straight from Instagram / WhatsApp / the gallery (installed app → Share → طلة)
+  // a photo shared straight from Instagram / WhatsApp / the gallery (installed app → Share → Twist)
   useEffect(() => {
     const token = sp.get('shared'); if (!token) return;
     (async () => {
@@ -219,7 +219,7 @@ export default function VisualSearch() {
               <h2 className="mt-4 font-display text-xl font-bold">{t('visual.noMatchTitle')}</h2>
               <p className="mt-2 text-sm leading-6 text-muted">{t(similar.length ? 'visual.noMatchBodySimilar' : 'visual.noMatchBody')}</p>
               <div className="mt-5 flex flex-wrap justify-center gap-2">
-                <Link to={requestHref} onClick={() => { visualHandoff.blob = blob; }} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-brand px-5 text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.98]"><PackagePlus className="h-4 w-4" />{t('visual.getIt')}</Link>
+                <Link to={requestHref} onClick={() => { visualHandoff.blob = blob; }} className="inline-flex h-11 items-center justify-center gap-2 rounded-full bg-btn px-5 text-sm font-bold text-white transition hover:opacity-90 active:scale-[0.98]"><PackagePlus className="h-4 w-4" />{t('visual.getIt')}</Link>
                 <Button variant="outline" onClick={() => input.current?.click()} icon={RefreshCcw}>{t('visual.again')}</Button>
                 {dept && <Button variant="outline" onClick={() => changeDept('')}>{t('visual.tryAllDepts')}</Button>}
               </div>

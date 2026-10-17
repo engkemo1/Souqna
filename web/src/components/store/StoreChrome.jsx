@@ -8,6 +8,7 @@ import { Search, Heart, ShoppingBag, Home, LayoutGrid, ChevronLeft, ChevronRight
 import { useI18n } from '../../lib/i18n.jsx';
 import { useCart, useFavorites, useMarketCart } from '../../lib/cart.jsx';
 import { useStore, sp } from '../../lib/store.jsx';
+import { exchangeLabel, exchangeSentence } from '../../lib/returns.js';
 import { useScrollDirection, useScrolled } from '../../lib/hooks.js';
 import { formatMoney } from '../../lib/format.js';
 import SmartImage from '../ui/SmartImage.jsx';
@@ -151,7 +152,7 @@ export function StoreHeader() {
           <IconButton to={sp(store.slug, 'favorites')} label={t('store.favorites')} icon={Heart} className="hidden lg:inline-grid" badge={<CountBadge n={favs.count} />} />
           <IconButton label={t('store.cart')} icon={ShoppingBag} onClick={cart.open} data-cart-target className="hidden lg:inline-grid" badge={<CountBadge n={cart.count} bumpKey={cart.bump} />} />
           <IconButton to={sp(store.slug, 'cart')} label={t('store.cart')} icon={ShoppingBag} data-cart-target className="lg:hidden" badge={<CountBadge n={cart.count} bumpKey={cart.bump} />} />
-          <IconButton to="/market-cart" label={isRtl ? 'سلة طلة' : 'Talla basket'} icon={ShoppingBag} badge={<CountBadge n={marketCart.count} />} />
+          <IconButton to="/market-cart" label={isRtl ? 'سلة Twist' : 'Twist basket'} icon={ShoppingBag} badge={<CountBadge n={marketCart.count} />} />
         </div>
       </div>
     </header>
@@ -219,7 +220,7 @@ export function TrustStrip({ className }) {
   const defaultItems = [
     { icon: Truck, title: t('store.delivery'), body: t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) }) },
     { icon: Banknote, title: t('store.cod'), body: t('market.why1b') },
-    { icon: RefreshCcw, title: t('store.exchange'), body: t('market.why2b') },
+    ...(exchangeLabel(t, store) ? [{ icon: RefreshCcw, title: exchangeLabel(t, store), body: t('store.exchangeBody') }] : []),
   ];
 
   const items = (customBadges?.items && customBadges.items.length > 0)
@@ -280,13 +281,13 @@ export function StoreFooter() {
         <div>
           <h3 className="text-sm font-semibold text-on-footer">{t('store.about')}</h3>
           <ul className="mt-4 space-y-2.5 text-sm text-footer-muted">
-            <li>{t('store.cod')}</li><li>{t('store.exchange')}</li><li>{t('store.delivery')}</li>
+            <li>{t('store.cod')}</li>{exchangeLabel(t, store) && <li>{exchangeLabel(t, store)}</li>}<li>{t('store.delivery')}</li>
           </ul>
         </div>
       </div>
       <div className="border-t border-white/10">
         <div className="container flex flex-col items-center justify-between gap-3 py-6 text-xs text-footer-muted sm:flex-row">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1"><p>© {new Date().getFullYear()} {tr(store.name)}</p>{[['privacy', 'legal.privacy'], ['terms', 'legal.terms'], ['returns', 'legal.returns']].map(([k, l]) => <Link key={k} className="hover:text-on-footer" to={`/legal/${k}`}>{t(l)}</Link>)}</div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1"><p>© {new Date().getFullYear()} {tr(store.name)}</p>{[['privacy', 'legal.privacy'], ['terms', 'legal.terms']].map(([k, l]) => <Link key={k} className="hover:text-on-footer" to={`/legal/${k}`}>{t(l)}</Link>)}</div>
           <Link to="/" className="inline-flex items-center gap-1.5 hover:text-on-footer"><Store className="h-3.5 w-3.5" />{t('store.poweredBy')} · {t('app.name')}</Link>
         </div>
       </div>

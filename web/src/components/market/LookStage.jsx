@@ -32,11 +32,11 @@ export default function LookStage({ entry, avatar = null, headingAs: Heading = '
         {cur && <span className="rounded-full bg-black/40 px-2.5 py-1 text-[10.5px] font-semibold text-white/90 backdrop-blur">{lang === 'ar' ? 'صورة توضيحية للإطلالة' : 'Illustrative image'}</span>}
       </div>
     </div>
-    <div className="order-2 min-w-0 rounded-[28px] border border-brand/15 bg-elevated p-4 shadow-sm sm:p-6 lg:order-1">
+    <div className="order-2 min-w-0 rounded-[28px] border border-line bg-elevated p-4 shadow-sm sm:p-6 lg:order-1">
       <div className="flex items-start gap-3">
         <ModaAvatar src={avatar} size={52} />
         <div className="min-w-0">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-1 text-[12px] font-bold text-brand"><Sparkles className="h-3.5 w-3.5" />{lang === 'ar' ? `${assistantName} نسّقت لك` : `Styled by ${assistantName}`}</span>
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF0F8] px-2.5 py-1 text-[12px] font-bold text-brand"><Sparkles className="h-3.5 w-3.5" />{lang === 'ar' ? `${assistantName} نسّقت لك` : `Styled by ${assistantName}`}</span>
           <p className="mt-2 text-[13px] font-semibold text-muted">{entry.occasion}{entry.age ? ` · ${entry.age}` : ''}</p>
         </div>
       </div>

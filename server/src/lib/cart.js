@@ -18,7 +18,7 @@ export function findCoupon(storeId, code) {
 const dayOk = (o, d) => (o.starts_at && o.starts_at > d ? 'coupon_not_started' : o.ends_at && o.ends_at < d ? 'coupon_expired' : o.usage_limit && o.usage_count >= o.usage_limit ? 'coupon_used_up' : null);
 const normPhone = (v) => String(v || '').replace(/\D/g, '');
 
-/** Platform-wide coupon (funded by Banha Outfit). `phone` is optional while browsing; it is enforced when the order is placed. */
+/** Platform-wide coupon (funded by Twist). `phone` is optional while browsing; it is enforced when the order is placed. */
 export function findPlatformCoupon(code, phone) {
   if (!code) return null;
   const o = q.get('SELECT * FROM platform_coupons WHERE UPPER(code)=UPPER(?) AND active=1', [String(code).trim()]);
@@ -76,7 +76,7 @@ export function quote(store, items = [], couponCode, { phone } = {}) {
   let platformDiscount = 0;
   if (couponCode) {
     let r = findCoupon(store.id, couponCode);
-    if (r.error === 'coupon_invalid') r = findPlatformCoupon(couponCode, phone); // not a store code → try a Banha Outfit code
+    if (r.error === 'coupon_invalid') r = findPlatformCoupon(couponCode, phone); // not a store code → try a Twist code
     if (r.error) couponError = r.error;
     else if (subtotal < r.offer.min_subtotal) couponError = 'coupon_min_subtotal';
     else {

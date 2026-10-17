@@ -107,13 +107,13 @@ export default function MarketHeader() {
               {t(cat.label)}
             </Link>
           ))}
-          <Link to="/search?sale=1" className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#fff0e5] px-3 py-1.5 font-bold text-brand transition hover:bg-brand hover:text-white"><Flame className="h-4 w-4" />{lang === 'ar' ? 'عروض بنها' : 'Banha deals'}</Link>
+          <Link to="/search?sale=1" className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#EAF0F8] px-3 py-1.5 font-bold text-brand transition hover:bg-btn hover:text-white"><Flame className="h-4 w-4" />{lang === 'ar' ? 'عروض بنها' : 'Banha deals'}</Link>
         </div>
       </div>
 
       {mobileMenuOpen && <div className="border-t border-line bg-white shadow-lg md:hidden">
         <div className="container grid gap-2 py-4">
-          <Link to="/stores" onClick={() => setMobileMenuOpen(false)} className="rounded-xl bg-brand px-4 py-3 text-center text-sm font-bold text-white">{t('market.exploreStores')}</Link>
+          <Link to="/stores" onClick={() => setMobileMenuOpen(false)} className="rounded-xl bg-btn px-4 py-3 text-center text-sm font-bold text-white">{t('market.exploreStores')}</Link>
           <a href="/#products" onClick={handleSectionLink('products')} className="rounded-xl border border-line px-4 py-3 text-center text-sm font-bold text-fg">{t('market.browseProducts')}</a>
           <Link to="/join" onClick={() => setMobileMenuOpen(false)} className="rounded-xl border border-line px-4 py-3 text-center text-sm font-bold text-fg">{t('market.openStore')}</Link>
           <div className="grid grid-cols-2 gap-2 pt-1">

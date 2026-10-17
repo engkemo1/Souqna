@@ -19,7 +19,7 @@ import { useDepartments } from '../../lib/departments.js';
 import PageTransition from '../../components/PageTransition.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'hero_mode', 'delivery_mode', 'opens_at', 'closes_at', 'day_off', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'hero_mode', 'delivery_mode', 'opens_at', 'closes_at', 'day_off', 'return_days', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
 
 function HeroModePicker({ value, onChange }) {
   const { t } = useI18n();
@@ -53,7 +53,7 @@ function AutoCover({ onDone }) {
   };
   return (
     <button type="button" onClick={run} disabled={busy}
-      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-l from-[#FF966F] via-[#F26B38] to-[#B84421] px-4 py-2.5 text-sm font-bold text-[#111] disabled:opacity-60">
+      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-l from-[#FF966F] via-[#F8620A] to-[#B84421] px-4 py-2.5 text-sm font-bold text-[#111] disabled:opacity-60">
       {busy ? 'بنصمم الـ cover…' : 'صمّملي غلافًا أنيقًا من منتجاتي'}
     </button>
   );
@@ -112,7 +112,7 @@ export default function Settings() {
     const x = ({
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
       address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', hero_mode: s.heroMode || 'auto', delivery_mode: s.deliveryMode || 'store', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
-      shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
+      return_days: String(s.returnDays ?? 3), shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
       logo_initials: s.logoInitials || (s.name.ar || s.name.en || s.code || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: s.logoColor || '#1B1B1B',
     });
     setF(x);
@@ -128,6 +128,7 @@ export default function Settings() {
     setErrors({});
     try {
       const body = Object.fromEntries(FIELDS.map((k) => [k, f[k]]));
+      body.return_days = Math.min(60, Number(body.return_days || 0));
       body.shipping_fee = Number(body.shipping_fee || 0);
       body.free_shipping_over = Number(body.free_shipping_over || 0);
       body.offer_badge_ar = body.offer_badge_ar || null;
@@ -220,6 +221,7 @@ export default function Settings() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('settings.shippingFee')}><Input inputMode="numeric" suffix={t('common.currency')} value={f.shipping_fee} onChange={(e) => setF({ ...f, shipping_fee: e.target.value.replace(/\D/g, '') })} /></Field>
               <Field label={t('settings.freeOver')}><Input inputMode="numeric" suffix={t('common.currency')} value={f.free_shipping_over} onChange={(e) => setF({ ...f, free_shipping_over: e.target.value.replace(/\D/g, '') })} /></Field>
+              <Field label={t('settings.returnDays')} hint={t('settings.returnDaysHint')}><Input inputMode="numeric" suffix={t('settings.days')} value={f.return_days} onChange={(e) => setF({ ...f, return_days: e.target.value.replace(/\D/g, '').slice(0, 2) })} /></Field>
               <Field label={t('settings.badgeAr')} hint={t('settings.badgeHint')}><Input dir="rtl" value={f.offer_badge_ar} onChange={set('offer_badge_ar')} maxLength={30} /></Field>
               <Field label={t('settings.badgeEn')}><Input dir="ltr" value={f.offer_badge_en} onChange={set('offer_badge_en')} maxLength={30} /></Field>
             </div>

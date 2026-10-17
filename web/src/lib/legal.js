@@ -1,4 +1,4 @@
-/** Legal pages (privacy, terms, returns). Arabic is the reference text; English is a faithful translation.
+/** Legal pages (privacy, terms). Arabic is the reference text; English is a faithful translation.
  *  Contact details come from config/contact.js at render time. Keep UPDATED in sync when the text changes. */
 export const LEGAL_UPDATED = '2026-10-12';
 
@@ -6,7 +6,7 @@ export const LEGAL = {
   privacy: {
     ar: {
       title: 'سياسة الخصوصية',
-      intro: 'طلة منصة بتجمع متاجر ملابس من بنها في مكان واحد. الصفحة دي بتوضّح إيه البيانات اللي بنجمعها، ليه، وبنعمل بيها إيه، وإيه حقوقك.',
+      intro: 'Twist منصة بتجمع متاجر ملابس من بنها في مكان واحد. الصفحة دي بتوضّح إيه البيانات اللي بنجمعها، ليه، وبنعمل بيها إيه، وإيه حقوقك.',
       sections: [
         ['البيانات اللي بنجمعها', [
           'عند إتمام الطلب: الاسم، رقم الموبايل، المحافظة والمدينة والعنوان، وملاحظات التوصيل، وتفاصيل الطلب.',
@@ -14,7 +14,7 @@ export const LEGAL = {
           'التقييمات: نص التقييم وأي صور بترفعها، وبيظهروا للناس باسمك الأول فقط.',
           'طلبات "مش لاقي في بنها": الوصف والصورة (لو رفعتها) وبيانات التواصل والعنوان اللي بتكتبها.',
           'المساعد مودة: الرسائل والصور اللي بتبعتها للمساعد بتتبعت لمزوّد الذكاء الاصطناعي (Anthropic أو Cloudflare) عشان يرد عليك. لو عامل حساب، بنحفظ آخر 20 محادثة نصية في حسابك عشان تقدر ترجع لها أو تمسحها من سجل المحادثات. صور الشات نفسها مش بتتحفظ في السجل. من غير حساب، المحادثة بتفضل على جهازك طول ما الصفحة مفتوحة بس. وممكن نحتفظ بنص قصير عن تفضيلاتك وتقييماتك لمودة على جهازك، وتقدر تمسح التفضيلات من داخل المحادثة.',
-          'لو قيّمت رد مودة، بنحفظ تقييمك وطلبك والرد والقطع المقترحة وسبب التقييم (لو اخترته) في سجل محدود يراجعه فريق طلة لتحسين جودة التنسيق. تقدر تتجنب إرسال التقييم، وفريق الإدارة يقدر يحذف السجل.',
+          'لو قيّمت رد مودة، بنحفظ تقييمك وطلبك والرد والقطع المقترحة وسبب التقييم (لو اخترته) في سجل محدود يراجعه فريق Twist لتحسين جودة التنسيق. تقدر تتجنب إرسال التقييم، وفريق الإدارة يقدر يحذف السجل.',
           'بيانات تقنية بسيطة: عدد زيارات كل متجر في اليوم (إجمالي بدون هوية)، ونوع المتصفح وعنوان الـIP لأغراض الأمان ومنع الإساءة.',
         ]],
         ['بنستخدم بياناتك في إيه', [
@@ -26,7 +26,7 @@ export const LEGAL = {
         ]],
         ['مين بيشوف بياناتك', [
           'المتجر اللي بتطلب منه بيشوف اسمك ورقمك وعنوانك وتفاصيل طلبك عشان يجهّز ويوصّل.',
-          'فريق طلة لما يكون التوصيل علينا أو لما تطلب حاجة من خلالنا.',
+          'فريق Twist لما يكون التوصيل علينا أو لما تطلب حاجة من خلالنا.',
           'مزوّد الذكاء الاصطناعي ومزوّد تخزين الصور واستضافة الموقع (زي Railway وCloudflare) بالقدر اللازم لتشغيل الخدمة فقط.',
           'الجهات الرسمية لو القانون طلب ده.',
         ]],
@@ -51,7 +51,7 @@ export const LEGAL = {
     },
     en: {
       title: 'Privacy Policy',
-      intro: 'Talla brings fashion stores from Banha together in one place. This page explains what data we collect, why, what we do with it, and your rights.',
+      intro: 'Twist brings fashion stores from Banha together in one place. This page explains what data we collect, why, what we do with it, and your rights.',
       sections: [
         ['Data we collect', [
           'When you place an order: your name, mobile number, governorate, city and address, delivery notes and the order details.',
@@ -59,7 +59,7 @@ export const LEGAL = {
           'Reviews: the review text and any photos you upload; they are shown with your first name only.',
           '"Can\'t find it in Banha" requests: the description, photo (if you add one), contact details and address you enter.',
           'The Moda assistant: messages and photos you send are passed to our AI provider (Anthropic or Cloudflare) so it can answer. If you have an account, we save your latest 20 text conversations to your account so you can revisit or delete them from chat history. Chat photos are not saved in that history. Without an account, the conversation stays on your device only while the page is open. A short note of your preferences and Moda ratings may also be kept on your device; you can clear the learned preference memory in the chat.',
-          'If you rate a Moda reply, we store your rating, request, reply, suggested pieces and any selected reason in a limited feedback log for the Talla team to review and improve styling quality. Rating is optional, and administrators can delete the feedback record.',
+          'If you rate a Moda reply, we store your rating, request, reply, suggested pieces and any selected reason in a limited feedback log for the Twist team to review and improve styling quality. Rating is optional, and administrators can delete the feedback record.',
           'Basic technical data: aggregate daily visit counts per store (not tied to a person), and browser type and IP address for security and abuse prevention.',
         ]],
         ['How we use your data', [
@@ -71,7 +71,7 @@ export const LEGAL = {
         ]],
         ['Who sees your data', [
           'The store you order from sees your name, number, address and order so it can prepare and deliver.',
-          'The Talla team when we deliver or when you ask us to source something.',
+          'The Twist team when we deliver or when you ask us to source something.',
           'Our AI provider, photo storage and hosting providers (such as Railway and Cloudflare), only as needed to run the service.',
           'Public authorities where the law requires it.',
         ]],
@@ -99,10 +99,10 @@ export const LEGAL = {
   terms: {
     ar: {
       title: 'الشروط والأحكام',
-      intro: 'باستخدامك لطلة أو بإتمامك طلب من خلاله، أنت موافق على الشروط دي. لو مش موافق، من فضلك متستخدمش الخدمة.',
+      intro: 'باستخدامك لـ Twist أو بإتمامك طلب من خلاله، أنت موافق على الشروط دي. لو مش موافق، من فضلك متستخدمش الخدمة.',
       sections: [
         ['إحنا مين', [
-          'طلة منصة بتعرض منتجات متاجر مستقلة من بنها وتسهّل الطلب والتوصيل. كل متجر هو البائع المسؤول عن منتجاته وأسعاره ومخزونه.',
+          'Twist منصة بتعرض منتجات متاجر مستقلة من بنها وتسهّل الطلب والتوصيل. كل متجر هو البائع المسؤول عن منتجاته وأسعاره ومخزونه.',
         ]],
         ['الطلبات والأسعار', [
           'الأسعار بالجنيه المصري وبتتحدد من كل متجر. الطلب بيتأكد بعد ما المتجر (أو فريقنا) يراجعه، وممكن يتعدّل أو يتلغي لو المنتج خلص أو في خطأ واضح في السعر.',
@@ -111,7 +111,7 @@ export const LEGAL = {
         ]],
         ['التوصيل', [
           'مواعيد التوصيل تقديرية. توصيل نفس اليوم متاح في المتاجر اللي بتفعّله وقبل موعد القفل اللي المتجر بيحدده، وبيتوقف تلقائيًا بعده.',
-          'بعض الطلبات بيوصّلها المتجر نفسه وبعضها بيوصّلها فريق طلة، وبيتحدد ده عند الطلب.',
+          'بعض الطلبات بيوصّلها المتجر نفسه وبعضها بيوصّلها فريق Twist، وبيتحدد ده عند الطلب.',
         ]],
         ['طلبات "مش لاقي في بنها"', [
           'تقدر تبعتلنا تفاصيل المنتج اللي مش لاقيه وهنحاول نجيبهولك. هنرجعلك بعرض سعر، ومفيش التزام عليك إلا بعد ما توافق عليه.',
@@ -133,7 +133,7 @@ export const LEGAL = {
         ['حدود المسؤولية', [
           'بنحاول نخلي المعلومات دقيقة ومحدّثة، لكن مش بنضمن خلوها من الأخطاء. مسؤولية المنتج وجودته على المتجر البائع، وإحنا مسؤولين عن تشغيل المنصة وخدمات التوصيل اللي بنقدمها بنفسنا، في حدود القانون.',
         ]],
-        ['الاسترجاع والاستبدال', ['تفاصيل الاسترجاع والاستبدال في صفحة "سياسة الاسترجاع".']],
+        ['الاسترجاع والاستبدال', ['كل محل بيحدد سياسة الاستبدال والاسترجاع الخاصة بيه ومدتها (المعتاد 3 أيام من الاستلام)، وبتلاقيها مكتوبة في صفحة المحل. ده لا يخل بحقوقك في قانون حماية المستهلك المصري.']],
         ['القانون الواجب التطبيق', [
           'تخضع الشروط دي للقانون المصري، وأي نزاع بيتحل ودّيًا الأول، وبعدها قدام المحاكم المصرية المختصة. ده مش بيقلل من حقوقك كمستهلك بموجب قانون حماية المستهلك.',
           'ممكن نعدّل الشروط، واستمرارك في استخدام الخدمة بعد التعديل معناه موافقتك عليها.',
@@ -142,9 +142,9 @@ export const LEGAL = {
     },
     en: {
       title: 'Terms & Conditions',
-      intro: 'By using Talla, or placing an order through it, you agree to these terms. If you do not agree, please do not use the service.',
+      intro: 'By using Twist, or placing an order through it, you agree to these terms. If you do not agree, please do not use the service.',
       sections: [
-        ['Who we are', ['Talla is a platform that shows products from independent stores in Banha and makes ordering and delivery easier. Each store is the seller responsible for its own products, prices and stock.']],
+        ['Who we are', ['Twist is a platform that shows products from independent stores in Banha and makes ordering and delivery easier. Each store is the seller responsible for its own products, prices and stock.']],
         ['Orders and prices', [
           'Prices are in Egyptian pounds and are set by each store. An order is confirmed after the store (or our team) reviews it, and it may be changed or cancelled if the item is out of stock or there is an obvious pricing error.',
           'Payment is currently cash on delivery. Fees and shipping are shown before you confirm.',
@@ -152,7 +152,7 @@ export const LEGAL = {
         ]],
         ['Delivery', [
           'Delivery times are estimates. Same-day delivery is available from stores that turn it on, before the cut-off time the store sets, and it switches off automatically afterwards.',
-          'Some orders are delivered by the store itself and some by the Talla team; this is decided when you order.',
+          'Some orders are delivered by the store itself and some by the Twist team; this is decided when you order.',
         ]],
         ['"Can\'t find it in Banha" requests', [
           'You can send us the details of an item you cannot find and we will try to source it. We will come back with a quote, and you are not committed until you accept it.',
@@ -166,68 +166,11 @@ export const LEGAL = {
         ['Moda assistant (AI)', ['Moda suggests products and outfits using AI and can make mistakes. Products and prices come from the stores\' real catalogue, but please check the details and size before you buy. Size suggestions are guidance, not a guarantee.']],
         ['Acceptable use', ['Do not attempt to hack or abuse the site, scrape its data automatically, or impersonate others.']],
         ['Limits of liability', ['We try to keep information accurate and up to date but cannot guarantee it is error-free. The seller store is responsible for its products and their quality; we are responsible for running the platform and for the delivery services we provide ourselves, within the limits of the law.']],
-        ['Returns and exchanges', ['See the "Return Policy" page.']],
+        ['Returns and exchanges', ['Each store sets its own exchange and return policy and period (usually 3 days from receiving the order), shown on the store page. This does not affect your rights under the Egyptian Consumer Protection Law.']],
         ['Governing law', [
           'These terms are governed by Egyptian law. Disputes are first settled amicably and then before the competent Egyptian courts. This does not reduce your rights as a consumer under the Consumer Protection Law.',
           'We may update these terms; continuing to use the service after an update means you accept it.',
         ]],
-      ],
-    },
-  },
-
-  returns: {
-    ar: {
-      title: 'سياسة الاسترجاع والاستبدال',
-      intro: 'عايزينك تشتري وإنت مطمّن. دي القواعد الأساسية للاسترجاع والاستبدال على طلة.',
-      sections: [
-        ['المعاينة قبل الاستلام', [
-          'تقدر تفتح الطلب وتعاين المنتج قدام المندوب قبل ما تدفع. لو في عيب أو المنتج مش اللي طلبته، ارفض الاستلام ومش هتدفع أي حاجة.',
-          'ده بينطبق كمان على طلبات "مش لاقي في بنها".',
-        ]],
-        ['الاستبدال', [
-          'تقدر تستبدل المقاس أو اللون خلال 3 أيام من الاستلام (أو المدة اللي المتجر كاتبها في صفحته لو أطول)، بشرط إن المنتج لم يُستخدم وعليه التيكت وفي عبوته الأصلية.',
-        ]],
-        ['الاسترجاع للعيوب أو عدم المطابقة', [
-          'لو المنتج فيه عيب أو مختلف عن المعروض (المقاس أو اللون أو الموديل)، تقدر ترجّعه أو تستبدله خلال 14 يوم من الاستلام، وده حسب قانون حماية المستهلك المصري، والشحن علينا أو على المتجر.',
-        ]],
-        ['حاجات مش بتترجع', [
-          'الملابس الداخلية ومنتجات النظافة الشخصية والمنتجات اللي اتفصّلت أو اتجهزت خصيصًا ليك، إلا لو فيها عيب.',
-          'المنتجات المستخدمة أو المغسولة أو اللي التيكت اتشال منها.',
-        ]],
-        ['إزاي تطلب', [
-          'كلّمنا على واتساب أو بالتليفون على الأرقام الموضحة أسفل الصفحة، وابعت رقم الطلب وصورة للمنتج لو في عيب. تقدر تلاقي رقم طلبك وتتابعه من صفحة "تتبع الطلب".',
-          'هنتواصل معاك لتحديد معاد استلام المنتج.',
-        ]],
-        ['استرداد المبلغ', [
-          'بعد ما المنتج يرجع ويتفحّص، بنرجعلك المبلغ كاش أو تحويل خلال حد أقصى 7 أيام عمل.',
-          'مصاريف الشحن الأصلية بترجع لو المرتجع بسبب عيب أو خطأ مننا أو من المتجر.',
-        ]],
-        ['متاجر بسياسات أوسع', ['بعض المتاجر بتقدّم مدة استبدال أو استرجاع أطول. لو المتجر كاتب سياسة أفضل في صفحته، بتتطبق هي.']],
-      ],
-    },
-    en: {
-      title: 'Return & Exchange Policy',
-      intro: 'We want you to shop with confidence. These are the basic rules for returns and exchanges on Talla.',
-      sections: [
-        ['Inspection before receiving', [
-          'You can open the parcel and inspect the item in front of the courier before you pay. If there is a defect or it is not what you ordered, refuse it and you pay nothing.',
-          'This also applies to "Can\'t find it in Banha" requests.',
-        ]],
-        ['Exchanges', ['You can exchange the size or colour within 3 days of receiving it (or the longer period the store states on its page), as long as the item is unused, tagged and in its original packaging.']],
-        ['Returns for defects or non-conformity', ['If the item is defective or differs from what was shown (size, colour or model), you can return or exchange it within 14 days of receiving it, in line with the Egyptian Consumer Protection Law, and shipping is on us or the store.']],
-        ['What cannot be returned', [
-          'Underwear and personal-hygiene items, and made-to-order or specially prepared items, unless they are defective.',
-          'Items that are used, washed or have the tags removed.',
-        ]],
-        ['How to request', [
-          'Contact us on WhatsApp or by phone using the details at the bottom of the page, and send the order number and a photo if there is a defect. You can find your order number and follow it on the "Track order" page.',
-          'We will get in touch to arrange collecting the item.',
-        ]],
-        ['Refunds', [
-          'Once the item is back and checked, we refund you in cash or by transfer within 7 working days at most.',
-          'The original shipping fee is refunded when the return is due to a defect or a mistake by us or the store.',
-        ]],
-        ['Stores with wider policies', ['Some stores offer a longer exchange or return period. If a store states a better policy on its page, that one applies.']],
       ],
     },
   },

@@ -19,14 +19,14 @@ function OrderSheet({ id, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const setDelivery = async (delivery_by) => {
     setBusy(true);
-    try { await adminApi(`/orders/${id}/delivery`, { method: 'PATCH', body: { delivery_by } }); toast({ title: delivery_by === 'platform' ? 'اتحوّل لتوصيل طلة' : 'رجع لتوصيل المحل' }); reload(); onChanged(); } catch (x) { toast({ tone: 'error', title: x.message }); }
+    try { await adminApi(`/orders/${id}/delivery`, { method: 'PATCH', body: { delivery_by } }); toast({ title: delivery_by === 'platform' ? 'اتحوّل لتوصيل Twist' : 'رجع لتوصيل المحل' }); reload(); onChanged(); } catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy(false);
   };
   return (
     <Sheet open={!!id} onClose={onClose} title={o ? `طلب #${o.number}` : 'طلب'} side="end" size="lg">
       {error ? <ErrorState error={error} onRetry={reload} compact /> : !o ? <Skeleton className="my-4 h-64 w-full rounded-2xl" /> : (
         <div className="space-y-5 py-4">
-          <div className="flex flex-wrap items-center gap-2"><StatusPill s={o.status} />{o.delivery_by === 'platform' ? <Badge tone="info">🚚 توصيل طلة</Badge> : <Badge>توصيل المحل</Badge>}<span className="text-sm text-muted">{fmtDateTime(o.created_at)}</span></div>
+          <div className="flex flex-wrap items-center gap-2"><StatusPill s={o.status} />{o.delivery_by === 'platform' ? <Badge tone="info">🚚 توصيل Twist</Badge> : <Badge>توصيل المحل</Badge>}<span className="text-sm text-muted">{fmtDateTime(o.created_at)}</span></div>
           <div className="rounded-2xl border border-line p-4">
             <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><StoreIcon className="h-4 w-4" />المحل (الاستلام)</p>
             <p className="font-medium">{o.store_name}</p><p className="text-sm text-muted">{o.store_address || '—'}</p>
@@ -53,7 +53,7 @@ function OrderSheet({ id, onClose, onChanged }) {
           {['pending', 'confirmed', 'processing'].includes(o.status) && (
             o.delivery_by === 'platform'
               ? <Button variant="outline" loading={busy} onClick={() => setDelivery('store')}>رجّع التوصيل للمحل</Button>
-              : <Button icon={Truck} loading={busy} onClick={() => setDelivery('platform')}>خلّي طلة توصّله</Button>
+              : <Button icon={Truck} loading={busy} onClick={() => setDelivery('platform')}>خلّي Twist توصّله</Button>
           )}
         </div>
       )}
@@ -77,7 +77,7 @@ export default function Orders() {
       <PageHeader title="الطلبات" subtitle="كل طلبات كل المحلات" />
       <div className="mb-4 space-y-3">
         <div className="flex flex-col gap-2 sm:flex-row"><SearchInput className="flex-1" value={term} onChange={(v) => { setTerm(v); setPage(1); }} placeholder="رقم الطلب أو اسم/تليفون العميل" />
-          <Select value={delivery} onChange={(e) => { setDelivery(e.target.value); setPage(1); }} className="sm:w-48" aria-label="التوصيل"><option value="all">كل التوصيل</option><option value="platform">توصيل طلة</option><option value="store">توصيل المحل</option></Select></div>
+          <Select value={delivery} onChange={(e) => { setDelivery(e.target.value); setPage(1); }} className="sm:w-48" aria-label="التوصيل"><option value="all">كل التوصيل</option><option value="platform">توصيل Twist</option><option value="store">توصيل المحل</option></Select></div>
         <FilterTabs value={status} onChange={(v) => { setStatus(v); setPage(1); }} options={[{ value: 'all', label: 'الكل', count: c.all }, ...Object.entries(ORDER_STATUS_AR).map(([v, label]) => ({ value: v, label, count: c[v] || 0 }))]} />
       </div>
       {loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : !data?.items.length ? <EmptyState title="مفيش طلبات" body="جرّب تغيّر الفلتر." /> : (

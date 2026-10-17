@@ -105,6 +105,7 @@ const storeSchema = z.object({
   logo_initials: z.string().trim().max(2).optional(),
   logo_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   delivery_mode: z.enum(['store', 'platform']).optional(),
+  return_days: z.coerce.number().int().min(0).max(60).optional(),
   opens_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   closes_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   day_off: z.union([z.literal(''), z.coerce.number().int().min(0).max(6)]).optional().nullable(),
@@ -664,6 +665,39 @@ r.patch('/variants/:id', h((req, res) => {
   res.json({ variant: { id: v.id, stock }, product: { id: p.id, stock: p.stock, stockStatus: stockStatus(p) } });
 }));
 
+/** In-store sale ("تم البيع"): the owner sold a piece offline, so take it out of stock and count it as sold. */
+r.post('/products/:id/sell', h((req, res) => {
+  const p = q.get('SELECT * FROM products WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
+  if (!p) throw notFound('Product');
+  const body = z.object({
+    variantId: z.coerce.number().int().positive().optional(),
+    qty: z.coerce.number().int().min(1).max(1000).default(1),
+  }).parse(req.body || {});
+  const hasVariants = q.val('SELECT COUNT(*) FROM variants WHERE product_id=?', [p.id]) > 0;
+  let variant = null;
+  if (hasVariants) {
+    if (!body.variantId) throw badRequest('variant_required', 'Choose the size/colour that was sold.');
+    variant = q.get('SELECT * FROM variants WHERE id=? AND product_id=?', [body.variantId, p.id]);
+    if (!variant) throw notFound('Variant');
+  }
+  if (p.track_stock) {
+    const available = variant ? variant.stock : p.stock;
+    if (available < body.qty) throw new AppError(409, 'out_of_stock', 'Not enough stock to record this sale.');
+  }
+  tx(() => {
+    if (variant && p.track_stock) q.run('UPDATE variants SET stock=stock-? WHERE id=?', [body.qty, variant.id]);
+    if (p.track_stock) {
+      if (variant) q.run('UPDATE products SET stock=(SELECT COALESCE(SUM(stock),0) FROM variants WHERE product_id=?) WHERE id=?', [p.id, p.id]);
+      else q.run('UPDATE products SET stock=stock-? WHERE id=?', [body.qty, p.id]);
+    }
+    q.run('UPDATE products SET sold_count=sold_count+?, updated_at=? WHERE id=?', [body.qty, nowIso(), p.id]);
+  });
+  invalidateModaCatalogue();
+  const np = q.get('SELECT * FROM products WHERE id=?', [p.id]);
+  const nv = variant ? q.get('SELECT id, stock FROM variants WHERE id=?', [variant.id]) : null;
+  res.json({ product: { id: np.id, stock: np.stock, sold: np.sold_count, stockStatus: stockStatus(np) }, variant: nv });
+}));
+
 r.delete('/products/:id', h((req, res) => {
   const p = q.get('SELECT * FROM products WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!p) throw notFound('Product');
@@ -693,7 +727,7 @@ r.get('/orders', h((req, res) => {
   res.json({ items: orderCards(rows), total, page, pages: Math.max(1, Math.ceil(total / limit)), counts });
 }));
 
-/** Orders Banha Outfit delivers: the store prepares them (up to "processing" = ready for pickup); pickup and delivery are ours. */
+/** Orders Twist delivers: the store prepares them (up to "processing" = ready for pickup); pickup and delivery are ours. */
 const PLATFORM_STATUSES = ['shipped', 'delivered'];
 const ownerNext = (o) => (ORDER_FLOW[o.status] || []).filter((s) => !(o.delivery_by === 'platform' && PLATFORM_STATUSES.includes(s)));
 
@@ -719,7 +753,7 @@ r.patch('/orders/:id/status', h((req, res) => {
   const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!o) throw notFound('Order');
   const { status, note } = z.object({ status: z.enum(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']), note: z.string().trim().max(300).optional() }).parse(req.body);
-  if (o.delivery_by === 'platform' && PLATFORM_STATUSES.includes(status)) throw badRequest('platform_delivers', 'Banha Outfit handles pickup and delivery of this order.');
+  if (o.delivery_by === 'platform' && PLATFORM_STATUSES.includes(status)) throw badRequest('platform_delivers', 'Twist handles pickup and delivery of this order.');
   if (!(ORDER_FLOW[o.status] || []).includes(status)) throw badRequest('invalid_transition', 'This status change is not allowed.');
   tx(() => {
     const now = nowIso();
@@ -738,11 +772,11 @@ r.patch('/orders/:id/status', h((req, res) => {
   res.json({ status, next: ownerNext({ status, delivery_by: o.delivery_by }) });
 }));
 
-/** "No delivery person free right now" → hand this one order over to Banha Outfit. */
+/** "No delivery person free right now" → hand this one order over to Twist. */
 r.post('/orders/:id/handoff', h((req, res) => {
   const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!o) throw notFound('Order');
-  if (o.delivery_by === 'platform') throw badRequest('already_handed_off', 'This order is already delivered by Banha Outfit.');
+  if (o.delivery_by === 'platform') throw badRequest('already_handed_off', 'This order is already delivered by Twist.');
   if (!['pending', 'confirmed', 'processing'].includes(o.status)) throw badRequest('invalid_transition', 'This order can no longer be handed over.');
   const now = nowIso();
   tx(() => {

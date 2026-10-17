@@ -15,6 +15,7 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   const cols = db.prepare('PRAGMA table_info(stores)').all().map((c) => c.name);
   if (!cols.includes('auto_whatsapp')) db.exec('ALTER TABLE stores ADD COLUMN auto_whatsapp INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('sort_order')) db.exec('ALTER TABLE stores ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('return_days')) db.exec('ALTER TABLE stores ADD COLUMN return_days INTEGER NOT NULL DEFAULT 3');
   if (!cols.includes('hidden')) db.exec('ALTER TABLE stores ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('map_url')) db.exec('ALTER TABLE stores ADD COLUMN map_url TEXT');
   if (!cols.includes('opens_at')) db.exec('ALTER TABLE stores ADD COLUMN opens_at TEXT');

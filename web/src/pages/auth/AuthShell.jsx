@@ -14,8 +14,8 @@ export default function AuthShell({ children }) {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}>{children}</motion.div>
         </div>
       </div>
-      <aside className="relative hidden overflow-hidden bg-[#14213D] p-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="pointer-events-none absolute -end-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-[#F26B38]/25 blur-3xl" />
+      <aside className="relative hidden overflow-hidden bg-[#03244D] p-12 text-white lg:flex lg:flex-col lg:justify-between">
+        <div className="pointer-events-none absolute -end-32 -top-32 h-[28rem] w-[28rem] rounded-full bg-[#F8620A]/25 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-40 -start-20 h-[24rem] w-[24rem] rounded-full bg-[#FF966F]/15 blur-3xl" />
         <div className="relative">
           <h2 className="max-w-md font-display text-4xl font-bold leading-tight text-white">{t('auth.sideTitle')}</h2>
@@ -31,9 +31,9 @@ export default function AuthShell({ children }) {
           <p className="text-xs font-medium text-neutral-500">{t('dash.todaySales')}</p>
           <p className="mt-1 font-display text-3xl font-bold">EGP 24,850</p>
           <svg viewBox="0 0 300 80" className="mt-4 h-20 w-full" aria-hidden="true">
-            <defs><linearGradient id="ag" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#F26B38" stopOpacity=".25" /><stop offset="1" stopColor="#F26B38" stopOpacity="0" /></linearGradient></defs>
+            <defs><linearGradient id="ag" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stopColor="#F8620A" stopOpacity=".25" /><stop offset="1" stopColor="#F8620A" stopOpacity="0" /></linearGradient></defs>
             <path d="M0 62 C30 58 45 40 75 44 S120 22 150 30 S200 12 230 20 S275 6 300 10 V80 H0Z" fill="url(#ag)" />
-            <path d="M0 62 C30 58 45 40 75 44 S120 22 150 30 S200 12 230 20 S275 6 300 10" fill="none" stroke="#F26B38" strokeWidth="2.5" />
+            <path d="M0 62 C30 58 45 40 75 44 S120 22 150 30 S200 12 230 20 S275 6 300 10" fill="none" stroke="#F8620A" strokeWidth="2.5" />
           </svg>
           <div className="mt-4 grid grid-cols-3 gap-3 text-center">
             {[['48', t('dash.ordersKpi')], ['328', t('dash.products')], ['1,240', t('dash.customers')]].map(([v, l]) => (

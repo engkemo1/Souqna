@@ -47,7 +47,7 @@ function DeptCard({ dept, lang, fmt, priority }) {
 
   return (
     <Link to={`/search?department=${dept.slug}`} className="group block focus:outline-none" aria-label={name}>
-      <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-neutral-100 shadow-[0_4px_16px_rgba(0,0,0,0.06)] ring-1 ring-black/5 transition duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-[0_16px_30px_-10px_rgba(20,33,61,0.22)] group-focus-visible:ring-2 group-focus-visible:ring-brand">
+      <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-neutral-100 shadow-[0_4px_16px_rgba(0,0,0,0.06)] ring-1 ring-black/5 transition duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-[0_16px_30px_-10px_rgba(3,36,77,0.22)] group-focus-visible:ring-2 group-focus-visible:ring-brand">
         {!imgErr && url ? (
           <img
             src={url}
@@ -127,7 +127,7 @@ export default function DeptStrip({ departments = [] }) {
         </div>
         <Link
           to="/search"
-          className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-4 py-2 text-xs font-bold transition hover:border-brand hover:text-brand sm:text-sm"
+          className="group inline-flex shrink-0 items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-4 py-2 text-xs font-bold transition hover:border-fg/30 hover:bg-[#F6F8FB] sm:text-sm"
         >
           <span>{t('market.seeAll')}</span>
           <ArrowRight className="h-4 w-4 rtl:rotate-180" />

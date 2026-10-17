@@ -144,7 +144,7 @@ function Alerts() {
       {!data ? <Skeleton className="h-40 w-full rounded-2xl" /> : !data.items.length ? <EmptyState icon={Bell} title={t('acc.alerts')} body={t('acc.noAlerts')} /> : (
         <ul className="space-y-2">
           {data.items.map((n) => (
-            <li key={n.id}><Link to={n.url || '/account'} className={cx('block rounded-2xl border p-4 transition hover:border-fg/30', n.read ? 'border-line bg-elevated' : 'border-brand/40 bg-brand/5')}>
+            <li key={n.id}><Link to={n.url || '/account'} className={cx('block rounded-2xl border p-4 transition hover:border-fg/30', n.read ? 'border-line bg-elevated' : 'border-line bg-[#F1F4F9]')}>
               <p className="font-semibold">{n.title}</p>{n.body && <p className="mt-0.5 text-sm text-muted">{n.body}</p>}<p className="mt-1 text-xs text-muted">{day(n.createdAt, lang)}</p></Link></li>
           ))}
         </ul>

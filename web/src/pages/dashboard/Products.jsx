@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink } from 'lucide-react';
+import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink, ShoppingBag } from 'lucide-react';
 import { useApi, useDebounced, useIsDesktop, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -123,6 +123,68 @@ function QuickEdit({ product, onClose, onSaved }) {
   );
 }
 
+/** "تم البيع": record a piece sold in the physical shop so it leaves the stock. */
+function SellSheet({ product, onClose, onSold }) {
+  const { t, tr, lang } = useI18n();
+  const toast = useToast();
+  const { data } = useApi(product ? `/owner/products/${product.id}` : null, { keepPrevious: false });
+  const full = data?.product;
+  const [stocks, setStocks] = useState({});
+  const [busyId, setBusyId] = useState(null);
+  useEffect(() => { if (full) setStocks(Object.fromEntries(full.variants.map((v) => [v.id, v.stock]))); }, [full]);
+  if (!product) return <Sheet open={false} onClose={onClose} />;
+  const hasVariants = full?.variants?.length > 0;
+  const colorName = (hex) => { const c = full?.colors?.find((x) => x.hex === hex); return c ? tr({ ar: c.name_ar, en: c.name_en }) : ''; };
+
+  const sell = async (variantId) => {
+    setBusyId(variantId ?? 'one');
+    try {
+      const r = await api(`/owner/products/${product.id}/sell`, { method: 'POST', body: variantId ? { variantId } : {} });
+      if (r.variant) setStocks((s) => ({ ...s, [r.variant.id]: r.variant.stock }));
+      onSold(product.id, { stock: r.product.stock, stockStatus: r.product.stockStatus, sold: r.product.sold });
+      invalidate('/owner/products');
+      invalidate('/owner/overview');
+      const left = hasVariants ? r.variant?.stock : r.product.stock;
+      toast({ title: product.trackStock && left <= 0 ? t('products.sellOut') : product.trackStock ? t('products.sellDone', { n: formatNumber(left, lang) }) : t('products.sell') });
+    } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); }
+    setBusyId(null);
+  };
+  const cur = hasVariants ? null : (product.stock);
+
+  return (
+    <Sheet open={!!product} onClose={onClose} title={t('products.sellTitle')} description={tr(product.name)} side="auto" desktop="end" size="md">
+      <div className="space-y-4 py-4">
+        <p className="text-sm text-muted">{t('products.sellHint')}</p>
+        {!full ? <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-14 rounded-xl" />)}</div> : hasVariants ? (
+          <ul className="divide-y divide-line rounded-2xl border border-line">
+            {full.variants.map((v) => {
+              const left = stocks[v.id] ?? v.stock;
+              const empty = full.trackStock && left <= 0;
+              return (
+                <li key={v.id} className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+                  <span className="flex min-w-0 items-center gap-2.5 text-sm">
+                    {v.color && <span className="h-4 w-4 shrink-0 rounded-full ring-1 ring-inset ring-black/10" style={{ background: v.color }} />}
+                    <span className="truncate">{colorName(v.color)}</span>
+                    {v.size && <span className="rounded-md bg-fg/[0.06] px-1.5 py-0.5 text-xs font-semibold">{v.size}</span>}
+                    {full.trackStock && <span className="text-xs text-muted tabular">× {formatNumber(left, lang)}</span>}
+                  </span>
+                  <Button size="sm" icon={ShoppingBag} disabled={empty} loading={busyId === v.id} onClick={() => sell(v.id)}>{t('products.sellOne')}</Button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <div className="space-y-3">
+            {!product.trackStock && <p className="text-sm text-muted">{t('products.sellNoTrack')}</p>}
+            <Button size="lg" full icon={ShoppingBag} disabled={product.trackStock && cur <= 0} loading={busyId === 'one'} onClick={() => sell()}>{t('products.sellOne')}</Button>
+            {product.trackStock && cur <= 0 && <p className="text-center text-sm text-sale">{t('products.sellEmpty')}</p>}
+          </div>
+        )}
+      </div>
+    </Sheet>
+  );
+}
+
 export default function Products() {
   const base = useDashBase();
   const { t, tr, lang } = useI18n();
@@ -137,6 +199,7 @@ export default function Products() {
   const [page, setPage] = useState(1);
   const [view, setView] = useState('list');
   const [quick, setQuick] = useState(null);
+  const [sellP, setSellP] = useState(null);
   const [del, setDel] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const q = useDebounced(term.trim(), 300);
@@ -214,7 +277,7 @@ export default function Products() {
                       <th className="py-3 text-start font-semibold">{t('products.stock')}</th>
                       <th className="py-3 text-start font-semibold">{t('products.price')}</th>
                       <th className="py-3 text-start font-semibold">{t('products.sold')}</th>
-                      <th className="w-32 py-3 pe-5" />
+                      <th className="w-40 py-3 pe-5" />
                     </tr></thead>
                     <tbody className="divide-y divide-line">
                       {data.items.map((p) => (
@@ -232,6 +295,7 @@ export default function Products() {
                           <td className="py-3 text-sm tabular text-muted">{formatNumber(p.sold, lang)}</td>
                           <td className="py-3 pe-5">
                             <div className="flex justify-end gap-1 opacity-60 transition group-hover:opacity-100">
+                              <IconButton size="sm" label={t('products.sell')} icon={ShoppingBag} onClick={() => setSellP(p)} iconClass="h-[18px] w-[18px] text-brand" />
                               <IconButton size="sm" label={t('products.quickEdit')} icon={Zap} onClick={() => setQuick(p)} iconClass="h-[18px] w-[18px]" />
                               <IconButton size="sm" label={t('common.edit')} icon={Pencil} to={`${base}/products/${p.id}`} iconClass="h-[18px] w-[18px]" />
                               <IconButton size="sm" label={t('common.delete')} icon={Trash2} onClick={() => setDel(p)} iconClass="h-[18px] w-[18px] text-sale" />
@@ -251,7 +315,7 @@ export default function Products() {
                       <div className="p-3.5">
                         <p className="truncate font-medium">{tr(p.name)}</p>
                         <div className="mt-1.5 flex items-center justify-between"><span className="font-semibold tabular">{formatMoney(p.price, lang)}</span><StockPill p={p} t={t} lang={lang} /></div>
-                        <div className="mt-3 flex gap-2"><Button size="xs" variant="secondary" full icon={Zap} onClick={() => setQuick(p)}>{t('products.quickEdit')}</Button></div>
+                        <div className="mt-3 flex gap-2"><Button size="xs" full icon={ShoppingBag} onClick={() => setSellP(p)}>{t('products.sell')}</Button><Button size="xs" variant="secondary" full icon={Zap} onClick={() => setQuick(p)}>{t('products.quickEdit')}</Button></div>
                       </div>
                     </div>
                   ) : (
@@ -262,6 +326,7 @@ export default function Products() {
                         <p className="mt-0.5 font-semibold tabular">{formatMoney(p.price, lang)}{p.compareAt && <span className="ms-2 text-xs font-normal text-muted line-through">{formatMoney(p.compareAt, lang)}</span>}</p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">{p.status !== 'active' && <StatusPill status={p.status} t={t} />}<StockPill p={p} t={t} lang={lang} /></div>
                       </Link>
+                      <button type="button" onClick={() => setSellP(p)} aria-label={t('products.sell')} className="grid h-11 shrink-0 place-items-center gap-0.5 rounded-xl bg-btn px-3 text-[11px] font-semibold text-white transition active:scale-90"><ShoppingBag className="h-4 w-4" />{t('products.sell')}</button>
                       <button type="button" onClick={() => setQuick(p)} aria-label={t('products.quickEdit')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><Zap className="h-5 w-5" /></button>
                     </div>
                   ))}
@@ -273,6 +338,7 @@ export default function Products() {
         </>
       )}
 
+      <SellSheet product={sellP && (data?.items.find((x) => x.id === sellP.id) || sellP)} onClose={() => setSellP(null)} onSold={onSaved} />
       <QuickEdit product={quick} onClose={() => setQuick(null)} onSaved={onSaved} />
       <ConfirmDialog open={!!del} onClose={() => setDel(null)} danger title={t('common.delete')} body={del ? t('products.confirmDelete', { name: tr(del.name) }) : ''}
         confirmLabel={t('common.delete')} loading={deleting} onConfirm={doDelete} />

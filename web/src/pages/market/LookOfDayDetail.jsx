@@ -33,7 +33,7 @@ export default function LookOfDayDetail() {
               {others.map(({ x, i }) => {
                 const img = x.looks?.map((l) => l.items?.[l.pick || 0]).find((p) => p?.image)?.image;
                 return (
-                  <Link key={i} to={`/look-of-day/${i}`} className="flex w-[260px] shrink-0 items-center gap-3 rounded-2xl border border-line bg-elevated p-2 shadow-sm transition hover:border-brand/40">
+                  <Link key={i} to={`/look-of-day/${i}`} className="flex w-[260px] shrink-0 items-center gap-3 rounded-2xl border border-line bg-elevated p-2 shadow-sm transition hover:border-fg/30/40">
                     <div className="h-20 w-16 shrink-0 overflow-hidden rounded-xl bg-secondary">{x.coverImage ? <img src={x.coverImage} alt="" className="h-full w-full object-cover" loading="lazy" /> : img ? <SmartImage media={img} alt="" className="h-full w-full" sizes="64px" /> : null}</div>
                     <div className="min-w-0"><p className="line-clamp-2 text-[13px] font-bold leading-snug">{x.title || x.occasion}</p><p className="mt-1 text-sm font-extrabold text-sale">{formatMoney(x.total || 0, lang)}</p></div>
                   </Link>

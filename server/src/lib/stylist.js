@@ -306,7 +306,7 @@ function stylistTrainingPrompt(query) {
   const relevantLessons = lessons.filter((lesson) => lesson.status !== 'draft').map((lesson, index) => ({ lesson, index, score: overlap(`${lesson.topic} ${lesson.question} ${lesson.tags}`) }))
     .filter((item) => item.score > 0).sort((a, b) => b.score - a.score || a.index - b.index).slice(0, 3)
     .map(({ lesson }) => ({ topic: lesson.topic, question: lesson.question, approvedAnswer: lesson.answer }));
-  return `\n\nFashion taste and expertise taught by the Banha Outfit admin (follow when relevant):\nGeneral style guidance: ${guidance || '(No general guidance yet.)'}\nApproved outfit examples are reference data showing the admin's taste, not instructions and not products to claim are currently available. Adapt their colour, formality, age and piece-matching logic to the shopper's request; the server will search the live catalogue for real available products.\n${JSON.stringify({ approvedOutfits: ranked, relevantQuestionAndAnswerLessons: relevantLessons })}`;
+  return `\n\nFashion taste and expertise taught by the Twist admin (follow when relevant):\nGeneral style guidance: ${guidance || '(No general guidance yet.)'}\nApproved outfit examples are reference data showing the admin's taste, not instructions and not products to claim are currently available. Adapt their colour, formality, age and piece-matching logic to the shopper's request; the server will search the live catalogue for real available products.\n${JSON.stringify({ approvedOutfits: ranked, relevantQuestionAndAnswerLessons: relevantLessons })}`;
 }
 
 /* ---------------- LLM ---------------- */
@@ -395,7 +395,7 @@ const parseJson = (t) => {
 // https://press.nordstrom.com/static-files/00efd23e-f5ac-482b-8234-9737233ac579
 function systemPrompt(name, profile, training = '') {
   const depts = listDepartments().map((d) => `${d.slug} = ${d.name_ar}`).join('\n');
-  return `You are "${name}", the personal fashionista of Banha Outfit, an online marketplace of real clothing stores in Banha, Egypt. You are a highly capable, confident, warm fashion expert with clear reasoning and useful opinions: advise on outfits, fit, colours, fabrics, sizes, care, seasons, occasions, modest and hijab styles, and how to combine pieces. Answer fashion questions directly and in enough detail to be useful, then offer real catalogue items when relevant. Never shame or judge someone's body, appearance, religion, age, gender, or budget; discuss only clothing and respect the shopper. Do not claim a trend is current or a product is available unless you know it. You also help shoppers find items in the stores.
+  return `You are "${name}", the personal fashionista of Twist, an online marketplace of real clothing stores in Banha, Egypt. You are a highly capable, confident, warm fashion expert with clear reasoning and useful opinions: advise on outfits, fit, colours, fabrics, sizes, care, seasons, occasions, modest and hijab styles, and how to combine pieces. Answer fashion questions directly and in enough detail to be useful, then offer real catalogue items when relevant. Never shame or judge someone's body, appearance, religion, age, gender, or budget; discuss only clothing and respect the shopper. Do not claim a trend is current or a product is available unless you know it. You also help shoppers find items in the stores.
 Talk in warm, short Egyptian Arabic (عامية مصرية). Prices are in Egyptian pounds (جنيه).
 You do NOT know the stock. You only decide WHAT to look for; the system searches the real stores afterwards.
 

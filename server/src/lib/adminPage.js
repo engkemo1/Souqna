@@ -1,7 +1,7 @@
 /** Platform admin page at /admin. Talks to /api/admin with the key typed in (kept in memory only). */
 export const ADMIN_HTML = `<!doctype html>
 <html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="/favicon.svg"><title>Banha Outfit · الإدارة</title>
+<link rel="icon" href="/favicon.svg"><title>Twist · الإدارة</title>
 <style>
 :root{--gold:#C9A24D;--ink:#141416}
 body{font-family:system-ui,Tahoma,sans-serif;background:#f4f2ee;margin:0;padding:20px;color:#1b1b1b}
@@ -18,7 +18,7 @@ button{padding:6px 11px;border-radius:8px;border:0;background:var(--ink);color:#
 .err{color:#b00020;margin-top:8px}.good{color:#0d6e55;margin-top:8px;word-break:break-all}
 .link{background:#f7f3e8;border:1px dashed var(--gold);border-radius:10px;padding:10px;margin-top:10px;word-break:break-all;font-size:13px}
 </style></head><body>
-<header><img src="/favicon.svg" alt=""><div><h1>Banha Outfit · لوحة الإدارة</h1><div class="muted" id="status"></div></div></header>
+<header><img src="/favicon.svg" alt=""><div><h1>Twist · لوحة الإدارة</h1><div class="muted" id="status"></div></div></header>
 
 <div class="card">
   <label>مفتاح الإدارة <input id="key" type="password" autocomplete="off" style="max-width:320px"></label>
@@ -57,7 +57,7 @@ button{padding:6px 11px;border-radius:8px;border:0;background:var(--ink);color:#
 
 <div class="card" id="delivBox" hidden>
   <h2>🚚 طلبات التوصيل علينا</h2>
-  <div class="muted">الطلبات اللي المحل حوّلها لنا أو مفعّل "بنها أوتفيت توصّل". نستلم لما الحالة "جاهز"، وبعدها نسلّم للعميل ونحصّل المبلغ (كاش).</div>
+  <div class="muted">الطلبات اللي المحل حوّلها لنا أو مفعّل "Twist توصّل". نستلم لما الحالة "جاهز"، وبعدها نسلّم للعميل ونحصّل المبلغ (كاش).</div>
   <table><thead><tr><th>الطلب</th><th>المحل (الاستلام)</th><th>العميل (التسليم)</th><th>نحصّل</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody id="delivRows"></tbody></table>
   <div class="muted" id="delivEmpty" hidden>مفيش طلبات توصيل دلوقتي.</div>
 </div>

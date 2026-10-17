@@ -149,7 +149,7 @@ function LivePreview({ slug, payload, L, onClose }) {
           {onClose && <Button size="sm" variant="outline" onClick={onClose}>{L('إغلاق', 'Close')}</Button>}
         </div>
       </div>
-      <div className="relative w-[320px] max-w-full rounded-[2.4rem] bg-fg p-[9px] shadow-[0_24px_60px_-24px_rgba(20,33,61,.5)]">
+      <div className="relative w-[320px] max-w-full rounded-[2.4rem] bg-fg p-[9px] shadow-[0_24px_60px_-24px_rgba(3,36,77,.5)]">
         <span className="absolute left-1/2 top-[14px] z-10 h-[5px] w-16 -translate-x-1/2 rounded-full bg-canvas/25" />
         <div className="relative overflow-hidden rounded-[1.9rem] bg-white" style={{ height: 600 }}>
           {!ready && <div className="absolute inset-0 grid place-items-center bg-white text-xs text-muted">{L('جاري تحميل المعاينة…', 'Loading preview…')}</div>}

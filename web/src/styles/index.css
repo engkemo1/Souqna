@@ -8,36 +8,36 @@
 @tailwind utilities;
 
 /* Platform default tokens (marketplace). Stores & dashboard override these via the Theme Engine. */
-/* Talla brand tokens: navy #14213D, orange #F26B38, and white. */
+/* Twist brand tokens: navy #03244D, orange #F8620A, and white. */
 :root {
-  --brand-navy: #14213D;
-  --brand-orange: #F26B38;
+  --brand-navy: #03244D;
+  --brand-orange: #F8620A;
   --c-background: 255 255 255;
-  --c-surface: 244 245 247;
+  --c-surface: 241 244 249;
   --c-elevated: 255 255 255;
-  --c-text: 20 33 61;
+  --c-text: 3 36 77;
   --c-muted: 91 101 119;
-  --c-border: 228 231 236;
-  --c-border-strong: 204 210 220;
-  --c-primary: 242 107 56;
+  --c-border: 226 232 240;
+  --c-border-strong: 198 208 222;
+  --c-primary: 248 98 10;
   --c-on-primary: 255 255 255;
-  --c-primary-ink: 178 63 29;
-  --c-display: 20 33 61;
+  --c-primary-ink: 196 67 0;
+  --c-display: 3 36 77;
   --c-secondary: 236 239 244;
-  --c-on-secondary: 20 33 61;
-  --c-accent: 242 107 56;
+  --c-on-secondary: 3 36 77;
+  --c-accent: 248 98 10;
   --c-on-accent: 255 255 255;
-  --c-button: 242 107 56;
+  --c-button: 3 36 77;
   --c-on-button: 255 255 255;
   --c-button-outline: transparent;
   --c-header: 255 255 255;
-  --c-on-header: 20 33 61;
-  --c-footer: 20 33 61;
+  --c-on-header: 3 36 77;
+  --c-footer: 3 36 77;
   --c-on-footer: 255 255 255;
   --c-footer-muted: 194 202 214;
   --c-sale: 198 40 40;
   --c-success: 21 128 61;
-  --c-ring: 242 107 56;
+  --c-ring: 248 98 10;
 
   --header-h: 64px;
   --bottom-nav-h: 64px;

@@ -19,6 +19,7 @@ export function serializeStore(s, { withTheme = true } = {}) {
     address: bi(s, 'address'),
     category: s.category,
     departments: decodeDepartments(s.departments),
+    returnDays: s.return_days ?? 3,
     deliveryMode: s.delivery_mode === 'platform' ? 'platform' : 'store',
     city: s.city,
     phone: s.phone,

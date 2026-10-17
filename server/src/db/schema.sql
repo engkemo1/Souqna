@@ -19,6 +19,7 @@ CREATE TABLE IF NOT EXISTS stores (
   description_ar TEXT, description_en TEXT,
   category TEXT NOT NULL DEFAULT 'mixed',
   departments TEXT NOT NULL DEFAULT '',
+  return_days INTEGER NOT NULL DEFAULT 3,
   delivery_mode TEXT NOT NULL DEFAULT 'store',
   city TEXT NOT NULL DEFAULT 'Banha',
   address_ar TEXT, address_en TEXT,

@@ -1,7 +1,7 @@
 {
-  "name": "طَلّة — كل المحلات في طلة",
-  "short_name": "طَلّة",
-  "description": "كل المحلات في طلة",
+  "name": "Twist Store",
+  "short_name": "Twist",
+  "description": "كل المحلات في مكان واحد",
   "lang": "ar",
   "dir": "rtl",
   "start_url": "/?source=pwa",
@@ -9,11 +9,11 @@
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#FFFFFF",
-  "theme_color": "#14213D",
+  "theme_color": "#03244D",
   "icons": [
-    { "src": "/brand/talla-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/brand/talla-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/brand/talla-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/brand/twist-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/twist-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/twist-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "share_target": {
     "action": "/api/share-target",
@@ -22,8 +22,8 @@
     "params": { "title": "title", "text": "text", "url": "url", "files": [{ "name": "photo", "accept": ["image/*"] }] }
   },
   "shortcuts": [
-    { "name": "صوّرها ولاقيها", "url": "/visual", "icons": [{ "src": "/brand/talla-192.png", "sizes": "192x192", "type": "image/png" }] },
-    { "name": "لوحة المحل", "url": "/dashboard", "icons": [{ "src": "/brand/talla-192.png", "sizes": "192x192", "type": "image/png" }] },
-    { "name": "تتبّع طلبي", "url": "/track", "icons": [{ "src": "/brand/talla-192.png", "sizes": "192x192", "type": "image/png" }] }
+    { "name": "صوّرها ولاقيها", "url": "/visual", "icons": [{ "src": "/brand/twist-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "لوحة المحل", "url": "/dashboard", "icons": [{ "src": "/brand/twist-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "تتبّع طلبي", "url": "/track", "icons": [{ "src": "/brand/twist-192.png", "sizes": "192x192", "type": "image/png" }] }
   ]
 }

@@ -2,7 +2,7 @@
  * "منسّق مودة" (Gemini/Claude): الموديل هو اللي بيرشّح الطقم، بس من منتجاتنا الحقيقية الأول.
  * - بنديله قايمة منتجات حقيقية (id + نوع + لون + سعر + رسمية) مفلترة على الفئة والمناسبة.
  * - لو قطعة مش لاقيلها حاجة مناسبة في القايمة، بيقترحها "من بره" (productId=null + وصف قصير)
- *   وبتتحول لزرار "اطلبه" عشان طلة تجيبها وتبلّغ العميل.
+ *   وبتتحول لزرار "اطلبه" عشان Twist تجيبها وتبلّغ العميل.
  * - الموديل ما بيكتبش أسعار ولا بيخترع منتجات: كل id بيتفحص إنه من القايمة، والأسعار والإجمالي من قاعدة البيانات،
  *   ولو الطقم عدّى الميزانية أو طلع غلط بنرجع لترشيح القواعد (plan الأصلي).
  */
@@ -48,14 +48,14 @@ export function curatorPrompt({ K, pools, persons, context, budget, adv, eventTi
   const formality = context ? K.contexts.get(context)?.formality : null;
   const asked = (parsed.garments || []).map((g) => `${g.key}${g.color ? `(${g.color})` : ''}`).join(', ');
   return [
-    `You are ${assistantName} (مودة), the expert fashion stylist of "Talla / طلة", an online marketplace of local clothing stores in Banha, Egypt. You are curating a complete outfit for each person from the REAL stock lists below.`,
+    `You are ${assistantName} (مودة), the expert fashion stylist of "Twist", an online marketplace of local clothing stores in Banha, Egypt. You are curating a complete outfit for each person from the REAL stock lists below.`,
     'Style knowledge: match the dress code of the occasion, keep the colours coherent (a small palette, partners may echo each other), respect the weather, make every look complete (e.g. suit/shirt/shoes, or dress/shoes/bag), and never pick sporty or casual pieces (hoodies, shorts, sport shoes) for a formal occasion. The only exception: plain minimalist white or black leather sneakers may go with a classic suit/blazer look at an engagement or wedding guest event, and only when no formal shoe/loafer fits; they are listed in stock only if allowed. Judge each item by its real name and type, not only its label.',
     `Occasion: ${context || 'not specified'}${formality ? ` (formality ${formality[0]}-${formality[1]} out of 5)` : ''}. Time: ${eventTime?.isNight ? 'evening/night' : 'daytime'}. Weather: ${weather}.`,
     budget ? `Total budget for everyone together: ${budget} EGP. The sum of the prices of the chosen products MUST NOT exceed it; split it sensibly between people. If a complete look cannot fit, choose fewer/cheaper pieces and say so in the note.` : 'No budget limit was given.',
     asked ? `The customer explicitly asked for: ${asked}.` : '',
     ...persons.map((a) => `STOCK for "${a}" (id | type (arabic) | name | colours | price EGP | formality):\n${pools[a].length ? pools[a].map((p) => line(p, K)).join('\n') : '(nothing in stock for this person)'}`),
     baseline ? `The rule-based system suggested this baseline (you may improve or replace it): ${JSON.stringify(baseline)}` : '',
-    'HARD RULES: (1) choose productId ONLY from the stock lists above for that same person, copied exactly. (2) Choose from our stock first. (3) If an essential piece has no suitable product in stock, DO NOT force a bad one: output it with productId null and a short Arabic "title" describing the piece to source from outside (e.g. "بدلة كحلي سليم فيت", with colour/style, no brand, no price) — Talla will offer to source it. (4) Never invent stock, brands, stores or prices; never write numbers or prices in any text field. (5) "type" must be one of the type keys shown in the lists (for outside pieces use a sensible type key such as suit, shirt, dress_party, heels_low, formal_shoes, loafers, blazer, trousers...).',
+    'HARD RULES: (1) choose productId ONLY from the stock lists above for that same person, copied exactly. (2) Choose from our stock first. (3) If an essential piece has no suitable product in stock, DO NOT force a bad one: output it with productId null and a short Arabic "title" describing the piece to source from outside (e.g. "بدلة كحلي سليم فيت", with colour/style, no brand, no price) — Twist will offer to source it. (4) Never invent stock, brands, stores or prices; never write numbers or prices in any text field. (5) "type" must be one of the type keys shown in the lists (for outside pieces use a sensible type key such as suit, shirt, dress_party, heels_low, formal_shoes, loafers, blazer, trousers...).',
     `Reply with ONE JSON object only, no prose around it. Text fields in ${lang === 'en' ? 'English' : 'friendly Egyptian Arabic'}:`,
     '{"people":[{"aud":"men","note":"one short styling tip for this person","items":[{"type":"suit","productId":123,"why":"few words"},{"type":"shirt","productId":null,"title":"قميص أبيض كلاسيك"}]}]}',
   ].filter(Boolean).join('\n');

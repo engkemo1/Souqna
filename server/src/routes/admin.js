@@ -80,7 +80,7 @@ r.post('/login', h((req, res) => {
   res.json({ session: makeSession(), twoStep: true });
 }));
 
-/** Orders Banha Outfit has to collect from stores and deliver. */
+/** Orders Twist has to collect from stores and deliver. */
 r.get('/deliveries', h((_req, res) => {
   const rows = q.all(`SELECT o.id, o.number, o.status, o.total, o.customer_name, o.phone, o.governorate, o.city, o.address, o.notes, o.created_at, o.handoff_at,
       s.slug, s.name_ar AS store_name, s.phone AS store_phone, s.address_ar AS store_address, s.map_url AS store_map
@@ -168,7 +168,7 @@ r.get('/reports/stores', h((req, res) => {
   });
 }));
 
-/* ---------------------------------------------------------- platform coupons (funded by Banha Outfit) */
+/* ---------------------------------------------------------- platform coupons (funded by Twist) */
 
 const couponSchema = z.object({
   code: z.string().trim().toUpperCase().regex(/^[A-Z0-9_-]{3,20}$/, 'code_invalid'),

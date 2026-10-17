@@ -117,7 +117,7 @@ function useDeliveryAlerts() {
     const id = setInterval(tick, 20000);
     return () => { stop = true; clearInterval(id); };
   }, [toast, beep]);
-  useEffect(() => { document.title = counts.ready ? `(${counts.ready}) إدارة طلة` : 'إدارة طلة'; }, [counts.ready]);
+  useEffect(() => { document.title = counts.ready ? `(${counts.ready}) إدارة Twist` : 'إدارة Twist'; }, [counts.ready]);
   const toggleSound = () => { const v = !sound; setSound(v); try { localStorage.setItem('bo.adminSound', v ? '1' : '0'); } catch { /* ignore */ } if (v) beep(); };
   const askPermission = () => { try { Notification.requestPermission(); } catch { /* ignore */ } };
   return { counts, recent, sound, toggleSound, askPermission };

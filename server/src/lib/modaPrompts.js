@@ -89,7 +89,7 @@ export async function suggestPrompts(callFn) {
   const K = loadKnowledge();
   const occasions = [...K.contexts.values()].filter((c) => c.key !== 'condolence').map((c) => c.ar).join('، ');
   const system = [
-    'You write ready-made suggestion buttons and example messages for "Moda (مودة)", the fashion-stylist chat of "Talla / طلة", an online marketplace of local clothing stores in Banha, Egypt.',
+    'You write ready-made suggestion buttons and example messages for "Moda (مودة)", the fashion-stylist chat of "Twist", an online marketplace of local clothing stores in Banha, Egypt.',
     'Write in warm Egyptian Arabic (and a short natural English version). Reply with ONE JSON object only, no prose:',
     '{"hero":[{"ar":"short button label (2-3 words)","en":"...","askAr":"the message sent to the stylist","askEn":"..."}],"chips":[{"ar":"a full natural sentence a customer would type","en":"..."}]}',
     `hero: exactly 6 items. Each askAr MUST clearly name ONE occasion or garment the shop can dress (occasions we know: ${occasions}). Never mention prices, brands or stores.`,

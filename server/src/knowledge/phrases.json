@@ -95,7 +95,7 @@
    "أقل سعر لقيته للقطعة {total} جنيه، يعني أعلى من ميزانيتك بـ{over} جنيه."
   ],
   "order_missing_button": "اطلبه",
-  "order_missing_hint": "مش متاح دلوقتي. تحب طلة تجيبهولك ونبلغك أول ما يتوفر؟",
+  "order_missing_hint": "مش متاح دلوقتي. تحب Twist تجيبهولك ونبلغك أول ما يتوفر؟",
   "clarify_audience": [
    "اللبس ده لمين؟"
   ],
@@ -310,7 +310,7 @@
    "You're welcome!"
   ],
   "order_missing_hint": [
-   "Not available now. Want Talla to source it for you and notify you as soon as it's in stock?"
+   "Not available now. Want Twist to source it for you and notify you as soon as it's in stock?"
   ],
   "alt_color": [
    "{wanted} isn't available in that exact colour, so I picked the closest"

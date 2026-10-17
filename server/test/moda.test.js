@@ -217,6 +217,6 @@ test('owned piece phrase prevents searching for it and coach jacket infers jacke
   const missing = res.blocks?.tabs?.[0]?.missing || [];
   assert.ok(missing.every((m) => m.key !== 'shirt'), 'owned shirt must not be in missing');
   assert.ok(missing.some((m) => m.key === 'sneakers'), 'sneakers should be missing');
-  assert.match(missing[0].hint, /طلة/);
+  assert.match(missing[0].hint, /Twist/);
 });
 

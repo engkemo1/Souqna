@@ -5,9 +5,9 @@ import { LEGAL, LEGAL_UPDATED } from '../../lib/legal.js';
 import { SALES_PHONE, SALES_WHATSAPP } from '../../config/contact.js';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 
-const TABS = [['privacy', 'legal.privacy'], ['terms', 'legal.terms'], ['returns', 'legal.returns']];
+const TABS = [['privacy', 'legal.privacy'], ['terms', 'legal.terms']];
 
-/** Privacy, terms and return policy — one page, three documents (/legal/privacy, /legal/terms, /legal/returns). */
+/** Privacy and terms — one page, two documents (/legal/privacy, /legal/terms). */
 export default function Legal() {
   const { doc } = useParams();
   const { t, lang } = useI18n();

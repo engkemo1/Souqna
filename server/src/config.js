@@ -22,7 +22,7 @@ export const config = {
   },
   webDist: path.resolve(ROOT, '..', 'web', 'dist'),
   maxUploadMb: 15,
-  // Accounts are created by the Banha Outfit team, not by the public. Set ALLOW_REGISTER=1 only to re-open sign-up.
+  // Accounts are created by the Twist team, not by the public. Set ALLOW_REGISTER=1 only to re-open sign-up.
   allowRegister: process.env.ALLOW_REGISTER === '1',
   // Platform admin key for /admin (sent as the x-admin-key header). Required to use the admin tools.
   // The public demo account (ahmed@…): always read-only, so "Try the dashboard" can never change a real store or the site.
@@ -34,7 +34,7 @@ export const config = {
   backupDir: process.env.BACKUP_DIR || '',
   backupKeepDays: Number(process.env.BACKUP_KEEP_DAYS || 14),
   // WhatsApp Cloud API (Meta). Used only when a store's auto_whatsapp switch is on.
-  // Banha Outfit team number that gets a WhatsApp alert whenever an order must be delivered by us.
+  // Twist team number that gets a WhatsApp alert whenever an order must be delivered by us.
   platformWa: process.env.PLATFORM_WA || '201067378110',
   wa: {
     token: process.env.WA_TOKEN || '',

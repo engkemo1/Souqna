@@ -42,7 +42,7 @@ export default function MarketFavorites() {
               <div className="flex items-center gap-2">
                 <h1 className="font-display text-2xl font-bold sm:text-3xl">{ar ? 'المفضلة' : 'Favorites'}</h1>
                 {count > 0 && (
-                  <span className="rounded-full bg-brand/10 px-2.5 py-0.5 text-xs font-bold text-brand">
+                  <span className="rounded-full bg-[#EAF0F8] px-2.5 py-0.5 text-xs font-bold text-brand">
                     {ar ? `${count} قطعة` : `${count} items`}
                   </span>
                 )}
@@ -67,10 +67,10 @@ export default function MarketFavorites() {
         {/* Content */}
         {!ids.length ? (
           <div className="rounded-3xl border border-line bg-elevated px-5 py-16 text-center shadow-sm">
-            <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#fff0e5] text-brand">
+            <span className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#EAF0F8] text-brand">
               <Heart className="h-8 w-8" />
             </span>
-            <h2 className="mt-5 font-display text-xl font-bold text-[#14213D] sm:text-2xl">
+            <h2 className="mt-5 font-display text-xl font-bold text-[#03244D] sm:text-2xl">
               {ar ? 'مفيش منتجات في المفضلة لسه' : 'No favorites yet'}
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted">

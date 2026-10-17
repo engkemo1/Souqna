@@ -50,6 +50,6 @@ export function notifyStore(storeId, payload) {
 export async function sendTest(storeId) {
   init();
   const subs = q.all('SELECT * FROM push_subscriptions WHERE store_id=?', [storeId]);
-  const results = await Promise.all(subs.map((s) => sendTo(s, { title: 'بنها أوتفيت ✅', body: 'الإشعارات شغالة. هتوصلك هنا أول ما يجيلك أوردر جديد.', url: '/dashboard/orders', tag: 'test' })));
+  const results = await Promise.all(subs.map((s) => sendTo(s, { title: 'Twist ✅', body: 'الإشعارات شغالة. هتوصلك هنا أول ما يجيلك أوردر جديد.', url: '/dashboard/orders', tag: 'test' })));
   return { devices: subs.length, delivered: results.filter(Boolean).length };
 }

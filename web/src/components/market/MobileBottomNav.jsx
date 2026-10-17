@@ -26,15 +26,15 @@ export default function MobileBottomNav() {
   ];
 
   return (
-    <nav aria-label={lang === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'} className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_-12px_rgba(20,33,61,.25)] backdrop-blur-md md:hidden">
+    <nav aria-label={lang === 'ar' ? 'التنقل الرئيسي' : 'Main navigation'} className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_28px_-12px_rgba(3,36,77,.25)] backdrop-blur-md md:hidden">
       <ul className="mx-auto grid h-[4.25rem] max-w-md grid-cols-5 items-end px-2">
         {items.map(({ to, icon: Icon, label, on, main }) => (
           <li key={to} className="flex justify-center">
             <Link to={to} aria-current={on ? 'page' : undefined} className="group flex w-full flex-col items-center gap-1 pb-2 text-[11px] font-semibold">
               {main ? (
-                <span className="-mt-6 grid h-14 w-14 place-items-center rounded-full bg-brand text-white shadow-[0_10px_24px_-6px_rgba(244,81,0,.55)] ring-4 ring-white transition active:scale-95"><Icon className="h-6 w-6" strokeWidth={2} /></span>
+                <span className="-mt-6 grid h-14 w-14 place-items-center rounded-full bg-btn text-white shadow-[0_10px_24px_-6px_rgba(3,36,77,.55)] ring-4 ring-white transition active:scale-95"><Icon className="h-6 w-6" strokeWidth={2} /></span>
               ) : (
-                <span className={cx('grid h-8 w-12 place-items-center rounded-full transition', on ? 'bg-brand/10 text-brand' : 'text-[#5b6679] group-active:bg-fg/5')}><Icon className="h-[22px] w-[22px]" strokeWidth={on ? 2.25 : 1.75} /></span>
+                <span className={cx('grid h-8 w-12 place-items-center rounded-full transition', on ? 'bg-[#EAF0F8] text-brand' : 'text-[#5b6679] group-active:bg-fg/5')}><Icon className="h-[22px] w-[22px]" strokeWidth={on ? 2.25 : 1.75} /></span>
               )}
               <span className={cx(on || main ? 'text-brand' : 'text-[#5b6679]')}>{label}</span>
             </Link>

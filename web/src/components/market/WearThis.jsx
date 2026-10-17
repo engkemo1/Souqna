@@ -7,10 +7,10 @@ export default function WearThis({ className = '' }) {
   return (
     <section className={className}>
       <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { photo: true, similar: true } }))}
-        className="group relative flex h-full min-h-[190px] w-full flex-col overflow-hidden rounded-3xl border border-brand/25 bg-gradient-to-br from-brand/[0.08] via-elevated to-elevated p-5 text-start shadow-[0_8px_24px_rgba(20,33,61,.04)] transition hover:border-brand/50 hover:shadow-[0_12px_30px_rgba(20,33,61,.09)] sm:p-6">
+        className="group relative flex h-full min-h-[190px] w-full flex-col overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-brand/[0.08] via-elevated to-elevated p-5 text-start shadow-[0_8px_24px_rgba(3,36,77,.04)] transition hover:border-fg/30/50 hover:shadow-[0_12px_30px_rgba(3,36,77,.09)] sm:p-6">
         <span className="pointer-events-none absolute -end-8 -top-10 h-36 w-36 rounded-full bg-brand/[0.08] transition group-hover:scale-110" />
         <span className="relative flex items-center gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-brand text-white shadow-sm"><Camera className="h-5 w-5" /></span>
+          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-btn text-white shadow-sm"><Camera className="h-5 w-5" /></span>
           <span className="min-w-0">
             <span className="block font-display text-base font-bold leading-snug sm:text-lg">{t('wear.title')}</span>
             <span className="mt-1 block text-xs leading-relaxed text-muted sm:text-[13px]">{t('wear.sub')}</span>

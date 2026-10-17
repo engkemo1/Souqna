@@ -245,7 +245,7 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
   res.json({ items: first?.items || [], total: withItems.reduce((n, g) => n + g.items.length, 0), groups, detected: found.detected, noMatch: withItems.length === 0 });
 }));
 
-/* Web Share Target: «Share → بنها أوتفيت» from Instagram / WhatsApp / the gallery (installed PWA, see manifest.webmanifest).
+/* Web Share Target: «Share → Twist» from Instagram / WhatsApp / the gallery (installed PWA, see manifest.webmanifest).
  * The shared photo is shrunk, kept in memory for 10 minutes and handed to /visual exactly once. Nothing is written to disk. */
 const sharedPhotos = new Map(); // token -> { buf, at }
 const SHARED_TTL = 600e3;

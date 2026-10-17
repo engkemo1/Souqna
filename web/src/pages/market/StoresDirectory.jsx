@@ -28,19 +28,19 @@ export default function StoresDirectory() {
   }, [t]);
 
   return (
-    <div className="min-h-dvh bg-[#faf9f7] text-[#14213D]">
+    <div className="min-h-dvh bg-[#F6F8FB] text-[#03244D]">
       <MarketHeader />
       <main>
-        <section className="border-b border-line bg-[radial-gradient(ellipse_at_85%_20%,#fff0e5_0%,transparent_38%),linear-gradient(180deg,#fffdfa_0%,#faf9f7_100%)]">
+        <section className="border-b border-line bg-[radial-gradient(ellipse_at_85%_20%,#EAF0F8_0%,transparent_38%),linear-gradient(180deg,#FAFBFD_0%,#F6F8FB_100%)]">
           <div className="container py-9 sm:py-14">
             <Link to="/" className="inline-flex items-center gap-2 text-xs font-bold text-muted transition hover:text-brand"><ArrowLeft className="h-4 w-4 rtl:-scale-x-100" />{lang === 'ar' ? 'العودة للرئيسية' : 'Back to home'}</Link>
             <div className="mt-5 flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-2xl">
-                <span className="inline-flex items-center gap-2 rounded-full bg-[#fff0e5] px-3.5 py-1.5 text-xs font-bold text-brand"><Store className="h-4 w-4" />{lang === 'ar' ? 'محلات بنها في مكان واحد' : 'Banha shops in one place'}</span>
+                <span className="inline-flex items-center gap-2 rounded-full bg-[#EAF0F8] px-3.5 py-1.5 text-xs font-bold text-brand"><Store className="h-4 w-4" />{lang === 'ar' ? 'محلات بنها في مكان واحد' : 'Banha shops in one place'}</span>
                 <h1 className="mt-3 font-display text-3xl font-black leading-tight sm:text-5xl">{lang === 'ar' ? 'اكتشف كل المحلات' : 'Discover all stores'}</h1>
                 <p className="mt-3 text-sm leading-7 text-[#526078] sm:text-base">{lang === 'ar' ? 'اختار القسم اللي بتدور عليه، قارن بين المحلات، وافتح صفحة كل محل عشان تشوف منتجاته وعروضه.' : 'Choose a department, compare local shops, and open each store page to browse its products and offers.'}</p>
               </div>
-              <Link to="/search?sale=1" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border border-brand/25 bg-white px-4 text-sm font-bold text-brand shadow-sm transition hover:bg-[#fff0e5]"><Tag className="h-4 w-4" />{lang === 'ar' ? 'شوف العروض' : 'Browse offers'}</Link>
+              <Link to="/search?sale=1" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border-[1.5px] border-[#F8620A] bg-white px-4 text-sm font-bold text-brand shadow-sm transition hover:bg-[#EAF0F8]"><Tag className="h-4 w-4" />{lang === 'ar' ? 'شوف العروض' : 'Browse offers'}</Link>
             </div>
           </div>
         </section>
@@ -60,7 +60,7 @@ export default function StoresDirectory() {
           </div>
 
           <div className="mb-7 flex flex-wrap gap-2" role="tablist" aria-label={t('settings.category')}>
-            {cats.map((item) => <button key={item} type="button" role="tab" aria-selected={category === item} onClick={() => setCategory(item)} className={cx('rounded-full border px-3.5 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm', category === item ? 'border-brand bg-brand text-white shadow-sm' : 'border-line-strong bg-white text-[#43516a] hover:border-brand/50 hover:text-brand')}>
+            {cats.map((item) => <button key={item} type="button" role="tab" aria-selected={category === item} onClick={() => setCategory(item)} className={cx('rounded-full border px-3.5 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm', category === item ? 'border-brand bg-btn text-white shadow-sm' : 'border-line-strong bg-white text-[#43516a] hover:border-fg/30/50 hover:text-brand')}>
               {item === 'all' ? t('cat.all') : label(item)}
             </button>)}
           </div>

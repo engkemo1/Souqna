@@ -51,7 +51,7 @@ export async function sendNewOrderAlert(store, orderId) {
 }
 
 /**
- * "Banha Outfit must deliver this order" alert to the platform team number (config.platformWa).
+ * "Twist must deliver this order" alert to the platform team number (config.platformWa).
  * Template variables: {{1}} store {{2}} order no. {{3}} store phone {{4}} store address
  *                     {{5}} customer {{6}} customer phone {{7}} customer address {{8}} cash to collect (EGP)
  */

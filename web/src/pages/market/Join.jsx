@@ -11,7 +11,7 @@ const ease = [0.22, 1, 0.36, 1];
 const up = (d = 0) => ({ initial: { opacity: 0, y: 28 }, whileInView: { opacity: 1, y: 0 }, viewport: { once: true, margin: '-60px' }, transition: { duration: 0.8, delay: d, ease } });
 const wa = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent(SALES_WA_TEXT)}`;
 const waPhoto = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent('أهلاً، محتاج عرض سعر لتصوير منتجات محلي. عدد المنتجات تقريباً:')}`;
-const waReadyPhotos = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent('أهلاً، عندي صور منتجاتي جاهزة أو بتعامل مع مصور، وعايز أعرف خطوات فتح متجري على طلة.')}`;
+const waReadyPhotos = `https://wa.me/${SALES_WHATSAPP}?text=${encodeURIComponent('أهلاً، عندي صور منتجاتي جاهزة أو بتعامل مع مصور، وعايز أعرف خطوات فتح متجري على Twist.')}`;
 const tel = `tel:${SALES_PHONE}`;
 
 const PERKS = [
@@ -33,8 +33,8 @@ function GoldButton({ href, icon: Icon, children, primary }) {
     <motion.a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
       whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.97 }}
       className={primary
-        ? 'relative inline-flex items-center gap-2.5 overflow-hidden rounded-full bg-[#f45100] px-7 py-4 text-[17px] font-bold text-white shadow-[0_10px_30px_-10px_rgba(244,81,0,.38)]'
-        : 'inline-flex items-center gap-2.5 rounded-full border border-[#f45100]/45 bg-white px-7 py-4 text-[17px] font-semibold text-[#f45100] transition hover:bg-[#fff0e5]'}>
+        ? 'relative inline-flex items-center gap-2.5 overflow-hidden rounded-full bg-btn px-7 py-4 text-[17px] font-bold text-white shadow-[0_10px_30px_-10px_rgba(3,36,77,.38)]'
+        : 'inline-flex items-center gap-2.5 rounded-full border border-line-strong bg-white px-7 py-4 text-[17px] font-semibold text-brand transition hover:bg-[#EAF0F8]'}>
       {primary && <motion.span aria-hidden className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-20deg] bg-white/40" animate={{ x: ['0%', '450%'] }} transition={{ duration: 2.4, repeat: Infinity, repeatDelay: 1.6, ease: 'easeInOut' }} />}
       <Icon className="relative h-5 w-5" /><span className="relative">{children}</span>
     </motion.a>
@@ -53,18 +53,18 @@ function ModaPitch() {
   useEffect(() => { const id = setInterval(() => setTalk((v) => !v), 2600); return () => clearInterval(id); }, []);
   return (
     <section className="relative mx-auto max-w-6xl px-5 pb-20">
-      <motion.div {...up(0)} className="grid items-center gap-8 overflow-hidden rounded-3xl border border-[#f45100]/20 bg-gradient-to-br from-[#fff0e5] via-white to-white p-6 shadow-[0_18px_50px_rgba(20,33,61,.07)] sm:p-10 md:grid-cols-[280px_1fr]">
+      <motion.div {...up(0)} className="grid items-center gap-8 overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-[#EAF0F8] via-white to-white p-6 shadow-[0_18px_50px_rgba(3,36,77,.07)] sm:p-10 md:grid-cols-[280px_1fr]">
         <div className="grid place-items-center"><ModaAvatar size={260} talking={talk} living tilt /></div>
         <div>
-          <p className="inline-flex items-center gap-2 rounded-full border border-[#f45100]/25 bg-[#f45100]/5 px-3.5 py-1 text-sm text-[#f45100]"><Sparkles className="h-4 w-4" /> جديد</p>
-          <h2 className="mt-3 font-display text-3xl font-bold text-[#14213D] sm:text-4xl">قابل «مودة»… الفاشونيستا اللي بتجيبلك زباين</h2>
+          <p className="inline-flex items-center gap-2 rounded-full border border-line bg-[#03244D]/5 px-3.5 py-1 text-sm text-brand"><Sparkles className="h-4 w-4" /> جديد</p>
+          <h2 className="mt-3 font-display text-3xl font-bold text-[#03244D] sm:text-4xl">قابل «مودة»… الفاشونيستا اللي بتجيبلك زباين</h2>
           <p className="mt-3 text-lg leading-relaxed text-[#43516a]">مساعدة ذكية بتتكلم بالمصري وبتفهم الصوت والصور. الزبونة تقولها اللي محتاجاه، وهي تختار من منتجات متاجر بنها بأسعارها الحقيقية.</p>
           <ul className="mt-5 space-y-3">
-            {MODA_POINTS.map((x) => <li key={x} className="flex items-start gap-3 text-base leading-relaxed text-[#26344e]"><Check className="mt-1 h-5 w-5 shrink-0 text-[#f45100]" />{x}</li>)}
+            {MODA_POINTS.map((x) => <li key={x} className="flex items-start gap-3 text-base leading-relaxed text-[#26344e]"><Check className="mt-1 h-5 w-5 shrink-0 text-brand" />{x}</li>)}
           </ul>
           <p className="mt-5 text-sm text-muted">كل ما منتجاتك أوصافها وألوانها أوضح، كل ما مودة تعرضها أكتر. وإحنا بنساعدك في ده.</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link to="/" className="inline-flex items-center gap-2 rounded-full bg-[#f45100] px-6 py-3 text-base font-bold text-white hover:bg-[#d94a00]"><Sparkles className="h-5 w-5" />جرّب مودة بنفسك</Link>
+            <Link to="/" className="inline-flex items-center gap-2 rounded-full bg-btn px-6 py-3 text-base font-bold text-white hover:brightness-110"><Sparkles className="h-5 w-5" />جرّب مودة بنفسك</Link>
           </div>
         </div>
       </motion.div>
@@ -74,27 +74,27 @@ function ModaPitch() {
 
 export default function Join() {
   const { data } = useApi('/marketplace');
-  useEffect(() => { document.title = 'افتح متجرك · طلة'; window.scrollTo(0, 0); }, []);
+  useEffect(() => { document.title = 'افتح متجرك · Twist'; window.scrollTo(0, 0); }, []);
 
   return (
-    <div dir="rtl" className="min-h-dvh overflow-hidden bg-[#faf9f7] text-[#14213D]">
+    <div dir="rtl" className="min-h-dvh overflow-hidden bg-[#F6F8FB] text-[#03244D]">
       {/* glow */}
-      <motion.div aria-hidden className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-[#f45100]/10 blur-[120px]"
+      <motion.div aria-hidden className="pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-[#03244D]/5 blur-[120px]"
         animate={{ opacity: [0.5, 0.9, 0.5], scale: [1, 1.08, 1] }} transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }} />
 
       <header className="relative mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-        <Link to="/" className="inline-flex items-center" aria-label="طلة — كل المحلات في طلة"><img src="/brand/talla-logo.svg" className="h-[64px] w-auto object-contain" alt="" aria-hidden="true" /></Link>
+        <Link to="/" className="inline-flex items-center" aria-label="Twist — كل المحلات في مكان واحد"><img src="/brand/twist-logo.png" className="h-[64px] w-auto object-contain" alt="" aria-hidden="true" /></Link>
         <Link to="/" className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-brand">السوق <ArrowLeft className="h-4 w-4" /></Link>
       </header>
 
       {/* hero */}
       <section className="relative mx-auto max-w-6xl px-5 pb-20 pt-10 text-center sm:pt-16">
-        <motion.div {...up(0)} className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#f45100]/25 bg-[#fff0e5] px-4 py-1.5 text-sm text-[#f45100]">
+        <motion.div {...up(0)} className="mx-auto inline-flex items-center gap-2 rounded-full border border-line bg-[#EAF0F8] px-4 py-1.5 text-sm text-brand">
           <Sparkles className="h-4 w-4" /> لأصحاب محلات الملابس في بنها
         </motion.div>
-        <motion.h1 {...up(0.1)} className="mx-auto mt-6 max-w-4xl font-display text-[40px] font-bold leading-[1.25] text-[#14213D] sm:text-[64px]">
+        <motion.h1 {...up(0.1)} className="mx-auto mt-6 max-w-4xl font-display text-[40px] font-bold leading-[1.25] text-[#03244D] sm:text-[64px]">
           محلك يستاهل يبقى
-          <span className="block bg-gradient-to-l from-[#f45100] via-[#ff7433] to-[#f45100] bg-[length:200%_auto] bg-clip-text pb-3 text-transparent [animation:shine_4s_linear_infinite]">على موبايل كل زبون في بنها</span>
+          <span className="block bg-gradient-to-l from-[#F8620A] via-[#ff7433] to-[#F8620A] bg-[length:200%_auto] bg-clip-text pb-3 text-transparent [animation:shine_4s_linear_infinite]">على موبايل كل زبون في بنها</span>
         </motion.h1>
         <motion.p {...up(0.2)} className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-[#43516a]">
           إحنا بنجهزلك متجرك الأونلاين من الألف للياء، وإنت تركّز في اللي بتعرفه: البيع. كل طلب جديد بيوصلك لحظة بلحظة، ومبيعاتك قدامك على موبايلك.
@@ -107,7 +107,7 @@ export default function Join() {
         {/* live numbers from the marketplace */}
         <motion.dl {...up(0.4)} className="mx-auto mt-14 grid max-w-xl grid-cols-3 gap-4 border-t border-line pt-8">
           {[[data?.stats.stores ?? '—', 'محل على المنصة'], [data?.stats.products ?? '—', 'منتج معروض'], ['24 ساعة', 'توصيل في القليوبية']].map(([v, l]) => (
-            <div key={l}><dd className="font-display text-3xl font-bold text-[#f45100]">{v}</dd><dt className="mt-1 text-sm text-muted">{l}</dt></div>
+            <div key={l}><dd className="font-display text-3xl font-bold text-brand">{v}</dd><dt className="mt-1 text-sm text-muted">{l}</dt></div>
           ))}
         </motion.dl>
 
@@ -118,13 +118,13 @@ export default function Join() {
 
       {/* perks */}
       <section className="relative mx-auto max-w-6xl px-5 pb-20">
-        <motion.h2 {...up()} className="text-center font-display text-3xl font-bold text-[#14213D] sm:text-4xl">كل اللي محلك محتاجه عشان يبيع أونلاين</motion.h2>
+        <motion.h2 {...up()} className="text-center font-display text-3xl font-bold text-[#03244D] sm:text-4xl">كل اللي محلك محتاجه عشان يبيع أونلاين</motion.h2>
         <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {PERKS.map((p, i) => (
             <motion.div key={p.title} {...up(i * 0.07)} whileHover={{ y: -6 }}
-              className="group rounded-2xl border border-line bg-white p-6 shadow-[0_10px_28px_rgba(20,33,61,.05)] transition hover:-translate-y-1 hover:border-[#f45100]/35 hover:shadow-[0_14px_32px_rgba(20,33,61,.09)]">
-              <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#fff0e5] text-[#f45100] transition-transform group-hover:rotate-6"><p.icon className="h-6 w-6" /></div>
-              <h3 className="mt-4 text-lg font-semibold text-[#14213D]">{p.title}</h3>
+              className="group rounded-2xl border border-line bg-white p-6 shadow-[0_10px_28px_rgba(3,36,77,.05)] transition hover:-translate-y-1 hover:border-line-strong hover:shadow-[0_14px_32px_rgba(3,36,77,.09)]">
+              <div className="grid h-12 w-12 place-items-center rounded-xl bg-[#EAF0F8] text-brand transition-transform group-hover:rotate-6"><p.icon className="h-6 w-6" /></div>
+              <h3 className="mt-4 text-lg font-semibold text-[#03244D]">{p.title}</h3>
               <p className="mt-2 text-base leading-relaxed text-[#526078]">{p.body}</p>
             </motion.div>
           ))}
@@ -135,17 +135,17 @@ export default function Join() {
 
       {/* professional photography ad */}
       <section className="relative mx-auto max-w-6xl px-5 pb-20">
-        <motion.div {...up()} className="relative overflow-hidden rounded-3xl border border-[#f45100]/20 bg-gradient-to-br from-[#fff0e5] via-white to-[#f7f3ed] p-7 shadow-[0_18px_50px_rgba(20,33,61,.06)] sm:p-12">
-          <motion.div aria-hidden className="absolute -left-16 -top-16 h-72 w-72 rounded-full bg-[#f45100]/10 blur-3xl" animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 7, repeat: Infinity }} />
+        <motion.div {...up()} className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-[#EAF0F8] via-white to-[#F1F4F9] p-7 shadow-[0_18px_50px_rgba(3,36,77,.06)] sm:p-12">
+          <motion.div aria-hidden className="absolute -left-16 -top-16 h-72 w-72 rounded-full bg-[#03244D]/5 blur-3xl" animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 7, repeat: Infinity }} />
           <div className="relative grid items-center gap-10 lg:grid-cols-5">
             <div className="lg:col-span-3">
-              <span className="inline-flex items-center gap-2 rounded-full border border-[#f45100]/25 bg-[#f45100]/5 px-3.5 py-1.5 text-sm text-[#f45100]"><Camera className="h-4 w-4" />خدمة جديدة من طلة</span>
-              <h2 className="mt-5 font-display text-3xl font-bold leading-snug text-[#14213D] sm:text-5xl">محتاج مساعدة في تصوير منتجاتك؟
-                <span className="block text-[#f45100]">خدمة اختيارية على قد احتياجك</span></h2>
+              <span className="inline-flex items-center gap-2 rounded-full border border-line bg-[#03244D]/5 px-3.5 py-1.5 text-sm text-brand"><Camera className="h-4 w-4" />خدمة جديدة من Twist</span>
+              <h2 className="mt-5 font-display text-3xl font-bold leading-snug text-[#03244D] sm:text-5xl">محتاج مساعدة في تصوير منتجاتك؟
+                <span className="block text-brand">خدمة اختيارية على قد احتياجك</span></h2>
               <p className="mt-4 max-w-xl text-lg leading-relaxed text-[#43516a]">لو بتصور بنفسك أو عندك مصور، كمّل بصورك عادي. ولو محتاج تصوير احترافي، فريقنا يقدر ييجي لمحلك ويجهز الصور لمتجرك.</p>
               <ul className="mt-6 grid gap-2.5 text-base text-[#26344e] sm:grid-cols-2">
                 {['بنوصلك لحد المحل في بنها', 'صور عالية الدقة بأسلوب احترافي', 'بنرفع الصور على متجرك', 'اطلب جلسة واحدة من غير اشتراك', 'للطلبات المتكررة: باقة شهرية اختيارية بكمية متفق عليها', 'نعرفك بالسعر والميعاد قبل ما نبدأ'].map((x) => (
-                  <li key={x} className="flex items-start gap-2"><Check className="mt-1 h-4 w-4 shrink-0 text-[#f45100]" />{x}</li>
+                  <li key={x} className="flex items-start gap-2"><Check className="mt-1 h-4 w-4 shrink-0 text-brand" />{x}</li>
                 ))}
               </ul>
               <div className="mt-8 flex flex-wrap gap-4">
@@ -156,7 +156,7 @@ export default function Join() {
             <div className="grid gap-4 lg:col-span-2">
               {[['طلب منفرد', 'حدد عدد المنتجات، وهنبعتلك السعر والميعاد قبل ما تأكد الطلب.'], ['باقة شهرية اختيارية', 'للتصوير المتكرر، بكمية وسعر نتفق عليهم مقدمًا.']].map(([t, b], i) => (
                 <motion.div key={t} {...up(0.1 + i * 0.1)} whileHover={{ y: -4 }} className="rounded-2xl border border-line bg-white p-5 shadow-sm">
-                  <p className="font-display text-xl font-bold text-[#14213D]">{t}</p>
+                  <p className="font-display text-xl font-bold text-[#03244D]">{t}</p>
                   <p className="mt-1.5 text-base text-[#526078]">{b}</p>
                 </motion.div>
               ))}
@@ -168,12 +168,12 @@ export default function Join() {
 
       {/* steps */}
       <section className="relative mx-auto max-w-4xl px-5 pb-20">
-        <motion.h2 {...up()} className="text-center font-display text-3xl font-bold text-[#14213D] sm:text-4xl">3 خطوات وتبدأ</motion.h2>
+        <motion.h2 {...up()} className="text-center font-display text-3xl font-bold text-[#03244D] sm:text-4xl">3 خطوات وتبدأ</motion.h2>
         <ol className="mt-10 grid gap-4 sm:grid-cols-3">
           {STEPS.map(([title, body], i) => (
-            <motion.li key={title} {...up(i * 0.12)} className="relative rounded-2xl border border-line bg-white p-6 shadow-[0_10px_28px_rgba(20,33,61,.05)]">
-              <span className="font-display text-5xl font-bold text-[#f45100]">{i + 1}</span>
-              <h3 className="mt-2 text-lg font-semibold text-[#14213D]">{title}</h3>
+            <motion.li key={title} {...up(i * 0.12)} className="relative rounded-2xl border border-line bg-white p-6 shadow-[0_10px_28px_rgba(3,36,77,.05)]">
+              <span className="font-display text-5xl font-bold text-brand">{i + 1}</span>
+              <h3 className="mt-2 text-lg font-semibold text-[#03244D]">{title}</h3>
               <p className="mt-2 text-base leading-relaxed text-[#526078]">{body}</p>
             </motion.li>
           ))}
@@ -182,12 +182,12 @@ export default function Join() {
 
       {/* final CTA */}
       <section className="relative mx-auto max-w-5xl px-5 pb-24">
-        <motion.div {...up()} className="relative overflow-hidden rounded-3xl border border-[#f45100]/20 bg-gradient-to-br from-[#fff0e5] via-white to-white p-8 text-center shadow-[0_18px_50px_rgba(20,33,61,.06)] sm:p-12">
-          <motion.div aria-hidden className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#f45100]/10 blur-3xl" animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 6, repeat: Infinity }} />
-          <h2 className="relative font-display text-3xl font-bold text-[#14213D] sm:text-4xl">جاهز تفتح متجرك؟</h2>
+        <motion.div {...up()} className="relative overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-[#EAF0F8] via-white to-white p-8 text-center shadow-[0_18px_50px_rgba(3,36,77,.06)] sm:p-12">
+          <motion.div aria-hidden className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#03244D]/5 blur-3xl" animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 6, repeat: Infinity }} />
+          <h2 className="relative font-display text-3xl font-bold text-[#03244D] sm:text-4xl">جاهز تفتح متجرك؟</h2>
           <ul className="relative mx-auto mt-6 grid max-w-md gap-2 text-start text-base text-[#43516a]">
             {['إحنا بنعمل الحساب ونرفع المنتجات معاك', 'تنبيه فوري بكل طلب جديد', 'اشتراك شهري بسيط، من غير عمولة على البيع'].map((x) => (
-              <li key={x} className="flex items-center gap-2"><Check className="h-4 w-4 shrink-0 text-[#f45100]" />{x}</li>
+              <li key={x} className="flex items-center gap-2"><Check className="h-4 w-4 shrink-0 text-brand" />{x}</li>
             ))}
           </ul>
           <div className="relative mt-8 flex flex-wrap justify-center gap-4">
@@ -198,9 +198,9 @@ export default function Join() {
       </section>
 
       {/* sticky mobile bar */}
-      <div className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-line bg-white/95 p-3 shadow-[0_-8px_24px_rgba(20,33,61,.08)] backdrop-blur sm:hidden">
-        <a href={wa} target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-2 rounded-full bg-[#f45100] py-3 font-bold text-white"><MessageCircle className="h-5 w-5" />واتساب</a>
-        <a href={tel} className="flex flex-1 items-center justify-center gap-2 rounded-full border border-[#f45100]/50 bg-white py-3 font-semibold text-[#f45100]"><Phone className="h-5 w-5" />اتصال</a>
+      <div className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-line bg-white/95 p-3 shadow-[0_-8px_24px_rgba(3,36,77,.08)] backdrop-blur sm:hidden">
+        <a href={wa} target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-2 rounded-full bg-btn py-3 font-bold text-white"><MessageCircle className="h-5 w-5" />واتساب</a>
+        <a href={tel} className="flex flex-1 items-center justify-center gap-2 rounded-full border-[1.5px] border-[#F8620A] bg-white py-3 font-semibold text-brand"><Phone className="h-5 w-5" />اتصال</a>
       </div>
       <div className="h-20 sm:hidden" />
     </div>

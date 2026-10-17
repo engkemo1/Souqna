@@ -27,7 +27,7 @@ export default function StoreCard({ store: s, index = 0, large }) {
             imgClassName="duration-[1.1s] group-hover:scale-[1.04] [@media(hover:none)]:group-hover:scale-100" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
           <div className="absolute start-3 top-3 flex flex-wrap gap-1.5">
-            {s.featured && <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11.5px] font-semibold text-neutral-900 shadow-sm backdrop-blur"><BadgeCheck className="h-3.5 w-3.5 text-[#F26B38]" />{t('market.featured')}</span>}
+            {s.featured && <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11.5px] font-semibold text-neutral-900 shadow-sm backdrop-blur"><BadgeCheck className="h-3.5 w-3.5 text-[#F8620A]" />{t('market.featured')}</span>}
             {s.sameDay && <SameDayBadge solid />}
             {s.offerBadge && <span className="rounded-full px-2.5 py-1 text-[11.5px] font-bold text-white shadow-sm" style={{ backgroundColor: brand ? `rgb(${brand})` : '#B4532A' }}>{tr(s.offerBadge)}</span>}
           </div>

@@ -28,7 +28,7 @@ function LookRow({ look, lang, tr, t, added, onAdd }) {
           <Link key={p.id} to={'/s/' + p.store.slug + '/p/' + p.slug} className={cx('group min-w-0 rounded-2xl border bg-elevated p-2 text-start transition hover:-translate-y-0.5 hover:border-fg hover:shadow-sm', i === look.pick ? 'border-brand ring-1 ring-brand/40' : 'border-line')}>
             <div className="relative">
               <SmartImage media={p.image} ratio="4 / 5" className="overflow-hidden rounded-xl" sizes="(min-width:1280px) 220px, (min-width:640px) 30vw, 44vw" />
-              {i === look.pick && <span className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full bg-brand px-2 py-1 text-[10px] font-bold text-white"><Check className="h-3 w-3" />{t('lod.picked')}</span>}
+              {i === look.pick && <span className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full bg-btn px-2 py-1 text-[10px] font-bold text-white"><Check className="h-3 w-3" />{t('lod.picked')}</span>}
             </div>
             <p className="mt-2 line-clamp-2 min-h-[2.6em] text-[12px] font-semibold leading-snug sm:text-[13px]">{tr(p.name)}</p>
             <p className="mt-1 text-sm font-bold text-sale">{formatMoney(p.price, lang)}</p>
@@ -52,7 +52,7 @@ function ManualLookCards({ looks, lang, tr, t, added, onAdd, editorial = false }
         const p = look.items[0];
         if (!p) return null;
         return (
-          <article key={`${p.id}-${index}`} className={cx('group overflow-hidden rounded-2xl border border-line bg-canvas/70 p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/40 hover:shadow-md sm:rounded-3xl sm:p-3', editorial && 'grid grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)] items-center gap-2 sm:gap-4')}>
+          <article key={`${p.id}-${index}`} className={cx('group overflow-hidden rounded-2xl border border-line bg-canvas/70 p-2.5 shadow-sm transition hover:-translate-y-0.5 hover:border-fg/30/40 hover:shadow-md sm:rounded-3xl sm:p-3', editorial && 'grid grid-cols-[minmax(0,1.05fr)_minmax(0,.95fr)] items-center gap-2 sm:gap-4')}>
             <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="group block min-w-0 text-start">
               <div className="relative">
                 <SmartImage media={p.image} ratio="4 / 4.5" className="overflow-hidden rounded-xl sm:rounded-2xl" sizes={editorial ? '(min-width:1024px) 28vw, 48vw' : '(min-width:1280px) 360px, (min-width:640px) 42vw, 92vw'} />
@@ -66,7 +66,7 @@ function ManualLookCards({ looks, lang, tr, t, added, onAdd, editorial = false }
                 <p className="mt-2 text-base font-extrabold text-sale sm:text-lg">{formatMoney(p.price, lang)}</p>
               </Link>
               {editorial && Array.isArray(p.colors) && p.colors.length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1" aria-label={lang === 'ar' ? 'الألوان المتاحة' : 'Available colours'}>{p.colors.slice(0, 5).map((color) => <span key={color.hex} title={lang === 'ar' ? color.name_ar : color.name_en} className="h-3.5 w-3.5 rounded-full border border-black/15 sm:h-4 sm:w-4" style={{ backgroundColor: color.hex }} />)}</div>}
-              <button type="button" onClick={() => onAdd(p)} className={cx('mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-2 py-2 text-[10px] font-bold transition sm:text-sm', added.includes(p.id) ? 'border-brand bg-brand/5 text-brand' : 'border-line-strong bg-elevated hover:border-brand hover:text-brand')}>
+              <button type="button" onClick={() => onAdd(p)} className={cx('mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-2 py-2 text-[10px] font-bold transition sm:text-sm', added.includes(p.id) ? 'border-[#F8620A] bg-[#FFF3EB] text-fg' : 'border-line-strong bg-elevated hover:border-fg/30 hover:bg-[#F6F8FB]')}>
                 {added.includes(p.id) ? <Check className="h-4 w-4 shrink-0" /> : <ShoppingBag className="h-4 w-4 shrink-0" />}{added.includes(p.id) ? t('stylist.added') : t('stylist.addPick')}
               </button>
             </div>
@@ -112,18 +112,18 @@ function Showcase({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, 
                 <p className="truncate text-[11px] text-muted">{tr(p.store.name)}</p>
               </Link>
               <p className="shrink-0 text-sm font-extrabold text-sale">{formatMoney(p.price, lang)}</p>
-              <button type="button" onClick={() => onAdd(p)} aria-label={t('stylist.addPick')} className={cx('grid h-9 w-9 shrink-0 place-items-center rounded-full border transition', added.includes(p.id) ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong hover:border-brand hover:text-brand')}>
+              <button type="button" onClick={() => onAdd(p)} aria-label={t('stylist.addPick')} className={cx('grid h-9 w-9 shrink-0 place-items-center rounded-full border transition', added.includes(p.id) ? 'border-brand bg-[#EAF0F8] text-brand' : 'border-line-strong hover:border-fg/30 hover:bg-[#F6F8FB]')}>
                 {added.includes(p.id) ? <Check className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}
               </button>
             </li>
           ))}
         </ul>
-        <div className="mt-3 rounded-2xl border border-brand/20 bg-brand/5 p-3.5">
+        <div className="mt-3 rounded-2xl border border-line bg-[#F1F4F9] p-3.5">
           <div className="flex items-end justify-between gap-3">
             <p className="text-[12px] font-semibold text-muted">{picks.length === 1 ? (ar ? 'سعر القطعة' : 'Item price') : (ar ? 'إجمالي اللوك' : 'Look total')}</p>
             <p className="text-2xl font-black text-brand">{formatMoney(total, lang)}</p>
           </div>
-          <button type="button" onClick={onAddAll} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-btn text-[15px] font-extrabold text-white shadow-[0_10px_24px_-10px_rgba(244,81,0,.6)] transition hover:brightness-95 active:scale-[.99]"><ShoppingBag className="h-5 w-5" />{picks.length === 1 ? t('stylist.addPick') : (ar ? 'أضف اللوك كامل للسلة' : 'Add the full look to cart')}</button>
+          <button type="button" onClick={onAddAll} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-btn text-[15px] font-extrabold text-white shadow-[0_10px_24px_-10px_rgba(3,36,77,.6)] transition hover:brightness-95 active:scale-[.99]"><ShoppingBag className="h-5 w-5" />{picks.length === 1 ? t('stylist.addPick') : (ar ? 'أضف اللوك كامل للسلة' : 'Add the full look to cart')}</button>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button type="button" onClick={onShare} className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[12.5px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{picks.length === 1 ? t('stylist.shareItem') : t('stylist.share')}</button>
             {storeLinks}
@@ -131,7 +131,7 @@ function Showcase({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, 
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span className="text-[12px] font-semibold text-muted">{ar ? 'اطلب من مودة:' : 'Ask Moda:'}</span>
-          {chips.map(([label, text]) => <button key={label} type="button" onClick={() => ask(text)} className="rounded-full border border-line bg-elevated px-3 py-1.5 text-[12px] font-semibold transition hover:border-brand hover:text-brand">{label}</button>)}
+          {chips.map(([label, text]) => <button key={label} type="button" onClick={() => ask(text)} className="rounded-full border border-line bg-elevated px-3 py-1.5 text-[12px] font-semibold transition hover:border-fg/30 hover:bg-[#F6F8FB]">{label}</button>)}
         </div>
       </div>
     </div>
@@ -163,7 +163,7 @@ function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare
               </Link>
               <div className="mt-auto flex items-center justify-between gap-2 pt-2">
                 <p className="text-sm font-extrabold text-sale">{formatMoney(p.price, lang)}</p>
-                <button type="button" onClick={() => onAdd(p)} aria-label={t('stylist.addPick')} className={cx('grid h-9 w-9 shrink-0 place-items-center rounded-full border transition', added.includes(p.id) ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong hover:border-brand hover:text-brand')}>
+                <button type="button" onClick={() => onAdd(p)} aria-label={t('stylist.addPick')} className={cx('grid h-9 w-9 shrink-0 place-items-center rounded-full border transition', added.includes(p.id) ? 'border-brand bg-[#EAF0F8] text-brand' : 'border-line-strong hover:border-fg/30 hover:bg-[#F6F8FB]')}>
                   {added.includes(p.id) ? <Check className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}
                 </button>
               </div>
@@ -172,7 +172,7 @@ function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare
         ))}
       </ul>
       <div className="mt-3 flex flex-wrap items-stretch gap-2">
-        <button type="button" onClick={onAddAll} className="flex h-14 w-full min-w-0 items-center justify-between sm:w-auto sm:flex-1 gap-3 rounded-2xl bg-btn px-4 text-white shadow-[0_12px_26px_-12px_rgba(244,81,0,.65)] transition hover:brightness-95 active:scale-[.99] sm:px-5">
+        <button type="button" onClick={onAddAll} className="flex h-14 w-full min-w-0 items-center justify-between sm:w-auto sm:flex-1 gap-3 rounded-2xl bg-btn px-4 text-white shadow-[0_12px_26px_-12px_rgba(3,36,77,.65)] transition hover:brightness-95 active:scale-[.99] sm:px-5">
           <span className="flex items-center gap-2 text-[14px] font-extrabold sm:text-[15px]"><ShoppingBag className="h-5 w-5" />{picks.length === 1 ? t('stylist.addPick') : (ar ? 'أضف الإطلالة كاملة للسلة' : 'Add the full look to basket')}</span>
           <span className="shrink-0 border-s border-white/40 ps-3 text-[15px] font-black">{formatMoney(total, lang)}</span>
         </button>
@@ -199,14 +199,14 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
   const shownLooks = tabs ? (tabs[Math.min(tab, tabs.length - 1)].items.filter((i) => i.card).map((i) => ({ label: i.label, items: [i.card], pick: 0 }))) : m.looks;
   const orderItems = (m.missingItems || []);
   const missing = orderItems.length > 0 ? (
-    <div className="mt-3 space-y-1.5">{orderItems.slice(0, 4).map((x, i) => <Link key={`${x.key}-${i}`} to={`/request?title=${encodeURIComponent(`${x.label}${x.material ? ' ' + x.material : ''}`)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-brand/50 bg-brand/5 px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" /><span className="flex-1">{x.label}{x.tab && tabs ? ` (${x.tab})` : ''} — {x.hint}</span><span className="rounded-full bg-brand px-3 py-1 text-[12px] text-white">{x.button}</span></Link>)}</div>
+    <div className="mt-3 space-y-1.5">{orderItems.slice(0, 4).map((x, i) => <Link key={`${x.key}-${i}`} to={`/request?title=${encodeURIComponent(`${x.label}${x.material ? ' ' + x.material : ''}`)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-line bg-[#F1F4F9] px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" /><span className="flex-1">{x.label}{x.tab && tabs ? ` (${x.tab})` : ''} — {x.hint}</span><span className="rounded-full bg-btn px-3 py-1 text-[12px] text-white">{x.button}</span></Link>)}</div>
   ) : miss.length > 0 && (
-    <div className="mt-3 space-y-1.5">{miss.map((x) => <Link key={x} to={`/request?title=${encodeURIComponent(x)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-brand/50 bg-brand/5 px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" />{t('req.moda', { x })}</Link>)}</div>
+    <div className="mt-3 space-y-1.5">{miss.map((x) => <Link key={x} to={`/request?title=${encodeURIComponent(x)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-line bg-[#F1F4F9] px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" />{t('req.moda', { x })}</Link>)}</div>
   );
-  const advice = hasAdvice && <div className="mt-3 rounded-2xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] leading-relaxed sm:text-sm">
+  const advice = hasAdvice && <div className="mt-3 rounded-2xl border border-line bg-[#F1F4F9] px-4 py-3 text-[13px] leading-relaxed sm:text-sm">
     {m.palette?.length > 0 && <p className="mb-1 text-[12px] font-semibold text-brand">{ar ? 'ألوان مقترحة' : 'Suggested colours'}: {m.palette.join(' · ')}</p>}
     {weatherTips.map((tip, i) => <p key={`weather-${i}`} className={i ? 'mt-1' : ''}>✨ {tip}</p>)}
-    {styleTips.length > 0 && <div className={weatherTips.length ? 'mt-2 border-t border-brand/15 pt-2' : ''}>
+    {styleTips.length > 0 && <div className={weatherTips.length ? 'mt-2 border-t border-line pt-2' : ''}>
       <p className="mb-1 font-semibold text-brand">{t('stylist.styleProposal')}</p>
       {styleTips.map((tip, i) => <p key={`style-${i}`} className={i ? 'mt-1' : ''}>{tip}</p>)}
     </div>}

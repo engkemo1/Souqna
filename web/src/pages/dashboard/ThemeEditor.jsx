@@ -14,6 +14,7 @@ import SmartImage from '../../components/ui/SmartImage.jsx';
 import { Segmented } from '../../components/ui/Field.jsx';
 import { ErrorState, errorMessage } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
+import { exchangeLabel } from '../../lib/returns.js';
 import { StoreLogo } from '../../components/store/StoreChrome.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
@@ -83,7 +84,7 @@ function LivePreview({ theme, store, products, device, lang }) {
         </div>
         <div className="bg-footer px-4 py-4 text-on-footer">
           <p className="font-display text-sm font-bold">{tr(store.name)}</p>
-          <p className="mt-1 text-[10px] text-footer-muted">{t('store.cod')} · {t('store.exchange')}</p>
+          <p className="mt-1 text-[10px] text-footer-muted">{[t('store.cod'), exchangeLabel(t, store)].filter(Boolean).join(' · ')}</p>
         </div>
       </div>
     </div>

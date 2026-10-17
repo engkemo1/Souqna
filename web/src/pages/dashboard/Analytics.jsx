@@ -13,7 +13,7 @@ import { Segmented } from '../../components/ui/Field.jsx';
 import { ErrorState } from '../../components/ui/States.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 
-const PALETTE = ['#F26B38', '#F26B38', '#6C8EAD', '#B9A37E', '#8E6C8A', '#5E8C61'];
+const PALETTE = ['#F8620A', '#F8620A', '#6C8EAD', '#B9A37E', '#8E6C8A', '#5E8C61'];
 
 function BarList({ rows, valueOf, labelOf, format, colorful }) {
   const max = Math.max(1, ...rows.map(valueOf));
@@ -23,11 +23,11 @@ function BarList({ rows, valueOf, labelOf, format, colorful }) {
       {rows.map((r, i) => (
         <li key={i}>
           <div className="mb-1.5 flex items-baseline justify-between gap-3 text-sm">
-            <span className="flex min-w-0 items-center gap-2 font-medium"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colorful ? PALETTE[i % PALETTE.length] : '#F26B38' }} /><span className="truncate">{labelOf(r)}</span></span>
+            <span className="flex min-w-0 items-center gap-2 font-medium"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: colorful ? PALETTE[i % PALETTE.length] : '#F8620A' }} /><span className="truncate">{labelOf(r)}</span></span>
             <span className="shrink-0 tabular"><b className="font-semibold">{format(valueOf(r))}</b> <span className="text-xs text-muted">{Math.round((valueOf(r) / total) * 100)}%</span></span>
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-fg/[0.06]">
-            <motion.div className="h-full rounded-full" style={{ background: colorful ? PALETTE[i % PALETTE.length] : '#F26B38' }} initial={{ width: 0 }} whileInView={{ width: `${(valueOf(r) / max) * 100}%` }} viewport={{ once: true }} transition={{ duration: 0.9, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }} />
+            <motion.div className="h-full rounded-full" style={{ background: colorful ? PALETTE[i % PALETTE.length] : '#F8620A' }} initial={{ width: 0 }} whileInView={{ width: `${(valueOf(r) / max) * 100}%` }} viewport={{ once: true }} transition={{ duration: 0.9, delay: i * 0.06, ease: [0.22, 1, 0.36, 1] }} />
           </div>
         </li>
       ))}
@@ -80,7 +80,7 @@ export default function Analytics() {
           {!d ? <Skeleton className="h-52" /> : <SimpleBars data={d.byHour.map((x) => ({ ...x, label: hourLabel(x.hour) }))} dataKey="orders" labelKey="label" />}
         </Panel>
         <Panel title={t('analytics.byWeekday')}>
-          {!d ? <Skeleton className="h-52" /> : <SimpleBars data={d.byWeekday.map((x) => ({ ...x, label: weekdays[x.wd] }))} dataKey="orders" labelKey="label" color="#F26B38" />}
+          {!d ? <Skeleton className="h-52" /> : <SimpleBars data={d.byWeekday.map((x) => ({ ...x, label: weekdays[x.wd] }))} dataKey="orders" labelKey="label" color="#F8620A" />}
         </Panel>
       </div>
 
