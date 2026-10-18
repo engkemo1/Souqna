@@ -134,7 +134,7 @@ Demo photography: Magento 2 sample data (Luma, AFL-3.0) and Sylius fixtures (MIT
 Free instances sleep after inactivity and reset their disk on redeploy (the demo data re-seeds automatically). For real stores, add a persistent disk and set `DB_FILE`/`MEDIA_DIR` to it.
 
 ## Sales contact
-Owners who want to join: **01067378110** (WhatsApp `201067378110`). Edit `web/src/config/contact.js` to change it.
+Owners who want to join: **01206928670** (WhatsApp `201206928670`). Edit `web/src/config/contact.js` to change it.
 
 ## Demo account
 `ahmed@banhalook.app` is promoted to a **read-only `demo` role** at server start (`DEMO_EMAIL` env to change): it can browse the whole dashboard but every write returns `demo_readonly`.

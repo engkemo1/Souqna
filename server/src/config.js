@@ -35,7 +35,7 @@ export const config = {
   backupKeepDays: Number(process.env.BACKUP_KEEP_DAYS || 14),
   // WhatsApp Cloud API (Meta). Used only when a store's auto_whatsapp switch is on.
   // Twist team number that gets a WhatsApp alert whenever an order must be delivered by us.
-  platformWa: process.env.PLATFORM_WA || '201067378110',
+  platformWa: process.env.PLATFORM_WA || '201206928670',
   wa: {
     token: process.env.WA_TOKEN || '',
     phoneId: process.env.WA_PHONE_ID || '',
