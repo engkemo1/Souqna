@@ -4,7 +4,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Images, FolderTree, Palette, Wand2, Settings, LogOut, ExternalLink, Plus, Menu, Camera, Star } from 'lucide-react';
+  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Images, FolderTree, Palette, Wand2, Settings, LogOut, ExternalLink, QrCode, Plus, Menu, Camera, Star } from 'lucide-react';
 import { useAuth } from '../../lib/auth.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
@@ -12,6 +12,7 @@ import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { BrandMark } from '../../components/market/Brand.jsx';
 import { StoreLogo } from '../../components/store/StoreChrome.jsx';
 import LangToggle from '../../components/LangToggle.jsx';
+import { StoreQrButton } from '../../components/dash/QrShare.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { cx } from '../../components/ui/cx.js';
 
@@ -55,7 +56,7 @@ function Sidebar({ pending }) {
           <StoreLogo store={store} size={40} className="h-10 w-10" />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold">{tr(store.name)}</p>
-            <a href={`/s/${store.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline">{t('dash.viewStore')}<ExternalLink className="h-3 w-3" /></a>
+            <span className="flex items-center gap-3"><a href={`/s/${store.slug}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline">{t('dash.viewStore')}<ExternalLink className="h-3 w-3" /></a><StoreQrButton store={store} className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"><QrCode className="h-3 w-3" />QR</StoreQrButton></span>
           </div>
         </div>
       </div>
@@ -115,6 +116,7 @@ function MobileTop() {
       </Link>
       <div className="flex items-center">
         <LangToggle compact />
+        <StoreQrButton store={store} className="grid h-11 w-11 place-items-center rounded-full hover:bg-fg/[0.06]" />
         <a href={`/s/${store.slug}`} target="_blank" rel="noreferrer" aria-label={t('dash.viewStore')} className="grid h-11 w-11 place-items-center rounded-full hover:bg-fg/[0.06]"><ExternalLink className="h-5 w-5" /></a>
       </div>
     </header>

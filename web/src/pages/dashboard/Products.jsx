@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink, ShoppingBag } from 'lucide-react';
+import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink, ShoppingBag, QrCode } from 'lucide-react';
 import { useApi, useDebounced, useIsDesktop, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -17,6 +17,7 @@ import { QtyStepper } from '../../components/ui/Commerce.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { EmptyState, ErrorState, errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
+import QrShare from '../../components/dash/QrShare.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
 
@@ -191,6 +192,8 @@ export default function Products() {
   const { store } = useAuth();
   const toast = useToast();
   const desktop = useIsDesktop();
+  const [qrP, setQrP] = useState(null);
+  const storeSlug = base.startsWith('/admin/manage/') ? base.split('/')[3] : store?.slug;
   const [params, setParams] = useSearchParams();
   const tab = params.get('stock') || params.get('status') || 'all';
   const [term, setTerm] = useState('');
@@ -296,6 +299,7 @@ export default function Products() {
                           <td className="py-3 pe-5">
                             <div className="flex justify-end gap-1 opacity-60 transition group-hover:opacity-100">
                               <IconButton size="sm" label={t('products.sell')} icon={ShoppingBag} onClick={() => setSellP(p)} iconClass="h-[18px] w-[18px] text-brand" />
+                              <IconButton size="sm" label={t('qr.productTitle')} icon={QrCode} onClick={() => setQrP(p)} iconClass="h-[18px] w-[18px]" />
                               <IconButton size="sm" label={t('products.quickEdit')} icon={Zap} onClick={() => setQuick(p)} iconClass="h-[18px] w-[18px]" />
                               <IconButton size="sm" label={t('common.edit')} icon={Pencil} to={`${base}/products/${p.id}`} iconClass="h-[18px] w-[18px]" />
                               <IconButton size="sm" label={t('common.delete')} icon={Trash2} onClick={() => setDel(p)} iconClass="h-[18px] w-[18px] text-sale" />
@@ -315,7 +319,7 @@ export default function Products() {
                       <div className="p-3.5">
                         <p className="truncate font-medium">{tr(p.name)}</p>
                         <div className="mt-1.5 flex items-center justify-between"><span className="font-semibold tabular">{formatMoney(p.price, lang)}</span><StockPill p={p} t={t} lang={lang} /></div>
-                        <div className="mt-3 flex gap-2"><Button size="xs" full icon={ShoppingBag} onClick={() => setSellP(p)}>{t('products.sell')}</Button><Button size="xs" variant="secondary" full icon={Zap} onClick={() => setQuick(p)}>{t('products.quickEdit')}</Button></div>
+                        <div className="mt-3 flex gap-2"><Button size="xs" full icon={ShoppingBag} onClick={() => setSellP(p)}>{t('products.sell')}</Button><Button size="xs" variant="secondary" full icon={Zap} onClick={() => setQuick(p)}>{t('products.quickEdit')}</Button><Button size="xs" variant="secondary" icon={QrCode} aria-label={t('qr.productTitle')} onClick={() => setQrP(p)} /></div>
                       </div>
                     </div>
                   ) : (
@@ -328,6 +332,7 @@ export default function Products() {
                       </Link>
                       <button type="button" onClick={() => setSellP(p)} aria-label={t('products.sell')} className="grid h-11 shrink-0 place-items-center gap-0.5 rounded-xl bg-btn px-3 text-[11px] font-semibold text-white transition active:scale-90"><ShoppingBag className="h-4 w-4" />{t('products.sell')}</button>
                       <button type="button" onClick={() => setQuick(p)} aria-label={t('products.quickEdit')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><Zap className="h-5 w-5" /></button>
+                      <button type="button" onClick={() => setQrP(p)} aria-label={t('qr.productTitle')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><QrCode className="h-5 w-5" /></button>
                     </div>
                   ))}
                 </div>
@@ -343,7 +348,8 @@ export default function Products() {
       <ConfirmDialog open={!!del} onClose={() => setDel(null)} danger title={t('common.delete')} body={del ? t('products.confirmDelete', { name: tr(del.name) }) : ''}
         confirmLabel={t('common.delete')} loading={deleting} onConfirm={doDelete} />
       {/* storefront link for context */}
-      <a href={`/s/${store.slug}/shop`} target="_blank" rel="noreferrer" className="mt-8 hidden items-center gap-1.5 text-sm font-medium text-muted hover:text-fg md:inline-flex"><ExternalLink className="h-4 w-4" />{t('dash.viewStore')}</a>
+      {qrP && <QrShare open onClose={() => setQrP(null)} kind="product" url={`${window.location.origin}/s/${storeSlug}/p/${qrP.slug}`} name={tr(qrP.name)} price={qrP.price} storeName={store ? tr(store.name) : storeSlug} />}
+      <a href={`/s/${storeSlug}/shop`} target="_blank" rel="noreferrer" className="mt-8 hidden items-center gap-1.5 text-sm font-medium text-muted hover:text-fg md:inline-flex"><ExternalLink className="h-4 w-4" />{t('dash.viewStore')}</a>
     </PageTransition>
   );
 }

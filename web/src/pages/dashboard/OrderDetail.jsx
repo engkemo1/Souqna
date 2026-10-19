@@ -15,6 +15,9 @@ import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 import { Textarea } from '../../components/ui/Field.jsx';
 import { ErrorState, EmptyState, errorMessage } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
+import { useAuth } from '../../lib/auth.jsx';
+import { printBlock, orderSlipHtml } from '../../lib/printSheets.js';
+import { orderUrl } from '../../lib/qr/index.js';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
 
@@ -51,6 +54,7 @@ export default function OrderDetail() {
   const { id } = useParams();
   const { t, tr, lang } = useI18n();
   const toast = useToast();
+  const { store } = useAuth();
   const { data, error, loading, reload, mutate } = useApi(`/owner/orders/${id}`);
   const [busy, setBusy] = useState(null);
   const [handoffOpen, setHandoffOpen] = useState(false);
@@ -94,6 +98,19 @@ export default function OrderDetail() {
   }
   if (!o) return null;
 
+  const printSlip = () => {
+    const fm = (n) => formatMoney(n, lang);
+    printBlock(orderSlipHtml({
+      store: store ? tr(store.name) : '', number: o.number,
+      date: `${formatDate(o.createdAt, lang, { day: 'numeric', month: 'long', year: 'numeric' })} · ${formatTime(o.createdAt, lang)}`,
+      customer: { name: o.customer.name, phone: o.customer.phone, address: [o.customer.address, o.customer.city, o.customer.governorate].filter(Boolean).join('، ') },
+      items: o.items.map((i) => ({ name: tr(i.name), variant: i.size ? `${t('product.size')}: ${i.size}` : '', qty: i.qty, total: fm(i.price * i.qty) })),
+      totals: [[t('cart.subtotal'), fm(o.subtotal)], ...(o.discount ? [[t('cart.discount'), `-${fm(o.discount)}`]] : []), [t('cart.shipping'), o.shipping ? fm(o.shipping) : t('qr.free')], [t('qr.total'), fm(o.total), true]],
+      payment: t('checkout.cod'), notes: o.notes, url: orderUrl(o.id),
+      labels: { order: t('qr.order'), items: t('qr.item'), qty: t('qr.qty'), total: t('qr.total'), notes: t('qr.notes'), scan: t('qr.orderScan') },
+    }), { page: 'A5', margin: '8mm' });
+  };
+
   const byUs = o.deliveryBy === 'platform';
   const canHandoff = !byUs && ['pending', 'confirmed', 'processing'].includes(o.status);
   const nextMain = o.next.find((s) => s !== 'cancelled');
@@ -112,7 +129,7 @@ export default function OrderDetail() {
       <PageHeader back="/dashboard/orders"
         title={<span className="flex flex-wrap items-center gap-3"><span dir="ltr">#{o.number}</span><StatusBadge status={o.status} t={t} /></span>}
         subtitle={`${formatDate(o.createdAt, lang, { weekday: 'long', day: 'numeric', month: 'long' })} · ${formatTime(o.createdAt, lang)}`}
-        actions={<div className="hidden items-center gap-2 md:flex"><Button variant="outline" icon={Printer} onClick={() => window.print()}>{t('orders.print')}</Button>{actions}</div>} />
+        actions={<div className="hidden items-center gap-2 md:flex"><Button variant="outline" icon={Printer} onClick={printSlip}>{t('orders.print')}</Button>{actions}</div>} />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">

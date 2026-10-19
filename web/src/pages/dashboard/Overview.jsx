@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Banknote, ShoppingBag, Receipt, Percent, Users, Package, Plus, TicketPercent, Share2, ArrowUpRight, AlertTriangle, PackageCheck, BellRing } from 'lucide-react';
+import { Banknote, ShoppingBag, Receipt, Percent, Users, Package, Plus, TicketPercent, Share2, QrCode, ArrowUpRight, AlertTriangle, PackageCheck, BellRing } from 'lucide-react';
 import { useApi, useIsDesktop, useMediaQuery } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
@@ -19,6 +19,7 @@ import WeeklyReportCard from '../../components/dash/WeeklyReportCard.jsx';
 import DemandCard from '../../components/dash/DemandCard.jsx';
 import SameDayCard from '../../components/dash/SameDayCard.jsx';
 import AppAlertsCard from '../../components/dash/AppAlertsCard.jsx';
+import { StoreQrButton } from '../../components/dash/QrShare.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
 
@@ -93,12 +94,13 @@ export default function Overview() {
       </div>
 
       {/* quick actions (mobile & tablet) */}
-      <div className="mt-4 grid grid-cols-3 gap-3 lg:hidden">
+      <div className="mt-4 grid grid-cols-4 gap-3 lg:hidden">
         {[[Plus, t('dash.addProduct'), '/dashboard/products/new'], [TicketPercent, t('dash.createOffer'), '/dashboard/offers?new=1'], [Share2, t('dash.shareStore'), null]].map(([Icon, label, to]) => {
           const cls = 'flex flex-col items-center justify-center gap-2 rounded-2xl border border-line bg-elevated px-2 py-4 text-center text-[13px] font-medium transition active:scale-95';
           const inner = <><span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-brand"><Icon className="h-5 w-5" /></span>{label}</>;
           return to ? <Link key={label} to={to} className={cls}>{inner}</Link> : <button key={label} type="button" onClick={share} className={cls}>{inner}</button>;
         })}
+        <StoreQrButton store={store} className="flex flex-col items-center justify-center gap-2 rounded-2xl border border-line bg-elevated px-2 py-4 text-center text-[13px] font-medium transition active:scale-95"><span className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-brand"><QrCode className="h-5 w-5" /></span>QR</StoreQrButton>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
