@@ -143,7 +143,7 @@ for (const S of STORES) {
     description_ar: S.description[0], description_en: S.description[1], address_ar: S.address[0], address_en: S.address[1],
     category: S.category, departments: S.category === 'mixed' ? ',women,men,kids,shoes,bags,' : `,${S.category},`, city: 'Banha', phone: S.phone, whatsapp: S.phone, instagram: S.instagram, facebook: S.facebook,
     theme_json: JSON.stringify(S.theme), rating: S.rating, rating_count: S.ratingCount, featured: S.featured,
-    offer_badge_ar: S.badge[0], offer_badge_en: S.badge[1], shipping_fee: 50, free_shipping_over: 1500,
+    offer_badge_ar: S.badge[0], offer_badge_en: S.badge[1], shipping_fee: 50, free_shipping_over: 1500, search_indexable: 0,
     opens_at: S.opens || '10:00', closes_at: S.closes || '23:00', day_off: S.dayOff ?? null,
     created_at: fmt(daysAgo(400)),
   });

@@ -5,7 +5,8 @@ import helmet from 'helmet';
 import compression from 'compression';
 import cors from 'cors';
 import { config } from './config.js';
-import './db/index.js';
+import { q } from './db/index.js';
+import { mediaMap } from './lib/media.js';
 import publicRoutes, { loadSharedLook } from './routes/public.js';
 import ownerRoutes from './routes/owner.js';
 import authRoutes from './routes/auth.js';
@@ -20,6 +21,63 @@ app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { poli
 app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));
+
+const SITE_ORIGIN = 'https://twistegy.com';
+const xml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
+
+app.get('/robots.txt', (_req, res) => {
+  res.type('text/plain').set('Cache-Control', 'public, max-age=3600').send([
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /admin',
+    'Disallow: /dashboard',
+    'Disallow: /account',
+    'Disallow: /login',
+    'Disallow: /register',
+    'Disallow: /market-cart',
+    'Disallow: /market-checkout',
+    'Disallow: /market-order-success',
+    'Disallow: /track',
+    'Disallow: /favorites',
+    'Disallow: /visual',
+    'Disallow: /s/*/cart',
+    'Disallow: /s/*/checkout',
+    'Disallow: /s/*/order/',
+    `Sitemap: ${SITE_ORIGIN}/sitemap.xml`,
+    '',
+  ].join('\n'));
+});
+
+app.get('/sitemap.xml', (_req, res) => {
+  const urls = [
+    `${SITE_ORIGIN}/`,
+    `${SITE_ORIGIN}/join`,
+  ];
+  const stores = q.all(`SELECT s.id, s.slug FROM stores s WHERE s.status='active' AND s.hidden=0 AND s.search_indexable=1
+    AND EXISTS (SELECT 1 FROM products p WHERE p.store_id=s.id AND p.status='active') ORDER BY s.id LIMIT 49998`);
+  urls.push(...stores.map(({ slug }) => `${SITE_ORIGIN}/s/${encodeURIComponent(slug)}`));
+  const remaining = 50000 - urls.length;
+  if (remaining > 0) urls.push(...q.all(`SELECT s.slug AS store_slug, p.slug AS product_slug FROM products p
+    JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND s.search_indexable=1
+    ORDER BY p.id LIMIT ?`, [remaining]).map(({ store_slug, product_slug }) =>
+    `${SITE_ORIGIN}/s/${encodeURIComponent(store_slug)}/p/${encodeURIComponent(product_slug)}`));
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((loc) => `  <url><loc>${xml(loc)}</loc></url>`).join('\n')}\n</urlset>`;
+  res.type('application/xml').set('Cache-Control', 'public, max-age=900, stale-while-revalidate=3600').send(body);
+});
+
+// Do not index the demo catalogue or checkout flows. Real stores become indexable
+// automatically when they are created; only public, active products enter the sitemap.
+app.use((req, res, next) => {
+  if (req.path === '/stores') res.set('X-Robots-Tag', 'noindex, follow');
+  if (req.path.startsWith('/s/')) {
+    const [, , slug, ...tail] = req.path.split('/');
+    let decodedSlug = '';
+    try { decodedSlug = decodeURIComponent(slug || ''); } catch { /* malformed path: keep it out of search */ }
+    const store = decodedSlug ? q.get("SELECT search_indexable FROM stores WHERE slug=? AND status='active' AND hidden=0", [decodedSlug]) : null;
+    if (!store?.search_indexable || tail[0] === 'cart' || tail[0] === 'checkout' || tail[0] === 'order') res.set('X-Robots-Tag', 'noindex, follow');
+  }
+  next();
+});
 
 // Media renditions are content-addressed → cache forever (CDN friendly).
 app.use('/media', express.static(config.mediaDir, { immutable: true, maxAge: '365d', fallthrough: false }));
@@ -36,6 +94,48 @@ app.use('/api', (_req, res) => res.status(404).json({ error: { code: 'not_found'
 if (fs.existsSync(config.webDist)) {
   app.use(express.static(config.webDist, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); if (/\/(sw\.js|manifest\.webmanifest|offline\.html)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  const withSeo = (html, { title, description, url, image }) => html
+    .replace(/<title>.*?<\/title>/, `<title>${esc(title)}</title>`)
+    .replace(/<meta name="description" content="[^"]*"\s*\/>/, `<meta name="description" content="${esc(description)}" />`)
+    .replace(/<link rel="canonical" href="[^"]*"\s*\/>/, `<link rel="canonical" href="${esc(url)}" />`)
+    .replace(/<meta property="og:title" content="[^"]*"\s*\/>/, `<meta property="og:title" content="${esc(title)}" />`)
+    .replace(/<meta property="og:description" content="[^"]*"\s*\/>/, `<meta property="og:description" content="${esc(description)}" />`)
+    .replace(/<meta property="og:url" content="[^"]*"\s*\/>/, `<meta property="og:url" content="${esc(url)}" />`)
+    .replace(/<meta property="og:image" content="[^"]*"\s*\/>/, `<meta property="og:image" content="${esc(image)}" />`);
+  app.get('/s/:slug/p/:pslug', (req, res, next) => {
+    const item = q.get(`SELECT p.id, p.name_ar, p.seo_title, p.seo_description, p.description_ar, s.name_ar AS store_name_ar
+      FROM products p JOIN stores s ON s.id=p.store_id
+      WHERE s.slug=? AND s.status='active' AND s.hidden=0 AND s.search_indexable=1 AND p.slug=? AND p.status='active'`, [req.params.slug, req.params.pslug]);
+    if (!item) return next();
+    const mediaId = q.get('SELECT media_id FROM product_media WHERE product_id=? ORDER BY is_primary DESC, position LIMIT 1', [item.id])?.media_id;
+    const imageBase = mediaMap([mediaId]).get(mediaId)?.base;
+    const url = `${SITE_ORIGIN}${req.path}`;
+    const title = `${item.seo_title || item.name_ar} | ${item.store_name_ar} | Twist بنها`;
+    const description = item.seo_description || item.description_ar || `${item.name_ar} من ${item.store_name_ar} على Twist بنها.`;
+    const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/app-icon.png`;
+    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url, image }));
+  });
+  app.get('/s/:slug', (req, res, next) => {
+    const store = q.get("SELECT id, name_ar, description_ar, logo_media_id, cover_media_id FROM stores WHERE slug=? AND status='active' AND hidden=0 AND search_indexable=1", [req.params.slug]);
+    if (!store) return next();
+    const images = mediaMap([store.cover_media_id, store.logo_media_id]);
+    const imageBase = images.get(store.cover_media_id)?.base || images.get(store.logo_media_id)?.base;
+    const url = `${SITE_ORIGIN}${req.path}`;
+    const title = `${store.name_ar} | ملابس وأزياء في بنها على Twist`;
+    const description = store.description_ar || `تسوق من ${store.name_ar} في بنها عبر Twist.`;
+    const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/app-icon.png`;
+    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url, image }));
+  });
+  app.get('/join', (_req, res) => {
+    const title = 'Twist بنها | افتح متجرك الإلكتروني لمحلك';
+    const description = 'Twist منصة بنها للتسوق المحلي. نجهز لمحلات الملابس متجرًا إلكترونيًا باسمها، مع متابعة الطلبات واشتراك شهري من غير عمولة على البيع.';
+    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, {
+      title, description, url: `${SITE_ORIGIN}/join`, image: `${SITE_ORIGIN}/brand/app-icon.png`,
+    }));
+  });
   // shared looks get their own preview card (WhatsApp / Facebook read the OG tags, not the SPA)
   app.get('/look/:token', (req, res, next) => {
     try {

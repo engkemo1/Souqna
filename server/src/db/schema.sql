@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS stores (
   auto_whatsapp INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   hidden INTEGER NOT NULL DEFAULT 0,
+  search_indexable INTEGER NOT NULL DEFAULT 1,
   map_url TEXT,
   opens_at TEXT, closes_at TEXT, day_off INTEGER,
   hero_mode TEXT NOT NULL DEFAULT 'auto',

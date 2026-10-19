@@ -74,7 +74,7 @@ function ModaPitch() {
 
 export default function Join() {
   const { data } = useApi('/marketplace');
-  useEffect(() => { document.title = 'افتح متجرك · Twist'; window.scrollTo(0, 0); }, []);
+  useEffect(() => { document.title = 'Twist بنها | افتح متجرك الإلكتروني لمحلك'; window.scrollTo(0, 0); }, []);
 
   return (
     <div dir="rtl" className="min-h-dvh overflow-hidden bg-[#F6F8FB] text-[#03244D]">
