@@ -70,7 +70,7 @@ export function quote(store, items = [], couponCode, { phone } = {}) {
   const subtotal = lines.filter((l) => !l.error).reduce((s, l) => s + l.price * l.qty, 0);
 
   let discount = 0;
-  let freeShipping = subtotal >= store.free_shipping_over;
+  let freeShipping = store.free_shipping_over > 0 && subtotal >= store.free_shipping_over;
   let coupon = null;
   let couponError = null;
   let platformDiscount = 0;

@@ -121,11 +121,15 @@ r.put('/me', h((req, res) => {
 
 /* ------------------------------------------------ orders (placed while signed in, or claimed with number + phone) */
 const orderRows = (buyerId) => {
-  const rows = q.all('SELECT o.*, s.name_ar AS s_ar, s.name_en AS s_en, s.slug AS s_slug FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.buyer_id=? ORDER BY o.id DESC LIMIT 50', [buyerId]);
+  const rows = q.all(`SELECT o.*, s.name_ar AS s_ar, s.name_en AS s_en, s.slug AS s_slug,
+      (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') AS delivery_group_count,
+      (SELECT COALESCE(SUM(g.total),0) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') AS delivery_group_total
+    FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.buyer_id=? ORDER BY o.id DESC LIMIT 50`, [buyerId]);
   const items = rows.length ? q.all(`SELECT * FROM order_items WHERE order_id IN (${rows.map(() => '?').join(',')})`, rows.map((x) => x.id)) : [];
   const media = mediaMap(items.map((i) => i.media_id));
   return rows.map((o) => ({
     number: o.number, token: o.track_token, status: o.status, total: o.total, createdAt: o.created_at,
+    deliveryGroup: o.delivery_group, deliveryGroupCount: o.delivery_group && o.delivery_group_count ? o.delivery_group_count : null, deliveryGroupTotal: o.delivery_group && o.delivery_group_count ? o.delivery_group_total : null,
     store: { slug: o.s_slug, name: { ar: o.s_ar, en: o.s_en } },
     items: items.filter((i) => i.order_id === o.id).map((i) => ({ name: bi(i, 'name'), qty: i.qty, image: media.get(i.media_id) || null })),
   }));
@@ -138,7 +142,8 @@ r.post('/orders/claim', h((req, res) => {
   const o = q.get('SELECT * FROM orders WHERE UPPER(number)=UPPER(?)', [b.number]);
   if (!o || normPhone(o.phone) !== normPhone(b.phone)) throw notFound('Order');
   if (o.buyer_id && o.buyer_id !== req.buyer.id) throw new AppError(409, 'order_claimed', 'This order belongs to another account.');
-  q.run('UPDATE orders SET buyer_id=? WHERE id=?', [req.buyer.id, o.id]);
+  if (o.delivery_group) q.run('UPDATE orders SET buyer_id=? WHERE delivery_group=? AND buyer_id IS NULL AND phone=?', [req.buyer.id, o.delivery_group, o.phone]);
+  else q.run('UPDATE orders SET buyer_id=? WHERE id=?', [req.buyer.id, o.id]);
   res.json({ items: orderRows(req.buyer.id) });
 }));
 

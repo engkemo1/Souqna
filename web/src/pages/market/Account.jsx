@@ -77,7 +77,7 @@ function Orders() {
       {!data.items.length && <EmptyState icon={ShoppingBag} title={t('acc.orders')} body={t('acc.noOrders')} />}
       {data.items.map((o) => (
         <Link key={o.token} to={`/track/${o.token}`} className="block rounded-2xl border border-line bg-elevated p-4 transition hover:border-fg/30">
-          <div className="flex items-center justify-between gap-3"><div><p className="font-mono font-semibold" dir="ltr">{o.number}</p><p className="text-[13px] text-muted">{tr(o.store.name)} · {formatMoney(o.total, lang)}</p></div><span className={cx('rounded-full px-3 py-1 text-[13px] font-semibold', STATUS_TONE[o.status])}>{t(`track.s.${o.status}`)}</span></div>
+          <div className="flex items-center justify-between gap-3"><div><p className="font-mono font-semibold" dir="ltr">{o.number}</p><p className="text-[13px] text-muted">{tr(o.store.name)} · {formatMoney(o.total, lang)}</p>{o.deliveryGroupTotal != null && <p className="text-xs font-medium text-brand">{t('cart.marketTotal')}: {formatMoney(o.deliveryGroupTotal, lang)}</p>}</div><span className={cx('rounded-full px-3 py-1 text-[13px] font-semibold', STATUS_TONE[o.status])}>{t(`track.s.${o.status}`)}</span></div>
           <div className="mt-3 flex gap-2">{o.items.slice(0, 5).map((i, k) => <SmartImage key={k} media={i.image} ratio="4 / 5" sizes="48px" className="w-12 rounded-lg" />)}</div>
         </Link>
       ))}

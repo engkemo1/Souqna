@@ -61,6 +61,9 @@ const AdminStores = lazy(() => import('./pages/admin/Stores.jsx'));
 const AdminDepartments = lazy(() => import('./pages/admin/Departments.jsx'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
 const AdminDeliveries = lazy(() => import('./pages/admin/Deliveries.jsx'));
+const AdminDeliveryPeople = lazy(() => import('./pages/admin/DeliveryPeople.jsx'));
+const AdminDeliveryRates = lazy(() => import('./pages/admin/DeliveryRates.jsx'));
+const AdminSubscriptions = lazy(() => import('./pages/admin/Subscriptions.jsx'));
 const AdminServices = lazy(() => import('./pages/admin/Services.jsx'));
 const AdminSourcing = lazy(() => import('./pages/admin/Sourcing.jsx'));
 const AdminBuyers = lazy(() => import('./pages/admin/Buyers.jsx'));
@@ -155,6 +158,9 @@ const router = createBrowserRouter([
           { path: 'departments', element: <AdminDepartments /> },
           { path: 'orders', element: <AdminOrders /> },
           { path: 'deliveries', element: <AdminDeliveries /> },
+          { path: 'delivery-people', element: <AdminDeliveryPeople /> },
+          { path: 'delivery-rates', element: <AdminDeliveryRates /> },
+          { path: 'subscriptions', element: <AdminSubscriptions /> },
           { path: 'services', element: <AdminServices /> },
           { path: 'sourcing', element: <AdminSourcing /> },
           { path: 'buyers', element: <AdminBuyers /> },

@@ -22,8 +22,8 @@ test('marketplace checkout creates one order per store and rolls all stores back
 
   try {
     const userId = insert('users', { name: 'Marketplace Test', email: `${randomUUID()}@example.test`, password_hash: 'test' });
-    const storeA = insert('stores', { owner_id: userId, slug: `test-a-${randomUUID()}`, code: 'TSTA', name_ar: 'محل أ', name_en: 'Store A' });
-    const storeB = insert('stores', { owner_id: userId, slug: `test-b-${randomUUID()}`, code: 'TSTB', name_ar: 'محل ب', name_en: 'Store B' });
+    const storeA = insert('stores', { owner_id: userId, slug: `test-a-${randomUUID()}`, code: 'TSTA', name_ar: 'محل أ', name_en: 'Store A', shipping_fee: 100, free_shipping_over: 300 });
+    const storeB = insert('stores', { owner_id: userId, slug: `test-b-${randomUUID()}`, code: 'TSTB', name_ar: 'محل ب', name_en: 'Store B', shipping_fee: 50, free_shipping_over: 1500 });
     const productA = insert('products', { store_id: storeA, slug: 'item-a', name_ar: 'منتج أ', name_en: 'Item A', price: 400, stock: 3 });
     const productB = insert('products', { store_id: storeB, slug: 'item-b', name_ar: 'منتج ب', name_en: 'Item B', price: 500, stock: 2 });
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -39,7 +39,12 @@ test('marketplace checkout creates one order per store and rolls all stores back
     assert.equal(first.status, 201);
     const { orders } = await first.json();
     assert.equal(orders.length, 2);
-    assert.deepEqual(orders.map((o) => o.total).sort((a, b) => a - b), [450, 550]);
+    assert.equal(new Set(orders.map((o) => o.deliveryGroup)).size, 1);
+    assert.deepEqual(orders.map((o) => o.total).sort((a, b) => a - b), [400, 525]);
+    assert.equal(orders.reduce((sum, order) => sum + order.shipping, 0), 25);
+    assert.equal(orders.find((o) => o.storeSlug === body.stores[0].slug).shipping, 0);
+    assert.equal(orders.find((o) => o.storeSlug === body.stores[1].slug).shipping, 25);
+    assert.equal(q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform'"), 2);
     assert.equal(q.val('SELECT COUNT(*) FROM orders'), 2);
     assert.equal(q.get('SELECT stock FROM products WHERE id=?', [productA]).stock, 2);
     assert.equal(q.get('SELECT stock FROM products WHERE id=?', [productB]).stock, 1);

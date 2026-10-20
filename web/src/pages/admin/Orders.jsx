@@ -26,7 +26,7 @@ function OrderSheet({ id, onClose, onChanged }) {
     <Sheet open={!!id} onClose={onClose} title={o ? `طلب #${o.number}` : 'طلب'} side="end" size="lg">
       {error ? <ErrorState error={error} onRetry={reload} compact /> : !o ? <Skeleton className="my-4 h-64 w-full rounded-2xl" /> : (
         <div className="space-y-5 py-4">
-          <div className="flex flex-wrap items-center gap-2"><StatusPill s={o.status} />{o.delivery_by === 'platform' ? <Badge tone="info">🚚 توصيل Twist</Badge> : <Badge>توصيل المحل</Badge>}<span className="text-sm text-muted">{fmtDateTime(o.created_at)}</span></div>
+          <div className="flex flex-wrap items-center gap-2"><StatusPill s={o.status} platform={o.delivery_by === 'platform'} />{o.delivery_by === 'platform' ? <Badge tone="info">🚚 توصيل Twist</Badge> : <Badge>توصيل المحل</Badge>}<span className="text-sm text-muted">{fmtDateTime(o.created_at)}</span></div>
           <div className="rounded-2xl border border-line p-4">
             <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><StoreIcon className="h-4 w-4" />المحل (الاستلام)</p>
             <p className="font-medium">{o.store_name}</p><p className="text-sm text-muted">{o.store_address || '—'}</p>
@@ -46,11 +46,13 @@ function OrderSheet({ id, onClose, onChanged }) {
           <div className="rounded-2xl border border-line p-4">
             <p className="mb-2 text-sm font-semibold">المنتجات</p>
             <ul className="divide-y divide-line">{data.items.map((i, k) => <li key={k} className="flex justify-between gap-3 py-2 text-sm"><span>{fmtNum(i.qty)}× {i.name_ar}{i.size ? ` · ${i.size}` : ''}</span><span className="tabular">{fmtMoney(i.price * i.qty)}</span></li>)}</ul>
-            <div className="mt-2 space-y-1 border-t border-line pt-2 text-sm"><div className="flex justify-between text-muted"><span>الشحن</span><span>{fmtMoney(o.shipping)}</span></div>{o.discount > 0 && <div className="flex justify-between text-muted"><span>خصم</span><span>−{fmtMoney(o.discount)}</span></div>}<div className="flex justify-between text-base font-semibold"><span>الإجمالي (كاش)</span><span>{fmtMoney(o.total)}</span></div></div>
+            <div className="mt-2 space-y-1 border-t border-line pt-2 text-sm"><div className="flex justify-between text-muted"><span>الشحن</span><span>{o.shipping_free ? 'مجاني للعميل' : o.shipping ? fmtMoney(o.shipping) : 'ضمن رسوم السلة المشتركة'}</span></div>{o.discount > 0 && <div className="flex justify-between text-muted"><span>خصم</span><span>−{fmtMoney(o.discount)}</span></div>}<div className="flex justify-between text-base font-semibold"><span>الإجمالي من العميل</span><span>{fmtMoney(o.total)}</span></div></div>
           </div>
           <div><p className="mb-2 text-sm font-semibold">سجل الطلب</p>
             <ol className="space-y-2 text-sm">{data.events.map((e, i) => <li key={i} className="flex gap-2"><span className="text-muted">{fmtDateTime(e.created_at)}</span><span className="font-medium">{ORDER_STATUS_AR[e.status] || e.status}</span>{e.note && <span className="text-muted">{e.note === '@handoff' ? '— اتحوّل لتوصيلنا' : e.note === '@store_delivery' ? '— رجع لتوصيل المحل' : `— ${e.note}`}</span>}</li>)}</ol></div>
-          {['pending', 'confirmed', 'processing'].includes(o.status) && (
+          {o.delivery_group && o.delivery_by === 'platform' ? (
+            <p className="rounded-xl bg-brand/5 p-3 text-sm font-medium text-brand">توصيل سلة Twist موحّد لكل المحلات، ومش ممكن تحويل جزء منها لتوصيل المحل.</p>
+          ) : ['pending', 'confirmed', 'processing'].includes(o.status) && (
             o.delivery_by === 'platform'
               ? <Button variant="outline" loading={busy} onClick={() => setDelivery('store')}>رجّع التوصيل للمحل</Button>
               : <Button icon={Truck} loading={busy} onClick={() => setDelivery('platform')}>خلّي Twist توصّله</Button>
@@ -86,7 +88,7 @@ export default function Orders() {
             {data.items.map((o) => (
               <li key={o.id}><button type="button" onClick={() => setOpen(o.id)} className="flex w-full flex-col gap-2 px-4 py-3.5 text-start hover:bg-fg/[0.025] sm:flex-row sm:items-center sm:gap-4 sm:px-5">
                 <div className="min-w-0 flex-1"><p className="font-semibold"><span dir="ltr">#{o.number}</span> · {o.customer_name}</p><p className="truncate text-[13px] text-muted">{o.store_name} · {o.city || ''} · {fmtDateTime(o.created_at)}</p></div>
-                <div className="flex items-center gap-2">{o.delivery_by === 'platform' && <Badge tone="info" size="sm">🚚 توصيلنا</Badge>}<StatusPill s={o.status} /></div>
+                <div className="flex items-center gap-2">{o.delivery_by === 'platform' && <Badge tone="info" size="sm">🚚 توصيلنا</Badge>}<StatusPill s={o.status} platform={o.delivery_by === 'platform'} /></div>
                 <span className="font-semibold tabular sm:w-28 sm:text-end">{fmtMoney(o.total)}</span>
               </button></li>
             ))}

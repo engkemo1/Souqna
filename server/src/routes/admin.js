@@ -27,6 +27,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { isWhatsAppConfigured, notifyPlatformDelivery } from '../lib/whatsapp.js';
+import { deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing } from '../lib/deliveryRates.js';
 
 function makeSetupLink(req, uid) {
   const token = crypto.randomBytes(24).toString('base64url');
@@ -80,28 +81,274 @@ r.post('/login', h((req, res) => {
   res.json({ session: makeSession(), twoStep: true });
 }));
 
+const subscriptionDateParts = (date) => String(date).split('-').map(Number);
+const subscriptionToday = () => {
+  const p = Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date()).map((x) => [x.type, x.value]));
+  return `${p.year}-${p.month}-${p.day}`;
+};
+const subscriptionAddDays = (date, days) => {
+  const [y, m, d] = subscriptionDateParts(date);
+  const value = new Date(Date.UTC(y, m - 1, d + days));
+  return `${value.getUTCFullYear()}-${String(value.getUTCMonth() + 1).padStart(2, '0')}-${String(value.getUTCDate()).padStart(2, '0')}`;
+};
+const subscriptionAddMonths = (date, months) => {
+  const [year, month, day] = subscriptionDateParts(date);
+  const monthIndex = month - 1 + months;
+  const targetYear = year + Math.floor(monthIndex / 12);
+  const targetMonth = ((monthIndex % 12) + 12) % 12;
+  const targetDay = Math.min(day, new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate());
+  return `${targetYear}-${String(targetMonth + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
+};
+const subscriptionSetting = (key, fallback) => q.get('SELECT value FROM app_settings WHERE key=?', [key])?.value ?? fallback;
+const subscriptionWindow = (storeId, months, kind, amount, paymentMethod, note) => {
+  const today = subscriptionToday();
+  const current = q.get('SELECT covered_through FROM store_subscriptions WHERE store_id=?', [storeId]);
+  const start = current?.covered_through && current.covered_through >= today ? subscriptionAddDays(current.covered_through, 1) : today;
+  const through = subscriptionAddDays(subscriptionAddMonths(start, months), -1);
+  q.run(`INSERT INTO store_subscriptions(store_id,covered_through,updated_at) VALUES(?,?,datetime('now'))
+    ON CONFLICT(store_id) DO UPDATE SET covered_through=excluded.covered_through,updated_at=excluded.updated_at`, [storeId, through]);
+  insert('subscription_periods', { store_id: storeId, kind, months, amount, covered_from: start, covered_through: through, payment_method: paymentMethod, note: note || null, created_at: new Date().toISOString().slice(0, 19).replace('T', ' ') });
+  return { coveredFrom: start, coveredThrough: through };
+};
+
+r.get('/subscriptions', h((_req, res) => {
+  const today = subscriptionToday();
+  const monthlyFee = Number(subscriptionSetting('subscription_monthly_fee', '0')) || 0;
+  const reminderDays = Number(subscriptionSetting('subscription_reminder_days', '5')) || 0;
+  const reminderTemplate = subscriptionSetting('subscription_reminder_template', 'أهلاً {store}، اشتراك Twist مستحق بمبلغ {amount} ج.م. موعد التجديد {due_date}.');
+  const stores = q.all(`SELECT s.id,s.slug,s.name_ar,s.phone,s.whatsapp,s.status,u.name AS owner_name,
+      ss.monthly_fee_override,ss.covered_through
+    FROM stores s JOIN users u ON u.id=s.owner_id LEFT JOIN store_subscriptions ss ON ss.store_id=s.id
+    ORDER BY s.status,s.name_ar`);
+  // Keep active entitlement lookup independent from the capped admin history.
+  // A busy system can have more than 500 ledger entries while an older period
+  // is still the current entitlement for a store.
+  const periods = q.all('SELECT id,store_id,kind,months,amount,covered_from,covered_through,payment_method,note,created_at FROM subscription_periods ORDER BY id DESC LIMIT 500');
+  const activePeriods = q.all(`SELECT id,store_id,kind,months,amount,covered_from,covered_through,payment_method,note,created_at
+    FROM subscription_periods WHERE covered_from<=? AND covered_through>=? ORDER BY id DESC`, [today, today]);
+  const currentPeriod = new Map();
+  for (const period of activePeriods) if (!currentPeriod.has(period.store_id)) currentPeriod.set(period.store_id, period);
+  const remindThrough = subscriptionAddDays(today, reminderDays);
+  const items = stores.map((store) => {
+    const current = currentPeriod.get(store.id);
+    const unregistered = !store.covered_through && !current;
+    const dueDate = unregistered ? null : store.covered_through ? subscriptionAddDays(store.covered_through, 1) : today;
+    const status = unregistered ? 'unregistered' : current?.kind === 'free' ? 'free' : store.covered_through && store.covered_through >= today ? 'paid' : dueDate === today ? 'due' : 'overdue';
+    const fee = store.monthly_fee_override == null ? monthlyFee : Number(store.monthly_fee_override);
+    return { ...store, monthly_fee_override: store.monthly_fee_override == null ? null : Number(store.monthly_fee_override), monthlyFee: fee, coveredThrough: store.covered_through, dueDate, status, currentPeriod: current || null,
+      dueSoon: status === 'paid' && dueDate <= remindThrough, reminderPhone: store.whatsapp || store.phone || null };
+  });
+  const history = periods.map((period) => ({ ...period, storeName: stores.find((store) => store.id === period.store_id)?.name_ar || 'محل محذوف' }));
+  res.json({ settings: { monthlyFee, reminderDays, reminderTemplate }, items, history, today });
+}));
+
+r.put('/subscriptions/settings', h((req, res) => {
+  const body = z.object({ monthlyFee: z.coerce.number().int().min(0).max(100000), reminderDays: z.coerce.number().int().min(0).max(90), reminderTemplate: z.string().trim().min(10).max(1000) }).parse(req.body);
+  tx(() => {
+    for (const [key, value] of [['subscription_monthly_fee', body.monthlyFee], ['subscription_reminder_days', body.reminderDays], ['subscription_reminder_template', body.reminderTemplate]]) {
+      q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [key, String(value)]);
+    }
+  });
+  res.json({ settings: body });
+}));
+
+r.put('/subscriptions/:slug/fee', h((req, res) => {
+  const body = z.object({ monthlyFeeOverride: z.union([z.number().int().min(0).max(100000), z.null()]) }).parse(req.body);
+  const store = q.get('SELECT id FROM stores WHERE slug=?', [req.params.slug]);
+  if (!store) throw new AppError(404, 'not_found', 'Store not found.');
+  q.run(`INSERT INTO store_subscriptions(store_id,monthly_fee_override,updated_at) VALUES(?,?,datetime('now'))
+    ON CONFLICT(store_id) DO UPDATE SET monthly_fee_override=excluded.monthly_fee_override,updated_at=excluded.updated_at`, [store.id, body.monthlyFeeOverride]);
+  res.json({ ok: true });
+}));
+
+r.post('/subscriptions/:slug/payment', h((req, res) => {
+  const body = z.object({ months: z.coerce.number().int().min(1).max(24), amount: z.coerce.number().int().min(1).max(1000000).optional(), method: z.enum(['cash','bank_transfer','wallet','instapay','other']), note: z.string().trim().max(300).optional().default('') }).parse(req.body);
+  const store = q.get('SELECT id FROM stores WHERE slug=?', [req.params.slug]);
+  if (!store) throw new AppError(404, 'not_found', 'Store not found.');
+  const row = q.get('SELECT monthly_fee_override FROM store_subscriptions WHERE store_id=?', [store.id]);
+  const fee = row?.monthly_fee_override == null ? Number(subscriptionSetting('subscription_monthly_fee', '0')) : Number(row.monthly_fee_override);
+  const amount = body.amount ?? fee * body.months;
+  if (amount < 1) throw new AppError(422, 'validation_failed', 'Set the monthly subscription price before recording payment.');
+  const period = tx(() => subscriptionWindow(store.id, body.months, 'paid', amount, body.method, body.note));
+  res.status(201).json({ ok: true, ...period, amount });
+}));
+
+r.post('/subscriptions/:slug/free-months', h((req, res) => {
+  const body = z.object({ months: z.coerce.number().int().min(1).max(24), note: z.string().trim().max(300).optional().default('') }).parse(req.body);
+  const store = q.get('SELECT id FROM stores WHERE slug=?', [req.params.slug]);
+  if (!store) throw new AppError(404, 'not_found', 'Store not found.');
+  const period = tx(() => subscriptionWindow(store.id, body.months, 'free', 0, null, body.note));
+  res.status(201).json({ ok: true, ...period });
+}));
+
 /** Orders Twist has to collect from stores and deliver. */
 r.get('/deliveries', h((_req, res) => {
-  const rows = q.all(`SELECT o.id, o.number, o.status, o.total, o.customer_name, o.phone, o.governorate, o.city, o.address, o.notes, o.created_at, o.handoff_at,
+  const rows = q.all(`SELECT o.id, o.number, o.status, o.total, o.shipping, o.shipping_free, o.delivery_group,
+      CASE WHEN o.delivery_group IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') END AS delivery_group_count,
+      CASE WHEN o.delivery_group IS NULL THEN o.total ELSE (SELECT COALESCE(SUM(g.total),0) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') END AS delivery_group_total,
+      CASE WHEN o.delivery_group IS NULL THEN (o.status='processing') ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status='processing') END AS delivery_group_ready_count,
+      CASE WHEN o.delivery_group IS NULL THEN (o.status='shipped') ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status='shipped') END AS delivery_group_shipped_count,
+      CASE WHEN o.delivery_group IS NULL THEN o.shipping ELSE (SELECT COALESCE(SUM(g.shipping),0) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') END AS delivery_customer_fee,
+      CASE WHEN o.delivery_group IS NULL THEN (SELECT COUNT(*) FROM orders g WHERE g.id=o.id AND g.shipping_free=1 AND g.status<>'cancelled') ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.shipping_free=1 AND g.status<>'cancelled') END AS delivery_free_count,
+      CASE WHEN o.delivery_group IS NULL THEN o.id ELSE (SELECT g.id FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled' ORDER BY g.id LIMIT 1) END AS delivery_run_owner_id,
+      CASE WHEN o.delivery_group IS NULL THEN o.courier_cost ELSE (SELECT g.courier_cost FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled' ORDER BY g.id LIMIT 1) END AS delivery_courier_cost,
+      CASE WHEN o.delivery_group IS NULL THEN o.delivery_person_id ELSE (SELECT g.delivery_person_id FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled' ORDER BY g.id LIMIT 1) END AS delivery_person_id,
+      o.customer_name, o.phone, o.governorate, o.city, o.address, o.notes, o.created_at, o.handoff_at,
       s.slug, s.name_ar AS store_name, s.phone AS store_phone, s.address_ar AS store_address, s.map_url AS store_map
     FROM orders o JOIN stores s ON s.id=o.store_id
-    WHERE o.delivery_by='platform' AND o.status NOT IN ('delivered','cancelled') ORDER BY o.created_at ASC LIMIT 300`);
-  res.json({ orders: rows });
+    WHERE o.delivery_by='platform' AND o.status NOT IN ('delivered','cancelled') ORDER BY o.created_at ASC,o.id ASC LIMIT 300`);
+  const deliveryPeople = new Map(q.all('SELECT id,name FROM delivery_people').map((p) => [p.id, p.name]));
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = row.delivery_group || `order:${row.id}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  }
+  const orders = rows.map((row) => {
+    const siblings = grouped.get(row.delivery_group || `order:${row.id}`);
+    const cost = row.delivery_courier_cost == null ? null : Number(row.delivery_courier_cost);
+    const perStop = cost == null ? [] : siblings.map((_, i) => Math.floor(cost / siblings.length) + (i < cost % siblings.length ? 1 : 0));
+    const sponsored = siblings.reduce((sum, sibling, i) => sum + (sibling.shipping_free ? (perStop[i] || 0) : 0), 0);
+    const index = siblings.findIndex((sibling) => sibling.id === row.id);
+    return { ...row, delivery_person_name: deliveryPeople.get(row.delivery_person_id) || null,
+      shop_delivery_sponsor_share: row.shipping_free ? (perStop[index] ?? null) : 0,
+      delivery_sponsored_total: cost == null ? null : sponsored,
+      delivery_profit: cost == null ? null : row.delivery_customer_fee + sponsored - cost };
+  });
+  const historyRows = q.all("SELECT id,delivery_group,shipping,shipping_free,courier_cost,delivery_person_id,customer_name,city,created_at FROM orders WHERE delivery_by='platform' AND status='delivered' ORDER BY id DESC LIMIT 600");
+  const historyGroups = new Map();
+  for (const row of historyRows) {
+    const key = row.delivery_group || `order:${row.id}`;
+    if (!historyGroups.has(key)) historyGroups.set(key, []);
+    historyGroups.get(key).push(row);
+  }
+  const deliveredRuns = [...historyGroups.entries()].map(([key, group]) => {
+    const ordered = [...group].sort((a, b) => a.id - b.id);
+    const owner = ordered[0];
+    const cost = owner.courier_cost == null ? null : Number(owner.courier_cost);
+    const shares = cost == null ? [] : ordered.map((_, i) => Math.floor(cost / ordered.length) + (i < cost % ordered.length ? 1 : 0));
+    const sponsored = ordered.reduce((sum, row, i) => sum + (row.shipping_free ? (shares[i] || 0) : 0), 0);
+    const fee = ordered.reduce((sum, row) => sum + row.shipping, 0);
+    return { key, orderId: owner.id, customerName: owner.customer_name, city: owner.city, createdAt: owner.created_at, storeCount: ordered.length, customerFee: fee, courierCost: cost, freeStoreContribution: cost == null ? null : sponsored, profit: cost == null ? null : fee + sponsored - cost, deliveryPersonName: deliveryPeople.get(owner.delivery_person_id) || null };
+  });
+  res.json({ orders, deliveredRuns });
+}));
+
+r.patch('/delivery-runs', h((req, res) => {
+  const body = z.object({ orderId: z.coerce.number().int().positive(), courierCost: z.coerce.number().int().min(0).max(100000).nullable(), deliveryPersonId: z.coerce.number().int().positive().nullable().optional() }).parse(req.body);
+  const order = q.get("SELECT id,delivery_group,status FROM orders WHERE id=? AND delivery_by='platform'", [body.orderId]);
+  if (!order) throw new AppError(404, 'not_found', 'Delivery run not found.');
+  const personId = body.deliveryPersonId ?? null;
+  if (personId && !q.get('SELECT id FROM delivery_people WHERE id=? AND active=1', [personId])) throw new AppError(422, 'validation_failed', 'Choose an active delivery person.');
+  const owner = order.delivery_group
+    ? q.get("SELECT id FROM orders WHERE delivery_group=? AND status<>'cancelled' ORDER BY id LIMIT 1", [order.delivery_group])
+    : order;
+  if (!owner) throw new AppError(404, 'not_found', 'No active order remains in this delivery run.');
+  q.run('UPDATE orders SET courier_cost=?, delivery_person_id=? WHERE id=?', [body.courierCost, personId, owner.id]);
+  res.json({ ok: true, ownerOrderId: owner.id });
 }));
 
 r.patch('/orders/:id/status', h((req, res) => {
   const { status } = z.object({ status: z.enum(['shipped', 'delivered']) }).parse(req.body);
   const o = q.get("SELECT * FROM orders WHERE id=? AND delivery_by='platform'", [Number(req.params.id)]);
   if (!o) throw new AppError(404, 'not_found', 'Order not found.');
-  const ok = (status === 'shipped' && o.status === 'processing') || (status === 'delivered' && o.status === 'shipped');
-  if (!ok) throw new AppError(400, 'invalid_transition', status === 'shipped' ? 'The store has not marked this order ready yet.' : 'Pick the order up first.');
+  const orders = o.delivery_group
+    ? q.all("SELECT * FROM orders WHERE delivery_group=? AND delivery_by='platform' AND status<>'cancelled'", [o.delivery_group])
+    : [o];
+  const expected = status === 'shipped' ? 'processing' : 'shipped';
+  if (!orders.length || orders.some((item) => item.status !== expected)) {
+    const message = status === 'shipped'
+      ? (o.delivery_group ? 'Wait until every shop in this Twist basket marks its order ready.' : 'The store has not marked this order ready yet.')
+      : (o.delivery_group ? 'All orders in this Twist basket must be picked up before delivery.' : 'Pick the order up first.');
+    throw new AppError(400, 'invalid_transition', message);
+  }
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   tx(() => {
-    q.run('UPDATE orders SET status=?, updated_at=? WHERE id=?', [status, now, o.id]);
-    insert('order_events', { order_id: o.id, status, note: null, created_at: now });
+    for (const item of orders) {
+      q.run('UPDATE orders SET status=?, updated_at=? WHERE id=?', [status, now, item.id]);
+      insert('order_events', { order_id: item.id, status, note: null, created_at: now });
+    }
   });
-  notifyOrderStatus(o.id, status);
-  res.json({ id: o.id, status });
+  for (const item of orders) notifyOrderStatus(item.id, status);
+  res.json({ id: o.id, status, updated: orders.length });
+}));
+
+const deliveryRateSchema = z.object({
+  governorate: z.union([z.literal('*'), z.string().trim().min(2).max(40)]),
+  city: z.string().trim().max(60).optional().default(''),
+  fee: z.coerce.number().int().min(0).max(5000).optional(),
+  distanceKm: z.coerce.number().min(0).max(300).optional().nullable(),
+}).refine((r) => r.fee != null || r.distanceKm != null, { path: ['fee'], message: 'fee_or_distance_required' });
+const normalizedDeliveryRate = (parsed) => {
+  const distanceKm = parsed.distanceKm == null ? null : Math.round(parsed.distanceKm * 10) / 10;
+  return {
+    governorate: parsed.governorate,
+    city: parsed.governorate === '*' ? '*' : parsed.city,
+    distance_km: distanceKm,
+    fee: distanceKm == null ? parsed.fee : deliveryFeeForDistance(distanceKm),
+  };
+};
+r.get('/delivery-rates', h((_req, res) => {
+  const pricing = getDeliveryPricing();
+  const items = q.all('SELECT id, governorate, city, fee, distance_km FROM delivery_rates ORDER BY governorate, city').map((item) => ({
+    ...item, distanceKm: item.distance_km == null ? null : Number(item.distance_km),
+    fee: item.distance_km == null ? item.fee : deliveryFeeForDistance(Number(item.distance_km), pricing),
+  }));
+  res.json({ items, pricing });
+}));
+r.put('/delivery-rates/pricing', h((req, res) => {
+  const pricing = z.object({ baseFee: z.coerce.number().int().min(0).max(5000), includedKm: z.coerce.number().min(0).max(100), perKm: z.coerce.number().int().min(0).max(1000) }).parse(req.body);
+  res.json({ pricing: saveDeliveryPricing(pricing) });
+}));
+r.post('/delivery-rates', h((req, res) => {
+  const rate = normalizedDeliveryRate(deliveryRateSchema.parse(req.body));
+  if (q.get('SELECT id FROM delivery_rates WHERE lower(governorate)=lower(?) AND lower(city)=lower(?)', [rate.governorate, rate.city])) throw new AppError(422, 'validation_failed', 'A delivery fee is already set for this area.', { city: 'area_taken' });
+  const id = insert('delivery_rates', rate);
+  res.status(201).json({ id, ...rate });
+}));
+r.patch('/delivery-rates/:id', h((req, res) => {
+  const id = Number(req.params.id);
+  const rate = normalizedDeliveryRate(deliveryRateSchema.parse(req.body));
+  if (!q.get('SELECT id FROM delivery_rates WHERE id=?', [id])) throw new AppError(404, 'not_found', 'Delivery fee not found.');
+  if (q.get('SELECT id FROM delivery_rates WHERE lower(governorate)=lower(?) AND lower(city)=lower(?) AND id<>?', [rate.governorate, rate.city, id])) throw new AppError(422, 'validation_failed', 'A delivery fee is already set for this area.', { city: 'area_taken' });
+  update('delivery_rates', id, rate);
+  res.json({ id, ...rate });
+}));
+r.delete('/delivery-rates/:id', h((req, res) => {
+  const result = q.run('DELETE FROM delivery_rates WHERE id=?', [Number(req.params.id)]);
+  if (!result.changes) throw new AppError(404, 'not_found', 'Delivery fee not found.');
+  res.json({ ok: true });
+}));
+
+const deliveryPersonSchema = z.object({
+  name: z.string().trim().min(2).max(80),
+  phone: z.preprocess((v) => {
+    const digits = String(v || '').replace(/\D/g, '');
+    return digits.startsWith('20') && digits.length === 12 ? `0${digits.slice(2)}` : digits;
+  }, z.string().regex(/^01[0125]\d{8}$/, 'phone_invalid')),
+});
+r.get('/delivery-people', h((_req, res) => {
+  res.json({ items: q.all('SELECT id, name, phone, active, created_at FROM delivery_people ORDER BY active DESC, name COLLATE NOCASE') });
+}));
+r.post('/delivery-people', h((req, res) => {
+  const person = deliveryPersonSchema.parse(req.body);
+  if (q.get('SELECT id FROM delivery_people WHERE phone=?', [person.phone])) throw new AppError(422, 'validation_failed', 'Phone number already registered.', { phone: 'phone_taken' });
+  const id = insert('delivery_people', { ...person, active: 1 });
+  res.status(201).json({ id, ...person, active: 1 });
+}));
+r.patch('/delivery-people/:id', h((req, res) => {
+  const id = Number(req.params.id);
+  if (!q.get('SELECT id FROM delivery_people WHERE id=?', [id])) throw new AppError(404, 'not_found', 'Delivery person not found.');
+  const person = deliveryPersonSchema.parse(req.body);
+  if (q.get('SELECT id FROM delivery_people WHERE phone=? AND id<>?', [person.phone, id])) throw new AppError(422, 'validation_failed', 'Phone number already registered.', { phone: 'phone_taken' });
+  update('delivery_people', id, person);
+  res.json({ id, ...person });
+}));
+r.delete('/delivery-people/:id', h((req, res) => {
+  const id = Number(req.params.id);
+  const result = q.run('DELETE FROM delivery_people WHERE id=?', [id]);
+  if (!result.changes) throw new AppError(404, 'not_found', 'Delivery person not found.');
+  res.json({ deleted: true });
 }));
 
 /**
@@ -543,13 +790,18 @@ r.patch('/sourcing/:id', h((req, res) => {
 /** Polled by the admin UI: new delivery requests since a timestamp + live counters. */
 r.get('/notifications', h((req, res) => {
   const since = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(req.query.since || '')) ? String(req.query.since) : '1970-01-01 00:00:00';
-  const items = q.all(`SELECT o.id, o.number, o.total, o.status, COALESCE(o.handoff_at, o.created_at) AS at, CASE WHEN o.handoff_at IS NULL THEN 'new' ELSE 'handoff' END AS kind, s.name_ar AS store_name
-    FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.delivery_by='platform' AND COALESCE(o.handoff_at, o.created_at) > ? ORDER BY at DESC LIMIT 10`, [since]);
+  const items = q.all(`SELECT o.id, o.number, o.total, o.status, o.handoff_at AS at, 'handoff' AS kind, s.name_ar AS store_name
+    FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.delivery_by='platform' AND o.handoff_at > ? ORDER BY at DESC LIMIT 10`, [since]);
+  const readyItems = q.all(`SELECT e.id AS event_id, o.id, o.number, o.total, o.status, e.created_at AS at, 'ready' AS kind, s.name_ar AS store_name,
+      CASE WHEN o.delivery_group IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') END AS group_count,
+      CASE WHEN o.delivery_group IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status IN ('processing','shipped','delivered')) END AS group_ready_count
+    FROM order_events e JOIN orders o ON o.id=e.order_id JOIN stores s ON s.id=o.store_id
+    WHERE o.delivery_by='platform' AND e.status='processing' AND e.created_at >= ? ORDER BY e.created_at DESC, e.id DESC LIMIT 10`, [since]);
   const services = q.all("SELECT r.id, r.plan, r.type, r.created_at AS at, s.name_ar AS store_name FROM service_requests r JOIN stores s ON s.id=r.store_id WHERE r.created_at > ? ORDER BY r.created_at DESC LIMIT 10", [since]);
   res.json({
     services, servicesNew: q.val("SELECT COUNT(*) FROM service_requests WHERE status='new'"),
     sourcing: q.all("SELECT id, number, title, created_at AS at FROM sourcing_requests WHERE created_at > ? ORDER BY created_at DESC LIMIT 10", [since]), sourcingNew: q.val("SELECT COUNT(*) FROM sourcing_requests WHERE status IN ('new','approved')"),
-    items, now: new Date().toISOString().slice(0, 19).replace('T', ' '),
+    items, readyItems, now: new Date().toISOString().slice(0, 19).replace('T', ' '),
     open: q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform' AND status NOT IN ('delivered','cancelled')"),
     ready: q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform' AND status='processing'"),
   });
@@ -577,7 +829,7 @@ r.get('/overview', h((_req, res) => {
     deliveriesDone: q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform' AND status='delivered'"),
     cashToCollect: q.val("SELECT COALESCE(SUM(total),0) FROM orders WHERE delivery_by='platform' AND status='shipped'"),
   };
-  const topStores = q.all(`SELECT s.slug, s.name_ar, COUNT(o.id) AS orders, COALESCE(SUM(o.total),0) AS revenue FROM stores s JOIN orders o ON o.store_id=s.id
+  const topStores = q.all(`SELECT s.slug, s.name_ar, COUNT(o.id) AS orders, COALESCE(SUM(CASE WHEN o.delivery_group IS NULL THEN o.total ELSE o.subtotal-o.discount END),0) AS revenue FROM stores s JOIN orders o ON o.store_id=s.id
     WHERE o.status<>'cancelled' AND date(o.created_at,'+3 hours') >= ? GROUP BY s.id ORDER BY revenue DESC LIMIT 5`, [days[0]]);
   const statusCounts = Object.fromEntries(q.all('SELECT status, COUNT(*) AS c FROM orders GROUP BY status').map((x) => [x.status, x.c]));
   const deptCount = new Map();
@@ -613,13 +865,14 @@ r.patch('/orders/:id/delivery', h((req, res) => {
   const { delivery_by } = z.object({ delivery_by: z.enum(['platform', 'store']) }).parse(req.body);
   const o = q.get('SELECT * FROM orders WHERE id=?', [Number(req.params.id)]);
   if (!o) throw new AppError(404, 'not_found', 'Order not found.');
+  if (o.delivery_group && delivery_by !== 'platform') throw new AppError(400, 'marketplace_delivery', 'Twist handles delivery for the whole marketplace basket.');
   if (!['pending', 'confirmed', 'processing'].includes(o.status)) throw new AppError(400, 'invalid_transition', 'Too late to change delivery for this order.');
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
   tx(() => {
     q.run('UPDATE orders SET delivery_by=?, handoff_at=?, updated_at=? WHERE id=?', [delivery_by, delivery_by === 'platform' ? now : null, now, o.id]);
     insert('order_events', { order_id: o.id, status: o.status, note: delivery_by === 'platform' ? '@handoff' : '@store_delivery', created_at: now });
   });
-  if (delivery_by === 'platform') notifyPlatformDelivery(o.id, o.number);
+  if (delivery_by === 'platform' && o.status === 'processing') notifyPlatformDelivery(o.id, o.number);
   res.json({ id: o.id, delivery_by });
 }));
 
@@ -629,7 +882,7 @@ r.get('/stores', h((_req, res) => {
       u.email AS owner_email, u.name AS owner_name, u.role,
       (SELECT COUNT(*) FROM products p WHERE p.store_id = s.id) AS products_count,
       (SELECT COUNT(*) FROM orders o WHERE o.store_id = s.id) AS orders_count,
-      (SELECT COALESCE(SUM(total),0) FROM orders o WHERE o.store_id = s.id AND o.status <> 'cancelled') AS revenue,
+      (SELECT COALESCE(SUM(CASE WHEN o.delivery_group IS NULL THEN o.total ELSE o.subtotal-o.discount END),0) FROM orders o WHERE o.store_id = s.id AND o.status <> 'cancelled') AS revenue,
       (SELECT MAX(created_at) FROM orders o WHERE o.store_id = s.id) AS last_order_at
     FROM stores s JOIN users u ON u.id = s.owner_id ORDER BY s.sort_order, s.id`);
   res.json({ stores: stores.map((s) => ({ ...s, departments: decodeDepartments(s.departments), auto_whatsapp: Boolean(s.auto_whatsapp), hidden: Boolean(s.hidden), featured: Boolean(s.featured), owner_disabled: s.role === 'disabled' })) });

@@ -101,7 +101,8 @@ if (fs.existsSync(config.webDist)) {
     .replace(/<meta property="og:title" content="[^"]*"\s*\/>/, `<meta property="og:title" content="${esc(title)}" />`)
     .replace(/<meta property="og:description" content="[^"]*"\s*\/>/, `<meta property="og:description" content="${esc(description)}" />`)
     .replace(/<meta property="og:url" content="[^"]*"\s*\/>/, `<meta property="og:url" content="${esc(url)}" />`)
-    .replace(/<meta property="og:image" content="[^"]*"\s*\/>/, `<meta property="og:image" content="${esc(image)}" />`);
+    .replace(/<meta property="og:image" content="[^"]*"\s*\/>/, `<meta property="og:image" content="${esc(image)}" />`)
+    .replace(/<meta name="twitter:image" content="[^"]*"\s*\/>/, `<meta name="twitter:image" content="${esc(image)}" />`);
   app.get('/s/:slug/p/:pslug', (req, res, next) => {
     const item = q.get(`SELECT p.id, p.name_ar, p.seo_title, p.seo_description, p.description_ar, s.name_ar AS store_name_ar
       FROM products p JOIN stores s ON s.id=p.store_id
@@ -112,7 +113,7 @@ if (fs.existsSync(config.webDist)) {
     const url = `${SITE_ORIGIN}${req.path}`;
     const title = `${item.seo_title || item.name_ar} | ${item.store_name_ar} | Twist بنها`;
     const description = item.seo_description || item.description_ar || `${item.name_ar} من ${item.store_name_ar} على Twist بنها.`;
-    const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/app-icon.png`;
+    const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/twist-share.png`;
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url, image }));
   });
@@ -124,7 +125,7 @@ if (fs.existsSync(config.webDist)) {
     const url = `${SITE_ORIGIN}${req.path}`;
     const title = `${store.name_ar} | ملابس وأزياء في بنها على Twist`;
     const description = store.description_ar || `تسوق من ${store.name_ar} في بنها عبر Twist.`;
-    const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/app-icon.png`;
+    const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/twist-share.png`;
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url, image }));
   });
@@ -133,7 +134,7 @@ if (fs.existsSync(config.webDist)) {
     const description = 'Twist منصة بنها للتسوق المحلي. نجهز لمحلات الملابس متجرًا إلكترونيًا باسمها، مع متابعة الطلبات واشتراك شهري من غير عمولة على البيع.';
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, {
-      title, description, url: `${SITE_ORIGIN}/join`, image: `${SITE_ORIGIN}/brand/app-icon.png`,
+      title, description, url: `${SITE_ORIGIN}/join`, image: `${SITE_ORIGIN}/brand/twist-share.png`,
     }));
   });
   // shared looks get their own preview card (WhatsApp / Facebook read the OG tags, not the SPA)
@@ -144,7 +145,7 @@ if (fs.existsSync(config.webDist)) {
       const origin = `${req.protocol}://${req.get('host')}`;
       const m = look.pieces[0].image;
       const sz = m ? ([...m.sizes].sort((a, b) => a.width - b.width).find((x) => x.width >= 600) || m.sizes[m.sizes.length - 1]) : null;
-      const img = m && sz ? `${m.base.startsWith('http') ? '' : origin}${m.base}/original.jpg` : `${origin}/brand/app-icon.png`;
+      const img = m && sz ? `${m.base.startsWith('http') ? '' : origin}${m.base}/original.jpg` : `${origin}/brand/twist-share.png`;
       const visual = look.kind === 'visual';
       const title = visual ? (look.title || 'لقيت دول في محلات بنها') : `${look.title || 'لوك من Twist'} · ${look.pieces.length} قطع`;
       const desc = visual ? `${look.pieces.slice(0, 4).map((p) => `${p.name.ar || p.name.en || p.name} — ${p.price} ج.م`).join(' | ')}` : `${look.pieces.map((p) => p.name.ar || p.name.en || p.name).join(' + ')} — ${look.total} ج.م`;

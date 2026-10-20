@@ -10,6 +10,10 @@ fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
 export const db = new DatabaseSync(config.dbFile);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
+db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
+  ('subscription_monthly_fee','0'),
+  ('subscription_reminder_days','5'),
+  ('subscription_reminder_template','أهلاً {store}، نذكّرك إن اشتراك متجرك على Twist مستحق بمبلغ {amount} ج.م. موعد التجديد {due_date}. ابعتلنا صورة التحويل أو تواصل معانا لتأكيد الدفع. شكراً لثقتك في Twist.')`);
 // Lightweight migrations for databases created by earlier versions.
 {
   const cols = db.prepare('PRAGMA table_info(stores)').all().map((c) => c.name);
@@ -60,11 +64,38 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   }
   const ocols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!ocols.includes('delivery_by')) db.exec("ALTER TABLE orders ADD COLUMN delivery_by TEXT NOT NULL DEFAULT 'store'");
+  if (!ocols.includes('delivery_group')) db.exec('ALTER TABLE orders ADD COLUMN delivery_group TEXT');
   if (!ocols.includes('handoff_at')) db.exec('ALTER TABLE orders ADD COLUMN handoff_at TEXT');
   if (!ocols.includes('platform_discount')) db.exec('ALTER TABLE orders ADD COLUMN platform_discount INTEGER NOT NULL DEFAULT 0');
   if (!ocols.includes('buyer_id')) db.exec('ALTER TABLE orders ADD COLUMN buyer_id INTEGER');
   if (!ocols.includes('track_token')) db.exec('ALTER TABLE orders ADD COLUMN track_token TEXT');
+  if (!ocols.includes('shipping_free')) db.exec('ALTER TABLE orders ADD COLUMN shipping_free INTEGER NOT NULL DEFAULT 0');
+  if (!ocols.includes('courier_cost')) db.exec('ALTER TABLE orders ADD COLUMN courier_cost INTEGER');
+  if (!ocols.includes('delivery_person_id')) db.exec('ALTER TABLE orders ADD COLUMN delivery_person_id INTEGER');
+  // Older single-store orders with zero delivery were genuinely free; only
+  // grouped marketplace sub-orders use zero to mean the basket fee is shared.
+  db.exec('UPDATE orders SET shipping_free=1 WHERE shipping=0 AND delivery_group IS NULL AND shipping_free=0');
+  if (!db.prepare("SELECT 1 FROM app_settings WHERE key='marketplace_shipping_customer_totals_v1'").get()) {
+    // Marketplace delivery is collected by Twist, not earned by a store.
+    // Remove any previously allocated shared fee from per-store customer spend.
+    db.exec(`UPDATE customers SET total_spent=MAX(0,total_spent-COALESCE((
+      SELECT SUM(o.shipping) FROM orders o WHERE o.customer_id=customers.id AND o.delivery_group IS NOT NULL AND o.status<>'cancelled'
+    ),0)) WHERE id IN (SELECT customer_id FROM orders WHERE delivery_group IS NOT NULL AND status<>'cancelled' AND shipping>0)`);
+    db.prepare("INSERT INTO app_settings(key,value) VALUES('marketplace_shipping_customer_totals_v1','1')").run();
+  }
   db.exec('CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_orders_delivery_group ON orders(delivery_group)');
+  const rateCols = db.prepare('PRAGMA table_info(delivery_rates)').all().map((c) => c.name);
+  if (!rateCols.includes('distance_km')) db.exec('ALTER TABLE delivery_rates ADD COLUMN distance_km REAL');
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_rates_area ON delivery_rates(lower(governorate), lower(city))');
+  db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
+    ('delivery_base_fee','50'), ('delivery_included_km','2'), ('delivery_per_km','10')`);
+  db.exec(`INSERT OR IGNORE INTO delivery_rates(governorate,city,fee,distance_km) VALUES
+    ('Qalyubia','Banha',50,0), ('Qalyubia','بنها',50,0),
+    ('Qalyubia','نصف أتريب',50,0.8), ('Qalyubia','كفر مناقر',50,1.3), ('Qalyubia','بطا',50,1.5),
+    ('Qalyubia','كفر أبو زكري',60,2.3), ('Qalyubia','كفر ابوزكري',60,2.3), ('Qalyubia','كفر ابو ذكري',60,2.3),
+    ('Qalyubia','كفر الجزار',60,2.5), ('Qalyubia','كفر سعد',70,3.6), ('Qalyubia','كفر بطا',70,4.0),
+    ('Qalyubia','بقيرة',80,5.0), ('Qalyubia','كفر الأربعين',90,5.4), ('Qalyubia','كفر فرسيس',90,5.7)`);
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_track_token ON orders(track_token) WHERE track_token IS NOT NULL');
   // Backfill tracking links for orders placed before this feature.
   for (const row of db.prepare('SELECT id FROM orders WHERE track_token IS NULL').all()) {

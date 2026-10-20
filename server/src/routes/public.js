@@ -21,8 +21,9 @@ import { getModaPrompts } from '../lib/modaPrompts.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
 import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
+import { resolveDeliveryRate, splitSharedDeliveryFee } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
-import { sendNewOrderAlert, notifyPlatformDelivery } from '../lib/whatsapp.js';
+import { sendNewOrderAlert } from '../lib/whatsapp.js';
 import {
   serializeStore, serializeCards, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi,
 } from '../lib/serialize.js';
@@ -629,6 +630,15 @@ r.post('/stores/:slug/quote', h((req, res) => {
   res.json({ ...qt, lines: qt.lines.map((l) => ({ ...l, image: media.get(l.mediaId) || null })) });
 }));
 
+r.post('/marketplace/delivery-fee', h((req, res) => {
+  const body = z.object({ governorate: z.string().trim().min(2).max(40), city: z.string().trim().min(2).max(60), stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems })).min(1).max(20) }).parse(req.body);
+  if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
+  const storeQuotes = body.stores.map(({ slug, items }) => quote(loadStore(slug), items));
+  const rate = resolveDeliveryRate(body.governorate, body.city, body.stores.map((s) => s.slug));
+  const split = splitSharedDeliveryFee(rate.fee, storeQuotes.map((qt) => ({ freeShipping: qt.shipping === 0 })));
+  res.json({ ...rate, fee: split.customerFee, fullRouteFee: rate.fee, storeShares: split.storeShares });
+}));
+
 const orderSchema = z.object({
   name: z.string().trim().min(2, 'name_required').max(80),
   phone: z.string().trim().regex(/^01[0125][0-9]{8}$/, 'phone_invalid'),
@@ -662,6 +672,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
       store_id: s.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
       governorate: body.governorate, city: body.city, address: body.address, notes: body.notes,
       status: 'pending', delivery_by: s.delivery_mode === 'platform' ? 'platform' : 'store', subtotal: qt.subtotal, discount: qt.discount, shipping: qt.shipping, total: qt.total,
+      shipping_free: qt.shipping === 0 ? 1 : 0,
       coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
     });
     for (const l of qt.lines) {
@@ -679,13 +690,14 @@ r.post('/stores/:slug/orders', h((req, res) => {
       .catch((e) => console.error(`[whatsapp] ${result.number} failed: ${e.message}`));
   }
   notifyStore(s.id, { title: `طلب جديد 🛍️ ${result.number}`, body: `${body.name} · ${result.total} ج.م`, url: `/dashboard/orders/${result.orderId}`, tag: `order-${result.orderId}` });
-  if (s.delivery_mode === 'platform') notifyPlatformDelivery(result.orderId, result.number);
   delete result.orderId;
   res.status(201).json({ order: result });
 }));
 
 const marketplaceOrderSchema = orderSchema.omit({ coupon: true, items: true }).extend({
   stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems })).min(1).max(20),
+  expectedShipping: z.number().int().min(0).max(5000).optional(),
+  expectedTotal: z.number().int().min(0).max(10000000).optional(),
 });
 
 // A single marketplace checkout is recorded as one independently managed order per store.
@@ -699,22 +711,37 @@ r.post('/marketplace/orders', h((req, res) => {
       if (qt.hasErrors) throw new AppError(409, 'cart_changed', 'Some items are no longer available.', { slug, lines: qt.lines });
       return { store, qt };
     });
+    // A marketplace checkout is one customer delivery even though each shop
+    // still receives and fulfils its own sub-order. Charge one platform fee.
+    // Store thresholds decide whether the shared destination-based delivery fee applies.
+    const fullRouteFee = resolveDeliveryRate(body.governorate, body.city, prepared.map(({ store }) => store.slug)).fee;
+    const split = splitSharedDeliveryFee(fullRouteFee, prepared.map(({ qt }) => ({ freeShipping: qt.shipping === 0 })));
+    const marketplaceShipping = split.customerFee;
+    const marketplaceTotal = prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0) + marketplaceShipping;
+    if ((body.expectedShipping != null && body.expectedShipping !== marketplaceShipping)
+      || (body.expectedTotal != null && body.expectedTotal !== marketplaceTotal)) {
+      throw new AppError(409, 'delivery_fee_changed', 'The delivery fee or order total changed. Please review the updated amount.');
+    }
+    const shippingStoreIndex = prepared.findIndex(({ qt }) => qt.shipping > 0);
+    const deliveryGroup = crypto.randomUUID();
     const now = nowIso();
-    return prepared.map(({ store, qt }) => {
+    const orders = prepared.map(({ store, qt }, storeIndex) => {
+      const shipping = storeIndex === shippingStoreIndex ? marketplaceShipping : 0;
       let customer = q.get('SELECT * FROM customers WHERE store_id=? AND phone=?', [store.id, body.phone]);
       if (!customer) {
         const id = insert('customers', { store_id: store.id, name: body.name, phone: body.phone, governorate: body.governorate, city: body.city, address: body.address, created_at: now });
         customer = { id };
       }
       q.run('UPDATE customers SET name=?, governorate=?, city=?, address=?, orders_count=orders_count+1, total_spent=total_spent+?, last_order_at=? WHERE id=?',
-        [body.name, body.governorate, body.city, body.address, qt.total, now, customer.id]);
+        [body.name, body.governorate, body.city, body.address, qt.subtotal, now, customer.id]);
       const seq = q.val('SELECT COUNT(*) FROM orders WHERE store_id=?', [store.id]) + 10001;
       const number = `${store.code}-${seq}`;
       const trackToken = crypto.randomBytes(12).toString('base64url');
       const orderId = insert('orders', {
         store_id: store.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
         governorate: body.governorate, city: body.city, address: body.address, notes: body.notes,
-        status: 'pending', delivery_by: store.delivery_mode === 'platform' ? 'platform' : 'store', subtotal: qt.subtotal, discount: 0, shipping: qt.shipping, total: qt.total,
+        status: 'pending', delivery_by: 'platform', delivery_group: deliveryGroup, subtotal: qt.subtotal, discount: 0, shipping, total: qt.subtotal + shipping,
+        shipping_free: qt.shipping === 0 ? 1 : 0,
         platform_discount: 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
       });
       for (const line of qt.lines) {
@@ -723,15 +750,17 @@ r.post('/marketplace/orders', h((req, res) => {
         q.run('UPDATE products SET stock=MAX(0, stock-?), sold_count=sold_count+? WHERE id=?', [line.qty, line.qty, line.productId]);
       }
       insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
-      return { orderId, number, trackToken, total: qt.total, storeSlug: store.slug, store: { ar: store.name_ar, en: store.name_en } };
+      return { orderId, number, trackToken, total: qt.subtotal + shipping, subtotal: qt.subtotal, shipping, deliveryGroup, storeSlug: store.slug, store: { ar: store.name_ar, en: store.name_en } };
     });
+    return orders;
   });
   for (const order of result) {
     const store = loadStore(order.storeSlug);
     // Store notifications are best-effort, after all sub-orders have committed atomically.
     if (store.auto_whatsapp) sendNewOrderAlert(store, order.orderId).catch((e) => console.error(`[whatsapp] ${order.number} failed: ${e.message}`));
     notifyStore(store.id, { title: `طلب جديد 🛍️ ${order.number}`, body: `${body.name} · ${order.total} ج.م`, url: `/dashboard/orders/${order.orderId}`, tag: `order-${order.orderId}` });
-    if (store.delivery_mode === 'platform') notifyPlatformDelivery(order.orderId, order.number);
+    // Marketplace orders are always delivered by Twist, regardless of the
+    // store's default delivery preference. Dispatch is notified when ready.
   }
   res.status(201).json({ orders: result.map(({ orderId, ...order }) => order) });
 }));
@@ -764,11 +793,13 @@ function trackPayload(o) {
   const items = q.all('SELECT * FROM order_items WHERE order_id=?', [o.id]);
   const media = mediaMap(items.map((i) => i.media_id));
   const events = q.all('SELECT status, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]);
+  const basket = o.delivery_group ? q.get("SELECT COUNT(*) AS count, COALESCE(SUM(total),0) AS total FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group]) : null;
   return {
     number: o.number, token: o.track_token, status: o.status, createdAt: o.created_at, updatedAt: o.updated_at,
     deliveryBy: o.delivery_by, firstName: String(o.customer_name || '').split(' ')[0],
     city: o.city, governorate: o.governorate, phone: o.phone.replace(/^(\d{3})\d{5}/, '$1•••••'),
-    subtotal: o.subtotal, discount: o.discount, shipping: o.shipping, total: o.total, payment: o.payment_method,
+    subtotal: o.subtotal, discount: o.discount, shipping: o.shipping, shippingFree: !!o.shipping_free, total: o.total, payment: o.payment_method,
+    deliveryGroupCount: basket?.count ? basket.count : null, deliveryGroupTotal: basket?.count ? basket.total : null,
     store: { name: { ar: s?.name_ar, en: s?.name_en }, slug: s?.slug, phone: s?.phone || null },
     items: items.map((i) => ({ productId: i.product_id, reviewed: i.product_id ? !!q.get('SELECT 1 AS x FROM reviews WHERE order_id=? AND product_id=?', [o.id, i.product_id]) : true, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
     events,

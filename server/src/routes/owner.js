@@ -278,14 +278,14 @@ r.delete('/store/:slot(logo|cover)', h(async (req, res) => {
 
 function periodStats(storeId, days) {
   const from = days[0], to = days[days.length - 1];
-  const o = q.get(`SELECT COUNT(*) AS orders, COALESCE(SUM(total),0) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY} BETWEEN ? AND ?`, [storeId, from, to]);
+  const o = q.get(`SELECT COUNT(*) AS orders, COALESCE(SUM(CASE WHEN delivery_group IS NULL THEN total ELSE subtotal-discount END),0) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY} BETWEEN ? AND ?`, [storeId, from, to]);
   const customers = q.val(`SELECT COUNT(*) FROM customers WHERE store_id=? AND ${LOCAL_DAY} BETWEEN ? AND ?`, [storeId, from, to]);
   const visits = q.val('SELECT COALESCE(SUM(visits),0) FROM store_visits WHERE store_id=? AND day BETWEEN ? AND ?', [storeId, from, to]);
   return { ...o, aov: o.orders ? Math.round(o.sales / o.orders) : 0, customers, visits, conversion: visits ? Math.round((o.orders / visits) * 1000) / 10 : 0 };
 }
 
 function series(storeId, days) {
-  const rows = q.all(`SELECT ${LOCAL_DAY} AS day, COUNT(*) AS orders, SUM(total) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY} BETWEEN ? AND ? GROUP BY day`, [storeId, days[0], days.at(-1)]);
+  const rows = q.all(`SELECT ${LOCAL_DAY} AS day, COUNT(*) AS orders, SUM(CASE WHEN delivery_group IS NULL THEN total ELSE subtotal-discount END) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY} BETWEEN ? AND ? GROUP BY day`, [storeId, days[0], days.at(-1)]);
   const visits = q.all('SELECT day, visits FROM store_visits WHERE store_id=? AND day BETWEEN ? AND ?', [storeId, days[0], days.at(-1)]);
   const map = new Map(rows.map((x) => [x.day, x]));
   const vmap = new Map(visits.map((x) => [x.day, x.visits]));
@@ -301,7 +301,7 @@ function orderCards(rows) {
     const its = items.filter((i) => i.order_id === o.id);
     return {
       id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, customer: o.customer_name, phone: o.phone, city: o.city, governorate: o.governorate,
-      total: o.total, createdAt: o.created_at, itemsCount: its.reduce((s, i) => s + i.qty, 0),
+      total: o.delivery_group ? o.subtotal - o.discount : o.total, deliveryGroup: o.delivery_group, shippingFree: !!o.shipping_free, createdAt: o.created_at, itemsCount: its.reduce((s, i) => s + i.qty, 0),
       images: its.slice(0, 3).map((i) => media.get(i.media_id)).filter(Boolean),
     };
   });
@@ -314,7 +314,7 @@ r.get('/overview', h((req, res) => {
   const prev = days.slice(0, n), cur = days.slice(n);
   const a = periodStats(sid, cur), b = periodStats(sid, prev);
   const today = cur.at(-1);
-  const todayStats = q.get(`SELECT COUNT(*) AS orders, COALESCE(SUM(total),0) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY}=?`, [sid, today]);
+  const todayStats = q.get(`SELECT COUNT(*) AS orders, COALESCE(SUM(CASE WHEN delivery_group IS NULL THEN total ELSE subtotal-discount END),0) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY}=?`, [sid, today]);
   const statusCounts = Object.fromEntries(q.all('SELECT status, COUNT(*) AS c FROM orders WHERE store_id=? GROUP BY status', [sid]).map((x) => [x.status, x.c]));
   const recent = orderCards(q.all('SELECT * FROM orders WHERE store_id=? ORDER BY created_at DESC LIMIT 6', [sid]));
   const top = q.all(
@@ -369,10 +369,10 @@ r.get('/analytics', h((req, res) => {
      FROM order_items oi JOIN orders o ON o.id=oi.order_id LEFT JOIN products p ON p.id=oi.product_id LEFT JOIN categories c ON c.id=p.category_id
      WHERE o.store_id=? AND o.status<>'cancelled' AND date(o.created_at,'+3 hours') BETWEEN ? AND ? GROUP BY c.id ORDER BY revenue DESC`, between,
   );
-  const byCity = q.all(`SELECT city, COUNT(*) AS orders, SUM(total) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY} BETWEEN ? AND ? GROUP BY city ORDER BY orders DESC LIMIT 6`, between);
+  const byCity = q.all(`SELECT city, COUNT(*) AS orders, SUM(CASE WHEN delivery_group IS NULL THEN total ELSE subtotal-discount END) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY} BETWEEN ? AND ? GROUP BY city ORDER BY orders DESC LIMIT 6`, between);
   const byHour = q.all(`SELECT CAST(strftime('%H', created_at, '+3 hours') AS INTEGER) AS hour, COUNT(*) AS orders FROM orders WHERE store_id=? AND ${LOCAL_DAY} BETWEEN ? AND ? GROUP BY hour`, between);
   const hours = Array.from({ length: 24 }, (_, hh) => ({ hour: hh, orders: byHour.find((x) => x.hour === hh)?.orders || 0 }));
-  const byWeekday = q.all(`SELECT CAST(strftime('%w', created_at, '+3 hours') AS INTEGER) AS wd, COUNT(*) AS orders, SUM(total) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY} BETWEEN ? AND ? GROUP BY wd`, between);
+  const byWeekday = q.all(`SELECT CAST(strftime('%w', created_at, '+3 hours') AS INTEGER) AS wd, COUNT(*) AS orders, SUM(CASE WHEN delivery_group IS NULL THEN total ELSE subtotal-discount END) AS sales FROM orders WHERE store_id=? AND ${NOT_CANCELLED} AND ${LOCAL_DAY} BETWEEN ? AND ? GROUP BY wd`, between);
   const top = q.all(
     `SELECT oi.product_id AS id, oi.name_ar, oi.name_en, SUM(oi.qty) AS qty, SUM(oi.qty*oi.price) AS revenue, MAX(oi.media_id) AS media_id
      FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.store_id=? AND o.status<>'cancelled' AND date(o.created_at,'+3 hours') BETWEEN ? AND ?
@@ -737,12 +737,21 @@ r.get('/orders/:id', h((req, res) => {
   const items = q.all('SELECT * FROM order_items WHERE order_id=?', [o.id]);
   const media = mediaMap(items.map((i) => i.media_id));
   const customer = o.customer_id ? q.get('SELECT * FROM customers WHERE id=?', [o.customer_id]) : null;
+  const runOrders = o.delivery_group
+    ? q.all("SELECT id,shipping_free FROM orders WHERE delivery_group=? AND status<>'cancelled' ORDER BY id", [o.delivery_group])
+    : [{ id: o.id, shipping_free: o.shipping_free }];
+  const runOwner = o.delivery_group ? q.get("SELECT courier_cost FROM orders WHERE delivery_group=? AND status<>'cancelled' ORDER BY id LIMIT 1", [o.delivery_group]) : o;
+  const runCost = runOwner?.courier_cost == null ? null : Number(runOwner.courier_cost);
+  const runPosition = runOrders.findIndex((item) => item.id === o.id);
+  const runShare = runCost == null || runPosition < 0 ? null : Math.floor(runCost / runOrders.length) + (runPosition < runCost % runOrders.length ? 1 : 0);
   res.json({
     order: {
-      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, handoffAt: o.handoff_at, next: ownerNext(o), createdAt: o.created_at, updatedAt: o.updated_at,
-      customer: { id: customer?.id, name: o.customer_name, phone: o.phone, governorate: o.governorate, city: o.city, address: o.address, ordersCount: customer?.orders_count || 1, totalSpent: customer?.total_spent || o.total },
+      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, deliveryGroup: o.delivery_group, handoffAt: o.handoff_at, next: ownerNext(o), createdAt: o.created_at, updatedAt: o.updated_at,
+      customer: { id: customer?.id, name: o.customer_name, phone: o.phone, governorate: o.governorate, city: o.city, address: o.address, ordersCount: customer?.orders_count || 1, totalSpent: customer?.total_spent ?? o.total },
       notes: o.notes, payment: o.payment_method, coupon: o.coupon_code, platformDiscount: o.platform_discount || 0,
-      subtotal: o.subtotal, discount: o.discount, shipping: o.shipping, total: o.total,
+      subtotal: o.subtotal, discount: o.discount, shipping: o.delivery_group ? 0 : o.shipping, total: o.delivery_group ? o.subtotal - o.discount : o.total,
+      shippingFree: !!o.shipping_free,
+      shippingSponsorDue: o.delivery_by === 'platform' && o.shipping_free ? runShare : 0,
       items: items.map((i) => ({ id: i.id, productId: i.product_id, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
       events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]),
     },
@@ -760,15 +769,45 @@ r.patch('/orders/:id/status', h((req, res) => {
     q.run('UPDATE orders SET status=?, updated_at=? WHERE id=?', [status, now, o.id]);
     insert('order_events', { order_id: o.id, status, note: note || null, created_at: now });
     if (status === 'cancelled') {
+      // Keep the one-trip courier record attached to a live sub-order if the
+      // original group owner is cancelled after dispatch details were entered.
+      if (o.delivery_group && (o.courier_cost != null || o.delivery_person_id != null)) {
+        const nextOwner = q.get("SELECT id FROM orders WHERE delivery_group=? AND id<>? AND status<>'cancelled' ORDER BY id LIMIT 1", [o.delivery_group, o.id]);
+        if (nextOwner) q.run('UPDATE orders SET courier_cost=?, delivery_person_id=? WHERE id=?', [o.courier_cost, o.delivery_person_id, nextOwner.id]);
+      }
       // return stock
       for (const i of q.all('SELECT * FROM order_items WHERE order_id=?', [o.id])) {
         if (i.variant_id) q.run('UPDATE variants SET stock=stock+? WHERE id=?', [i.qty, i.variant_id]);
         q.run('UPDATE products SET stock=stock+?, sold_count=MAX(0,sold_count-?) WHERE id=?', [i.qty, i.qty, i.product_id]);
       }
-      if (o.customer_id) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [o.total, o.customer_id]);
+      if (o.customer_id) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [o.delivery_group ? o.subtotal - o.discount : o.total, o.customer_id]);
+      // If this marketplace sub-order carried the basket's single customer
+      // delivery fee, move that fee to a remaining non-free store order.
+      if (o.delivery_group) {
+        const active = q.all(`SELECT o.id, o.customer_id, o.subtotal, o.shipping, o.total
+          FROM orders o
+          WHERE o.delivery_group=? AND o.status<>'cancelled' AND o.shipping_free=0 ORDER BY o.id`, [o.delivery_group]);
+        const fee = o.shipping || active.reduce((sum, item) => sum + item.shipping, 0);
+        const feeOrderId = fee > 0 ? active[0]?.id : undefined;
+        for (const item of q.all("SELECT id, customer_id, subtotal, total FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group])) {
+          const shipping = item.id === feeOrderId ? fee : 0;
+          const total = item.subtotal + shipping;
+          if (total !== item.total) {
+            q.run('UPDATE orders SET shipping=?, total=? WHERE id=?', [shipping, total, item.id]);
+          }
+        }
+      }
     }
   });
   notifyOrderStatus(o.id, status);
+  if (o.delivery_by === 'platform' && status === 'processing') {
+    if (o.delivery_group) {
+      const batch = q.all("SELECT id, number, status FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group]);
+      if (batch.length && batch.every((item) => item.status === 'processing')) {
+        for (const item of batch) notifyPlatformDelivery(item.id, item.number);
+      }
+    } else notifyPlatformDelivery(o.id, o.number);
+  }
   res.json({ status, next: ownerNext({ status, delivery_by: o.delivery_by }) });
 }));
 

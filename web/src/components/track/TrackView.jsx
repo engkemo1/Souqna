@@ -82,8 +82,9 @@ export default function TrackView({ order: o }) {
         <dl className="mt-5 space-y-2 border-t border-line pt-4 text-sm">
           <div className="flex justify-between"><dt className="text-muted">{t('cart.subtotal')}</dt><dd className="tabular">{formatMoney(o.subtotal, lang)}</dd></div>
           {o.discount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')}</dt><dd className="tabular">−{formatMoney(o.discount, lang)}</dd></div>}
-          <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{o.shipping ? formatMoney(o.shipping, lang) : t('common.free')}</dd></div>
+          <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{o.shippingFree ? t('common.free') : o.shipping ? formatMoney(o.shipping, lang) : t('cart.sharedDelivery')}</dd></div>
           <div className="flex justify-between text-base font-semibold"><dt>{t('cart.total')}</dt><dd className="tabular">{formatMoney(o.total, lang)}</dd></div>
+          {o.deliveryGroupTotal != null && <div className="flex justify-between border-t border-line pt-2 font-semibold text-brand"><dt>{t('cart.marketTotal')} · {o.deliveryGroupCount} {lang === 'ar' ? 'محلات' : 'stores'}</dt><dd className="tabular">{formatMoney(o.deliveryGroupTotal, lang)}</dd></div>}
         </dl>
         <p className="mt-4 rounded-xl bg-surface px-4 py-3 text-sm text-muted">{t('track.payCod')} · {o.city}{o.governorate ? ` — ${t(`gov.${o.governorate}`)}` : ''}</p>
       </div>

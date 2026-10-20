@@ -7,7 +7,7 @@ import Badge from '../../components/ui/Badge.jsx';
 import { useAdminApi, fmtMoney, fmtNum, fmtDateTime, ORDER_STATUS_AR, useAdminDepartments } from './adminApi.js';
 
 const STATUS_TONE = { pending: 'warning', confirmed: 'info', processing: 'violet', shipped: 'info', delivered: 'success', cancelled: 'danger' };
-export const StatusPill = ({ s }) => <Badge tone={STATUS_TONE[s] || 'neutral'} dot>{ORDER_STATUS_AR[s] || s}</Badge>;
+export const StatusPill = ({ s, platform = false }) => <Badge tone={STATUS_TONE[s] || 'neutral'} dot>{platform && s === 'processing' ? 'جاهز للاستلام' : ORDER_STATUS_AR[s] || s}</Badge>;
 
 export default function Overview() {
   const { data, error, loading, reload } = useAdminApi('/overview', { every: 60000 });
@@ -73,7 +73,7 @@ export default function Overview() {
                   <p className="truncate font-semibold"><span dir="ltr">#{o.number}</span> · {o.customer_name}</p>
                   <p className="truncate text-[13px] text-muted">{o.store_name} · {fmtDateTime(o.created_at)}{o.delivery_by === 'platform' ? ' · 🚚 توصيلنا' : ''}</p>
                 </div>
-                <StatusPill s={o.status} />
+                <StatusPill s={o.status} platform={o.delivery_by === 'platform'} />
                 <span className="w-24 text-end font-semibold tabular">{fmtMoney(o.total)}</span>
               </li>
             ))}

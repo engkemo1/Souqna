@@ -23,7 +23,7 @@ import { cx } from '../../components/ui/cx.js';
 
 const FLOW = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
 
-function Stepper({ status, events, t, lang }) {
+function Stepper({ status, events, t, lang, byPlatform }) {
   const cancelled = status === 'cancelled';
   const idx = cancelled ? -1 : FLOW.indexOf(status);
   const at = (s) => events.find((e) => e.status === s)?.created_at;
@@ -41,7 +41,7 @@ function Stepper({ status, events, t, lang }) {
               </motion.span>
               <span className={cx('h-0.5 flex-1 rounded-full', i === FLOW.length - 1 ? 'opacity-0' : i < idx ? 'bg-primary' : 'bg-fg/10')} />
             </div>
-            <p className={cx('mt-2 text-xs font-medium leading-tight sm:text-xs', done ? 'text-fg' : 'text-muted')}>{t(`status.${s}`)}</p>
+            <p className={cx('mt-2 text-xs font-medium leading-tight sm:text-xs', done ? 'text-fg' : 'text-muted')}>{byPlatform && s === 'processing' ? t('orders.markReady') : t(`status.${s}`)}</p>
             {at(s) && <p className="mt-0.5 hidden text-xs text-muted sm:block">{formatDate(at(s), lang, { day: 'numeric', month: 'short' })}</p>}
           </li>
         );
@@ -105,13 +105,14 @@ export default function OrderDetail() {
       date: `${formatDate(o.createdAt, lang, { day: 'numeric', month: 'long', year: 'numeric' })} · ${formatTime(o.createdAt, lang)}`,
       customer: { name: o.customer.name, phone: o.customer.phone, address: [o.customer.address, o.customer.city, o.customer.governorate].filter(Boolean).join('، ') },
       items: o.items.map((i) => ({ name: tr(i.name), variant: i.size ? `${t('product.size')}: ${i.size}` : '', qty: i.qty, total: fm(i.price * i.qty) })),
-      totals: [[t('cart.subtotal'), fm(o.subtotal)], ...(o.discount ? [[t('cart.discount'), `-${fm(o.discount)}`]] : []), [t('cart.shipping'), o.shipping ? fm(o.shipping) : t('qr.free')], [t('qr.total'), fm(o.total), true]],
+      totals: [[t('cart.subtotal'), fm(o.subtotal)], ...(o.discount ? [[t('cart.discount'), `-${fm(o.discount)}`]] : []), [t('cart.shipping'), o.shippingFree ? t('qr.free') : o.deliveryGroup ? t('cart.sharedDelivery') : o.shipping ? fm(o.shipping) : t('cart.sharedDelivery')], [t('qr.total'), fm(o.total), true]],
       payment: t('checkout.cod'), notes: o.notes, url: orderUrl(o.id),
       labels: { order: t('qr.order'), items: t('qr.item'), qty: t('qr.qty'), total: t('qr.total'), notes: t('qr.notes'), scan: t('qr.orderScan') },
     }), { page: 'A5', margin: '8mm' });
   };
 
   const byUs = o.deliveryBy === 'platform';
+  const statusT = (key, vars) => byUs && o.status === 'processing' && key === 'status.processing' ? t('orders.markReady') : t(key, vars);
   const canHandoff = !byUs && ['pending', 'confirmed', 'processing'].includes(o.status);
   const nextMain = o.next.find((s) => s !== 'cancelled');
   const canCancel = o.next.includes('cancelled');
@@ -127,7 +128,7 @@ export default function OrderDetail() {
   return (
     <PageTransition className="pb-20 md:pb-0">
       <PageHeader back="/dashboard/orders"
-        title={<span className="flex flex-wrap items-center gap-3"><span dir="ltr">#{o.number}</span><StatusBadge status={o.status} t={t} /></span>}
+        title={<span className="flex flex-wrap items-center gap-3"><span dir="ltr">#{o.number}</span><StatusBadge status={o.status} t={statusT} /></span>}
         subtitle={`${formatDate(o.createdAt, lang, { weekday: 'long', day: 'numeric', month: 'long' })} · ${formatTime(o.createdAt, lang)}`}
         actions={<div className="hidden items-center gap-2 md:flex"><Button variant="outline" icon={Printer} onClick={printSlip}>{t('orders.print')}</Button>{actions}</div>} />
 
@@ -136,7 +137,7 @@ export default function OrderDetail() {
           <Panel>
             {o.status === 'cancelled' ? (
               <div className="flex items-center gap-3 rounded-xl bg-red-50 p-4 text-red-800"><X className="h-5 w-5" /><p className="font-semibold">{t('status.cancelled')}</p></div>
-            ) : <Stepper status={o.status} events={o.events} t={t} lang={lang} />}
+            ) : <Stepper status={o.status} events={o.events} t={t} lang={lang} byPlatform={byUs} />}
             {!o.next.length && o.status !== 'cancelled' && <p className="mt-4 text-center text-sm text-muted">{t('orders.final')}</p>}
           </Panel>
 
@@ -161,7 +162,8 @@ export default function OrderDetail() {
               <div className="flex justify-between"><dt className="text-muted">{t('cart.subtotal')}</dt><dd className="tabular">{formatMoney(o.subtotal, lang)}</dd></div>
               {o.platformDiscount > 0 && <div className="rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900">{t('order.platformDiscount', { v: formatMoney(o.platformDiscount, lang) })}</div>}
               {o.discount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')} {o.coupon && <span className="rounded bg-success/10 px-1.5 py-0.5 font-mono text-xs" dir="ltr">{o.coupon}</span>}</dt><dd className="tabular">−{formatMoney(o.discount, lang)}</dd></div>}
-              <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{o.shipping ? formatMoney(o.shipping, lang) : t('common.free')}</dd></div>
+              <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{o.shippingFree ? t('common.free') : o.deliveryGroup ? t('cart.sharedDelivery') : o.shipping ? formatMoney(o.shipping, lang) : t('cart.sharedDelivery')}</dd></div>
+              {o.deliveryBy === 'platform' && o.shippingFree ? <p className="rounded-lg bg-brand/5 p-3 text-xs leading-5 text-muted">{o.shippingSponsorDue == null ? t('orders.shippingSponsorPending') : t('orders.shippingSponsorDue', { v: formatMoney(o.shippingSponsorDue, lang) })}</p> : o.deliveryGroup && <p className="rounded-lg bg-brand/5 p-3 text-xs leading-5 text-muted">{t('orders.marketplaceFeeNote')}</p>}
               <div className="flex justify-between pt-1 text-lg font-semibold"><dt>{t('cart.total')}</dt><dd className="tabular">{formatMoney(o.total, lang)}</dd></div>
             </dl>
             <div className="mt-4 flex items-center gap-3 rounded-xl bg-surface p-3 text-sm"><Banknote className="h-5 w-5 text-brand" /><span className="font-medium">{t('checkout.cod')}</span></div>

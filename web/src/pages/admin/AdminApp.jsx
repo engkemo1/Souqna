@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X } from 'lucide-react';
+import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -13,6 +13,7 @@ const NAV_GROUPS = [
   { label: 'الرئيسية', items: [{ to: '/admin', end: true, icon: LayoutDashboard, label: 'نظرة عامة' }] },
   { label: 'إدارة السوق', items: [
     { to: '/admin/stores', icon: Store, label: 'المحلات' },
+    { to: '/admin/subscriptions', icon: CreditCard, label: 'اشتراكات المحلات' },
     { to: '/admin/departments', icon: Tags, label: 'الأقسام' },
     { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
     { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
@@ -21,6 +22,8 @@ const NAV_GROUPS = [
   { label: 'الطلبات والتشغيل', items: [
     { to: '/admin/orders', icon: ShoppingBag, label: 'الطلبات' },
     { to: '/admin/deliveries', icon: Truck, label: 'التوصيل', badge: 'open' },
+    { to: '/admin/delivery-rates', icon: MapPin, label: 'رسوم المناطق' },
+    { to: '/admin/delivery-people', icon: Users, label: 'أفراد الدليفري' },
     { to: '/admin/services', icon: Camera, label: 'الخدمات', badge: 'services' },
     { to: '/admin/sourcing', icon: PackagePlus, label: 'طلبات من برّه', badge: 'sourcing' },
   ] },
@@ -81,6 +84,7 @@ function useDeliveryAlerts() {
   const [recent, setRecent] = useState([]);
   const [sound, setSound] = useState(() => { try { return localStorage.getItem('bo.adminSound') !== '0'; } catch { return true; } });
   const since = useRef(null);
+  const seenReadyEvents = useRef(new Set());
   const soundRef = useRef(sound);
   soundRef.current = sound;
   const beep = useCallback(() => {
@@ -110,6 +114,24 @@ function useDeliveryAlerts() {
           }
           if (soundRef.current) beep();
         }
+        const newReadyItems = (d.readyItems || []).filter((it) => {
+          const unseen = !seenReadyEvents.current.has(it.event_id);
+          seenReadyEvents.current.add(it.event_id);
+          return since.current && unseen;
+        });
+        if (newReadyItems.length) {
+          for (const it of newReadyItems.slice().reverse()) {
+            const allReady = it.group_ready_count === it.group_count;
+            const text = `${it.store_name} جهّز الطلب #${it.number}`;
+            const description = it.group_count > 1
+              ? (allReady ? 'كل محلات السلة جهّزت الطلبات — السلة جاهزة للاستلام' : `جاهز ${it.group_ready_count} من ${it.group_count} محلات — ننتظر الباقي`)
+              : 'الطلب جاهز للاستلام من المحل';
+            toast({ title: text, description, tone: 'info', duration: 12000 });
+            try { if (document.hidden && Notification?.permission === 'granted') new Notification('طلب جاهز للاستلام 🚚', { body: `${text} — ${description}` }); } catch { /* ignore */ }
+          }
+          if (soundRef.current) beep();
+        }
+        if (seenReadyEvents.current.size > 1000) seenReadyEvents.current = new Set([...seenReadyEvents.current].slice(-500));
         since.current = d.now;
       } catch { /* ignore transient */ }
     };

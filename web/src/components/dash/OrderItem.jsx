@@ -19,12 +19,13 @@ function Thumbs({ images = [], count }) {
 /** Mobile-first order card. */
 export function OrderCard({ o }) {
   const { t, lang, isRtl } = useI18n();
+  const statusT = (key, vars) => o.deliveryBy === 'platform' && o.status === 'processing' && key === 'status.processing' ? t('orders.markReady') : t(key, vars);
   const Chevron = isRtl ? ChevronLeft : ChevronRight;
   return (
     <Link to={`/dashboard/orders/${o.id}`} className="block rounded-2xl border border-line bg-elevated p-4 transition active:scale-[.99] hover:border-line-strong">
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-sm font-semibold" dir="ltr">#{o.number}</span>
-        <span className="flex items-center gap-1.5">{o.deliveryBy === 'platform' && <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-brand">{t('orders.byPlatformShort')}</span>}<StatusBadge status={o.status} t={t} /></span>
+        <span className="flex items-center gap-1.5">{o.deliveryBy === 'platform' && <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-brand">{t('orders.byPlatformShort')}</span>}<StatusBadge status={o.status} t={statusT} /></span>
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
@@ -44,6 +45,7 @@ export function OrderCard({ o }) {
 /** Desktop table row. */
 export function OrderRow({ o }) {
   const { t, lang } = useI18n();
+  const statusT = (key, vars) => o.deliveryBy === 'platform' && o.status === 'processing' && key === 'status.processing' ? t('orders.markReady') : t(key, vars);
   return (
     <tr className="group cursor-pointer transition hover:bg-fg/[0.025]">
       <td className="py-3.5 ps-5"><Link to={`/dashboard/orders/${o.id}`} className="font-mono text-sm font-semibold after:absolute after:inset-0" dir="ltr">#{o.number}</Link></td>
@@ -51,7 +53,7 @@ export function OrderRow({ o }) {
       <td className="py-3.5 text-sm text-muted"><p>{formatDate(o.createdAt, lang, { day: 'numeric', month: 'short' })}</p><p className="text-xs">{formatTime(o.createdAt, lang)}</p></td>
       <td className="py-3.5"><Thumbs images={o.images} count={o.itemsCount} /></td>
       <td className="py-3.5 font-semibold tabular">{formatMoney(o.total, lang)}</td>
-      <td className="py-3.5 pe-5"><StatusBadge status={o.status} t={t} /></td>
+      <td className="py-3.5 pe-5"><StatusBadge status={o.status} t={statusT} /></td>
     </tr>
   );
 }

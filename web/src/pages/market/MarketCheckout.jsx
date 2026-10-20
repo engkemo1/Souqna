@@ -25,6 +25,8 @@ export default function MarketCheckout() {
   const [saved, setSaved] = useLocalState('souqna.customer', { name: '', phone: '', governorate: 'Qalyubia', city: ar ? 'بنها' : 'Banha', address: '' });
   const [form, setForm] = useState({ ...saved, notes: '' });
   const [quotes, setQuotes] = useState(null);
+  const [deliveryQuote, setDeliveryQuote] = useState(null);
+  const [quoteVersion, setQuoteVersion] = useState(0);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const groups = useMemo(() => Object.values(cart.items.reduce((acc, line) => {
@@ -36,20 +38,33 @@ export default function MarketCheckout() {
   useEffect(() => {
     let alive = true;
     if (!groups.length) { setQuotes(null); return () => { alive = false; }; }
-    setQuotes(null); setError('');
+    setQuotes(null);
     Promise.all(groups.map(async (group) => {
       const quote = await api(`/stores/${group.slug}/quote`, { method: 'POST', body: { items: group.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })) } });
       return [group.slug, quote];
     })).then((rows) => { if (alive) setQuotes(Object.fromEntries(rows)); })
       .catch(() => { if (alive) setError(ar ? 'مش قادرين نراجع الأسعار والتوفر دلوقتي. جرّب تاني.' : 'We could not verify prices and availability. Please try again.'); });
     return () => { alive = false; };
-  }, [groupKey, ar]);
+  }, [groupKey, ar, quoteVersion]);
 
-  const set = (key) => (event) => setForm((f) => ({ ...f, [key]: event.target.value }));
+  useEffect(() => {
+    let alive = true;
+    if (!groups.length || form.city.trim().length < 2) { setDeliveryQuote(null); return () => { alive = false; }; }
+    setDeliveryQuote(null);
+    const timer = setTimeout(() => {
+      api('/marketplace/delivery-fee', { method: 'POST', body: { governorate: form.governorate, city: form.city.trim(), stores: groups.map((g) => ({ slug: g.slug, items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })) })) } })
+        .then((fee) => { if (alive) setDeliveryQuote(fee); })
+        .catch(() => { if (alive) setError(ar ? 'مش قادرين نحدد رسوم التوصيل للمنطقة دي. جرّب تاني.' : 'We could not calculate delivery for this area. Please try again.'); });
+    }, 300);
+    return () => { alive = false; clearTimeout(timer); };
+  }, [groupKey, ar, form.governorate, form.city, quoteVersion]);
+
+  const set = (key) => (event) => { setError(''); setForm((f) => ({ ...f, [key]: event.target.value })); };
   const quoteRows = groups.map((g) => ({ group: g, quote: quotes?.[g.slug] }));
   const hasErrors = quoteRows.some(({ quote }) => quote?.hasErrors);
   const subtotal = quoteRows.reduce((sum, row) => sum + (row.quote?.subtotal || 0), 0);
-  const shipping = quoteRows.reduce((sum, row) => sum + (row.quote?.shipping || 0), 0);
+  const needsDeliveryFee = quoteRows.some(({ quote }) => (quote?.shipping || 0) > 0);
+  const shipping = needsDeliveryFee ? (deliveryQuote?.fee || 0) : 0;
   const total = subtotal + shipping;
 
   const placeOrder = async (event) => {
@@ -57,11 +72,12 @@ export default function MarketCheckout() {
     if (form.name.trim().length < 2 || !PHONE.test(form.phone.trim()) || !form.city.trim() || form.address.trim().length < 6) {
       setError(ar ? 'راجع الاسم ورقم الموبايل والمدينة والعنوان، واكتب رقم موبايل مصري صحيح.' : 'Please check your name, Egyptian mobile number, city and address.'); return;
     }
-    if (!quotes || hasErrors) { setError(ar ? 'في منتج اتغير توفره أو سعره. راجع السلة وحاول تاني.' : 'An item changed in price or availability. Review your basket and try again.'); return; }
+    if (!quotes || !deliveryQuote || hasErrors) { setError(ar ? 'راجع توفر المنتجات ورسوم التوصيل للمنطقة، وحاول تاني.' : 'Review item availability and delivery fee for this area, then try again.'); return; }
     setBusy(true);
     try {
       const result = await api('/marketplace/orders', { method: 'POST', body: {
         name: form.name.trim(), phone: form.phone.trim(), governorate: form.governorate, city: form.city.trim(), address: form.address.trim(), notes: form.notes.trim(),
+        expectedShipping: shipping, expectedTotal: total,
         stores: groups.map((g) => ({ slug: g.slug, items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })) })),
       } });
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
@@ -69,7 +85,8 @@ export default function MarketCheckout() {
       cart.clear();
       navigate('/market-order-success', { replace: true, state: { orders: result.orders, name: form.name.split(' ')[0] } });
     } catch (e) {
-      setError(e.code === 'cart_changed' ? (ar ? 'في منتج خلص أو اتغيرت كميته. حدّث السلة وحاول تاني.' : 'An item sold out or its stock changed. Update your basket and try again.') : (ar ? 'الطلب ماكملش. راجع البيانات وحاول تاني.' : 'The order could not be completed. Please check your details and try again.'));
+      if (e.code === 'delivery_fee_changed' || e.code === 'cart_changed') setQuoteVersion((version) => version + 1);
+      setError(e.code === 'delivery_fee_changed' ? (ar ? 'الإجمالي اتغيّر بعد تحديث الأسعار. راجع المبلغ الجديد وأكّد تاني.' : 'The total changed after prices were updated. Review the new amount and confirm again.') : e.code === 'cart_changed' ? (ar ? 'في منتج خلص أو اتغيرت كميته. حدّث السلة وحاول تاني.' : 'An item sold out or its stock changed. Update your basket and try again.') : (ar ? 'الطلب ماكملش. راجع البيانات وحاول تاني.' : 'The order could not be completed. Please check your details and try again.'));
       setBusy(false);
     }
   };
@@ -89,14 +106,14 @@ export default function MarketCheckout() {
           <Field label={ar ? 'العنوان بالتفصيل' : 'Full address'} className="sm:col-span-2"><Textarea rows={2} autoComplete="street-address" value={form.address} onChange={set('address')} required minLength={6} /></Field>
           <Field label={ar ? 'ملاحظات' : 'Notes'} className="sm:col-span-2"><Textarea rows={2} value={form.notes} onChange={set('notes')} /></Field>
         </div></section>
-        <section className="flex items-center gap-4 rounded-3xl border-2 border-fg bg-elevated p-4"><Banknote className="h-6 w-6 shrink-0" /><span><strong className="block">{ar ? 'الدفع عند الاستلام' : 'Cash on delivery'}</strong><span className="text-sm text-muted">{ar ? 'هتدفعي لكل طلب عند استلام شحنته.' : 'Pay for each store order when its package arrives.'}</span></span></section>
+        <section className="flex items-center gap-4 rounded-3xl border-2 border-fg bg-elevated p-4"><Banknote className="h-6 w-6 shrink-0" /><span><strong className="block">{ar ? 'الدفع عند الاستلام' : 'Cash on delivery'}</strong><span className="text-sm text-muted">{ar ? 'هتدفعي إجمالي طلبك مرة واحدة لمندوب Twist.' : 'Pay the order total once to the Twist courier.'}</span></span></section>
         {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
-        <Button type="submit" size="lg" full loading={busy} disabled={!quotes || hasErrors}>{groups.length > 1 ? (ar ? `تأكيد ${groups.length} طلبات · ${formatMoney(total, lang)}` : `Confirm ${groups.length} orders · ${formatMoney(total, lang)}`) : (ar ? `تأكيد الطلب · ${formatMoney(total, lang)}` : `Place order · ${formatMoney(total, lang)}`)}</Button>
+        <Button type="submit" size="lg" full loading={busy} disabled={!quotes || !deliveryQuote || hasErrors}>{groups.length > 1 ? (ar ? `تأكيد ${groups.length} طلبات · ${formatMoney(total, lang)}` : `Confirm ${groups.length} orders · ${formatMoney(total, lang)}`) : (ar ? `تأكيد الطلب · ${formatMoney(total, lang)}` : `Place order · ${formatMoney(total, lang)}`)}</Button>
         <p className="flex items-center justify-center gap-2 text-xs text-muted"><Lock className="h-3.5 w-3.5" />{ar ? 'كل محل هيستلم طلبه ويديره بشكل منفصل.' : 'Each store receives and manages its own order.'}</p>
       </form>
       <aside className="h-fit rounded-3xl border border-line bg-elevated p-5 sm:p-6 lg:sticky lg:top-24 lg:col-span-5"><h2 className="mb-5 flex items-center gap-2 font-semibold"><ShoppingBag className="h-5 w-5" />{ar ? 'ملخص الطلبات' : 'Order summary'}</h2>
-        <div className="space-y-5">{quoteRows.map(({ group, quote }) => <section key={group.slug} className="border-b border-line pb-4 last:border-0"><h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Store className="h-4 w-4" />{group.name?.[lang] || group.name?.ar || group.slug}</h3><div className="flex justify-between text-sm"><span className="text-muted">{ar ? 'المنتجات' : 'Items'}</span><span>{quote ? formatMoney(quote.subtotal, lang) : '…'}</span></div><div className="mt-1 flex justify-between text-sm"><span className="text-muted">{ar ? 'الشحن' : 'Shipping'}</span><span>{!quote ? '…' : quote.shipping ? formatMoney(quote.shipping, lang) : (ar ? 'مجاني' : 'Free')}</span></div>{group.items.slice(0, 3).map((line) => <div key={line.key} className="mt-3 flex items-center gap-3"><SmartImage media={line.image} ratio="4 / 5" sizes="40px" className="w-10 rounded-lg" /><span className="min-w-0 flex-1 truncate text-xs">{line.name?.[lang] || line.name?.ar || line.name} × {line.qty}</span><span className="text-xs">{formatMoney(line.price * line.qty, lang)}</span></div>)}{quote?.hasErrors && <p className="mt-2 text-xs font-medium text-sale">{ar ? 'في منتج غير متاح أو كميته أكبر من المخزون.' : 'An item is unavailable or exceeds stock.'}</p>}</section>)}</div>
-        <div className="mt-4 flex justify-between border-t border-line pt-4 text-lg font-bold"><span>{ar ? 'الإجمالي' : 'Total'}</span><span>{quotes ? formatMoney(total, lang) : '…'}</span></div><p className="mt-2 text-xs leading-5 text-muted">{ar ? 'الشحن بيتحسب منفصل لكل محل. أكواد الخصم الخاصة بالمحلات مش بتتطبق على السلة العامة.' : 'Shipping is calculated per store. Store-specific coupons are not available in the marketplace basket.'}</p>
+        <div className="space-y-5">{quoteRows.map(({ group, quote }) => <section key={group.slug} className="border-b border-line pb-4 last:border-0"><h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Store className="h-4 w-4" />{group.name?.[lang] || group.name?.ar || group.slug}</h3><div className="flex justify-between text-sm"><span className="text-muted">{ar ? 'المنتجات' : 'Items'}</span><span>{quote ? formatMoney(quote.subtotal, lang) : '…'}</span></div>{quote && <p className="mt-1 text-xs text-muted">{quote.shipping === 0 ? (ar ? 'المحل مؤهل للشحن المجاني؛ قد تظل هناك رسوم واحدة لمحلات أخرى في السلة.' : 'This store qualifies for free shipping; another store may still make one shared basket fee.') : (ar ? 'المحل لم يصل لحد الشحن المجاني؛ رسوم التوصيل تُحسب مرة واحدة للسلة كلها.' : 'This store has not reached its free-shipping threshold; delivery is charged once for the whole basket.')}</p>}{group.items.slice(0, 3).map((line) => { const current = quote?.lines?.find((item) => item.productId === line.productId && (item.variantId || null) === (line.variantId || null)); return <div key={line.key} className="mt-3 flex items-center gap-3"><SmartImage media={line.image} ratio="4 / 5" sizes="40px" className="w-10 rounded-lg" /><span className="min-w-0 flex-1 truncate text-xs">{line.name?.[lang] || line.name?.ar || line.name} × {line.qty}</span><span className="text-xs">{formatMoney((current?.price ?? line.price) * line.qty, lang)}</span></div>;})}{quote?.hasErrors && <p className="mt-2 text-xs font-medium text-sale">{ar ? 'في منتج غير متاح أو كميته أكبر من المخزون.' : 'An item is unavailable or exceeds stock.'}</p>}</section>)}</div>
+        <div className="mt-4 space-y-2 border-t border-line pt-4 text-sm"><div className="flex justify-between"><span className="text-muted">{ar ? `توصيل Twist إلى ${form.city || 'منطقتك'} (مرة واحدة)` : `One Twist delivery to ${form.city || 'your area'}`}</span><span>{quotes && deliveryQuote ? (shipping ? formatMoney(shipping, lang) : (ar ? 'مجاني' : 'Free')) : '…'}</span></div><div className="flex justify-between text-lg font-bold"><span>{ar ? 'الإجمالي' : 'Total'}</span><span>{quotes && deliveryQuote ? formatMoney(total, lang) : '…'}</span></div></div>{deliveryQuote && !deliveryQuote.matched && needsDeliveryFee && <p className="mt-2 text-xs text-amber-700">{ar ? 'المنطقة دي مش مسجلة بالتحديد؛ استخدمنا السعر الأساسي للتوصيل.' : 'This area has no specific rate yet; the configured base delivery fee is used.'}</p>}<p className="mt-2 text-xs leading-5 text-muted">{ar ? 'دي رسوم رحلة واحدة، وبتقل بنصيب المحلات المؤهلة للشحن المجاني. لو كل المحلات مؤهلة، مش هتدفع شحن. كل محل يجهز طلبه بشكل مستقل وTwist توصلهم معًا.' : 'This is one route fee, reduced by the shares of stores that qualify for free shipping. If every store qualifies, you pay no delivery fee. Each store prepares its items and Twist delivers them together.'}</p>
       </aside>
     </div>
   </main></div>;

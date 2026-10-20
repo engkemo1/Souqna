@@ -183,10 +183,14 @@ CREATE TABLE IF NOT EXISTS orders (
   governorate TEXT, city TEXT, address TEXT, notes TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   delivery_by TEXT NOT NULL DEFAULT 'store',
+  delivery_group TEXT,
   handoff_at TEXT,
   payment_method TEXT NOT NULL DEFAULT 'cod',
   subtotal INTEGER NOT NULL, discount INTEGER NOT NULL DEFAULT 0,
   shipping INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL,
+  shipping_free INTEGER NOT NULL DEFAULT 0,
+  courier_cost INTEGER,
+  delivery_person_id INTEGER,
   coupon_code TEXT,
   platform_discount INTEGER NOT NULL DEFAULT 0,
   track_token TEXT,
@@ -249,6 +253,44 @@ CREATE INDEX IF NOT EXISTS idx_service_requests_status ON service_requests(statu
 CREATE TABLE IF NOT EXISTS app_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS store_subscriptions (
+  store_id INTEGER PRIMARY KEY REFERENCES stores(id) ON DELETE CASCADE,
+  monthly_fee_override INTEGER CHECK (monthly_fee_override IS NULL OR monthly_fee_override >= 0),
+  covered_through TEXT,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE TABLE IF NOT EXISTS subscription_periods (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('paid','free')),
+  months INTEGER NOT NULL CHECK (months > 0),
+  amount INTEGER NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  covered_from TEXT NOT NULL,
+  covered_through TEXT NOT NULL,
+  payment_method TEXT,
+  note TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_subscription_periods_store ON subscription_periods(store_id, id DESC);
+
+CREATE TABLE IF NOT EXISTS delivery_rates (
+  id INTEGER PRIMARY KEY,
+  governorate TEXT NOT NULL,
+  city TEXT NOT NULL DEFAULT '',
+  fee INTEGER NOT NULL CHECK (fee >= 0 AND fee <= 5000),
+  distance_km REAL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(governorate, city)
+);
+
+CREATE TABLE IF NOT EXISTS delivery_people (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  phone TEXT NOT NULL UNIQUE,
+  active INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
 CREATE TABLE IF NOT EXISTS push_subscriptions (
