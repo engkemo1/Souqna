@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS stores (
   auto_whatsapp INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   hidden INTEGER NOT NULL DEFAULT 0,
+  delivery_zone TEXT NOT NULL DEFAULT '',
   search_indexable INTEGER NOT NULL DEFAULT 1,
   map_url TEXT,
   opens_at TEXT, closes_at TEXT, day_off INTEGER,
@@ -184,13 +185,19 @@ CREATE TABLE IF NOT EXISTS orders (
   status TEXT NOT NULL DEFAULT 'pending',
   delivery_by TEXT NOT NULL DEFAULT 'store',
   delivery_group TEXT,
+  delivery_route_id TEXT,
+  delivery_mode TEXT NOT NULL DEFAULT 'pooled' CHECK (delivery_mode IN ('pooled','split')),
+  delivery_fee_status TEXT NOT NULL DEFAULT 'confirmed' CHECK (delivery_fee_status IN ('pending','offered','confirmed','rejected')),
   handoff_at TEXT,
   payment_method TEXT NOT NULL DEFAULT 'cod',
   subtotal INTEGER NOT NULL, discount INTEGER NOT NULL DEFAULT 0,
   shipping INTEGER NOT NULL DEFAULT 0, total INTEGER NOT NULL,
+  delivery_fee_quote INTEGER CHECK (delivery_fee_quote IS NULL OR delivery_fee_quote >= 0),
   shipping_free INTEGER NOT NULL DEFAULT 0,
   courier_cost INTEGER,
   delivery_person_id INTEGER,
+  delivery_sponsor_share INTEGER NOT NULL DEFAULT 0 CHECK (delivery_sponsor_share >= 0),
+  delivery_sponsor_collected INTEGER NOT NULL DEFAULT 0 CHECK (delivery_sponsor_collected IN (0,1)),
   coupon_code TEXT,
   platform_discount INTEGER NOT NULL DEFAULT 0,
   track_token TEXT,
@@ -454,3 +461,131 @@ CREATE TABLE IF NOT EXISTS shared_looks (
   kind TEXT NOT NULL DEFAULT 'look',  -- 'look' (from Moda) | 'visual' (results of a photo search)
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+-- Which cashier/POS system each store uses (set by the platform admin). Recording only: no sync runs from this table yet.
+CREATE TABLE IF NOT EXISTS store_cashier_links (
+  store_id INTEGER PRIMARY KEY REFERENCES stores(id) ON DELETE CASCADE,
+  cashier_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('none','pending','active','paused')),
+  note TEXT NOT NULL DEFAULT '',
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- A store's private key for pushing stock/sales from its own cashier. Only a SHA-256 hash is stored.
+CREATE TABLE IF NOT EXISTS store_cashier_keys (
+  store_id INTEGER PRIMARY KEY REFERENCES stores(id) ON DELETE CASCADE,
+  key_hash TEXT NOT NULL UNIQUE,
+  key_prefix TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  last_used_at TEXT
+);
+-- One row per file import or API call, so the admin can see what changed and what failed.
+CREATE TABLE IF NOT EXISTS cashier_sync_log (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  source TEXT NOT NULL,            -- 'file' | 'api'
+  kind TEXT NOT NULL,              -- 'stock' | 'sale' | 'return'
+  ok INTEGER NOT NULL DEFAULT 1,
+  matched INTEGER NOT NULL DEFAULT 0,
+  updated INTEGER NOT NULL DEFAULT 0,
+  unmatched INTEGER NOT NULL DEFAULT 0,
+  message TEXT NOT NULL DEFAULT '',
+  details_json TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_cashier_sync_log_store ON cashier_sync_log(store_id, id DESC);
+-- Sales/returns already applied, keyed by the cashier's own id so a retry never deducts stock twice.
+CREATE TABLE IF NOT EXISTS cashier_events (
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  external_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (store_id, external_id)
+);
+
+-- Payments for the cashier add-on (independent of the main Twist subscription).
+CREATE TABLE IF NOT EXISTS cashier_subscription_periods (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  months INTEGER NOT NULL CHECK (months > 0),
+  amount INTEGER NOT NULL DEFAULT 0 CHECK (amount >= 0),
+  covered_from TEXT NOT NULL,
+  covered_through TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_cashier_sub_store ON cashier_subscription_periods(store_id, id DESC);
+
+-- ---------------------------------------------------------------- Twist cashier (POS)
+-- Invoices are never edited or deleted. A return is its own record.
+CREATE TABLE IF NOT EXISTS pos_sales (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  uuid TEXT NOT NULL,                       -- made on the device, so a retry never makes a second invoice
+  number INTEGER NOT NULL,                  -- official invoice number, per store, assigned by the server
+  local_no TEXT NOT NULL DEFAULT '',        -- the temporary number printed while offline
+  subtotal INTEGER NOT NULL,
+  discount INTEGER NOT NULL DEFAULT 0,
+  total INTEGER NOT NULL,
+  paid INTEGER NOT NULL,
+  change_due INTEGER NOT NULL DEFAULT 0,
+  cashier_name TEXT NOT NULL DEFAULT '',
+  customer_name TEXT NOT NULL DEFAULT '',
+  customer_phone TEXT NOT NULL DEFAULT '',
+  note TEXT NOT NULL DEFAULT '',
+  device_at TEXT NOT NULL,                  -- when the sale really happened (device clock)
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(store_id, uuid),
+  UNIQUE(store_id, number)
+);
+CREATE INDEX IF NOT EXISTS idx_pos_sales_day ON pos_sales(store_id, device_at);
+
+CREATE TABLE IF NOT EXISTS pos_sale_items (
+  id INTEGER PRIMARY KEY,
+  sale_id INTEGER NOT NULL REFERENCES pos_sales(id) ON DELETE CASCADE,
+  product_id INTEGER, variant_id INTEGER,
+  name TEXT NOT NULL, color TEXT NOT NULL DEFAULT '', size TEXT NOT NULL DEFAULT '',
+  sku TEXT NOT NULL DEFAULT '', barcode TEXT NOT NULL DEFAULT '',
+  price INTEGER NOT NULL, qty INTEGER NOT NULL, discount INTEGER NOT NULL DEFAULT 0,
+  returned_qty INTEGER NOT NULL DEFAULT 0,
+  oversold INTEGER NOT NULL DEFAULT 0       -- 1 = stock on the server was lower than what was sold
+);
+CREATE INDEX IF NOT EXISTS idx_pos_items_sale ON pos_sale_items(sale_id);
+
+CREATE TABLE IF NOT EXISTS pos_payments (
+  id INTEGER PRIMARY KEY,
+  sale_id INTEGER NOT NULL REFERENCES pos_sales(id) ON DELETE CASCADE,
+  method TEXT NOT NULL CHECK (method IN ('cash','card','wallet')),
+  amount INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS pos_returns (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  sale_id INTEGER NOT NULL REFERENCES pos_sales(id) ON DELETE CASCADE,
+  uuid TEXT NOT NULL,
+  refund INTEGER NOT NULL,
+  method TEXT NOT NULL DEFAULT 'cash',
+  reason TEXT NOT NULL DEFAULT '',
+  cashier_name TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(store_id, uuid)
+);
+CREATE TABLE IF NOT EXISTS pos_return_items (
+  id INTEGER PRIMARY KEY,
+  return_id INTEGER NOT NULL REFERENCES pos_returns(id) ON DELETE CASCADE,
+  sale_item_id INTEGER NOT NULL REFERENCES pos_sale_items(id) ON DELETE CASCADE,
+  qty INTEGER NOT NULL, amount INTEGER NOT NULL
+);
+
+-- Every stock change made by the cashier, so a number can always be explained.
+CREATE TABLE IF NOT EXISTS stock_movements (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  product_id INTEGER NOT NULL, variant_id INTEGER,
+  delta INTEGER NOT NULL,
+  reason TEXT NOT NULL,                     -- 'pos_sale' | 'pos_return'
+  ref TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_stock_mov ON stock_movements(store_id, id DESC);

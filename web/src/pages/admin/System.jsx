@@ -8,6 +8,7 @@ import { ErrorState } from '../../components/ui/States.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useAdminApi, adminApi, adminUpload, adminKey, adminSession, fmtDateTime, fmtMoney } from './adminApi.js';
 import { useSearchParams } from 'react-router-dom';
+import CashierTools from './CashierTools.jsx';
 
 const uptime = (s) => { const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60); return [d && `${d} يوم`, h && `${h} ساعة`, `${m} دقيقة`].filter(Boolean).join(' ') ; };
 
@@ -799,10 +800,75 @@ function ResourcePanel() {
   );
 }
 
+const LINK_STATUS_AR = { none: 'غير مربوط', pending: 'قيد التجهيز', active: 'مفعّل', paused: 'موقوف' };
+
+function StoreCashierRow({ link, systems, onSaved }) {
+  const toast = useToast();
+  const [f, setF] = useState({ cashierId: link.cashierId || '', status: link.cashier_id || link.cashierId ? link.status : 'pending', note: link.note || '' });
+  const [saving, setSaving] = useState(false);
+  const [tools, setTools] = useState(false);
+  const dirty = f.cashierId !== (link.cashierId || '') || f.note !== (link.note || '') || (f.cashierId && f.status !== link.status);
+  const system = systems.find((c) => c.id === f.cashierId);
+  const save = async () => {
+    setSaving(true);
+    try {
+      await adminApi(`/cashier-sync/stores/${link.slug}`, { method: 'PUT', body: { cashierId: f.cashierId || null, status: f.status, note: f.note } });
+      toast({ title: 'تم الحفظ' }); onSaved();
+    } catch (x) { toast({ tone: 'error', title: x.message }); } finally { setSaving(false); }
+  };
+  return (
+    <div className="grid gap-2 rounded-xl border border-fg/10 p-3 md:grid-cols-[1.2fr_1.4fr_1fr_1.6fr_auto] md:items-end">
+      <div><p className="font-medium">{link.storeName}</p><p className="text-xs text-muted" dir="ltr">{link.slug}</p>{link.cashierId && <p className="text-xs text-muted">الاشتراك: {({ off: 'غير مفعّل', pending: 'قيد التجهيز', paused: 'موقوف', active: 'ساري', grace: 'فترة سماح', expired: 'منتهي' })[link.state] || link.state}{link.endsAt ? ` حتى ${link.endsAt}` : ''}</p>}</div>
+      <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">نظام الكاشير</span>
+        <Select value={f.cashierId} onChange={(e) => setF({ ...f, cashierId: e.target.value })}>
+          <option value="">بدون</option>
+          {systems.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </Select></label>
+      <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">الحالة</span>
+        <Select value={f.status} disabled={!f.cashierId} onChange={(e) => setF({ ...f, status: e.target.value })}>
+          {['pending', 'active', 'paused'].map((k) => <option key={k} value={k}>{LINK_STATUS_AR[k]}</option>)}
+        </Select></label>
+      <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">ملاحظة</span>
+        <Input value={f.note} maxLength={300} placeholder={system?.id === 'other' ? 'اسم البرنامج' : system?.note || ''} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>
+      <div className="flex gap-2">
+        <Button size="sm" loading={saving} disabled={!dirty} onClick={save}>حفظ</Button>
+        <Button size="sm" variant="outline" onClick={() => setTools((v) => !v)}>{tools ? 'إخفاء' : 'إدارة الربط'}</Button>
+      </div>
+      {tools && <CashierTools slug={link.slug} link={link} onSaved={onSaved} />}
+    </div>
+  );
+}
+
+function CashierSyncPanel() {
+  const toast = useToast();
+  const { data, loading, reload } = useAdminApi('/cashier-sync');
+  return (
+    <>
+      <Panel title="ربط أنظمة الكاشير" subtitle="تحكم في إتاحة ميزة المزامنة على المنصة" className="lg:col-span-3">
+        <div className="space-y-4">
+          <Switch checked={!!data?.enabled} disabled={loading || !data} onChange={async (enabled) => {
+            try { await adminApi('/cashier-sync', { method: 'PUT', body: { enabled } }); toast({ title: enabled ? 'تم تسجيل قرار الإطلاق' : 'تم إيقاف الإتاحة' }); reload(); }
+            catch (x) { toast({ tone: 'error', title: x.message }); }
+          }} label="قرار إطلاق الميزة" description="المفتاح مقفول افتراضياً. تغييره يسجل قرار الإطلاق فقط؛ لن تظهر للتجار أو تبدأ المزامنة قبل تنفيذ موصل مدعوم." />
+          <p className="rounded-xl bg-fg/[0.04] p-3 text-sm text-muted">حالة التنفيذ: {data?.ready ? 'جاهز' : 'لا توجد موصلات كاشير أو استيراد ملفات منفذة بعد'}. استيراد الملفات ومفتاح الربط شغّالين لأي برنامج كاشير. باقي الأنظمة في القائمة موصلاتها المباشرة لسه قيد التنفيذ، وتتربط في الوقت ده بملف أو مفتاح.</p>
+        </div>
+      </Panel>
+      <Panel title="كاشير كل محل" subtitle="اختر البرنامج اللي بيستخدمه المحل، وهنظبط الموصل المناسب له في الكود" className="lg:col-span-3">
+        {!data ? <Skeleton className="h-40 w-full rounded-2xl" /> : (
+          <div className="space-y-2">
+            {data.links.length === 0 && <p className="text-sm text-muted">لا توجد محلات.</p>}
+            {data.links.map((l) => <StoreCashierRow key={`${l.slug}:${l.cashierId}:${l.status}:${l.note}`} link={l} systems={data.systems} onSaved={reload} />)}
+          </div>
+        )}
+      </Panel>
+    </>
+  );
+}
+
 export default function System() {
   const [searchParams] = useSearchParams();
   const requestedSection = searchParams.get('section');
-  const section = ['moda', 'visual', 'security'].includes(requestedSection) ? requestedSection : 'security';
+  const section = ['moda', 'visual', 'security', 'cashier'].includes(requestedSection) ? requestedSection : 'security';
   const { data, error, loading, reload } = useAdminApi('/status');
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
   const required = (data?.checks || []).filter((c) => !c.optional);
@@ -810,8 +876,8 @@ export default function System() {
   return (
     <div>
       <PageHeader
-        title={section === 'moda' ? 'المساعد الذكي' : section === 'visual' ? 'البحث المرئي' : 'السيرفر والنسخ'}
-        subtitle={section === 'moda' ? 'إعداداته، اقتراحاته، ومراجعتها وتعليمه' : section === 'visual' ? 'إعدادات البحث بالصور' : 'جاهزية الموقع، النسخ الاحتياطي، وحالة التشغيل'}
+        title={section === 'moda' ? 'المساعد الذكي' : section === 'visual' ? 'البحث المرئي' : section === 'cashier' ? 'ربط أنظمة الكاشير' : 'السيرفر والنسخ'}
+        subtitle={section === 'moda' ? 'إعداداته، اقتراحاته، ومراجعتها وتعليمه' : section === 'visual' ? 'إعدادات البحث بالصور' : section === 'cashier' ? 'إتاحة الميزة ومتابعة جاهزيتها' : 'جاهزية الموقع، النسخ الاحتياطي، وحالة التشغيل'}
       />
       {loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : (
         <div className="grid gap-4 lg:grid-cols-3">
@@ -837,6 +903,7 @@ export default function System() {
           </Panel>
           </>}
           {section === 'visual' && <VisualPanel />}
+          {section === 'cashier' && <CashierSyncPanel />}
           {section === 'moda' && <>
           <StylistPanel />
           <ModaPromptsPanel />

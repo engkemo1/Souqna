@@ -1,31 +1,74 @@
-/* Twist service worker: offline fallback, reusable public images, and order push notifications.
- * API responses are deliberately left to the network so prices, stock, carts, and orders stay live. */
-const VERSION = 'bo-sw-v4';
+/* Twist service worker: offline fallback, reusable public images, order push notifications, and the offline cashier.
+ * API responses are deliberately left to the network so prices, stock, carts, and orders stay live.
+ * The cashier (/pos) is the one screen that must open with no internet at all, so its page and its hashed build files are kept. */
+const VERSION = 'bo-sw-v5';
 const IMAGE_CACHE = 'bo-images-v1';
+const ASSET_CACHE = 'bo-assets-v1';
+const SHELL_CACHE = 'bo-shell-v1';
+const KEEP = [VERSION, IMAGE_CACHE, ASSET_CACHE, SHELL_CACHE];
 const MAX_CACHED_IMAGES = 180;
+const MAX_CACHED_ASSETS = 400;
 const OFFLINE = '/offline.html';
+const POS_SHELL = '/pos';
+const isPos = (pathname) => pathname === '/pos' || pathname.startsWith('/pos/');
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.add(OFFLINE)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
   e.waitUntil(caches.keys()
-    .then((keys) => Promise.all(keys.filter((k) => k.startsWith('bo-') && k !== VERSION && k !== IMAGE_CACHE).map((k) => caches.delete(k))))
+    .then((keys) => Promise.all(keys.filter((k) => k.startsWith('bo-') && !KEEP.includes(k)).map((k) => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
+
+async function trim(cache, max) {
+  const keys = await cache.keys();
+  if (keys.length > max) await Promise.all(keys.slice(0, keys.length - max).map((k) => cache.delete(k)));
+}
+
+/** The cashier page: network first (so a new deploy shows up), but never wait long on a bad connection. */
+async function posShell(req) {
+  const cache = await caches.open(SHELL_CACHE);
+  const cached = await cache.match(POS_SHELL);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), cached ? 3500 : 15000);
+  try {
+    const res = await fetch(req, { signal: ctrl.signal });
+    clearTimeout(timer);
+    if (res.ok && (res.headers.get('content-type') || '').includes('text/html')) cache.put(POS_SHELL, res.clone()).catch(() => {});
+    return res;
+  } catch {
+    clearTimeout(timer);
+    return cached || (await caches.match(OFFLINE)) || Response.error();
+  }
+}
+
+/** Build files have a hash in their name, so a cached copy is always the right copy. */
+async function hashedAsset(req) {
+  const cache = await caches.open(ASSET_CACHE);
+  const hit = await cache.match(req);
+  if (hit) return hit;
+  const res = await fetch(req);
+  if (res.ok) { cache.put(req, res.clone()).then(() => trim(cache, MAX_CACHED_ASSETS)).catch(() => {}); }
+  return res;
+}
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
+  const url = new URL(req.url);
 
   if (req.mode === 'navigate') {
+    if (url.origin === self.location.origin && isPos(url.pathname)) { e.respondWith(posShell(req)); return; }
     e.respondWith(fetch(req).catch(() => caches.match(OFFLINE)));
     return;
   }
 
+  if (url.origin === self.location.origin && url.pathname.startsWith('/assets/')) { e.respondWith(hashedAsset(req)); return; }
+
   // Product images have immutable, unique media URLs. Keep only public image GETs,
   // with no query string or authorization header, so signed/private URLs are excluded.
   if (req.destination === 'image' && !req.headers.has('authorization') && !req.headers.has('range')) {
-    const url = new URL(req.url);
     if (url.protocol !== 'https:' || url.search) return;
     e.respondWith((async () => {
       let cache;
@@ -44,15 +87,31 @@ self.addEventListener('fetch', (e) => {
       if (response.ok || response.type === 'opaque') {
         try {
           await cache.put(req, response.clone());
-          const keys = await cache.keys();
-          if (keys.length > MAX_CACHED_IMAGES) {
-            await Promise.all(keys.slice(0, keys.length - MAX_CACHED_IMAGES).map((key) => cache.delete(key)));
-          }
+          await trim(cache, MAX_CACHED_IMAGES);
         } catch { /* keep the network response usable if storage is unavailable */ }
       }
       return response;
     })());
   }
+});
+
+/* The page that is open when the worker first takes control has already loaded its files without us.
+ * The cashier screen sends us what it loaded so the very first visit is enough to work offline afterwards. */
+self.addEventListener('message', (e) => {
+  const d = e.data || {};
+  if (d.type !== 'cache-pos') return;
+  const reply = (ok) => { try { e.source?.postMessage({ type: 'pos-cache', ok }); } catch { /* the page went away */ } };
+  e.waitUntil((async () => {
+    try {
+      const assets = await caches.open(ASSET_CACHE);
+      const urls = (d.urls || []).filter((u) => { try { const x = new URL(u, self.location.origin); return x.origin === self.location.origin && x.pathname.startsWith('/assets/'); } catch { return false; } });
+      await Promise.all(urls.map(async (u) => { if (!(await assets.match(u))) { const r = await fetch(u); if (r.ok) await assets.put(u, r); } }));
+      const shell = await caches.open(SHELL_CACHE);
+      const page = await fetch(POS_SHELL, { cache: 'no-cache' });
+      if (page.ok) await shell.put(POS_SHELL, page);
+      reply(page.ok);
+    } catch { reply(false); }
+  })());
 });
 
 self.addEventListener('push', (e) => {

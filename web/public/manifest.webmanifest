@@ -23,6 +23,7 @@
   },
   "shortcuts": [
     { "name": "صوّرها ولاقيها", "url": "/visual", "icons": [{ "src": "/brand/twist-192.png", "sizes": "192x192", "type": "image/png" }] },
+    { "name": "الكاشير", "url": "/pos", "icons": [{ "src": "/brand/twist-192.png", "sizes": "192x192", "type": "image/png" }] },
     { "name": "لوحة المحل", "url": "/dashboard", "icons": [{ "src": "/brand/twist-192.png", "sizes": "192x192", "type": "image/png" }] },
     { "name": "تتبّع طلبي", "url": "/track", "icons": [{ "src": "/brand/twist-192.png", "sizes": "192x192", "type": "image/png" }] }
   ]

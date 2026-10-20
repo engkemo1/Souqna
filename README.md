@@ -165,3 +165,35 @@ The admin System page shows the filesystem mounted for the database and the app 
 ## Photo size (R2 space)
 - New uploads are stored as WebP renditions (thumb/sm/md/lg) plus one `original.jpg` (q82). The old JPEG rendition ladder is gone: about -50% bytes per photo with an SSIM change under 0.005 (measured on real catalogue photos, not visible).
 - Existing photos: `npm run media:optimize -w server` is a **dry run** (prints the saving, changes nothing). `npm run media:optimize -w server -- --apply` re-encodes the WebP renditions (only when smaller) and deletes the now-unused JPEG renditions. `original.jpg` is never touched. Safe to re-run; on the demo set it takes ~13 minutes and saves ~40% (258 MB -> 153 MB).
+
+## Cashier linking (admin only, hidden from stores until activated)
+
+Platform admin → **النظام → ربط أنظمة الكاشير**. The global switch ("قرار إطلاق الميزة") is a kill switch; each store also needs a link with status **مفعّل**. Stores never see anything unless both are on (`GET /api/owner/store` returns `features.cashier`).
+
+Two linking methods work with any cashier program:
+
+1. **File import** (per store → "إدارة الربط"): upload the `.xlsx`/`.csv` the cashier exports. Columns are guessed (Arabic and English headers) and can be changed; a preview shows what will change before anything is saved. Rows are matched by barcode, then SKU. Only the **stock** of products the store already has is updated: no products are created and no prices change. Rows that can't be matched safely (unknown code, code used twice, product with sizes/colours matched by its parent code) are skipped and listed.
+2. **Store API key**: the admin creates a key (shown once, only its hash is stored). The cashier or its developer calls:
+   - `POST /api/cashier/v1/stock` `{ "items": [{ "sku": "SH-R-M", "stock": 6 }] }` — absolute levels, safe to repeat.
+   - `POST /api/cashier/v1/sales` `{ "externalId": "INV-1001", "type": "sale" | "return", "items": [{ "sku": "SH-R-M", "qty": 2 }] }` — the same `externalId` is never applied twice.
+   Header: `Authorization: Bearer cshr_...`. Limit: 120 requests/minute per store.
+
+**Subscription (independent of the main Twist one):** per store, an end date plus grace days (default 7). `active` and `grace` (past the end date, still inside the grace days) keep working; `expired` stops the API with `cashier_expired` but never deletes data, and the admin can still import files and read the log. Leave the end date empty for no automatic expiry. "تسجيل دفعة وتمديد" records the payment (amount, months) and moves the end date from the later of today and the old end date.
+
+**Product codes:** store owners can set a barcode on a product and a SKU/barcode per colour/size in the product editor (Advanced). A barcode can belong to only one product/variant in a store. Saving a product from an editor that doesn't send variant codes keeps the existing codes.
+
+Every import/API call is written to the store's sync log (what changed, what was skipped). `npm run test:cashier -w server` runs the tests. Direct connectors for specific programs (Loyverse, Qoyod, Daftra, Odoo…) are listed in the catalogue (`server/src/lib/cashier-catalog.js`) as `planned` until each is built and tested against a real account.
+
+## Twist cashier (POS) — `/pos`
+
+A full-screen selling screen for stores that have no cashier program. It is the same web app, installed as a PWA, and it keeps working with no internet.
+
+- **Who sees it:** only a store whose cashier link is "كاشير Twist" and whose cashier subscription is active (or inside its grace days). The dashboard menu shows "الكاشير" only then.
+- **Selling:** search by name, or scan a barcode (a scanner types like a keyboard: fast digits + Enter). Product with sizes/colours opens a picker. Discount by amount or percent. Cash (with change), card, wallet, or a mix. Receipt is 80mm, printed from the browser.
+- **Offline:** the first visit with internet saves the screen and the catalogue on the device (service worker + IndexedDB). After that `/pos` opens with no internet. Every sale is written to the device first (with a uuid), the shown stock drops at once, and the sale is sent when the connection returns. A retry never makes a second invoice (the uuid is the key). Offline receipts say "فاتورة مؤقتة م-000N"; the official number is assigned by the server.
+- **What needs internet:** returns, old invoices, the day report. Selling never does.
+- **Stock:** the server is the only place that changes stock. It never goes below 0; a line sold without stock is kept and flagged `oversold`. Every change is also written to `stock_movements`.
+- **Invoices are never edited or deleted.** A return is its own record and refunds the customer's share of any invoice discount.
+- **Subscription ends:** selling stops, but sales made on a device before the end date + grace days are still accepted when they arrive later. Nothing is deleted.
+- **API:** `GET /api/pos/bootstrap`, `POST /api/pos/sales`, `GET /api/pos/sales[/:id|/number/:n]`, `POST /api/pos/returns`, `GET /api/pos/summary?day=YYYY-MM-DD` (owner sign-in).
+- **Tests:** `npm run test:cashier -w server` (server) and `npm test -w web` (offline engine).

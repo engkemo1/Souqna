@@ -29,6 +29,7 @@ const NAV_GROUPS = [
   ] },
   { label: 'التحليلات', items: [{ to: '/admin/reports', icon: BarChart3, label: 'التقارير' }] },
   { label: 'الذكاء الاصطناعي والمنصة', items: [
+    { to: '/admin/system?section=cashier', icon: DatabaseBackup, label: 'ربط الكاشير' },
     { to: '/admin/system?section=moda', icon: Sparkles, label: 'المساعد الذكي' },
     { to: '/admin/system?section=visual', icon: ScanSearch, label: 'البحث المرئي' },
     { to: '/admin/system?section=security', icon: DatabaseBackup, label: 'السيرفر والنسخ' },
@@ -124,7 +125,9 @@ function useDeliveryAlerts() {
             const allReady = it.group_ready_count === it.group_count;
             const text = `${it.store_name} جهّز الطلب #${it.number}`;
             const description = it.group_count > 1
-              ? (allReady ? 'كل محلات السلة جهّزت الطلبات — السلة جاهزة للاستلام' : `جاهز ${it.group_ready_count} من ${it.group_count} محلات — ننتظر الباقي`)
+              ? (it.route_mode === 'split'
+                ? (allReady ? 'محلات المسار جهّزت الطلبات — المسار جاهز للاستلام' : `جاهز ${it.group_ready_count} من ${it.group_count} محلات في المسار`)
+                : (allReady ? 'كل محلات السلة جهّزت الطلبات — السلة جاهزة للاستلام' : `جاهز ${it.group_ready_count} من ${it.group_count} محلات — ننتظر الباقي`))
               : 'الطلب جاهز للاستلام من المحل';
             toast({ title: text, description, tone: 'info', duration: 12000 });
             try { if (document.hidden && Notification?.permission === 'granted') new Notification('طلب جاهز للاستلام 🚚', { body: `${text} — ${description}` }); } catch { /* ignore */ }

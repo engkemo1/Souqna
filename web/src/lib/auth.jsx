@@ -18,7 +18,8 @@ export function AuthProvider({ children }) {
     if (!tokenStore.get()) return;
     api('/auth/me')
       .then(({ user, store }) => setState({ user, store, ready: true }))
-      .catch(() => logout());
+      // Only a refused token ends the session. No network (the cashier working offline) must never sign anyone out.
+      .catch((e) => { if (e?.status === 401) logout(); else setState({ user: null, store: null, ready: true }); });
   }, [logout]);
 
   const login = useCallback(async (email, password) => {

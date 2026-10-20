@@ -4,7 +4,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Images, FolderTree, Palette, Wand2, Settings, LogOut, ExternalLink, QrCode, Plus, Menu, Camera, Star } from 'lucide-react';
+  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Images, FolderTree, Palette, Wand2, Settings, LogOut, ExternalLink, QrCode, Plus, Menu, Camera, Star, ScanBarcode } from 'lucide-react';
 import { useAuth } from '../../lib/auth.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
@@ -17,10 +17,12 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import { cx } from '../../components/ui/cx.js';
 
 export function useNav() {
-  const { t } = useI18n();
+  const { t, isRtl } = useI18n();
+  const { data: info } = useApi('/owner/store');
   return [
     { group: null, items: [
       { to: '/dashboard', end: true, icon: LayoutDashboard, label: t('dash.overview') },
+      ...(info?.features?.pos ? [{ to: '/pos', icon: ScanBarcode, label: isRtl ? 'الكاشير' : 'Cashier' }] : []),
       { to: '/dashboard/orders', icon: ShoppingBag, label: t('dash.orders'), badge: 'pending' },
       { to: '/dashboard/products', icon: Package, label: t('dash.products') },
       { to: '/dashboard/customers', icon: Users, label: t('dash.customers') },

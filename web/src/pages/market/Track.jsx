@@ -4,6 +4,7 @@ import { PackageSearch, Copy, Share2 } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { formatMoney } from '../../lib/format.js';
 import { getRecentOrders, rememberOrder, trackUrl } from '../../lib/recentOrders.js';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import TrackView from '../../components/track/TrackView.jsx';
@@ -26,9 +27,17 @@ function Shell({ children }) {
 
 /** /track/<token> — private link. */
 function ByToken({ token }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
+  const ar = lang === 'ar';
   const toast = useToast();
   const { data, error, reload } = useApi(`/track/${token}`);
+  const [feeBusy, setFeeBusy] = useState(false);
+  const respondToFee = async (accepted) => {
+    setFeeBusy(true);
+    try { await api(`/track/${token}/delivery-fee`, { method: 'POST', body: { accepted } }); await reload(); }
+    catch (e) { toast({ title: e.code === 'fee_not_available' ? (ar ? 'العرض غير متاح دلوقتي' : 'This offer is no longer available') : (ar ? 'حصلت مشكلة، جرّب تاني' : 'Something went wrong. Please try again.') }); }
+    finally { setFeeBusy(false); }
+  };
   useEffect(() => { if (data?.order) rememberOrder({ number: data.order.number, token, store: data.order.store.name }); }, [data, token]);
   const link = trackUrl(token);
   const share = async () => {
@@ -42,7 +51,7 @@ function ByToken({ token }) {
           ? <div className="rounded-3xl border border-line bg-elevated p-6 text-center"><p className="font-semibold">{t('track.notFound')}</p><Button className="mt-4" to="/track">{t('track.tryNumber')}</Button></div>
           : <ErrorState error={error} onRetry={reload} compact />)
           : !data ? <div className="space-y-4"><Skeleton className="h-72 w-full rounded-3xl" /><Skeleton className="h-48 w-full rounded-3xl" /></div>
-          : (<><TrackView order={data.order} />
+          : (<>{data.order.status !== 'cancelled' && data.order.deliveryFeeStatus === 'offered' && <section className="mb-4 rounded-2xl border-2 border-brand/20 bg-elevated p-5"><h2 className="font-semibold">{ar ? 'رسوم توصيل سلة Twist' : 'Twist basket delivery fee'}</h2><p className="mt-2 text-sm text-muted">{ar ? 'رسوم التوصيل النهائية:' : 'Final delivery fee:'} <strong className="text-fg">{formatMoney(data.order.deliveryFeeQuote, lang)}</strong>. {ar ? 'مش هنبعت مندوب غير بعد موافقتك.' : 'We will dispatch only after you approve.'}</p><div className="mt-4 flex flex-wrap gap-3"><Button disabled={feeBusy} onClick={() => respondToFee(true)}>{ar ? 'موافق، كمّلوا الطلب' : 'Accept and continue'}</Button><Button variant="outline" disabled={feeBusy} onClick={() => respondToFee(false)}>{ar ? 'مش موافق' : 'Decline'}</Button></div></section>}{data.order.status !== 'cancelled' && data.order.deliveryFeeStatus === 'pending' && <p className="mb-4 rounded-xl bg-amber-50 p-4 text-sm text-amber-900">{ar ? 'رسوم التوصيل لسه قيد التحديد. هنتواصل معاك بالسعر النهائي قبل إرسال المندوب.' : 'The delivery fee is still being determined. We will contact you with the final price before dispatch.'}</p>}{data.order.status !== 'cancelled' && data.order.deliveryFeeStatus === 'rejected' && <p className="mb-4 rounded-xl bg-red-50 p-4 text-sm text-red-800">{ar ? 'تم إيقاف التوصيل بعد رفض الرسوم. Twist هتتواصل معاك بخصوص الطلب.' : 'Delivery is paused because you declined the fee. Twist will contact you about the order.'}</p>}<TrackView order={data.order} />
             <div className="mt-5 flex items-center justify-between gap-3 rounded-2xl border border-dashed border-line p-4 text-sm">
               <p className="text-muted">{t('track.saveLink')}</p>
               <Button size="sm" variant="outline" icon={navigator.share ? Share2 : Copy} onClick={share}>{navigator.share ? t('track.share') : t('common.copy')}</Button>

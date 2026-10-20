@@ -9,10 +9,11 @@ import { productTypeTree, deriveDepartment, audienceOrNull, AUDIENCE_KEYS } from
 import { inferGender, inferKey } from '../lib/moda/products.js';
 import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
+import { cashierAccess } from '../lib/cashier-access.js';
 import { requireOwner } from '../lib/auth.js';
 import { vapidPublicKey, sendTest } from '../lib/push.js';
 import { clampInt, nowIso, slugify } from '../lib/util.js';
-import { notifyOrderStatus, notifyPriceDrop, notifyFollowers } from '../lib/buyers.js';
+import { notifyBuyer, notifyOrderStatus, notifyPriceDrop, notifyFollowers } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { weeklyReport } from '../lib/report.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled } from '../lib/visual-demand.js';
@@ -65,7 +66,7 @@ r.get('/notifications', h((req, res) => {
 
 r.get('/store', h((req, res) => {
   const t = buildTheme(json(req.store.theme_json, {}));
-  res.json({ store: serializeStore(req.store), user: req.user, themeReport: t.report, themeChecks: t.checks });
+  res.json({ store: serializeStore(req.store), user: req.user, themeReport: t.report, themeChecks: t.checks, features: (() => { const a = cashierAccess(req.store.id); const own = q.val('SELECT cashier_id FROM store_cashier_links WHERE store_id=?', [req.store.id]) === 'twist'; return { cashier: a.allowed, cashierState: a.state, cashierEndsAt: a.endsAt, pos: a.allowed && own }; })() });
 }));
 
 /* ---------------------------------------------------------- same-day delivery: switched on for today, expires by itself */
@@ -536,6 +537,7 @@ const productSchema = z.object({
   compare_at_price: z.coerce.number().int().min(0).max(1_000_000).nullable().optional(),
   cost: z.coerce.number().int().min(0).max(1_000_000).nullable().optional(),
   sku: z.string().trim().max(60).optional().nullable(),
+  barcode: z.string().trim().max(60).optional().nullable(),
   category_id: z.coerce.number().int().nullable().optional(),
   department: z.string().max(31).nullable().optional(),
   style_level: z.number().int().min(1).max(5).nullable().optional(),
@@ -547,7 +549,7 @@ const productSchema = z.object({
   is_new: z.boolean().optional().default(false),
   colors: z.array(colorSchema).max(12).default([]),
   sizes: z.array(z.string().trim().min(1).max(12)).max(30).default([]),
-  variants: z.array(z.object({ id: z.number().int().optional().nullable(), color: z.string().nullable().optional(), size: z.string().nullable().optional(), stock: z.coerce.number().int().min(0).max(100000), sku: z.string().max(60).optional().nullable() })).max(200).default([]),
+  variants: z.array(z.object({ id: z.number().int().optional().nullable(), color: z.string().nullable().optional(), size: z.string().nullable().optional(), stock: z.coerce.number().int().min(0).max(100000), sku: z.string().trim().max(60).optional().nullable(), barcode: z.string().trim().max(60).optional().nullable() })).max(200).default([]),
   track_stock: z.boolean().optional().default(true),
   stock: z.coerce.number().int().min(0).max(100000).optional().default(0),
   low_stock_at: z.coerce.number().int().min(0).max(1000).optional().default(5),
@@ -564,8 +566,22 @@ function uniqueSlug(storeId, base, exceptId = 0) {
   return slug;
 }
 
+/** A barcode must identify one product/variant inside a store, otherwise cashier files can't be matched safely. */
+function assertBarcodesFree(storeId, data, existingId) {
+  const norm = (v) => String(v || '').trim().replace(/\.0+$/, '').toLowerCase();
+  const mine = [data.barcode, ...data.variants.map((v) => v.barcode)].map(norm).filter(Boolean);
+  if (new Set(mine).size !== mine.length) throw new AppError(409, 'barcode_in_use', 'The same barcode is used twice in this product.', { barcode: 'barcode_in_use' });
+  if (!mine.length) return;
+  const taken = new Set([
+    ...q.all('SELECT barcode FROM products WHERE store_id=? AND barcode IS NOT NULL AND id<>?', [storeId, existingId || 0]),
+    ...q.all('SELECT v.barcode FROM variants v JOIN products p ON p.id=v.product_id WHERE p.store_id=? AND v.barcode IS NOT NULL AND p.id<>?', [storeId, existingId || 0]),
+  ].map((r) => norm(r.barcode)));
+  if (mine.some((b) => taken.has(b))) throw new AppError(409, 'barcode_in_use', 'This barcode already belongs to another product in your store.', { barcode: 'barcode_in_use' });
+}
+
 function saveProduct(storeId, data, existing) {
   return tx(() => {
+    assertBarcodesFree(storeId, data, existing?.id);
     if (data.category_id && !q.val('SELECT id FROM categories WHERE id=? AND store_id=?', [data.category_id, storeId])) throw badRequest('invalid_category', 'Category not found.');
     if (data.moda_key) {
       const item = loadKnowledge().items.get(data.moda_key);
@@ -576,7 +592,7 @@ function saveProduct(storeId, data, existing) {
     const stock = variants.length ? variants.reduce((s, v) => s + v.stock, 0) : data.stock;
     const row = {
       name_ar: data.name_ar, name_en: data.name_en || data.name_ar, description_ar: data.description_ar, description_en: data.description_en,
-      price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null,
+      price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null, ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
       category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, data.department, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
@@ -599,9 +615,10 @@ function saveProduct(storeId, data, existing) {
     const keep = [];
     for (const v of variants) {
       if (v.id && q.val('SELECT id FROM variants WHERE id=? AND product_id=?', [v.id, id])) {
-        q.run('UPDATE variants SET color=?, size=?, stock=?, sku=? WHERE id=?', [v.color || null, v.size || null, v.stock, v.sku || null, v.id]);
+        // sku/barcode are only changed when the client sent them: older editors never send variant codes and must not wipe them.
+        update('variants', v.id, { color: v.color || null, size: v.size || null, stock: v.stock, sku: v.sku === undefined ? undefined : (v.sku || null), barcode: v.barcode === undefined ? undefined : (v.barcode || null) });
         keep.push(v.id);
-      } else keep.push(insert('variants', { product_id: id, color: v.color || null, size: v.size || null, stock: v.stock, sku: v.sku || null }));
+      } else keep.push(insert('variants', { product_id: id, color: v.color || null, size: v.size || null, stock: v.stock, sku: v.sku || null, barcode: v.barcode || null }));
     }
     q.run(`DELETE FROM variants WHERE product_id=? ${keep.length ? `AND id NOT IN (${keep.join(',')})` : ''}`, [id]);
     return id;
@@ -764,6 +781,7 @@ r.patch('/orders/:id/status', h((req, res) => {
   const { status, note } = z.object({ status: z.enum(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']), note: z.string().trim().max(300).optional() }).parse(req.body);
   if (o.delivery_by === 'platform' && PLATFORM_STATUSES.includes(status)) throw badRequest('platform_delivers', 'Twist handles pickup and delivery of this order.');
   if (!(ORDER_FLOW[o.status] || []).includes(status)) throw badRequest('invalid_transition', 'This status change is not allowed.');
+  const feeNeedsRequote = o.delivery_group && (o.delivery_fee_status === 'offered' || o.delivery_fee_status === 'rejected' || (o.delivery_fee_status === 'confirmed' && o.delivery_fee_quote != null));
   tx(() => {
     const now = nowIso();
     q.run('UPDATE orders SET status=?, updated_at=? WHERE id=?', [status, now, o.id]);
@@ -780,10 +798,12 @@ r.patch('/orders/:id/status', h((req, res) => {
         if (i.variant_id) q.run('UPDATE variants SET stock=stock+? WHERE id=?', [i.qty, i.variant_id]);
         q.run('UPDATE products SET stock=stock+?, sold_count=MAX(0,sold_count-?) WHERE id=?', [i.qty, i.qty, i.product_id]);
       }
-      if (o.customer_id) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [o.delivery_group ? o.subtotal - o.discount : o.total, o.customer_id]);
+      if (o.customer_id) q.run('UPDATE customers SET orders_count=MAX(0,orders_count-1),total_spent=MAX(0,total_spent-?) WHERE id=?', [o.delivery_group ? o.subtotal - o.discount : o.total, o.customer_id]);
       // If this marketplace sub-order carried the basket's single customer
       // delivery fee, move that fee to a remaining non-free store order.
-      if (o.delivery_group) {
+      if (o.delivery_group && feeNeedsRequote) {
+        q.run("UPDATE orders SET delivery_fee_status='pending',delivery_fee_quote=NULL,shipping=0,total=subtotal-discount,updated_at=? WHERE delivery_group=? AND status<>'cancelled'", [now, o.delivery_group]);
+      } else if (o.delivery_group) {
         const active = q.all(`SELECT o.id, o.customer_id, o.subtotal, o.shipping, o.total
           FROM orders o
           WHERE o.delivery_group=? AND o.status<>'cancelled' AND o.shipping_free=0 ORDER BY o.id`, [o.delivery_group]);
@@ -799,7 +819,14 @@ r.patch('/orders/:id/status', h((req, res) => {
       }
     }
   });
-  notifyOrderStatus(o.id, status);
+  if (feeNeedsRequote && status === 'cancelled') {
+    const notified = new Set();
+    for (const item of q.all("SELECT buyer_id,track_token FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group])) if (item.buyer_id && !notified.has(item.buyer_id)) {
+      notified.add(item.buyer_id);
+      notifyBuyer(item.buyer_id, { kind: 'order', title: 'تغيّر طلب سلة Twist', body: `المحل ألغى الطلب ${o.number}. Twist هتراجع رسوم التوصيل وتبعتلك السعر من جديد قبل إرسال المندوب.`, url: `/track/${item.track_token}` });
+    }
+    notifyOrderStatus(o.id, status);
+  } else notifyOrderStatus(o.id, status);
   if (o.delivery_by === 'platform' && status === 'processing') {
     if (o.delivery_group) {
       const batch = q.all("SELECT id, number, status FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group]);

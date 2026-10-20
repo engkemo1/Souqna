@@ -21,7 +21,7 @@ import { getModaPrompts } from '../lib/modaPrompts.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
 import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
-import { resolveDeliveryRate, splitSharedDeliveryFee } from '../lib/deliveryRates.js';
+import { addMarketplacePickupFees, resolveDeliveryRate, splitSharedDeliveryFee } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert } from '../lib/whatsapp.js';
 import {
@@ -635,8 +635,12 @@ r.post('/marketplace/delivery-fee', h((req, res) => {
   if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
   const storeQuotes = body.stores.map(({ slug, items }) => quote(loadStore(slug), items));
   const rate = resolveDeliveryRate(body.governorate, body.city, body.stores.map((s) => s.slug));
-  const split = splitSharedDeliveryFee(rate.fee, storeQuotes.map((qt) => ({ freeShipping: qt.shipping === 0 })));
-  res.json({ ...rate, fee: split.customerFee, fullRouteFee: rate.fee, storeShares: split.storeShares });
+  const pickup = addMarketplacePickupFees(rate.fee, body.stores.map((s) => s.slug));
+  const split = splitSharedDeliveryFee(pickup.fee, storeQuotes.map((qt) => ({ freeShipping: qt.shipping === 0 })));
+  const needsFee = storeQuotes.some((qt) => qt.shipping > 0);
+  // Only an explicit city rate is precise enough to promise at checkout.
+  const pending = needsFee && (body.stores.length > 1 || rate.scope !== 'city');
+  res.json({ ...rate, ...pickup, fee: pending ? null : split.customerFee, feeStatus: pending ? 'pending' : 'confirmed', fullRouteFee: pending ? null : pickup.fee, storeShares: pending ? [] : split.storeShares });
 }));
 
 const orderSchema = z.object({
@@ -714,19 +718,24 @@ r.post('/marketplace/orders', h((req, res) => {
     // A marketplace checkout is one customer delivery even though each shop
     // still receives and fulfils its own sub-order. Charge one platform fee.
     // Store thresholds decide whether the shared destination-based delivery fee applies.
-    const fullRouteFee = resolveDeliveryRate(body.governorate, body.city, prepared.map(({ store }) => store.slug)).fee;
+    const rate = resolveDeliveryRate(body.governorate, body.city, prepared.map(({ store }) => store.slug));
+    const needsFee = prepared.some(({ qt }) => qt.shipping > 0);
+    const pendingFee = needsFee && (prepared.length > 1 || rate.scope !== 'city');
+    const baseRouteFee = rate.fee;
+    const fullRouteFee = addMarketplacePickupFees(baseRouteFee, prepared.map(({ store }) => store.slug)).fee;
     const split = splitSharedDeliveryFee(fullRouteFee, prepared.map(({ qt }) => ({ freeShipping: qt.shipping === 0 })));
-    const marketplaceShipping = split.customerFee;
+    const marketplaceShipping = pendingFee ? 0 : split.customerFee;
     const marketplaceTotal = prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0) + marketplaceShipping;
-    if ((body.expectedShipping != null && body.expectedShipping !== marketplaceShipping)
+    if ((!pendingFee && body.expectedShipping != null && body.expectedShipping !== marketplaceShipping)
       || (body.expectedTotal != null && body.expectedTotal !== marketplaceTotal)) {
       throw new AppError(409, 'delivery_fee_changed', 'The delivery fee or order total changed. Please review the updated amount.');
     }
-    const shippingStoreIndex = prepared.findIndex(({ qt }) => qt.shipping > 0);
     const deliveryGroup = crypto.randomUUID();
     const now = nowIso();
     const orders = prepared.map(({ store, qt }, storeIndex) => {
-      const shipping = storeIndex === shippingStoreIndex ? marketplaceShipping : 0;
+      // Keep the one basket fee allocated across the store sub-orders so a
+      // split dispatch can see each route's correct cash amount.
+      const shipping = pendingFee || split.storeShares[storeIndex]?.freeShipping ? 0 : split.storeShares[storeIndex]?.share || 0;
       let customer = q.get('SELECT * FROM customers WHERE store_id=? AND phone=?', [store.id, body.phone]);
       if (!customer) {
         const id = insert('customers', { store_id: store.id, name: body.name, phone: body.phone, governorate: body.governorate, city: body.city, address: body.address, created_at: now });
@@ -740,7 +749,7 @@ r.post('/marketplace/orders', h((req, res) => {
       const orderId = insert('orders', {
         store_id: store.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
         governorate: body.governorate, city: body.city, address: body.address, notes: body.notes,
-        status: 'pending', delivery_by: 'platform', delivery_group: deliveryGroup, subtotal: qt.subtotal, discount: 0, shipping, total: qt.subtotal + shipping,
+        status: 'pending', delivery_fee_status: pendingFee ? 'pending' : 'confirmed', delivery_fee_quote: null, delivery_by: 'platform', delivery_group: deliveryGroup, delivery_route_id: deliveryGroup, delivery_mode: 'pooled', subtotal: qt.subtotal, discount: 0, shipping, total: qt.subtotal + shipping,
         shipping_free: qt.shipping === 0 ? 1 : 0,
         platform_discount: 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
       });
@@ -750,7 +759,7 @@ r.post('/marketplace/orders', h((req, res) => {
         q.run('UPDATE products SET stock=MAX(0, stock-?), sold_count=sold_count+? WHERE id=?', [line.qty, line.qty, line.productId]);
       }
       insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
-      return { orderId, number, trackToken, total: qt.subtotal + shipping, subtotal: qt.subtotal, shipping, deliveryGroup, storeSlug: store.slug, store: { ar: store.name_ar, en: store.name_en } };
+      return { orderId, number, trackToken, total: qt.subtotal + shipping, subtotal: qt.subtotal, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, store: { ar: store.name_ar, en: store.name_en } };
     });
     return orders;
   });
@@ -793,13 +802,15 @@ function trackPayload(o) {
   const items = q.all('SELECT * FROM order_items WHERE order_id=?', [o.id]);
   const media = mediaMap(items.map((i) => i.media_id));
   const events = q.all('SELECT status, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]);
-  const basket = o.delivery_group ? q.get("SELECT COUNT(*) AS count, COALESCE(SUM(total),0) AS total FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group]) : null;
+  const feeState = o.delivery_group ? q.get("SELECT delivery_fee_status,delivery_fee_quote FROM orders WHERE delivery_group=? AND status<>'cancelled' ORDER BY id LIMIT 1", [o.delivery_group]) : null;
+  const basket = o.delivery_group ? q.get("SELECT COUNT(*) AS count, COALESCE(SUM(total),0) AS total, COALESCE(SUM(subtotal-discount),0) AS items_total FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group]) : null;
   return {
     number: o.number, token: o.track_token, status: o.status, createdAt: o.created_at, updatedAt: o.updated_at,
     deliveryBy: o.delivery_by, firstName: String(o.customer_name || '').split(' ')[0],
     city: o.city, governorate: o.governorate, phone: o.phone.replace(/^(\d{3})\d{5}/, '$1•••••'),
     subtotal: o.subtotal, discount: o.discount, shipping: o.shipping, shippingFree: !!o.shipping_free, total: o.total, payment: o.payment_method,
-    deliveryGroupCount: basket?.count ? basket.count : null, deliveryGroupTotal: basket?.count ? basket.total : null,
+    deliveryGroupCount: basket?.count ? basket.count : null, deliveryGroupTotal: basket?.count ? (feeState?.delivery_fee_status === 'rejected' ? basket.items_total : basket.total) : null,
+    deliveryFeeStatus: feeState?.delivery_fee_status || o.delivery_fee_status || 'confirmed', deliveryFeeQuote: feeState?.delivery_fee_quote ?? o.delivery_fee_quote ?? null,
     store: { name: { ar: s?.name_ar, en: s?.name_en }, slug: s?.slug, phone: s?.phone || null },
     items: items.map((i) => ({ productId: i.product_id, reviewed: i.product_id ? !!q.get('SELECT 1 AS x FROM reviews WHERE order_id=? AND product_id=?', [o.id, i.product_id]) : true, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
     events,
@@ -811,6 +822,17 @@ r.get('/track/:token', h((req, res) => {
   const o = /^[A-Za-z0-9_-]{10,40}$/.test(req.params.token) ? q.get('SELECT * FROM orders WHERE track_token=?', [req.params.token]) : null;
   if (!o) trackMiss(req, recent);
   res.json({ order: trackPayload(o) });
+}));
+
+r.post('/track/:token/delivery-fee', h((req, res) => {
+  const { accepted } = z.object({ accepted: z.boolean() }).parse(req.body);
+  const o = /^[A-Za-z0-9_-]{10,40}$/.test(req.params.token) ? q.get('SELECT * FROM orders WHERE track_token=?', [req.params.token]) : null;
+  if (!o || !o.delivery_group) throw notFound('Order');
+  const basket = q.all("SELECT id,status,delivery_fee_status FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group]);
+  if (!basket.length || basket.some((item) => item.delivery_fee_status !== 'offered')) throw new AppError(409, 'fee_not_available', 'There is no pending delivery fee offer.');
+  const status = accepted ? 'confirmed' : 'rejected';
+  tx(() => { for (const item of basket) q.run('UPDATE orders SET delivery_fee_status=?,updated_at=? WHERE id=?', [status, nowIso(), item.id]); });
+  res.json({ ok: true, deliveryFeeStatus: status });
 }));
 
 r.post('/track/lookup', h((req, res) => {

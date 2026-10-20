@@ -11,6 +11,8 @@ import publicRoutes, { loadSharedLook } from './routes/public.js';
 import ownerRoutes from './routes/owner.js';
 import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
+import cashierRoutes from './routes/cashier.js';
+import posRoutes from './routes/pos.js';
 import { errorHandler } from './lib/errors.js';
 import buyerRoutes from './routes/buyer.js';
 
@@ -85,6 +87,8 @@ app.use('/media', express.static(config.mediaDir, { immutable: true, maxAge: '36
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/cashier/v1', cashierRoutes);
+app.use('/api/pos', posRoutes);
 app.use('/api/buyer', buyerRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api', publicRoutes);

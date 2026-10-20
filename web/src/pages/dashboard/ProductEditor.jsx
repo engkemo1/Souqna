@@ -27,7 +27,7 @@ const PRESET_COLORS = [
 
 
 const EMPTY = {
-  name_ar: '', name_en: '', description_ar: '', description_en: '', price: '', compare_at_price: '', cost: '', sku: '',
+  name_ar: '', name_en: '', description_ar: '', description_en: '', price: '', compare_at_price: '', cost: '', sku: '', barcode: '', variantCodes: {},
   category_id: '', audience: '', moda_key: '', style_level: '', badge_text: '', badge_tone: 'brand', status: 'active', featured: false, is_new: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
   media: [], seo_title: '', seo_description: '',
 };
@@ -39,11 +39,12 @@ const nz = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').repla
 function fromProduct(p) {
   const matrix = {};
   const ids = {};
-  for (const v of p.variants) { matrix[vkey(v.color, v.size)] = v.stock; ids[vkey(v.color, v.size)] = v.id; }
+  const codes = {};
+  for (const v of p.variants) { matrix[vkey(v.color, v.size)] = v.stock; ids[vkey(v.color, v.size)] = v.id; codes[vkey(v.color, v.size)] = { sku: v.sku || '', barcode: v.barcode || '' }; }
   return {
     ...EMPTY,
     name_ar: p.name.ar, name_en: p.name.en && p.name.en !== p.name.ar ? p.name.en : '', description_ar: p.description.ar || '', description_en: p.description.en || '',
-    price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '',
+    price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '', barcode: p.barcode || '', variantCodes: codes,
     category_id: p.categoryId ? String(p.categoryId) : '', audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', badge_text: p.badgeText || '', badge_tone: p.badgeTone || 'brand', status: p.status, featured: p.featured, is_new: p.isNewFlag,
     colors: p.colors, sizes: p.sizes, matrix, variantIds: ids, track_stock: p.trackStock, stock: p.stockCount, low_stock_at: p.lowStockAt,
     media: p.media, seo_title: p.seo.title || '', seo_description: p.seo.description || '',
@@ -54,12 +55,12 @@ function toPayload(f) {
   const colors = f.colors.length ? f.colors : [null];
   const sizes = f.sizes.length ? f.sizes : [null];
   const variants = (f.colors.length || f.sizes.length)
-    ? colors.flatMap((c) => sizes.map((s) => ({ id: f.variantIds?.[vkey(c?.hex, s)] ?? null, color: c?.hex ?? null, size: s, stock: Number(f.matrix[vkey(c?.hex, s)] || 0) })))
+    ? colors.flatMap((c) => sizes.map((s) => ({ id: f.variantIds?.[vkey(c?.hex, s)] ?? null, color: c?.hex ?? null, size: s, stock: Number(f.matrix[vkey(c?.hex, s)] || 0), ...(f.variantCodes?.[vkey(c?.hex, s)] ? { sku: f.variantCodes[vkey(c?.hex, s)].sku || null, barcode: f.variantCodes[vkey(c?.hex, s)].barcode || null } : {}) })))
     : [];
   return {
     name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en,
     price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, cost: f.cost ? Number(f.cost) : null,
-    sku: f.sku || null, category_id: f.category_id ? Number(f.category_id) : null, audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, badge_text: f.badge_text.trim() || null, badge_tone: f.badge_text.trim() ? f.badge_tone : null, status: f.status, featured: f.featured, is_new: f.is_new,
+    sku: f.sku || null, barcode: f.barcode || null, category_id: f.category_id ? Number(f.category_id) : null, audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, badge_text: f.badge_text.trim() || null, badge_tone: f.badge_text.trim() ? f.badge_tone : null, status: f.status, featured: f.featured, is_new: f.is_new,
     colors: f.colors, sizes: f.sizes, variants, track_stock: f.track_stock, stock: Number(f.stock || 0), low_stock_at: Number(f.low_stock_at || 0),
     media: f.media.map((m) => m.id), primary_media_id: f.media[0]?.id ?? null, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
   };
@@ -484,9 +485,29 @@ export default function ProductEditor() {
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label={t('editor.cost')} hint={t('editor.costHint')} optional={t('common.optional')}><Input inputMode="numeric" suffix={t('common.currency')} value={f.cost} onChange={(e) => set({ cost: e.target.value.replace(/\D/g, '') })} /></Field>
               <Field label={t('editor.sku')} optional={t('common.optional')}><Input dir="ltr" value={f.sku} onChange={(e) => set({ sku: e.target.value })} /></Field>
+              <Field label={L('الباركود', 'Barcode')} optional={t('common.optional')} hint={L('بيربط المنتج بالكاشير', 'Links the product to your cashier')}><Input dir="ltr" value={f.barcode} onChange={(e) => set({ barcode: e.target.value })} /></Field>
               {f.track_stock && <Field label={t('editor.lowStockAt')}><Input inputMode="numeric" value={f.low_stock_at} onChange={(e) => set({ low_stock_at: e.target.value.replace(/\D/g, '') })} /></Field>}
               {margin != null && <p className="rounded-xl bg-secondary px-3 py-2 text-sm font-medium text-brand sm:col-span-3">{t('editor.margin')}: {margin}% · {t('editor.profit')}: {formatMoney(f.price - f.cost, lang)}</p>}
             </div>
+            {(f.colors.length > 0 || f.sizes.length > 0) && (
+              <details className="rounded-xl border border-line p-3">
+                <summary className="cursor-pointer text-sm font-medium">{L('أكواد الكاشير لكل لون/مقاس', 'Cashier codes per colour/size')}</summary>
+                <p className="mt-1 text-[13px] text-muted">{L('اختياري. الكود أو الباركود اللي بيستخدمه كاشير المحل لكل قطعة، عشان المخزون يتزامن صح.', 'Optional. The code or barcode your cashier uses for each piece, so stock syncs correctly.')}</p>
+                <div className="mt-3 space-y-2">
+                  {(f.colors.length ? f.colors : [null]).flatMap((c) => (f.sizes.length ? f.sizes : [null]).map((s) => {
+                    const key = vkey(c?.hex, s); const cur = f.variantCodes?.[key] || { sku: '', barcode: '' };
+                    const setCode = (patch) => set({ variantCodes: { ...f.variantCodes, [key]: { ...cur, ...patch } } });
+                    return (
+                      <div key={key} className="grid items-center gap-2 sm:grid-cols-[1fr_1fr_1fr]">
+                        <span className="flex items-center gap-2 text-sm">{c && <span className="h-4 w-4 rounded-full ring-1 ring-line" style={{ background: c.hex }} />}{[c ? (lang === 'ar' ? c.name_ar : c.name_en) : '', s].filter(Boolean).join(' / ')}</span>
+                        <Input dir="ltr" placeholder="SKU" value={cur.sku} onChange={(e) => setCode({ sku: e.target.value })} />
+                        <Input dir="ltr" placeholder={L('الباركود', 'Barcode')} value={cur.barcode} onChange={(e) => setCode({ barcode: e.target.value })} />
+                      </div>
+                    );
+                  }))}
+                </div>
+              </details>
+            )}
             <Field label={L('مناسب لإيه؟ (بيساعد مودة ترشّحه للمناسبة الصح)', 'Dress code (helps the stylist match occasions)')} optional={t('common.optional')} hint={styleDefault ? L(`لو سيبتها، بنفترض: ${styleDefault}`, undefined) : undefined}>
               <div className="flex flex-wrap gap-2" role="group">
                 {[['', L('تلقائي', 'Auto')], ...STYLE_LEVELS].map(([v, label]) => <button key={v} type="button" aria-pressed={f.style_level === v} onClick={() => set({ style_level: v })} className={chipCls(f.style_level === v)}>{label}</button>)}

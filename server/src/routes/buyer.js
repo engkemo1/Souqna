@@ -123,13 +123,18 @@ r.put('/me', h((req, res) => {
 const orderRows = (buyerId) => {
   const rows = q.all(`SELECT o.*, s.name_ar AS s_ar, s.name_en AS s_en, s.slug AS s_slug,
       (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') AS delivery_group_count,
-      (SELECT COALESCE(SUM(g.total),0) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') AS delivery_group_total
+      (SELECT g.delivery_fee_status FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled' ORDER BY g.id LIMIT 1) AS delivery_group_fee_status,
+      (SELECT g.delivery_fee_quote FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled' ORDER BY g.id LIMIT 1) AS delivery_group_fee_quote,
+      CASE WHEN EXISTS(SELECT 1 FROM orders g WHERE g.delivery_group=o.delivery_group AND g.delivery_fee_status='rejected' AND g.status<>'cancelled')
+        THEN (SELECT COALESCE(SUM(g.subtotal-g.discount),0) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled')
+        ELSE (SELECT COALESCE(SUM(g.total),0) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') END AS delivery_group_total
     FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.buyer_id=? ORDER BY o.id DESC LIMIT 50`, [buyerId]);
   const items = rows.length ? q.all(`SELECT * FROM order_items WHERE order_id IN (${rows.map(() => '?').join(',')})`, rows.map((x) => x.id)) : [];
   const media = mediaMap(items.map((i) => i.media_id));
   return rows.map((o) => ({
-    number: o.number, token: o.track_token, status: o.status, total: o.total, createdAt: o.created_at,
+    number: o.number, token: o.track_token, status: o.status, total: o.delivery_fee_status === 'rejected' ? o.subtotal - o.discount : o.total, createdAt: o.created_at,
     deliveryGroup: o.delivery_group, deliveryGroupCount: o.delivery_group && o.delivery_group_count ? o.delivery_group_count : null, deliveryGroupTotal: o.delivery_group && o.delivery_group_count ? o.delivery_group_total : null,
+    deliveryFeeStatus: o.delivery_group_fee_status || o.delivery_fee_status, deliveryFeeQuote: o.delivery_group_fee_quote ?? o.delivery_fee_quote,
     store: { slug: o.s_slug, name: { ar: o.s_ar, en: o.s_en } },
     items: items.filter((i) => i.order_id === o.id).map((i) => ({ name: bi(i, 'name'), qty: i.qty, image: media.get(i.media_id) || null })),
   }));

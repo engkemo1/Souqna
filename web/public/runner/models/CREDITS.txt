@@ -1,0 +1,6 @@
+3D vehicle models used in Banha Runner (Sketchfab, licensed CC BY 4.0):
+- "Low Poly 2013 Toyota HiAce" by Alvin.Woodly - https://sketchfab.com/3d-models/low-poly-2013-toyota-hiace-f83b4ed4d8534efb81def77b6c1b642d
+- "Tuk Tuk Auto Rikshaw Lowpoly" by maanzart - https://sketchfab.com/3d-models/tuk-tuk-auto-rikshaw-lowpoly-2124df89548644278c6d4d1b1b0ad92a
+- "Low Poly Motorcycle 001" by ROH3D - https://sketchfab.com/3d-models/low-poly-motorcycle-001-38a3b1f8cdb24a049d2430520eb9882a
+- "Hyundai Accent (TaGAZ) 2004" by panderlaike_design - https://sketchfab.com/3d-models/hyundai-accent-tagaz-2004-b00b5faebc314e54aef423e46230e963 (simplified/compressed for the game)
+- "Nathan Animated 003 - Walking 3D Man" by Renderpeople - https://sketchfab.com/3d-models/nathan-animated-003-walking-3d-man-143a2b1ea5eb4385ae90a73657aca3bc (textures reduced to 1k)

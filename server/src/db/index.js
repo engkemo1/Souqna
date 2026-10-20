@@ -13,7 +13,8 @@ db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
 db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   ('subscription_monthly_fee','0'),
   ('subscription_reminder_days','5'),
-  ('subscription_reminder_template','أهلاً {store}، نذكّرك إن اشتراك متجرك على Twist مستحق بمبلغ {amount} ج.م. موعد التجديد {due_date}. ابعتلنا صورة التحويل أو تواصل معانا لتأكيد الدفع. شكراً لثقتك في Twist.')`);
+  ('subscription_reminder_template','أهلاً {store}، نذكّرك إن اشتراك متجرك على Twist مستحق بمبلغ {amount} ج.م. موعد التجديد {due_date}. ابعتلنا صورة التحويل أو تواصل معانا لتأكيد الدفع. شكراً لثقتك في Twist.'),
+  ('cashier_sync_enabled','0')`);
 // Lightweight migrations for databases created by earlier versions.
 {
   const cols = db.prepare('PRAGMA table_info(stores)').all().map((c) => c.name);
@@ -21,6 +22,7 @@ db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   if (!cols.includes('sort_order')) db.exec('ALTER TABLE stores ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('return_days')) db.exec('ALTER TABLE stores ADD COLUMN return_days INTEGER NOT NULL DEFAULT 3');
   if (!cols.includes('hidden')) db.exec('ALTER TABLE stores ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('delivery_zone')) db.exec("ALTER TABLE stores ADD COLUMN delivery_zone TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('search_indexable')) db.exec('ALTER TABLE stores ADD COLUMN search_indexable INTEGER NOT NULL DEFAULT 1');
   if (!db.prepare("SELECT 1 FROM app_settings WHERE key='seo_indexability_bootstrapped'").get()) {
     // Existing catalogue rows are the known demo stores. New stores keep the column default (indexable).
@@ -51,6 +53,17 @@ db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   if (!pcols.includes('badge_tone')) db.exec('ALTER TABLE products ADD COLUMN badge_tone TEXT');
   if (!pcols.includes('audience')) db.exec('ALTER TABLE products ADD COLUMN audience TEXT'); // الفئة: men|women|boys|girls|kids|unisex (فاضي = مستنتج من الاسم)
   if (!pcols.includes('moda_key')) db.exec('ALTER TABLE products ADD COLUMN moda_key TEXT'); // نوع القطعة الصريح لمحرك مودة (فاضي = تلقائي)
+  // Cashier linking: barcodes (matched together with sku when a cashier file or API call arrives).
+  if (!pcols.includes('barcode')) db.exec('ALTER TABLE products ADD COLUMN barcode TEXT');
+  const vcols = db.prepare('PRAGMA table_info(variants)').all().map((c) => c.name);
+  if (!vcols.includes('barcode')) db.exec('ALTER TABLE variants ADD COLUMN barcode TEXT');
+  const clcols = db.prepare('PRAGMA table_info(store_cashier_links)').all().map((x) => x.name);
+  if (!clcols.includes('starts_at')) db.exec('ALTER TABLE store_cashier_links ADD COLUMN starts_at TEXT');
+  if (!clcols.includes('ends_at')) db.exec('ALTER TABLE store_cashier_links ADD COLUMN ends_at TEXT');
+  if (!clcols.includes('grace_days')) db.exec('ALTER TABLE store_cashier_links ADD COLUMN grace_days INTEGER NOT NULL DEFAULT 7');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_variants_barcode ON variants(barcode) WHERE barcode IS NOT NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_variants_sku ON variants(sku) WHERE sku IS NOT NULL');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_products_barcode ON products(store_id, barcode) WHERE barcode IS NOT NULL');
   // Single-department stores: their products belong to that department.
   db.exec(`UPDATE products SET department = (SELECT TRIM(s.departments, ',') FROM stores s WHERE s.id = products.store_id)
            WHERE department IS NULL AND (SELECT LENGTH(s.departments) - LENGTH(REPLACE(s.departments, ',', '')) FROM stores s WHERE s.id = products.store_id) = 2`);
@@ -65,6 +78,9 @@ db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   const ocols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!ocols.includes('delivery_by')) db.exec("ALTER TABLE orders ADD COLUMN delivery_by TEXT NOT NULL DEFAULT 'store'");
   if (!ocols.includes('delivery_group')) db.exec('ALTER TABLE orders ADD COLUMN delivery_group TEXT');
+  if (!ocols.includes('delivery_route_id')) db.exec('ALTER TABLE orders ADD COLUMN delivery_route_id TEXT');
+  if (!ocols.includes('delivery_mode')) db.exec("ALTER TABLE orders ADD COLUMN delivery_mode TEXT NOT NULL DEFAULT 'pooled'");
+  if (!ocols.includes('delivery_fee_status')) db.exec("ALTER TABLE orders ADD COLUMN delivery_fee_status TEXT NOT NULL DEFAULT 'confirmed'");
   if (!ocols.includes('handoff_at')) db.exec('ALTER TABLE orders ADD COLUMN handoff_at TEXT');
   if (!ocols.includes('platform_discount')) db.exec('ALTER TABLE orders ADD COLUMN platform_discount INTEGER NOT NULL DEFAULT 0');
   if (!ocols.includes('buyer_id')) db.exec('ALTER TABLE orders ADD COLUMN buyer_id INTEGER');
@@ -72,6 +88,10 @@ db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   if (!ocols.includes('shipping_free')) db.exec('ALTER TABLE orders ADD COLUMN shipping_free INTEGER NOT NULL DEFAULT 0');
   if (!ocols.includes('courier_cost')) db.exec('ALTER TABLE orders ADD COLUMN courier_cost INTEGER');
   if (!ocols.includes('delivery_person_id')) db.exec('ALTER TABLE orders ADD COLUMN delivery_person_id INTEGER');
+  if (!ocols.includes('delivery_fee_quote')) db.exec('ALTER TABLE orders ADD COLUMN delivery_fee_quote INTEGER');
+  if (!ocols.includes('delivery_sponsor_share')) db.exec('ALTER TABLE orders ADD COLUMN delivery_sponsor_share INTEGER NOT NULL DEFAULT 0');
+  if (!ocols.includes('delivery_sponsor_collected')) db.exec('ALTER TABLE orders ADD COLUMN delivery_sponsor_collected INTEGER NOT NULL DEFAULT 0');
+  db.exec("UPDATE orders SET delivery_route_id=COALESCE(delivery_group,'order:' || id) WHERE delivery_by='platform' AND delivery_route_id IS NULL");
   // Older single-store orders with zero delivery were genuinely free; only
   // grouped marketplace sub-orders use zero to mean the basket fee is shared.
   db.exec('UPDATE orders SET shipping_free=1 WHERE shipping=0 AND delivery_group IS NULL AND shipping_free=0');
@@ -85,11 +105,13 @@ db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   }
   db.exec('CREATE INDEX IF NOT EXISTS idx_orders_buyer ON orders(buyer_id)');
   db.exec('CREATE INDEX IF NOT EXISTS idx_orders_delivery_group ON orders(delivery_group)');
+  db.exec('CREATE INDEX IF NOT EXISTS idx_orders_delivery_route ON orders(delivery_route_id)');
   const rateCols = db.prepare('PRAGMA table_info(delivery_rates)').all().map((c) => c.name);
   if (!rateCols.includes('distance_km')) db.exec('ALTER TABLE delivery_rates ADD COLUMN distance_km REAL');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_rates_area ON delivery_rates(lower(governorate), lower(city))');
   db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
-    ('delivery_base_fee','50'), ('delivery_included_km','2'), ('delivery_per_km','10')`);
+    ('delivery_base_fee','50'), ('delivery_included_km','2'), ('delivery_per_km','10'),
+    ('delivery_extra_pickup_stop_fee','0'), ('delivery_extra_pickup_zone_fee','0')`);
   db.exec(`INSERT OR IGNORE INTO delivery_rates(governorate,city,fee,distance_km) VALUES
     ('Qalyubia','Banha',50,0), ('Qalyubia','بنها',50,0),
     ('Qalyubia','نصف أتريب',50,0.8), ('Qalyubia','كفر مناقر',50,1.3), ('Qalyubia','بطا',50,1.5),

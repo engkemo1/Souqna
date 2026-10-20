@@ -27,6 +27,8 @@ const LookShare = lazy(() => import('./pages/market/LookShare.jsx'));
 const LookOfDayDetail = lazy(() => import('./pages/market/LookOfDayDetail.jsx'));
 const Legal = lazy(() => import('./pages/market/Legal.jsx'));
 const Request = lazy(() => import('./pages/market/Request.jsx'));
+const BanhaRunner = lazy(() => import('./pages/market/BanhaRunner.jsx'));
+const Pos = lazy(() => import('./pages/pos/Pos.jsx'));
 
 const StoreLayout = lazy(() => import('./pages/store/StoreLayout.jsx'));
 const StoreHome = lazy(() => import('./pages/store/StoreHome.jsx'));
@@ -109,6 +111,8 @@ const router = createBrowserRouter([
       { path: '/legal/:doc', element: <Legal /> },
       { path: '/request', element: <Request /> },
       { path: '/request/:token', element: <Request /> },
+      { path: '/play/banha', element: <BanhaRunner /> },
+      { path: '/pos', element: <Pos /> },
       {
         path: '/s/:slug',
         element: <StoreLayout />,

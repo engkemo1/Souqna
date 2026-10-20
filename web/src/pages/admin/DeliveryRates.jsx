@@ -15,10 +15,10 @@ export default function DeliveryRates() {
   const { data, error, loading, reload } = useAdminApi('/delivery-rates');
   const toast = useToast();
   const [form, setForm] = useState(blank);
-  const [pricing, setPricing] = useState({ baseFee: '50', includedKm: '2', perKm: '10' });
+  const [pricing, setPricing] = useState({ baseFee: '50', includedKm: '2', perKm: '10', extraPickupStopFee: '0', extraPickupZoneFee: '0' });
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (data?.pricing) setPricing({ baseFee: String(data.pricing.baseFee), includedKm: String(data.pricing.includedKm), perKm: String(data.pricing.perKm) }); }, [data?.pricing]);
+  useEffect(() => { if (data?.pricing) setPricing({ baseFee: String(data.pricing.baseFee), includedKm: String(data.pricing.includedKm), perKm: String(data.pricing.perKm), extraPickupStopFee: String(data.pricing.extraPickupStopFee ?? 0), extraPickupZoneFee: String(data.pricing.extraPickupZoneFee ?? 0) }); }, [data?.pricing]);
   const reset = () => { setForm(blank); setEditing(null); };
   const save = async (event) => {
     event.preventDefault(); setBusy(true);
@@ -34,8 +34,8 @@ export default function DeliveryRates() {
   const savePricing = async (event) => {
     event.preventDefault(); setBusy(true);
     try {
-      await adminApi('/delivery-rates/pricing', { method: 'PUT', body: { baseFee: Number(pricing.baseFee), includedKm: Number(pricing.includedKm), perKm: Number(pricing.perKm) } });
-      toast({ title: 'تم حفظ طريقة حساب رسوم المسافة' }); reload();
+      await adminApi('/delivery-rates/pricing', { method: 'PUT', body: { baseFee: Number(pricing.baseFee), includedKm: Number(pricing.includedKm), perKm: Number(pricing.perKm), extraPickupStopFee: Number(pricing.extraPickupStopFee), extraPickupZoneFee: Number(pricing.extraPickupZoneFee) } });
+      toast({ title: 'تم حفظ طريقة حساب رسوم التوصيل' }); reload();
     } catch (e) { toast({ tone: 'error', title: e.message }); }
     setBusy(false);
   };
@@ -48,11 +48,14 @@ export default function DeliveryRates() {
   return <div>
     <PageHeader title="رسوم التوصيل حسب المنطقة" subtitle="رسوم واحدة للعميل عن رحلة المندوب كلها، مع تقسيم نصيب الشحن المجاني بين المحلات المؤهلة." />
     <div className="mb-5 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">المسافات المسجلة تقريبية بخط مستقيم من وسط بنها وليست مسافة طريق. سعر المدينة له الأولوية، وبعده المحافظة، ثم السعر الافتراضي. لو العميل كتب منطقة غير مسجلة، يظهر السعر الأساسي الذي تحدده هنا حتى تضيف سعرًا دقيقًا لها. رسوم المنطقة تقدير للرحلة؛ سجّل تكلفة المندوب الفعلية من صفحة «التوصيل علينا» لمراجعة صافي الرحلة ونصيب المحلات التي فعّلت الشحن المجاني.</div>
-    <Panel title="طريقة حساب المسافة" className="mb-5">
+    <Panel title="طريقة حساب رسوم التوصيل" className="mb-5">
+      <p className="mb-4 text-sm leading-6 text-muted">رسوم العميل الواحدة = سعر منطقة العميل + رسوم نقاط الاستلام الإضافية + رسوم مناطق الاستلام الإضافية. عيّن نفس منطقة الاستلام للمحلات القريبة من صفحة المحلات؛ المحل من غير منطقة يُعامل كنقطة مستقلة.</p>
       <form onSubmit={savePricing} className="grid gap-4 sm:grid-cols-3 sm:items-end">
         <Field label="السعر الأساسي"><Input inputMode="numeric" suffix="ج.م" value={pricing.baseFee} onChange={(e) => setPricing({ ...pricing, baseFee: e.target.value.replace(/\D/g, '') })} required /></Field>
         <Field label="المسافة المشمولة"><Input inputMode="decimal" suffix="كم" value={pricing.includedKm} onChange={(e) => setPricing({ ...pricing, includedKm: e.target.value.replace(/[^\d.]/g, '') })} required /></Field>
         <Field label="لكل كيلومتر إضافي (تقريب لأعلى)"><Input inputMode="numeric" suffix="ج.م" value={pricing.perKm} onChange={(e) => setPricing({ ...pricing, perKm: e.target.value.replace(/\D/g, '') })} required /></Field>
+        <Field label="لكل نقطة استلام إضافية" hint="تُحسب مرة لكل محل بعد الأول"><Input inputMode="numeric" suffix="ج.م" value={pricing.extraPickupStopFee} onChange={(e) => setPricing({ ...pricing, extraPickupStopFee: e.target.value.replace(/\D/g, '') })} required /></Field>
+        <Field label="لكل منطقة استلام إضافية" hint="المحلات التي تشارك نفس منطقة الاستلام تُحسب منطقة واحدة"><Input inputMode="numeric" suffix="ج.م" value={pricing.extraPickupZoneFee} onChange={(e) => setPricing({ ...pricing, extraPickupZoneFee: e.target.value.replace(/\D/g, '') })} required /></Field>
         <div className="sm:col-span-3"><Button type="submit" loading={busy}>حفظ طريقة الحساب</Button></div>
       </form>
     </Panel>

@@ -113,13 +113,14 @@ export function serializeProductDetail(p) {
   const media = q
     .all('SELECT m.*, pm.is_primary, pm.position FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=? ORDER BY pm.is_primary DESC, pm.position', [p.id])
     .map((m) => ({ ...serializeMedia(m), primary: !!m.is_primary }));
-  const variants = q.all('SELECT id, color, size, sku, stock FROM variants WHERE product_id=? ORDER BY id', [p.id]);
+  const variants = q.all('SELECT id, color, size, sku, barcode, stock FROM variants WHERE product_id=? ORDER BY id', [p.id]);
   const category = p.category_id ? q.get('SELECT id, slug, name_ar, name_en FROM categories WHERE id=?', [p.category_id]) : null;
   const [card] = serializeCards([p]);
   return {
     ...card,
     description: bi(p, 'description'),
     sku: p.sku,
+    barcode: p.barcode || null,
     department: p.department || null,
     media,
     sizes: json(p.sizes_json, []),

@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import express from 'express';
 
-test('marketplace checkout creates one order per store and rolls all stores back on stock errors', async () => {
+test('multi-store checkout defers unconfirmed delivery fees and rolls all stores back on stock errors', async () => {
   const dbFile = path.join(os.tmpdir(), `souqna-market-cart-${randomUUID()}.db`);
   process.env.DB_FILE = dbFile;
   process.env.JWT_SECRET = `market-cart-test-${randomUUID()}`;
@@ -27,7 +27,8 @@ test('marketplace checkout creates one order per store and rolls all stores back
     const productA = insert('products', { store_id: storeA, slug: 'item-a', name_ar: 'منتج أ', name_en: 'Item A', price: 400, stock: 3 });
     const productB = insert('products', { store_id: storeB, slug: 'item-b', name_ar: 'منتج ب', name_en: 'Item B', price: 500, stock: 2 });
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-    const url = `http://127.0.0.1:${server.address().port}/api/marketplace/orders`;
+    const apiUrl = `http://127.0.0.1:${server.address().port}/api`;
+    const url = `${apiUrl}/marketplace/orders`;
     const body = {
       name: 'Test Customer', phone: '01012345678', governorate: 'Qalyubia', city: 'Banha', address: 'Test street, building 1', notes: '',
       stores: [
@@ -35,15 +36,22 @@ test('marketplace checkout creates one order per store and rolls all stores back
         { slug: q.get('SELECT slug FROM stores WHERE id=?', [storeB]).slug, items: [{ productId: productB, qty: 1 }] },
       ],
     };
+    const feePreview = await fetch(`${apiUrl}/marketplace/delivery-fee`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({
+      governorate: body.governorate, city: body.city, stores: body.stores,
+    }) });
+    assert.equal(feePreview.status, 200);
+    const fee = await feePreview.json();
+    assert.equal(fee.fee, null);
+    assert.equal(fee.feeStatus, 'pending');
     const first = await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
     assert.equal(first.status, 201);
     const { orders } = await first.json();
     assert.equal(orders.length, 2);
     assert.equal(new Set(orders.map((o) => o.deliveryGroup)).size, 1);
-    assert.deepEqual(orders.map((o) => o.total).sort((a, b) => a - b), [400, 525]);
-    assert.equal(orders.reduce((sum, order) => sum + order.shipping, 0), 25);
+    assert.deepEqual(orders.map((o) => o.total).sort((a, b) => a - b), [400, 500]);
+    assert.ok(orders.every((order) => order.shipping === 0 && order.deliveryFeeStatus === 'pending'));
     assert.equal(orders.find((o) => o.storeSlug === body.stores[0].slug).shipping, 0);
-    assert.equal(orders.find((o) => o.storeSlug === body.stores[1].slug).shipping, 25);
+    assert.equal(orders.find((o) => o.storeSlug === body.stores[1].slug).shipping, 0);
     assert.equal(q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform'"), 2);
     assert.equal(q.val('SELECT COUNT(*) FROM orders'), 2);
     assert.equal(q.get('SELECT stock FROM products WHERE id=?', [productA]).stock, 2);

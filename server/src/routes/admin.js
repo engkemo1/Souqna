@@ -18,7 +18,7 @@ import { testProvider, stylistStatus, saveStylistSettings, providerReady, stylis
 import { llmChain } from '../lib/stylist.js';
 import { adminModaPrompts, saveModaPrompts, resetModaPrompts, suggestPrompts } from '../lib/modaPrompts.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage } from '../lib/deptImage.js';
-import { notifyOrderStatus } from '../lib/buyers.js';
+import { notifyBuyer, notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
 import { verifyTotp } from '../lib/totp.js';
 import { snapshotDb, runBackup, lastBackup, runOffsiteBackup, lastOffsite } from '../lib/backup.js';
@@ -27,6 +27,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { isWhatsAppConfigured, notifyPlatformDelivery } from '../lib/whatsapp.js';
+import { mountCashierAdmin } from './admin-cashier.js';
+import { cashierAccess } from '../lib/cashier-access.js';
+import { CASHIER_SYSTEMS, CASHIER_IDS, CASHIER_LINK_STATUSES } from '../lib/cashier-catalog.js';
 import { deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing } from '../lib/deliveryRates.js';
 
 function makeSetupLink(req, uid) {
@@ -152,6 +155,47 @@ r.put('/subscriptions/settings', h((req, res) => {
   res.json({ settings: body });
 }));
 
+/* ---- staged cashier integration rollout (disabled until platform admin enables it) ---- */
+const cashierPayload = () => ({
+  enabled: subscriptionSetting('cashier_sync_enabled', '0') === '1',
+  ready: CASHIER_SYSTEMS.some((c) => c.connector === 'ready'),
+  supportedMethods: CASHIER_SYSTEMS.filter((c) => c.connector === 'ready').map((c) => c.id),
+  systems: CASHIER_SYSTEMS,
+  links: q.all(`SELECT s.id AS storeId, s.slug, s.name_ar AS storeName, l.cashier_id AS cashierId, COALESCE(l.status,'none') AS status, COALESCE(l.note,'') AS note, l.updated_at AS updatedAt,
+      l.starts_at AS startsAt, l.ends_at AS endsAt, COALESCE(l.grace_days,7) AS graceDays
+    FROM stores s LEFT JOIN store_cashier_links l ON l.store_id=s.id ORDER BY s.name_ar`).map(({ storeId, ...l }) => ({ ...l, state: cashierAccess(storeId).state })),
+});
+r.get('/cashier-sync', h((_req, res) => { res.json(cashierPayload()); }));
+r.put('/cashier-sync/stores/:slug', h((req, res) => {
+  const body = z.object({
+    cashierId: z.enum(CASHIER_IDS).nullable(),
+    status: z.enum(CASHIER_LINK_STATUSES).default('pending'),
+    note: z.string().trim().max(300).default(''),
+    startsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    endsAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+    graceDays: z.coerce.number().int().min(0).max(60).optional(),
+  }).parse(req.body);
+  const store = q.get('SELECT id FROM stores WHERE slug=?', [req.params.slug]);
+  if (!store) throw new AppError(404, 'not_found', 'Store not found.');
+  if (!body.cashierId) q.run('DELETE FROM store_cashier_links WHERE store_id=?', [store.id]);
+  else {
+    q.run(`INSERT INTO store_cashier_links(store_id,cashier_id,status,note,updated_at) VALUES(?,?,?,?,datetime('now'))
+      ON CONFLICT(store_id) DO UPDATE SET cashier_id=excluded.cashier_id,status=excluded.status,note=excluded.note,updated_at=excluded.updated_at`,
+      [store.id, body.cashierId, body.status, body.note]);
+    // dates are only touched when the client sent them (null clears)
+    if (body.startsAt !== undefined) q.run('UPDATE store_cashier_links SET starts_at=? WHERE store_id=?', [body.startsAt, store.id]);
+    if (body.endsAt !== undefined) q.run('UPDATE store_cashier_links SET ends_at=? WHERE store_id=?', [body.endsAt, store.id]);
+    if (body.graceDays !== undefined) q.run('UPDATE store_cashier_links SET grace_days=? WHERE store_id=?', [body.graceDays, store.id]);
+  }
+  res.json(cashierPayload());
+}));
+mountCashierAdmin(r);
+r.put('/cashier-sync', h((req, res) => {
+  const body = z.object({ enabled: z.boolean() }).parse(req.body);
+  q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', ['cashier_sync_enabled', body.enabled ? '1' : '0']);
+  res.json(cashierPayload());
+}));
+
 r.put('/subscriptions/:slug/fee', h((req, res) => {
   const body = z.object({ monthlyFeeOverride: z.union([z.number().int().min(0).max(100000), z.null()]) }).parse(req.body);
   const store = q.get('SELECT id FROM stores WHERE slug=?', [req.params.slug]);
@@ -183,42 +227,50 @@ r.post('/subscriptions/:slug/free-months', h((req, res) => {
 
 /** Orders Twist has to collect from stores and deliver. */
 r.get('/deliveries', h((_req, res) => {
-  const rows = q.all(`SELECT o.id, o.number, o.status, o.total, o.shipping, o.shipping_free, o.delivery_group,
-      CASE WHEN o.delivery_group IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') END AS delivery_group_count,
-      CASE WHEN o.delivery_group IS NULL THEN o.total ELSE (SELECT COALESCE(SUM(g.total),0) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') END AS delivery_group_total,
-      CASE WHEN o.delivery_group IS NULL THEN (o.status='processing') ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status='processing') END AS delivery_group_ready_count,
-      CASE WHEN o.delivery_group IS NULL THEN (o.status='shipped') ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status='shipped') END AS delivery_group_shipped_count,
-      CASE WHEN o.delivery_group IS NULL THEN o.shipping ELSE (SELECT COALESCE(SUM(g.shipping),0) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') END AS delivery_customer_fee,
-      CASE WHEN o.delivery_group IS NULL THEN (SELECT COUNT(*) FROM orders g WHERE g.id=o.id AND g.shipping_free=1 AND g.status<>'cancelled') ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.shipping_free=1 AND g.status<>'cancelled') END AS delivery_free_count,
-      CASE WHEN o.delivery_group IS NULL THEN o.id ELSE (SELECT g.id FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled' ORDER BY g.id LIMIT 1) END AS delivery_run_owner_id,
-      CASE WHEN o.delivery_group IS NULL THEN o.courier_cost ELSE (SELECT g.courier_cost FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled' ORDER BY g.id LIMIT 1) END AS delivery_courier_cost,
-      CASE WHEN o.delivery_group IS NULL THEN o.delivery_person_id ELSE (SELECT g.delivery_person_id FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled' ORDER BY g.id LIMIT 1) END AS delivery_person_id,
-      o.customer_name, o.phone, o.governorate, o.city, o.address, o.notes, o.created_at, o.handoff_at,
-      s.slug, s.name_ar AS store_name, s.phone AS store_phone, s.address_ar AS store_address, s.map_url AS store_map
+  const rows = q.all(`SELECT o.id,o.number,o.status,o.total,o.subtotal,o.shipping,o.shipping_free,o.delivery_group,o.delivery_fee_status,o.delivery_fee_quote,o.track_token,o.delivery_sponsor_share,o.delivery_sponsor_collected,
+      o.delivery_route_id,o.delivery_mode,o.delivery_person_id,o.courier_cost,o.customer_name,o.phone,o.governorate,o.city,o.address,o.notes,o.created_at,o.handoff_at,
+      s.id AS store_id,s.slug,s.name_ar AS store_name,s.phone AS store_phone,s.whatsapp AS store_whatsapp,s.address_ar AS store_address,s.map_url AS store_map,s.delivery_zone
     FROM orders o JOIN stores s ON s.id=o.store_id
     WHERE o.delivery_by='platform' AND o.status NOT IN ('delivered','cancelled') ORDER BY o.created_at ASC,o.id ASC LIMIT 300`);
   const deliveryPeople = new Map(q.all('SELECT id,name FROM delivery_people').map((p) => [p.id, p.name]));
-  const grouped = new Map();
+  const routeKey = (row) => row.delivery_route_id || row.delivery_group || `order:${row.id}`;
+  const grouped = new Map(); const baskets = new Map();
   for (const row of rows) {
-    const key = row.delivery_group || `order:${row.id}`;
-    if (!grouped.has(key)) grouped.set(key, []);
-    grouped.get(key).push(row);
+    const key = routeKey(row);
+    if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(row);
+    if (row.delivery_group) { if (!baskets.has(row.delivery_group)) baskets.set(row.delivery_group, []); baskets.get(row.delivery_group).push(row); }
   }
   const orders = rows.map((row) => {
-    const siblings = grouped.get(row.delivery_group || `order:${row.id}`);
+    const siblings = grouped.get(routeKey(row));
+    const basket = row.delivery_group ? (baskets.get(row.delivery_group) || []) : [row];
+    const collectionLeader = [...basket].sort((a,b) => a.id-b.id)[0];
+    const leaderRoute = collectionLeader ? grouped.get(routeKey(collectionLeader)) : siblings;
+    const owner = [...siblings].sort((a,b) => a.id-b.id)[0];
     const cost = row.delivery_courier_cost == null ? null : Number(row.delivery_courier_cost);
-    const perStop = cost == null ? [] : siblings.map((_, i) => Math.floor(cost / siblings.length) + (i < cost % siblings.length ? 1 : 0));
-    const sponsored = siblings.reduce((sum, sibling, i) => sum + (sibling.shipping_free ? (perStop[i] || 0) : 0), 0);
-    const index = siblings.findIndex((sibling) => sibling.id === row.id);
-    return { ...row, delivery_person_name: deliveryPeople.get(row.delivery_person_id) || null,
-      shop_delivery_sponsor_share: row.shipping_free ? (perStop[index] ?? null) : 0,
-      delivery_sponsored_total: cost == null ? null : sponsored,
-      delivery_profit: cost == null ? null : row.delivery_customer_fee + sponsored - cost };
+    return { ...row,
+      delivery_route_id: routeKey(row), delivery_run_owner_id: owner.id,
+      delivery_route_count: siblings.length, delivery_route_ready_count: siblings.filter((x) => x.status === 'processing').length,
+      delivery_route_shipped_count: siblings.filter((x) => x.status === 'shipped').length,
+      delivery_route_cash: siblings.reduce((sum,x) => sum + x.total, 0),
+      delivery_route_customer_fee: siblings.reduce((sum,x) => sum + x.shipping, 0),
+      delivery_group_count: basket.length, delivery_group_total: basket.reduce((sum,x) => sum + x.total,0),
+      delivery_group_shipped_count: basket.filter((x) => x.status === 'shipped').length,
+      delivery_group_all_shipped: basket.length > 0 && basket.every((x) => x.status === 'shipped'),
+      delivery_collection_route_id: leaderRoute?.[0] ? routeKey(leaderRoute[0]) : routeKey(row),
+      delivery_customer_fee: basket.reduce((sum,x) => sum + x.shipping,0),
+      delivery_fee_status: basket[0]?.delivery_fee_status || 'confirmed', delivery_fee_quote: basket[0]?.delivery_fee_quote ?? null,
+      delivery_person_name: deliveryPeople.get(owner.delivery_person_id) || null,
+      delivery_courier_cost: owner.courier_cost,
+      delivery_person_id: owner.delivery_person_id,
+      shop_delivery_sponsor_share: row.delivery_sponsor_share || 0,
+      shop_delivery_sponsor_collected: Boolean(row.delivery_sponsor_collected),
+      delivery_sponsored_total: siblings.reduce((sum,x) => sum + (x.delivery_sponsor_collected ? x.delivery_sponsor_share : 0),0),
+      delivery_profit: cost == null ? null : siblings.reduce((sum,x) => sum+x.shipping + (x.delivery_sponsor_collected ? x.delivery_sponsor_share : 0),0)-cost };
   });
-  const historyRows = q.all("SELECT id,delivery_group,shipping,shipping_free,courier_cost,delivery_person_id,customer_name,city,created_at FROM orders WHERE delivery_by='platform' AND status='delivered' ORDER BY id DESC LIMIT 600");
+  const historyRows = q.all("SELECT id,delivery_group,delivery_route_id,shipping,shipping_free,delivery_sponsor_share,delivery_sponsor_collected,courier_cost,delivery_person_id,customer_name,city,created_at FROM orders WHERE delivery_by='platform' AND status='delivered' ORDER BY id DESC LIMIT 600");
   const historyGroups = new Map();
   for (const row of historyRows) {
-    const key = row.delivery_group || `order:${row.id}`;
+    const key = row.delivery_route_id || row.delivery_group || `order:${row.id}`;
     if (!historyGroups.has(key)) historyGroups.set(key, []);
     historyGroups.get(key).push(row);
   }
@@ -226,40 +278,132 @@ r.get('/deliveries', h((_req, res) => {
     const ordered = [...group].sort((a, b) => a.id - b.id);
     const owner = ordered[0];
     const cost = owner.courier_cost == null ? null : Number(owner.courier_cost);
-    const shares = cost == null ? [] : ordered.map((_, i) => Math.floor(cost / ordered.length) + (i < cost % ordered.length ? 1 : 0));
-    const sponsored = ordered.reduce((sum, row, i) => sum + (row.shipping_free ? (shares[i] || 0) : 0), 0);
     const fee = ordered.reduce((sum, row) => sum + row.shipping, 0);
-    return { key, orderId: owner.id, customerName: owner.customer_name, city: owner.city, createdAt: owner.created_at, storeCount: ordered.length, customerFee: fee, courierCost: cost, freeStoreContribution: cost == null ? null : sponsored, profit: cost == null ? null : fee + sponsored - cost, deliveryPersonName: deliveryPeople.get(owner.delivery_person_id) || null };
+    const collectedSponsors = ordered.reduce((sum,row) => sum + (row.delivery_sponsor_collected ? row.delivery_sponsor_share : 0),0);
+    return { key, orderId: owner.id, customerName: owner.customer_name, city: owner.city, createdAt: owner.created_at, storeCount: ordered.length, customerFee: fee, courierCost: cost, collectedSponsors, profit: cost == null ? null : fee + collectedSponsors - cost, deliveryPersonName: deliveryPeople.get(owner.delivery_person_id) || null };
   });
   res.json({ orders, deliveredRuns });
 }));
 
 r.patch('/delivery-runs', h((req, res) => {
-  const body = z.object({ orderId: z.coerce.number().int().positive(), courierCost: z.coerce.number().int().min(0).max(100000).nullable(), deliveryPersonId: z.coerce.number().int().positive().nullable().optional() }).parse(req.body);
-  const order = q.get("SELECT id,delivery_group,status FROM orders WHERE id=? AND delivery_by='platform'", [body.orderId]);
+  const body = z.object({ orderId: z.coerce.number().int().positive(), courierCost: z.coerce.number().int().min(0).max(100000).nullable(), deliveryPersonId: z.coerce.number().int().positive().nullable().optional(), deliveryMode: z.enum(['pooled','split']).optional(), customerFee: z.coerce.number().int().min(0).max(5000).optional() }).parse(req.body);
+  const order = q.get("SELECT id,store_id,delivery_group,delivery_route_id,status FROM orders WHERE id=? AND delivery_by='platform'", [body.orderId]);
   if (!order) throw new AppError(404, 'not_found', 'Delivery run not found.');
   const personId = body.deliveryPersonId ?? null;
   if (personId && !q.get('SELECT id FROM delivery_people WHERE id=? AND active=1', [personId])) throw new AppError(422, 'validation_failed', 'Choose an active delivery person.');
-  const owner = order.delivery_group
-    ? q.get("SELECT id FROM orders WHERE delivery_group=? AND status<>'cancelled' ORDER BY id LIMIT 1", [order.delivery_group])
-    : order;
+  if (body.deliveryMode && order.delivery_group && q.get("SELECT id FROM orders WHERE delivery_group=? AND status IN ('shipped','delivered') LIMIT 1", [order.delivery_group])) throw new AppError(409, 'route_locked', 'The delivery plan cannot change after a courier starts the route.');
+  if (body.deliveryMode && order.delivery_group && q.get("SELECT id FROM orders WHERE delivery_group=? AND (delivery_fee_status='offered' OR (delivery_fee_status='confirmed' AND delivery_fee_quote IS NOT NULL)) LIMIT 1", [order.delivery_group])) throw new AppError(409, 'fee_offer_route_locked', 'The delivery plan cannot change after a fee offer is sent or accepted.');
+  if (body.customerFee != null) {
+    if (!order.delivery_group) throw new AppError(400, 'not_marketplace_basket', 'A customer fee can only be offered for a marketplace basket.');
+    const basket = q.all("SELECT id,status,subtotal,discount,shipping_free,buyer_id,track_token FROM orders WHERE delivery_group=? AND status<>'cancelled' ORDER BY id", [order.delivery_group]);
+    if (basket.some((item) => item.status !== 'processing')) throw new AppError(409, 'stores_not_ready', 'Wait until every store in the basket marks its order ready before offering a delivery fee.');
+    if (basket.some((item) => q.val('SELECT delivery_fee_status FROM orders WHERE id=?', [item.id]) === 'confirmed')) throw new AppError(409, 'fee_already_confirmed', 'This delivery fee has already been confirmed.');
+    const chargeable = basket.filter((item) => !item.shipping_free);
+    const base = chargeable.length ? Math.floor(body.customerFee / chargeable.length) : 0;
+    let remainder = chargeable.length ? body.customerFee % chargeable.length : 0;
+    const shares = new Map(chargeable.map((item) => [item.id, base + (remainder-- > 0 ? 1 : 0)]));
+    tx(() => {
+      for (const item of basket) {
+        const shipping = shares.get(item.id) || 0;
+        q.run("UPDATE orders SET shipping=?,total=subtotal-discount+?,delivery_fee_quote=?,delivery_fee_status='offered',updated_at=? WHERE id=?", [shipping, shipping, body.customerFee, new Date().toISOString(), item.id]);
+      }
+    });
+    const notified = new Set();
+    for (const item of basket) if (item.buyer_id && !notified.has(item.buyer_id)) {
+      notified.add(item.buyer_id);
+      notifyBuyer(item.buyer_id, { kind: 'order', title: 'رسوم توصيل طلبك جاهزة', body: `رسوم توصيل سلة Twist: ${body.customerFee} ج.م. راجع رابط التتبع للموافقة.`, url: `/track/${item.track_token}` });
+    }
+  }
+  if (body.deliveryMode && order.delivery_group) {
+    const basket = q.all("SELECT o.id,s.delivery_zone FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.delivery_group=? AND o.status<>'cancelled' ORDER BY o.id", [order.delivery_group]);
+    const routed = new Map();
+    for (const item of basket) {
+      const zoneKey = String(item.delivery_zone || '').trim().toLocaleLowerCase('ar-EG') || `store:${item.id}`;
+      const routeId = body.deliveryMode === 'pooled' ? order.delivery_group : `${order.delivery_group}:${zoneKey}`;
+      if (!routed.has(routeId)) routed.set(routeId, []);
+      routed.get(routeId).push(item.id);
+    }
+    for (const [routeId, ids] of routed) {
+      const placeholders = ids.map(() => '?').join(',');
+      q.run(`UPDATE orders SET delivery_route_id=?,delivery_mode=? WHERE id IN (${placeholders})`, [routeId, body.deliveryMode, ...ids]);
+    }
+    // Mode changes invalidate per-route assignments so no shop silently keeps the wrong courier.
+    q.run("UPDATE orders SET courier_cost=NULL,delivery_person_id=NULL WHERE delivery_group=? AND status<>'cancelled'", [order.delivery_group]);
+  }
+  const activeRoute = body.deliveryMode && order.delivery_group
+    ? (body.deliveryMode === 'pooled' ? order.delivery_group : (() => { const z = q.get('SELECT delivery_zone FROM stores WHERE id=?',[order.store_id])?.delivery_zone; return `${order.delivery_group}:${String(z || '').trim().toLocaleLowerCase('ar-EG') || `store:${order.id}`}`; })())
+    : (order.delivery_route_id || order.delivery_group || `order:${order.id}`);
+  const owner = q.get("SELECT id FROM orders WHERE COALESCE(delivery_route_id,delivery_group,'order:' || id)=? AND status<>'cancelled' ORDER BY id LIMIT 1", [activeRoute]);
   if (!owner) throw new AppError(404, 'not_found', 'No active order remains in this delivery run.');
   q.run('UPDATE orders SET courier_cost=?, delivery_person_id=? WHERE id=?', [body.courierCost, personId, owner.id]);
-  res.json({ ok: true, ownerOrderId: owner.id });
+  if (body.courierCost != null) {
+    const routeOrders = q.all("SELECT id,shipping_free,delivery_sponsor_share FROM orders WHERE COALESCE(delivery_route_id,delivery_group,'order:' || id)=? AND status<>'cancelled' ORDER BY id", [activeRoute]);
+    routeOrders.forEach((item,index) => {
+      const share = item.shipping_free ? Math.floor(body.courierCost / routeOrders.length) + (index < body.courierCost % routeOrders.length ? 1 : 0) : 0;
+      q.run('UPDATE orders SET delivery_sponsor_share=?,delivery_sponsor_collected=CASE WHEN delivery_sponsor_share=? THEN delivery_sponsor_collected ELSE 0 END WHERE id=?', [share,share,item.id]);
+    });
+  }
+  res.json({ ok: true, ownerOrderId: owner.id, deliveryRouteId: activeRoute });
+}));
+
+r.post('/delivery-runs/cancel-rejected', h((req, res) => {
+  const { orderId } = z.object({ orderId: z.coerce.number().int().positive() }).parse(req.body);
+  const order = q.get("SELECT id,delivery_group FROM orders WHERE id=? AND delivery_by='platform'", [orderId]);
+  if (!order?.delivery_group) throw new AppError(404, 'not_found', 'Marketplace delivery basket not found.');
+  const basket = q.all("SELECT id,status,delivery_fee_status,customer_id,buyer_id,track_token,subtotal FROM orders WHERE delivery_group=? AND status<>'cancelled'", [order.delivery_group]);
+  if (!basket.length || basket.some((item) => item.delivery_fee_status !== 'rejected' || !['pending','confirmed','processing'].includes(item.status))) throw new AppError(409, 'cannot_cancel_basket', 'Only a rejected delivery offer can be cancelled before dispatch.');
+  const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
+  tx(() => {
+    for (const item of basket) {
+      for (const line of q.all('SELECT product_id,variant_id,qty FROM order_items WHERE order_id=?', [item.id])) {
+        if (line.variant_id) q.run('UPDATE variants SET stock=stock+? WHERE id=?', [line.qty, line.variant_id]);
+        q.run('UPDATE products SET stock=stock+?,sold_count=MAX(0,sold_count-?) WHERE id=?', [line.qty, line.qty, line.product_id]);
+      }
+      if (item.customer_id) q.run('UPDATE customers SET orders_count=MAX(0,orders_count-1),total_spent=MAX(0,total_spent-?) WHERE id=?', [item.subtotal, item.customer_id]);
+      q.run("UPDATE orders SET status='cancelled',updated_at=? WHERE id=?", [now, item.id]);
+      insert('order_events', { order_id: item.id, status: 'cancelled', note: 'Customer rejected delivery fee', created_at: now });
+    }
+  });
+  const notified = new Set();
+  for (const item of basket) if (item.buyer_id && !notified.has(item.buyer_id)) {
+    notified.add(item.buyer_id);
+    notifyBuyer(item.buyer_id, { kind: 'order', title: 'تم إلغاء طلبات سلة Twist', body: 'تم إلغاء السلة بعد رفض رسوم التوصيل وإرجاع المنتجات للمخزون.', url: `/track/${item.track_token}` });
+  }
+  res.json({ ok: true, cancelled: basket.length });
+}));
+
+r.patch('/orders/:id/delivery-sponsor', h((req,res) => {
+  const { collected } = z.object({ collected: z.boolean() }).parse(req.body);
+  const order = q.get("SELECT id,shipping_free,delivery_sponsor_share FROM orders WHERE id=? AND delivery_by='platform'", [Number(req.params.id)]);
+  if (!order) throw new AppError(404,'not_found','Delivery order not found.');
+  if (!order.shipping_free) throw new AppError(409,'not_sponsored','Only a free-shipping store has a delivery contribution to reconcile.');
+  q.run('UPDATE orders SET delivery_sponsor_collected=? WHERE id=?',[collected ? 1 : 0,order.id]);
+  res.json({ ok:true, share:order.delivery_sponsor_share, collected });
 }));
 
 r.patch('/orders/:id/status', h((req, res) => {
   const { status } = z.object({ status: z.enum(['shipped', 'delivered']) }).parse(req.body);
   const o = q.get("SELECT * FROM orders WHERE id=? AND delivery_by='platform'", [Number(req.params.id)]);
   if (!o) throw new AppError(404, 'not_found', 'Order not found.');
-  const orders = o.delivery_group
+  if (status === 'shipped' && o.delivery_group) {
+    const unconfirmed = q.get("SELECT id FROM orders WHERE delivery_group=? AND status<>'cancelled' AND delivery_fee_status<>'confirmed' LIMIT 1", [o.delivery_group]);
+    if (unconfirmed) throw new AppError(409, 'delivery_fee_not_accepted', 'Wait until the customer accepts the delivery fee.');
+  }
+  if (status === 'delivered' && o.delivery_group && o.delivery_mode === 'split') {
+    const leader = q.get("SELECT delivery_route_id FROM orders WHERE delivery_group=? AND status<>'cancelled' ORDER BY id LIMIT 1", [o.delivery_group]);
+    if (leader && (leader.delivery_route_id || o.delivery_group) !== (o.delivery_route_id || o.delivery_group)) throw new AppError(409, 'collection_lead_only', 'Only the primary delivery person can confirm the one-time basket collection.');
+  }
+  const routeId = o.delivery_route_id || o.delivery_group || `order:${o.id}`;
+  const orders = o.delivery_group && status === 'delivered' && o.delivery_mode === 'split'
     ? q.all("SELECT * FROM orders WHERE delivery_group=? AND delivery_by='platform' AND status<>'cancelled'", [o.delivery_group])
+    : o.delivery_group
+      ? q.all("SELECT * FROM orders WHERE COALESCE(delivery_route_id,delivery_group,'order:' || id)=? AND delivery_by='platform' AND status<>'cancelled'", [routeId])
     : [o];
   const expected = status === 'shipped' ? 'processing' : 'shipped';
   if (!orders.length || orders.some((item) => item.status !== expected)) {
     const message = status === 'shipped'
-      ? (o.delivery_group ? 'Wait until every shop in this Twist basket marks its order ready.' : 'The store has not marked this order ready yet.')
-      : (o.delivery_group ? 'All orders in this Twist basket must be picked up before delivery.' : 'Pick the order up first.');
+      ? (o.delivery_group ? 'Wait until every shop assigned to this delivery route marks its order ready.' : 'The store has not marked this order ready yet.')
+      : (o.delivery_group && o.delivery_mode === 'split' ? 'Wait until every delivery route is on the way, then confirm one basket handoff.' : o.delivery_group ? 'All orders assigned to this delivery route must be picked up before delivery.' : 'Pick the order up first.');
     throw new AppError(400, 'invalid_transition', message);
   }
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -269,7 +413,17 @@ r.patch('/orders/:id/status', h((req, res) => {
       insert('order_events', { order_id: item.id, status, note: null, created_at: now });
     }
   });
-  for (const item of orders) notifyOrderStatus(item.id, status);
+  if (status === 'delivered' && o.delivery_group && o.delivery_mode === 'split') {
+    const notified = new Set();
+    for (const item of orders) {
+      const buyer = item.buyer_id;
+      if (buyer && !notified.has(buyer)) {
+        notified.add(buyer);
+        const first = orders.find((candidate) => candidate.buyer_id === buyer) || item;
+        notifyBuyer(buyer, { kind: 'order', title: 'سلة Twist وصلتك 🎉', body: 'تم تسليم كل طلبات السلة والتحصيل مرة واحدة.', url: `/track/${first.track_token}` });
+      }
+    }
+  } else for (const item of orders) notifyOrderStatus(item.id, status);
   res.json({ id: o.id, status, updated: orders.length });
 }));
 
@@ -297,7 +451,7 @@ r.get('/delivery-rates', h((_req, res) => {
   res.json({ items, pricing });
 }));
 r.put('/delivery-rates/pricing', h((req, res) => {
-  const pricing = z.object({ baseFee: z.coerce.number().int().min(0).max(5000), includedKm: z.coerce.number().min(0).max(100), perKm: z.coerce.number().int().min(0).max(1000) }).parse(req.body);
+  const pricing = z.object({ baseFee: z.coerce.number().int().min(0).max(5000), includedKm: z.coerce.number().min(0).max(100), perKm: z.coerce.number().int().min(0).max(1000), extraPickupStopFee: z.coerce.number().int().min(0).max(1000).default(0), extraPickupZoneFee: z.coerce.number().int().min(0).max(2000).default(0) }).parse(req.body);
   res.json({ pricing: saveDeliveryPricing(pricing) });
 }));
 r.post('/delivery-rates', h((req, res) => {
@@ -793,8 +947,9 @@ r.get('/notifications', h((req, res) => {
   const items = q.all(`SELECT o.id, o.number, o.total, o.status, o.handoff_at AS at, 'handoff' AS kind, s.name_ar AS store_name
     FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.delivery_by='platform' AND o.handoff_at > ? ORDER BY at DESC LIMIT 10`, [since]);
   const readyItems = q.all(`SELECT e.id AS event_id, o.id, o.number, o.total, o.status, e.created_at AS at, 'ready' AS kind, s.name_ar AS store_name,
-      CASE WHEN o.delivery_group IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status<>'cancelled') END AS group_count,
-      CASE WHEN o.delivery_group IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM orders g WHERE g.delivery_group=o.delivery_group AND g.status IN ('processing','shipped','delivered')) END AS group_ready_count
+      o.delivery_mode AS route_mode,
+      CASE WHEN o.delivery_group IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM orders g WHERE COALESCE(g.delivery_route_id,g.delivery_group,'order:' || g.id)=COALESCE(o.delivery_route_id,o.delivery_group,'order:' || o.id) AND g.status<>'cancelled') END AS group_count,
+      CASE WHEN o.delivery_group IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM orders g WHERE COALESCE(g.delivery_route_id,g.delivery_group,'order:' || g.id)=COALESCE(o.delivery_route_id,o.delivery_group,'order:' || o.id) AND g.status IN ('processing','shipped','delivered')) END AS group_ready_count
     FROM order_events e JOIN orders o ON o.id=e.order_id JOIN stores s ON s.id=o.store_id
     WHERE o.delivery_by='platform' AND e.status='processing' AND e.created_at >= ? ORDER BY e.created_at DESC, e.id DESC LIMIT 10`, [since]);
   const services = q.all("SELECT r.id, r.plan, r.type, r.created_at AS at, s.name_ar AS store_name FROM service_requests r JOIN stores s ON s.id=r.store_id WHERE r.created_at > ? ORDER BY r.created_at DESC LIMIT 10", [since]);
@@ -878,7 +1033,7 @@ r.patch('/orders/:id/delivery', h((req, res) => {
 
 r.get('/stores', h((_req, res) => {
   const stores = q.all(`
-    SELECT s.id, s.slug, s.name_ar, s.name_en, s.phone, s.whatsapp, s.auto_whatsapp, s.hidden, s.featured, s.sort_order, s.status, s.delivery_mode, s.departments, s.category, s.logo_initials, s.logo_color, s.created_at,
+    SELECT s.id, s.slug, s.name_ar, s.name_en, s.phone, s.whatsapp, s.auto_whatsapp, s.hidden, s.featured, s.sort_order, s.status, s.delivery_mode, s.delivery_zone, s.departments, s.category, s.logo_initials, s.logo_color, s.created_at,
       u.email AS owner_email, u.name AS owner_name, u.role,
       (SELECT COUNT(*) FROM products p WHERE p.store_id = s.id) AS products_count,
       (SELECT COUNT(*) FROM orders o WHERE o.store_id = s.id) AS orders_count,
@@ -891,6 +1046,7 @@ r.get('/stores', h((_req, res) => {
 r.patch('/stores/:slug', h((req, res) => {
   const body = z.object({
     auto_whatsapp: z.boolean().optional(), hidden: z.boolean().optional(), featured: z.boolean().optional(),
+    delivery_zone: z.string().trim().max(80).optional(),
     sort_order: z.coerce.number().int().min(0).max(9999).optional(), delivery_mode: z.enum(['store', 'platform']).optional(),
     status: z.enum(['active', 'suspended']).optional(), owner_disabled: z.boolean().optional(),
     departments: z.array(z.string().max(31)).min(1).optional(),
@@ -902,7 +1058,7 @@ r.patch('/stores/:slug', h((req, res) => {
   if (!store) throw new AppError(404, 'not_found', 'Store not found.');
   const patch = {};
   for (const k of ['hidden', 'featured', 'auto_whatsapp']) if (body[k] !== undefined) patch[k] = body[k] ? 1 : 0;
-  for (const k of ['sort_order', 'delivery_mode', 'status', 'name_ar', 'name_en', 'phone', 'logo_initials', 'logo_color']) if (body[k] !== undefined) patch[k] = body[k];
+  for (const k of ['sort_order', 'delivery_mode', 'delivery_zone', 'status', 'name_ar', 'name_en', 'phone', 'logo_initials', 'logo_color']) if (body[k] !== undefined) patch[k] = body[k];
   if (body.departments) { assertDepartments(body.departments); patch.departments = encodeDepartments(body.departments); patch.category = body.departments.length === 1 ? body.departments[0] : 'mixed'; }
   update('stores', store.id, patch);
   if (body.owner_disabled !== undefined) q.run("UPDATE users SET role=? WHERE id=? AND role<>'demo'", [body.owner_disabled ? 'disabled' : 'owner', store.owner_id]);

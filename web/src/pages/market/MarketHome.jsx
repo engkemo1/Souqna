@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Store, CreditCard, MapPin, Sparkles, Camera, MessageSquare, Users, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package } from 'lucide-react';
+import { Search, Store, CreditCard, MapPin, Sparkles, Camera, MessageSquare, Users, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package, Gamepad2 } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
@@ -191,6 +191,18 @@ export default function MarketHome() {
       <div className="container mt-5 grid gap-4 md:mt-7 md:grid-cols-2">
         {showWearThis && <WearThis className="h-full" />}
         <RequestBanner compact className={showWearThis ? 'h-full' : 'h-full md:col-span-2'} />
+      </div>
+
+      <div className="container mt-5 sm:mt-7">
+        <Link to="/play/banha" className="group relative flex min-h-36 items-center justify-between gap-4 overflow-hidden rounded-[26px] bg-[#03244D] px-5 py-5 text-white shadow-[0_18px_40px_rgba(3,36,77,.2)] transition hover:-translate-y-0.5 sm:px-8">
+          <span aria-hidden="true" className="pointer-events-none absolute -end-8 -top-16 h-56 w-56 rounded-full bg-[#F8620A]/30 blur-2xl" />
+          <span className="relative flex items-center gap-4">
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-white/10 text-[#FF9A5D] ring-1 ring-white/15"><Gamepad2 className="h-7 w-7" /></span>
+            <span><span className="block text-lg font-black sm:text-xl">مشوار بنها وصل!</span><span className="mt-1 block text-sm text-white/75">سوق في شوارع البلد واجمع شنط Twist — العب التحدي</span></span>
+          </span>
+          <span className="relative hidden rounded-xl bg-[#F8620A] px-5 py-3 text-sm font-extrabold shadow-lg transition group-hover:bg-[#E45408] sm:block">العب دلوقتي</span>
+          <ArrowRight className="relative h-5 w-5 shrink-0 text-white/70 sm:hidden" />
+        </Link>
       </div>
 
       {/* Stats Row */}
