@@ -244,6 +244,7 @@ function halfArch(g, r, w, mat, x, y, z) {
   m.rotation.z = Math.PI / 2; m.position.set(x, y, z); g.add(m); return m;
 }
 export function makeTuktuk() {
+  if (hasReal('tuktuk')) return realVehicle('tuktuk');
   const g = new THREE.Group(), W = 1.3, v = TUK[Math.floor(Math.random() * TUK.length)];
   const front = paintMat(v.front), rear = paintMat(v.rear), trim = paintMat(v.trim || v.front), black = stdMat('#121417', .8, .1), glass = new THREE.MeshPhysicalMaterial({ color: '#8FA8B2', roughness: .05, metalness: .1, transparent: true, opacity: .32, depthWrite: false }), seat = stdMat('#23262B', .95, 0), rubber = stdMat('#101214', .95, 0);
   const metal = stdMat('#B9BEC4', .35, .7);
@@ -294,6 +295,7 @@ export const REAL_MODELS = {
   microbus: { file: 'hiace.glb', length: 3.5, flip: false },
   car: { file: 'sedan.glb', length: 2.9, flip: false },
   bike: { file: 'motorcycle.glb', length: 1.9, flip: false },
+  tuktuk: { file: 'tuktuk.glb', length: 2.3, flip: false },
 };
 const REAL = {};
 const hasReal = (k) => !!REAL[k];
