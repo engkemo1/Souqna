@@ -30,8 +30,8 @@ const LEVELS = [
 const ROUTE_STOPS = [
   { distance: 0, name: 'شارع المحطة', detail: 'واجهة المتاجر المشاركة' },
   { distance: 72, name: 'شارع سعد زغلول', detail: 'وسط مدينة بنها' },
+  { distance: 80, name: 'نفق سعد زغلول • المنشية', detail: 'على يمين الميدان باتجاه المحطة وأسفل خط السكة الحديد' },
   { distance: 100, name: 'تمثال سعد زغلول', detail: 'في الجزيرة الوسطى بالميدان' },
-  { distance: 118, name: 'نفق سعد زغلول • المنشية', detail: 'أسفل خط السكة الحديد بجوار الميدان' },
   { distance: 160, name: 'شارع فريد ندا', detail: 'اتجاه منطقة الاستاد' },
   { distance: 208, name: 'استاد بنها', detail: 'منطقة الاستاد' },
   { distance: 285, name: 'كوبري كفر الجزار', detail: 'الطريق إلى كفر الجزار' },
@@ -1096,7 +1096,6 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
       const routeFinish = routeLength;
       if (g.running && g.hits >= 3) { g.running = false; g.failed = true; }
       else if (g.running && g.bags >= g.level.goal && g.distance >= routeFinish) { g.running = false; g.complete = true; }
-      if (monument && monument.visible && !g.stationIslandHit && monument.position.z > 1.05 && monument.position.z < 2.2) g.stationIslandHit = true;
     } else {
       g.trafficAudio?.update(Infinity, 0);
       runner.position.x = Math.sin(g.time * .8) * .18;
@@ -1247,7 +1246,7 @@ export default function BanhaRunner() {
     unlockTrafficAudio();
     playMusic();
     try { document.exitPointerLock?.(); } catch { /* ignore */ }
-    const g = gameRef.current; g.trafficAudio?.resetHonkCooldown?.(); g.resetRoute?.(); Object.assign(g, { running: true, exploring: false, paused: false, lane: 1, currentX: 0, jump: 0, slide: 0, hitPause: 0, time: 0, distance: 0, nextStop: 0, nextCrateAt: level.speed * 4.5, location: null, locationUntil: 0, tukMessageUntil: 0, lastTukPhraseAt: -20, nextTrafficHornAt: 0, bags: 0, hits: 0, spawn: .45, trafficSpawn: 1.5, stuntSpawned: false, tataSpawned: false, rightEntrySpawned: false, leftEntrySpawned: false, bothEntrySpawned: false, corsaSpawned: false, rearCarSpawned: false, level, complete: false, failed: false, stationIslandHit: true, resetChallenge: true });
+    const g = gameRef.current; g.trafficAudio?.resetHonkCooldown?.(); g.resetRoute?.(); Object.assign(g, { running: true, exploring: false, paused: false, lane: 1, currentX: 0, jump: 0, slide: 0, hitPause: 0, time: 0, distance: 0, nextStop: 0, nextCrateAt: level.speed * 4.5, location: null, locationUntil: 0, tukMessageUntil: 0, lastTukPhraseAt: -20, nextTrafficHornAt: 0, bags: 0, hits: 0, spawn: .45, trafficSpawn: 1.5, stuntSpawned: false, tataSpawned: false, rightEntrySpawned: false, leftEntrySpawned: false, bothEntrySpawned: false, corsaSpawned: false, rearCarSpawned: false, level, complete: false, failed: false, resetChallenge: true });
     setHud({ bags: 0, hits: 0, running: true, exploring: false, paused: false, complete: false, failed: false, location: null });
   }, [level, playMusic, unlockTrafficAudio]);
   const act = useCallback((action) => {

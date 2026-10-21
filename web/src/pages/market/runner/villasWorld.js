@@ -1196,7 +1196,10 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
     if (m === 0) left = 'station';
     if (m === 1) right = 'sidestreet';
     if (m === 3) left = 'sidestreet';
-    if (m === 4) right = 'mosque';
+    // The mosque stays on the left side of the statue approach; the underpass
+    // is on the opposite (right) side and closer to the station.
+    if (m === 4) left = 'mosque';
+    if (m === 5) right = 'none'; // leave the right-side underpass portal clear
     if (m === 6) { left = 'sidestreet'; right = 'sidestreet'; }
     if (m >= 7 && m < 9) { left = 'tower'; right = 'none'; }
     else if (m >= 18 && m < 22) { left = 'canal'; right = 'canal'; }
@@ -1205,7 +1208,7 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
     const p = {
       left, right,
       bridge: m >= 18 && m <= 20,
-      tunnel: m === 7,
+      tunnel: m === 5,
       shopVariant: idx,
       signText: ({
         3: 'شارع سعد زغلول',
@@ -1362,14 +1365,14 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
       nightMode = !!enabled;
       scene.background.set(nightMode ? '#1D3048' : '#F7DEB8');
       scene.fog.color.set(nightMode ? '#354760' : '#F0DABC');
-      scene.fog.near = nightMode ? 24 : 58; scene.fog.far = 220;
+      scene.fog.near = nightMode ? 32 : 58; scene.fog.far = 220;
       if (hemi) {
         hemi.color.set(nightMode ? '#7188A8' : '#FFF7E8');
         hemi.groundColor.set(nightMode ? '#59616D' : '#A7957C');
-        hemi.intensity = nightMode ? .9 : (envUrl ? 1.25 : 1.4);
+        hemi.intensity = nightMode ? 1.15 : (envUrl ? 1.25 : 1.4);
       }
-      if (sun) sun.intensity = nightMode ? .14 : 2.9;
-      scene.environmentIntensity = nightMode ? .29 : .62;
+      if (sun) sun.intensity = nightMode ? .3 : 2.9;
+      scene.environmentIntensity = nightMode ? .4 : .62;
       if (sky) sky.visible = !nightMode;
       if (sunSprite) sunSprite.visible = !nightMode;
       for (const cloud of clouds) cloud.visible = !nightMode;
