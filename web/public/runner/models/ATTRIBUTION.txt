@@ -1,0 +1,36 @@
+3D model attribution
+
+sedan.glb
+"Hyundai Accent (TaGAZ) 2004" by panderlaike_design
+https://sketchfab.com/3d-models/hyundai-accent-tagaz-2004-b00b5faebc314e54aef423e46230e963
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+hiace.glb
+"Low Poly 2013 Toyota HiAce" by Alvin.Woodly
+https://sketchfab.com/3d-models/low-poly-2013-toyota-hiace-f83b4ed4d8534efb81def77b6c1b642d
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+motorcycle.glb
+"Low Poly Motorcycle 001" by tedpermana
+https://sketchfab.com/3d-models/low-poly-motorcycle-001-38a3b1f8cdb24a049d2430520eb9882a
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+walker.glb
+"Nathan Animated 003 - Walking 3D Man" by Renderpeople
+https://sketchfab.com/3d-models/nathan-animated-003-walking-3d-man-143a2b1ea5eb4385ae90a73657aca3bc
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+tata_signa_cargo_truck.glb
+"Tata Signa Cargo Truck | Low Poly Game Ready PBR" by kevin_k_5124
+https://sketchfab.com/3d-models/tata-signa-cargo-truck-low-poly-game-ready-pbr-a5c03c1a1c2c4b21b7db6192b1ef8718
+Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+toyota_corsa_truck.glb
+"Truck Toyota Corsa B" by randombug
+https://sketchfab.com/3d-models/truck-toyota-corsa-b-e3ae80546a4d48d5a79774fc7bce5766
+Source file supplied by the project owner; original Sketchfab license information should be retained with the source.
+
+tangara_sydney_trains_t_set.glb
+"Tangara Sydney Trains T set" by A Certain Duck (@TheOminousDuck)
+https://sketchfab.com/3d-models/tangara-sydney-trains-t-set-07d7a69ffb544ec48442ae3448ee6f1f
+Creative Commons Attribution (CC BY). Adapted for the Banha railway crossing.

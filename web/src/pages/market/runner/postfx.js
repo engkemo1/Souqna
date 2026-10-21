@@ -27,10 +27,13 @@ const GradeShader = {
 
 export function createPost(renderer, scene, camera, { mobile = false } = {}) {
   const size = renderer.getSize(new THREE.Vector2());
-  const target = new THREE.WebGLRenderTarget(Math.max(size.x, 2), Math.max(size.y, 2), { type: THREE.HalfFloatType, samples: mobile ? 2 : 4 });
+  // The renderer already runs without MSAA. Multisampling this full-resolution
+  // post-process target added a costly second sample pass, especially in WebGL
+  // embedded previews, without improving the small game viewport noticeably.
+  const target = new THREE.WebGLRenderTarget(Math.max(size.x, 2), Math.max(size.y, 2), { type: THREE.HalfFloatType, samples: 0 });
   const composer = new EffectComposer(renderer, target);
   composer.addPass(new RenderPass(scene, camera));
-  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x * .5, size.y * .5), mobile ? .32 : .45, .85, .92);
+  const bloom = new UnrealBloomPass(new THREE.Vector2(size.x * .5, size.y * .5), mobile ? .16 : .26, .85, .95);
   composer.addPass(bloom);
   const grade = new ShaderPass(GradeShader); composer.addPass(grade);
   composer.addPass(new OutputPass());

@@ -3,7 +3,9 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
+import { MeshoptSimplifier } from 'three/examples/jsm/libs/meshopt_simplifier.module.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { loadWalker, makeSeatedTuktukDriver, makeBikeRider } from './walkers.js';
 
 // Shared vertex-colour materials: lets hundreds of differently-coloured primitives share ONE draw call.
 export const VC = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .75, metalness: .05 });
@@ -130,8 +132,11 @@ function bodyDetails(g, W, { arches, seams, pillarZ, pillarY, pillarH, seamY, se
 }
 
 const SEDAN_COLORS = ['#E9EBEC', '#E9EBEC', '#C9CDD2', '#2F5C86', '#8E2F28', '#2E3238', '#A8B0B7', '#E9EBEC'];
+const REAL_SEDAN_COLORS = ['#C5C9C9', '#E4E2DA', '#6D7881', '#7D3430', '#253C50', '#D4D3CC'];
 let sedanShape = null;
 export function makeSedan(color) {
+  const suv = selectVariant('sportage', .48);
+  if (suv) return suv;
   if (hasReal('car')) return realVehicle('car');
   const g = new THREE.Group(), W = 1.72;
   const paint = paintMat(color || SEDAN_COLORS[Math.floor(Math.random() * SEDAN_COLORS.length)]);
@@ -170,7 +175,17 @@ export function makeSedan(color) {
 
 let busShape = null;
 export function makeMicrobus(route = 'بنها - القاهرة') {
-  if (hasReal('microbus')) return realVehicle('microbus');
+  const vanKey = Math.random() < .5 ? 'carry' : 'carnival';
+  const van = selectVariant(vanKey, .55);
+  if (van) return van;
+  if (hasReal('microbus')) {
+    const g = realVehicle('microbus');
+    const board = new THREE.Mesh(new THREE.BoxGeometry(.88, .2, .055), stdMat('#12313D', .58, .12));
+    board.position.set(0, 1.92, 1.72); board.castShadow = true; g.add(board);
+    const destination = new THREE.Mesh(new THREE.PlaneGeometry(.78, .12), new THREE.MeshBasicMaterial({ map: textTexture(route, { bg: '#12313D', color: '#FFF2D2', width: 512, height: 128, size: 54 }) }));
+    destination.position.set(0, 1.92, 1.752); g.add(destination);
+    return g;
+  }
   // Toyota Hiace-style high-roof van, the standard Egyptian microbus: white with a sliding door and rows of windows.
   const g = new THREE.Group(), W = 1.78;
   const white = paintMat('#F1F2F0'), glass = glassMat(), dark = stdMat('#171B1F', .8, .1), chrome = stdMat('#C9CDD2', .25, .85);
@@ -214,7 +229,16 @@ export function makeMicrobus(route = 'بنها - القاهرة') {
 
 const BIKE_COLORS = ['#B32A22', '#1F4E8C', '#2E3238', '#D9D9D4'];
 export function makeMotorcycle() {
-  if (hasReal('bike')) return realVehicle('bike');
+  const superbike = selectVariant('hayabusa', .48);
+  if (superbike) {
+    addMotorcycleRider(superbike, RIDER_FIT.hayabusa, 'hayabusa');
+    return superbike;
+  }
+  if (hasReal('bike')) {
+    const g = realVehicle('bike');
+    addMotorcycleRider(g, RIDER_FIT.bike, 'bike');
+    return g;
+  }
   const g = new THREE.Group();
   const paint = paintMat(BIKE_COLORS[Math.floor(Math.random() * BIKE_COLORS.length)]), dark = stdMat('#15181B', .7, .2), chrome = stdMat('#C9CDD2', .25, .85);
   const shirt = stdMat(['#3F6C8F', '#B4503C', '#5D7F52', '#E4DED0', '#2F4F5E'][Math.floor(Math.random() * 5)], .9), skin = stdMat('#B97D58', .7), pants = stdMat('#2B3645', .9);
@@ -233,6 +257,39 @@ export function makeMotorcycle() {
   return bake(g);
 }
 
+// Where the rider's hips sit differs per bike model; hands stay on the bars, the body shifts back / down onto the seat.
+const RIDER_FIT = { hayabusa: { dz: -.24, dy: -.02 }, bike: { dz: -.34, dy: -.04 } };
+// Realistic (skinned) rider: pelvis position on the seat + arm reach / lean per bike model.
+const RIDER_REAL = { hayabusa: { seat: [0, .8, -.3], thigh: 1.3, calf: 2.0, bars: [.9, .5], gap: .2, pegs: [.38, -.2], pegGap: .24, lean: .8, height: 1.7 }, bike: { seat: [0, .68, -.3], thigh: 1.3, calf: 2.0, bars: [.95, .42], gap: .3, pegs: [.3, .05], pegGap: .24, lean: .5, height: 1.7 } };
+function addMotorcycleRider(g, fit = {}, realKey = null) {
+  const real = realKey && makeBikeRider(RIDER_REAL[realKey]);
+  if (real) { g.add(real); return; }
+  const { dz = 0, dy = 0 } = fit;
+  const jacket = stdMat('#344A5D', .82), pants = stdMat('#26333D', .88), skin = stdMat('#B87957', .7), helmet = stdMat('#20272D', .32, .35), sole = stdMat('#15191D', .92);
+  const between = (a, b, radius, material) => {
+    const start = new THREE.Vector3(...a), end = new THREE.Vector3(...b), direction = end.clone().sub(start);
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius * .86, radius, direction.length(), 9), material);
+    mesh.position.copy(start).add(end).multiplyScalar(.5); mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()); mesh.castShadow = true; g.add(mesh);
+    return mesh;
+  };
+  const B = (x, y, z) => [x, y + dy, z + dz];          // a body point that moves with the rider
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.19, .34, 4, 10), jacket);
+  torso.position.set(0, 1.0 + dy, -.12 + dz); torso.rotation.x = .31; torso.castShadow = true; g.add(torso);
+  const neck = new THREE.Mesh(new THREE.CylinderGeometry(.065, .07, .12, 10), skin); neck.position.set(0, 1.27 + dy, -.02 + dz); g.add(neck);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.145, 16, 12), skin); head.position.set(0, 1.43 + dy, .02 + dz); head.castShadow = true; g.add(head);
+  const helmetShell = new THREE.Mesh(new THREE.SphereGeometry(.16, 16, 10, 0, Math.PI * 2, 0, Math.PI * .62), helmet); helmetShell.position.set(0, 1.48 + dy, .005 + dz); helmetShell.castShadow = true; g.add(helmetShell);
+  const visor = new THREE.Mesh(new THREE.BoxGeometry(.21, .045, .035), stdMat('#657780', .18, .2, { transparent: true, opacity: .72 })); visor.position.set(0, 1.45 + dy, .14 + dz); g.add(visor);
+  for (const side of [-1, 1]) {
+    const hand = [side * .2, .84, .47];
+    between(B(side * .16, 1.18, -.04), [side * .22, .99, .23 + dz * .4], .065, jacket);
+    between([side * .22, .99, .23 + dz * .4], hand, .05, jacket);
+    const handMesh = new THREE.Mesh(new THREE.SphereGeometry(.06, 10, 8), skin); handMesh.position.set(...hand); g.add(handMesh);
+    between(B(side * .11, .83, -.2), B(side * .2, .58, .02), .085, pants);
+    between(B(side * .2, .58, .02), B(side * .22, .38, -.29), .07, pants);
+    const boot = new THREE.Mesh(new THREE.BoxGeometry(.15, .11, .25), sole); boot.position.set(side * .22, .34 + dy, -.24 + dz); g.add(boot);
+  }
+}
+
 // Egyptian "توكتوك" (Bajaj RE style): black soft roof, open sides, one front wheel under a big mudguard,
 // painted nose, slanted windscreen, rear bench. Front faces +z.
 const TUK = [
@@ -244,7 +301,17 @@ function halfArch(g, r, w, mat, x, y, z) {
   m.rotation.z = Math.PI / 2; m.position.set(x, y, z); g.add(m); return m;
 }
 export function makeTuktuk() {
-  if (hasReal('tuktuk')) return realVehicle('tuktuk');
+  const newerAuto = selectVariant('autoRickshaw', .42);
+  if (newerAuto) {
+    addTuktukDriver(newerAuto, true);
+    return newerAuto;
+  }
+  if (hasReal('tuktuk')) {
+    const g = realVehicle('tuktuk');
+    addTuktukModelDetails(g);
+    addTuktukDriver(g, true);
+    return g;
+  }
   const g = new THREE.Group(), W = 1.3, v = TUK[Math.floor(Math.random() * TUK.length)];
   const front = paintMat(v.front), rear = paintMat(v.rear), trim = paintMat(v.trim || v.front), black = stdMat('#121417', .8, .1), glass = new THREE.MeshPhysicalMaterial({ color: '#8FA8B2', roughness: .05, metalness: .1, transparent: true, opacity: .32, depthWrite: false }), seat = stdMat('#23262B', .95, 0), rubber = stdMat('#101214', .95, 0);
   const metal = stdMat('#B9BEC4', .35, .7);
@@ -283,42 +350,265 @@ export function makeTuktuk() {
   const red = stdMat('#D8262B', .4, 0, { emissive: '#7A0D10', emissiveIntensity: .8 });
   for (const sx of [-1, 1]) box(g, .14, .1, .05, red, sx * .46, .74, -1.12);
   plate(g, .58, -1.14, .42).rotation.y = Math.PI;
+  addTuktukDriver(g, false);
   return bake(g);
+}
+
+// Seated rider visible through the tuk-tuk windshield. The local vehicle points +Z.
+function addTuktukDriver(g, useRiggedModel = false) {
+  const vehicleHeight = g.userData.trafficBounds?.height || 1.48;
+  const riderHeight = Math.min(1.02, vehicleHeight * .7);
+  const realistic = useRiggedModel ? makeSeatedTuktukDriver(riderHeight) : null;
+  if (realistic) {
+    // Seat the rider lower in the actual cabin so neither hair nor cap cuts
+    // through the low canvas roof.
+    realistic.position.set(0, vehicleHeight * .13, -.2);
+    realistic.rotation.y = 0;
+    realistic.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+    g.add(realistic);
+    return;
+  }
+  const shirt = stdMat('#3D596B', .9), pants = stdMat('#293846', .92), skin = stdMat('#B97B58', .8), cap = stdMat('#19374B', .85), shoes = stdMat('#202124', .92);
+  const limb = (a, b, radius, material) => {
+    const start = new THREE.Vector3(...a), end = new THREE.Vector3(...b), axis = end.clone().sub(start);
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radius * .9, radius, axis.length(), 9), material);
+    mesh.position.copy(start).add(end).multiplyScalar(.5);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize());
+    mesh.castShadow = true; g.add(mesh);
+  };
+  const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.19, .3, 4, 10), shirt);
+  torso.position.set(0, 1.12, -.12); torso.rotation.x = .16; torso.castShadow = true; g.add(torso);
+  const head = new THREE.Mesh(new THREE.SphereGeometry(.14, 14, 12), skin);
+  head.position.set(0, 1.47, -.16); head.castShadow = true; g.add(head);
+  const capMesh = new THREE.Mesh(new THREE.SphereGeometry(.148, 14, 9, 0, Math.PI * 2, 0, Math.PI * .56), cap);
+  capMesh.position.set(0, 1.51, -.16); g.add(capMesh);
+  for (const side of [-1, 1]) {
+    limb([side * .15, 1.22, -.08], [side * .22, 1.02, .18], .065, shirt);
+    limb([side * .22, 1.02, .18], [side * .2, .96, .46], .05, shirt);
+    limb([side * .1, .96, -.2], [side * .18, .65, .02], .085, pants);
+    limb([side * .18, .65, .02], [side * .2, .43, .3], .065, pants);
+    const shoe = new THREE.Mesh(new THREE.BoxGeometry(.14, .09, .2), shoes);
+    shoe.position.set(side * .2, .39, .34); g.add(shoe);
+  }
+}
+
+// The compact source tuk-tuk has very little visible trim at game distance.
+// Add the familiar Egyptian front lamp, indicators, plate, bumper and mirrors
+// as real 3D pieces while keeping the supplied vehicle mesh and texture.
+function addTuktukModelDetails(g) {
+  const chrome = stdMat('#B9C1C5', .32, .68), black = stdMat('#171A1D', .62, .12);
+  const lamp = stdMat('#FFF1C4', .22, .05, { emissive: '#80652A', emissiveIntensity: .48 });
+  const amber = stdMat('#E87519', .4, .08, { emissive: '#7A3210', emissiveIntensity: .3 });
+  const red = stdMat('#B8272E', .38, .08, { emissive: '#5B1014', emissiveIntensity: .3 });
+  // Keep dimensions tied to the normalized model's 2.3 m length and ~1.3 m width.
+  const bumper = new THREE.Mesh(new THREE.BoxGeometry(1.02, .105, .075), black);
+  bumper.position.set(0, .28, 1.08); bumper.castShadow = true; g.add(bumper);
+  const plateMesh = plate(g, .46, 1.125, .38); plateMesh.rotation.y = 0;
+  const headlight = new THREE.Mesh(new THREE.CylinderGeometry(.105, .105, .045, 20), lamp);
+  headlight.rotation.x = Math.PI / 2; headlight.position.set(0, .77, 1.105); g.add(headlight);
+  for (const side of [-1, 1]) {
+    const indicator = new THREE.Mesh(new THREE.BoxGeometry(.105, .075, .035), amber);
+    indicator.position.set(side * .43, .69, 1.09); g.add(indicator);
+    const mirrorStem = new THREE.Mesh(new THREE.CylinderGeometry(.014, .018, .25, 8), chrome);
+    mirrorStem.position.set(side * .52, 1.14, .53); mirrorStem.rotation.z = side * -.12; g.add(mirrorStem);
+    const mirror = new THREE.Mesh(new THREE.SphereGeometry(.073, 12, 8), black);
+    mirror.scale.set(1.2, .82, .34); mirror.position.set(side * .54, 1.27, .55); g.add(mirror);
+    const mirrorFace = new THREE.Mesh(new THREE.CircleGeometry(.048, 12), stdMat('#8FA5AD', .18, .24));
+    mirrorFace.position.set(side * .54, 1.27, .574); g.add(mirrorFace);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(.105, .12, .035), red);
+    tail.position.set(side * .47, .72, -1.09); g.add(tail);
+  }
+  const roofEdge = new THREE.Mesh(new THREE.BoxGeometry(1.19, .035, .045), chrome);
+  roofEdge.position.set(0, 1.465, -.39); g.add(roofEdge);
 }
 
 // ---------------------------------------------------------------------------------------------
 // Real 3D models. Drop GLB files into web/public/runner/models/ and they replace the built-in
 // stand-ins automatically. Names: hiace.glb (microbus), sedan.glb, motorcycle.glb, tuktuk.glb.
-// `length` = target length in game units (sedan ~2.9). `flip: true` if a model faces backwards.
+// `length` = target length in game units (sedan ~4.1). `flip: true` if a model faces backwards.
 // ---------------------------------------------------------------------------------------------
 export const REAL_MODELS = {
-  microbus: { file: 'hiace.glb', length: 3.5, flip: false },
-  car: { file: 'sedan.glb', length: 2.9, flip: false },
-  bike: { file: 'motorcycle.glb', length: 1.9, flip: false },
-  tuktuk: { file: 'tuktuk.glb', length: 2.3, flip: false },
+  // Traffic approaches in +Z, toward the camera. The supplied GLBs already face +Z.
+  microbus: { file: 'hiace.glb', length: 4.4, flip: false },
+  // Sedan wheels read slightly detached from the road in the supplied model;
+  // sink its suspension a touch after ground normalization to restore contact.
+  car: { file: 'sedan.glb', length: 4.15, flip: false, groundOffset: -.055 },
+  bike: { file: 'motorcycle.glb', length: 1.9, flip: true },
+  tuktuk: { file: 'tuktuk.glb', length: 2.45, flip: false },
+  // User-provided traffic variants; loaded lazily after the first scene is ready.
+  carry: { file: 'suzuki-carry.glb', length: 3.35, width: 1.55, flip: false },
+  // This downloaded autorickshaw faces the opposite local forward axis from
+  // the traffic flow; flip its mesh so the nose leads while it moves toward +Z.
+  autoRickshaw: { file: 'autorickshaw.glb', length: 2.6, width: 1.42, flip: true },
+  sportage: { file: 'kia-sportage-2026.glb', length: 4.3, width: 1.9, flip: false },
+  carnival: { file: 'kia-carnival.glb', length: 4.9, width: 1.95, flip: false },
+  hayabusa: { file: 'suzuki-hayabusa.glb', length: 2.2, width: .82, flip: false },
+  // Special challenge events: a cargo truck to pass beneath, and a pickup crossing the road.
+  tataTruck: { file: 'tata_signa_cargo_truck.glb', length: 8.2, width: 2.45, flip: false },
+  corsaTruck: { file: 'toyota_corsa_truck.glb', length: 4.15, width: 1.8, flip: false },
 };
 const REAL = {};
+const REAL_PENDING = new Map();
+let vehicleLoader = null, modelBasePath = '/runner/models/', variantsReady = false;
 const hasReal = (k) => !!REAL[k];
+// KHR_mesh_quantization GLBs keep Int16/Int8 attributes; transforming those in place rounds the vertices to integers and
+// explodes the model, so expand everything to Float32 first. Mirrored nodes also need their triangle winding flipped.
+function expandToFloat(geometry) {
+  for (const [name, attr] of Object.entries(geometry.attributes)) {
+    if (name === 'skinIndex' || name === 'skinWeight' || (attr.array instanceof Float32Array && !attr.isInterleavedBufferAttribute)) continue;
+    const out = new Float32Array(attr.count * attr.itemSize), comps = ['getX', 'getY', 'getZ', 'getW'];
+    for (let i = 0; i < attr.count; i++) for (let c = 0; c < attr.itemSize; c++) out[i * attr.itemSize + c] = attr[comps[c]](i);
+    geometry.setAttribute(name, new THREE.BufferAttribute(out, attr.itemSize));
+  }
+  return geometry;
+}
+function flipWinding(geometry) {
+  for (const attr of Object.values(geometry.attributes)) {
+    const n = attr.itemSize, arr = attr.array;
+    for (let t = 0; t + 2 < attr.count; t += 3) for (let c = 0; c < n; c++) { const i1 = (t + 1) * n + c, i2 = (t + 2) * n + c, tmp = arr[i1]; arr[i1] = arr[i2]; arr[i2] = tmp; }
+  }
+  return geometry;
+}
+function flattenVehicleModel(source, simplify = true) {
+  source.updateMatrixWorld(true);
+  const buckets = new Map(), loose = [];
+  source.traverse((o) => {
+    if (!o.isMesh || o.isSkinnedMesh || o.morphTargetInfluences || Array.isArray(o.material)) { if (o.isMesh) loose.push(o); return; }
+    let geometry = expandToFloat(o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone());
+    geometry.applyMatrix4(o.matrixWorld);
+    if (o.matrixWorld.determinant() < 0) flipWinding(geometry);
+    const signature = Object.keys(geometry.attributes).sort().map((name) => `${name}:${geometry.attributes[name].itemSize}:${geometry.attributes[name].normalized ? 1 : 0}`).join(',');
+    const key = `${o.material.uuid}|${signature}`;
+    if (!buckets.has(key)) buckets.set(key, { material: o.material, geometries: [] });
+    buckets.get(key).geometries.push(geometry);
+  });
+  const packed = new THREE.Group();
+  for (const { material, geometries } of buckets.values()) {
+    let geometry = geometries.length === 1 ? geometries[0] : mergeGeometries(geometries, false);
+    if (!geometry) { geometries.forEach((part) => { const mesh = new THREE.Mesh(part, material); mesh.castShadow = true; packed.add(mesh); }); continue; }
+    if (simplify && geometry.attributes.position && geometry.attributes.position.count > 40000) {
+      try {
+        const position = geometry.attributes.position, count = position.count;
+        const indices = new Uint32Array(count); for (let i = 0; i < count; i++) indices[i] = i;
+        const target = Math.max(9000, Math.floor(indices.length * .42 / 3) * 3);
+        const [reduced] = MeshoptSimplifier.simplify(indices, position.array, position.itemSize, target, .008);
+        const [remap, compactCount] = MeshoptSimplifier.compactMesh(reduced);
+        for (const [name, attr] of Object.entries(geometry.attributes)) {
+          const compact = new attr.array.constructor(compactCount * attr.itemSize);
+          for (let old = 0; old < count; old++) { const next = remap[old]; if (next === 0xffffffff || next >= compactCount) continue; for (let c = 0; c < attr.itemSize; c++) compact[next * attr.itemSize + c] = attr.array[old * attr.itemSize + c]; }
+          geometry.setAttribute(name, new THREE.BufferAttribute(compact, attr.itemSize, attr.normalized));
+        }
+        geometry.setIndex(new THREE.BufferAttribute(reduced, 1)); geometry.computeBoundingBox(); geometry.computeBoundingSphere();
+      } catch { /* Keep the original mesh if a source geometry cannot be simplified safely. */ }
+    }
+    const mesh = new THREE.Mesh(geometry, material); mesh.castShadow = true; mesh.receiveShadow = false; packed.add(mesh);
+  }
+  for (const mesh of loose) {
+    const clone = mesh.clone();
+    clone.geometry = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    clone.material = mesh.material;
+    clone.position.set(0, 0, 0); clone.rotation.set(0, 0, 0); clone.scale.set(1, 1, 1); clone.updateMatrix();
+    packed.add(clone);
+  }
+  return packed;
+}
+async function loadRealModel(key) {
+  if (REAL[key]) return true;
+  if (REAL_PENDING.has(key)) return REAL_PENDING.get(key);
+  const cfg = REAL_MODELS[key]; if (!cfg) return false;
+  vehicleLoader ||= new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+  const pending = (async () => {
+    try {
+      const gltf = await vehicleLoader.loadAsync(modelBasePath + cfg.file);
+      const source = gltf.scene, originalBox = new THREE.Box3().setFromObject(source), originalSize = originalBox.getSize(new THREE.Vector3());
+      if (originalSize.x > originalSize.z) source.rotation.y = Math.PI / 2;
+      if (cfg.flip) source.rotation.y += Math.PI;
+      const model = flattenVehicleModel(source, !['car', 'microbus', 'bike', 'tuktuk'].includes(key));
+      const holder = new THREE.Group(); holder.add(model);
+      const box = new THREE.Box3().setFromObject(holder), size = box.getSize(new THREE.Vector3()), center = box.getCenter(new THREE.Vector3());
+      const scale = cfg.length / Math.max(size.z, .001);
+      model.scale.multiplyScalar(scale);
+      model.position.set(-center.x * scale, -box.min.y * scale + (cfg.groundOffset || 0), -center.z * scale);
+      holder.userData.modelKey = key;
+      holder.userData.trafficBounds = { halfDepth: cfg.length / 2, halfWidth: (cfg.width || Math.min(size.x * scale, 1.85)) / 2, height: size.y * scale };
+      REAL[key] = holder;
+      return true;
+    } catch { return false; }
+    finally { REAL_PENDING.delete(key); }
+  })();
+  REAL_PENDING.set(key, pending);
+  return pending;
+}
+function selectVariant(key, chance) {
+  if (!variantsReady || Math.random() >= chance) return null;
+  if (REAL[key]) return realVehicle(key);
+  void loadRealModel(key);
+  return null;
+}
+export function makeRealVehicleVariant(key) {
+  const vehicle = realVehicle(key);
+  if (!vehicle) return null;
+  if (key === 'hayabusa') addMotorcycleRider(vehicle, RIDER_FIT.hayabusa, 'hayabusa');
+  if (key === 'autoRickshaw') addTuktukDriver(vehicle, true);
+  return vehicle;
+}
 export const realVehicle = (k) => {
   if (!REAL[k]) return null;
   const root = REAL[k].clone(true);
-  root.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
+  root.userData.modelKey = REAL[k].userData.modelKey;
+  root.userData.trafficBounds = REAL[k].userData.trafficBounds;
+  root.userData.ownedMaterials = [];
+  const sedanColor = REAL_SEDAN_COLORS[Math.floor(Math.random() * REAL_SEDAN_COLORS.length)];
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.castShadow = true; o.receiveShadow = false;
+    const recolor = (material) => {
+      // Keep the detailed Hyundai mesh and trim, but make the painted body read as
+      // common Egyptian road-car colors with a clean automotive clear coat.
+      if ((k === 'car' && material.name === 'Kuzov') || (k === 'microbus' && material.name === 'base')) {
+        const copy = material.clone(); root.userData.ownedMaterials.push(copy);
+        if (k === 'car') {
+          copy.color.set(sedanColor); copy.roughness = .3; copy.metalness = .42;
+          if ('clearcoat' in copy) { copy.clearcoat = .9; copy.clearcoatRoughness = .14; }
+          copy.envMapIntensity = 1.25;
+        } else {
+          copy.color.set('#E7E6DF'); copy.roughness = .48; copy.metalness = .12; copy.envMapIntensity = 1.05;
+        }
+        return copy;
+      }
+      if (k === 'tuktuk') {
+        const copy = material.clone(); root.userData.ownedMaterials.push(copy);
+        copy.color.set('#FFFFFF'); copy.roughness = .64; copy.metalness = .08; copy.envMapIntensity = 1.05;
+        return copy;
+      }
+      return material;
+    };
+    o.material = Array.isArray(o.material) ? o.material.map(recolor) : recolor(o.material);
+  });
   return root;
 };
 export async function loadRealVehicles(base = '/runner/models/') {
-  const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder), found = [];
-  await Promise.all(Object.entries(REAL_MODELS).map(async ([key, cfg]) => {
-    try {
-      const gltf = await loader.loadAsync(base + cfg.file);
-      const model = gltf.scene, box = new THREE.Box3().setFromObject(model), size = box.getSize(new THREE.Vector3());
-      const holder = new THREE.Group(); holder.add(model);
-      if (size.x > size.z) model.rotation.y = Math.PI / 2; // longest horizontal axis -> z
-      if (cfg.flip) model.rotation.y += Math.PI;
-      const b2 = new THREE.Box3().setFromObject(holder), s2 = b2.getSize(new THREE.Vector3()), c = b2.getCenter(new THREE.Vector3());
-      const k = cfg.length / Math.max(s2.z, .001);
-      model.scale.multiplyScalar(k); model.position.set(-c.x * k, -b2.min.y * k, -c.z * k);
-      REAL[key] = holder; found.push(key);
-    } catch { /* file not provided: keep the built-in model */ }
+  // Share the already-used pedestrian GLB so seated tuk-tuk drivers use a
+  // skinned 3D person without downloading another character asset.
+  await loadWalker();
+  modelBasePath = base;
+  await MeshoptSimplifier.ready;
+  const found = [];
+  await Promise.all(['microbus', 'car', 'bike', 'tuktuk'].map(async (key) => {
+    if (await loadRealModel(key)) found.push(key);
   }));
+  variantsReady = true;
   return found;
+}
+// Load the supplied traffic models progressively. The base traffic stays live
+// while each larger GLB downloads, then the caller can swap it into the street.
+export async function loadRealVehicleVariants(onReady = () => {}) {
+  // Request together so the 66 MB Sportage cannot block the small bike, van,
+  // and tuk-tuk GLBs from appearing first on slower connections.
+  await Promise.all(['sportage', 'carry', 'carnival', 'hayabusa', 'autoRickshaw', 'tataTruck', 'corsaTruck'].map(async (key) => {
+    if (await loadRealModel(key)) {
+      variantsReady = true;
+      onReady(key);
+    }
+  }));
 }

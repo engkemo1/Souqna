@@ -2,3 +2,8 @@
 Tuk-tuk: "Indian Auto Rickshaw, Ahmedabad, Gujarat, India" by Doron Altaratz (CC BY 4.0)
   https://sketchfab.com/3d-models/indian-auto-rickshaw-ahmedabad-gujarat-india-9075b08e08b149f099f601c3a239cfa1
   Cropped from the scene, recoloured (black/gold) and optimised for the game.
+
+shopper-sam.glb and shopper-maya.glb
+  Innerscene animated people adapted from MakeHuman/MPFB assets, released CC0.
+  https://www.innerscene.com/tools/library/3d-parts/relaxed-walk-sam-3d-person-animated-732f1206
+  https://www.innerscene.com/tools/library/3d-parts/relaxed-walk-maya-3d-person-animated-2c6669a2
