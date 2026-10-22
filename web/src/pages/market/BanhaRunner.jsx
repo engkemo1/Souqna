@@ -58,7 +58,7 @@ function getOccupiedChallengeLanes(obstacles) {
       continue;
     }
     if (!CHALLENGE_VEHICLE_TYPES.includes(item.type) && item.type !== 'roadCrate') continue;
-    if (item.type === 'corsaTruck') {
+    if (item.type === 'corsaTruck' || item.rotated) {
       const bounds = item.group.userData.trafficBounds;
       const halfWidth = (bounds?.halfDepth || 2.075) * item.group.scale.z;
       LANES.forEach((x, lane) => { if (Math.abs(item.group.position.x - x) < halfWidth + .32) occupied.add(lane); });
@@ -257,11 +257,11 @@ function addTrafficLights(vehicle, type) {
         : type === 'tataTruck' || type === 'corsaTruck'
           ? [[-.55, .82], [.55, .82]]
         : [[0, Math.min(.88, height * .58)]];
+  // Lamps are lightweight proxies (no real THREE light per vehicle). Adding/removing real lights as cars
+  // spawn changes the scene's light count, which forces EVERY material to recompile (a big hitch) and makes
+  // every pixel pay for every lamp. A tiny fixed pool of real spotlights is assigned to the nearest lit lamps.
   for (const [x, y] of positions) {
-    const light = new THREE.SpotLight('#FFF0B8', 0, 22, Math.PI / 7, .62, 2);
-    light.position.set(x, y, halfDepth - .18);
-    light.target.position.set(x, y - 1.35, halfDepth + 7);
-    vehicle.add(light, light.target); lamps.push(light);
+    lamps.push({ intensity: 0, local: new THREE.Vector3(x, y, halfDepth - .18), aim: new THREE.Vector3(x, y - 1.35, halfDepth + 7) });
   }
   vehicle.userData.trafficLights = lamps;
   return vehicle;
@@ -289,6 +289,64 @@ function createSideStreetEntry(side, z) {
     dash.rotation.x = -Math.PI / 2; dash.position.set(x, -.01, 0); road.add(dash);
   }
   return road;
+}
+
+
+// ---------- sidewalk lanes + scenario obstacles ----------
+const SIDE_X = 6.7; // centre of each pavement (the avenue's kerb-to-wall strip is 5.98 – 8.6 m)
+const laneX = (lane) => (lane < 0 ? -SIDE_X : lane > 2 ? SIDE_X : LANES[lane]);
+const KIT_TEMPLATES = new Map();
+function kitTemplate(key, build) {
+  // Built once; every spawn clones it (shared geometry + materials: no GPU uploads, no shader compiles, no leaks).
+  if (!KIT_TEMPLATES.has(key)) { const g = new THREE.Group(); build(g); KIT_TEMPLATES.set(key, g); }
+  const clone = KIT_TEMPLATES.get(key).clone(true);
+  clone.userData = { ...KIT_TEMPLATES.get(key).userData };
+  return clone;
+}
+// Jump-over road hazards (all type 'roadCrate' for the collision code): crate, concrete barrier, cones, tyres.
+function makeRoadLow(kind = 'barrier') {
+  if (kind === 'crate') return makeRoadCrate();
+  return kitTemplate('low-' + kind, (g) => {
+    if (kind === 'barrier') {
+      const concrete = mat('#B9B6AE', .9), red = mat('#C8412F', .8);
+      addBox(g, [1.5, .55, .45], [0, .275, 0], concrete); addBox(g, [1.5, .12, .46], [0, .5, 0], red); addBox(g, [1.46, .1, .47], [0, .36, 0], mat('#F1EDE2', .8));
+      g.userData.trafficBounds = { halfWidth: .78, halfDepth: .3 };
+    } else if (kind === 'cones') {
+      const orange = mat('#EE6A1F', .7), white = mat('#F4F0E4', .7);
+      for (const [x, z] of [[-.5, 0], [0, .15], [.5, 0]]) {
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(.2, .62, 12), orange); cone.position.set(x, .31, z); cone.castShadow = true; g.add(cone);
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(.115, .14, .1, 12), white); band.position.set(x, .3, z); g.add(band);
+        addBox(g, [.4, .04, .4], [x, .02, z], mat('#2B2F34', .9), false);
+      }
+      g.userData.trafficBounds = { halfWidth: .85, halfDepth: .4 };
+    } else { // tyres
+      const rubber = mat('#1E2124', .95);
+      for (const [x, y] of [[-.3, .14], [.3, .14], [0, .4]]) { const t = new THREE.Mesh(new THREE.TorusGeometry(.3, .13, 8, 16), rubber); t.rotation.x = Math.PI / 2; t.position.set(x, y, 0); t.castShadow = true; g.add(t); }
+      g.userData.trafficBounds = { halfWidth: .75, halfDepth: .45 };
+    }
+  });
+}
+// Pavement obstacles: 'low' (jump), 'awning' (slide under), 'cart' (change lane).
+function makeSideObstacle(kind, variant = 0) {
+  return kitTemplate(`side-${kind}-${variant}`, (g) => {
+    if (kind === 'low') {
+      if (variant === 0) { addBox(g, [.95, .42, .95], [0, .21, 0], mat('#9A5B3A', .9)); addBox(g, [.75, .28, .75], [0, .56, 0], mat('#2F7A3E', .95)); g.userData.trafficBounds = { halfWidth: .55, halfDepth: .5 }; }
+      else if (variant === 1) { addBox(g, [1.5, .1, .5], [0, .46, 0], mat('#8A5A33', .85)); addBox(g, [1.5, .38, .07], [0, .74, -.22], mat('#8A5A33', .85)); for (const x of [-.62, .62]) addBox(g, [.08, .46, .42], [x, .23, 0], mat('#3C4248', .6)); g.userData.trafficBounds = { halfWidth: .8, halfDepth: .3 }; }
+      else { addBox(g, [.55, .78, .55], [0, .39, 0], mat('#3E6B52', .8)); addBox(g, [.6, .08, .6], [0, .8, 0], mat('#2B2F34', .8)); g.userData.trafficBounds = { halfWidth: .35, halfDepth: .35 }; }
+    } else if (kind === 'awning') {
+      const colour = ['#D9432F', '#2C7DA0', '#E0A526'][variant % 3], pole = mat('#4A4F55', .6);
+      for (const x of [-.95, .95]) addBox(g, [.08, 1.35, .08], [x, .675, 0], pole);
+      addBox(g, [2.2, .14, 1.3], [0, 1.3, 0], mat(colour, .8)); addBox(g, [2.2, .1, .05], [0, 1.18, .62], mat('#F4EBD3', .8));
+      g.userData.trafficBounds = { halfWidth: 1.1, halfDepth: .65 };
+    } else { // cart
+      addBox(g, [1.3, .12, .8], [0, .62, 0], mat('#A8743F', .85)); addBox(g, [1.3, .5, .08], [0, .85, -.36], mat('#A8743F', .85));
+      for (const x of [-.5, .5]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(.3, .3, .1, 14), mat('#2B2F34', .8)); w.rotation.z = Math.PI / 2; w.position.set(x * 1.1, .3, .1); w.castShadow = true; g.add(w); }
+      for (const [x, c] of [[-.38, '#C94A2A'], [0, '#E0A526'], [.38, '#5E9B3A']]) addBox(g, [.34, .2, .34], [x, .78, .08], mat(c, .8));
+      addBox(g, [.06, 2.1, .06], [0, 1.1, -.3], mat('#4A4F55', .6));
+      const canopy = new THREE.Mesh(new THREE.ConeGeometry(.95, .35, 12), mat('#2C7DA0', .8)); canopy.position.set(0, 2.15, -.3); canopy.castShadow = true; g.add(canopy);
+      g.userData.trafficBounds = { halfWidth: .8, halfDepth: .5 };
+    }
+  });
 }
 
 function makeCollectibleBag() {
@@ -448,7 +506,10 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
   // Requesting a high-performance adapter plus multisampling could exhaust or
   // fail context allocation in the in-app preview, leaving the whole game blank.
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, alpha: false, powerPreference: 'low-power', stencil: false, failIfMajorPerformanceCaveat: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.6)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  const mobile = window.innerWidth < 700;
+  // The runner is a fill-rate heavy scene. A modest internal resolution keeps
+  // frame times stable on phones and embedded browsers with high-DPI screens.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, mobile ? 1 : 1.35)); renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.28;
   const scene = new THREE.Scene(); scene.background = new THREE.Color('#9DD8EB'); scene.fog = new THREE.Fog('#C9DAD3', 36, 105);
   if (area.id === 'station') scene.fog.far = 250;
@@ -457,18 +518,23 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
   const sun = new THREE.DirectionalLight('#FFF0D2', 3.0); sun.position.set(-12, 22, 12); sun.castShadow = true;
   sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -22; sun.shadow.camera.right = 22; sun.shadow.camera.top = 26; sun.shadow.camera.bottom = -15; scene.add(sun);
   const nightStreetLights = [];
+  const headlightPool = Array.from({ length: mobile ? 2 : 4 }, () => {
+    const l = new THREE.SpotLight('#FFF0B8', 0, 22, Math.PI / 7, .62, 2); scene.add(l, l.target); return l;
+  });
+  const _hlW = new THREE.Vector3();
 
   // Villas get the new curved, streamed world; every other area keeps the original straight street.
   const world = area.id === 'villas' ? createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl: '/runner/env/sunset_1k.hdr', startIdx: 0, storeNames, storeBrands }) : null;
+  gameRef.current.sideLanes = !!world; // villas avenue: the two pavements are extra (risky) lanes
+  gameRef.current.freeLimit = world ? 4.9 : 8.1; // the villas avenue is 11.2 m wide: never roam onto the pavement or into the walls
   const resetRoute = () => world?.reset();
   gameRef.current.resetRoute = resetRoute;
   const routeShift = world ? (Math.max(2, Math.ceil(storeNames.length / 4)) - 2) * 14 : 0;
   const routeStops = ROUTE_STOPS.map((stop) => ({ ...stop, distance: stop.distance + routeShift }));
-  const mobile = window.innerWidth < 700;
   if (world) {
     camera.fov = 60; camera.far = 260; camera.position.set(0, 4.35, 11.2); camera.updateProjectionMatrix();
     sun.position.set(-16, 20, -6); // low sun ahead-left: long shadows toward the camera
-    sun.shadow.mapSize.set(mobile ? 1024 : 2048, mobile ? 1024 : 2048);
+    sun.shadow.mapSize.set(mobile ? 512 : 1024, mobile ? 512 : 1024);
     Object.assign(sun.shadow.camera, { left: -28, right: 28, top: 45, bottom: -25 }); sun.shadow.camera.updateProjectionMatrix(); sun.shadow.bias = -.0004;
   }
   let roadTexture = null, pavementTextures = [];
@@ -608,7 +674,24 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
     if (prog.finished || !prog.heroDone || !prog.baseDone || !prog.varDone) return;
     prog.finished = true;
     try { renderer.compile(scene, camera); } catch { /* shader warm-up is optional */ }
-    loadReportTimer = setTimeout(() => { if (!disposed) report(); }, 60); // not rAF: background tabs never fire it
+    // Warm every vehicle / obstacle type once (GPU upload + shader compile) so the first spawn never freezes the game.
+    try {
+      const warm = [];
+      for (let k = 0; k < 6; k++) for (const type of ['car', 'microbus', 'bike', 'tuktuk']) warm.push(createVehicle(type, ROUTES[k % ROUTES.length]));
+      warm.push(createEventVehicle('tataTruck'), createEventVehicle('corsaTruck'), makeRoadCrate(), makeCollectibleBag());
+      for (const kind of ['crate', 'barrier', 'cones', 'tyres']) warm.push(makeRoadLow(kind));
+      for (const [kind, n] of [['low', 3], ['awning', 3], ['cart', 1]]) for (let v = 0; v < n; v++) warm.push(makeSideObstacle(kind, v));
+      const probe = new THREE.WebGLRenderTarget(4, 4);
+      for (const object of warm) { object.position.set(0, ROAD_SURFACE_Y, -20); if (world) patchBend(object); scene.add(object); }
+      renderer.setRenderTarget(probe); renderer.render(scene, camera); renderer.setRenderTarget(null);
+      for (const object of warm) scene.remove(object);
+      probe.dispose();
+    } catch { /* warm-up is best effort */ }
+    // Pre-build the whole route off-screen (signs, textures, shaders) so nothing hitches when it streams in.
+    Promise.resolve(world?.prewarm?.(6000, () => !!(gameRef.current.running || gameRef.current.exploring))).catch(() => {}).finally(() => {
+      if (disposed) return;
+      loadReportTimer = setTimeout(() => { if (!disposed) report(); }, 60); // not rAF: background tabs never fire it
+    });
   };
   const loadTimer = setTimeout(() => { prog.heroDone = prog.baseDone = prog.varDone = true; settle(); }, 45000);
   report();
@@ -685,10 +768,12 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
       }
     }).catch(() => finishVariantGate());
   });
-  const post = world ? createPost(renderer, scene, camera, { mobile }) : null;
+  // Full-screen bloom and grading cost several extra passes. Keep the cinematic
+  // treatment on desktop; mobile gets the same scene with the base renderer.
+  let post = world && !mobile ? createPost(renderer, scene, camera, { mobile }) : null;
   // A small live rear-view mirror shows an approaching car without a warning banner.
   const rearView = world ? (() => {
-    const target = new THREE.WebGLRenderTarget(384, 192, { depthBuffer: true, stencilBuffer: false });
+    const target = new THREE.WebGLRenderTarget(mobile ? 192 : 256, mobile ? 96 : 128, { depthBuffer: true, stencilBuffer: false });
     target.texture.colorSpace = THREE.SRGBColorSpace;
     target.texture.generateMipmaps = false;
     target.texture.wrapS = THREE.RepeatWrapping; target.texture.repeat.x = -1; target.texture.offset.x = 1;
@@ -702,7 +787,25 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
     group.visible = false; camera.add(group); camera.layers.enable(1); scene.add(camera);
     return { target, camera: viewCamera, group, frame, screen };
   })() : null;
-  const clock = new THREE.Clock(); let hudTime = 0, raf = 0;
+  const clock = new THREE.Clock(); let hudTime = 0, raf = 0, rearViewTime = 0;
+  // Adaptive quality: untouched on devices that hold ~50fps. On a slow device it
+  // steps down one cost at a time (resolution, bloom, mirror rate, shadows) until smooth.
+  let qLevel = 0, slowAcc = 0, slowN = 0, lastNow = performance.now(), warm = 0, rearEvery = .125;
+  const governor = () => {
+    const now = performance.now(), raw = now - lastNow; lastNow = now;
+    if (raw > 90 && warm >= 90) console.warn(`[runner] hitch ${Math.round(raw)}ms`, { running: gameRef.current.running, t: +gameRef.current.time?.toFixed?.(1), obstacles: obstacles.length });
+    if (raw > 250) { slowAcc = 0; slowN = 0; return; } // tab switch / loading hitch: ignore
+    if (++warm < 90) return; // let the scene settle first
+    slowAcc += raw; slowN++;
+    if (slowN < 45) return;
+    const avg = slowAcc / slowN; slowAcc = 0; slowN = 0;
+    if (avg < 21 || qLevel >= 4) return; // >= ~48fps: fine
+    qLevel++; warm = 60;
+    if (qLevel === 1) { rearEvery = .3; renderer.setPixelRatio(Math.min(renderer.getPixelRatio(), 1)); resize(); }
+    else if (qLevel === 2 && post) { post.dispose(); post = null; }
+    else if (qLevel === 3) { sun.castShadow = false; }
+    else if (qLevel === 4) { renderer.setPixelRatio(.8); resize(); }
+  };
   const resize = () => {
     const rect = canvas.getBoundingClientRect(); renderer.setSize(rect.width, rect.height, false); post?.setSize(rect.width, rect.height);
     camera.aspect = rect.width / Math.max(rect.height, 1); camera.updateProjectionMatrix();
@@ -715,8 +818,11 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
   const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
   const marker = new THREE.Mesh(new THREE.RingGeometry(.26, .36, 28), new THREE.MeshBasicMaterial({ color: '#F47C1E', transparent: true, opacity: .85, depthWrite: false }));
   marker.rotation.x = -Math.PI / 2; marker.visible = false; marker.renderOrder = 5; scene.add(marker);
+  const _tmpV = new THREE.Vector3();
   const tick = () => {
+    if (document.hidden || disposed) { raf = 0; return; }
     raf = requestAnimationFrame(tick); const dt = Math.min(clock.getDelta(), .045), g = gameRef.current;
+    governor();
     if (appliedNight !== !!g.nightMode) { applyNight(g.nightMode); appliedNight = !!g.nightMode; }
     if ((g.running || g.exploring) && !g.paused) g.hitPause = Math.max(0, (g.hitPause || 0) - dt);
     const active = (g.running || g.exploring) && !g.paused;
@@ -777,12 +883,15 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
     }
     marker.visible = false;
     const routeLength = routeStops[routeStops.length - 1].distance;
-    const progress = THREE.MathUtils.clamp((g.distance || 0) / Math.max(routeLength, 1), 0, 1);
-    // Increase road speed gently across the route; each selected level keeps its own clear starting speed.
-    const challengeSpeed = g.level.speed * (1 + progress * .12);
+    const stage = g.stage || 1, stageGoal = g.stageGoal || g.level.goal;
+    const stagePressure = Math.min(1.4, (stage - 1) / 8 * 1.4);
+    // The road and difficulty keep progressing after each named landmark loop.
+    const stageSpeed = Math.min(1.9, 1 + (stage - 1) * .06);
+    const challengeSpeed = g.level.speed * stageSpeed;
     const worldSpeed = g.paused ? 0 : active ? (g.exploring ? (g.hitPause > 0 ? 0 : g.scroll || 0) : (g.hitPause > 0 ? 0 : challengeSpeed)) : .8;
     if (g.exploring && active) g.walked = Math.max(0, (g.walked || 0) + worldSpeed * dt);
     if (!g.paused) g.time += dt * (active ? 1 : .55);
+    if (g.hintUntil && g.time >= g.hintUntil) { g.hintUntil = 0; g.onHud?.((old) => old.hint ? { ...old, hint: null } : old); }
     if (g.tukMessageUntil && g.time >= g.tukMessageUntil) {
       g.tukMessageUntil = 0;
       g.onHud?.((old) => old.tukMessage ? { ...old, tukMessage: null } : old);
@@ -804,6 +913,13 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
     if (active) {
       if (g.running) {
         g.distance = (g.distance || 0) + worldSpeed * dt;
+        const routeLeg = Math.floor(g.distance / routeLength);
+        if (routeLeg !== (g.routeLeg || 0)) {
+          g.routeLeg = routeLeg;
+          g.tataSpawned = g.rightEntrySpawned = g.rearCarSpawned = false;
+          g.stuntSpawned = g.leftEntrySpawned = g.corsaSpawned = g.bothEntrySpawned = false;
+          g.nextCrateAt = g.distance + g.level.speed * 1.5;
+        }
         const reachedStop = routeStops.find((stop, index) => g.distance >= stop.distance && index >= (g.nextStop || 0));
         if (reachedStop) {
           g.location = reachedStop;
@@ -814,39 +930,125 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
       // Keep spawn clocks tied to road movement. Otherwise a collision pause
       // can create several hazards at the same frozen distance.
       if (g.running && worldSpeed > 0) g.spawn -= dt;
-      if (g.running && g.bags < g.level.goal && g.spawn <= 0 && obstacles.length < 22) {
+      if (g.running && g.stageBags < stageGoal && g.spawn <= 0 && obstacles.length < 22) {
         const occupiedLanes = getOccupiedChallengeLanes(obstacles);
         const openLanes = LANES.map((_, lane) => lane).filter((lane) => !occupiedLanes.has(lane));
         if (openLanes.length) {
           const group = makeCollectibleBag();
-          const lane = openLanes[Math.floor(Math.random() * openLanes.length)];
-          group.position.set(LANES[lane], ROAD_SURFACE_Y, -48); scene.add(group); if (world) patchBend(group);
+          let lane = openLanes[Math.floor(Math.random() * openLanes.length)];
+          // Risk / reward: now and then a bag sits on the pavement (where pavement obstacles live).
+          if (g.sideLanes && Math.random() < .14) {
+            const sl = Math.random() < .5 ? -1 : 3;
+            if (!obstacles.some((o) => o.lane === sl && !o.initial && o.group.position.z < -30 && o.group.position.z > -64)) lane = sl;
+          }
+          group.position.set(laneX(lane), ROAD_SURFACE_Y, -48); scene.add(group); if (world) patchBend(group);
           obstacles.push({ group, type: 'bag', lane, checked: false, initial: false });
-          g.spawn = (Math.max(.62, 1.18 - challengeSpeed / 26) / area.density + Math.random() * .38) * (g.level.bagIntervalScale || 1);
+          g.spawn = (Math.max(.62, 1.18 - challengeSpeed / 26) / area.density + Math.random() * .38) * (g.level.bagIntervalScale || 1) * Math.max(.55, 1 - (stage - 1) * .025);
         } else g.spawn = .2;
       }
       if (g.running && worldSpeed > 0) g.trafficSpawn = (g.trafficSpawn ?? 1.2) - dt;
       if (g.running && g.trafficSpawn <= 0 && obstacles.length < 22) {
         const occupiedLanes = getOccupiedChallengeLanes(obstacles);
-        const openLanes = LANES.map((_, lane) => lane).filter((lane) => !occupiedLanes.has(lane));
+        // Only the approach zone decides which lanes are free to spawn into (cars already behind the runner don't block).
+        const aheadLanes = getOccupiedChallengeLanes(obstacles.filter((o) => o.group.position.z < -18));
+        const openLanes = LANES.map((_, lane) => lane).filter((lane) => !aheadLanes.has(lane));
         // Special events follow elapsed road distance, so they still arrive if
         // the player misses a bag; level speed scales the spacing fairly.
-        const event = !g.tataSpawned && g.distance >= g.level.speed * 3 ? 'tataTruck'
-          : !g.rightEntrySpawned && g.distance >= g.level.speed * 5 ? 'sideEntryRight'
-            : !g.rearCarSpawned && g.distance >= g.level.speed * 7 ? 'rearCar'
-              : !g.stuntSpawned && g.distance >= g.level.speed * 9 ? 'stuntBike'
-                : !g.leftEntrySpawned && g.distance >= g.level.speed * 11 ? 'sideEntryLeft'
-                  : !g.corsaSpawned && g.distance >= g.level.speed * 12 ? 'corsaTruck'
-                    : !g.bothEntrySpawned && g.distance >= g.level.speed * 13 ? 'sideEntryBoth'
-                      : g.distance >= (g.nextCrateAt ?? g.level.speed * 4.5) ? 'roadCrate' : null;
+        const legStart = Math.floor(g.distance / routeLength) * routeLength;
+        // ---------------- scenario director: every run is different ----------------
+        // Each tick picks a random scenario from a weighted bag. Weights shift with the stage (difficulty), the player's lane
+        // (pavement runners meet pavement obstacles) and what the streamed street offers (real side streets / crossroads).
+        const rampD = stagePressure, onSidewalk = g.lane < 0 || g.lane > 2;
+        const sideJ = (side) => (world?.junctionNear ? world.junctionNear(side, -92, -30) : null);
+        const crossZ = world?.crossroadNear ? world.crossroadNear(-94, -36) : null;
+        const quiet = aheadLanes.size === 0, calm = aheadLanes.size < 2;
+        const jR = sideJ(1), jL = sideJ(-1);
+        const bag = [
+          ['crates', 3.2 + rampD * .6, calm],
+          ['tataTruck', 1.5 + rampD * .8, quiet],
+          ['rearCar', 1.1, !onSidewalk && !occupiedLanes.has(g.lane)],
+          ['stuntBike', 1.1 + rampD * .5, calm],
+          ['sideEntryRight', 1.9, jR != null && calm],
+          ['sideEntryLeft', 1.9, jL != null && calm],
+          ['sideEntryBoth', .9 + rampD, jR != null && jL != null && quiet],
+          ['corsaTruck', 1.2 + rampD * .5, (jR != null || jL != null) && quiet],
+          ['crossTraffic', 3.2, crossZ != null && calm],
+          ['roadBlock', (g.stage || 1) >= 2 ? .8 + rampD * 1.6 : 0, quiet],
+          ['sidewalk', 1.4 + (onSidewalk ? 14 : 0) + ((g.sideSince != null && g.time - g.sideSince > 2) ? 8 : 0), g.time >= (g.noSideUntil || 0)],
+        ].filter((entry) => entry[2] && entry[1] > 0).map((entry) => [entry[0], entry[0] === g.lastScenario ? entry[1] * .2 : entry[1]]);
+        const eventChance = Math.min(.82, .42 + rampD * .3 + (onSidewalk ? .25 : 0));
+        let event = null, junctionSide = 0, junctionZ = null, otherJunction = null;
+        if (bag.length && Math.random() < eventChance) {
+          let roll = Math.random() * bag.reduce((sum, entry) => sum + entry[1], 0);
+          for (const [name, weight] of bag) { roll -= weight; if (roll <= 0) { event = name; break; } }
+          event = event || bag[bag.length - 1][0];
+        }
+        if (event && (event.startsWith('sideEntry') || event === 'corsaTruck')) {
+          const order = event === 'sideEntryRight' ? [1] : event === 'sideEntryLeft' ? [-1] : Math.random() < .5 ? [1, -1] : [-1, 1];
+          for (const side of order) { const z = side > 0 ? jR : jL; if (z != null) { junctionSide = side; junctionZ = z; break; } }
+          if (junctionZ == null) event = null;
+          else if (event === 'sideEntryBoth') otherJunction = junctionSide > 0 ? jL : jR;
+        }
+        if (event) g.lastScenario = event;
         // A wide crossing event gets a completely clear approach; a shifting Tata uses two lanes at most.
         const canSpawnEvent = event === 'rearCar' ? !occupiedLanes.has(g.lane)
-          : event === 'sideEntryBoth' || event === 'tataTruck' ? occupiedLanes.size === 0
-          : event === 'corsaTruck' ? occupiedLanes.size === 0
-            : event?.startsWith('sideEntry') ? occupiedLanes.size < 2
-            : occupiedLanes.size < 2;
-        if (openLanes.length && canSpawnEvent) {
-          const ramp = Math.min(1, Math.max((g.distance || 0) / 180, (g.bags || 0) / g.level.goal));
+          : event === 'sideEntryBoth' || event === 'tataTruck' || event === 'corsaTruck' ? quiet
+            : calm;
+        if (event === 'crates' || event === 'crossTraffic' || event === 'roadBlock' || event === 'sidewalk') {
+          let placed = false;
+          const push = (item) => { scene.add(item.group); if (world) patchBend(item.group); obstacles.push(item); placed = true; };
+          const sideBusy = (lane, z = -48, span = 9) => obstacles.some((o) => o.lane === lane && !o.initial && o.type.startsWith('side') && Math.abs(o.group.position.z - z) < span);
+          const randomRoute = () => ROUTES[Math.floor(Math.random() * ROUTES.length)];
+          const carScale = { car: .96, microbus: .92, tuktuk: .96 };
+          if (event === 'crates') {
+            const free = [0, 1, 2].filter((lane) => !occupiedLanes.has(lane)).sort(() => Math.random() - .5);
+            const count = Math.min(free.length, 1 + (Math.random() < .3 + rampD * .35 ? 1 : 0) + (Math.random() < rampD * .3 ? 1 : 0));
+            const kinds = ['crate', 'barrier', 'cones', 'tyres'];
+            for (let k = 0; k < count; k++) {
+              const kind = kinds[Math.floor(Math.random() * kinds.length)], group = makeRoadLow(kind);
+              group.position.set(LANES[free[k]], ROAD_SURFACE_Y, -48 - (count > 1 ? Math.random() * 3 : 0));
+              if (kind !== 'crate') group.rotation.y = (Math.random() - .5) * .3;
+              push({ group, type: 'roadCrate', lane: free[k], direction: 1, checked: false, initial: false });
+            }
+          } else if (event === 'crossTraffic' && crossZ != null) {
+            // A car drives straight through a real crossroad, from one side street to the other (either direction).
+            const dir = Math.random() < .5 ? 1 : -1, type = ['car', 'microbus', 'tuktuk'][Math.floor(Math.random() * 3)];
+            const targetLane = Math.floor(Math.random() * 3), arrive = (runner.position.z - crossZ) / Math.max(worldSpeed, 4);
+            const v = THREE.MathUtils.clamp((dir * LANES[targetLane] + 30) / arrive, 4.5, 11);
+            let x0 = LANES[targetLane] - dir * v * arrive; x0 = THREE.MathUtils.clamp(x0, -32, 32);
+            if (Math.abs(x0) >= 12 && Math.sign(x0) === -dir) {
+              const group = createVehicle(type, randomRoute()); group.scale.setScalar(carScale[type]);
+              group.position.set(x0, ROAD_SURFACE_Y, crossZ); group.rotation.y = dir * Math.PI / 2;
+              push({ group, type, lane: targetLane, direction: 1, checked: false, initial: false, rotated: true, crossThrough: true, crossDir: dir, crossV: v, crossBase: Math.max(worldSpeed, 1), apron: true });
+            }
+          } else if (event === 'roadBlock') {
+            // Traffic jam across the whole road: only the pavement is open (a risky lane with its own obstacles).
+            const leftBusy = sideBusy(-1, -20, 44), rightBusy = sideBusy(3, -20, 44);
+            if (!(leftBusy && rightBusy)) {
+              for (const lane of [0, 1, 2]) {
+                const type = ['car', 'microbus', 'tuktuk'][Math.floor(Math.random() * 3)], group = createVehicle(type, randomRoute());
+                group.scale.setScalar(carScale[type]);
+                group.position.set(LANES[lane] + (Math.random() - .5) * .4, ROAD_SURFACE_Y, -52 - Math.random() * 4); group.rotation.y = (Math.random() - .5) * .5;
+                push({ group, type, lane, direction: 1, checked: false, initial: false, static: true });
+              }
+              g.noSideUntil = g.time + 3.6; g.hintUntil = g.time + 2.8;
+              g.onHud?.((old) => ({ ...old, hint: { text: 'الطريق واقف! اطلع على الرصيف', id: Math.round(g.time * 1000) } }));
+            }
+          } else if (event === 'sidewalk') {
+            const lane = onSidewalk ? g.lane : (Math.random() < .5 ? -1 : 3);
+            const spawnSide = (z) => {
+              if (sideBusy(lane, z, 10)) return;
+              const pickKind = Math.random(), kind = pickKind < .4 ? 'low' : pickKind < .72 ? 'awning' : 'cart';
+              const variant = kind === 'cart' ? 0 : Math.floor(Math.random() * 3);
+              const group = makeSideObstacle(kind, variant); group.position.set(laneX(lane), 0, z);
+              push({ group, type: kind === 'low' ? 'sideLow' : kind === 'awning' ? 'sideAwning' : 'sideCart', lane, direction: 1, checked: false, initial: false, avoid: kind === 'low' ? 'jump' : kind === 'awning' ? 'slide' : 'lane' });
+            };
+            spawnSide(-48);
+            if (Math.random() < .25 + rampD * .35) spawnSide(-60 - Math.random() * 6);
+          }
+          g.trafficSpawn = placed ? 1.9 - Math.min(.6, rampD * .45) + Math.random() * .5 : .25;
+        } else if (openLanes.length && canSpawnEvent) {
+          const ramp = stagePressure;
           const isStunt = event === 'stuntBike';
           const isSideEntry = event?.startsWith('sideEntry');
           const isRearCar = event === 'rearCar';
@@ -867,22 +1069,30 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
             item.crossing = true;
             const openCrossingLanes = [0, 2, 1].filter((candidate) => !occupiedLanes.has(candidate));
             const targetLane = openCrossingLanes[0] ?? lane;
-            item.targetX = LANES[targetLane] + (targetLane === 2 ? 2 : -2);
-            item.group.rotation.y = item.targetX > item.group.position.x ? Math.PI / 2 : -Math.PI / 2;
-            item.group.position.set(item.targetX > 0 ? -8.8 : 8.8, ROAD_SURFACE_Y, -48);
-            item.entryRoad = createSideStreetEntry(item.group.position.x < 0 ? -1 : 1, -48);
-            scene.add(item.entryRoad); if (world) patchBend(item.entryRoad);
+            if (junctionZ != null) {
+              item.targetX = THREE.MathUtils.clamp(LANES[targetLane] - junctionSide * 2, -4.2, 4.2);
+              item.group.rotation.y = -junctionSide * Math.PI / 2;
+              item.group.position.set(junctionSide * 19, ROAD_SURFACE_Y, junctionZ);
+              item.entryRoad = new THREE.Group(); item.entryRoad.position.z = junctionZ; scene.add(item.entryRoad);
+              item.mouth = true; item.mouthSide = junctionSide;
+            } else {
+              item.targetX = LANES[targetLane] + (targetLane === 2 ? 2 : -2);
+              item.group.rotation.y = item.targetX > item.group.position.x ? Math.PI / 2 : -Math.PI / 2;
+              item.group.position.set(item.targetX > 0 ? -8.8 : 8.8, ROAD_SURFACE_Y, -48);
+              item.entryRoad = createSideStreetEntry(item.group.position.x < 0 ? -1 : 1, -48);
+              scene.add(item.entryRoad); if (world) patchBend(item.entryRoad);
+            }
             item.crossSpeed = (item.targetX - item.group.position.x) / ((runner.position.z - item.group.position.z) / (challengeSpeed * 1.32));
             item.crossSpeedBase = challengeSpeed;
             g.corsaSpawned = true;
           } else if (isSideEntry) {
-            const fromRight = event === 'sideEntryRight' || (event === 'sideEntryBoth' && Math.random() < .5);
-            const startX = fromRight ? 8.8 : -8.8;
+            const fromRight = junctionZ != null ? junctionSide > 0 : (event === 'sideEntryRight' || (event === 'sideEntryBoth' && Math.random() < .5));
+            const startX = junctionZ != null ? (fromRight ? 19 : -19) : (fromRight ? 8.8 : -8.8), startZ = junctionZ ?? -54;
             item.targetX = LANES[lane];
-            item.group.position.set(startX, ROAD_SURFACE_Y, -54);
-            item.entryRoad = createSideStreetEntry(fromRight ? 1 : -1, -54);
-            scene.add(item.entryRoad); if (world) patchBend(item.entryRoad);
-            item.crossSpeed = (item.targetX - startX) / ((runner.position.z + 54) / (challengeSpeed * 1.32));
+            item.group.position.set(startX, ROAD_SURFACE_Y, startZ);
+            if (junctionZ != null) { item.entryRoad = new THREE.Group(); item.entryRoad.position.z = startZ; scene.add(item.entryRoad); item.mouth = true; item.mouthSide = fromRight ? 1 : -1; }
+            else { item.entryRoad = createSideStreetEntry(fromRight ? 1 : -1, -54); scene.add(item.entryRoad); if (world) patchBend(item.entryRoad); }
+            item.crossSpeed = (item.targetX - startX) / ((runner.position.z - startZ) / (challengeSpeed * 1.32));
             item.crossSpeedBase = challengeSpeed;
             item.group.rotation.y = Math.atan2(item.crossSpeed, challengeSpeed * 1.32);
             if (event === 'sideEntryRight') g.rightEntrySpawned = true;
@@ -890,23 +1100,24 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
             else {
               g.bothEntrySpawned = true;
               const otherLane = openLanes.find((candidate) => candidate !== lane);
-              if (otherLane != null) {
+              if (otherLane != null && (!world?.junctionNear || otherJunction != null)) {
                 const otherType = ['car', 'microbus', 'tuktuk'][Math.floor(Math.random() * 3)];
                 const otherGroup = createVehicle(otherType, ROUTES[Math.floor(Math.random() * ROUTES.length)]);
                 otherGroup.scale.setScalar({ car: .96, microbus: .92, tuktuk: .96 }[otherType]);
-                const otherFromRight = !fromRight, otherStartX = otherFromRight ? 8.8 : -8.8, otherStartZ = -66;
+                const otherFromRight = !fromRight, otherStartX = otherJunction != null ? (otherFromRight ? 19 : -19) : (otherFromRight ? 8.8 : -8.8), otherStartZ = otherJunction ?? -66;
                 const otherSpeed = (LANES[otherLane] - otherStartX) / ((runner.position.z - otherStartZ) / (challengeSpeed * 1.32));
                 otherGroup.position.set(otherStartX, ROAD_SURFACE_Y, otherStartZ);
                 otherGroup.rotation.y = Math.atan2(otherSpeed, challengeSpeed * 1.32);
-                const otherRoad = createSideStreetEntry(otherFromRight ? 1 : -1, otherStartZ);
-                scene.add(otherRoad); if (world) patchBend(otherRoad);
+                const otherRoad = otherJunction != null ? new THREE.Group() : createSideStreetEntry(otherFromRight ? 1 : -1, otherStartZ);
+                if (otherJunction != null) otherRoad.position.z = otherStartZ;
+                scene.add(otherRoad); if (world && otherJunction == null) patchBend(otherRoad);
                 scene.add(otherGroup); if (world) patchBend(otherGroup);
-                obstacles.push({ group: otherGroup, entryRoad: otherRoad, type: otherType, lane: otherLane, direction: 1, checked: false, initial: false, sideEntry: true, targetX: LANES[otherLane], crossSpeed: otherSpeed, crossSpeedBase: challengeSpeed });
+                obstacles.push({ group: otherGroup, entryRoad: otherRoad, type: otherType, lane: otherLane, direction: 1, checked: false, initial: false, sideEntry: true, targetX: LANES[otherLane], crossSpeed: otherSpeed, crossSpeedBase: challengeSpeed, mouth: otherJunction != null, mouthSide: otherFromRight ? 1 : -1 });
               }
             }
           } else if (isRearCar) {
             // A faster car closes in from behind without a warning prompt.
-            const rearLane = g.lane;
+            const rearLane = THREE.MathUtils.clamp(g.lane, 0, 2);
             item.lane = rearLane;
             item.direction = -1;
             item.rearApproach = true;
@@ -915,7 +1126,7 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
             g.rearCarSpawned = true;
           } else if (type === 'roadCrate') {
             item.group.position.set(LANES[lane], ROAD_SURFACE_Y, -48);
-            const crateSpacing = Math.max(54, 82 - (g.level.speed - LEVELS[0].speed) * 6);
+            const crateSpacing = Math.max(42, 82 - (g.level.speed - LEVELS[0].speed) * 6 - Math.min(24, (stage - 1) * 2));
             g.nextCrateAt = g.distance + crateSpacing;
           } else {
             item.group.position.set(LANES[lane], ROAD_SURFACE_Y, -54);
@@ -926,15 +1137,17 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
           scene.add(group); if (world) patchBend(group);
           obstacles.push(item);
           const levelBias = (g.level.speed - LEVELS[0].speed) * .12;
-          g.trafficSpawn = event ? 1.7 + Math.random() * .25 : Math.max(1.8, 3.5 - ramp * 1.25 - levelBias) + Math.random() * .35;
+          const stageBias = Math.min(1.35, (stage - 1) * .08);
+          g.trafficSpawn = event ? 1.7 + Math.random() * .25 : Math.max(1.1, 3.5 - ramp * 1.25 - levelBias - stageBias) + Math.random() * .35;
         } else g.trafficSpawn = .25;
       }
       g.jump = Math.max(0, g.jump - dt); g.slide = Math.max(0, g.slide - dt);
       if (g.exploring) {
-        g.freeX = THREE.MathUtils.clamp((g.freeX || 0) + (g.hitPause > 0 ? 0 : (g.mvx || 0) * dt), -8.1, 8.1);
+        g.freeX = THREE.MathUtils.clamp((g.freeX || 0) + (g.hitPause > 0 ? 0 : (g.mvx || 0) * dt), -(g.freeLimit ?? 8.1), (g.freeLimit ?? 8.1));
         g.currentX = THREE.MathUtils.damp(g.currentX || 0, g.freeX, 9, dt);
-      } else g.currentX = THREE.MathUtils.damp(g.currentX || 0, LANES[g.lane], 12, dt);
+      } else g.currentX = THREE.MathUtils.damp(g.currentX || 0, laneX(g.lane), 12, dt);
       runner.position.x = g.currentX; runner.position.z = 2.3 + (g.exploring ? g.zoff || 0 : 0);
+      if (g.lane < 0 || g.lane > 2) { if (g.sideSince == null) g.sideSince = g.time; } else g.sideSince = null;
       const jumping = g.jump > 0; const sliding = g.slide > 0;
       const twist = runner.userData.twist, crashed = !!twist && g.hitPause > 0;
       runner.position.y = crashed ? 0 : jumping ? Math.sin((1 - g.jump / .68) * Math.PI) * 1.25 : sliding && !twist ? -.08 : 0;
@@ -943,16 +1156,17 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
       if (runner.userData.deliveryBag) { runner.userData.deliveryBag.position.y = THREE.MathUtils.damp(runner.userData.deliveryBag.position.y, sliding ? 1.12 : 1.3, 10, dt); runner.userData.deliveryBag.rotation.x = THREE.MathUtils.damp(runner.userData.deliveryBag.rotation.x, sliding ? -.82 : 0, 10, dt); }
       // Before the run starts, an idle courier turns to follow the mouse / finger with his body and head.
       const lookOn = !!twist && g.exploring && !g.moving && !crashed && !!g.pointer && !document.pointerLockElement;
-      const sideDx = (g.exploring ? (g.freeX || 0) : LANES[g.lane]) - runner.position.x; // <0: moving to his left, >0: to his right
+      const sideDx = (g.exploring ? (g.freeX || 0) : laneX(g.lane)) - runner.position.x; // <0: moving to his left, >0: to his right
       if (twist) twist.update(dt, { side: g.exploring ? 0 : Math.abs(sideDx) > .25 ? Math.sign(sideDx) : 0, paused: g.paused, hitT: crashed ? 1 - g.hitPause / twist.hitTime : null, jumpT: jumping ? 1 - g.jump / .68 : null, slideT: sliding ? 1 - g.slide / .92 : null, walk: g.exploring && !!g.moving && !g.sprinting, idle: g.exploring && !g.moving, speed: challengeSpeed, look: lookOn ? g.pointer : null });
       else if (runner.userData.mixer) runner.userData.mixer.update(dt * 1.55);
       else if (runner.userData.animate) runner.userData.animate(g.time * 13, .85, jumping, sliding);
       else animateLimb(runner.userData.limbs, g.time * 13, sliding ? .12 : jumping ? .25 : .82);
       runner.rotation.x = THREE.MathUtils.damp(runner.rotation.x, g.hitPause > 0 && !twist ? .18 : 0, 8, dt);
       { const ty = g.exploring ? g.heading || 0 : 0, dy = Math.atan2(Math.sin(ty - runner.rotation.y), Math.cos(ty - runner.rotation.y)); runner.rotation.y += dy * (1 - Math.exp(-(g.moving ? 10 : 6) * dt)); }
-      const targetLean = g.exploring ? 0 : (LANES[g.lane] - runner.position.x) * -.08;
+      const targetLean = g.exploring ? 0 : (laneX(g.lane) - runner.position.x) * -.08;
       runner.rotation.z = THREE.MathUtils.damp(runner.rotation.z, targetLean, 6, dt);
       let closestTrafficDistance = Infinity, closestTrafficX = 0;
+      const statueBox = g.running ? world?.getSaadStatueObstacle?.() : null;
       for (const item of obstacles) {
         if (g.exploring && !TRAFFIC_TYPES.includes(item.type)) continue;
         // Oncoming traffic closes the distance faster than road-bound
@@ -960,7 +1174,7 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
         // scenery, making bags and barriers appear to sit on top of them.
         const isVehicle = CHALLENGE_VEHICLE_TYPES.includes(item.type);
         const previousZ = item.group.position.z;
-        const approachSpeed = isVehicle ? 1.32 : item.type === 'pedestrian' ? 1.05 : 1;
+        const approachSpeed = isVehicle ? (item.mouth || item.static || item.crossThrough ? 1 : 1.32) : item.type === 'pedestrian' ? 1.05 : 1;
         if (item.rearApproach) {
           const brakeLine = runner.position.z + 1.5;
           if (!item.rearStopped) {
@@ -972,6 +1186,12 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
           }
         } else item.group.position.z += worldSpeed * dt * approachSpeed * (item.direction || 1);
         if (item.entryRoad) item.entryRoad.position.z += worldSpeed * dt * approachSpeed * (item.direction || 1);
+        if (isVehicle && !item.mouth && !item.initial) {
+          // Traffic never drives through the statue island: it is hidden while its centre is on the monument.
+          const onStatue = !!statueBox && Math.abs(item.group.position.z - statueBox.z) < statueBox.halfDepth + 1.2 && Math.abs(item.group.position.x - statueBox.x) < statueBox.halfWidth + .4;
+          if (onStatue) { item.group.visible = false; item.statueHidden = true; }
+          else if (item.statueHidden) { item.group.visible = true; item.statueHidden = false; }
+        }
         if (isVehicle) {
           const crossSpeed = item.crossSpeed * challengeSpeed / (item.crossSpeedBase || challengeSpeed);
           if (item.stunt) item.group.rotation.x = -.27 + Math.sin(g.time * 5) * .035;
@@ -980,7 +1200,21 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
             item.group.position.x = THREE.MathUtils.lerp(LANES[item.sourceLane], LANES[item.targetLane], eased);
             item.lane = t < .5 ? item.sourceLane : item.targetLane;
           }
-          if (item.sideEntry) {
+          if (item.crossThrough) {
+            // Through traffic on a crossroad: perpendicular to the avenue, locked to the street's scroll.
+            item.group.position.x += item.crossDir * item.crossV * (worldSpeed / item.crossBase) * dt * (worldSpeed > 0 ? 1 : 0);
+            if (Math.abs(item.group.position.x) > 31) item.group.visible = false;
+          } else if (item.mouth) {
+            // Still inside the side street: drive straight out to the road edge, locked to the street's own scroll.
+            const dir = -item.mouthSide;
+            item.group.position.x += dir * 6.5 * dt * (worldSpeed > 0 ? 1 : 0);
+            item.group.rotation.y = dir * Math.PI / 2;
+            if (Math.abs(item.group.position.x) <= 5.3) {
+              item.mouth = false;
+              item.crossSpeed = (item.targetX - item.group.position.x) / (Math.max(8, runner.position.z - item.group.position.z) / (challengeSpeed * 1.32));
+              item.crossSpeedBase = challengeSpeed;
+            }
+          } else if (item.sideEntry) {
             const remaining = item.targetX - item.group.position.x, step = crossSpeed * dt * (worldSpeed > 0 ? 1 : 0);
             item.group.position.x = remaining * step <= 0 ? item.targetX : item.group.position.x + step;
             item.group.rotation.y = THREE.MathUtils.damp(item.group.rotation.y, 0, 2.8, dt);
@@ -989,10 +1223,15 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
             item.group.position.x = LANES[item.lane];
             item.group.rotation.y = Math.PI;
           }
-          if (item.crossing) {
-            const endX = item.targetX + Math.sign(item.crossSpeed) * 4.5;
+          if (item.crossing && !item.mouth) {
+            const endX = THREE.MathUtils.clamp(item.targetX + Math.sign(item.crossSpeed) * 4.5, -5.0, 5.0);
             const crossingStep = crossSpeed * dt * (worldSpeed > 0 ? 1 : 0);
             item.group.position.x = item.crossSpeed > 0 ? Math.min(endX, item.group.position.x + crossingStep) : Math.max(endX, item.group.position.x + crossingStep);
+          }
+          if (item.mouthSide || item.apron) { // roll over the junction's drop-kerb apron (raised asphalt) instead of sinking into it
+            const ax = Math.abs(item.group.position.x);
+            const lift = ax <= 4.6 ? 0 : ax < 5.6 ? (ax - 4.6) * .165 : ax <= 9.6 ? .165 : ax < 11.2 ? .165 - (ax - 9.6) / 1.6 * .145 : .02;
+            item.group.position.y = ROAD_SURFACE_Y + lift;
           }
           const distance = Math.hypot(item.group.position.x - runner.position.x, item.group.position.z - runner.position.z);
           if (distance < closestTrafficDistance) { closestTrafficDistance = distance; closestTrafficX = item.group.position.x - runner.position.x; }
@@ -1029,22 +1268,26 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
           }
         }
         const actualLane = item.type === 'pedestrian' ? LANES.reduce((best, x, index) => Math.abs(x - item.group.position.x) < Math.abs(LANES[best] - item.group.position.x) ? index : best, 0) : item.lane;
-        const bounds = item.group.userData.trafficBounds, rotatedCrossing = item.type === 'corsaTruck';
+        const bounds = item.group.userData.trafficBounds, rotatedCrossing = item.type === 'corsaTruck' || !!item.rotated;
         const bagPickup = item.type === 'bag' ? item.group.userData.collectRadius : null;
-        const halfDepth = bagPickup?.z ?? (bounds ? (rotatedCrossing ? bounds.halfWidth : bounds.halfDepth) * item.group.scale.z : ({ car: 1.72, microbus: 1.9, tuktuk: 1.2, bike: 1.0, roadCrate: .42 }[item.type] || .4));
-        const halfWidth = bagPickup?.x ?? (bounds ? (rotatedCrossing ? bounds.halfDepth : bounds.halfWidth) * item.group.scale.x : ({ car: .86, microbus: .9, tuktuk: .68, bike: .62, roadCrate: .5 }[item.type] || .4));
+        const tbl = { car: [.86, 1.72], microbus: [.9, 1.9], tuktuk: [.68, 1.2], bike: [.62, 1.0], roadCrate: [.5, .42] }[item.type];
+        const baseW = bounds ? bounds.halfWidth * item.group.scale.x : (tbl ? tbl[0] : .4), baseD = bounds ? bounds.halfDepth * item.group.scale.z : (tbl ? tbl[1] : .4);
+        const halfDepth = bagPickup?.z ?? (rotatedCrossing ? baseW : baseD);
+        const halfWidth = bagPickup?.x ?? (rotatedCrossing ? baseD : baseW);
         const overlapsRunner = Math.abs(item.group.position.z - runner.position.z) < halfDepth + (bagPickup ? 0 : .35)
           && Math.abs(item.group.position.x - runner.position.x) < halfWidth + (bagPickup ? 0 : .28);
         if (g.exploring && isVehicle && !item.checked && !(g.hitPause > 0) && overlapsRunner) {
           // Walked into traffic (or it reached him): he is knocked down, the car brakes, then he gets back up.
           item.checked = true; g.hitPause = runner.userData.twist ? runner.userData.twist.hitTime : .42; item.hold = g.hitPause;
-          g.freeX = THREE.MathUtils.clamp((g.freeX || 0) + (item.group.position.x <= runner.position.x ? 2.2 : -2.2), -8.1, 8.1);
+          g.freeX = THREE.MathUtils.clamp((g.freeX || 0) + (item.group.position.x <= runner.position.x ? 2.2 : -2.2), -(g.freeLimit ?? 8.1), (g.freeLimit ?? 8.1));
         }
         if (g.running && !item.initial && !item.checked && overlapsRunner && (item.type === 'bag' || item.type === 'tataTruck' || rotatedCrossing || actualLane === g.lane)) {
           item.checked = true;
-          if (item.type === 'bag') { g.bags += 1; item.group.visible = false; }
+          if (item.type === 'bag') { g.bags += 1; g.stageBags += 1; item.group.visible = false; }
           else if (g.hitPause > 0) { /* Brief collision recovery prevents stacked hazards from taking multiple hits. */ }
-          else if (item.type === 'roadCrate' && runner.position.y > .68) { item.group.visible = false; }
+          else if (item.type === 'roadCrate' && runner.position.y > .68) { /* hopped over it */ }
+          else if (item.avoid === 'jump' && runner.position.y > .68) { /* hopped over it */ }
+          else if (item.avoid === 'slide' && sliding) { /* slid underneath */ }
           else if (item.type === 'roadCrate') {
             g.hits += 1; g.hitPause = runner.userData.twist ? runner.userData.twist.hitTime : .42;
             if (!runner.userData.twist) runner.rotation.x = .18;
@@ -1054,7 +1297,7 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
             if (item.rearApproach) { item.rearStopped = true; item.rearStoppedAt = g.time; }
             g.hits += 1; g.hitPause = runner.userData.twist ? runner.userData.twist.hitTime : .42;
             const shove = item.group.position.x <= runner.position.x ? 1 : -1;
-            g.lane = THREE.MathUtils.clamp(g.lane + shove, 0, LANES.length - 1);
+            g.lane = THREE.MathUtils.clamp(g.lane + shove, g.lane < 0 ? -1 : 0, g.lane > 2 ? 3 : 2);
             if (!runner.userData.twist) runner.rotation.x = .18;
           }
         }
@@ -1079,7 +1322,7 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
           g.hits += 1;
           g.lane = runner.position.x <= statue.x ? 0 : LANES.length - 1;
         } else {
-          g.freeX = THREE.MathUtils.clamp((g.freeX || 0) + (runner.position.x <= statue.x ? -2.4 : 2.4), -8.1, 8.1);
+          g.freeX = THREE.MathUtils.clamp((g.freeX || 0) + (runner.position.x <= statue.x ? -2.4 : 2.4), -(g.freeLimit ?? 8.1), (g.freeLimit ?? 8.1));
           if (g.mv) { g.mv.x = 0; g.mv.z = 0; }
         }
       }
@@ -1093,9 +1336,13 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
         for (const material of group.userData.ownedMaterials || []) material.dispose();
         obstacles.splice(i, 1);
       }
-      const routeFinish = routeLength;
+      if (g.running && g.stageBags >= stageGoal) {
+        g.stage += 1;
+        g.stageBags = 0;
+        g.stageGoal = g.level.goal + (g.stage - 1) * 2;
+        g.onHud?.((old) => ({ ...old, stage: g.stage, bags: 0, goal: g.stageGoal }));
+      }
       if (g.running && g.hits >= 3) { g.running = false; g.failed = true; }
-      else if (g.running && g.bags >= g.level.goal && g.distance >= routeFinish) { g.running = false; g.complete = true; }
     } else {
       g.trafficAudio?.update(Infinity, 0);
       runner.position.x = Math.sin(g.time * .8) * .18;
@@ -1122,7 +1369,7 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
         camera.position.x = THREE.MathUtils.lerp(camera.position.x, px + Math.sin(cm.yaw) * cp * cm.dist, cm.w);
         camera.position.y = THREE.MathUtils.lerp(camera.position.y, 1.4 + Math.sin(cm.pitch) * cm.dist, cm.w);
         camera.position.z = THREE.MathUtils.lerp(camera.position.z, pz + Math.cos(cm.yaw) * cp * cm.dist, cm.w);
-        tgt.lerp(new THREE.Vector3(px, 1.35, pz - .3), cm.w);
+        tgt.lerp(_tmpV.set(px, 1.35, pz - .3), cm.w);
       }
       camera.lookAt(tgt);
     }
@@ -1130,17 +1377,39 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
     if (rearView) {
       const rearVisible = g.running && obstacles.some((item) => item.rearApproach && item.group.position.z > runner.position.z - 5 && item.group.position.z < runner.position.z + 48);
       rearView.group.visible = !!rearVisible;
-      if (rearVisible) {
+      // The mirror is a secondary scene render. Refresh it at 8 fps; motion in
+      // the main view remains smooth while avoiding a second full render each frame.
+      if (rearVisible && clock.elapsedTime - rearViewTime >= rearEvery) {
         rearView.camera.position.set(runner.position.x, 1.55, runner.position.z + .08);
         rearView.camera.lookAt(runner.position.x, 1.3, runner.position.z + 42);
         renderer.setRenderTarget(rearView.target); renderer.clear(); renderer.render(scene, rearView.camera); renderer.setRenderTarget(null);
+        rearViewTime = clock.elapsedTime;
+      }
+    }
+    {
+      // Hand the pooled real spotlights to the nearest lamps that are currently lit (constant light count = no recompiles).
+      const lit = [];
+      for (const item of obstacles) {
+        const lamps = item.group.userData.trafficLights;
+        if (!lamps || !item.group.visible) continue;
+        const dz = item.group.position.z - runner.position.z;
+        for (const lamp of lamps) if (lamp.intensity > .01) lit.push({ lamp, item, d: dz * dz + Math.abs(item.group.position.x - runner.position.x) });
+      }
+      lit.sort((a, b) => a.d - b.d);
+      for (let i = 0; i < headlightPool.length; i++) {
+        const l = headlightPool[i], pick = lit[i];
+        if (!pick) { l.intensity = 0; continue; }
+        pick.item.group.updateWorldMatrix(true, false);
+        l.position.copy(_hlW.copy(pick.lamp.local).applyMatrix4(pick.item.group.matrixWorld));
+        l.target.position.copy(_hlW.copy(pick.lamp.aim).applyMatrix4(pick.item.group.matrixWorld)); l.target.updateMatrixWorld();
+        l.intensity = pick.lamp.intensity;
       }
     }
     if (post) post.render(clock.elapsedTime); else renderer.render(scene, camera);
     if (clock.elapsedTime - hudTime > .12) {
       g.onHud?.((old) => ({
         ...old,
-        bags: Math.min(g.bags, g.level.goal), hits: g.hits, running: g.running,
+        bags: g.stageBags || 0, goal: g.stageGoal || g.level.goal, stage: g.stage || 1, totalBags: g.bags, hits: g.hits, running: g.running,
         exploring: g.exploring, paused: g.paused, complete: g.complete, failed: g.failed,
         location: g.locationUntil > g.time ? g.location : null,
         tukMessage: g.tukMessageUntil > g.time ? old.tukMessage : null,
@@ -1148,9 +1417,15 @@ function createScene(canvas, area, gameRef, storeNames, storeBrands = {}) {
       hudTime = clock.elapsedTime;
     }
   };
+  const resumeRendering = () => {
+    if (document.hidden || disposed || raf) return;
+    clock.getDelta();
+    raf = requestAnimationFrame(tick);
+  };
+  document.addEventListener('visibilitychange', resumeRendering);
   tick();
   return () => {
-    disposed = true; clearTimeout(loadTimer); clearTimeout(loadReportTimer); clearTimeout(variantLoadTimer); cancelAnimationFrame(raf); observer.disconnect(); world?.dispose(); post?.dispose();
+    disposed = true; document.removeEventListener('visibilitychange', resumeRendering); clearTimeout(loadTimer); clearTimeout(loadReportTimer); clearTimeout(variantLoadTimer); cancelAnimationFrame(raf); observer.disconnect(); world?.dispose(); post?.dispose();
     if (gameRef.current.resetRoute === resetRoute) delete gameRef.current.resetRoute;
     if (rearView) {
       camera.remove(rearView.group); scene.remove(camera); scene.remove(rearView.camera);
@@ -1173,14 +1448,14 @@ export default function BanhaRunner() {
   const trafficAudioRef = useRef(null);
   const trafficSoundsEnabledRef = useRef(true);
   const musicEnabledRef = useRef(true);
-  const gameRef = useRef({ running: false, exploring: true, paused: false, lane: 1, freeX: 0, currentX: 0, jump: 0, slide: 0, time: 0, bags: 0, hits: 0, spawn: .6, level: LEVELS[1], complete: false, failed: false, nightMode: true });
+  const gameRef = useRef({ running: false, exploring: true, paused: false, lane: 1, freeX: 0, currentX: 0, jump: 0, slide: 0, time: 0, bags: 0, hits: 0, spawn: .6, level: LEVELS[1], complete: false, failed: false, nightMode: false });
   const [levelId, setLevelId] = useState('normal');
   const [hud, setHud] = useState({ bags: 0, hits: 0, running: false, exploring: true, paused: false, complete: false, failed: false });
   const [loadPct, setLoadPct] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [trafficSoundsEnabled, setTrafficSoundsEnabled] = useState(true);
-  const [nightMode, setNightMode] = useState(true);
+  const [nightMode, setNightMode] = useState(false);
   const area = AREAS.find((x) => x.id === 'villas'), level = LEVELS.find((x) => x.id === levelId) || LEVELS[1];
   const { data: marketplace } = useApi('/marketplace?q=&category=all&sort=featured');
   const [cachedStoreNames] = useState(() => {
@@ -1246,24 +1521,24 @@ export default function BanhaRunner() {
     unlockTrafficAudio();
     playMusic();
     try { document.exitPointerLock?.(); } catch { /* ignore */ }
-    const g = gameRef.current; g.trafficAudio?.resetHonkCooldown?.(); g.resetRoute?.(); Object.assign(g, { running: true, exploring: false, paused: false, lane: 1, currentX: 0, jump: 0, slide: 0, hitPause: 0, time: 0, distance: 0, nextStop: 0, nextCrateAt: level.speed * 4.5, location: null, locationUntil: 0, tukMessageUntil: 0, lastTukPhraseAt: -20, nextTrafficHornAt: 0, bags: 0, hits: 0, spawn: .45, trafficSpawn: 1.5, stuntSpawned: false, tataSpawned: false, rightEntrySpawned: false, leftEntrySpawned: false, bothEntrySpawned: false, corsaSpawned: false, rearCarSpawned: false, level, complete: false, failed: false, resetChallenge: true });
-    setHud({ bags: 0, hits: 0, running: true, exploring: false, paused: false, complete: false, failed: false, location: null });
+    const g = gameRef.current; g.trafficAudio?.resetHonkCooldown?.(); g.resetRoute?.(); Object.assign(g, { running: true, exploring: false, paused: false, lane: 1, currentX: 0, jump: 0, slide: 0, hitPause: 0, time: 0, distance: 0, routeLeg: 0, nextStop: 0, nextCrateAt: level.speed * 4.5, location: null, locationUntil: 0, tukMessageUntil: 0, lastTukPhraseAt: -20, nextTrafficHornAt: 0, bags: 0, stageBags: 0, stage: 1, stageGoal: level.goal, hits: 0, spawn: .45, trafficSpawn: 1.5, stuntSpawned: false, tataSpawned: false, rightEntrySpawned: false, leftEntrySpawned: false, bothEntrySpawned: false, corsaSpawned: false, rearCarSpawned: false, level, complete: false, failed: false, resetChallenge: true });
+    setHud({ bags: 0, goal: level.goal, stage: 1, totalBags: 0, hits: 0, running: true, exploring: false, paused: false, complete: false, failed: false, location: null });
   }, [level, playMusic, unlockTrafficAudio]);
   const act = useCallback((action) => {
     const g = gameRef.current; if ((!g.running && !g.exploring) || g.paused) return;
     unlockTrafficAudio();
     playMusic();
     if (g.exploring) {
-      if (action === 'left') g.freeX = THREE.MathUtils.clamp((g.freeX || 0) - 1.1, -8.1, 8.1);
-      if (action === 'right') g.freeX = THREE.MathUtils.clamp((g.freeX || 0) + 1.1, -8.1, 8.1);
+      if (action === 'left') g.freeX = THREE.MathUtils.clamp((g.freeX || 0) - 1.1, -(g.freeLimit ?? 8.1), (g.freeLimit ?? 8.1));
+      if (action === 'right') g.freeX = THREE.MathUtils.clamp((g.freeX || 0) + 1.1, -(g.freeLimit ?? 8.1), (g.freeLimit ?? 8.1));
       if (action === 'forward') g.walkForward = true;
       if (action === 'back') g.walkForward = false;
       if (action === 'jump' && g.jump <= 0 && g.slide <= 0) g.jump = .68;
       if (action === 'slide' && g.jump <= 0 && g.slide <= 0) g.slide = .92;
       return;
     }
-    if (action === 'left') g.lane = Math.max(0, g.lane - 1);
-    if (action === 'right') g.lane = Math.min(2, g.lane + 1);
+    if (action === 'left') g.lane = Math.max(g.sideLanes ? -1 : 0, g.lane - 1);
+    if (action === 'right') g.lane = Math.min(g.sideLanes ? 3 : 2, g.lane + 1);
     if (action === 'jump' && g.jump <= 0 && g.slide <= 0) g.jump = .68;
     if (action === 'slide' && g.jump <= 0 && g.slide <= 0) g.slide = .92;
   }, [playMusic, unlockTrafficAudio]);
@@ -1417,23 +1692,24 @@ export default function BanhaRunner() {
         <div className="pointer-events-auto flex items-center gap-2.5"><Link to="/" aria-label="العودة للسوق" className="grid h-10 w-10 place-items-center rounded-2xl border border-white/20 bg-[#09243A]/70 backdrop-blur-xl"><ArrowRight className="h-5 w-5" /></Link><div><p className="text-[10px] font-black tracking-[.16em] text-[#FF9A42]">TWIST • BANHA RUN</p><p className="mt-0.5 text-sm font-black sm:text-base">{area.name}</p></div></div>
         <div className="pointer-events-auto flex gap-2"><button type="button" onClick={toggleNightMode} aria-label={nightMode ? 'تشغيل الوضع النهاري' : 'تشغيل الوضع الليلي'} title={nightMode ? 'الوضع النهاري' : 'الوضع الليلي'} className="grid h-10 w-10 place-items-center rounded-2xl border border-white/20 bg-[#09243A]/70 backdrop-blur-xl">{nightMode ? <Sun className="h-5 w-5 text-amber-300" /> : <Moon className="h-5 w-5" />}</button><button type="button" onClick={toggleMusic} aria-label={musicEnabled ? 'كتم الموسيقى' : 'تشغيل الموسيقى'} title={musicEnabled ? 'كتم الموسيقى' : 'تشغيل الموسيقى'} className="grid h-10 w-10 place-items-center rounded-2xl border border-white/20 bg-[#09243A]/70 backdrop-blur-xl">{musicEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button><button type="button" onClick={toggleTrafficSounds} aria-label={trafficSoundsEnabled ? 'كتم صوت المرور' : 'تشغيل صوت المرور'} title={trafficSoundsEnabled ? 'كتم صوت المرور' : 'تشغيل صوت المرور'} className="grid h-10 w-10 place-items-center rounded-2xl border border-white/20 bg-[#09243A]/70 backdrop-blur-xl">{trafficSoundsEnabled ? <Car className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}</button><button type="button" onClick={toggleFullscreen} aria-label={isFullscreen ? 'الخروج من ملء الشاشة' : 'ملء الشاشة'} className="grid h-10 w-10 place-items-center rounded-2xl border border-white/20 bg-[#09243A]/70 backdrop-blur-xl">{isFullscreen ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}</button>{hud.running && <button type="button" onClick={togglePause} aria-label={hud.paused ? 'استكمال' : 'إيقاف مؤقت'} className="grid h-10 w-10 place-items-center rounded-2xl border border-white/20 bg-[#09243A]/70 backdrop-blur-xl">{hud.paused ? <Play className="h-5 w-5" /> : <Pause className="h-5 w-5" />}</button>}</div>
       </div>
-      {hud.running && <div className="absolute left-1/2 top-[62px] flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-white/20 bg-[#08233C]/75 px-4 py-2 shadow-xl backdrop-blur-xl sm:top-5"><span className="flex items-center gap-1.5 font-black text-[#FF9A42]"><ShoppingBag className="h-4 w-4" />{hud.bags}<span className="text-white/55">/ {level.goal}</span></span><span className="h-5 w-px bg-white/20" /><span className="text-xs font-bold text-white/85">خبطات {hud.hits}/3</span></div>}
+      {hud.running && <div className="absolute left-1/2 top-[62px] flex -translate-x-1/2 items-center gap-3 rounded-2xl border border-white/20 bg-[#08233C]/75 px-4 py-2 shadow-xl backdrop-blur-xl sm:top-5"><span className="text-xs font-black text-[#FFAA5B]">مرحلة {hud.stage || 1}</span><span className="h-5 w-px bg-white/20" /><span className="flex items-center gap-1.5 font-black text-[#FF9A42]"><ShoppingBag className="h-4 w-4" />{hud.bags}<span className="text-white/55">/ {hud.goal || level.goal}</span></span><span className="h-5 w-px bg-white/20" /><span className="text-xs font-bold text-white/85">خبطات {hud.hits}/3</span></div>}
       {hud.running && <div className="pointer-events-none absolute bottom-[88px] left-1/2 -translate-x-1/2 rounded-full border border-white/15 bg-[#08233C]/75 px-3 py-1.5 text-center text-[10px] font-bold text-white/85 shadow-lg backdrop-blur sm:bottom-24 sm:text-xs">← → تفادى <span className="mx-1 text-white/35">•</span> ↑ اقفز فوق الصندوق <span className="mx-1 text-white/35">•</span> ↓ انزلق تحت الشاحنة</div>}
       {hud.exploring && <div className="absolute left-1/2 top-[62px] flex -translate-x-1/2 flex-col items-center gap-2 rounded-2xl border border-white/20 bg-[#08233C]/90 px-4 py-3 text-center shadow-xl backdrop-blur-xl"><span className="text-xs font-black text-[#FFAA5B]">جولة حرة في سوق بنها</span><span className="text-[11px] text-white/75">لف على المحلات واتحرك براحتك</span><div className="flex items-center gap-1 rounded-xl bg-black/25 p-1">{LEVELS.map((x) => <button type="button" key={x.id} aria-pressed={levelId === x.id} onClick={() => setLevelId(x.id)} className={'rounded-lg px-3 py-1.5 text-[11px] font-black transition ' + (levelId === x.id ? 'bg-[#F8620A] text-white' : 'text-white/65 hover:bg-white/10')}>{x.label}</button>)}</div><span className="text-[10px] text-white/65">اجمع {level.goal} شنط • سرعة المرور بتعلى مع التقدم</span><button type="button" onClick={start} className="rounded-xl bg-[#F8620A] px-4 py-2 text-xs font-black shadow-lg">ابدأ تحدي Twist</button></div>}
       {hud.running && hud.location && <div key={hud.location.name} className="pointer-events-none absolute left-1/2 top-[118px] -translate-x-1/2 animate-[fade-in_0.25s_ease-out] rounded-2xl border border-[#FF9A42]/50 bg-[#08233C]/90 px-5 py-3 text-center shadow-[0_12px_40px_rgba(0,0,0,.38)] backdrop-blur-xl sm:top-[78px]"><p className="text-[10px] font-bold text-white/60">أنت الآن في</p><p className="mt-0.5 text-lg font-black text-[#FFAA5B]">{hud.location.name}</p><p className="text-[11px] text-white/70">{hud.location.detail}</p></div>}
+      {hud.hint && <div key={hud.hint.id} className="pointer-events-none absolute left-1/2 top-[120px] z-10 -translate-x-1/2 animate-[fade-in_0.2s_ease-out] rounded-2xl border border-[#FF9A42]/50 bg-[#2B1A10]/90 px-4 py-2 text-center shadow-[0_10px_32px_rgba(0,0,0,.35)] backdrop-blur-xl sm:top-[96px]"><p className="whitespace-nowrap text-sm font-black text-[#FFB866]">⚠️ {hud.hint.text}</p></div>}
       {hud.tukMessage && <div key={hud.tukMessage.id} className="pointer-events-none absolute left-1/2 top-[220px] z-10 -translate-x-1/2 animate-[fade-in_0.25s_ease-out] rounded-2xl border border-[#FFD277]/45 bg-[#172B35]/90 px-4 py-2.5 text-center shadow-[0_10px_32px_rgba(0,0,0,.35)] backdrop-blur-xl sm:top-[162px]"><p className="text-[10px] font-bold text-[#FFD277]/75">🛺 من التوك توك</p><p className="mt-0.5 whitespace-nowrap text-sm font-black text-white">{hud.tukMessage.text}</p></div>}
       {hud.running && <div className="absolute inset-x-0 bottom-4 flex items-end justify-between px-4 sm:bottom-7 sm:px-8"><div className="flex gap-2.5">{control('left', ChevronLeft, 'تحرك يسار')}{control('right', ChevronRight, 'تحرك يمين')}</div><div className="flex gap-2.5">{control('slide', ChevronDown, 'انزل واتزحلق')}{control('jump', ChevronUp, 'انط', true)}</div></div>}
       {hud.exploring && <div className="pointer-events-none absolute inset-x-0 bottom-3 hidden justify-center sm:flex"><span className="rounded-full border border-white/15 bg-[#08233C]/70 px-4 py-1.5 text-[12px] text-white/80 backdrop-blur">WASD للمشي • Shift للجري • Space للقفز • C للانزلاق • اضغط على الشاشة وحرّك الماوس للكاميرا • Esc للإفلات</span></div>}
       {hud.exploring && <div className="absolute inset-x-0 bottom-4 flex items-end justify-between px-4 sm:bottom-7 sm:px-8"><div className="flex gap-2.5">{control('left', ChevronLeft, 'امشِ يسار')}{control('right', ChevronRight, 'امشِ يمين')}</div><div className="flex gap-2.5">{control('slide', ChevronsDown, 'انزلاق')}{control('jump', ChevronsUp, 'قفز')}{control('forward', ChevronUp, 'امشِ للأمام', true)}</div></div>}
       {!hud.running && !hud.exploring && !finished && <div className="absolute inset-0 grid place-items-center bg-[#06121F]/30 p-4 backdrop-blur-[2px]"><section className="w-full max-w-xl rounded-[30px] border border-white/20 bg-[#09243A]/88 p-5 shadow-[0_30px_100px_rgba(0,0,0,.38)] backdrop-blur-2xl sm:p-8">
         <div className="mb-5 flex items-center justify-between"><span className="text-xs font-black tracking-[.16em] text-[#FF9A42]">TWIST • BANHA RUN</span><span className="rounded-full border border-white/15 px-3 py-1 text-xs font-bold text-white/70">تحدي بنها</span></div>
-        <h1 className="text-3xl font-black leading-tight sm:text-4xl">اجري في بنها،<br /><span className="text-[#FF8B35]">واجمع شنط Twist</span></h1><p className="mt-3 max-w-md text-sm leading-6 text-white/70">ابدأ في شارع المتاجر، وعدّي شوارع بنها ونفق سعد زغلول تحت السكة الحديد، ثم شارع فريد ندا والاستاد، وصولًا لكوبري كفر الجزار. أسماء الأماكن هتظهر وأنت بتعدّيها.</p>
+        <h1 className="text-3xl font-black leading-tight sm:text-4xl">اجري في بنها،<br /><span className="text-[#FF8B35]">واجمع شنط Twist</span></h1><p className="mt-3 max-w-md text-sm leading-6 text-white/70">ابدأ في شارع المتاجر، وعدّي شوارع بنها ونفق سعد زغلول تحت السكة الحديد، ثم شارع فريد ندا والاستاد وكوبري كفر الجزار. الطريق مفتوح، وكل مرحلة أصعب من اللي قبلها.</p>
         <div className="mt-6 grid gap-4"><fieldset><legend className="text-xs font-bold text-white/60">مستوى التحدي</legend><div className="mt-2 grid grid-cols-3 gap-1 rounded-2xl bg-black/25 p-1">{LEVELS.map((x) => <button type="button" key={x.id} onClick={() => setLevelId(x.id)} className={'h-10 rounded-xl text-xs font-black transition ' + (levelId === x.id ? 'bg-[#F8620A] text-white shadow-lg' : 'text-white/60 hover:bg-white/10')}>{x.label}</button>)}</div></fieldset></div>
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><p className="text-xs font-semibold text-white/65">من شارع المتاجر إلى كوبري كفر الجزار<span className="mx-1 text-white/35">•</span>اجمع {level.goal} شنط</p><button type="button" onClick={start} className="inline-flex h-12 items-center gap-2 rounded-2xl bg-[#F8620A] px-6 font-black shadow-[0_8px_25px_rgba(248,98,10,.3)] transition hover:-translate-y-0.5 hover:bg-[#E45407]"><Play className="h-4 w-4 fill-current" />يلا بينا</button></div>
+        <div className="mt-5 flex flex-wrap items-center justify-between gap-3"><p className="text-xs font-semibold text-white/65">طريق مفتوح<span className="mx-1 text-white/35">•</span>اجمع {level.goal} شنط للمرحلة الأولى</p><button type="button" onClick={start} className="inline-flex h-12 items-center gap-2 rounded-2xl bg-[#F8620A] px-6 font-black shadow-[0_8px_25px_rgba(248,98,10,.3)] transition hover:-translate-y-0.5 hover:bg-[#E45407]"><Play className="h-4 w-4 fill-current" />يلا بينا</button></div>
         <p className="mt-5 text-center text-[11px] text-white/50">اسحب على الشاشة أو استخدم الأسهم: حركة • فوق: اقفز فوق الصندوق • تحت: انزلق تحت الشاحنة</p>
       </section></div>}
       {hud.paused && <div className="absolute inset-0 grid place-items-center bg-black/50 p-4 backdrop-blur-sm"><section className="rounded-[28px] border border-white/15 bg-[#09243A]/95 p-8 text-center shadow-2xl"><Pause className="mx-auto h-8 w-8 text-[#FF9A42]" /><h2 className="mt-3 text-xl font-black">وقفنا هنا</h2><button type="button" onClick={togglePause} className="mt-5 rounded-2xl bg-[#F8620A] px-7 py-3 font-black">كمّل الجري</button></section></div>}
-      {finished && <div className="absolute inset-0 grid place-items-center bg-[#06121F]/55 p-4 backdrop-blur-sm"><section className="w-full max-w-sm rounded-[30px] border border-white/15 bg-[#09243A]/95 p-7 text-center shadow-2xl"><span className={'mx-auto grid h-14 w-14 place-items-center rounded-2xl ' + (hud.complete ? 'bg-amber-400/15 text-amber-300' : 'bg-rose-400/15 text-rose-300')}>{hud.complete ? <Trophy className="h-7 w-7" /> : <X className="h-7 w-7" />}</span><h2 className="mt-4 text-2xl font-black">{hud.complete ? 'عاش! خلّصت التحدي' : 'الزحمة لحقتك!'}</h2><p className="mt-2 text-sm text-white/65">جمعت {hud.bags} شنطة في {area.name}</p><p className="mt-2 text-xs text-white/45">مكافآت المتاجر هتتضاف بعد اعتماد الحملات.</p><button type="button" onClick={start} className="mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-[#F8620A] px-6 font-black"><RotateCcw className="h-4 w-4" /> العب تاني</button></section></div>}
+      {finished && <div className="absolute inset-0 grid place-items-center bg-[#06121F]/55 p-4 backdrop-blur-sm"><section className="w-full max-w-sm rounded-[30px] border border-white/15 bg-[#09243A]/95 p-7 text-center shadow-2xl"><span className={'mx-auto grid h-14 w-14 place-items-center rounded-2xl ' + (hud.complete ? 'bg-amber-400/15 text-amber-300' : 'bg-rose-400/15 text-rose-300')}>{hud.complete ? <Trophy className="h-7 w-7" /> : <X className="h-7 w-7" />}</span><h2 className="mt-4 text-2xl font-black">{hud.complete ? 'عاش! خلّصت التحدي' : 'الزحمة لحقتك!'}</h2><p className="mt-2 text-sm text-white/65">جمعت {hud.totalBags ?? hud.bags} شنطة في {area.name} ووصلت للمرحلة {hud.stage || 1}</p><p className="mt-2 text-xs text-white/45">مكافآت المتاجر هتتضاف بعد اعتماد الحملات.</p><button type="button" onClick={start} className="mt-6 inline-flex h-12 items-center gap-2 rounded-2xl bg-[#F8620A] px-6 font-black"><RotateCcw className="h-4 w-4" /> العب تاني</button></section></div>}
       {loadPct < 100 && !hud.sceneError && <div className="absolute inset-0 z-50 grid place-items-center bg-[#06121F] p-6 text-center"><div className="w-full max-w-sm"><p className="text-[11px] font-black tracking-[.2em] text-[#FF9A42]">TWIST • BANHA RUN</p><h2 className="mt-3 text-2xl font-black text-white">بنجهّز سوق بنها...</h2><p className="mt-1 text-xs text-white/60">{loadPct < 35 ? 'تحميل الشخصية والشوارع' : loadPct < 80 ? 'تحميل العربيات والموتوسيكلات' : 'تجهيز المشهد'}</p><div className="mt-6 h-3 overflow-hidden rounded-full bg-white/10" role="progressbar" aria-valuenow={loadPct} aria-valuemin={0} aria-valuemax={100}><div className="h-full rounded-full bg-gradient-to-l from-[#FF9A42] to-[#F8620A] transition-[width] duration-300" style={{ width: loadPct + '%' }} /></div><p className="mt-2 text-sm font-black tabular-nums text-[#FFAA5B]">{loadPct}%</p></div></div>}
       {hud.sceneError && <div className="absolute inset-0 grid place-items-center bg-[#071521]/95 p-6 text-center"><div><h2 className="text-xl font-black">مشهد اللعبة مش قادر يشتغل على المتصفح ده</h2><p className="mt-2 text-sm text-white/60">جرّب تفتحها في متصفح بيدعم WebGL.</p>{hud.sceneErrorMessage && <p className="mx-auto mt-3 max-w-md break-words text-xs text-rose-200/75">{hud.sceneErrorMessage}</p>}</div></div>}
     </main>

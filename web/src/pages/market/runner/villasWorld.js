@@ -139,7 +139,7 @@ function noise(ctx, w, h, count, lo, hi, aLo, aHi, size = 2, seed = 1) {
 
 /** Turns a procedurally drawn height field into a tangent-space normal map (gives real surface relief under the sun). */
 function normalMapFrom(w, h, drawHeight, { strength = 2.5, repeat, blur = 1 } = {}) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); drawHeight(x, w, h);
+  const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d', { willReadFrequently: true }); drawHeight(x, w, h);
   const src = x.getImageData(0, 0, w, h).data; let hf = new Float32Array(w * h);
   for (let i = 0; i < w * h; i++) hf[i] = src[i * 4] / 255;
   for (let pass = 0; pass < blur; pass++) { const o = new Float32Array(w * h); for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) { let a = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) a += hf[((yy + dy + h) % h) * w + ((xx + dx + w) % w)]; o[yy * w + xx] = a / 9; } hf = o; }
@@ -1006,6 +1006,13 @@ function sideStreet(b, rnd, s) {
   // the old facade at x=9 sat directly across this opening, so entering cars
   // looked as if they were driving through a wall.
   b.plane(asphalt, 29, 9, s * 20.1, -.02, 0, 0, -Math.PI / 2);
+  // Drop-kerb apron: the main road's kerb and pavement run past the mouth, so without this the opening reads as a
+  // dam. A raised asphalt table (top at .125, just above the kerb) with short ramps both ways lets traffic roll
+  // straight across the pavement like a real junction.
+  b.box(asphalt, 4.0, .17, 9, s * 7.6, .04, 0);
+  const rampUp = Math.atan2(.165, 1.0), rampDown = Math.atan2(.145, 1.6);
+  b.box(asphalt, 1.014, .03, 9, s * 5.1, .04, 0, 0, 0, s * rampUp);
+  b.box(asphalt, 1.61, .03, 9, s * 10.4, .0525, 0, 0, 0, -s * rampDown);
   for (let i = 0; i < 7; i++) b.box(line, 1.3, .02, .35, s * (13 + i * 3), .0, 0);
   const bld = (z) => {
     const h2 = 7 + rnd() * 3, v = Math.floor(rnd() * 8);
@@ -1201,6 +1208,9 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
     if (m === 4) left = 'mosque';
     if (m === 5) right = 'none'; // leave the right-side underpass portal clear
     if (m === 6) { left = 'sidestreet'; right = 'sidestreet'; }
+    // Extra real junctions: single side streets (traffic merges in) and crossroads (traffic drives straight through).
+    if (m === 2 || m === 10 || m === 17) { left = 'sidestreet'; right = 'sidestreet'; }
+    if (m === 12 || m === 15) left = 'sidestreet';
     if (m >= 7 && m < 9) { left = 'tower'; right = 'none'; }
     else if (m >= 18 && m < 22) { left = 'canal'; right = 'canal'; }
     else if (m >= 22 && m < 26) { left = 'villas'; right = 'villas'; }
@@ -1270,9 +1280,9 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
   function mountCrossingTrain(slot, idx, token) {
     const rig = new THREE.Group();
     rig.visible = false; rig.position.set(0, 0, -59); slot.group.add(rig);
-    slot.trainRig = rig; crossingTrain = rig;
+    slot.trainRig = rig; if (!slot.spare) crossingTrain = rig;
     loadTangaraAsset().then((gltf) => {
-      if (disposed || slot.token !== token || slot.idx !== idx || slot.trainRig !== rig) return;
+      if (disposed || rig.userData.dead) return;
       const model = gltf.scene.clone(true);
       model.traverse((o) => {
         if (!o.isMesh) return;
@@ -1295,12 +1305,38 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
       rig.add(model); patchBend(model);
     }).catch(() => {});
   }
-  function rebuild(slot, idx, immediate = false) {
+  // Built segments are cached by route index (the route is fixed and deterministic). Recycling a slot then only
+  // re-parents ready-made, already-uploaded geometry instead of rebuilding it: no CPU spike, no GPU upload.
+  const segCache = new Map(); // idx -> { holder, children, actors, trainRig, tunnelVan }
+  const CACHE_MAX = (typeof window !== 'undefined' && window.innerWidth < 700) ? 12 : 48;
+  const cacheFinish = (slot, idx) => {
+    if (segCache.has(idx) || segCache.size >= CACHE_MAX) return;
+    slot.group.updateMatrixWorld();
+    segCache.set(idx, { owner: slot, holder: slot.group, children: [...slot.group.children], actors: [...slot.actors], trainRig: slot.trainRig, tunnelVan: slot.tunnelVan });
+  };
+  function releaseSlot(slot) {
     if (slot.trainRig === crossingTrain) crossingTrain = null;
-    for (const c of [...slot.group.children]) { disposeGroup(c); slot.group.remove(c); }
-    slot.trainRig = null;
-    slot.tunnelVan = null;
-    slot.actors.length = 0;
+    const entry = segCache.get(slot.idx);
+    if (entry && entry.owner === slot) { // keep the built segment alive in the cache under a private holder
+      const holder = new THREE.Group(); for (const c of [...slot.group.children]) holder.add(c);
+      entry.holder = holder; entry.owner = null;
+    } else {
+      if (slot.trainRig) slot.trainRig.userData.dead = true;
+      for (const c of [...slot.group.children]) { disposeGroup(c); slot.group.remove(c); }
+    }
+    slot.trainRig = null; slot.tunnelVan = null; slot.actors.length = 0;
+  }
+  function rebuild(slot, idx, immediate = false) {
+    releaseSlot(slot);
+    const hit = segCache.get(idx);
+    if (hit && hit.owner == null) {
+      slot.idx = idx; slot.token = (slot.token || 0) + 1;
+      for (const c of hit.children) slot.group.add(c);
+      slot.actors.push(...hit.actors); slot.trainRig = hit.trainRig; slot.tunnelVan = hit.tunnelVan;
+      if (hit.trainRig) crossingTrain = hit.trainRig;
+      hit.owner = slot;
+      return;
+    }
     slot.idx = idx; slot.token = (slot.token || 0) + 1; const token = slot.token;
     const p = plan(idx), rnd = rngFrom(idx * 7919 + 17);
     // Each piece is built on its own frame so a recycled segment never causes a long hitch.
@@ -1330,6 +1366,7 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
         if (p.bridge) { const br = buildBridge(idx - shopSegments === 18); slot.group.add(br); patchBend(br); }
       },
     ];
+    jobs.push(() => cacheFinish(slot, idx));
     for (const job of jobs) { const guarded = () => { if (slot.token === token) job(); }; immediate ? guarded() : queue.push(guarded); }
   }
   // Start the storefront strip ahead of the courier. Previously segment 0 was
@@ -1380,7 +1417,7 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
     },
     refreshParkedVehicles() {
       const parked = [];
-      root.traverse((object) => { if (object.userData.parkedVehicleType) parked.push(object); });
+      [root, ...[...segCache.values()].filter((e) => !e.owner).map((e) => e.holder)].forEach((r) => r.traverse((object) => { if (object.userData.parkedVehicleType) parked.push(object); }));
       for (const old of parked) {
         const replacement = makeParkedVehicle(old.userData.parkedVehicleType, Math.random);
         replacement.userData.parkedVehicleType = old.userData.parkedVehicleType;
@@ -1388,6 +1425,55 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
         old.parent.add(replacement); old.parent.remove(old); patchBend(replacement);
       }
       return parked.length;
+    },
+    /**
+     * Warm-up during the loading screen. Builds every route segment once off-screen so the first time a
+     * shop sign texture, a tunnel/bridge/train or a new shader shows up it is already compiled and uploaded
+     * (that first-time work is what caused the hitches at specific places). Nothing visible changes.
+     */
+    async prewarm(maxMs = 7000, isBusy = () => false) {
+      if (disposed || !renderer) return;
+      const t0 = performance.now(), sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+      try { await loadWalker(); } catch { /* shoppers are optional */ }
+      const total = shopSegments + 26;
+      const rt = new THREE.WebGLRenderTarget(4, 4);
+      let gateOpen = true;
+      const gate = new Promise((resolve) => setTimeout(() => { gateOpen = false; resolve(); }, maxMs));
+      const work = (async () => {
+        for (let i = 0; i < total && !disposed && segCache.size < CACHE_MAX; i++) {
+          while (!gateOpen && isBusy() && !disposed) await sleep(400); // after loading, only warm up while the player is idle
+          const idx = startIdx + i;
+          if (segCache.has(idx)) continue;
+          const spare = { group: new THREE.Group(), actors: [], idx: -1, token: 0, z: 0, spare: true };
+          root.add(spare.group);
+          rebuild(spare, idx, true);
+          // Upload geometry + textures and compile shaders off-screen (4x4 target: nothing is shown).
+          try { spare.group.updateMatrixWorld(true); renderer.setRenderTarget(rt); renderer.render(scene, camera); } catch { /* best effort */ }
+          renderer.setRenderTarget(null);
+          releaseSlot(spare); root.remove(spare.group);
+          await sleep(gateOpen ? 0 : 30);
+        }
+      })();
+      await Promise.race([work, gate]);
+      if (!gateOpen) work.finally(() => rt.dispose()); else rt.dispose();
+    },
+    /** z of a streamed crossroad (side streets on BOTH sides, not the statue square) whose centre lies in [zMin, zMax], else null. */
+    crossroadNear(zMin, zMax) {
+      for (const slot of slots) {
+        if (slot.idx < 0) continue;
+        const p = plan(slot.idx);
+        if (p.left === 'sidestreet' && p.right === 'sidestreet' && slot.idx - shopSegments !== 6 && slot.z >= zMin && slot.z <= zMax) return slot.z;
+      }
+      return null;
+    },
+    /** z of a streamed side street on that side (-1 left / +1 right) whose mouth lies in [zMin, zMax], else null. */
+    junctionNear(side, zMin, zMax) {
+      for (const slot of slots) {
+        if (slot.idx < 0) continue;
+        const p = plan(slot.idx);
+        if ((side > 0 ? p.right : p.left) === 'sidestreet' && slot.z >= zMin && slot.z <= zMax) return slot.z;
+      }
+      return null;
     },
     update(dt, speed) {
       distance += speed * dt; sky.position.copy(camera.position);
@@ -1427,9 +1513,9 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
       }
       const job = queue.shift(); if (job) job();
       const period = 140 / 14;
-      roadTex.offset.y = (roadTex.offset.y + dz * 14 / 140) % 1; roadNormal.offset.y = roadTex.offset.y;
-      curbTex.offset.y = (curbTex.offset.y + dz * 70 / 140) % 1;
-      padTex.offset.y = (padTex.offset.y + dz * 18 / 140) % 1; padNormal.offset.y = padTex.offset.y;
+      roadTex.offset.y = (roadTex.offset.y + dz * 14 / 230) % 1; roadNormal.offset.y = roadTex.offset.y;
+      curbTex.offset.y = (curbTex.offset.y + dz * 70 / 230) % 1;
+      padTex.offset.y = (padTex.offset.y + dz * 18 / 230) % 1; padNormal.offset.y = padTex.offset.y;
       MAT.water.map.offset.y = (MAT.water.map.offset.y + dt * .01) % 1; void period;
       for (const m of markings) { m.position.z += dz; if (m.position.z > 8) m.position.z -= 140; }
       for (const c of clouds) { c.position.x += dt * .6; if (c.position.x > 130) c.position.x = -130; }
@@ -1437,6 +1523,8 @@ export function createVillasWorld(scene, camera, { sun, hemi, renderer, envUrl, 
     dispose() {
       disposed = true;
       for (const slot of slots) for (const c of [...slot.group.children]) disposeGroup(c);
+      for (const e of segCache.values()) if (!e.owner) for (const c of [...e.holder.children]) disposeGroup(c);
+      segCache.clear();
       scene.remove(root); scene.environment = null; envTexture?.dispose(); WORLD_BEND.uCurve.value = 0; WORLD_BEND.uHill.value = 0;
     },
   };

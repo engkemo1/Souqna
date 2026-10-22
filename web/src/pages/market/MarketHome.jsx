@@ -270,6 +270,7 @@ export default function MarketHome() {
         </div>
       </footer>
       <StylistChat />
+      </div>
     </div>
   );
 }
