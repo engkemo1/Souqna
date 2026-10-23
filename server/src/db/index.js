@@ -204,6 +204,7 @@ export const json = (s, fallback) => {
 {
   const cc = db.prepare('PRAGMA table_info(categories)').all().map((c) => c.name);
   if (!cc.includes('parent_id')) db.exec('ALTER TABLE categories ADD COLUMN parent_id INTEGER');
+  if (!cc.includes('system')) db.exec('ALTER TABLE categories ADD COLUMN system INTEGER NOT NULL DEFAULT 0');
   const dc = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);
   if (!dc.includes('parent_slug')) db.exec('ALTER TABLE departments ADD COLUMN parent_slug TEXT');
   if (!db.prepare("SELECT 1 FROM app_settings WHERE key='dept_tree_v1'").get()) {
@@ -239,11 +240,12 @@ export const json = (s, fallback) => {
         const parent = node.parent_slug ? nodes.get(node.parent_slug) : null;
         const parentId = parent && parent.parent_slug && depth < 3 ? ensure(parent, depth + 1, storeId) : null;
         const sort = db.prepare('SELECT COALESCE(MAX(sort),-1)+1 AS n FROM categories WHERE store_id=?').get(storeId).n;
-        return Number(db.prepare('INSERT INTO categories (store_id, slug, name_ar, name_en, parent_id, sort) VALUES (?,?,?,?,?,?)').run(storeId, catSlug, node.name_ar, node.name_en, parentId, sort).lastInsertRowid);
+        return Number(db.prepare('INSERT INTO categories (store_id, slug, name_ar, name_en, parent_id, system, sort) VALUES (?,?,?,?,?,1,?)').run(storeId, catSlug, node.name_ar, node.name_en, parentId, sort).lastInsertRowid);
       };
       for (const st of db.prepare('SELECT id, departments FROM stores').all()) {
         for (const slug of String(st.departments || '').split(',').filter(Boolean)) { const n = nodes.get(slug); if (n) ensure(n, 0, st.id); }
       }
+      db.exec("UPDATE categories SET system=1 WHERE slug IN (SELECT REPLACE(slug,'_','-') FROM departments)");
       // 4) drop empty leftover starter categories (e.g. "جينز" in a dresses store) that aren't one of the store's departments
       const del = db.prepare('DELETE FROM categories WHERE id=?');
       for (const c of db.prepare('SELECT c.id, c.slug, s.departments FROM categories c JOIN stores s ON s.id=c.store_id WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.category_id=c.id) AND NOT EXISTS (SELECT 1 FROM categories k WHERE k.parent_id=c.id)').all()) {

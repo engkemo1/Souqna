@@ -134,7 +134,7 @@ export function serializeProductDetail(p) {
 }
 
 export function serializeCategory(c) {
-  return { id: c.id, slug: c.slug, name: bi(c, 'name'), image: c.media_id ? serializeMedia(getMedia(c.media_id)) : null, count: c.count ?? undefined, sort: c.sort, parentId: c.parent_id ?? null };
+  return { id: c.id, slug: c.slug, name: bi(c, 'name'), image: c.media_id ? serializeMedia(getMedia(c.media_id)) : null, count: c.count ?? undefined, sort: c.sort, parentId: c.parent_id ?? null, system: !!c.system };
 }
 
 export function serializeBanner(b, media) {

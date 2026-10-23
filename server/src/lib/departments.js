@@ -38,7 +38,7 @@ export function ensureDeptCategories(storeId, slugs) {
     const parent = node.parent_slug ? by.get(node.parent_slug) : null;
     if (parent && parent.parent_slug && depth < 3) parentId = ensure(parent, depth + 1); // أب هو قسم مش قسم رئيسي (مثال: فساتين أفراح تحت فساتين)
     const sort = (q.val('SELECT COALESCE(MAX(sort),-1)+1 FROM categories WHERE store_id=?', [storeId])) || 0;
-    return insert('categories', { store_id: storeId, slug: catSlug, name_ar: node.name_ar, name_en: node.name_en, parent_id: parentId, sort });
+    return insert('categories', { store_id: storeId, slug: catSlug, name_ar: node.name_ar, name_en: node.name_en, parent_id: parentId, system: 1, sort });
   };
   for (const s of slugs) { const n = by.get(s); if (n) ensure(n); }
 }

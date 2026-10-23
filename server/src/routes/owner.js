@@ -966,7 +966,7 @@ r.put('/categories/:id', h((req, res) => {
   const c = q.get('SELECT * FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!c) throw notFound('Category');
   const d = catSchema.parse(req.body);
-  if (!req.adminStore && !c.parent_id) throw badRequest('top_level_admin_only', 'Main categories are managed by the platform admin.');
+  if (!req.adminStore && c.system) throw badRequest('system_category', 'This section is managed by the platform admin.');
   let parentId;
   if (req.adminStore && d.parent_id !== undefined) parentId = checkCatParent(req.store.id, d.parent_id, c.id);
   update('categories', c.id, { name_ar: d.name_ar, name_en: d.name_en, media_id: d.media_id === undefined ? undefined : d.media_id, parent_id: parentId });
@@ -978,8 +978,8 @@ r.put('/categories-order', h((req, res) => {
   res.status(204).end();
 }));
 r.delete('/categories/:id', h((req, res) => {
-  const cur = q.get('SELECT parent_id FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
-  if (!req.adminStore && cur && !cur.parent_id) throw badRequest('top_level_admin_only', 'Main categories are managed by the platform admin.');
+  const cur = q.get('SELECT parent_id, system FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
+  if (!req.adminStore && cur && cur.system) throw badRequest('system_category', 'This section is managed by the platform admin.');
   q.run('UPDATE categories SET parent_id=NULL WHERE parent_id=? AND store_id=?', [req.params.id, req.store.id]);
   q.run('DELETE FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   res.status(204).end();

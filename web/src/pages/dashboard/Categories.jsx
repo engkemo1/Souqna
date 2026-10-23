@@ -16,7 +16,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 
 function CatRow({ c, onEdit, onDelete, onDragEnd, onAddSub, canTop, parent, t, tr }) {
-  const locked = !c.parentId && !canTop;
+  const locked = !!c.system && !canTop; // أقسام الأدمن (الرئيسية وأنواعها) مفيهاش تعديل لصاحب المحل؛ اللي هو أضافه يعدّل فيه
   const controls = useDragControls();
   return (
     <Reorder.Item value={c} dragListener={false} dragControls={controls} onDragEnd={onDragEnd} className="list-none" whileDrag={{ scale: 1.02, boxShadow: '0 20px 40px -20px rgba(0,0,0,.3)' }}>
