@@ -28,7 +28,7 @@ export default function MarketSearch() {
   const sort = params.get('sort') || 'relevance';
   const { list, label, pathLabel } = useDepartments();
   const dq = useDebounced(q, 150);
-  const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store', 'same_day', 'sizes', 'colors', 'category', 'audience'];
+  const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store', 'same_day', 'sizes', 'colors', 'category', 'audience', 'material', 'discount'];
   const [open, setOpen] = useState(false);
   const key = new URLSearchParams({ q: dq, department, sort, ...Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || '']).filter(([, v]) => v)) }).toString();
   const activeCount = FILTER_KEYS.filter((k) => params.get(k)).length + (department ? 1 : 0);
@@ -50,11 +50,14 @@ export default function MarketSearch() {
   const csv = (k) => (params.get(k) || '').split(',').filter(Boolean);
   const without = (k, v) => set({ [k]: csv(k).filter((x) => x !== v).join(',') });
   const activeChips = [
+    params.get('discount') && { id: 'discount', label: lang === 'ar' ? `خصم ${params.get('discount')}٪+` : `${params.get('discount')}%+ off`, remove: () => set({ discount: '' }) },
+    params.get('rating') && { id: 'rating', label: lang === 'ar' ? `${params.get('rating') === '3' ? 3 : 4} نجوم فأكثر` : `${params.get('rating') === '3' ? 3 : 4}★ & up`, remove: () => set({ rating: '' }) },
+    ...csv('material').map((k) => ({ id: `mat-${k}`, label: (data?.facets?.materials || []).find((x) => x.key === k)?.name?.[lang] || k, remove: () => without('material', k) })),
     params.get('category') && { id: 'category', label: (data?.facets?.categories || []).find((c) => c.key === params.get('category'))?.name?.[lang] || params.get('category'), remove: () => set({ category: '' }) },
     params.get('audience') && { id: 'audience', label: ({ men: 'رجالي', women: 'حريمي', boys: 'ولادي', girls: 'بناتي', kids: 'أطفال', unisex: 'للجنسين' })[params.get('audience')] || params.get('audience'), remove: () => set({ audience: '' }) },
     department && { id: 'department', label: pathLabel(department), remove: () => set({ department: '' }) },
     (params.get('min') || params.get('max')) && { id: 'price', label: `${params.get('min') || 0} – ${params.get('max') || '∞'} ${t('search.price').includes('EGP') ? 'EGP' : 'ج.م'}`, remove: () => set({ min: '', max: '' }) },
-    ...[['sale', 'search.onSale'], ['in_stock', 'search.inStock'], ['rating', 'search.rating4'], ['same_day', 'sameday.filter']].filter(([k]) => params.get(k) === '1').map(([k, m]) => ({ id: k, label: t(m), remove: () => set({ [k]: '' }) })),
+    ...[['sale', 'search.onSale'], ['in_stock', 'search.inStock'], ['same_day', 'sameday.filter']].filter(([k]) => params.get(k) === '1').map(([k, m]) => ({ id: k, label: t(m), remove: () => set({ [k]: '' }) })),
     params.get('new') && { id: 'new', label: t('search.lastDays', { n: formatNumber(Number(params.get('new')) > 1 ? Number(params.get('new')) : 30, lang) }), remove: () => set({ new: '' }) },
     params.get('store') && { id: 'store', label: (data?.facets?.stores || []).find((x) => x.slug === params.get('store'))?.name?.[lang] || params.get('store'), remove: () => set({ store: '' }) },
     ...csv('sizes').map((z) => ({ id: `size-${z}`, label: `${t('search.size')}: ${z}`, remove: () => without('sizes', z) })),

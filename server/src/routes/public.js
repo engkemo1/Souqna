@@ -99,6 +99,25 @@ r.get('/search/suggest', h((req, res) => {
 }));
 
 const AUD_GROUP = { men: ['men', 'unisex'], women: ['women', 'unisex'], kids: ['kids', 'boys', 'girls'], boys: ['boys', 'kids'], girls: ['girls', 'kids'], unisex: ['unisex'] };
+// خامات بنستنتجها من اسم المنتج / وصفه / شارته (مفيش عمود خامة في الداتا): قطن، جينز، جلد…
+const MATERIALS = [
+  { key: 'cotton', ar: 'قطن', en: 'Cotton', words: ['قطن', 'cotton'] },
+  { key: 'denim', ar: 'جينز / دنيم', en: 'Denim', words: ['جينز', 'دنيم', 'denim', 'jeans'] },
+  { key: 'leather', ar: 'جلد', en: 'Leather', words: ['جلد', 'leather'] },
+  { key: 'linen', ar: 'كتان', en: 'Linen', words: ['كتان', 'linen'] },
+  { key: 'wool', ar: 'صوف / تريكو', en: 'Wool & knit', words: ['صوف', 'تريكو', 'wool', 'knit'] },
+  { key: 'fleece', ar: 'فليس', en: 'Fleece', words: ['فليس', 'fleece'] },
+  { key: 'polyester', ar: 'بوليستر', en: 'Polyester', words: ['بوليستر', 'polyester'] },
+  { key: 'satin', ar: 'ساتان / حرير', en: 'Satin & silk', words: ['ساتان', 'حرير', 'satin', 'silk'] },
+  { key: 'chiffon', ar: 'شيفون', en: 'Chiffon', words: ['شيفون', 'chiffon'] },
+  { key: 'velvet', ar: 'مخمل / قطيفة', en: 'Velvet', words: ['مخمل', 'قطيفه', 'velvet'] },
+  { key: 'stretch', ar: 'استريتش / لايكرا', en: 'Stretch', words: ['استريتش', 'لايكرا', 'stretch', 'lycra'] },
+  { key: 'dryfit', ar: 'دراي فيت', en: 'Dri-fit', words: ['دراي فيت', 'دراي-فيت', 'dri fit', 'dri-fit', 'dryfit'] },
+];
+const MATERIAL_KEYS = new Set(MATERIALS.map((m) => m.key));
+const MAT_TEXT = () => `(' ' || ${NORM('COALESCE(p.name_ar,\'\')')} || ' ' || ${NORM('COALESCE(p.name_en,\'\')')} || ' ' || ${NORM('COALESCE(p.description_ar,\'\')')} || ' ' || ${NORM('COALESCE(p.description_en,\'\')')} || ' ' || ${NORM('COALESCE(p.badge_text,\'\')')})`;
+const matCond = (m) => ({ sql: `(${m.words.map(() => `${MAT_TEXT()} LIKE ?`).join(' OR ')})`, params: m.words.map((w) => `%${normText(w)}%`) });
+
 const AUD_DEPT = { men: 'men', women: 'women', kids: 'kids', boys: 'kids', girls: 'kids' };
 
 r.get('/search', h((req, res) => {
@@ -137,7 +156,10 @@ r.get('/search', h((req, res) => {
   if (sale === '1') where.push('p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price');
   if (isNew) { const days = isNew === '1' ? 30 : [7, 30, 90].includes(Number(isNew)) ? Number(isNew) : 0; if (days) where.push(`(p.is_new=1 OR p.created_at >= datetime('now','-${days} days'))`); }
   if (inStock === '1') where.push('(p.track_stock=0 OR p.stock>0)');
-  if (rating === '1') where.push('p.rating >= 4');
+  if (rating === '1' || rating === '4') where.push('p.rating >= 4');
+  else if (rating === '3') where.push('p.rating >= 3');
+  const discMin = [20, 30, 50, 70].includes(Number(req.query.discount)) ? Number(req.query.discount) : 0;
+  if (discMin) { where.push('(p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price AND (p.compare_at_price - p.price) * 100.0 / p.compare_at_price >= ?)'); params.push(discMin); }
   if (req.query.same_day === '1') { const sd = sameDaySql(); where.push(sd.sql); params.push(...sd.params); }
   // facets (counts per department / per store) are computed with every filter EXCEPT their own
   const rawCat = String(req.query.category || '').slice(0, 60);
@@ -167,6 +189,12 @@ r.get('/search', h((req, res) => {
   const noCat = { where: [...where], params: [...params] }; // the category / type facet ignores its own filter
   if (catClause) { where.push(catClause); params.push(catKey); }
   if (typeKey) { where.push('p.moda_key=?'); params.push(typeKey); }
+  const preMat = { where: [...where], params: [...params] }; // facet الخامة بتتجاهل فلتر الخامة نفسه
+  const matList = String(req.query.material || '').split(',').filter((k) => MATERIAL_KEYS.has(k)).slice(0, 6);
+  if (matList.length) {
+    const cs = matList.map((k) => matCond(MATERIALS.find((m) => m.key === k)));
+    where.push(`(${cs.map((c) => c.sql).join(' OR ')})`); params.push(...cs.flatMap((c) => c.params));
+  }
   const preVariant = { where: [...where], params: [...params] }; // facets for size/colour ignore their own filter
   if (sizes) {
     const list = String(sizes).split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12);
@@ -219,15 +247,19 @@ r.get('/search', h((req, res) => {
   const categories = typeFacet.length >= 1 || typeKey ? typeFacet : legacyCategories; // أنواع المنتجات لما تكون متاحة، وإلا مجموعات المحلات القديمة
   const fromV = `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')}`;
   const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'One size', 'Free size'];
-  const facetSizes = q.all(`SELECT v.size AS size, COUNT(DISTINCT p.id) AS n FROM variants v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')} AND v.stock>0 AND v.size IS NOT NULL AND v.size<>'' GROUP BY v.size`, preVariant.params)
-    .sort((a, b) => { const ia = sizeOrder.indexOf(a.size), ib = sizeOrder.indexOf(b.size); return ia === -1 && ib === -1 ? (Number(a.size) - Number(b.size) || String(a.size).localeCompare(String(b.size))) : (ia === -1 ? 1 : ib === -1 ? -1 : ia - ib); }).slice(0, 30);
+  const facetSizes = q.all(`SELECT v.size AS size, CASE WHEN p.department LIKE '%shoes%' THEN 'shoes' WHEN v.size GLOB '[0-9]*' THEN 'num' ELSE 'letters' END AS grp, COUNT(DISTINCT p.id) AS n FROM variants v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')} AND v.stock>0 AND v.size IS NOT NULL AND v.size<>'' GROUP BY v.size, grp`, preVariant.params)
+    .sort((a, b) => { const ia = sizeOrder.indexOf(a.size), ib = sizeOrder.indexOf(b.size); return ia === -1 && ib === -1 ? (Number(a.size) - Number(b.size) || String(a.size).localeCompare(String(b.size))) : (ia === -1 ? 1 : ib === -1 ? -1 : ia - ib); }).slice(0, 40);
   const colorMap = new Map();
   for (const row of q.all(`SELECT p.colors_json AS cj ${fromV} LIMIT 600`, preVariant.params)) {
     for (const c of json(row.cj, [])) { const hex = String(c.hex || '').toUpperCase(); if (hex) { const e = colorMap.get(hex) || { hex, name: c.name || null, n: 0 }; e.n++; colorMap.set(hex, e); } }
   }
   const facetColors = [...colorMap.values()].sort((a, b) => b.n - a.n).slice(0, 16);
+  // الخامات: عدد المنتجات لكل خامة (جوه نفس القسم والفئة) في استعلام واحد
+  const matSums = MATERIALS.map((m, i) => { const c = matCond(m); return { sql: `SUM(CASE WHEN ${c.sql} THEN 1 ELSE 0 END) AS m${i}`, params: c.params }; });
+  const matRow = q.get(`SELECT ${matSums.map((x) => x.sql).join(', ')} FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preMat.where.join(' AND ')}`, [...matSums.flatMap((x) => x.params), ...preMat.params]) || {};
+    const materials = MATERIALS.map((m, i) => ({ key: m.key, name: { ar: m.ar, en: m.en }, n: Number(matRow[`m${i}`]) || 0 })).filter((m) => m.n > 0 || matList.includes(m.key)).sort((a, b) => b.n - a.n);
   cache(res, 20);
-  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences } });
+  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences, materials } });
 }));
 
 /* ---------------------------------------------------------- visual search: "snap it, find it in Banha" */
