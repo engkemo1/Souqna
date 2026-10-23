@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartments } from '@souqna/shared';
 import { q, tx, insert, update, json } from '../db/index.js';
 import { config } from '../config.js';
-import { assertDepartments, inferDepartment, ensureDeptCategories } from '../lib/departments.js';
+import { assertDepartments, inferDepartment, ensureDeptCategories, deptSubtree } from '../lib/departments.js';
 import { productTypeTree, deriveDepartment, audienceOrNull, AUDIENCE_KEYS } from '../lib/product-types.js';
 import { inferGender, inferKey } from '../lib/moda/products.js';
 import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
@@ -939,7 +939,11 @@ r.get('/customers/:id', h((req, res) => {
 /* ---------------------------------------------------------- categories */
 
 r.get('/categories', h((req, res) => {
-  const rows = q.all('SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id=c.id AND p.status<>\'archived\') AS count FROM categories c WHERE store_id=? ORDER BY sort, id', [req.store.id]);
+  const rows = q.all('SELECT c.* FROM categories c WHERE store_id=? ORDER BY sort, id', [req.store.id]);
+  for (const c of rows) { // a platform section also counts every product filed under its department tree
+    const depts = c.system ? deptSubtree(c.slug.replace(/-/g, '_')) : [];
+    c.count = q.val(`SELECT COUNT(*) FROM products p WHERE p.store_id=? AND p.status<>'archived' AND (p.category_id=?${depts.length ? ` OR p.department IN (${depts.map(() => '?').join(',')})` : ''})`, [req.store.id, c.id, ...depts]);
+  }
   res.json({ items: rows.map(serializeCategory), canManageTop: !!req.adminStore });
 }));
 

@@ -246,6 +246,9 @@ export const json = (s, fallback) => {
         for (const slug of String(st.departments || '').split(',').filter(Boolean)) { const n = nodes.get(slug); if (n) ensure(n, 0, st.id); }
       }
       db.exec("UPDATE categories SET system=1 WHERE slug IN (SELECT REPLACE(slug,'_','-') FROM departments)");
+      // 3b) "جينز" is not a section of its own any more (it lives inside "بناطيل وجينز"): remove such store categories even when they hold products
+      const jeansCats = db.prepare("SELECT id FROM categories WHERE system=0 AND (slug='denim' OR name_ar IN ('جينز','الجينز') OR LOWER(name_en) IN ('denim','jeans'))").all().map((c) => c.id);
+      for (const id of jeansCats) { db.prepare('UPDATE products SET category_id=NULL WHERE category_id=?').run(id); db.prepare('UPDATE categories SET parent_id=NULL WHERE parent_id=?').run(id); db.prepare('DELETE FROM categories WHERE id=?').run(id); }
       // 4) drop empty leftover starter categories (e.g. "جينز" in a dresses store) that aren't one of the store's departments
       const del = db.prepare('DELETE FROM categories WHERE id=?');
       for (const c of db.prepare('SELECT c.id, c.slug, s.departments FROM categories c JOIN stores s ON s.id=c.store_id WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.category_id=c.id) AND NOT EXISTS (SELECT 1 FROM categories k WHERE k.parent_id=c.id)').all()) {

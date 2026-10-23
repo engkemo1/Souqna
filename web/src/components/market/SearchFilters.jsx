@@ -37,6 +37,8 @@ export default function SearchFilters({ params, set, facets, departments, label,
   const deptBy = new Map(departments.map((d) => [d.slug, d]));
   const deptChain = new Set(); // القسم المختار + كل أجداده: ولادهم بيتفتحوا تحته
   for (let s = dept, i = 0; s && i < 4; s = deptBy.get(s)?.parent, i++) deptChain.add(s);
+  const audTop = { men: 'men', women: 'women', boys: 'kids', girls: 'kids', kids: 'kids' }[params.get('audience') || ''];
+  if (audTop) deptChain.add(audTop); // داخل رجالي: أقسام الرجالي كلها ظاهرة (تيشيرتات، بدل، جلاليب…) مش بس الأقسام الرئيسية
   const applyPrice = (e) => { e?.preventDefault(); set({ min: min && Number(min) > 0 ? String(Math.floor(Number(min))) : '', max: max && Number(max) > 0 ? String(Math.floor(Number(max))) : '' }); };
   const flag = (k) => params.get(k) === '1';
   const list = (k) => (params.get(k) || '').split(',').filter(Boolean);

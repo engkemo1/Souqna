@@ -190,7 +190,14 @@ r.get('/search', h((req, res) => {
   const items = serializeCards(rows).map((c, i) => ({ ...c, store: { slug: rows[i].store_slug, name: bi(rows[i], 'store_name') } }));
   const price = q.get(`SELECT MIN(p.price) AS min, MAX(p.price) AS max ${from}`, params);
   const fd = facetFrom(storeSlug ? ['s.slug=?'] : [], storeSlug ? [storeSlug] : []);
-  const deptRows = q.all(`SELECT p.department AS slug, COUNT(*) AS n ${fd.sql} AND p.department IS NOT NULL GROUP BY p.department`, fd.params);
+  // inside رجالي / حريمي / أطفال the section counts only count that audience's products (its sections + its shoes, bags…)
+  const audFacet = { sql: '', params: [] };
+  if (audKey) {
+    const g = AUD_GROUP[audKey]; const ad = deptSubtree(AUD_DEPT[audKey] || '_none');
+    audFacet.sql = ` AND (p.audience IN (${g.map(() => '?').join(',')}) OR (p.audience IS NULL AND p.department IN (${ad.map(() => '?').join(',')})))`;
+    audFacet.params = [...g, ...ad];
+  }
+  const deptRows = q.all(`SELECT p.department AS slug, COUNT(*) AS n ${fd.sql}${audFacet.sql} AND p.department IS NOT NULL GROUP BY p.department`, [...fd.params, ...audFacet.params]);
   const deptRoll = new Map();
   for (const d of deptRows) for (const sl of [d.slug, ...deptAncestors(d.slug)]) deptRoll.set(sl, (deptRoll.get(sl) || 0) + d.n); // الأب بيعد منتجات اللي تحته
   const departments = [...deptRoll].map(([slug, n]) => ({ slug, n }));
@@ -418,7 +425,8 @@ r.get('/look-of-day', h(async (_req, res) => {
 
 r.get('/marketplace', h((req, res) => {
   const { q: term = '', category = '', sort = 'featured' } = req.query;
-  const where = ["s.status='active'", 's.hidden=0'];
+  // a shop with no products yet (a test / just-created store) is not shown on the public pages until it has something to sell
+  const where = ["s.status='active'", 's.hidden=0', "(SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0"];
   const params = [];
   if (category && category !== 'all') {
     const cl = deptSubtree(String(category).replace(/[^a-z_]/g, ''));
@@ -438,14 +446,14 @@ r.get('/marketplace', h((req, res) => {
   }[sort] || 's.featured DESC, s.rating DESC';
   const rows = q.all(`SELECT ${STORE_COLS} FROM stores s WHERE ${where.join(' AND ')} ORDER BY s.sort_order ASC, ${order}`, params);
   const deptCount = new Map();
-  for (const row of q.all("SELECT departments FROM stores WHERE status='active' AND hidden=0")) {
+  for (const row of q.all("SELECT departments FROM stores s WHERE status='active' AND hidden=0 AND (SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0")) {
     const seen = new Set();
     for (const d of decodeDepartments(row.departments)) for (const x of [d, ...deptAncestors(d)]) if (!seen.has(x)) { seen.add(x); deptCount.set(x, (deptCount.get(x) || 0) + 1); }
   }
   const names = new Map(listDepartments().map((d) => [d.slug, d]));
   const categories = [...deptCount].filter(([id]) => names.has(id)).map(([id, count]) => ({ id, count, name: names.get(id).name })).sort((a, b) => b.count - a.count);
   const stats = {
-    stores: q.val("SELECT COUNT(*) FROM stores WHERE status='active' AND hidden=0"),
+    stores: q.val("SELECT COUNT(*) FROM stores s WHERE status='active' AND hidden=0 AND (SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0"),
     products: q.val("SELECT COUNT(*) FROM products WHERE status='active'"),
   };
   // A few trending products across stores for the marketplace home
@@ -473,12 +481,18 @@ r.get('/marketplace', h((req, res) => {
 
 /* ---------------------------------------------------------- storefront */
 
+/** Which products belong to a store category: its own + its sub-categories', plus — for a platform section — every product filed under that department tree. */
+function catScope(categories, c) {
+  const nodes = [c, ...categories.filter((k) => k.parent_id === c.id)];
+  const depts = [...new Set(nodes.filter((n) => n.system).flatMap((n) => deptSubtree(n.slug.replace(/-/g, '_'))))];
+  return { ids: nodes.map((n) => n.id), depts };
+}
+const catWhere = (sc) => ({ sql: `(p.category_id IN (${sc.ids.map(() => '?').join(',')})${sc.depts.length ? ` OR p.department IN (${sc.depts.map(() => '?').join(',')})` : ''})`, params: [...sc.ids, ...sc.depts] });
+
 r.get('/stores/:slug', h((req, res) => {
   const s = loadStore(req.params.slug);
-  const categories = q.all(
-    `SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id=c.id AND p.status='active') AS count
-     FROM categories c WHERE c.store_id=? ORDER BY c.sort, c.id`, [s.id],
-  );
+  const categories = q.all('SELECT c.* FROM categories c WHERE c.store_id=? ORDER BY c.sort, c.id', [s.id]);
+  for (const c of categories) { const w = catWhere(catScope(categories, c)); c.count = q.val(`SELECT COUNT(*) FROM products p WHERE p.store_id=? AND p.status='active' AND ${w.sql}`, [s.id, ...w.params]); }
   const banners = q.all('SELECT * FROM banners WHERE store_id=? AND active=1 ORDER BY position, id', [s.id]);
   const bm = mediaMap(banners.flatMap((b) => [b.media_id, b.mobile_media_id]));
   const d = new Date().toISOString().slice(0, 10);
@@ -493,7 +507,7 @@ r.get('/stores/:slug', h((req, res) => {
     // Top-level categories carry their sub-categories (counts include them); allCategories is the flat list.
     categories: categories.filter((c) => !c.parent_id).map((c) => {
       const kids = categories.filter((k) => k.parent_id === c.id);
-      return { ...serializeCategory({ ...c, count: c.count + kids.reduce((n, k) => n + k.count, 0) }), children: kids.map(serializeCategory) };
+      return { ...serializeCategory(c), children: kids.map(serializeCategory) };
     }),
     allCategories: categories.map(serializeCategory),
     banners: banners.map((b) => serializeBanner(b, bm)),
@@ -525,8 +539,9 @@ r.get('/stores/:slug/products', h((req, res) => {
     params.push(...list);
   }
   if (category) {
-    where.push('p.category_id IN (SELECT id FROM categories WHERE store_id=? AND (slug=? OR parent_id=(SELECT id FROM categories WHERE store_id=? AND slug=?)))');
-    params.push(s.id, String(category), s.id, String(category));
+    const allCats = q.all('SELECT * FROM categories WHERE store_id=?', [s.id]);
+    const cur = allCats.find((c) => c.slug === String(category));
+    if (cur) { const w = catWhere(catScope(allCats, cur)); where.push(w.sql); params.push(...w.params); } else where.push('1=0');
   }
   if (term) {
     for (const tk of normText(String(term).slice(0, 60)).split(/\s+/).filter(Boolean).slice(0, 5)) {

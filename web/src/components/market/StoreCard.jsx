@@ -23,8 +23,15 @@ export default function StoreCard({ store: s, index = 0, large }) {
     >
       <Link to={`/s/${s.slug}`} className="block rounded-3xl bg-elevated p-2 ring-1 ring-line transition duration-300 ease-out hover:-translate-y-1 hover:shadow-lift hover:ring-line-strong focus-visible:shadow-ring active:scale-[.99] [@media(hover:none)]:hover:translate-y-0">
         <div className="relative overflow-hidden rounded-[20px]">
-          <SmartImage media={s.cover} ratio={large ? '16 / 10' : '16 / 11'} sizes={large ? '(min-width:1024px) 48vw, 100vw' : '(min-width:1024px) 32vw, (min-width:640px) 48vw, 100vw'}
-            imgClassName="duration-[1.1s] group-hover:scale-[1.04] [@media(hover:none)]:group-hover:scale-100" />
+          {s.cover ? (
+            <SmartImage media={s.cover} ratio={large ? '16 / 10' : '16 / 11'} sizes={large ? '(min-width:1024px) 48vw, 100vw' : '(min-width:1024px) 32vw, (min-width:640px) 48vw, 100vw'}
+              imgClassName="duration-[1.1s] group-hover:scale-[1.04] [@media(hover:none)]:group-hover:scale-100" />
+          ) : (
+            // no cover uploaded: a clean brand-coloured cover with the store's logo instead of a broken-image box
+            <div className="grid w-full place-items-center" style={{ aspectRatio: large ? '16 / 10' : '16 / 11', background: brand ? `linear-gradient(135deg, rgb(${brand}) 0%, rgb(${brand} / .62) 100%)` : 'linear-gradient(135deg, #1B1B1B 0%, #4a4a4a 100%)' }}>
+              <StoreLogo store={s} size={84} className="h-[84px] w-[84px] shadow-soft ring-4 ring-white/25" />
+            </div>
+          )}
           <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
           <div className="absolute start-3 top-3 flex flex-wrap gap-1.5">
             {s.featured && <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11.5px] font-semibold text-neutral-900 shadow-sm backdrop-blur"><BadgeCheck className="h-3.5 w-3.5 text-[#F8620A]" />{t('market.featured')}</span>}

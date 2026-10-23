@@ -17,6 +17,7 @@ import path from 'node:path';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { config, ROOT } from '../config.js';
+import { LEGACY_DEPARTMENTS } from '@souqna/shared';
 
 for (const f of [config.dbFile, `${config.dbFile}-wal`, `${config.dbFile}-shm`]) fs.rmSync(f, { force: true });
 fs.rmSync(config.mediaDir, { recursive: true, force: true });
@@ -141,7 +142,7 @@ for (const S of STORES) {
   const sid = insert('stores', {
     owner_id: uid, slug: S.slug, code: S.code, name_ar: S.name[0], name_en: S.name[1], tagline_ar: S.tagline[0], tagline_en: S.tagline[1],
     description_ar: S.description[0], description_en: S.description[1], address_ar: S.address[0], address_en: S.address[1],
-    category: S.category, departments: S.category === 'mixed' ? ',women,men,kids,shoes,bags,' : `,${S.category},`, city: 'Banha', phone: S.phone, whatsapp: S.phone, instagram: S.instagram, facebook: S.facebook,
+    category: S.category, departments: `,${(S.category === 'mixed' ? ['women', 'men', 'kids', 'shoes'] : LEGACY_DEPARTMENTS[S.category] || [S.category]).join(',')},`, city: 'Banha', phone: S.phone, whatsapp: S.phone, instagram: S.instagram, facebook: S.facebook,
     theme_json: JSON.stringify(S.theme), rating: S.rating, rating_count: S.ratingCount, featured: S.featured,
     offer_badge_ar: S.badge[0], offer_badge_en: S.badge[1], shipping_fee: 50, free_shipping_over: 1500, search_indexable: 0,
     opens_at: S.opens || '10:00', closes_at: S.closes || '23:00', day_off: S.dayOff ?? null,

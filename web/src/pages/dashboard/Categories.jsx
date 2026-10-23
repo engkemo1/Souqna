@@ -14,6 +14,7 @@ import { Field, Input } from '../../components/ui/Field.jsx';
 import { EmptyState, ErrorState, errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
+import { SUBSECTION_SUGGESTIONS } from '../../lib/subsections.js';
 
 function CatRow({ c, onEdit, onDelete, onDragEnd, onAddSub, canTop, parent, t, tr }) {
   const locked = !!c.system && !canTop; // أقسام الأدمن (الرئيسية وأنواعها) مفيهاش تعديل لصاحب المحل؛ اللي هو أضافه يعدّل فيه
@@ -42,6 +43,7 @@ export default function Categories() {
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState(null);
+  const [picks, setPicks] = useState([]);
   const items = data?.items || [];
   const canTop = !!data?.canManageTop;
   const ref = useRef(items);
@@ -49,17 +51,28 @@ export default function Categories() {
 
   useEffect(() => {
     if (!form) return;
-    setErrors({});
+    setErrors({}); setPicks([]);
     setF(form.id ? { name_ar: form.name.ar, name_en: form.name.en, media: form.image ? [form.image] : [], parent_id: form.parentId ?? null } : { name_ar: '', name_en: '', media: [], parent_id: form.parentId ?? null });
   }, [form]);
 
   const save = async () => {
     setBusy(true);
     try {
-      const body = { name_ar: f.name_ar, name_en: f.name_en, media_id: f.media[0]?.id ?? null, parent_id: f.parent_id ? Number(f.parent_id) : null };
-      if (form.id && !canTop) delete body.parent_id;
-      const r = await api(form.id ? `/owner/categories/${form.id}` : '/owner/categories', { method: form.id ? 'PUT' : 'POST', body });
-      mutate((d) => ({ items: form.id ? d.items.map((x) => (x.id === form.id ? { ...r.category, count: x.count } : x)) : [...d.items, r.category] }));
+      if (!form.id) {
+        // sub-sections: the ticked suggestions + (optionally) one the owner typed himself
+        const todo = [...picks, ...(f.name_ar.trim() ? [{ ar: f.name_ar.trim(), en: (f.name_en || '').trim() || f.name_ar.trim() }] : [])];
+        const made = [];
+        for (const p of todo) {
+          const r = await api('/owner/categories', { method: 'POST', body: { name_ar: p.ar, name_en: p.en, media_id: f.media[0]?.id && todo.length === 1 ? f.media[0].id : null, parent_id: f.parent_id ? Number(f.parent_id) : null } });
+          made.push(r.category);
+        }
+        mutate((d) => ({ ...d, items: [...d.items, ...made] }));
+      } else {
+        const body = { name_ar: f.name_ar, name_en: f.name_en || f.name_ar, media_id: f.media[0]?.id ?? null, parent_id: f.parent_id ? Number(f.parent_id) : null };
+        if (!canTop) delete body.parent_id;
+        const r = await api(`/owner/categories/${form.id}`, { method: 'PUT', body });
+        mutate((d) => ({ ...d, items: d.items.map((x) => (x.id === form.id ? { ...r.category, count: x.count } : x)) }));
+      }
       invalidate(`/stores/${store.slug}`);
       toast({ title: t('categories.saved') });
       setForm(null);
@@ -76,7 +89,7 @@ export default function Categories() {
 
   return (
     <PageTransition>
-      <PageHeader title={t('categories.title')} subtitle={items.length > 1 ? t('categories.reorderHint') : null} actions={canTop ? <Button icon={Plus} onClick={() => setForm({})}>{t('categories.new')}</Button> : null} />
+      <PageHeader title={t('categories.title')} subtitle={items.length > 1 ? t('categories.reorderHint') : null} actions={<Button icon={Plus} onClick={() => setForm({})}>{canTop ? t('categories.new') : 'قسم فرعي جديد'}</Button>} />
       {error ? <ErrorState error={error} onRetry={reload} /> : !data ? <ListSkeleton rows={4} /> : !items.length ? (
         <EmptyState icon={FolderTree} title={t('categories.empty')} body={t('categories.emptyBody')} action={canTop ? <Button icon={Plus} onClick={() => setForm({})}>{t('categories.new')}</Button> : null} />
       ) : (
@@ -85,15 +98,32 @@ export default function Categories() {
         </Reorder.Group>
       )}
       <Sheet open={!!form} onClose={() => setForm(null)} title={form?.id ? t('common.edit') : t('categories.new')} side="auto" desktop="center" size="md"
-        footer={<Button full size="lg" onClick={save} loading={busy} disabled={!f.name_ar || !f.name_en || (!canTop && !f.parent_id)}>{t('common.save')}</Button>}>
+        footer={<Button full size="lg" onClick={save} loading={busy} disabled={form?.id ? (!f.name_ar || (!canTop && false)) : ((!picks.length && !f.name_ar.trim()) || (!canTop && !f.parent_id))}>{t('common.save')}</Button>}>
         <div className="space-y-4 py-4">
+          {!form?.id && (() => {
+            const parent = items.find((x) => x.id === Number(f.parent_id));
+            const have = new Set(items.filter((x) => x.parentId === parent?.id).map((x) => x.name.ar));
+            const sugg = (parent && SUBSECTION_SUGGESTIONS[parent.slug] || []).filter((x) => !have.has(x.ar));
+            if (!parent) return <p className="rounded-xl bg-secondary px-3 py-2 text-[13px] text-muted">اختار القسم الرئيسي الأول (تحت)، وهتظهرلك أقسام جاهزة تختار منها.</p>;
+            return sugg.length ? (
+              <div>
+                <p className="mb-2 text-sm font-medium">اختار من الأقسام الجاهزة لـ «{tr(parent.name)}» أو اكتب قسمك تحت</p>
+                <div className="flex flex-wrap gap-2">
+                  {sugg.map((x) => { const on = picks.some((p) => p.ar === x.ar); return (
+                    <button key={x.ar} type="button" aria-pressed={on} onClick={() => setPicks(on ? picks.filter((p) => p.ar !== x.ar) : [...picks, x])}
+                      className={`h-9 rounded-full border px-3.5 text-sm font-medium transition active:scale-95 ${on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg'}`}>{x.ar}</button>
+                  ); })}
+                </div>
+              </div>
+            ) : null;
+          })()}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('categories.nameAr')} error={errors.name_ar}><Input dir="rtl" value={f.name_ar} onChange={(e) => setF({ ...f, name_ar: e.target.value })} /></Field>
-            <Field label={t('categories.nameEn')} error={errors.name_en}><Input dir="ltr" value={f.name_en} onChange={(e) => setF({ ...f, name_en: e.target.value })} /></Field>
+            <Field label={t('categories.nameEn')} error={errors.name_en} optional="اختياري"><Input dir="ltr" value={f.name_en} onChange={(e) => setF({ ...f, name_en: e.target.value })} /></Field>
           </div>
           <Field label="القسم الرئيسي" hint={canTop ? 'سيبه فاضي لو ده قسم رئيسي' : 'القسم الفرعي بيظهر تحت القسم الرئيسي في متجرك'}>
             <select dir="rtl" className="h-11 w-full rounded-xl border border-line-strong bg-elevated px-3 text-sm" value={f.parent_id || ''} disabled={!canTop && !!form?.id} onChange={(e) => setF({ ...f, parent_id: e.target.value ? Number(e.target.value) : null })}>
-              {canTop && <option value="">— قسم رئيسي —</option>}
+              <option value="">{canTop ? '— قسم رئيسي —' : '— اختار القسم —'}</option>
               {items.filter((x) => !x.parentId && x.id !== form?.id).map((x) => <option key={x.id} value={x.id}>{tr(x.name)}</option>)}
             </select>
           </Field>
