@@ -458,7 +458,7 @@ r.get('/look-of-day', h(async (_req, res) => {
 r.get('/marketplace', h((req, res) => {
   const { q: term = '', category = '', sort = 'featured' } = req.query;
   // a shop with no products yet (a test / just-created store) is not shown on the public pages until it has something to sell
-  const where = ["s.status='active'", 's.hidden=0', "(SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0"];
+  const where = ["s.status='active'", 's.hidden=0', "(s.show_when_empty=1 OR (SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0)"];
   const params = [];
   if (category && category !== 'all') {
     const cl = deptSubtree(String(category).replace(/[^a-z_]/g, ''));
@@ -478,14 +478,14 @@ r.get('/marketplace', h((req, res) => {
   }[sort] || 's.featured DESC, s.rating DESC';
   const rows = q.all(`SELECT ${STORE_COLS} FROM stores s WHERE ${where.join(' AND ')} ORDER BY s.sort_order ASC, ${order}`, params);
   const deptCount = new Map();
-  for (const row of q.all("SELECT departments FROM stores s WHERE status='active' AND hidden=0 AND (SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0")) {
+  for (const row of q.all("SELECT departments FROM stores s WHERE status='active' AND hidden=0 AND (s.show_when_empty=1 OR (SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0)")) {
     const seen = new Set();
     for (const d of decodeDepartments(row.departments)) for (const x of [d, ...deptAncestors(d)]) if (!seen.has(x)) { seen.add(x); deptCount.set(x, (deptCount.get(x) || 0) + 1); }
   }
   const names = new Map(listDepartments().map((d) => [d.slug, d]));
   const categories = [...deptCount].filter(([id]) => names.has(id)).map(([id, count]) => ({ id, count, name: names.get(id).name })).sort((a, b) => b.count - a.count);
   const stats = {
-    stores: q.val("SELECT COUNT(*) FROM stores s WHERE status='active' AND hidden=0 AND (SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0"),
+    stores: q.val("SELECT COUNT(*) FROM stores s WHERE status='active' AND hidden=0 AND (s.show_when_empty=1 OR (SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0)"),
     products: q.val("SELECT COUNT(*) FROM products WHERE status='active'"),
   };
   // A few trending products across stores for the marketplace home

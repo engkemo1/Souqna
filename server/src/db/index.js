@@ -23,6 +23,11 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!cols.includes('sort_order')) db.exec('ALTER TABLE stores ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('return_days')) db.exec('ALTER TABLE stores ADD COLUMN return_days INTEGER NOT NULL DEFAULT 3');
   if (!cols.includes('hidden')) db.exec('ALTER TABLE stores ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('show_when_empty')) {
+    db.exec('ALTER TABLE stores ADD COLUMN show_when_empty INTEGER NOT NULL DEFAULT 0');
+    // one-time: keep the test store(s) visible even while empty
+    db.exec("UPDATE stores SET show_when_empty=1 WHERE lower(slug) LIKE '%test%' OR name_ar LIKE '%تجريب%' OR name_ar LIKE '%تجرب%'");
+  }
   if (!cols.includes('delivery_zone')) db.exec("ALTER TABLE stores ADD COLUMN delivery_zone TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('search_indexable')) db.exec('ALTER TABLE stores ADD COLUMN search_indexable INTEGER NOT NULL DEFAULT 1');
   if (!db.prepare("SELECT 1 FROM app_settings WHERE key='seo_indexability_bootstrapped'").get()) {

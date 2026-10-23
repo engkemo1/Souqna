@@ -1033,19 +1033,19 @@ r.patch('/orders/:id/delivery', h((req, res) => {
 
 r.get('/stores', h((_req, res) => {
   const stores = q.all(`
-    SELECT s.id, s.slug, s.name_ar, s.name_en, s.phone, s.whatsapp, s.auto_whatsapp, s.hidden, s.featured, s.sort_order, s.status, s.delivery_mode, s.delivery_zone, s.departments, s.category, s.logo_initials, s.logo_color, s.created_at,
+    SELECT s.id, s.slug, s.name_ar, s.name_en, s.phone, s.whatsapp, s.auto_whatsapp, s.hidden, s.show_when_empty, s.featured, s.sort_order, s.status, s.delivery_mode, s.delivery_zone, s.departments, s.category, s.logo_initials, s.logo_color, s.created_at,
       u.email AS owner_email, u.name AS owner_name, u.role,
       (SELECT COUNT(*) FROM products p WHERE p.store_id = s.id) AS products_count,
       (SELECT COUNT(*) FROM orders o WHERE o.store_id = s.id) AS orders_count,
       (SELECT COALESCE(SUM(CASE WHEN o.delivery_group IS NULL THEN o.total ELSE o.subtotal-o.discount END),0) FROM orders o WHERE o.store_id = s.id AND o.status <> 'cancelled') AS revenue,
       (SELECT MAX(created_at) FROM orders o WHERE o.store_id = s.id) AS last_order_at
     FROM stores s JOIN users u ON u.id = s.owner_id ORDER BY s.sort_order, s.id`);
-  res.json({ stores: stores.map((s) => ({ ...s, departments: decodeDepartments(s.departments), auto_whatsapp: Boolean(s.auto_whatsapp), hidden: Boolean(s.hidden), featured: Boolean(s.featured), owner_disabled: s.role === 'disabled' })) });
+  res.json({ stores: stores.map((s) => ({ ...s, departments: decodeDepartments(s.departments), auto_whatsapp: Boolean(s.auto_whatsapp), hidden: Boolean(s.hidden), show_when_empty: Boolean(s.show_when_empty), featured: Boolean(s.featured), owner_disabled: s.role === 'disabled' })) });
 }));
 
 r.patch('/stores/:slug', h((req, res) => {
   const body = z.object({
-    auto_whatsapp: z.boolean().optional(), hidden: z.boolean().optional(), featured: z.boolean().optional(),
+    auto_whatsapp: z.boolean().optional(), hidden: z.boolean().optional(), show_when_empty: z.boolean().optional(), featured: z.boolean().optional(),
     delivery_zone: z.string().trim().max(80).optional(),
     sort_order: z.coerce.number().int().min(0).max(9999).optional(), delivery_mode: z.enum(['store', 'platform']).optional(),
     status: z.enum(['active', 'suspended']).optional(), owner_disabled: z.boolean().optional(),
@@ -1063,7 +1063,7 @@ r.patch('/stores/:slug', h((req, res) => {
     if (q.get('SELECT 1 FROM store_slug_aliases WHERE old_slug=? AND store_id<>?', [body.slug, store.id])) throw new AppError(422, 'validation_failed', 'This store link is already used.', { slug: 'slug_taken' });
     patch.slug = body.slug;
   }
-  for (const k of ['hidden', 'featured', 'auto_whatsapp']) if (body[k] !== undefined) patch[k] = body[k] ? 1 : 0;
+  for (const k of ['hidden', 'show_when_empty', 'featured', 'auto_whatsapp']) if (body[k] !== undefined) patch[k] = body[k] ? 1 : 0;
   for (const k of ['sort_order', 'delivery_mode', 'delivery_zone', 'status', 'name_ar', 'name_en', 'phone', 'logo_initials', 'logo_color']) if (body[k] !== undefined) patch[k] = body[k];
   if (body.departments) { assertDepartments(body.departments); patch.departments = encodeDepartments(body.departments); patch.category = body.departments.length === 1 ? body.departments[0] : 'mixed'; }
   update('stores', store.id, patch);
