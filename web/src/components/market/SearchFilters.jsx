@@ -34,6 +34,9 @@ export default function SearchFilters({ params, set, facets, departments, label,
   useEffect(() => { setMin(params.get('min') || ''); setMax(params.get('max') || ''); }, [params]);
   const deptCount = new Map((facets?.departments || []).map((d) => [d.slug, d.n]));
   const dept = params.get('department') || '';
+  const deptBy = new Map(departments.map((d) => [d.slug, d]));
+  const deptChain = new Set(); // القسم المختار + كل أجداده: ولادهم بيتفتحوا تحته
+  for (let s = dept, i = 0; s && i < 4; s = deptBy.get(s)?.parent, i++) deptChain.add(s);
   const applyPrice = (e) => { e?.preventDefault(); set({ min: min && Number(min) > 0 ? String(Math.floor(Number(min))) : '', max: max && Number(max) > 0 ? String(Math.floor(Number(max))) : '' }); };
   const flag = (k) => params.get(k) === '1';
   const list = (k) => (params.get(k) || '').split(',').filter(Boolean);
@@ -44,11 +47,11 @@ export default function SearchFilters({ params, set, facets, departments, label,
     <div className="text-fg">
       <Group title={t('search.department')}>
         <ul className="space-y-0.5">
-          {[{ slug: '' }, ...departments].filter((d) => !d.slug || d.slug === dept || ((deptCount.get(d.slug) || 0) > 0 && !(facets?.audiences?.length > 1 && ['men', 'women', 'kids'].includes(d.slug)))).map((d) => {
-            const n = d.slug ? deptCount.get(d.slug) || 0 : [...deptCount.values()].reduce((a, b) => a + b, 0);
+          {[{ slug: '' }, ...departments].filter((d) => !d.slug || d.slug === dept || (!d.parent ? ((deptCount.get(d.slug) || 0) > 0 && !(facets?.audiences?.length > 1 && ['men', 'women', 'kids'].includes(d.slug))) : (deptChain.has(d.parent) && (deptCount.get(d.slug) || 0) > 0))).map((d) => {
+            const n = d.slug ? deptCount.get(d.slug) || 0 : departments.filter((x) => !x.parent).reduce((a, x) => a + (deptCount.get(x.slug) || 0), 0);
             const on = dept === d.slug;
             return (
-              <li key={d.slug || 'all'}>
+              <li key={d.slug || 'all'} style={d.parent ? { paddingInlineStart: 14 } : undefined}>
                 <button type="button" onClick={() => set({ department: d.slug })} aria-pressed={on}
                   className={cx('flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-start text-sm transition', on ? 'bg-secondary font-bold' : 'hover:bg-secondary/60', !on && d.slug && n === 0 && 'text-muted')}>
                   <span className="flex items-center gap-2"><span aria-hidden="true">{d.slug ? DEPT_EMOJI[d.slug] || '🛍️' : '🛒'}</span>{d.slug ? label(d.slug) : t('search.allDepartments')}</span>

@@ -78,10 +78,18 @@ export const suggestedStyle = (key, K = loadKnowledge()) => { const f = K.items.
 export function deriveDepartment(key, audience, storeDepartments = [], K = loadKnowledge()) {
   const mine = new Set(storeDepartments);
   const family = K.items.get(key)?.family;
-  const byType = { dress_bridal: ['wedding_dress'], tuxedo: ['wedding_suit'], jeans: ['denim'], abaya: ['abaya'], jalabiya: ['jalabiya'], hijab_set: ['hijab'], tarha: ['hijab'], sleepwear: ['underwear'] }[key] || [];
-  const byFamily = { shoes: ['shoes'], bags: ['bags'], accessories: ['accessories'], sport: ['sports'], underwear_sleep: ['underwear'] }[family] || [];
-  const byAudience = { men: ['men'], women: ['women'], boys: ['kids'], girls: ['kids'], kids: ['kids'], unisex: ['men', 'women'] }[audience] || ['women', 'men'];
-  for (const d of [...byType, ...byFamily, ...byAudience]) if (mine.has(d)) return d;
+  const grp = { men: ['men'], women: ['women'], boys: ['kids'], girls: ['kids'], kids: ['kids'], unisex: ['men', 'women'] }[audience] || ['women', 'men'];
+  const per = (suffix) => grp.map((g) => `${g}_${suffix}`);
+  const byType = {
+    dress_bridal: ['women_wedding_dresses', 'women_dresses'], dress_evening: ['women_soiree_dresses', 'women_dresses'], dress_party: ['women_soiree_dresses', 'women_dresses'], dress_casual: ['women_casual_dresses', 'women_dresses'],
+    tuxedo: ['men_wedding_suits', 'men_suits'], suit: ['men_formal_suits', 'men_suits'], classic_set: ['men_formal_suits', 'men_suits'], waistcoat: ['men_suits'],
+    jeans: per('pants'), trousers: per('pants'), chinos: per('pants'), skirt: ['women_skirts'],
+    abaya: ['women_abaya'], jalabiya: ['men_jalabiya'], hijab_set: ['women_hijab'], tarha: ['women_hijab'], sleepwear: per('underwear'),
+  }[key] || [];
+  const shoesLeaf = { men: ['shoes_men'], women: ['shoes_women'], boys: ['shoes_kids'], girls: ['shoes_kids'], kids: ['shoes_kids'] }[audience] || ['shoes_men', 'shoes_women'];
+  const byFamily = { shoes: [...shoesLeaf, 'shoes'], bags: per('bags'), accessories: per('accessories'), sport: per('sports'), underwear_sleep: per('underwear'), tops: per('tops'), dresses: ['women_dresses'], bottoms: per('pants') }[family] || [];
+  const kidsLeaf = { boys: ['kids_boys'], girls: ['kids_girls'] }[audience] || [];
+  for (const d of [...byType, ...byFamily, ...kidsLeaf, ...grp]) if (mine.has(d)) return d;
   return null;
 }
 

@@ -14,5 +14,13 @@ export function useDepartments() {
     const k = `cat.${slug}`; const v = t(k);
     return v === k ? slug : v;
   }, [bySlug, lang, t]);
-  return { list, label, bySlug, ready: !!data };
+  const tops = useMemo(() => list.filter((d) => !d.parent), [list]);
+  const childrenOf = useCallback((slug) => list.filter((d) => d.parent === slug), [list]);
+  // "حريمي › فساتين › فساتين أفراح"
+  const pathLabel = useCallback((slug) => {
+    const parts = [];
+    for (let s = slug, i = 0; s && i < 4; s = bySlug.get(s)?.parent, i++) parts.unshift(label(s));
+    return parts.join(' › ');
+  }, [bySlug, label]);
+  return { list, label, bySlug, tops, childrenOf, pathLabel, ready: !!data };
 }

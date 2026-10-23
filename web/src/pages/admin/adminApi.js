@@ -84,7 +84,8 @@ export const ORDER_STATUS_AR = { pending: 'جديد', confirmed: 'متأكد', p
 export function useAdminDepartments() {
   const { data, reload, loading } = useAdminApi('/departments');
   const list = data?.departments || [];
-  const label = (slug) => list.find((d) => d.slug === slug)?.name_ar || slug;
+  const by = new Map(list.map((d) => [d.slug, d]));
+  const label = (slug) => { const parts = []; for (let s = slug, i = 0; s && i < 4; s = by.get(s)?.parent, i++) parts.unshift(by.get(s)?.name_ar || s); return parts.join(' › '); };
   return { list, label, reload, loading };
 }
 export const waLink = (phone, text) => {

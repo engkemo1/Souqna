@@ -6,7 +6,7 @@ import { q, tx, insert, update } from '../db/index.js';
 import { config } from '../config.js';
 import { h, AppError } from '../lib/errors.js';
 import { signToken, requireOwner } from '../lib/auth.js';
-import { slugify } from '../lib/util.js';
+import { slugify, latinSlug } from '../lib/util.js';
 import { serializeStore } from '../lib/serialize.js';
 import { THEME_PRESETS } from '@souqna/shared';
 
@@ -67,10 +67,10 @@ r.post('/register', h((req, res) => {
   if (q.get('SELECT id FROM users WHERE email=?', [d.email])) throw new AppError(422, 'validation_failed', 'Email already registered', { email: 'email_taken' });
   const out = tx(() => {
     const uid = insert('users', { name: d.name, email: d.email, password_hash: bcrypt.hashSync(d.password, 10) });
-    let slug = slugify(d.store_name);
-    if (!/^[a-z0-9-]+$/.test(slug)) slug = `store-${uid}`;
+    const baseSlug = latinSlug(d.store_name).length >= 2 ? latinSlug(d.store_name) : `store-${uid}`;
+    let slug = baseSlug;
     let i = 1;
-    while (q.get('SELECT id FROM stores WHERE slug=?', [slug])) slug = `${slugify(d.store_name)}-${++i}`;
+    while (q.get('SELECT id FROM stores WHERE slug=?', [slug])) slug = `${baseSlug}-${++i}`;
     const code = d.store_name.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'SQ';
     const sid = insert('stores', {
       owner_id: uid, slug, code, name_ar: d.store_name, name_en: d.store_name, phone: d.phone, whatsapp: d.phone,

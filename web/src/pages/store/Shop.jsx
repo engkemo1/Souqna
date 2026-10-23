@@ -96,7 +96,7 @@ function FilterPanel({ value, onChange, facets, categories }) {
 }
 
 export default function Shop() {
-  const { store, categories } = useStore();
+  const { store, categories, allCategories } = useStore();
   const { t, tr, lang } = useI18n();
   const [params, setParams] = useSearchParams();
   const [sheet, setSheet] = useState(false);
@@ -144,7 +144,10 @@ export default function Shop() {
     setParams(next, { replace: true });
   };
   const setSort = (s) => { const next = new URLSearchParams(params); next.set('sort', s); setParams(next, { replace: true }); };
-  const cat = categories.find((c) => c.slug === params.get('category'));
+  const allCats = allCategories || categories;
+  const cat = allCats.find((c) => c.slug === params.get('category'));
+  const topCat = cat ? (cat.parentId ? allCats.find((c) => c.id === cat.parentId) : cat) : null;
+  const subCats = topCat ? allCats.filter((c) => c.parentId === topCat.id) : [];
   const q = params.get('q');
   const title = q ? `“${q}”` : params.get('sale') === '1' ? t('store.onSale') : cat ? tr(cat.name) : t('shop.title');
 
@@ -169,7 +172,7 @@ export default function Shop() {
       {/* category chips */}
       <div className="scroll-x -mx-4 mb-4 gap-2 px-4 lg:hidden">
         {[{ slug: '', name: { ar: t('common.all'), en: t('common.all') } }, ...categories].map((c) => {
-          const active = (params.get('category') || '') === c.slug;
+          const active = (params.get('category') || '') === c.slug || (!!cat?.parentId && cat.parentId === c.id);
           return (
             <button key={c.slug || 'all'} type="button" onClick={() => apply({ ...current, category: c.slug || undefined })}
               className={cx('h-10 shrink-0 snap-start rounded-full border px-4 text-sm font-medium transition', active ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated')}>
@@ -178,6 +181,19 @@ export default function Shop() {
           );
         })}
       </div>
+      {subCats.length > 0 && (
+        <div className="scroll-x -mx-4 mb-4 gap-2 px-4">
+          {[{ slug: topCat.slug, name: { ar: `كل ${tr(topCat.name)}`, en: `All ${tr(topCat.name)}` } }, ...subCats].map((c) => {
+            const active = (params.get('category') || '') === c.slug;
+            return (
+              <button key={c.slug} type="button" onClick={() => apply({ ...current, category: c.slug })}
+                className={cx('h-9 shrink-0 snap-start rounded-full border px-3.5 text-[13px] font-medium transition', active ? 'border-fg bg-fg/[0.07] text-fg' : 'border-line bg-elevated text-muted')}>
+                {tr(c.name)}
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* toolbar */}
       <div className="sticky top-0 z-20 -mx-4 mb-6 flex items-center gap-2 border-b border-line bg-canvas/90 px-4 py-2.5 backdrop-blur lg:static lg:mx-0 lg:mb-8 lg:border-0 lg:bg-transparent lg:px-0 lg:py-0">

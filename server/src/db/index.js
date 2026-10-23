@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { DEFAULT_DEPARTMENTS } from '@souqna/shared';
+import { DEFAULT_DEPARTMENTS, LEGACY_DEPARTMENTS } from '@souqna/shared';
 import { config } from '../config.js';
 
 fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
@@ -15,6 +15,7 @@ db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   ('subscription_reminder_days','5'),
   ('subscription_reminder_template','أهلاً {store}، نذكّرك إن اشتراك متجرك على Twist مستحق بمبلغ {amount} ج.م. موعد التجديد {due_date}. ابعتلنا صورة التحويل أو تواصل معانا لتأكيد الدفع. شكراً لثقتك في Twist.'),
   ('cashier_sync_enabled','0')`);
+db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KEY, store_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
 // Lightweight migrations for databases created by earlier versions.
 {
   const cols = db.prepare('PRAGMA table_info(stores)').all().map((c) => c.name);
@@ -198,3 +199,62 @@ export function tx(fn) {
 export const json = (s, fallback) => {
   try { return s ? JSON.parse(s) : fallback; } catch { return fallback; }
 };
+
+// Sub-categories (store categories under a top-level one) + department tree (main section > section > type).
+{
+  const cc = db.prepare('PRAGMA table_info(categories)').all().map((c) => c.name);
+  if (!cc.includes('parent_id')) db.exec('ALTER TABLE categories ADD COLUMN parent_id INTEGER');
+  const dc = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);
+  if (!dc.includes('parent_slug')) db.exec('ALTER TABLE departments ADD COLUMN parent_slug TEXT');
+  if (!db.prepare("SELECT 1 FROM app_settings WHERE key='dept_tree_v1'").get()) {
+    try {
+      db.exec('BEGIN');
+      // 1) the new tree: insert missing nodes, set parents + order (existing images/sizes are kept)
+      const insD = db.prepare('INSERT OR IGNORE INTO departments (slug, name_ar, name_en, sizes_json, sort) VALUES (?,?,?,?,?)');
+      const updD = db.prepare('UPDATE departments SET parent_slug=?, sort=?, active=1 WHERE slug=?');
+      DEFAULT_DEPARTMENTS.forEach((d, i) => { insD.run(d.slug, d.ar, d.en, JSON.stringify(d.sizes), i * 10); updD.run(d.parent || null, i * 10, d.slug); });
+      db.exec("UPDATE departments SET name_ar='أحذية', name_en='Shoes' WHERE slug='shoes' AND name_ar='كوتشيات وأحذية'");
+      // 2) move stores + products from the old flat departments to the new sections
+      const encode = (list) => `,${[...new Set(list)].join(',')},`;
+      const legacy = Object.keys(LEGACY_DEPARTMENTS);
+      for (const st of db.prepare('SELECT id, departments, category FROM stores').all()) {
+        const cur = String(st.departments || '').split(',').filter(Boolean);
+        if (!cur.some((d) => LEGACY_DEPARTMENTS[d])) continue;
+        const next = cur.flatMap((d) => LEGACY_DEPARTMENTS[d] || [d]);
+        const uniq = [...new Set(next)];
+        db.prepare('UPDATE stores SET departments=?, category=? WHERE id=?').run(encode(uniq), uniq.length === 1 ? uniq[0] : 'mixed', st.id);
+      }
+      for (const old of legacy) {
+        const [w, m] = LEGACY_DEPARTMENTS[old];
+        db.prepare("UPDATE products SET department=? WHERE department=? AND COALESCE(audience,'')<>'men'").run(w, old);
+        db.prepare('UPDATE products SET department=? WHERE department=?').run(m || w, old);
+      }
+      db.prepare(`DELETE FROM departments WHERE slug IN (${legacy.map(() => '?').join(',')})`).run(...legacy);
+      // 3) every store gets a category per department it sells (owners add sub-categories under them)
+      const nodes = new Map(db.prepare('SELECT slug, name_ar, name_en, parent_slug FROM departments').all().map((n) => [n.slug, n]));
+      const ensure = (node, depth = 0, storeId) => {
+        const catSlug = node.slug.replace(/_/g, '-');
+        const ex = db.prepare('SELECT id FROM categories WHERE store_id=? AND slug=?').get(storeId, catSlug);
+        if (ex) return ex.id;
+        const parent = node.parent_slug ? nodes.get(node.parent_slug) : null;
+        const parentId = parent && parent.parent_slug && depth < 3 ? ensure(parent, depth + 1, storeId) : null;
+        const sort = db.prepare('SELECT COALESCE(MAX(sort),-1)+1 AS n FROM categories WHERE store_id=?').get(storeId).n;
+        return Number(db.prepare('INSERT INTO categories (store_id, slug, name_ar, name_en, parent_id, sort) VALUES (?,?,?,?,?,?)').run(storeId, catSlug, node.name_ar, node.name_en, parentId, sort).lastInsertRowid);
+      };
+      for (const st of db.prepare('SELECT id, departments FROM stores').all()) {
+        for (const slug of String(st.departments || '').split(',').filter(Boolean)) { const n = nodes.get(slug); if (n) ensure(n, 0, st.id); }
+      }
+      // 4) drop empty leftover starter categories (e.g. "جينز" in a dresses store) that aren't one of the store's departments
+      const del = db.prepare('DELETE FROM categories WHERE id=?');
+      for (const c of db.prepare('SELECT c.id, c.slug, s.departments FROM categories c JOIN stores s ON s.id=c.store_id WHERE NOT EXISTS (SELECT 1 FROM products p WHERE p.category_id=c.id) AND NOT EXISTS (SELECT 1 FROM categories k WHERE k.parent_id=c.id)').all()) {
+        const deps = String(c.departments || '').split(',').filter(Boolean).map((d) => d.replace(/_/g, '-'));
+        if (!deps.includes(c.slug)) del.run(c.id);
+      }
+      db.prepare("INSERT INTO app_settings (key, value) VALUES ('dept_tree_v1', '1')").run();
+      db.exec('COMMIT');
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch { /* ignore */ }
+      console.error('[db] department tree migration failed (will retry on next start):', e.message);
+    }
+  }
+}

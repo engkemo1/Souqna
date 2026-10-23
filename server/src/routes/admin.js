@@ -6,10 +6,10 @@ import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { q, tx, insert, update } from '../db/index.js';
 import { signToken } from '../lib/auth.js';
-import { slugify } from '../lib/util.js';
+import { slugify, latinSlug } from '../lib/util.js';
 import { config } from '../config.js';
 import { h, AppError } from '../lib/errors.js';
-import { listDepartments, assertDepartments } from '../lib/departments.js';
+import { listDepartments, assertDepartments, ensureDeptCategories, deptAncestors } from '../lib/departments.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
@@ -1053,16 +1053,27 @@ r.patch('/stores/:slug', h((req, res) => {
     name_ar: z.string().trim().min(2).max(60).optional(), name_en: z.string().trim().min(2).max(60).optional(),
     phone: z.string().trim().regex(/^01[0125][0-9]{8}$/, 'phone_invalid').optional(),
     logo_initials: z.string().trim().max(2).optional(), logo_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
+    slug: z.string().trim().toLowerCase().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, 'slug_invalid').min(2).max(40).optional(),
   }).parse(req.body);
   const store = q.get('SELECT id, owner_id FROM stores WHERE slug=?', [req.params.slug]);
   if (!store) throw new AppError(404, 'not_found', 'Store not found.');
   const patch = {};
+  if (body.slug && body.slug !== req.params.slug) {
+    if (q.get('SELECT id FROM stores WHERE slug=?', [body.slug])) throw new AppError(422, 'validation_failed', 'This store link is already used.', { slug: 'slug_taken' });
+    if (q.get('SELECT 1 FROM store_slug_aliases WHERE old_slug=? AND store_id<>?', [body.slug, store.id])) throw new AppError(422, 'validation_failed', 'This store link is already used.', { slug: 'slug_taken' });
+    patch.slug = body.slug;
+  }
   for (const k of ['hidden', 'featured', 'auto_whatsapp']) if (body[k] !== undefined) patch[k] = body[k] ? 1 : 0;
   for (const k of ['sort_order', 'delivery_mode', 'delivery_zone', 'status', 'name_ar', 'name_en', 'phone', 'logo_initials', 'logo_color']) if (body[k] !== undefined) patch[k] = body[k];
   if (body.departments) { assertDepartments(body.departments); patch.departments = encodeDepartments(body.departments); patch.category = body.departments.length === 1 ? body.departments[0] : 'mixed'; }
   update('stores', store.id, patch);
+  if (body.departments) ensureDeptCategories(store.id, body.departments);
+  if (patch.slug) {
+    q.run('INSERT OR REPLACE INTO store_slug_aliases (old_slug, store_id) VALUES (?, ?)', [req.params.slug, store.id]);
+    q.run('DELETE FROM store_slug_aliases WHERE old_slug=?', [patch.slug]);
+  }
   if (body.owner_disabled !== undefined) q.run("UPDATE users SET role=? WHERE id=? AND role<>'demo'", [body.owner_disabled ? 'disabled' : 'owner', store.owner_id]);
-  res.json({ slug: req.params.slug });
+  res.json({ slug: patch.slug || req.params.slug });
 }));
 
 const createSchema = z.object({
@@ -1092,8 +1103,8 @@ r.post('/stores', h((req, res) => {
   const password = d.password || genPassword();
   const out = tx(() => {
     const uid = insert('users', { name: d.owner_name, email: d.email, password_hash: bcrypt.hashSync(password, 10) });
-    let slug = slugify(d.store_name);
-    if (!/^[a-z0-9-]+$/.test(slug) || !slug) slug = `store-${uid}`;
+    let slug = latinSlug(d.store_name);
+    if (!slug || slug.length < 2) slug = `store-${uid}`;
     let i = 1;
     const base = slug;
     while (q.get('SELECT id FROM stores WHERE slug=?', [slug])) slug = `${base}-${++i}`;
@@ -1106,8 +1117,8 @@ r.post('/stores', h((req, res) => {
       tagline_ar: 'أهلاً بيك في متجرنا', tagline_en: 'Welcome to our store',
       theme_json: JSON.stringify({ primary: '#1B1B1B', secondary: '#F3F0EA', accent: '#B4532A', background: '#FFFFFF', text: '#0F172A', button: '#1B1B1B', header: '#FFFFFF', footer: '#0F172A' }),
     });
-    [['new-in', 'وصل حديثاً', 'New In'], ['tops', 'تيشيرتات وقمصان', 'Tops'], ['bottoms', 'بناطيل', 'Bottoms']].forEach(([cs, ar, en], idx) =>
-      insert('categories', { store_id: sid, slug: cs, name_ar: ar, name_en: en, sort: idx }));
+    // A category per department the store sells (e.g. "فساتين"); the owner adds sub-categories under them.
+    ensureDeptCategories(sid, d.departments);
     return { slug, sid, uid };
   });
   res.status(201).json({ ...credentials(req, out.slug, d.email, password), setup: makeSetupLink(req, out.uid) });
@@ -1141,7 +1152,15 @@ const deptSchema = z.object({
   name_ar: z.string().trim().min(2).max(40), name_en: z.string().trim().min(2).max(40),
   sizes: z.array(z.string().trim().min(1).max(12)).max(40).default([]),
   sort: z.coerce.number().int().min(0).max(999).optional(), active: z.boolean().optional(),
+  parent: z.string().trim().toLowerCase().nullable().optional(),
 });
+function checkDeptParent(parent, self) {
+  if (!parent) return null;
+  const p = q.get('SELECT slug FROM departments WHERE slug=?', [parent]);
+  if (!p || p.slug === self) throw new AppError(422, 'validation_failed', 'Main section not found.', { parent: 'parent_invalid' });
+  if (deptAncestors(p.slug).length >= 2) throw new AppError(422, 'validation_failed', 'Sections can be nested at most 3 levels deep.', { parent: 'parent_too_deep' });
+  return p.slug;
+}
 r.get('/departments', h((_req, res) => res.json({ departments: listDepartments({ all: true }) })));
 r.post('/departments', h((req, res) => {
   const body = deptSchema.extend({ slug: z.string().trim().toLowerCase().optional() }).parse(req.body);
@@ -1149,7 +1168,7 @@ r.post('/departments', h((req, res) => {
   if (!DEPT_SLUG_RE.test(slug)) throw new AppError(422, 'validation_failed', 'Use an English key like "perfumes".', { slug: 'slug_invalid' });
   if (q.get('SELECT id FROM departments WHERE slug=?', [slug])) throw new AppError(422, 'validation_failed', 'This department already exists.', { slug: 'slug_taken' });
   const sort = body.sort ?? (q.val('SELECT COALESCE(MAX(sort),0)+1 FROM departments'));
-  insert('departments', { slug, name_ar: body.name_ar, name_en: body.name_en, sizes_json: JSON.stringify([...new Set(body.sizes)]), sort, active: 1 });
+  insert('departments', { slug, name_ar: body.name_ar, name_en: body.name_en, sizes_json: JSON.stringify([...new Set(body.sizes)]), sort, active: 1, parent_slug: checkDeptParent(body.parent, slug) });
   res.status(201).json({ departments: listDepartments({ all: true }) });
 }));
 r.patch('/departments/:id', h((req, res) => {
@@ -1160,6 +1179,7 @@ r.patch('/departments/:id', h((req, res) => {
     name_ar: body.name_ar, name_en: body.name_en, sort: body.sort,
     sizes_json: body.sizes ? JSON.stringify([...new Set(body.sizes)]) : undefined,
     active: body.active === undefined ? undefined : body.active ? 1 : 0,
+    parent_slug: body.parent === undefined ? undefined : (body.parent && deptAncestors(body.parent).includes(d.slug)) ? (() => { throw new AppError(422, 'validation_failed', 'A section cannot sit under its own sub-section.', { parent: 'parent_invalid' }); })() : checkDeptParent(body.parent, d.slug),
   });
   res.json({ departments: listDepartments({ all: true }) });
 }));
@@ -1263,6 +1283,7 @@ r.delete('/departments/:id', h((req, res) => {
   const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);
   if (!d) throw new AppError(404, 'not_found', 'Department not found.');
   const used = q.val("SELECT COUNT(*) FROM stores WHERE departments LIKE '%,' || ? || ',%'", [d.slug]);
+  if (q.val('SELECT COUNT(*) FROM departments WHERE parent_slug=?', [d.slug])) throw new AppError(409, 'department_has_children', 'Delete or move the sections under it first.');
   if (used) throw new AppError(409, 'department_in_use', `${used} stores use this department — deactivate it instead, or move the stores first.`);
   q.run('DELETE FROM departments WHERE id=?', [d.id]);
   res.json({ departments: listDepartments({ all: true }) });

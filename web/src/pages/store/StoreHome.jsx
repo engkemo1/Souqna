@@ -62,9 +62,10 @@ function ProductRail({ items, slug, onQuickAdd, loading }) {
 }
 
 function CategoryTiles() {
-  const { store, categories } = useStore();
+  const { store, categories: allCategories } = useStore();
   const { tr, t } = useI18n();
   const { cat } = useDesign();
+  const categories = allCategories.filter((c) => (c.count ?? 0) > 0); // empty categories are not shown to shoppers
   if (!categories.length) return null;
   if (cat === 'circles') {
     return (
@@ -157,7 +158,7 @@ function OfferBand() {
 
 export default function StoreHome() {
   const { store, banners } = useStore();
-  const { t, tr } = useI18n();
+  const { t, tr, lang } = useI18n();
   const { data, error, loading, reload } = useApi(`/stores/${store.slug}/home`);
   const [quick, setQuick] = useState(null);
 
@@ -206,6 +207,17 @@ export default function StoreHome() {
         );
 
       case 'new_arrivals':
+        if (!loading && data && !(data.newArrivals?.length)) {
+          const ar = lang === 'ar';
+          return (
+            <section key="new_arrivals" className="container mt-14 sm:mt-20">
+              <div className="rounded-3xl px-6 py-16 text-center ring-1 ring-line-strong sm:py-24">
+                <p className="font-display text-2xl font-bold sm:text-3xl">{ar ? 'بنجهّز المنتجات' : 'Products are on the way'}</p>
+                <p className="mx-auto mt-3 max-w-md text-[15px] opacity-70">{ar ? 'المتجر لسه بيضيف تشكيلته. تعالى زورنا تاني قريب، أو كلمنا على واتساب وإحنا نساعدك.' : 'This store is still adding its collection. Check back soon or message us on WhatsApp.'}</p>
+              </div>
+            </section>
+          );
+        }
         return (
           <section key="new_arrivals" className="container mt-14 sm:mt-20">
             <SectionHeader eyebrow={tr(store.name)} title={t('store.newArrivals')} to={sp(store.slug, 'shop?sort=newest')} />

@@ -415,7 +415,7 @@ export default function ProductEditor() {
           <Field label={L('المجموعة في متجرك', 'Collection in your store')} optional={t('common.optional')} hint={L('بترتّب منتجاتك في صفحة المحل (زي: هوديز، شتوي).', 'Groups products on your store page.')}>
             <Select value={f.category_id} onChange={(e) => set({ category_id: e.target.value })}>
               <option value="">{L('من غير مجموعة', 'No collection')}</option>
-              {cats.items.map((c) => <option key={c.id} value={c.id}>{tr(c.name)}</option>)}
+              {cats.items.filter((c) => !c.parentId).flatMap((c) => [c, ...cats.items.filter((k) => k.parentId === c.id)]).map((c) => <option key={c.id} value={c.id}>{c.parentId ? '— ' : ''}{tr(c.name)}</option>)}
             </Select>
           </Field>
         )}

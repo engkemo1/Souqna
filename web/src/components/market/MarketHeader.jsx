@@ -12,18 +12,12 @@ import { cx } from '../ui/cx.js';
 import { useMarketCart } from '../../lib/cart.jsx';
 
 const TOP_CATEGORIES = [
-  { slug: 'women', label: 'cat.women', href: '/search?department=women' },
-  { slug: 'men', label: 'cat.men', href: '/search?department=men' },
-  { slug: 'kids', label: 'cat.kids', href: '/search?department=kids' },
+  { slug: 'women', label: 'cat.women', href: '/search?audience=women' },
+  { slug: 'men', label: 'cat.men', href: '/search?audience=men' },
+  { slug: 'kids', label: 'cat.kids', href: '/search?audience=kids' },
   { slug: 'shoes', label: 'cat.shoes', href: '/search?department=shoes' },
-  { slug: 'bags', label: 'cat.bags', href: '/search?department=bags' },
-  { slug: 'perfume_makeup', label: 'market.nav.perfume', href: '/search?q=عطور' },
-  { slug: 'care', label: 'market.nav.care', href: '/search?q=عناية' },
-  { slug: 'maternity', label: 'market.nav.maternity', href: '/search?q=حوامل' },
-  { slug: 'underwear', label: 'cat.underwear', href: '/search?department=underwear' },
-  { slug: 'wedding_suit', label: 'cat.wedding_suit', href: '/search?department=wedding_suit' },
-  { slug: 'wedding_dress', label: 'cat.wedding_dress', href: '/search?department=wedding_dress' },
-  { slug: 'sports', label: 'cat.sports', href: '/search?department=sports' },
+  { slug: 'perfume_makeup', label: 'market.nav.perfume', href: '/search?department=perfume_makeup' },
+  { slug: 'care', label: 'market.nav.care', href: '/search?department=care' },
 ];
 
 export default function MarketHeader() {

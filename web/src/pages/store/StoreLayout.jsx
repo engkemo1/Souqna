@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Outlet, useLocation, useParams } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { Store } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
@@ -22,6 +22,12 @@ export default function StoreLayout() {
   const { pathname } = useLocation();
   const { t, tr } = useI18n();
   const { data: apiData, error, reload } = useApi(`/stores/${slug}`);
+  const navigate = useNavigate();
+  // رابط قديم (اتغير اسم/رابط المتجر): حوّل للرابط الجديد من غير ما الزائر يحس.
+  useEffect(() => {
+    const cur = apiData?.store?.slug;
+    if (cur && cur !== slug) navigate(pathname.replace(`/s/${slug}`, `/s/${cur}`) + window.location.search + window.location.hash, { replace: true });
+  }, [apiData, slug]); // eslint-disable-line react-hooks/exhaustive-deps
   // وضع المعاينة الحية: لما المتجر يتفتح جوه مصمّم المتجر (?preview=design) بيسمع إعدادات التصميم الغير محفوظة ويرسمها فورًا.
   const isPreview = typeof window !== 'undefined' && window.parent !== window && new URLSearchParams(window.location.search).get('preview') === 'design';
   const [preview, setPreview] = useState(null);

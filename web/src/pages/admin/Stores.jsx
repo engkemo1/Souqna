@@ -13,16 +13,33 @@ import { tokenStore } from '../../lib/api.js';
 import { adminApi, useAdminApi, fmtMoney, fmtNum, fmtDateTime, useAdminDepartments } from './adminApi.js';
 import MapLinkField from '../../components/dash/MapLinkField.jsx';
 
-const DeptPicker = ({ value, onChange, depts }) => (
-  <div className="flex flex-wrap gap-2" role="group">
-    {[...depts.list.filter((d) => d.active).map((d) => d.slug), ...value.filter((v) => !depts.list.some((d) => d.slug === v && d.active))].map((d) => {
-      const on = value.includes(d);
-      return <button key={d} type="button" aria-pressed={on} onClick={() => onChange(on ? value.filter((x) => x !== d) : [...value, d])}
-        className={cx('h-9 rounded-full border px-3.5 text-sm font-medium transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{depts.label(d)}</button>;
-    })}
-    {!depts.list.length && <p className="text-sm text-muted">جارٍ التحميل…</p>}
-  </div>
-);
+const DeptPicker = ({ value, onChange, depts }) => {
+  const act = depts.list.filter((d) => d.active);
+  const kids = (slug) => act.filter((d) => d.parent === slug);
+  const toggle = (d) => onChange(value.includes(d) ? value.filter((x) => x !== d) : [...value, d]);
+  const chip = (d, label) => {
+    const on = value.includes(d);
+    return <button key={d} type="button" aria-pressed={on} onClick={() => toggle(d)}
+      className={cx('h-9 rounded-full border px-3.5 text-sm font-medium transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{label}</button>;
+  };
+  const known = new Set(act.map((d) => d.slug));
+  const walk = (parent, depth) => kids(parent).flatMap((d) => [
+    <div key={d.slug} className="flex flex-wrap items-center gap-2" style={{ paddingInlineStart: depth * 18 }}>{chip(d.slug, d.name_ar)}</div>,
+    ...walk(d.slug, depth + 1),
+  ]);
+  return (
+    <div className="space-y-3" role="group">
+      {act.filter((d) => !d.parent).map((top) => (
+        <div key={top.slug} className="rounded-2xl border border-line p-3">
+          <div className="mb-2 flex flex-wrap gap-2">{chip(top.slug, `${top.name_ar} (كل الأقسام)`)}</div>
+          <div className="space-y-2">{walk(top.slug, 1)}</div>
+        </div>
+      ))}
+      {value.filter((v) => !known.has(v)).length > 0 && <div className="flex flex-wrap gap-2">{value.filter((v) => !known.has(v)).map((d) => chip(d, depts.label(d)))}</div>}
+      {!depts.list.length && <p className="text-sm text-muted">جارٍ التحميل…</p>}
+    </div>
+  );
+};
 
 function CreateSheet({ open, onClose, onDone, depts }) {
   const toast = useToast();
@@ -116,15 +133,17 @@ function EditSheet({ store, onClose, onChanged, depts }) {
   const [prod, setProd] = useState(null);
   const [del, setDel] = useState('');
   const [link, setLink] = useState(null);
-  if (store && key !== store.slug) { setKey(store.slug); setLink(null); setDel(''); setF({ name_ar: store.name_ar, name_en: store.name_en, phone: store.phone || '', delivery_zone: store.delivery_zone || '', departments: store.departments, delivery_mode: store.delivery_mode, hidden: store.hidden, featured: store.featured, auto_whatsapp: store.auto_whatsapp, suspended: store.status !== 'active', owner_disabled: store.owner_disabled, sort_order: store.sort_order, logo_initials: store.logo_initials || (store.name_ar || store.name_en || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: store.logo_color || '#1B1B1B' }); }
+  if (store && key !== store.slug) { setKey(store.slug); setLink(null); setDel(''); setF({ slug: store.slug, name_ar: store.name_ar, name_en: store.name_en, phone: store.phone || '', delivery_zone: store.delivery_zone || '', departments: store.departments, delivery_mode: store.delivery_mode, hidden: store.hidden, featured: store.featured, auto_whatsapp: store.auto_whatsapp, suspended: store.status !== 'active', owner_disabled: store.owner_disabled, sort_order: store.sort_order, logo_initials: store.logo_initials || (store.name_ar || store.name_en || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: store.logo_color || '#1B1B1B' }); }
   if (!store || !f) return <Sheet open={false} onClose={onClose} />;
   const patch = async (body, label) => {
     setBusy(label || 'save');
-    try { await adminApi(`/stores/${store.slug}`, { method: 'PATCH', body }); onChanged(); return true; } catch (x) { toast({ tone: 'error', title: x.fields?.phone ? 'رقم تليفون غير صحيح' : x.message }); return false; } finally { setBusy(''); }
+    try { await adminApi(`/stores/${store.slug}`, { method: 'PATCH', body }); onChanged(); return true; } catch (x) { toast({ tone: 'error', title: x.fields?.phone ? 'رقم تليفون غير صحيح' : x.fields?.slug === 'slug_taken' ? 'الرابط ده مستخدم في متجر تاني' : x.fields?.slug ? 'رابط غير صالح' : x.message }); return false; } finally { setBusy(''); }
   };
   const save = async () => {
     if (!f.departments.length) { toast({ tone: 'error', title: 'اختار قسم واحد على الأقل' }); return; }
-    const ok = await patch({ name_ar: f.name_ar, name_en: f.name_en, phone: f.phone, delivery_zone: f.delivery_zone, departments: f.departments, delivery_mode: f.delivery_mode, hidden: f.hidden, featured: f.featured, auto_whatsapp: f.auto_whatsapp, status: f.suspended ? 'suspended' : 'active', owner_disabled: f.owner_disabled, sort_order: Number(f.sort_order) || 0, logo_initials: f.logo_initials, logo_color: f.logo_color });
+    const newSlug = String(f.slug || '').trim().toLowerCase();
+    if (newSlug && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(newSlug)) { toast({ tone: 'error', title: 'رابط المتجر: حروف إنجليزية وأرقام وشرطات بس' }); return; }
+    const ok = await patch({ ...(newSlug && newSlug !== store.slug ? { slug: newSlug } : {}), name_ar: f.name_ar, name_en: f.name_en, phone: f.phone, delivery_zone: f.delivery_zone, departments: f.departments, delivery_mode: f.delivery_mode, hidden: f.hidden, featured: f.featured, auto_whatsapp: f.auto_whatsapp, status: f.suspended ? 'suspended' : 'active', owner_disabled: f.owner_disabled, sort_order: Number(f.sort_order) || 0, logo_initials: f.logo_initials, logo_color: f.logo_color });
     if (ok) { toast({ title: 'اتحفظ' }); onClose(); }
   };
   const setup = async () => { try { const r = await adminApi(`/stores/${store.slug}/setup-link`, { method: 'POST', body: {} }); setLink(r.url); navigator.clipboard?.writeText(r.url); toast({ title: 'اتعمل لينك تفعيل واتنسخ' }); } catch (x) { toast({ tone: 'error', title: x.message }); } };
@@ -143,6 +162,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="الاسم (عربي)"><Input value={f.name_ar} onChange={(e) => setF({ ...f, name_ar: e.target.value })} /></Field>
             <Field label="الاسم (إنجليزي)"><Input dir="ltr" value={f.name_en} onChange={(e) => setF({ ...f, name_en: e.target.value })} className="text-start" /></Field>
+            <Field label="رابط المتجر" hint={`twistegy.com/s/${f.slug || ''} — الرابط القديم بيحوّل للجديد تلقائي`}><Input dir="ltr" value={f.slug || ''} onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} className="text-start" /></Field>
             <Field label="رقم التليفون"><Input dir="ltr" inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className="text-start" /></Field>
             <Field label="ترتيب الظهور" hint="الأصغر يظهر الأول"><Input type="number" dir="ltr" min={0} value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
           </div>

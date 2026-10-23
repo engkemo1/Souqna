@@ -13,19 +13,9 @@ export const DEPT_EMOJI = {
 export const DEFAULT_DEPTS = [
   { slug: 'women', name: { ar: 'حريمي', en: 'Women' } },
   { slug: 'men', name: { ar: 'رجالي', en: 'Men' } },
-  { slug: 'shoes', name: { ar: 'كوتشيات وأحذية', en: 'Shoes' } },
   { slug: 'kids', name: { ar: 'أطفال', en: 'Kids' } },
-  { slug: 'bags', name: { ar: 'شنط', en: 'Bags' } },
-  { slug: 'abaya', name: { ar: 'عبايات', en: 'Abayas' } },
-  { slug: 'sports', name: { ar: 'رياضي', en: 'Sports' } },
-  { slug: 'denim', name: { ar: 'جينز', en: 'Denim' } },
-  { slug: 'hijab', name: { ar: 'طرح وحجاب', en: 'Hijab' } },
+  { slug: 'shoes', name: { ar: 'أحذية', en: 'Shoes' } },
   { slug: 'perfume_makeup', name: { ar: 'عطور ومكياج', en: 'Perfume & Makeup' } },
-  { slug: 'accessories', name: { ar: 'إكسسوارات', en: 'Accessories' } },
-  { slug: 'wedding_dress', name: { ar: 'فساتين أفراح', en: 'Wedding Dresses' } },
-  { slug: 'wedding_suit', name: { ar: 'بدل أفراح', en: 'Wedding Suits' } },
-  { slug: 'underwear', name: { ar: 'ملابس داخلية', en: 'Underwear' } },
-  { slug: 'jalabiya', name: { ar: 'جلابيب', en: 'Jalabiya' } },
   { slug: 'care', name: { ar: 'عنايات', en: 'Care' } },
 ];
 
@@ -39,6 +29,9 @@ const DEFAULT_IMG = {
 };
 const defaultImg = (slug) => (DEFAULT_IMG[slug] ? `https://images.unsplash.com/${DEFAULT_IMG[slug]}?q=80&w=800&auto=format&fit=crop` : null);
 
+// رجالي / حريمي / أطفال أقسام رئيسية: بتفتح كل منتجات الفئة (أحذية، جلاليب، شباشب، إكسسوارات…) مش القسم الواحد بس.
+const AUDIENCE_DEPTS = ['women', 'men', 'kids'];
+
 function DeptCard({ dept, lang, fmt, priority }) {
   const [imgErr, setImgErr] = useState(false);
   const name = dept.name?.[lang] || dept.name?.ar || dept.slug;
@@ -46,7 +39,7 @@ function DeptCard({ dept, lang, fmt, priority }) {
   const url = dept.image || localUrl || defaultImg(dept.slug);
 
   return (
-    <Link to={`/search?department=${dept.slug}`} className="group block focus:outline-none" aria-label={name}>
+    <Link to={AUDIENCE_DEPTS.includes(dept.slug) ? `/search?audience=${dept.slug}` : `/search?department=${dept.slug}`} className="group block focus:outline-none" aria-label={name}>
       <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-neutral-100 shadow-[0_4px_16px_rgba(0,0,0,0.06)] ring-1 ring-black/5 transition duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-[0_16px_30px_-10px_rgba(3,36,77,0.22)] group-focus-visible:ring-2 group-focus-visible:ring-brand">
         {!imgErr && url ? (
           <img
@@ -100,17 +93,20 @@ export default function DeptStrip({ departments = [] }) {
   // عرض كل الأقسام الأساسية (أطفال، شنط، عبايات، طرح، عطور...) بجانب الأقسام التي بها منتجات حالياً
   const list = useMemo(() => {
     const liveMap = new Map((departments || []).map((d) => [d.slug, d]));
-    return DEFAULT_DEPTS.map((def) => {
+    // الأقسام الرئيسية بس (اللي من غير أب)؛ لو الأدمن ضاف قسم رئيسي جديد بيظهر هنا لوحده.
+    const tops = (departments || []).filter((d) => !d.parent);
+    const base = tops.length ? tops.map((d) => ({ slug: d.slug, name: d.name })) : DEFAULT_DEPTS;
+    return base.map((def) => {
       const live = liveMap.get(def.slug);
       return {
         ...def,
         ...live,
-        products: live?.products || 0,
+        products: AUDIENCE_DEPTS.includes(def.slug) ? 0 : live?.products || 0, // عدّاد القسم الواحد مضلل للفئات الرئيسية
       };
     });
   }, [departments]);
 
-  const totalProducts = list.reduce((s, d) => s + (d.products || 0), 0);
+  const totalProducts = (departments || []).reduce((s, d) => s + (d.products || 0), 0);
 
   return (
     <section aria-label={t('market.shopByDept')} className="container mt-6">

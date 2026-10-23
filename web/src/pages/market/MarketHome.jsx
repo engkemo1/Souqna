@@ -86,7 +86,8 @@ export default function MarketHome() {
   const { label: deptLabel } = useDepartments();
   const STREET_DEPTS = ['women', 'men', 'kids', 'shoes', 'bags', 'hijab', 'abaya', 'jalabiya', 'denim', 'sports', 'accessories', 'underwear', 'wedding_dress', 'wedding_suit'];
   const deptLabels = Object.fromEntries(STREET_DEPTS.map((d) => [d, deptLabel(d)]));
-  const deptCounts = base ? Object.fromEntries(STREET_DEPTS.map((d) => [d, base.departments?.find((x) => x.slug === d)?.products || 0])) : {};
+  const STREET_MAP = { bags: ['women_bags', 'men_bags'], hijab: ['women_hijab'], abaya: ['women_abaya'], jalabiya: ['men_jalabiya'], denim: ['women_pants', 'men_pants'], sports: ['women_sports', 'men_sports'], accessories: ['women_accessories', 'men_accessories'], underwear: ['women_underwear', 'men_underwear'], wedding_dress: ['women_wedding_dresses'], wedding_suit: ['men_wedding_suits'] };
+  const deptCounts = base ? Object.fromEntries(STREET_DEPTS.map((d) => [d, (STREET_MAP[d] || [d]).reduce((n, sl) => n + (base.departments?.find((x) => x.slug === sl)?.products || 0), 0)])) : {};
   const showWearThis = base?.features?.stylist !== false;
 
   useEffect(() => { document.title = `${t('app.name')} · ${t('app.tagline')}`; }, [t]);
@@ -133,9 +134,9 @@ export default function MarketHome() {
 
             <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none lg:hidden">
               {[
-                ['women', t('cat.women'), '/search?department=women'],
-                ['men', t('cat.men'), '/search?department=men'],
-                ['kids', t('cat.kids'), '/search?department=kids'],
+                ['women', t('cat.women'), '/search?audience=women'],
+                ['men', t('cat.men'), '/search?audience=men'],
+                ['kids', t('cat.kids'), '/search?audience=kids'],
                 ['shoes', t('cat.shoes'), '/search?department=shoes'],
                 ['bags', t('cat.bags'), '/search?department=bags'],
               ].map(([slug, label, href]) => <Link key={slug} to={href} className="shrink-0 rounded-full border-[1.5px] border-[#F8620A] bg-white px-3.5 py-2 text-xs font-semibold text-[#03244D]">{label}</Link>)}

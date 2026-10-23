@@ -11,7 +11,7 @@ import SameDayBadge from '../store/SameDayBadge.jsx';
 
 export default function StoreCard({ store: s, index = 0, large }) {
   const { t, tr, lang } = useI18n();
-  const { label: deptLabel } = useDepartments();
+  const { pathLabel: deptLabel } = useDepartments();
   const brand = s.theme?.cssVars?.['--c-primary'];
   return (
     <motion.article

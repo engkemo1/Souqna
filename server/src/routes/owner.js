@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartments } from '@souqna/shared';
 import { q, tx, insert, update, json } from '../db/index.js';
 import { config } from '../config.js';
-import { assertDepartments, inferDepartment } from '../lib/departments.js';
+import { assertDepartments, inferDepartment, ensureDeptCategories } from '../lib/departments.js';
 import { productTypeTree, deriveDepartment, audienceOrNull, AUDIENCE_KEYS } from '../lib/product-types.js';
 import { inferGender, inferKey } from '../lib/moda/products.js';
 import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
@@ -122,6 +122,7 @@ r.put('/store', h((req, res) => {
   for (const k of ['opens_at', 'closes_at', 'day_off', 'map_url']) if (body[k] === '') body[k] = null;
   if (body.departments) { assertDepartments(body.departments); const d = body.departments; body.departments = encodeDepartments(d); body.category = d.length === 1 ? d[0] : 'mixed'; }
   update('stores', req.store.id, body);
+  if (body.departments) ensureDeptCategories(req.store.id, decodeDepartments(body.departments));
   const s = q.get('SELECT * FROM stores WHERE id=?', [req.store.id]);
   res.json({ store: serializeStore(s) });
 }));
@@ -938,23 +939,36 @@ r.get('/customers/:id', h((req, res) => {
 
 r.get('/categories', h((req, res) => {
   const rows = q.all('SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id=c.id AND p.status<>\'archived\') AS count FROM categories c WHERE store_id=? ORDER BY sort, id', [req.store.id]);
-  res.json({ items: rows.map(serializeCategory) });
+  res.json({ items: rows.map(serializeCategory), canManageTop: !!req.adminStore });
 }));
 
-const catSchema = z.object({ name_ar: z.string().trim().min(1).max(40), name_en: z.string().trim().min(1).max(40), media_id: z.number().int().nullable().optional() });
+function checkCatParent(storeId, parentId, selfId) {
+  if (!parentId) return null;
+  const p = q.get('SELECT id, parent_id FROM categories WHERE id=? AND store_id=?', [parentId, storeId]);
+  if (!p || p.parent_id || p.id === selfId) throw badRequest('invalid_parent', 'Main category not valid.');
+  if (selfId && q.val('SELECT 1 FROM categories WHERE parent_id=?', [selfId])) throw badRequest('invalid_parent', 'A category that has sub-categories cannot become a sub-category.');
+  return p.id;
+}
+const catSchema = z.object({ name_ar: z.string().trim().min(1).max(40), name_en: z.string().trim().min(1).max(40), media_id: z.number().int().nullable().optional(), parent_id: z.number().int().nullable().optional() });
 r.post('/categories', h((req, res) => {
   const d = catSchema.parse(req.body);
+  // Store owners only add sub-categories; the top-level categories are managed by the platform admin.
+  if (!req.adminStore && !d.parent_id) throw badRequest('top_level_admin_only', 'Choose a main category to add this sub-category under.');
+  const parentId = checkCatParent(req.store.id, d.parent_id, null);
   let slug = slugify(d.name_en), i = 1;
   while (q.val('SELECT id FROM categories WHERE store_id=? AND slug=?', [req.store.id, slug])) slug = `${slugify(d.name_en)}-${++i}`;
   const sort = (q.val('SELECT MAX(sort) FROM categories WHERE store_id=?', [req.store.id]) || 0) + 1;
-  const id = insert('categories', { store_id: req.store.id, slug, name_ar: d.name_ar, name_en: d.name_en, media_id: d.media_id ?? null, sort });
+  const id = insert('categories', { store_id: req.store.id, slug, name_ar: d.name_ar, name_en: d.name_en, media_id: d.media_id ?? null, parent_id: parentId, sort });
   res.status(201).json({ category: serializeCategory({ ...q.get('SELECT * FROM categories WHERE id=?', [id]), count: 0 }) });
 }));
 r.put('/categories/:id', h((req, res) => {
   const c = q.get('SELECT * FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!c) throw notFound('Category');
   const d = catSchema.parse(req.body);
-  update('categories', c.id, { name_ar: d.name_ar, name_en: d.name_en, media_id: d.media_id === undefined ? undefined : d.media_id });
+  if (!req.adminStore && !c.parent_id) throw badRequest('top_level_admin_only', 'Main categories are managed by the platform admin.');
+  let parentId;
+  if (req.adminStore && d.parent_id !== undefined) parentId = checkCatParent(req.store.id, d.parent_id, c.id);
+  update('categories', c.id, { name_ar: d.name_ar, name_en: d.name_en, media_id: d.media_id === undefined ? undefined : d.media_id, parent_id: parentId });
   res.json({ category: serializeCategory(q.get('SELECT * FROM categories WHERE id=?', [c.id])) });
 }));
 r.put('/categories-order', h((req, res) => {
@@ -963,6 +977,9 @@ r.put('/categories-order', h((req, res) => {
   res.status(204).end();
 }));
 r.delete('/categories/:id', h((req, res) => {
+  const cur = q.get('SELECT parent_id FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
+  if (!req.adminStore && cur && !cur.parent_id) throw badRequest('top_level_admin_only', 'Main categories are managed by the platform admin.');
+  q.run('UPDATE categories SET parent_id=NULL WHERE parent_id=? AND store_id=?', [req.params.id, req.store.id]);
   q.run('DELETE FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   res.status(204).end();
 }));

@@ -15,16 +15,18 @@ import { EmptyState, ErrorState, errorMessage, fieldErrors } from '../../compone
 import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 
-function CatRow({ c, onEdit, onDelete, onDragEnd, t, tr }) {
+function CatRow({ c, onEdit, onDelete, onDragEnd, onAddSub, canTop, parent, t, tr }) {
+  const locked = !c.parentId && !canTop;
   const controls = useDragControls();
   return (
     <Reorder.Item value={c} dragListener={false} dragControls={controls} onDragEnd={onDragEnd} className="list-none" whileDrag={{ scale: 1.02, boxShadow: '0 20px 40px -20px rgba(0,0,0,.3)' }}>
-      <div className="flex items-center gap-3 rounded-2xl border border-line bg-elevated p-3">
+      <div className={`flex items-center gap-3 rounded-2xl border border-line bg-elevated p-3 ${c.parentId ? 'ms-8' : ''}`}>
         <button type="button" onPointerDown={(e) => controls.start(e)} aria-label="Reorder" className="grid h-11 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-muted hover:bg-fg/[0.05]"><GripVertical className="h-5 w-5" /></button>
         <SmartImage media={c.image} ratio="1 / 1" sizes="64px" className="h-14 w-14 shrink-0 rounded-xl" />
-        <div className="min-w-0 flex-1"><p className="truncate font-semibold">{tr(c.name)}</p><p className="text-sm text-muted">{t('categories.count', { n: c.count ?? 0 })}</p></div>
-        <IconButton size="sm" label={t('common.edit')} icon={Pencil} iconClass="h-4 w-4" onClick={() => onEdit(c)} />
-        <IconButton size="sm" label={t('common.delete')} icon={Trash2} iconClass="h-4 w-4 text-sale" onClick={() => onDelete(c)} />
+        <div className="min-w-0 flex-1"><p className="truncate font-semibold">{tr(c.name)}{parent && <span className="ms-2 text-xs font-normal text-muted">تحت: {tr(parent.name)}</span>}</p><p className="text-sm text-muted">{t('categories.count', { n: c.count ?? 0 })}</p></div>
+        {!c.parentId && <Button size="sm" variant="outline" icon={Plus} onClick={() => onAddSub(c)}>قسم فرعي</Button>}
+        {!locked && <IconButton size="sm" label={t('common.edit')} icon={Pencil} iconClass="h-4 w-4" onClick={() => onEdit(c)} />}
+        {!locked && <IconButton size="sm" label={t('common.delete')} icon={Trash2} iconClass="h-4 w-4 text-sale" onClick={() => onDelete(c)} />}
       </div>
     </Reorder.Item>
   );
@@ -36,24 +38,26 @@ export default function Categories() {
   const toast = useToast();
   const { data, error, reload, mutate } = useApi('/owner/categories');
   const [form, setForm] = useState(null);
-  const [f, setF] = useState({ name_ar: '', name_en: '', media: [] });
+  const [f, setF] = useState({ name_ar: '', name_en: '', media: [], parent_id: null });
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [del, setDel] = useState(null);
   const items = data?.items || [];
+  const canTop = !!data?.canManageTop;
   const ref = useRef(items);
   ref.current = items;
 
   useEffect(() => {
     if (!form) return;
     setErrors({});
-    setF(form.id ? { name_ar: form.name.ar, name_en: form.name.en, media: form.image ? [form.image] : [] } : { name_ar: '', name_en: '', media: [] });
+    setF(form.id ? { name_ar: form.name.ar, name_en: form.name.en, media: form.image ? [form.image] : [], parent_id: form.parentId ?? null } : { name_ar: '', name_en: '', media: [], parent_id: form.parentId ?? null });
   }, [form]);
 
   const save = async () => {
     setBusy(true);
     try {
-      const body = { name_ar: f.name_ar, name_en: f.name_en, media_id: f.media[0]?.id ?? null };
+      const body = { name_ar: f.name_ar, name_en: f.name_en, media_id: f.media[0]?.id ?? null, parent_id: f.parent_id ? Number(f.parent_id) : null };
+      if (form.id && !canTop) delete body.parent_id;
       const r = await api(form.id ? `/owner/categories/${form.id}` : '/owner/categories', { method: form.id ? 'PUT' : 'POST', body });
       mutate((d) => ({ items: form.id ? d.items.map((x) => (x.id === form.id ? { ...r.category, count: x.count } : x)) : [...d.items, r.category] }));
       invalidate(`/stores/${store.slug}`);
@@ -72,21 +76,27 @@ export default function Categories() {
 
   return (
     <PageTransition>
-      <PageHeader title={t('categories.title')} subtitle={items.length > 1 ? t('categories.reorderHint') : null} actions={<Button icon={Plus} onClick={() => setForm({})}>{t('categories.new')}</Button>} />
+      <PageHeader title={t('categories.title')} subtitle={items.length > 1 ? t('categories.reorderHint') : null} actions={canTop ? <Button icon={Plus} onClick={() => setForm({})}>{t('categories.new')}</Button> : null} />
       {error ? <ErrorState error={error} onRetry={reload} /> : !data ? <ListSkeleton rows={4} /> : !items.length ? (
-        <EmptyState icon={FolderTree} title={t('categories.empty')} body={t('categories.emptyBody')} action={<Button icon={Plus} onClick={() => setForm({})}>{t('categories.new')}</Button>} />
+        <EmptyState icon={FolderTree} title={t('categories.empty')} body={t('categories.emptyBody')} action={canTop ? <Button icon={Plus} onClick={() => setForm({})}>{t('categories.new')}</Button> : null} />
       ) : (
         <Reorder.Group axis="y" values={items} onReorder={(list) => mutate({ items: list })} className="max-w-3xl space-y-3">
-          {items.map((c) => <CatRow key={c.id} c={c} t={t} tr={tr} onEdit={setForm} onDelete={setDel} onDragEnd={persist} />)}
+          {items.map((c) => <CatRow key={c.id} c={c} t={t} tr={tr} onEdit={setForm} onDelete={setDel} onDragEnd={persist} canTop={canTop} onAddSub={(p) => setForm({ parentId: p.id })} parent={c.parentId ? items.find((x) => x.id === c.parentId) : null} />)}
         </Reorder.Group>
       )}
       <Sheet open={!!form} onClose={() => setForm(null)} title={form?.id ? t('common.edit') : t('categories.new')} side="auto" desktop="center" size="md"
-        footer={<Button full size="lg" onClick={save} loading={busy} disabled={!f.name_ar || !f.name_en}>{t('common.save')}</Button>}>
+        footer={<Button full size="lg" onClick={save} loading={busy} disabled={!f.name_ar || !f.name_en || (!canTop && !f.parent_id)}>{t('common.save')}</Button>}>
         <div className="space-y-4 py-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label={t('categories.nameAr')} error={errors.name_ar}><Input dir="rtl" value={f.name_ar} onChange={(e) => setF({ ...f, name_ar: e.target.value })} /></Field>
             <Field label={t('categories.nameEn')} error={errors.name_en}><Input dir="ltr" value={f.name_en} onChange={(e) => setF({ ...f, name_en: e.target.value })} /></Field>
           </div>
+          <Field label="القسم الرئيسي" hint={canTop ? 'سيبه فاضي لو ده قسم رئيسي' : 'القسم الفرعي بيظهر تحت القسم الرئيسي في متجرك'}>
+            <select dir="rtl" className="h-11 w-full rounded-xl border border-line-strong bg-elevated px-3 text-sm" value={f.parent_id || ''} disabled={!canTop && !!form?.id} onChange={(e) => setF({ ...f, parent_id: e.target.value ? Number(e.target.value) : null })}>
+              {canTop && <option value="">— قسم رئيسي —</option>}
+              {items.filter((x) => !x.parentId && x.id !== form?.id).map((x) => <option key={x.id} value={x.id}>{tr(x.name)}</option>)}
+            </select>
+          </Field>
           <Field label={t('editor.images')} optional={t('common.optional')}><MediaUploader value={f.media} onChange={(m) => setF((x) => ({ ...x, media: m.slice(-1) }))} kind="category" max={1} /></Field>
         </div>
       </Sheet>

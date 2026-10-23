@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import { listDepartments } from '../lib/departments.js';
+import { listDepartments, deptSubtree, deptAncestors } from '../lib/departments.js';
 import { z } from 'zod';
 import { q, tx, insert, json } from '../db/index.js';
 import { randomBytes } from 'node:crypto';
@@ -36,14 +36,18 @@ const ACTIVE = "status='active'";
 const STORE_COLS = `s.*, (SELECT COUNT(*) FROM products p WHERE p.store_id=s.id AND p.status='active') AS product_count`;
 
 function loadStore(slug) {
-  const s = q.get(`SELECT ${STORE_COLS} FROM stores s WHERE s.slug=? AND s.status='active'`, [slug]);
+  let s = q.get(`SELECT ${STORE_COLS} FROM stores s WHERE s.slug=? AND s.status='active'`, [slug]);
+  if (!s) {
+    const al = q.get('SELECT store_id FROM store_slug_aliases WHERE old_slug=?', [slug]);
+    if (al) s = q.get(`SELECT ${STORE_COLS} FROM stores s WHERE s.id=? AND s.status='active'`, [al.store_id]);
+  }
   if (!s) throw notFound('Store');
   return s;
 }
 
 /* ---------------------------------------------------------- marketplace */
 
-r.get('/departments', h((_req, res) => res.json({ departments: listDepartments().map(({ slug, name, sizes, image }) => ({ slug, name, sizes, image })) })));
+r.get('/departments', h((_req, res) => res.json({ departments: listDepartments().map(({ slug, name, sizes, image, parent }) => ({ slug, name, sizes, image, parent })) })));
 
 r.get('/homepage-ads', h((_req, res) => {
   const today = cairoNow().date;
@@ -94,6 +98,9 @@ r.get('/search/suggest', h((req, res) => {
   res.json({ products: names, departments, stores });
 }));
 
+const AUD_GROUP = { men: ['men', 'unisex'], women: ['women', 'unisex'], kids: ['kids', 'boys', 'girls'], boys: ['boys', 'kids'], girls: ['girls', 'kids'], unisex: ['unisex'] };
+const AUD_DEPT = { men: 'men', women: 'women', kids: 'kids', boys: 'kids', girls: 'kids' };
+
 r.get('/search', h((req, res) => {
   const { q: term = '', department = '', store = '', sort = 'relevance', min, max, page = '1', sale, new: isNew, in_stock: inStock, rating, ids, sizes, colors } = req.query;
   const tokens = normText(String(term).slice(0, 80)).split(/\s+/).filter(Boolean).slice(0, 6);
@@ -143,11 +150,20 @@ r.get('/search', h((req, res) => {
   const deptSlug = String(department).replace(/[^a-z0-9_]/g, '');
   const storeSlug = String(store).replace(/[^a-z0-9_-]/gi, '');
   const facetFrom = (extra, extraParams) => ({ sql: `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${[...baseWhere, ...extra].join(' AND ')}`, params: [...baseParams, ...extraParams] });
-  if (deptSlug) { where.push('p.department=?'); params.push(deptSlug); }
+  const deptList = deptSlug ? deptSubtree(deptSlug) : [];
+  const deptIn = `p.department IN (${deptList.map(() => '?').join(',') || "''"})`;
+  if (deptSlug) { where.push(deptIn); params.push(...deptList); }
   if (storeSlug) { where.push('s.slug=?'); params.push(storeSlug); }
   const preAud = { where: [...where], params: [...params] }; // the audience facet ignores its own filter
   const audKey = AUDIENCE_KEYS.has(String(req.query.audience || '')) ? String(req.query.audience) : '';
-  if (audKey) { where.push('p.audience=?'); params.push(audKey); }
+  if (audKey) {
+    // "رجالي" = every product made for men, whatever its department (shoes, jalabiya, accessories…), plus unisex ones;
+    // old products with no audience yet fall back to their department.
+    const g = AUD_GROUP[audKey];
+    const audDepts = deptSubtree(AUD_DEPT[audKey] || '_none');
+    where.push(`(p.audience IN (${g.map(() => '?').join(',')}) OR (p.audience IS NULL AND p.department IN (${audDepts.map(() => '?').join(',')})))`);
+    params.push(...g, ...audDepts);
+  }
   const noCat = { where: [...where], params: [...params] }; // the category / type facet ignores its own filter
   if (catClause) { where.push(catClause); params.push(catKey); }
   if (typeKey) { where.push('p.moda_key=?'); params.push(typeKey); }
@@ -174,8 +190,11 @@ r.get('/search', h((req, res) => {
   const items = serializeCards(rows).map((c, i) => ({ ...c, store: { slug: rows[i].store_slug, name: bi(rows[i], 'store_name') } }));
   const price = q.get(`SELECT MIN(p.price) AS min, MAX(p.price) AS max ${from}`, params);
   const fd = facetFrom(storeSlug ? ['s.slug=?'] : [], storeSlug ? [storeSlug] : []);
-  const departments = q.all(`SELECT p.department AS slug, COUNT(*) AS n ${fd.sql} AND p.department IS NOT NULL GROUP BY p.department`, fd.params);
-  const fs2 = facetFrom(deptSlug ? ['p.department=?'] : [], deptSlug ? [deptSlug] : []);
+  const deptRows = q.all(`SELECT p.department AS slug, COUNT(*) AS n ${fd.sql} AND p.department IS NOT NULL GROUP BY p.department`, fd.params);
+  const deptRoll = new Map();
+  for (const d of deptRows) for (const sl of [d.slug, ...deptAncestors(d.slug)]) deptRoll.set(sl, (deptRoll.get(sl) || 0) + d.n); // الأب بيعد منتجات اللي تحته
+  const departments = [...deptRoll].map(([slug, n]) => ({ slug, n }));
+  const fs2 = facetFrom(deptSlug ? [deptIn] : [], deptSlug ? deptList : []);
   const stores = q.all(`SELECT s.slug AS slug, s.name_ar AS name_ar, s.name_en AS name_en, COUNT(*) AS n ${fs2.sql} GROUP BY s.id ORDER BY n DESC LIMIT 12`, fs2.params)
     .map((x) => ({ slug: x.slug, name: { ar: x.name_ar, en: x.name_en }, n: x.n }));
   const audiences = q.all(`SELECT p.audience AS key, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preAud.where.join(' AND ')} AND p.audience IS NOT NULL GROUP BY p.audience ORDER BY n DESC`, preAud.params);
@@ -401,7 +420,10 @@ r.get('/marketplace', h((req, res) => {
   const { q: term = '', category = '', sort = 'featured' } = req.query;
   const where = ["s.status='active'", 's.hidden=0'];
   const params = [];
-  if (category && category !== 'all') { where.push('s.departments LIKE ?'); params.push(`%,${String(category).replace(/[^a-z_]/g, '')},%`); }
+  if (category && category !== 'all') {
+    const cl = deptSubtree(String(category).replace(/[^a-z_]/g, ''));
+    where.push(`(${cl.map(() => 's.departments LIKE ?').join(' OR ')})`); params.push(...cl.map((d) => `%,${d},%`));
+  }
   if (term) {
     where.push('(s.name_ar LIKE ? OR s.name_en LIKE ? OR s.tagline_ar LIKE ? OR s.tagline_en LIKE ?)');
     const like = `%${String(term).slice(0, 60)}%`;
@@ -417,7 +439,8 @@ r.get('/marketplace', h((req, res) => {
   const rows = q.all(`SELECT ${STORE_COLS} FROM stores s WHERE ${where.join(' AND ')} ORDER BY s.sort_order ASC, ${order}`, params);
   const deptCount = new Map();
   for (const row of q.all("SELECT departments FROM stores WHERE status='active' AND hidden=0")) {
-    for (const d of decodeDepartments(row.departments)) deptCount.set(d, (deptCount.get(d) || 0) + 1);
+    const seen = new Set();
+    for (const d of decodeDepartments(row.departments)) for (const x of [d, ...deptAncestors(d)]) if (!seen.has(x)) { seen.add(x); deptCount.set(x, (deptCount.get(x) || 0) + 1); }
   }
   const names = new Map(listDepartments().map((d) => [d.slug, d]));
   const categories = [...deptCount].filter(([id]) => names.has(id)).map(([id, count]) => ({ id, count, name: names.get(id).name })).sort((a, b) => b.count - a.count);
@@ -439,10 +462,11 @@ r.get('/marketplace', h((req, res) => {
   const newest = railRows("ORDER BY p.is_new DESC, p.created_at DESC LIMIT 12");
   const deals = railRows('AND p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price ORDER BY (p.compare_at_price - p.price) * 1.0 / p.compare_at_price DESC LIMIT 12');
   const deptCounts = q.all("SELECT p.department AS slug, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL GROUP BY p.department");
-  const countBy = new Map(deptCounts.map((d) => [d.slug, d.n]));
-  const departments = listDepartments().map((d) => ({ slug: d.slug, name: d.name, image: d.image, products: countBy.get(d.slug) || 0 }));
-  const deptRails = departments.filter((d) => d.products >= 3).sort((a, b) => b.products - a.products).slice(0, 4)
-    .map((d) => ({ slug: d.slug, name: d.name, items: railRows('AND p.department=? ORDER BY p.sold_count DESC, p.id DESC LIMIT 10', [d.slug]) }));
+  const countBy = new Map();
+  for (const d of deptCounts) for (const sl of [d.slug, ...deptAncestors(d.slug)]) countBy.set(sl, (countBy.get(sl) || 0) + d.n);
+  const departments = listDepartments().map((d) => ({ slug: d.slug, name: d.name, image: d.image, parent: d.parent, products: countBy.get(d.slug) || 0 }));
+  const deptRails = departments.filter((d) => !d.parent && d.products >= 3).sort((a, b) => b.products - a.products).slice(0, 4)
+    .map((d) => { const sub = deptSubtree(d.slug); return { slug: d.slug, name: d.name, items: railRows(`AND p.department IN (${sub.map(() => '?').join(',')}) ORDER BY p.sold_count DESC, p.id DESC LIMIT 10`, sub) }; });
   cache(res, 60);
   res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });
 }));
@@ -466,7 +490,12 @@ r.get('/stores/:slug', h((req, res) => {
   cache(res, 30);
   res.json({
     store: serializeStore(s),
-    categories: categories.map(serializeCategory),
+    // Top-level categories carry their sub-categories (counts include them); allCategories is the flat list.
+    categories: categories.filter((c) => !c.parent_id).map((c) => {
+      const kids = categories.filter((k) => k.parent_id === c.id);
+      return { ...serializeCategory({ ...c, count: c.count + kids.reduce((n, k) => n + k.count, 0) }), children: kids.map(serializeCategory) };
+    }),
+    allCategories: categories.map(serializeCategory),
     banners: banners.map((b) => serializeBanner(b, bm)),
     offers: offers.map(serializeOffer),
   });
@@ -496,8 +525,8 @@ r.get('/stores/:slug/products', h((req, res) => {
     params.push(...list);
   }
   if (category) {
-    where.push('p.category_id = (SELECT id FROM categories WHERE store_id=? AND slug=?)');
-    params.push(s.id, String(category));
+    where.push('p.category_id IN (SELECT id FROM categories WHERE store_id=? AND (slug=? OR parent_id=(SELECT id FROM categories WHERE store_id=? AND slug=?)))');
+    params.push(s.id, String(category), s.id, String(category));
   }
   if (term) {
     for (const tk of normText(String(term).slice(0, 60)).split(/\s+/).filter(Boolean).slice(0, 5)) {

@@ -26,7 +26,7 @@ export default function MarketSearch() {
   const q = params.get('q') || '';
   const department = params.get('department') || '';
   const sort = params.get('sort') || 'relevance';
-  const { list, label } = useDepartments();
+  const { list, label, pathLabel } = useDepartments();
   const dq = useDebounced(q, 150);
   const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store', 'same_day', 'sizes', 'colors', 'category', 'audience'];
   const [open, setOpen] = useState(false);
@@ -52,7 +52,7 @@ export default function MarketSearch() {
   const activeChips = [
     params.get('category') && { id: 'category', label: (data?.facets?.categories || []).find((c) => c.key === params.get('category'))?.name?.[lang] || params.get('category'), remove: () => set({ category: '' }) },
     params.get('audience') && { id: 'audience', label: ({ men: 'رجالي', women: 'حريمي', boys: 'ولادي', girls: 'بناتي', kids: 'أطفال', unisex: 'للجنسين' })[params.get('audience')] || params.get('audience'), remove: () => set({ audience: '' }) },
-    department && { id: 'department', label: label(department), remove: () => set({ department: '' }) },
+    department && { id: 'department', label: pathLabel(department), remove: () => set({ department: '' }) },
     (params.get('min') || params.get('max')) && { id: 'price', label: `${params.get('min') || 0} – ${params.get('max') || '∞'} ${t('search.price').includes('EGP') ? 'EGP' : 'ج.م'}`, remove: () => set({ min: '', max: '' }) },
     ...[['sale', 'search.onSale'], ['in_stock', 'search.inStock'], ['rating', 'search.rating4'], ['same_day', 'sameday.filter']].filter(([k]) => params.get(k) === '1').map(([k, m]) => ({ id: k, label: t(m), remove: () => set({ [k]: '' }) })),
     params.get('new') && { id: 'new', label: t('search.lastDays', { n: formatNumber(Number(params.get('new')) > 1 ? Number(params.get('new')) : 30, lang) }), remove: () => set({ new: '' }) },
