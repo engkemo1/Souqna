@@ -120,6 +120,7 @@ const storeSchema = z.object({
 r.put('/store', h((req, res) => {
   const body = storeSchema.parse(req.body);
   for (const k of ['opens_at', 'closes_at', 'day_off', 'map_url']) if (body[k] === '') body[k] = null;
+  if (!req.adminStore) delete body.departments; // أقسام المتجر الرئيسية بيحددها الأدمن بس، مش صاحب المحل
   if (body.departments) { assertDepartments(body.departments); const d = body.departments; body.departments = encodeDepartments(d); body.category = d.length === 1 ? d[0] : 'mixed'; }
   update('stores', req.store.id, body);
   if (body.departments) ensureDeptCategories(req.store.id, decodeDepartments(body.departments));
