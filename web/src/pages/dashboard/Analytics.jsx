@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { Banknote, ShoppingBag, Receipt, Percent, Eye, Repeat } from 'lucide-react';
 import { useApi, useIsDesktop } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
-import { formatMoney, formatNumber } from '../../lib/format.js';
+import { formatMoney, formatNumber, formatDate } from '../../lib/format.js';
 import { PageHeader, KpiCard, Panel } from '../../components/dash/Kit.jsx';
 import { SalesAreaChart, SimpleBars } from '../../components/dash/SalesChart.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
@@ -35,6 +35,33 @@ function BarList({ rows, valueOf, labelOf, format, colorful }) {
   );
 }
 
+function PageTrafficList({ rows, totalViews, format, t }) {
+  if (!rows.length) return <p className="py-8 text-center text-sm text-muted">{t('analytics.noPages')}</p>;
+  const typeLabel = (type) => t(`analytics.pageType.${type}`) || t('analytics.pageType.page');
+  return (
+    <ol className="divide-y divide-line">
+      {rows.map((row, i) => {
+        const basePath = row.path.split('/').slice(0, 3).join('/');
+        const route = row.path.slice(basePath.length).replace(/\/$/, '') || '/';
+        const title = row.type === 'store' ? t('analytics.pageStore') : row.type === 'catalog' || route === '/categories' ? typeLabel(row.type === 'catalog' ? 'catalog' : 'category') : route.split('/').filter(Boolean).slice(-1)[0] || t('analytics.pageStore');
+        return (
+          <li key={row.path} className="flex items-center gap-3 py-3 first:pt-1 last:pb-1">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-secondary text-sm font-bold text-brand">{i + 1}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold" dir="auto">{title}</span>
+              <span className="mt-0.5 block text-xs text-muted">{typeLabel(row.type)}</span>
+            </span>
+            <span className="shrink-0 text-end">
+              <span className="block text-sm font-semibold tabular">{t('analytics.pageVisits', { n: format(row.views) })}</span>
+              <span className="mt-0.5 block text-xs text-muted">{t('analytics.pageShare', { n: Math.round((row.views / Math.max(1, totalViews)) * 100) })}</span>
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 export default function Analytics() {
   const { t, tr, lang } = useI18n();
   const desktop = useIsDesktop();
@@ -48,6 +75,7 @@ export default function Analytics() {
   const peak = d ? d.byHour.reduce((a, b) => (b.orders > a.orders ? b : a), d.byHour[0]) : null;
   const hourLabel = (h) => new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG-u-nu-latn' : 'en-US', { hour: 'numeric', hour12: true, timeZone: 'UTC' }).format(new Date(Date.UTC(2020, 0, 1, h)));
   const f = d?.funnel;
+  const traffic = d?.traffic;
 
   return (
     <PageTransition>
@@ -65,6 +93,27 @@ export default function Analytics() {
       <Panel className="mt-4" title={t('analytics.revenue')}>
         {!d ? <Skeleton className="h-[280px]" /> : <SalesAreaChart series={d.series} previous={d.previousSeries} height={desktop ? 320 : 240} />}
       </Panel>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Panel title={t('analytics.pageViews')} subtitle={t('analytics.pageViewsHelp')}>
+          {!traffic ? <Skeleton className="h-40" /> : (
+            <>
+              <div className="rounded-2xl bg-secondary p-5">
+                <p className="text-sm font-medium text-muted">{t('analytics.viewsInRange')}</p>
+                <p className="mt-1 text-4xl font-bold tabular text-brand">{num(traffic.pageViews)}</p>
+                <p className="mt-3 text-sm font-medium text-fg">{t(traffic.previousPageViews === 0 && traffic.pageViews > 0 ? 'analytics.viewsNew' : traffic.pageViewsDelta > 0 ? 'analytics.viewsUp' : traffic.pageViewsDelta < 0 ? 'analytics.viewsDown' : 'analytics.viewsSame', { n: Math.abs(traffic.pageViewsDelta) })}</p>
+              </div>
+              <div className="mt-4 border-t border-line pt-3">
+                <p className="mb-1 text-xs font-medium text-muted">{t('analytics.dailyViews')}</p>
+                <SimpleBars data={traffic.pageViewSeries.map((x) => ({ ...x, label: formatDate(`${x.day} 12:00:00`, lang, { day: 'numeric', month: 'short' }) }))} dataKey="views" labelKey="label" height={desktop ? 190 : 160} />
+              </div>
+            </>
+          )}
+        </Panel>
+        <Panel title={t('analytics.topPages')} subtitle={t('analytics.topPagesHelp')}>
+          {!traffic ? <Skeleton className="h-52" /> : <PageTrafficList rows={traffic.topPages} totalViews={traffic.pageViews} format={num} t={t} />}
+        </Panel>
+      </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Panel title={t('analytics.byCategory')}>

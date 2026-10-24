@@ -63,6 +63,17 @@ export default function StoreLayout() {
     api(`/stores/${slug}/visit`, { method: 'POST' }).catch(() => {});
   }, [data, slug]);
 
+  useEffect(() => {
+    if (!data || isPreview) return;
+    const path = window.location.pathname;
+    const key = `souqna.pageview.${slug}.${path}`;
+    try {
+      if (sessionStorage.getItem(key)) return;
+      sessionStorage.setItem(key, '1');
+    } catch { /* ignore */ }
+    api(`/stores/${slug}/page-view`, { method: 'POST', body: { path } }).catch(() => {});
+  }, [data, slug, pathname, isPreview]);
+
   useEffect(() => { if (data) document.title = `${tr(data.store.name)} · ${t('app.name')}`; }, [data, tr, t]);
 
   const sub = pathname.replace(sp(slug), '');

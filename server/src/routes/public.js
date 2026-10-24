@@ -696,6 +696,20 @@ r.post('/stores/:slug/visit', h((req, res) => {
   res.status(204).end();
 }));
 
+r.post('/stores/:slug/page-view', h((req, res) => {
+  const s = loadStore(req.params.slug);
+  const body = z.object({ path: z.string().trim().min(1).max(240) }).parse(req.body);
+  const path = body.path.split(/[?#]/, 1)[0];
+  const storePath = `/s/${s.slug}`;
+  if ((path !== storePath && !path.startsWith(`${storePath}/`)) || path.includes('..')) throw badRequest('invalid_page', 'Invalid store page.');
+  const suffix = path.slice(storePath.length) || '/';
+  const pageType = suffix === '/' ? 'store' : suffix.startsWith('/p/') ? 'product' : suffix === '/categories' || suffix.startsWith('/categories/') ? 'category' : suffix === '/shop' ? 'catalog' : 'page';
+  const day = new Date().toISOString().slice(0, 10);
+  q.run(`INSERT INTO store_page_views (store_id, day, path, page_type, views) VALUES (?,?,?,?,1)
+    ON CONFLICT(store_id, day, path) DO UPDATE SET views=views+1`, [s.id, day, path, pageType]);
+  res.status(204).end();
+}));
+
 const cartItems = z.array(z.object({ productId: z.coerce.number().int(), variantId: z.coerce.number().int().nullable().optional(), qty: z.coerce.number().int().min(1).max(20) })).min(1).max(50);
 
 r.post('/stores/:slug/quote', h((req, res) => {

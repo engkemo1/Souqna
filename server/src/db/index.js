@@ -33,6 +33,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   // delivery is always done by Twist - no more per-store delivery choice
   db.exec("UPDATE stores SET delivery_mode='platform' WHERE delivery_mode<>'platform'");
   db.exec(`CREATE TABLE IF NOT EXISTS pickup_zones (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, fee INTEGER NOT NULL DEFAULT 0 CHECK (fee >= 0 AND fee <= 5000), courier_cost INTEGER NOT NULL DEFAULT 0 CHECK (courier_cost >= 0 AND courier_cost <= 5000), created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+  // every store is shown by default, even before it has products (the admin can switch it off per store)
+  if (db.prepare("INSERT OR IGNORE INTO app_settings(key,value) VALUES('show_empty_default_v1','1')").run().changes) db.exec('UPDATE stores SET show_when_empty=1');
   if (!cols.includes('delivery_zone')) db.exec("ALTER TABLE stores ADD COLUMN delivery_zone TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('search_indexable')) db.exec('ALTER TABLE stores ADD COLUMN search_indexable INTEGER NOT NULL DEFAULT 1');
   if (!db.prepare("SELECT 1 FROM app_settings WHERE key='seo_indexability_bootstrapped'").get()) {

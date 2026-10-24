@@ -383,7 +383,13 @@ r.get('/analytics', h((req, res) => {
   );
   const tm = mediaMap(top.map((t) => t.media_id));
   const repeat = q.get('SELECT SUM(orders_count>1) AS repeat, COUNT(*) AS total FROM customers WHERE store_id=?', [sid]);
-  const views = q.val("SELECT COALESCE(SUM(views),0) FROM products WHERE store_id=?", [sid]);
+  const pageViews = q.val('SELECT COALESCE(SUM(views),0) FROM store_page_views WHERE store_id=? AND day BETWEEN ? AND ?', [sid, cur[0], cur.at(-1)]);
+  const previousPageViews = q.val('SELECT COALESCE(SUM(views),0) FROM store_page_views WHERE store_id=? AND day BETWEEN ? AND ?', [sid, prev[0], prev.at(-1)]);
+  const topPages = q.all(`SELECT path, page_type AS type, SUM(views) AS views FROM store_page_views
+    WHERE store_id=? AND day BETWEEN ? AND ? GROUP BY path ORDER BY views DESC LIMIT 8`, between);
+  const pageViewSeries = q.all('SELECT day, SUM(views) AS views FROM store_page_views WHERE store_id=? AND day BETWEEN ? AND ? GROUP BY day', between);
+  const pageViewByDay = new Map(pageViewSeries.map((x) => [x.day, x.views]));
+  const productViews = q.val("SELECT COALESCE(SUM(views),0) FROM store_page_views WHERE store_id=? AND page_type='product' AND day BETWEEN ? AND ?", [sid, cur[0], cur.at(-1)]);
   const statusCounts = Object.fromEntries(q.all(`SELECT status, COUNT(*) AS c FROM orders WHERE store_id=? AND ${LOCAL_DAY} BETWEEN ? AND ? GROUP BY status`, between).map((x) => [x.status, x.c]));
   res.json({
     range: n,
@@ -396,13 +402,14 @@ r.get('/analytics', h((req, res) => {
       repeatRate: { value: repeat.total ? Math.round((repeat.repeat / repeat.total) * 1000) / 10 : 0 },
     },
     series: series(sid, cur),
+    traffic: { pageViews, previousPageViews, pageViewsDelta: pct(pageViews, previousPageViews), pageViewSeries: cur.map((day) => ({ day, views: pageViewByDay.get(day) || 0 })), topPages },
     previousSeries: series(sid, prev).map((x) => x.sales),
     byCategory: byCategory.map((c) => ({ name: bi(c, 'name'), revenue: c.revenue, qty: c.qty })),
     byCity,
     byHour: hours,
     byWeekday: Array.from({ length: 7 }, (_, d) => byWeekday.find((x) => x.wd === d) || { wd: d, orders: 0, sales: 0 }),
     topProducts: top.map((t) => ({ id: t.id, name: bi(t, 'name'), qty: t.qty, revenue: t.revenue, image: tm.get(t.media_id) || null })),
-    funnel: { visits: a.visits, productViews: Math.min(views, Math.round(a.visits * 2.4)), orders: a.orders },
+    funnel: { visits: a.visits, productViews, orders: a.orders },
     statusCounts,
   });
 }));

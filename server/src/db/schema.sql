@@ -232,6 +232,16 @@ CREATE TABLE IF NOT EXISTS store_visits (
   PRIMARY KEY (store_id, day)
 );
 
+-- Daily, page-level aggregate only. No visitor identifiers are retained.
+CREATE TABLE IF NOT EXISTS store_page_views (
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  day TEXT NOT NULL,
+  path TEXT NOT NULL,
+  page_type TEXT NOT NULL DEFAULT 'page',
+  views INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (store_id, day, path)
+);
+
 CREATE TABLE IF NOT EXISTS departments (
   id INTEGER PRIMARY KEY,
   slug TEXT NOT NULL UNIQUE,

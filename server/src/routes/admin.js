@@ -1140,6 +1140,7 @@ r.post('/stores', h((req, res) => {
     while (q.get('SELECT id FROM stores WHERE slug=?', [slug])) slug = `${base}-${++i}`;
     const code = d.store_name.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'SQ';
     const sid = insert('stores', {
+      show_when_empty: 1,
       owner_id: uid, slug, code, delivery_mode: 'platform', name_ar: d.store_name, name_en: d.store_name, category: d.departments.length === 1 ? d.departments[0] : 'mixed', departments: encodeDepartments(d.departments),
       phone: d.phone, whatsapp: d.whatsapp || d.phone, city: 'Banha', auto_whatsapp: d.auto_whatsapp ? 1 : 0,
       address_ar: d.address || null, address_en: d.address || null, map_url: d.map_url || null, lat: d.lat ?? null, lng: d.lng ?? null,

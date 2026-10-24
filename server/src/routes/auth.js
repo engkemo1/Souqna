@@ -73,6 +73,7 @@ r.post('/register', h((req, res) => {
     while (q.get('SELECT id FROM stores WHERE slug=?', [slug])) slug = `${baseSlug}-${++i}`;
     const code = d.store_name.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'SQ';
     const sid = insert('stores', {
+      show_when_empty: 1,
       owner_id: uid, slug, code, name_ar: d.store_name, name_en: d.store_name, phone: d.phone, whatsapp: d.phone,
       tagline_ar: 'أحدث صيحات الموضة في بنها', tagline_en: 'The latest fashion in Banha',
       theme_json: JSON.stringify(THEME_PRESETS.noir),
