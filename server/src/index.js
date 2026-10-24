@@ -19,7 +19,8 @@ import buyerRoutes from './routes/buyer.js';
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
-app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+// OpenStreetMap tiles are refused without a Referer, so send the origin (helmet's default is no-referrer)
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' }, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
 app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '1mb' }));

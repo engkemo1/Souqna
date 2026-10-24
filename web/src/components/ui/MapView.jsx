@@ -21,7 +21,7 @@ function useMap(containerRef, init, deps) {
       if (dead || !containerRef.current) return;
       if (!state.current.map) {
         const map = L.map(containerRef.current, { scrollWheelZoom: false, attributionControl: true }).setView(BANHA, 13);
-        L.tileLayer(TILES, { maxZoom: 19, attribution: ATTR }).addTo(map);
+        L.tileLayer(TILES, { maxZoom: 19, attribution: ATTR, referrerPolicy: 'origin' }).addTo(map);
         state.current = { map, L, layer: L.layerGroup().addTo(map) };
         setTimeout(() => map.invalidateSize(), 200); // inside sheets/tabs the container may still be animating open
       }
