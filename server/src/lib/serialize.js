@@ -25,6 +25,8 @@ export function serializeStore(s, { withTheme = true } = {}) {
     phone: s.phone,
     whatsapp: s.whatsapp,
     mapUrl: s.map_url || null,
+    lat: s.lat ?? null,
+    lng: s.lng ?? null,
     heroMode: s.hero_mode || 'auto',
     hours: s.opens_at && s.closes_at ? { open: s.opens_at, close: s.closes_at, dayOff: s.day_off ?? null } : null,
     instagram: s.instagram,

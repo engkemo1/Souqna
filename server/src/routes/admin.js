@@ -30,7 +30,7 @@ import { isWhatsAppConfigured, notifyPlatformDelivery } from '../lib/whatsapp.js
 import { mountCashierAdmin } from './admin-cashier.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { CASHIER_SYSTEMS, CASHIER_IDS, CASHIER_LINK_STATUSES } from '../lib/cashier-catalog.js';
-import { deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing } from '../lib/deliveryRates.js';
+import { deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing, getZonePolicy, saveZonePolicy, zoneKey } from '../lib/deliveryRates.js';
 
 function makeSetupLink(req, uid) {
   const token = crypto.randomBytes(24).toString('base64url');
@@ -473,6 +473,34 @@ r.delete('/delivery-rates/:id', h((req, res) => {
   if (!result.changes) throw new AppError(404, 'not_found', 'Delivery fee not found.');
   res.json({ ok: true });
 }));
+/* ---- pickup zones: price per zone + multi-zone discount + profit guard ---- */
+const zoneList = () => {
+  const saved = new Map(q.all('SELECT key, name, fee, courier_cost FROM pickup_zones').map((z) => [z.key, z]));
+  const groups = new Map();
+  for (const s of q.all("SELECT id, slug, name_ar, delivery_zone, lat, lng FROM stores WHERE status='active' ORDER BY sort_order, id")) {
+    const key = zoneKey(s.delivery_zone, s.id);
+    if (!groups.has(key)) { const row = saved.get(key); groups.set(key, { key, name: String(s.delivery_zone || '').trim() || s.name_ar, fee: row?.fee || 0, courierCost: row?.courier_cost || 0, stores: [] }); }
+    groups.get(key).stores.push({ slug: s.slug, name: s.name_ar, lat: s.lat, lng: s.lng });
+  }
+  return [...groups.values()];
+};
+r.get('/delivery-zones', h((_req, res) => {
+  res.json({ zones: zoneList(), policy: getZonePolicy(), fallbackFee: getDeliveryPricing().baseFee });
+}));
+r.put('/delivery-zones', h((req, res) => {
+  const body = z.object({
+    zones: z.array(z.object({ key: z.string().trim().min(1).max(120), name: z.string().trim().max(80).default(''), fee: z.coerce.number().int().min(0).max(5000), courierCost: z.coerce.number().int().min(0).max(5000).default(0) })).max(200),
+    policy: z.object({ tiers: z.array(z.object({ zones: z.coerce.number().int().min(2).max(10), percent: z.coerce.number().min(0).max(90) })).max(9), extraStopCost: z.coerce.number().int().min(0).max(5000).default(0), minMargin: z.coerce.number().int().min(0).max(5000).default(0) }),
+  }).parse(req.body);
+  tx(() => {
+    for (const zn of body.zones) {
+      q.run('INSERT INTO pickup_zones(key,name,fee,courier_cost) VALUES(?,?,?,?) ON CONFLICT(key) DO UPDATE SET name=excluded.name, fee=excluded.fee, courier_cost=excluded.courier_cost', [zn.key, zn.name, zn.fee, zn.courierCost]);
+    }
+    saveZonePolicy(body.policy);
+  });
+  res.json({ zones: zoneList(), policy: getZonePolicy() });
+}));
+
 
 const deliveryPersonSchema = z.object({
   name: z.string().trim().min(2).max(80),
@@ -1033,7 +1061,7 @@ r.patch('/orders/:id/delivery', h((req, res) => {
 
 r.get('/stores', h((_req, res) => {
   const stores = q.all(`
-    SELECT s.id, s.slug, s.name_ar, s.name_en, s.phone, s.whatsapp, s.auto_whatsapp, s.hidden, s.show_when_empty, s.featured, s.sort_order, s.status, s.delivery_mode, s.delivery_zone, s.departments, s.category, s.logo_initials, s.logo_color, s.created_at,
+    SELECT s.id, s.slug, s.name_ar, s.name_en, s.phone, s.whatsapp, s.auto_whatsapp, s.hidden, s.show_when_empty, s.featured, s.sort_order, s.status, s.delivery_mode, s.delivery_zone, s.lat, s.lng, s.departments, s.category, s.logo_initials, s.logo_color, s.created_at,
       u.email AS owner_email, u.name AS owner_name, u.role,
       (SELECT COUNT(*) FROM products p WHERE p.store_id = s.id) AS products_count,
       (SELECT COUNT(*) FROM orders o WHERE o.store_id = s.id) AS orders_count,
@@ -1047,6 +1075,7 @@ r.patch('/stores/:slug', h((req, res) => {
   const body = z.object({
     auto_whatsapp: z.boolean().optional(), hidden: z.boolean().optional(), show_when_empty: z.boolean().optional(), featured: z.boolean().optional(),
     delivery_zone: z.string().trim().max(80).optional(),
+    lat: z.coerce.number().min(-90).max(90).nullable().optional(), lng: z.coerce.number().min(-180).max(180).nullable().optional(),
     sort_order: z.coerce.number().int().min(0).max(9999).optional(), delivery_mode: z.enum(['store', 'platform']).optional(),
     status: z.enum(['active', 'suspended']).optional(), owner_disabled: z.boolean().optional(),
     departments: z.array(z.string().max(31)).min(1).optional(),
@@ -1064,7 +1093,7 @@ r.patch('/stores/:slug', h((req, res) => {
     patch.slug = body.slug;
   }
   for (const k of ['hidden', 'show_when_empty', 'featured', 'auto_whatsapp']) if (body[k] !== undefined) patch[k] = body[k] ? 1 : 0;
-  for (const k of ['sort_order', 'delivery_mode', 'delivery_zone', 'status', 'name_ar', 'name_en', 'phone', 'logo_initials', 'logo_color']) if (body[k] !== undefined) patch[k] = body[k];
+  for (const k of ['sort_order', 'delivery_zone', 'lat', 'lng', 'status', 'name_ar', 'name_en', 'phone', 'logo_initials', 'logo_color']) if (body[k] !== undefined) patch[k] = body[k];
   if (body.departments) { assertDepartments(body.departments); patch.departments = encodeDepartments(body.departments); patch.category = body.departments.length === 1 ? body.departments[0] : 'mixed'; }
   update('stores', store.id, patch);
   if (body.departments) ensureDeptCategories(store.id, body.departments);
@@ -1086,6 +1115,7 @@ const createSchema = z.object({
   departments: z.array(z.string().max(31)).min(1, 'departments_required'),
   address: z.string().trim().max(160).optional(),
   map_url: z.string().trim().url().max(400).optional(),
+  lat: z.coerce.number().min(-90).max(90).optional(), lng: z.coerce.number().min(-180).max(180).optional(),
   opens_at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   closes_at: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
   auto_whatsapp: z.boolean().default(false),
@@ -1110,9 +1140,9 @@ r.post('/stores', h((req, res) => {
     while (q.get('SELECT id FROM stores WHERE slug=?', [slug])) slug = `${base}-${++i}`;
     const code = d.store_name.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'SQ';
     const sid = insert('stores', {
-      owner_id: uid, slug, code, name_ar: d.store_name, name_en: d.store_name, category: d.departments.length === 1 ? d.departments[0] : 'mixed', departments: encodeDepartments(d.departments),
+      owner_id: uid, slug, code, delivery_mode: 'platform', name_ar: d.store_name, name_en: d.store_name, category: d.departments.length === 1 ? d.departments[0] : 'mixed', departments: encodeDepartments(d.departments),
       phone: d.phone, whatsapp: d.whatsapp || d.phone, city: 'Banha', auto_whatsapp: d.auto_whatsapp ? 1 : 0,
-      address_ar: d.address || null, address_en: d.address || null, map_url: d.map_url || null,
+      address_ar: d.address || null, address_en: d.address || null, map_url: d.map_url || null, lat: d.lat ?? null, lng: d.lng ?? null,
       opens_at: d.opens_at || '10:00', closes_at: d.closes_at || '23:00',
       tagline_ar: 'أهلاً بيك في متجرنا', tagline_en: 'Welcome to our store',
       theme_json: JSON.stringify({ primary: '#1B1B1B', secondary: '#F3F0EA', accent: '#B4532A', background: '#FFFFFF', text: '#0F172A', button: '#1B1B1B', header: '#FFFFFF', footer: '#0F172A' }),

@@ -21,7 +21,7 @@ import { getModaPrompts } from '../lib/modaPrompts.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
 import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
-import { addMarketplacePickupFees, resolveDeliveryRate, splitSharedDeliveryFee } from '../lib/deliveryRates.js';
+import { computeBasketDelivery, splitSharedDeliveryFee } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert } from '../lib/whatsapp.js';
 import {
@@ -710,13 +710,14 @@ r.post('/marketplace/delivery-fee', h((req, res) => {
   const body = z.object({ governorate: z.string().trim().min(2).max(40), city: z.string().trim().min(2).max(60), stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems })).min(1).max(20) }).parse(req.body);
   if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
   const storeQuotes = body.stores.map(({ slug, items }) => quote(loadStore(slug), items));
-  const rate = resolveDeliveryRate(body.governorate, body.city, body.stores.map((s) => s.slug));
-  const pickup = addMarketplacePickupFees(rate.fee, body.stores.map((s) => s.slug));
-  const split = splitSharedDeliveryFee(pickup.fee, storeQuotes.map((qt) => ({ freeShipping: qt.shipping === 0 })));
+  const bd = computeBasketDelivery(body.stores.map((s) => s.slug), body.governorate, body.city);
+  const split = splitSharedDeliveryFee(bd.fee, storeQuotes.map((qt) => ({ freeShipping: qt.shipping === 0 })));
   const needsFee = storeQuotes.some((qt) => qt.shipping > 0);
-  // Only an explicit city rate is precise enough to promise at checkout.
-  const pending = needsFee && (body.stores.length > 1 || rate.scope !== 'city');
-  res.json({ ...rate, ...pickup, fee: pending ? null : split.customerFee, feeStatus: pending ? 'pending' : 'confirmed', fullRouteFee: pending ? null : pickup.fee, storeShares: pending ? [] : split.storeShares });
+  res.json({
+    fee: needsFee ? split.customerFee : 0, feeStatus: 'confirmed', fullRouteFee: bd.fee, storeShares: split.storeShares,
+    matched: bd.matched || bd.zones.every((z) => z.custom), scope: bd.scope, pickupStops: bd.stopCount, pickupZones: bd.zones.length,
+    breakdown: { zones: bd.zones.map(({ courierCost, ...z }) => z), subtotal: bd.subtotal, percent: bd.percent, discount: bd.discount, total: bd.fee },
+  });
 }));
 
 const orderSchema = z.object({
@@ -751,7 +752,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
     const orderId = insert('orders', {
       store_id: s.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
       governorate: body.governorate, city: body.city, address: body.address, notes: body.notes,
-      status: 'pending', delivery_by: s.delivery_mode === 'platform' ? 'platform' : 'store', subtotal: qt.subtotal, discount: qt.discount, shipping: qt.shipping, total: qt.total,
+      status: 'pending', delivery_by: 'platform', subtotal: qt.subtotal, discount: qt.discount, shipping: qt.shipping, total: qt.total,
       shipping_free: qt.shipping === 0 ? 1 : 0,
       coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
     });
@@ -794,11 +795,9 @@ r.post('/marketplace/orders', h((req, res) => {
     // A marketplace checkout is one customer delivery even though each shop
     // still receives and fulfils its own sub-order. Charge one platform fee.
     // Store thresholds decide whether the shared destination-based delivery fee applies.
-    const rate = resolveDeliveryRate(body.governorate, body.city, prepared.map(({ store }) => store.slug));
     const needsFee = prepared.some(({ qt }) => qt.shipping > 0);
-    const pendingFee = needsFee && (prepared.length > 1 || rate.scope !== 'city');
-    const baseRouteFee = rate.fee;
-    const fullRouteFee = addMarketplacePickupFees(baseRouteFee, prepared.map(({ store }) => store.slug)).fee;
+    const pendingFee = false; // the fee is always known up front now (pickup-zone prices)
+    const fullRouteFee = computeBasketDelivery(prepared.map(({ store }) => store.slug), body.governorate, body.city).fee;
     const split = splitSharedDeliveryFee(fullRouteFee, prepared.map(({ qt }) => ({ freeShipping: qt.shipping === 0 })));
     const marketplaceShipping = pendingFee ? 0 : split.customerFee;
     const marketplaceTotal = prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0) + marketplaceShipping;

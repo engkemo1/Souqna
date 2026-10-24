@@ -1,7 +1,9 @@
 import qrcode from './qrcode-generator.js';
+import { TWIST_MARK } from './logo.js';
 
 /** QR as an SVG string (crisp at any size, prints perfectly). `level` M survives a bit of smudging. */
-export function qrSvg(text, { size = 256, margin = 2, fg = '#111111', bg = '#ffffff', level = 'M' } = {}) {
+export function qrSvg(text, { size = 256, margin = 2, fg = '#111111', bg = '#ffffff', level = 'M', logo = true } = {}) {
+  if (logo) level = 'H'; // logo covers the centre, so use the highest error correction
   const qr = qrcode(0, level);
   qr.addData(String(text), 'Byte');
   qr.make();
@@ -13,7 +15,14 @@ export function qrSvg(text, { size = 256, margin = 2, fg = '#111111', bg = '#fff
       if (qr.isDark(r, c)) d += `M${c + margin} ${r + margin}h1v1h-1z`;
     }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" width="${size}" height="${size}" shape-rendering="crispEdges"><rect width="${total}" height="${total}" fill="${bg}"/><path d="${d}" fill="${fg}"/></svg>`;
+  // centre logo: ~19% of the code width (well under H's 30% recovery), on a white plate
+  let mark = '';
+  if (logo) {
+    const w = Math.round(n * 0.19), pad = 1.2;
+    const x = total / 2 - w / 2, y = x;
+    mark = `<rect x="${x - pad}" y="${y - pad}" width="${w + pad * 2}" height="${w + pad * 2}" rx="${(w + pad * 2) * 0.22}" fill="#ffffff"/><image href="${typeof logo === 'string' ? logo : TWIST_MARK}" x="${x}" y="${y}" width="${w}" height="${w}"/>`;
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${total} ${total}" width="${size}" height="${size}"><rect width="${total}" height="${total}" fill="${bg}"/><path d="${d}" fill="${fg}" shape-rendering="crispEdges"/>${mark}</svg>`;
 }
 
 /** Rasterise the QR to a PNG data URL (for "download"). */

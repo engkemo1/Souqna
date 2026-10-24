@@ -22,6 +22,7 @@ const NAV_GROUPS = [
   { label: 'الطلبات والتشغيل', items: [
     { to: '/admin/orders', icon: ShoppingBag, label: 'الطلبات' },
     { to: '/admin/deliveries', icon: Truck, label: 'التوصيل', badge: 'open' },
+    { to: '/admin/delivery-zones', icon: MapPin, label: 'مناطق الاستلام والخصم' },
     { to: '/admin/delivery-rates', icon: MapPin, label: 'رسوم المناطق' },
     { to: '/admin/delivery-people', icon: Users, label: 'أفراد الدليفري' },
     { to: '/admin/services', icon: Camera, label: 'الخدمات', badge: 'services' },

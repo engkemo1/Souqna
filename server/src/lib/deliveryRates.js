@@ -71,3 +71,77 @@ export function resolveDeliveryRate(governorate, city, storeSlugs = []) {
   // fee when the customer types an area that has no explicit rate.
   return { fee: getDeliveryPricing().baseFee, matched: false, scope: 'fallback' };
 }
+
+/* ------------------------------------------------------------------
+ * Pickup-zone pricing (marketplace baskets)
+ * Every pickup zone has a customer price and (optionally) our real courier cost.
+ * Shops in one zone = one stop = one price. A basket from several zones pays the sum of the
+ * zone prices minus an admin-set % discount for that many zones - but never below what the
+ * combined trip really costs us (+ minimum margin), so a discount can't lose money.
+ * ------------------------------------------------------------------ */
+export const zoneKey = (zone, storeId) => clean(zone) || `store:${storeId}`;
+
+export function getZonePolicy() {
+  const rows = Object.fromEntries(q.all("SELECT key, value FROM app_settings WHERE key IN ('delivery_multizone_discount','delivery_extra_stop_cost','delivery_min_margin')").map((r) => [r.key, r.value]));
+  let tiers = {};
+  try { tiers = JSON.parse(rows.delivery_multizone_discount || '{}'); } catch { tiers = {}; }
+  const clamp = (v) => Math.max(0, Math.min(90, Math.round(Number(v) || 0)));
+  const tierList = Object.entries(tiers).map(([n, pct]) => ({ zones: Number(n), percent: clamp(pct) })).filter((t) => t.zones >= 2).sort((a, b) => a.zones - b.zones);
+  return { tiers: tierList, extraStopCost: Math.max(0, Math.round(Number(rows.delivery_extra_stop_cost) || 0)), minMargin: Math.max(0, Math.round(Number(rows.delivery_min_margin) || 0)) };
+}
+
+export function saveZonePolicy({ tiers = [], extraStopCost = 0, minMargin = 0 }) {
+  const obj = {};
+  for (const t of tiers) if (t.zones >= 2 && t.zones <= 10) obj[t.zones] = Math.max(0, Math.min(90, Math.round(Number(t.percent) || 0)));
+  for (const [k, v] of [['delivery_multizone_discount', JSON.stringify(obj)], ['delivery_extra_stop_cost', String(Math.max(0, Math.round(Number(extraStopCost) || 0)))], ['delivery_min_margin', String(Math.max(0, Math.round(Number(minMargin) || 0)))]]) {
+    q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [k, v]);
+  }
+  return getZonePolicy();
+}
+
+/** The discount % that applies to a basket spanning `n` zones (highest tier not above n). */
+export function discountPercentFor(n, policy = getZonePolicy()) {
+  let pct = 0;
+  for (const t of policy.tiers) if (t.zones <= n) pct = t.percent;
+  return pct;
+}
+
+/** Pure maths (no DB): zones = [{key,name,fee,courierCost}] -> price breakdown. */
+export function priceZones(zones, policy) {
+  const n = zones.length;
+  const subtotal = zones.reduce((s, z) => s + z.fee, 0);
+  if (n < 2) return { subtotal, percent: 0, discount: 0, fee: Math.min(5000, subtotal), capped: false, tripCost: null };
+  const percent = discountPercentFor(n, policy);
+  let fee = Math.round(subtotal * (1 - percent / 100));
+  const costs = zones.map((z) => z.courierCost);
+  const known = costs.every((c) => c > 0);
+  const tripCost = known ? Math.max(...costs) + (n - 1) * policy.extraStopCost : null;
+  let capped = false;
+  if (tripCost != null) {
+    const floor = Math.min(subtotal, tripCost + policy.minMargin);
+    if (fee < floor) { fee = floor; capped = true; }
+  }
+  fee = Math.min(5000, fee);
+  return { subtotal, percent: capped ? Math.round(((subtotal - fee) / subtotal) * 100) : percent, discount: subtotal - fee, fee, capped, tripCost };
+}
+
+/** Full basket delivery quote for the checkout (groups shops by pickup zone). */
+export function computeBasketDelivery(storeSlugs, governorate, city) {
+  const slugs = [...new Set(storeSlugs.map((s) => String(s || '').trim()).filter(Boolean))];
+  const stores = slugs.length ? q.all(`SELECT id, slug, name_ar, name_en, delivery_zone, lat, lng FROM stores WHERE slug IN (${slugs.map(() => '?').join(',')})`, slugs) : [];
+  const dest = resolveDeliveryRate(governorate, city, slugs); // fallback price for a zone that has none
+  const saved = new Map(q.all('SELECT key, name, fee, courier_cost FROM pickup_zones').map((z) => [z.key, z]));
+  const groups = new Map();
+  for (const s of stores) {
+    const key = zoneKey(s.delivery_zone, s.id);
+    if (!groups.has(key)) {
+      const row = saved.get(key);
+      groups.set(key, { key, name: String(s.delivery_zone || '').trim() || s.name_ar, fee: row && row.fee > 0 ? row.fee : dest.fee, courierCost: row?.courier_cost || 0, custom: Boolean(row && row.fee > 0), stores: [] });
+    }
+    groups.get(key).stores.push({ slug: s.slug, name_ar: s.name_ar, name_en: s.name_en, lat: s.lat, lng: s.lng });
+  }
+  const zones = [...groups.values()];
+  const policy = getZonePolicy();
+  const price = priceZones(zones, policy);
+  return { zones, ...price, matched: dest.matched, scope: dest.scope, stopCount: stores.length };
+}

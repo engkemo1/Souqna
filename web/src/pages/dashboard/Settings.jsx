@@ -6,7 +6,7 @@ import { api, upload } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import DesignHelp from '../../components/dash/DesignHelp.jsx';
-import MapLinkField from '../../components/dash/MapLinkField.jsx';
+import { LocationPicker } from '../../components/ui/MapView.jsx';
 import { PageHeader, Panel } from '../../components/dash/Kit.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
@@ -19,7 +19,7 @@ import { useDepartments } from '../../lib/departments.js';
 import PageTransition from '../../components/PageTransition.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'hero_mode', 'delivery_mode', 'opens_at', 'closes_at', 'day_off', 'return_days', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'opens_at', 'closes_at', 'day_off', 'return_days', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
 
 function HeroModePicker({ value, onChange }) {
   const { t } = useI18n();
@@ -111,7 +111,7 @@ export default function Settings() {
     const s = data.store;
     const x = ({
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
-      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', hero_mode: s.heroMode || 'auto', delivery_mode: s.deliveryMode || 'store', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
+      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
       return_days: String(s.returnDays ?? 3), shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
       logo_initials: s.logoInitials || (s.name.ar || s.name.en || s.code || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: s.logoColor || '#1B1B1B',
     });
@@ -128,6 +128,8 @@ export default function Settings() {
     setErrors({});
     try {
       const body = Object.fromEntries(FIELDS.map((k) => [k, f[k]]));
+      body.lat = body.lat === '' || body.lat == null ? null : Number(body.lat);
+      body.lng = body.lng === '' || body.lng == null ? null : Number(body.lng);
       body.return_days = Math.min(60, Number(body.return_days || 0));
       body.shipping_fee = Number(body.shipping_fee || 0);
       body.free_shipping_over = Number(body.free_shipping_over || 0);
@@ -187,22 +189,14 @@ export default function Settings() {
               </div>
             </div>
           </Panel>
-          <Panel title={t('settings.deliveryTitle')}>
-            <p className="mb-3 text-sm text-muted">{t('settings.deliveryHint')}</p>
-            <fieldset className="grid gap-2">
-              {[['store', t('settings.deliveryStore'), t('settings.deliveryStoreHint')], ['platform', t('settings.deliveryPlatform'), t('settings.deliveryPlatformHint')]].map(([v, label, hint]) => (
-                <label key={v} className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 ring-1 transition ${f.delivery_mode === v ? 'bg-fg/[0.04] ring-fg' : 'ring-line hover:bg-fg/[0.02]'}`}>
-                  <input type="radio" name="delivery_mode" value={v} checked={f.delivery_mode === v} onChange={() => setF({ ...f, delivery_mode: v })} className="mt-1" />
-                  <span><span className="block text-sm font-semibold">{label}</span><span className="block text-[13px] text-muted">{hint}</span></span>
-                </label>
-              ))}
-            </fieldset>
+          <Panel title="موقع المحل على الخريطة">
+            <p className="mb-3 text-sm text-muted">التوصيل دايماً من عندنا (Twist). حدد مكان المحل بالظبط عشان المندوب يستلم الطلبات من عندك، ونحسب سعر الدليفري صح للعميل.</p>
+            <LocationPicker lat={f.lat === '' ? null : f.lat} lng={f.lng === '' ? null : f.lng} onChange={(la, ln) => setF({ ...f, lat: la, lng: ln, map_url: `https://www.google.com/maps?q=${la},${ln}` })} />
           </Panel>
           <Panel title={t('settings.contact')}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('settings.phone')}><Input dir="ltr" inputMode="tel" value={f.phone} onChange={set('phone')} className="text-start" /></Field>
               <Field label={t('settings.whatsapp')}><Input dir="ltr" inputMode="tel" value={f.whatsapp} onChange={set('whatsapp')} className="text-start" /></Field>
-              <div className="sm:col-span-2"><MapLinkField value={f.map_url} onChange={(value) => setF({ ...f, map_url: value })} error={errors.map_url} query={[f.name_ar, f.address_ar, f.address_en].filter(Boolean).join(' ')} /></div>
               <Field label={t('settings.opensAt')} error={errors.opens_at}><Input type="time" dir="ltr" value={f.opens_at} onChange={set('opens_at')} /></Field>
               <Field label={t('settings.closesAt')} error={errors.closes_at}><Input type="time" dir="ltr" value={f.closes_at} onChange={set('closes_at')} /></Field>
               <Field label={t('settings.dayOff')}>

@@ -105,7 +105,7 @@ const storeSchema = z.object({
   hero_mode: z.enum(['auto', 'cover', 'slider']).optional(),
   logo_initials: z.string().trim().max(2).optional(),
   logo_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
-  delivery_mode: z.enum(['store', 'platform']).optional(),
+  lat: z.coerce.number().min(-90).max(90).nullable().optional(), lng: z.coerce.number().min(-180).max(180).nullable().optional(),
   return_days: z.coerce.number().int().min(0).max(60).optional(),
   opens_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   closes_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),

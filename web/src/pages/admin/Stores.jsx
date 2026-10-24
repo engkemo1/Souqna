@@ -11,7 +11,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { tokenStore } from '../../lib/api.js';
 import { adminApi, useAdminApi, fmtMoney, fmtNum, fmtDateTime, useAdminDepartments } from './adminApi.js';
-import MapLinkField from '../../components/dash/MapLinkField.jsx';
+import { LocationPicker } from '../../components/ui/MapView.jsx';
 
 const DeptPicker = ({ value, onChange, depts }) => {
   const act = depts.list.filter((d) => d.active);
@@ -43,7 +43,7 @@ const DeptPicker = ({ value, onChange, depts }) => {
 
 function CreateSheet({ open, onClose, onDone, depts }) {
   const toast = useToast();
-  const empty = { store_name: '', owner_name: '', email: '', phone: '', whatsapp: '', address: '', map_url: '', opens_at: '10:00', closes_at: '23:00', departments: [], delivery_mode: 'store', auto_whatsapp: false };
+  const empty = { store_name: '', owner_name: '', email: '', phone: '', whatsapp: '', address: '', map_url: '', opens_at: '10:00', closes_at: '23:00', departments: [], auto_whatsapp: false };
   const [f, setF] = useState(empty);
   const [busy, setBusy] = useState(false);
   const [errs, setErrs] = useState({});
@@ -54,9 +54,8 @@ function CreateSheet({ open, onClose, onDone, depts }) {
     if (!f.departments.length) { setErrs({ departments: 'اختار قسم واحد على الأقل' }); return; }
     setBusy(true); setErrs({});
     try {
-      const body = Object.fromEntries(Object.entries(f).filter(([k, v]) => v !== '' && k !== 'delivery_mode'));
+      const body = Object.fromEntries(Object.entries(f).filter(([k, v]) => v !== ''));
       const r = await adminApi('/stores', { method: 'POST', body });
-      if (f.delivery_mode === 'platform') await adminApi(`/stores/${r.slug}`, { method: 'PATCH', body: { delivery_mode: 'platform' } });
       setLink({ slug: r.slug, url: r.setup.url, expires: r.setup.expires });
       onDone();
     } catch (x) {
@@ -86,14 +85,11 @@ function CreateSheet({ open, onClose, onDone, depts }) {
             <Field label="رقم التليفون" error={errs.phone}><Input dir="ltr" inputMode="tel" required pattern="01[0125][0-9]{8}" value={f.phone} onChange={set('phone')} className="text-start" /></Field>
             <Field label="واتساب المحل (لو مختلف)" optional error={errs.whatsapp}><Input dir="ltr" inputMode="tel" pattern="01[0125][0-9]{8}" value={f.whatsapp} onChange={set('whatsapp')} className="text-start" /></Field>
             <Field label="العنوان" optional><Input value={f.address} onChange={set('address')} placeholder="شارع ...، بنها" /></Field>
-            <MapLinkField value={f.map_url} onChange={(value) => setF({ ...f, map_url: value })} error={errs.map_url} query={[f.store_name, f.address].filter(Boolean).join(' ')} className="sm:col-span-2" />
+            <div className="sm:col-span-2"><p className="mb-2 text-sm font-medium">موقع المحل على الخريطة</p><LocationPicker lat={f.lat ?? null} lng={f.lng ?? null} onChange={(la, ln) => setF({ ...f, lat: la, lng: ln, map_url: `https://www.google.com/maps?q=${la},${ln}` })} height={220} /></div>
             <Field label="بيفتح الساعة"><Input type="time" dir="ltr" value={f.opens_at} onChange={set('opens_at')} /></Field>
             <Field label="بيقفل الساعة"><Input type="time" dir="ltr" value={f.closes_at} onChange={set('closes_at')} /></Field>
           </div>
           <div><p className="mb-2 text-sm font-medium">أقسام المحل (واحد أو أكتر)</p><DeptPicker depts={depts} value={f.departments} onChange={(v) => setF({ ...f, departments: v })} />{errs.departments && <p className="mt-1 text-sm text-sale">{errs.departments}</p>}</div>
-          <div><p className="mb-2 text-sm font-medium">التوصيل</p>
-            <Segmented value={f.delivery_mode} onChange={(v) => setF({ ...f, delivery_mode: v })} options={[{ value: 'store', label: 'المحل بيوصّل' }, { value: 'platform', label: 'Twist توصّل' }]} />
-          </div>
           <Switch checked={f.auto_whatsapp} onChange={(v) => setF({ ...f, auto_whatsapp: v })} label="إشعار واتساب تلقائي للمحل" description="يتطلب واتساب API متوصل" />
           <Button type="submit" full loading={busy}>إنشاء المحل + لينك التفعيل</Button>
         </form>
@@ -133,7 +129,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
   const [prod, setProd] = useState(null);
   const [del, setDel] = useState('');
   const [link, setLink] = useState(null);
-  if (store && key !== store.slug) { setKey(store.slug); setLink(null); setDel(''); setF({ slug: store.slug, name_ar: store.name_ar, name_en: store.name_en, phone: store.phone || '', delivery_zone: store.delivery_zone || '', departments: store.departments, delivery_mode: store.delivery_mode, hidden: store.hidden, show_when_empty: store.show_when_empty, featured: store.featured, auto_whatsapp: store.auto_whatsapp, suspended: store.status !== 'active', owner_disabled: store.owner_disabled, sort_order: store.sort_order, logo_initials: store.logo_initials || (store.name_ar || store.name_en || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: store.logo_color || '#1B1B1B' }); }
+  if (store && key !== store.slug) { setKey(store.slug); setLink(null); setDel(''); setF({ slug: store.slug, name_ar: store.name_ar, name_en: store.name_en, phone: store.phone || '', delivery_zone: store.delivery_zone || '', departments: store.departments, lat: store.lat ?? null, lng: store.lng ?? null, hidden: store.hidden, show_when_empty: store.show_when_empty, featured: store.featured, auto_whatsapp: store.auto_whatsapp, suspended: store.status !== 'active', owner_disabled: store.owner_disabled, sort_order: store.sort_order, logo_initials: store.logo_initials || (store.name_ar || store.name_en || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: store.logo_color || '#1B1B1B' }); }
   if (!store || !f) return <Sheet open={false} onClose={onClose} />;
   const patch = async (body, label) => {
     setBusy(label || 'save');
@@ -143,7 +139,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
     if (!f.departments.length) { toast({ tone: 'error', title: 'اختار قسم واحد على الأقل' }); return; }
     const newSlug = String(f.slug || '').trim().toLowerCase();
     if (newSlug && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(newSlug)) { toast({ tone: 'error', title: 'رابط المتجر: حروف إنجليزية وأرقام وشرطات بس' }); return; }
-    const ok = await patch({ ...(newSlug && newSlug !== store.slug ? { slug: newSlug } : {}), name_ar: f.name_ar, name_en: f.name_en, phone: f.phone, delivery_zone: f.delivery_zone, departments: f.departments, delivery_mode: f.delivery_mode, hidden: f.hidden, show_when_empty: f.show_when_empty, featured: f.featured, auto_whatsapp: f.auto_whatsapp, status: f.suspended ? 'suspended' : 'active', owner_disabled: f.owner_disabled, sort_order: Number(f.sort_order) || 0, logo_initials: f.logo_initials, logo_color: f.logo_color });
+    const ok = await patch({ ...(newSlug && newSlug !== store.slug ? { slug: newSlug } : {}), name_ar: f.name_ar, name_en: f.name_en, phone: f.phone, delivery_zone: f.delivery_zone, departments: f.departments, lat: f.lat ?? null, lng: f.lng ?? null, hidden: f.hidden, show_when_empty: f.show_when_empty, featured: f.featured, auto_whatsapp: f.auto_whatsapp, status: f.suspended ? 'suspended' : 'active', owner_disabled: f.owner_disabled, sort_order: Number(f.sort_order) || 0, logo_initials: f.logo_initials, logo_color: f.logo_color });
     if (ok) { toast({ title: 'اتحفظ' }); onClose(); }
   };
   const setup = async () => { try { const r = await adminApi(`/stores/${store.slug}/setup-link`, { method: 'POST', body: {} }); setLink(r.url); navigator.clipboard?.writeText(r.url); toast({ title: 'اتعمل لينك تفعيل واتنسخ' }); } catch (x) { toast({ tone: 'error', title: x.message }); } };
@@ -176,8 +172,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
             <p className="mt-2 text-xs text-muted">يظهر لو مفيش صورة شعار مرفوعة للمحل.</p>
           </div>
           <div><p className="mb-2 text-sm font-medium">الأقسام</p><DeptPicker depts={depts} value={f.departments} onChange={(v) => setF({ ...f, departments: v })} /></div>
-          <div><p className="mb-2 text-sm font-medium">التوصيل</p>
-            <Segmented value={f.delivery_mode} onChange={(v) => setF({ ...f, delivery_mode: v })} options={[{ value: 'store', label: 'المحل بيوصّل' }, { value: 'platform', label: 'Twist توصّل' }]} /></div>
+          <div><p className="mb-2 text-sm font-medium">موقع المحل على الخريطة</p><LocationPicker lat={f.lat} lng={f.lng} onChange={(la, ln) => setF({ ...f, lat: la, lng: ln })} height={220} /></div>
           <Field label="منطقة استلام الطلبات" hint="اكتب نفس المنطقة للمحلات القريبة التي يمكن للمندوب جمع طلباتها في جولة واحدة. اتركها فارغة لو المحل يحتاج مسارًا منفصلًا."><Input value={f.delivery_zone} onChange={(e) => setF({ ...f, delivery_zone: e.target.value })} maxLength={80} placeholder="مثال: وسط بنها" /></Field>
           <div className="space-y-3 rounded-2xl border border-line p-4">
             <Switch checked={!f.hidden} onChange={(v) => setF({ ...f, hidden: !v })} label="ظاهر في الصفحة الرئيسية" />
@@ -215,12 +210,12 @@ export default function Stores() {
   const [create, setCreate] = useState(false);
   const [edit, setEdit] = useState(null);
   const stores = data?.stores || [];
-  const counts = useMemo(() => ({ all: stores.length, active: stores.filter((s) => s.status === 'active' && !s.hidden).length, hidden: stores.filter((s) => s.hidden).length, suspended: stores.filter((s) => s.status !== 'active').length, platform: stores.filter((s) => s.delivery_mode === 'platform').length }), [stores]);
+  const counts = useMemo(() => ({ all: stores.length, active: stores.filter((s) => s.status === 'active' && !s.hidden).length, hidden: stores.filter((s) => s.hidden).length, suspended: stores.filter((s) => s.status !== 'active').length, platform: stores.filter((s) => s.lat == null).length }), [stores]);
   const shown = stores.filter((s) => {
     if (tab === 'active' && !(s.status === 'active' && !s.hidden)) return false;
     if (tab === 'hidden' && !s.hidden) return false;
     if (tab === 'suspended' && s.status === 'active') return false;
-    if (tab === 'platform' && s.delivery_mode !== 'platform') return false;
+    if (tab === 'platform' && s.lat != null) return false;
     const x = term.trim().toLowerCase();
     return !x || [s.name_ar, s.name_en, s.slug, s.owner_name, s.owner_email, s.phone].some((v) => String(v || '').toLowerCase().includes(x));
   });
@@ -231,7 +226,7 @@ export default function Stores() {
       <PageHeader title="المحلات" subtitle={`${fmtNum(stores.length)} محل على المنصة`} actions={<Button icon={Plus} onClick={() => setCreate(true)}>محل جديد</Button>} />
       <div className="mb-4 space-y-3">
         <SearchInput value={term} onChange={setTerm} placeholder="ابحث بالاسم أو الإيميل أو التليفون" />
-        <FilterTabs value={tab} onChange={setTab} options={[{ value: 'all', label: 'الكل', count: counts.all }, { value: 'active', label: 'ظاهر', count: counts.active }, { value: 'hidden', label: 'مخفي', count: counts.hidden }, { value: 'suspended', label: 'موقوف', count: counts.suspended }, { value: 'platform', label: 'توصيلنا', count: counts.platform }]} />
+        <FilterTabs value={tab} onChange={setTab} options={[{ value: 'all', label: 'الكل', count: counts.all }, { value: 'active', label: 'ظاهر', count: counts.active }, { value: 'hidden', label: 'مخفي', count: counts.hidden }, { value: 'suspended', label: 'موقوف', count: counts.suspended }, { value: 'platform', label: 'بدون موقع', count: counts.platform }]} />
       </div>
       {loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : !shown.length ? <EmptyState title="مفيش محلات" body="جرّب بحث تاني أو أضف محل جديد." /> : (
         <div className="overflow-hidden rounded-2xl border border-line bg-elevated">
@@ -244,7 +239,7 @@ export default function Stores() {
                       {s.status !== 'active' && <Badge tone="danger" size="sm">موقوف</Badge>}
                       {s.hidden && <Badge size="sm">مخفي</Badge>}
                       {s.featured && <Badge tone="warning" size="sm">★ مميز</Badge>}
-                      {s.delivery_mode === 'platform' && <Badge tone="info" size="sm">🚚 توصيلنا</Badge>}
+                      {s.lat == null && <Badge tone="warning" size="sm">📍 بدون موقع</Badge>}
                       {s.owner_disabled && <Badge tone="danger" size="sm">الدخول معطّل</Badge>}
                     </p>
                     <p className="mt-0.5 truncate text-[13px] text-muted">{s.owner_name} · {s.owner_email} · {s.phone}</p>
