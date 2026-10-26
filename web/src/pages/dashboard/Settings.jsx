@@ -7,6 +7,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
 import DesignHelp from '../../components/dash/DesignHelp.jsx';
 import { LocationPicker } from '../../components/ui/MapView.jsx';
+import PlaceAutocomplete from '../../components/ui/PlaceAutocomplete.jsx';
 import { PageHeader, Panel } from '../../components/dash/Kit.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
@@ -17,6 +18,7 @@ import { ErrorState, errorMessage, fieldErrors } from '../../components/ui/State
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useDepartments } from '../../lib/departments.js';
 import PageTransition from '../../components/PageTransition.jsx';
+import BrandPaletteCard from '../../components/dash/BrandPaletteCard.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 
 const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'opens_at', 'closes_at', 'day_off', 'return_days', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
@@ -72,7 +74,7 @@ function ImageSlot({ label, media, slot, ratio, onUploaded, onDelete, deleteBusy
       const fd = new FormData();
       fd.append('file', file);
       const r = await upload(`/owner/store/${slot}`, fd);
-      onUploaded(r.media);
+      onUploaded(r.media, r.brand);
       toast({ title: t('settings.logoUpdated') });
     } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); }
     setBusy(false);
@@ -145,7 +147,9 @@ export default function Settings() {
     } catch (e) { setErrors(fieldErrors(t, e)); toast({ tone: 'error', title: errorMessage(t, e) }); }
     setBusy(false);
   };
-  const onImage = (slot) => (media) => {
+  const [brandKey, setBrandKey] = useState(0);
+  const onImage = (slot) => (media, brand) => {
+    if (slot === 'logo') { invalidate('/owner/store'); setBrandKey((k) => k + 1); if (brand?.status === 'applied') toast({ title: 'ألوان المتجر اتحدّثت من اللوجو' }); }
     const s = { ...data.store, [slot]: media };
     mutate((d) => ({ ...d, store: s }));
     setStore(s);
@@ -191,7 +195,17 @@ export default function Settings() {
           </Panel>
           <Panel title="موقع المحل على الخريطة">
             <p className="mb-3 text-sm text-muted">التوصيل دايماً من عندنا (Twist). حدد مكان المحل بالظبط عشان المندوب يستلم الطلبات من عندك، ونحسب سعر الدليفري صح للعميل.</p>
-            <LocationPicker lat={f.lat === '' ? null : f.lat} lng={f.lng === '' ? null : f.lng} onChange={(la, ln) => setF({ ...f, lat: la, lng: ln, map_url: `https://www.google.com/maps?q=${la},${ln}` })} />
+            <LocationPicker
+              lat={f.lat === '' ? null : f.lat}
+              lng={f.lng === '' ? null : f.lng}
+              onChange={(la, ln, place) => setF((prev) => ({
+                ...prev,
+                lat: la,
+                lng: ln,
+                map_url: `https://www.google.com/maps?q=${la},${ln}`,
+                address_ar: !prev.address_ar?.trim() && place?.shortName ? place.shortName : prev.address_ar,
+              }))}
+            />
           </Panel>
           <Panel title={t('settings.contact')}>
             <div className="grid gap-4 sm:grid-cols-2">
@@ -207,7 +221,24 @@ export default function Settings() {
               </Field>
               <Field label={t('settings.instagram')}><Input dir="ltr" prefix="@" value={f.instagram} onChange={set('instagram')} /></Field>
               <Field label={t('settings.facebook')}><Input dir="ltr" value={f.facebook} onChange={set('facebook')} className="text-start" /></Field>
-              <Field label={t('settings.addressAr')}><Input dir="rtl" value={f.address_ar} onChange={set('address_ar')} /></Field>
+              <Field label={t('settings.addressAr')}>
+                <PlaceAutocomplete
+                  value={f.address_ar}
+                  onChange={(v) => setF((prev) => ({ ...prev, address_ar: v }))}
+                  onSelect={(place) => {
+                    if (place.lat && place.lng) {
+                      setF((prev) => ({
+                        ...prev,
+                        address_ar: place.name || place.shortName || prev.address_ar,
+                        lat: place.lat,
+                        lng: place.lng,
+                        map_url: `https://www.google.com/maps?q=${place.lat},${place.lng}`,
+                      }));
+                    }
+                  }}
+                  placeholder="ابحث عن شارع أو معلم (مثلاً: شارع كلية التجارة، مسجد الخضر)…"
+                />
+              </Field>
               <Field label={t('settings.addressEn')}><Input dir="ltr" value={f.address_en} onChange={set('address_en')} /></Field>
             </div>
           </Panel>
@@ -225,6 +256,7 @@ export default function Settings() {
           <Panel title={t('settings.brand')}>
             <div className="space-y-5">
               <ImageSlot label={t('settings.logo')} media={data.store.logo} slot="logo" ratio="1 / 1" round onUploaded={onImage('logo')} onDelete={() => deleteImage('logo')} deleteBusy={deleteBusy === 'logo'} />
+              <BrandPaletteCard key={brandKey} compact />
               <div className="space-y-3 rounded-2xl border border-line p-3">
                 <p className="text-sm font-semibold">شعار بالحروف (بدون تكلفة)</p>
                 <div className="flex items-end gap-3">

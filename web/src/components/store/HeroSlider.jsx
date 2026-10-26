@@ -13,11 +13,10 @@ const ease = [0.22, 1, 0.36, 1];
 function BannerPicture({ banner, priority, isRtl }) {
   const d = banner.image;
   const m = banner.mobileImage || d;
-  const [loaded, setLoaded] = useState(false);
   const flip = banner.mirrorRtl && isRtl;
   return (
     <div className="absolute inset-0" style={{ backgroundColor: d?.color }}>
-      {d?.lqip && <img src={d.lqip} alt="" aria-hidden="true" className={cx('absolute inset-0 h-full w-full scale-110 object-cover blur-2xl transition-opacity duration-700', loaded && 'opacity-0')} />}
+      {d?.lqip && <img src={d.lqip} alt="" aria-hidden="true" className="absolute inset-0 h-full w-full scale-125 object-cover blur-2xl brightness-90" />}
       <picture>
         <source media="(max-width: 639px)" type="image/webp" srcSet={srcSet(m, 'webp')} sizes="100vw" />
         <source media="(max-width: 639px)" srcSet={srcSet(m, 'jpg')} sizes="100vw" />
@@ -30,9 +29,7 @@ function BannerPicture({ banner, priority, isRtl }) {
           loading={priority ? 'eager' : 'lazy'}
           fetchpriority={priority ? 'high' : undefined}
           decoding="async"
-          onLoad={() => setLoaded(true)}
-          className={cx('absolute inset-0 h-full w-full object-contain object-center transition-opacity duration-700',
-            loaded ? 'opacity-100' : 'opacity-0', flip && 'sm:-scale-x-100')}
+          className={cx('absolute inset-0 h-full w-full object-contain object-center', flip && 'sm:-scale-x-100')}
         />
       </picture>
     </div>

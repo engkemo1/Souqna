@@ -17,6 +17,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { exchangeLabel } from '../../lib/returns.js';
 import { StoreLogo } from '../../components/store/StoreChrome.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
+import BrandPaletteCard from '../../components/dash/BrandPaletteCard.jsx';
 import { cx } from '../../components/ui/cx.js';
 
 function ColorField({ field, value, onChange, fixedTo }) {
@@ -126,8 +127,16 @@ export default function ThemeEditor() {
     setBusy(false);
   };
 
+  const onBrandApplied = (th) => {
+    if (!th) return;
+    setInput(th.input); setSaved(th.input);
+    setStore({ ...store, theme: th });
+    invalidate(`/stores/${store.slug}`);
+  };
+
   const controls = (
     <div className="space-y-4">
+      <BrandPaletteCard onApplied={onBrandApplied} />
       <Panel title={t('theme.presets')}>
         <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-6 lg:grid-cols-3 xl:grid-cols-6">
           {Object.entries(THEME_PRESETS).map(([key, p]) => (

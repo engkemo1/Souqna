@@ -61,6 +61,15 @@ function ProductRail({ items, slug, onQuickAdd, loading }) {
   );
 }
 
+/** Tile art for categories that have no photo yet: brand-coloured, with the category's first letters. */
+function CategoryArt({ name }) {
+  return (
+    <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary to-secondary">
+      <span className="font-display text-6xl font-bold text-on-primary sm:text-7xl">{String(name || '').trim().slice(0, 2)}</span>
+    </div>
+  );
+}
+
 function CategoryTiles() {
   const { store, categories: allCategories } = useStore();
   const { tr, t } = useI18n();
@@ -74,7 +83,7 @@ function CategoryTiles() {
         <div className="scroll-x -mx-4 gap-5 px-4 sm:mx-0 sm:flex sm:flex-wrap sm:justify-center sm:gap-8 sm:px-0">
           {categories.map((c) => (
             <Link key={c.id} to={sp(store.slug, `shop?category=${c.slug}`)} className="group flex w-24 shrink-0 flex-col items-center gap-2 text-center sm:w-32">
-              <span className="block w-full overflow-hidden rounded-full ring-2 ring-accent/60 ring-offset-2 ring-offset-canvas"><SmartImage media={c.image} ratio="1 / 1" sizes="128px" imgClassName="group-hover:scale-[1.06] duration-700" /></span>
+              <span className="relative block aspect-square w-full overflow-hidden rounded-full ring-2 ring-accent/60 ring-offset-2 ring-offset-canvas">{c.image ? <SmartImage media={c.image} ratio="1 / 1" sizes="128px" imgClassName="group-hover:scale-[1.06] duration-700" /> : <CategoryArt name={tr(c.name)} />}</span>
               <span className="line-clamp-2 text-[13px] font-semibold sm:text-sm">{tr(c.name)}</span>
             </Link>
           ))}
@@ -96,15 +105,22 @@ function CategoryTiles() {
       </section>
     );
   }
+  if (categories.length < 2) return null; // a single category is just "all products" — the storefront already links to it
+  const few = categories.length <= 3;
+  const cols = categories.length === 2 ? 'sm:grid-cols-2' : few ? 'sm:grid-cols-3' : 'sm:grid-cols-3 lg:grid-cols-4';
   return (
     <section className="container mt-14 sm:mt-20">
       <SectionHeader title={t('store.shopByCategory')} />
-      <div className="scroll-x -mx-4 gap-3 px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-5 sm:overflow-visible sm:px-0 lg:grid-cols-4">
+      <div className={`scroll-x -mx-4 gap-3 px-4 sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 ${cols}`}>
         {categories.map((c, i) => (
           <motion.div key={c.id} className="w-[62%] shrink-0 snap-start xs:w-[52%] sm:w-auto"
             initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06, duration: 0.5 }}>
             <Link to={sp(store.slug, `shop?category=${c.slug}`)} className="group relative block overflow-hidden rounded-3xl">
-              <SmartImage media={c.image} ratio="4 / 5" sizes="(min-width:1024px) 25vw, (min-width:640px) 33vw, 60vw" imgClassName="group-hover:scale-[1.04] duration-[1.2s]" />
+              <div className={`relative ${few ? 'aspect-[4/5] sm:aspect-[4/3]' : 'aspect-[4/5]'}`}>
+                {c.image
+                  ? <SmartImage media={c.image} className="h-full w-full" sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 60vw" imgClassName="group-hover:scale-[1.04] duration-[1.2s]" />
+                  : <CategoryArt name={tr(c.name)} />}
+              </div>
               <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-transparent" />
               <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4 text-white sm:p-5">
                 <div>

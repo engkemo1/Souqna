@@ -524,7 +524,14 @@ const catWhere = (sc) => ({ sql: `(p.category_id IN (${sc.ids.map(() => '?').joi
 r.get('/stores/:slug', h((req, res) => {
   const s = loadStore(req.params.slug);
   const categories = q.all('SELECT c.* FROM categories c WHERE c.store_id=? ORDER BY c.sort, c.id', [s.id]);
-  for (const c of categories) { const w = catWhere(catScope(categories, c)); c.count = q.val(`SELECT COUNT(*) FROM products p WHERE p.store_id=? AND p.status='active' AND ${w.sql}`, [s.id, ...w.params]); }
+  for (const c of categories) {
+    const w = catWhere(catScope(categories, c));
+    c.count = q.val(`SELECT COUNT(*) FROM products p WHERE p.store_id=? AND p.status='active' AND ${w.sql}`, [s.id, ...w.params]);
+    // no photo of its own → use the photo of the category's best product (shown, not saved), so a tile is never an empty grey box
+    if (!c.media_id && c.count) {
+      c.media_id = q.val(`SELECT pm.media_id FROM products p JOIN product_media pm ON pm.product_id=p.id AND pm.is_primary=1 WHERE p.store_id=? AND p.status='active' AND ${w.sql} ORDER BY p.featured DESC, p.sold_count DESC, p.id DESC LIMIT 1`, [s.id, ...w.params]) || null;
+    }
+  }
   const banners = q.all('SELECT * FROM banners WHERE store_id=? AND active=1 ORDER BY position, id', [s.id]);
   const bm = mediaMap(banners.flatMap((b) => [b.media_id, b.mobile_media_id]));
   const d = new Date().toISOString().slice(0, 10);
@@ -731,6 +738,19 @@ r.post('/marketplace/delivery-fee', h((req, res) => {
     fee: needsFee ? split.customerFee : 0, feeStatus: 'confirmed', fullRouteFee: bd.fee, storeShares: split.storeShares,
     matched: bd.matched || bd.zones.every((z) => z.custom), scope: bd.scope, pickupStops: bd.stopCount, pickupZones: bd.zones.length,
     breakdown: { zones: bd.zones.map(({ courierCost, ...z }) => z), subtotal: bd.subtotal, percent: bd.percent, discount: bd.discount, total: bd.fee },
+  });
+}));
+
+r.get('/marketplace/delivery-areas', h((_req, res) => {
+  const rows = q.all("SELECT id, governorate, city, fee, distance_km FROM delivery_rates WHERE city <> '*' ORDER BY id");
+  res.json({
+    areas: rows.map((r) => ({
+      id: r.id,
+      governorate: r.governorate,
+      city: r.city,
+      fee: r.fee,
+      distanceKm: r.distance_km == null ? null : Number(r.distance_km),
+    })),
   });
 }));
 

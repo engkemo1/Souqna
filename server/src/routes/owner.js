@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartments } from '@souqna/shared';
+import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartments, suggestThemes } from '@souqna/shared';
+import { extractSwatches } from '../lib/logo-palette.js';
 import { q, tx, insert, update, json } from '../db/index.js';
 import { config } from '../config.js';
 import { assertDepartments, inferDepartment, ensureDeptCategories, deptSubtree } from '../lib/departments.js';
@@ -257,6 +258,102 @@ r.post('/store/cover/auto', h(async (req, res) => {
   res.json({ media: serializeMedia(m) });
 }));
 
+
+/* ---------------------------------------------------------- store colours from the logo
+ * The logo's colours are turned into two ready themes (light / dark) that already pass WCAG AA (shared/palette.js).
+ * A NEW logo never recolours the store behind the owner's back: it raises a suggestion ("pending") that the owner applies or dismisses.
+ * Exceptions: a brand-new store with no theme yet gets its first palette automatically, and an owner who switched on "follow my logo" gets updates automatically.
+ */
+const brandOf = (store) => json(store.customization_json, {}).brand || {};
+const saveBrand = (store, brand) => {
+  const cz = json(store.customization_json, {});
+  q.run('UPDATE stores SET customization_json=? WHERE id=?', [JSON.stringify({ ...cz, brand }), store.id]);
+};
+function applyVariant(store, sug, variantId) {
+  const v = sug.variants.find((x) => x.id === variantId) || sug.variants.find((x) => x.id === sug.recommended) || sug.variants[0];
+  const t = buildTheme(v.input);
+  q.run('UPDATE stores SET theme_json=? WHERE id=?', [JSON.stringify(t.input), store.id]);
+  return { id: v.id, t };
+}
+const publicBrand = (store, brand, sug) => ({
+  hasLogo: Boolean(store.logo_media_id),
+  status: sug ? (brand.status || 'idle') : 'none', // none | idle | pending | applied | dismissed
+  autoSync: Boolean(brand.autoSync),
+  variant: brand.variant || null,
+  recommended: sug?.recommended || null,
+  monochrome: Boolean(sug?.monochrome),
+  swatches: sug?.swatches || [],
+  variants: (sug?.variants || []).map((v) => ({ id: v.id, input: v.input, cssVars: v.cssVars, dark: v.dark, checks: v.checks, ok: v.ok, fixed: v.report.length })),
+});
+
+async function onLogoUploaded(store, media, buffer) {
+  let swatches = [];
+  try { swatches = await extractSwatches(buffer); } catch { return null; }
+  if (!swatches.length) return null;
+  const sug = suggestThemes(swatches);
+  const prev = brandOf(store);
+  const themeEmpty = Object.keys(json(store.theme_json, {})).length === 0;
+  const brand = { logoId: media.id, swatches: sug.swatches, autoSync: Boolean(prev.autoSync), variant: prev.variant || null, status: 'pending', updatedAt: nowIso() };
+  if (themeEmpty || brand.autoSync) {
+    const done = applyVariant(store, sug, brand.variant || sug.recommended);
+    brand.variant = done.id; brand.status = 'applied'; brand.appliedAt = nowIso();
+  }
+  saveBrand(store, brand);
+  return publicBrand(store, brand, sug);
+}
+
+r.get('/store/brand-palette', h(async (req, res) => {
+  const store = req.store;
+  const brand = brandOf(store);
+  if (!store.logo_media_id) return res.json({ brand: publicBrand(store, {}, null) });
+  let { swatches, status } = brand;
+  if (!swatches?.length || brand.logoId !== store.logo_media_id) {
+    // a logo that was uploaded before this feature existed: compute once, quietly ("idle" = suggestion available, no prompt)
+    const m = getMedia(store.logo_media_id);
+    swatches = [];
+    try { swatches = await extractSwatches(await readMediaFile(m, 'original.jpg')); } catch { /* unreadable logo */ }
+    if (!swatches.length) return res.json({ brand: publicBrand(store, {}, null) });
+    status = 'idle';
+    saveBrand(store, { ...brand, logoId: m.id, swatches, status });
+  }
+  res.json({ brand: publicBrand(store, { ...brand, status }, suggestThemes(swatches)) });
+}));
+
+r.post('/store/brand-palette/apply', h((req, res) => {
+  const { variant } = z.object({ variant: z.enum(['light', 'dark']) }).parse(req.body || {});
+  const brand = brandOf(req.store);
+  if (!brand.swatches?.length) throw badRequest('no_palette', 'Upload a logo first.');
+  const sug = suggestThemes(brand.swatches);
+  const done = applyVariant(req.store, sug, variant);
+  const next = { ...brand, status: 'applied', variant: done.id, appliedAt: nowIso() };
+  saveBrand(req.store, next);
+  res.json({ theme: { input: done.t.input, cssVars: done.t.cssVars, dark: done.t.dark }, report: done.t.report, checks: done.t.checks, brand: publicBrand(req.store, next, sug) });
+}));
+
+r.post('/store/brand-palette/dismiss', h((req, res) => {
+  const brand = brandOf(req.store);
+  if (!brand.swatches?.length) throw badRequest('no_palette', 'Upload a logo first.');
+  const next = { ...brand, status: 'dismissed' };
+  saveBrand(req.store, next);
+  res.json({ brand: publicBrand(req.store, next, suggestThemes(brand.swatches)) });
+}));
+
+r.put('/store/brand-palette/auto', h((req, res) => {
+  const { enabled, variant } = z.object({ enabled: z.boolean(), variant: z.enum(['light', 'dark']).optional() }).parse(req.body || {});
+  const brand = brandOf(req.store);
+  if (!brand.swatches?.length) throw badRequest('no_palette', 'Upload a logo first.');
+  const sug = suggestThemes(brand.swatches);
+  let next = { ...brand, autoSync: enabled };
+  let theme = null;
+  if (enabled) { // turning it on means "follow my logo": bring the store in line right now
+    const done = applyVariant(req.store, sug, variant || brand.variant || sug.recommended);
+    next = { ...next, status: 'applied', variant: done.id, appliedAt: nowIso() };
+    theme = { input: done.t.input, cssVars: done.t.cssVars, dark: done.t.dark };
+  }
+  saveBrand(req.store, next);
+  res.json({ theme, brand: publicBrand(req.store, next, sug) });
+}));
+
 r.post('/store/:slot(logo|cover)', upload.single('file'), h(async (req, res) => {
   if (!req.file) throw badRequest('no_file', 'Please choose an image.');
   const kind = req.params.slot;
@@ -266,7 +363,8 @@ r.post('/store/:slot(logo|cover)', upload.single('file'), h(async (req, res) => 
   q.run(`UPDATE stores SET ${col}=? WHERE id=?`, [m.id, req.store.id]);
   q.run('UPDATE media SET attached=1 WHERE id=?', [m.id]);
   if (old) await deleteMedia(old);
-  res.json({ media: serializeMedia(m) });
+  const brand = kind === 'logo' ? await onLogoUploaded(req.store, m, req.file.buffer) : null;
+  res.json({ media: serializeMedia(m), brand });
 }));
 
 r.delete('/store/:slot(logo|cover)', h(async (req, res) => {
