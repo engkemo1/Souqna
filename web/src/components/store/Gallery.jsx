@@ -55,7 +55,7 @@ export default function Gallery({ media = [], name, galleryRef }) {
         <div ref={trackRef} className="scroll-x sm:rounded-3xl" aria-label={name}>
           {media.map((m, i) => (
             <button key={m.id} type="button" onClick={() => setLightbox(i)} className="w-full shrink-0 snap-center snap-always" aria-label={`${t('product.zoom')} — ${t('product.image', { n: i + 1, total: media.length })}`}>
-              <SmartImage media={m} ratio={ratio} sizes="(min-width:640px) 80vw, 100vw" priority={i === 0} alt={i === 0 ? name : ''} className="bg-white" showPlaceholder={false} />
+              <SmartImage media={m} ratio={ratio} fit="contain" sizes="(min-width:640px) 80vw, 100vw" priority={i === 0} alt={i === 0 ? name : ''} className="bg-white" showPlaceholder={false} />
             </button>
           ))}
         </div>
@@ -80,7 +80,7 @@ export default function Gallery({ media = [], name, galleryRef }) {
           {media.map((m, i) => (
             <button key={m.id} type="button" role="tab" aria-selected={i === active} onClick={() => setActive(i)} onMouseEnter={() => setActive(i)}
               className={cx('relative overflow-hidden rounded-xl transition duration-200', i === active ? 'ring-2 ring-fg ring-offset-2 ring-offset-canvas' : 'opacity-70 hover:opacity-100')}>
-              <SmartImage media={m} ratio={ratio} sizes="96px" className="bg-white" showPlaceholder={false} />
+              <SmartImage media={m} ratio={ratio} fit="contain" sizes="96px" className="bg-white" showPlaceholder={false} />
             </button>
           ))}
         </div>
@@ -98,7 +98,7 @@ export default function Gallery({ media = [], name, galleryRef }) {
           >
             <AnimatePresence initial={false} mode="popLayout">
               <motion.div key={media[active].id} className="absolute inset-0" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }}>
-                <SmartImage media={media[active]} ratio={ratio} sizes="(min-width:1280px) 46vw, 52vw" priority={active === 0} alt={name} className="h-full bg-white" showPlaceholder={false} />
+                <SmartImage media={media[active]} ratio={ratio} fit="contain" sizes="(min-width:1280px) 46vw, 52vw" priority={active === 0} alt={name} className="h-full bg-white" showPlaceholder={false} />
               </motion.div>
             </AnimatePresence>
             {zoom && (
@@ -206,7 +206,7 @@ function Lightbox({ media, index, onClose, name }) {
             {media.map((m, i) => (
               <button key={m.id} type="button" onClick={() => scrollTo(i)} aria-label={t('product.image', { n: i + 1, total: media.length })}
                 className={cx('w-12 shrink-0 overflow-hidden rounded-lg transition sm:w-14', i === cur ? 'ring-2 ring-white' : 'opacity-50 hover:opacity-90')}>
-                <SmartImage media={m} ratio={`${m.w} / ${m.h}`} sizes="64px" className="bg-white" showPlaceholder={false} />
+                <SmartImage media={m} ratio={`${m.w} / ${m.h}`} fit="contain" sizes="64px" className="bg-white" showPlaceholder={false} />
               </button>
             ))}
           </div>
