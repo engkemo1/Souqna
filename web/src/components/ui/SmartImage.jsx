@@ -11,7 +11,7 @@ import { cx } from './cx.js';
  *  - native lazy loading (eager + high priority for LCP images)
  *  - fade-in on load, graceful error fallback
  */
-function SmartImage({ media, alt, sizes = '100vw', ratio, fit = 'cover', priority = false, className, imgClassName, position = 'center', onLoad, draggable = false }) {
+function SmartImage({ media, alt, sizes = '100vw', ratio, fit = 'cover', priority = false, className, imgClassName, position = 'center', onLoad, draggable = false, showPlaceholder = true }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const ref = useRef(null);
@@ -22,7 +22,7 @@ function SmartImage({ media, alt, sizes = '100vw', ratio, fit = 'cover', priorit
   const aspect = ratio === 'natural' && media ? `${media.w} / ${media.h}` : ratio;
   return (
     <div className={cx('relative overflow-hidden', className)} style={{ aspectRatio: aspect, backgroundColor: media?.color || undefined }}>
-      {media?.lqip && !failed && (
+      {showPlaceholder && media?.lqip && !failed && (
         <img src={media.lqip} alt="" aria-hidden="true" className={cx('absolute inset-0 h-full w-full scale-110 blur-xl transition-opacity duration-700', fit === 'cover' ? 'object-cover' : 'object-contain', loaded ? 'opacity-0' : 'opacity-100')} />
       )}
       {media && !failed ? (
