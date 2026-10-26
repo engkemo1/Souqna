@@ -31,9 +31,8 @@ function BannerPicture({ banner, priority, isRtl }) {
           fetchpriority={priority ? 'high' : undefined}
           decoding="async"
           onLoad={() => setLoaded(true)}
-          className={cx('absolute inset-0 h-full w-full object-cover transition-opacity duration-700',
-            'object-[50%_100%] sm:object-[var(--pos)]', loaded ? 'opacity-100' : 'opacity-0', flip && 'sm:-scale-x-100')}
-          style={{ '--pos': banner.align === 'center' ? '50% 30%' : '100% 100%' }}
+          className={cx('absolute inset-0 h-full w-full object-contain object-center transition-opacity duration-700',
+            loaded ? 'opacity-100' : 'opacity-0', flip && 'sm:-scale-x-100')}
         />
       </picture>
     </div>

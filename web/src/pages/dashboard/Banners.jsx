@@ -26,7 +26,7 @@ function Preview({ f, device, lang }) {
   const cta = lang === 'ar' ? f.cta_ar : f.cta_en;
   return (
     <div className={cx('relative mx-auto overflow-hidden rounded-xl bg-surface', device === 'mobile' ? 'aspect-[4/5] w-48' : 'aspect-[2400/1000] w-full')} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-      {img && <img src={`${img.base}/${img.sizes.find((s) => s.name === 'md')?.name || img.sizes[0].name}.webp`} alt="" className={cx('absolute inset-0 h-full w-full object-cover', f.mirror_rtl && lang === 'ar' && device !== 'mobile' && '-scale-x-100')} />}
+      {img && <img src={`${img.base}/${img.sizes.find((s) => s.name === 'md')?.name || img.sizes[0].name}.webp`} alt="" className={cx('absolute inset-0 h-full w-full object-contain', f.mirror_rtl && lang === 'ar' && device !== 'mobile' && '-scale-x-100')} />}
       {!light && <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10" />}
       <div className={cx('absolute inset-0 flex p-4', device === 'mobile' ? (light ? 'items-start justify-center text-center' : 'items-end justify-center text-center') : f.align === 'center' ? 'items-center justify-center text-center' : 'items-center')}>
         <div className={cx('max-w-[60%]', device === 'mobile' && 'max-w-full', light ? 'text-neutral-900' : 'text-white')}>
@@ -124,8 +124,8 @@ function Row({ b, onEdit, onDelete, onToggle, onDragEnd, t, tr }) {
       <div className="flex flex-col gap-4 rounded-2xl border border-line bg-elevated p-3 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <button type="button" onPointerDown={(e) => controls.start(e)} aria-label="Reorder" className="grid h-11 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-muted hover:bg-fg/[0.05] active:cursor-grabbing"><GripVertical className="h-5 w-5" /></button>
-          <SmartImage media={b.image} ratio="2400 / 1000" sizes="280px" className="w-full min-w-0 rounded-xl sm:w-64" />
-          {b.mobileImage && <SmartImage media={b.mobileImage} ratio="4 / 5" sizes="80px" className="hidden w-[52px] shrink-0 rounded-lg sm:block" />}
+          <SmartImage media={b.image} ratio="natural" fit="contain" sizes="280px" className="w-full min-w-0 rounded-xl sm:w-64" />
+          {b.mobileImage && <SmartImage media={b.mobileImage} ratio="natural" fit="contain" sizes="80px" className="hidden w-[52px] shrink-0 rounded-lg sm:block" />}
         </div>
         <div className="min-w-0 flex-1 px-1 sm:px-0">
           <p className="text-xs font-semibold tracking-wider text-muted">{tr(b.eyebrow)}</p>

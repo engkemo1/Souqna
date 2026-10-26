@@ -81,7 +81,7 @@ function ImageSlot({ label, media, slot, ratio, onUploaded, onDelete, deleteBusy
     <div>
       <p className="mb-2 text-sm font-medium">{label}</p>
       <button type="button" onClick={() => ref.current?.click()} className={`group relative block w-full overflow-hidden bg-surface ring-1 ring-line ${round ? 'h-28 w-28 rounded-full' : 'rounded-2xl'}`}>
-        <SmartImage media={media} ratio={ratio} sizes="400px" />
+        <SmartImage media={media} ratio={slot === 'cover' ? 'natural' : ratio} fit={slot === 'cover' ? 'contain' : 'cover'} sizes="400px" />
         <span className="absolute inset-0 grid place-items-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100 [@media(hover:none)]:bg-black/25 [@media(hover:none)]:opacity-100">
           {busy ? <Spinner size={24} /> : <span className="inline-flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-sm font-semibold"><Camera className="h-4 w-4" />{t('settings.change')}</span>}
         </span>
@@ -235,7 +235,7 @@ export default function Settings() {
                 <p className="text-xs text-muted">بيظهر الشعار بالحروف لو مفيش صورة شعار مرفوعة.</p>
               </div>
 <div>
-                <ImageSlot label={t('settings.cover')} media={data.store.cover} slot="cover" ratio="16 / 10" onUploaded={onImage('cover')} onDelete={() => deleteImage('cover')} deleteBusy={deleteBusy === 'cover'} />
+                <ImageSlot label={t('settings.cover')} media={data.store.cover} slot="cover" ratio="natural" onUploaded={onImage('cover')} onDelete={() => deleteImage('cover')} deleteBusy={deleteBusy === 'cover'} />
                 <AutoCover onDone={onImage('cover')} />
                 <DesignHelp what="cover" className="mt-3" />
                 <HeroModePicker value={f.hero_mode} onChange={(v) => setF({ ...f, hero_mode: v })} />

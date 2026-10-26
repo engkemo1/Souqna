@@ -33,7 +33,7 @@ export function HeroSplit({ banners = [] }) {
           </div>
         </div>
         <div className="order-1 md:order-2">
-          {image ? <SmartImage media={image} priority ratio="4 / 5" sizes="(min-width:768px) 50vw, 100vw" className="rounded-3xl" /> : <div className="aspect-[4/5] rounded-3xl bg-primary/10" />}
+          {image ? <SmartImage media={image} priority ratio="natural" fit="contain" sizes="(min-width:768px) 50vw, 100vw" className="rounded-3xl" /> : <div className="aspect-[4/5] rounded-3xl bg-primary/10" />}
         </div>
       </div>
     </section>
