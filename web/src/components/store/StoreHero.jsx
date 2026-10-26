@@ -25,9 +25,9 @@ export default function StoreHero() {
           <SmartImage media={store.cover} priority sizes="100vw" fit="contain" className="h-full w-full" imgClassName="h-full w-full object-contain" />
         </motion.div>
       )}
-      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black via-black/55 to-black/10" />
-      <div className="absolute inset-0 -z-10 from-black/80 via-black/35 to-transparent ltr:bg-gradient-to-r rtl:bg-gradient-to-l" />
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(0,0,0,0)_0%,rgba(0,0,0,.45)_80%)]" />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/35 via-black/15 to-transparent" />
+      <div className="absolute inset-0 -z-10 from-black/40 via-black/15 to-transparent ltr:bg-gradient-to-r rtl:bg-gradient-to-l" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top,rgba(0,0,0,0)_0%,rgba(0,0,0,.2)_80%)]" />
       {/* hairline frame in the store's accent colour */}
       <div className="pointer-events-none absolute inset-3 rounded-[28px] border border-accent/45 sm:inset-5" />
 
