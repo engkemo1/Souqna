@@ -22,7 +22,7 @@ import PageTransition from '../../components/PageTransition.jsx';
 import BrandPaletteCard from '../../components/dash/BrandPaletteCard.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'opens_at', 'closes_at', 'day_off', 'return_days', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'opens_at', 'closes_at', 'day_off', 'return_days', 'instagram', 'facebook', 'tiktok', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
 
 /** Exchange & return policy: one clear period choice (saved with the page) plus a note on pieces excluded one by one. */
 function ReturnsBox({ days, onDays }) {
@@ -217,7 +217,7 @@ export default function Settings() {
     const s = data.store;
     const x = ({
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
-      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', photo_style: s.photoStyle || 'white', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
+      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', photo_style: s.photoStyle || 'white', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
       return_days: String(s.returnDays ?? 3), shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
       logo_initials: s.logoInitials || (s.name.ar || s.name.en || s.code || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: s.logoColor || '#1B1B1B',
     });
@@ -324,6 +324,7 @@ export default function Settings() {
               </Field>
               <Field label={t('settings.instagram')}><Input dir="ltr" prefix="@" value={f.instagram} onChange={set('instagram')} /></Field>
               <Field label={t('settings.facebook')}><Input dir="ltr" value={f.facebook} onChange={set('facebook')} className="text-start" /></Field>
+              <Field label={t('settings.tiktok')}><Input dir="ltr" prefix="@" value={f.tiktok} onChange={set('tiktok')} placeholder="username" /></Field>
               <Field label={t('settings.addressAr')}>
                 <PlaceAutocomplete
                   value={f.address_ar}

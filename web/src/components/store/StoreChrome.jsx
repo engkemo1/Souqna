@@ -272,8 +272,9 @@ export function StoreFooter() {
           <ul className="mt-4 space-y-3 text-sm text-footer-muted">
             <li><a className="flex gap-2.5 hover:text-on-footer" href={mapsLinks(store, tr(store.address)).open} target="_blank" rel="noreferrer"><MapPin className="mt-0.5 h-4 w-4 shrink-0" />{tr(store.address)}</a></li>
             {store.phone && <li><a className="flex gap-2.5 hover:text-on-footer" href={`tel:${store.phone}`} dir="ltr"><Phone className="h-4 w-4 shrink-0" />{store.phone}</a></li>}
-            {store.instagram && <li><a className="flex gap-2.5 hover:text-on-footer" href={`https://instagram.com/${store.instagram}`} target="_blank" rel="noreferrer"><Instagram className="h-4 w-4 shrink-0" />@{store.instagram}</a></li>}
-            {store.facebook && <li><a className="flex gap-2.5 hover:text-on-footer" href={`https://facebook.com/${store.facebook}`} target="_blank" rel="noreferrer"><Facebook className="h-4 w-4 shrink-0" />{store.facebook}</a></li>}
+            {store.instagram && <li><a className="flex gap-2.5 hover:text-on-footer" href={`https://instagram.com/${String(store.instagram).replace(/^@/, '')}`} target="_blank" rel="noreferrer"><Instagram className="h-4 w-4 shrink-0" />@{String(store.instagram).replace(/^@/, '')}</a></li>}
+            {store.tiktok && <li><a className="flex gap-2.5 hover:text-on-footer" href={`https://tiktok.com/@${String(store.tiktok).replace(/^@/, '')}`} target="_blank" rel="noreferrer"><svg className="h-4 w-4 shrink-0 fill-current" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64c.29 0 .58.04.86.11V9.4a6.33 6.33 0 0 0-.86-.06A6.34 6.34 0 0 0 3.1 15.68a6.34 6.34 0 0 0 10.83 4.49 6.3 6.3 0 0 0 1.86-4.49v-7.1a8.28 8.28 0 0 0 4.8 1.53v-3.42z"/></svg>@{String(store.tiktok).replace(/^@/, '')}</a></li>}
+            {store.facebook && <li><a className="flex gap-2.5 hover:text-on-footer" href={store.facebook.startsWith('http') ? store.facebook : `https://facebook.com/${store.facebook}`} target="_blank" rel="noreferrer"><Facebook className="h-4 w-4 shrink-0" />{store.facebook}</a></li>}
           </ul>
         </div>
         <div>

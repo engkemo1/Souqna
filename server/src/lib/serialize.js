@@ -32,6 +32,7 @@ export function serializeStore(s, { withTheme = true } = {}) {
     hours: s.opens_at && s.closes_at ? { open: s.opens_at, close: s.closes_at, dayOff: s.day_off ?? null } : null,
     instagram: s.instagram,
     facebook: s.facebook,
+    tiktok: s.tiktok || '',
     logo: media.get(s.logo_media_id) || null,
     logoInitials: s.logo_initials || '',
     logoColor: s.logo_color || '#1B1B1B',

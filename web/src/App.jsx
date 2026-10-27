@@ -29,6 +29,8 @@ const Legal = lazy(() => import('./pages/market/Legal.jsx'));
 const Request = lazy(() => import('./pages/market/Request.jsx'));
 const BanhaRunner = lazy(() => import('./pages/market/BanhaRunner.jsx'));
 const Pos = lazy(() => import('./pages/pos/Pos.jsx'));
+const ContactSupport = lazy(() => import('./pages/market/ContactSupport.jsx'));
+const Feedback = lazy(() => import('./pages/market/Feedback.jsx'));
 
 const StoreLayout = lazy(() => import('./pages/store/StoreLayout.jsx'));
 const StoreHome = lazy(() => import('./pages/store/StoreHome.jsx'));

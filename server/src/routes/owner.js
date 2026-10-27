@@ -114,7 +114,7 @@ const storeSchema = z.object({
   closes_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   day_off: z.union([z.literal(''), z.coerce.number().int().min(0).max(6)]).optional().nullable(),
   map_url: z.union([z.literal(''), z.string().trim().url().max(400).refine((u) => /^https:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u), 'map_url_invalid')]).optional().nullable(),
-  instagram: z.string().trim().max(60).optional(), facebook: z.string().trim().max(60).optional(),
+  instagram: z.string().trim().max(60).optional(), facebook: z.string().trim().max(60).optional(), tiktok: z.string().trim().max(60).optional(),
   shipping_fee: z.coerce.number().int().min(0).max(1000).optional(),
   free_shipping_over: z.coerce.number().int().min(0).max(100000).optional(),
   offer_badge_ar: z.string().trim().max(30).optional().nullable(), offer_badge_en: z.string().trim().max(30).optional().nullable(),

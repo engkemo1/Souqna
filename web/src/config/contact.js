@@ -6,7 +6,7 @@ export const SALES_WA_TEXT = 'أهلاً، عندي محل في بنها وعا�
 /** Public brand profiles and contact details (shown in the footer, the legal pages and the search-engine data). */
 export const SOCIAL = {
   facebook: 'https://www.facebook.com/profile.php?id=61595798750009',
-  instagram: 'https://www.instagram.com/twiststore2026',
+  instagram: 'https://www.instagram.com/twiststore2026?fbclid=IwY2xjawVNY3lleHRuA2FlbQIxMABwZG9mBWJyaWQRMTZOdzFFUXFjaDgwY0xqSTZzcnRjBmFwcF9pZBAyMjIwMzkxNzg4MjAwODkyAAEeoPe9buZ0DSoghYmJc9o7kMCxjggtL0OLENq_XSvclhzNWFU6LX9v8irM9Tw_aem_X50_2AMVK7eH0cls3HiDCg',
   tiktok: 'https://www.tiktok.com/@twiststore0',
 };
 export const CONTACT_EMAIL = 'storetwist007@gmail.com';

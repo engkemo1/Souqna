@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS stores (
   delivery_mode TEXT NOT NULL DEFAULT 'store',
   city TEXT NOT NULL DEFAULT 'Banha',
   address_ar TEXT, address_en TEXT,
-  phone TEXT, whatsapp TEXT, instagram TEXT, facebook TEXT,
+  phone TEXT, whatsapp TEXT, instagram TEXT, facebook TEXT, tiktok TEXT,
   auto_whatsapp INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0,
   hidden INTEGER NOT NULL DEFAULT 0,

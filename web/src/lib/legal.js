@@ -1,6 +1,6 @@
 /** Legal pages (privacy, terms). Arabic is the reference text; English is a faithful translation.
  *  Contact details come from config/contact.js at render time. Keep UPDATED in sync when the text changes. */
-export const LEGAL_UPDATED = '2026-10-12';
+export const LEGAL_UPDATED = '2026-10-27';
 
 export const LEGAL = {
   privacy: {
@@ -27,7 +27,7 @@ export const LEGAL = {
         ['مين بيشوف بياناتك', [
           'المتجر اللي بتطلب منه بيشوف اسمك ورقمك وعنوانك وتفاصيل طلبك عشان يجهّز ويوصّل.',
           'فريق Twist لما يكون التوصيل علينا أو لما تطلب حاجة من خلالنا.',
-          'مزوّد الذكاء الاصطناعي ومزوّد تخزين الصور واستضافة الموقع (زي Railway وCloudflare) بالقدر اللازم لتشغيل الخدمة فقط.',
+          'مزوّدات الخدمات التقنية (استضافة الخوادم وتخزين الصور) بالقدر اللازم لتشغيل الخدمة فقط وبأعلى معايير الأمان.',
           'الجهات الرسمية لو القانون طلب ده.',
         ]],
         ['الكوكيز والتخزين على جهازك', [
@@ -72,7 +72,7 @@ export const LEGAL = {
         ['Who sees your data', [
           'The store you order from sees your name, number, address and order so it can prepare and deliver.',
           'The Twist team when we deliver or when you ask us to source something.',
-          'Our AI provider, photo storage and hosting providers (such as Railway and Cloudflare), only as needed to run the service.',
+          'Our technical service providers (cloud server hosting, photo storage and infrastructure), strictly as needed to run the service securely.',
           'Public authorities where the law requires it.',
         ]],
         ['Cookies and on-device storage', [
@@ -133,7 +133,21 @@ export const LEGAL = {
         ['حدود المسؤولية', [
           'بنحاول نخلي المعلومات دقيقة ومحدّثة، لكن مش بنضمن خلوها من الأخطاء. مسؤولية المنتج وجودته على المتجر البائع، وإحنا مسؤولين عن تشغيل المنصة وخدمات التوصيل اللي بنقدمها بنفسنا، في حدود القانون.',
         ]],
-        ['الاسترجاع والاستبدال', ['كل محل بيحدد سياسة الاستبدال والاسترجاع الخاصة بيه ومدتها (المعتاد 3 أيام من الاستلام)، وبتلاقيها مكتوبة في صفحة المحل. ده لا يخل بحقوقك في قانون حماية المستهلك المصري.']],
+        ['الاسترجاع والاستبدال (سياسة متوازنة لحماية العميل والتاجر)', [
+          'استقلالية سياسة كل متجر: كل متجر شريك على Twist هو بائع مستقل ويحدد سياسته الخاصة للاستبدال والاسترجاع وعدد أيام السماح (من 0 يوم وحتى 14 يوم)، وتظهر سياسة كل متجر بوضوح في صفحته الرئيسية، وبطاقة المنتج، وصفحة إتمام الطلب قبل الشراء.',
+          'شروط قبول الاستبدال أو الاسترجاع (حماية صاحب المحل):',
+          '• يجب تقديم طلب الاستبدال أو الاسترجاع خلال المهلة المحددة من المتجر ابتداءً من تاريخ ووقت استلام الشحنة.',
+          '• يجب أن تكون القطعة بحالتها الأصلية تماماً: غير ملبوسة، غير مستخدمة، محتفظة بكافة التيكتات، الكروت، ملصقات الباركود، والغلاف والتعبئة الأصلية.',
+          '• خلو القطعة تماماً من أي آثار استعمال، بقع، تجاعيد ناتجة عن ارتداء، أو أي روائح (مثل العطور، الدخان، مساحيق الغسيل).',
+          '• استثناءات صحية وقائية (لا تقبل الاسترجاع): حفاظاً على الصحة العامة، لا يُسمح نهائياً باسترجاع أو استبدال الملابس الداخلية، ملابس النوم واللانجيري، الجوارب، والإكسسوارات الملامسة مباشرة للجلد، أو القطع المحددة من التاجر كـ "تصفية نهائية / غير قابلة للاسترجاع".',
+          'تكاليف الشحن في الاستبدال والاسترجاع:',
+          '• في حالة طلب استبدال المقاس أو اللون أو الموديل بناءً على رغبة العميل الشخصية، يتحمل العميل رسوم شحن مندوب التوصيل للذهاب والعودة.',
+          '• في حالة وجود عيب صناعة مؤكد بالقطعة، أو استلام منتج مختلف عن المطلوب، يتحمل المتجر بالكامل تكاليف الشحن ويحق للعميل استبدال القطعة أو استرداد كامل المبلغ المدفوع.',
+          'حقوق ومعاينة العميل (حماية المشتري):',
+          '• يحق للعميل معاينة الشحنة ظاهرياً عند الاستلام من المندوب والتأكد من مطابقة المنتج لطلبه قبل الاستلام.',
+          '• حقوق المستهلك مكفولة بالكامل في حالات العيوب المصنعية أو عدم المطابقة للمواصفات طبقاً لأحكام قانون حماية المستهلك المصري رقم 181 لسنة 2018.',
+          'دور منصة Twist: تعمل المنصة كوسيط تقني ولوجستي محايد ينسق عمليات التوصيل ويضمن التزام الطرفين بالسياسات المعلنة وحل أي نزاع بشكل ودي وسريع بما يرضي الطرفين.',
+        ]],
         ['القانون الواجب التطبيق', [
           'تخضع الشروط دي للقانون المصري، وأي نزاع بيتحل ودّيًا الأول، وبعدها قدام المحاكم المصرية المختصة. ده مش بيقلل من حقوقك كمستهلك بموجب قانون حماية المستهلك.',
           'ممكن نعدّل الشروط، واستمرارك في استخدام الخدمة بعد التعديل معناه موافقتك عليها.',
@@ -166,7 +180,21 @@ export const LEGAL = {
         ['Twila assistant (AI)', ['Twila suggests products and outfits using AI and can make mistakes. Products and prices come from the stores\' real catalogue, but please check the details and size before you buy. Size suggestions are guidance, not a guarantee.']],
         ['Acceptable use', ['Do not attempt to hack or abuse the site, scrape its data automatically, or impersonate others.']],
         ['Limits of liability', ['We try to keep information accurate and up to date but cannot guarantee it is error-free. The seller store is responsible for its products and their quality; we are responsible for running the platform and for the delivery services we provide ourselves, within the limits of the law.']],
-        ['Returns and exchanges', ['Each store sets its own exchange and return policy and period (usually 3 days from receiving the order), shown on the store page. This does not affect your rights under the Egyptian Consumer Protection Law.']],
+        ['Returns and exchanges (Balanced policy protecting both parties)', [
+          'Store Policy Ownership: Each partner store on Twist is an independent seller setting its own return and exchange policy and eligibility window (from 0 up to 14 days). The specific policy is clearly displayed on the store\'s page, product details, and at checkout before completing the order.',
+          'Eligibility Conditions (Protecting the Store Owner):',
+          '• Return or exchange requests must be initiated within the store\'s designated return period starting from the exact date and time of delivery.',
+          '• The item must be in its original, brand-new condition: unworn, unwashed, with all original tags, cards, barcode stickers, and packaging intact.',
+          '• Completely free from any signs of wear, stains, alterations, or odours (such as perfumes, smoke, or detergents).',
+          '• Hygiene Exclusions (Non-returnable items): For public health and hygiene, undergarments, sleepwear/lingerie, socks, and jewellery in direct contact with skin are strictly non-returnable and non-exchangeable, as well as items explicitly marked by the merchant as "Final Sale".',
+          'Delivery and Shipping Costs:',
+          '• If an exchange is requested due to customer preference (e.g. changing size, colour, or model), the customer covers the courier delivery fee.',
+          '• If the return/exchange is due to a confirmed manufacturing defect or an incorrect item sent, the merchant fully covers all shipping fees, and the customer is entitled to a replacement or a full refund.',
+          'Customer Rights and Inspection (Protecting the Buyer):',
+          '• Customers are entitled to inspect the parcel upon delivery to ensure items match their order before receiving them.',
+          '• Consumer rights regarding defective or non-conforming items are fully guaranteed under Egyptian Consumer Protection Law No. 181 of 2018.',
+          'Role of Twist: Twist acts as a neutral technology and logistics facilitator coordinating deliveries, ensuring adherence to transparent policies, and assisting both parties in resolving any inquiries amicably.',
+        ]],
         ['Governing law', [
           'These terms are governed by Egyptian law. Disputes are first settled amicably and then before the competent Egyptian courts. This does not reduce your rights as a consumer under the Consumer Protection Law.',
           'We may update these terms; continuing to use the service after an update means you accept it.',

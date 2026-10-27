@@ -19,20 +19,24 @@ export default function StoreStoryCard() {
   const text = (lang === 'ar' ? story.text_ar : story.text_en) || story.text_ar || story.text_en || '';
   const map = mapsLinks(store, tr(store.address));
 
+  const ig = story.instagram || store.instagram;
+  const tt = story.tiktok || store.tiktok;
+  const fb = story.facebook || store.facebook;
+
   const socials = [
-    story.instagram && {
+    ig && {
       name: 'Instagram',
-      url: story.instagram.startsWith('http') ? story.instagram : `https://instagram.com/${story.instagram.replace(/^@/, '')}`,
+      url: ig.startsWith('http') ? ig : `https://instagram.com/${ig.replace(/^@/, '')}`,
       color: 'hover:text-[#E4405F]',
     },
-    story.tiktok && {
+    tt && {
       name: 'TikTok',
-      url: story.tiktok.startsWith('http') ? story.tiktok : `https://tiktok.com/@${story.tiktok.replace(/^@/, '')}`,
+      url: tt.startsWith('http') ? tt : `https://tiktok.com/@${tt.replace(/^@/, '')}`,
       color: 'hover:text-[#000000] dark:hover:text-[#ffffff]',
     },
-    story.facebook && {
+    fb && {
       name: 'Facebook',
-      url: story.facebook.startsWith('http') ? story.facebook : `https://facebook.com/${story.facebook}`,
+      url: fb.startsWith('http') ? fb : `https://facebook.com/${fb}`,
       color: 'hover:text-[#1877F2]',
     },
   ].filter(Boolean);

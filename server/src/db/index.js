@@ -58,6 +58,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!cols.includes('same_day_until')) db.exec("ALTER TABLE stores ADD COLUMN same_day_until TEXT NOT NULL DEFAULT '18:00'");
   if (!cols.includes('photo_style')) db.exec("ALTER TABLE stores ADD COLUMN photo_style TEXT NOT NULL DEFAULT 'white'");
   if (!cols.includes('customization_json')) db.exec("ALTER TABLE stores ADD COLUMN customization_json TEXT NOT NULL DEFAULT '{}'");
+  if (!cols.includes('tiktok')) db.exec('ALTER TABLE stores ADD COLUMN tiktok TEXT');
   db.exec("UPDATE stores SET departments=',' || category || ',' WHERE departments='' AND category NOT IN ('mixed','')");
   const mcols = db.prepare('PRAGMA table_info(media)').all().map((c) => c.name);
   if (!mcols.includes('remote')) db.exec('ALTER TABLE media ADD COLUMN remote INTEGER NOT NULL DEFAULT 0');

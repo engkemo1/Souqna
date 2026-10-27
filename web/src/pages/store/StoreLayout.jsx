@@ -8,7 +8,6 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { StoreContext, sp } from '../../lib/store.jsx';
 import { StoreHeader, BottomNav, StoreFooter, AnnouncementBar } from '../../components/store/StoreChrome.jsx';
 import CartDrawer from '../../components/store/CartDrawer.jsx';
-import SmartWhatsApp from '../../components/store/SmartWhatsApp.jsx';
 import { resolveDesign } from '@souqna/shared/layout';
 import { buildTheme } from '@souqna/shared/theme';
 import { HeroSkeleton } from '../../components/store/HeroSlider.jsx';
@@ -117,7 +116,6 @@ export default function StoreLayout() {
       <StoreFooter />
       {!hideBottomNav && <BottomNav />}
       <CartDrawer slug={slug} />
-      <SmartWhatsApp hasBottomNav={!hideBottomNav} />
       </div>
     </StoreContext.Provider>
   );
