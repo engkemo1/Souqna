@@ -172,7 +172,7 @@ function PreviewSheet({ t, files, onConfirm, onCancel }) {
   }, [files]);
   const opts = [['white', t('settings.photoWhite')], ['cream', t('settings.photoCream')], ['original', t('settings.photoOriginal')]];
   const go = async () => {
-    try { await api('/owner/photo-style', { method: 'PUT', body: { style } }); } catch (e) { toast({ tone: 'error', title: e.message || t('editor.uploadFailed') }); }
+    try { if (!(info && !info.studio)) await api('/owner/photo-style', { method: 'PUT', body: { style } }); } catch (e) { toast({ tone: 'error', title: e.message || t('editor.uploadFailed') }); }
     try { if (skip) localStorage.setItem('souqna.skipPhotoPreview', '1'); } catch { /* storage unavailable */ }
     onConfirm(style);
   };
@@ -181,6 +181,11 @@ function PreviewSheet({ t, files, onConfirm, onCancel }) {
       <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-elevated p-4 shadow-lift sm:max-w-lg sm:rounded-3xl">
         <div className="flex items-center justify-between"><h3 className="text-base font-bold">{t('editor.pvTitle')}</h3>
           <button type="button" onClick={onCancel} aria-label={t('common.cancel')} className="grid h-9 w-9 place-items-center rounded-full hover:bg-fg/[0.06]"><X className="h-4 w-4" /></button></div>
+        {info && !info.studio ? (
+          <div className="mx-auto mt-3 w-40 rounded-2xl p-1.5 text-center ring-1 ring-line">
+            <span className="block aspect-[4/5] overflow-hidden rounded-xl bg-surface"><img src={info.looks.original} alt="" className="h-full w-full object-cover" /></span>
+          </div>
+        ) : (
         <div className="mt-3 grid grid-cols-3 gap-2.5">
           {opts.map(([v, label]) => (
             <button key={v} type="button" onClick={() => setStyle(v)} aria-pressed={style === v} className={cx('rounded-2xl p-1.5 text-center text-xs font-semibold ring-1 transition active:scale-[.98]', style === v ? 'bg-fg/[0.05] ring-2 ring-fg' : 'ring-line')}>
@@ -191,6 +196,7 @@ function PreviewSheet({ t, files, onConfirm, onCancel }) {
             </button>
           ))}
         </div>
+        )}
         <p className="mt-3 text-[12.5px] leading-relaxed text-muted">{info && !info.studio ? t('editor.pvNoStudio') : t('editor.pvNote')}</p>
         {files.length > 1 && <p className="mt-1 text-[12.5px] text-muted">{t('editor.pvMany', { n: files.length })}</p>}
         <label className="mt-3 flex items-center gap-2 text-[13px] text-muted"><input type="checkbox" checked={skip} onChange={(e) => setSkip(e.target.checked)} className="h-4 w-4" />{t('editor.pvSkip')}</label>

@@ -168,7 +168,7 @@ function enhance(pipeline, an) {
  * Uniform product canvas (4:5), sized to the photo (smaller photos → smaller canvas, never blown up).
  *  - studio shot on a plain light backdrop (style white/cream): trim the empty margin, set the backdrop to the exact canvas colour
  *    (no visible rectangle), centre the product with an even margin and a very soft contact shadow — the marketplace "white background" look.
- *  - anything else (people, street, busy scenes), or style "original": near-4:5 → gentle cover crop; otherwise the whole photo is kept over a soft blurred copy of itself.
+ *  - anything else (people, street, busy scenes), or style "original": near-4:5 → gentle cover crop; otherwise the whole photo is kept on a clean backdrop matching its own edge colours.
  */
 async function productCanvas(data, style = 'original', analysis = null) {
   const meta = await sharp(data).metadata();
@@ -208,11 +208,31 @@ async function productCanvas(data, style = 'original', analysis = null) {
   if (isNear) {
     pipeline = sharp(base).resize(cw, ch, { fit: 'cover', position: sharp.strategy.attention });
   } else {
-    const [bg, fg] = await Promise.all([
-      sharp(base).resize(cw, ch, { fit: 'cover' }).blur(40).modulate({ brightness: 1.06, saturation: 0.9 }).toBuffer(),
-      sharp(base).resize({ width: cw, height: ch, fit: 'inside' }).toBuffer(),
-    ]);
-    pipeline = sharp(bg).composite([{ input: fg, gravity: 'centre' }]);
+    // Not 4:5: keep the whole photo and extend it with a clean backdrop that continues the photo's own edge colours
+    // (each empty bar takes the colour of the photo edge it touches) instead of a blurred copy of the picture.
+    const fg = await sharp(base).resize({ width: cw, height: ch, fit: 'inside' }).toBuffer({ resolveWithObject: true });
+    const fw = fg.info.width, fh = fg.info.height;
+    const edge = async (left, top, w, h) => {
+      const piece = await sharp(fg.data).extract({ left, top, width: Math.max(1, w), height: Math.max(1, h) }).png().toBuffer();
+      const st = await sharp(piece).stats();
+      return st.channels.slice(0, 3).map((c) => Math.round(c.mean));
+    };
+    let bgBuf;
+    try {
+      const strip = Math.max(2, Math.round(Math.min(fw, fh) * 0.03));
+      const vertical = fh < ch; // bars above/below
+      const [c1, c2] = vertical
+        ? await Promise.all([edge(0, 0, fw, strip), edge(0, fh - strip, fw, strip)])
+        : await Promise.all([edge(0, 0, strip, fh), edge(fw - strip, 0, strip, fh)]);
+      const rgb = (c) => `rgb(${c[0]},${c[1]},${c[2]})`;
+      const svg = Buffer.from(vertical
+        ? `<svg xmlns="http://www.w3.org/2000/svg" width="${cw}" height="${ch}"><rect width="${cw}" height="${Math.ceil(ch / 2)}" fill="${rgb(c1)}"/><rect y="${Math.floor(ch / 2)}" width="${cw}" height="${Math.ceil(ch / 2)}" fill="${rgb(c2)}"/></svg>`
+        : `<svg xmlns="http://www.w3.org/2000/svg" width="${cw}" height="${ch}"><rect width="${Math.ceil(cw / 2)}" height="${ch}" fill="${rgb(c1)}"/><rect x="${Math.floor(cw / 2)}" width="${Math.ceil(cw / 2)}" height="${ch}" fill="${rgb(c2)}"/></svg>`);
+      bgBuf = await sharp(svg).jpeg({ quality: 95 }).toBuffer();
+    } catch {
+      bgBuf = await sharp({ create: { width: cw, height: ch, channels: 3, background: { r: 245, g: 244, b: 240 } } }).jpeg().toBuffer();
+    }
+    pipeline = sharp(bgBuf).composite([{ input: fg.data, gravity: 'centre' }]);
   }
   return pipeline.jpeg(ORIGINAL_JPEG).toBuffer({ resolveWithObject: true });
 }

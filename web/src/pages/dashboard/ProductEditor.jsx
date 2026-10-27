@@ -83,12 +83,15 @@ function Card({ id, step, title, hint, done, children, className, bare }) {
 const chipCls = (on) => cx('inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg');
 
 /** اختيار نوع المنتج على طريقة Amazon: الفئة (لمين؟) ← ابحث أو تصفح الأنواع. من النوع بنحدد القسم والمقاسات تلقائي. */
-function TypePicker({ tree, audience, typeKey, onChange, error, suggested }) {
+function TypePicker({ tree, audience, typeKey, onChange, error, suggested, customName, onAddSection }) {
   const { lang } = useI18n();
   const L = (ar, en) => (lang === 'ar' ? ar : en);
   const [q, setQ] = useState('');
   const [fam, setFam] = useState('');
   const [open, setOpen] = useState(!typeKey);
+  const [adding, setAdding] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const submitAdd = async () => { setBusy(true); const ok = await onAddSection(adding); setBusy(false); if (ok) { setAdding(null); setQ(''); } };
   useEffect(() => { setOpen(!typeKey); }, [typeKey]);
   if (!tree) return <Skeleton className="h-32 rounded-xl" />;
   const found = tree.families.flatMap((f) => f.types.map((t) => ({ ...t, family: f }))).find((t) => t.key === typeKey);
@@ -144,6 +147,20 @@ function TypePicker({ tree, audience, typeKey, onChange, error, suggested }) {
           </div>
         </div>
       )}
+      {audience && !(found && !open) && (customName ? (
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-success/40 bg-success/5 px-4 py-3">
+          <div className="min-w-0"><p className="text-[12.5px] text-muted">{L('قسم جديد في متجرك', 'New section in your store')}</p><p className="truncate text-base font-semibold">{customName}</p></div>
+          <Check className="h-5 w-5 shrink-0 text-success" strokeWidth={3} />
+        </div>
+      ) : adding ? (
+        <div className="space-y-2.5 rounded-xl border border-dashed border-line-strong p-3">
+          <p className="text-[13px] text-muted">{L('اكتب اسم القسم وإحنا نضيفه في متجرك ونختاره للمنتج ده.', 'Name the new section — we add it to your store and pick it.')}</p>
+          <Input value={adding.name} autoFocus onChange={(e) => setAdding({ name: e.target.value })} placeholder={L('مثال: شوز', 'e.g. Shoes')} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } }} />
+          <div className="flex gap-2"><button type="button" disabled={busy} onClick={submitAdd} className="h-10 flex-1 rounded-xl bg-fg text-sm font-semibold text-canvas disabled:opacity-60">{busy ? '…' : L('إضافة واختيار', 'Add & select')}</button><button type="button" onClick={() => setAdding(null)} className="h-10 rounded-xl border border-line-strong px-4 text-sm">{L('إلغاء', 'Cancel')}</button></div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => setAdding({ name: q.trim() })} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-brand hover:bg-brand/10"><Plus className="h-3.5 w-3.5" />{L('مش لاقي نوعك؟ أضف قسم جديد', 'Can’t find it? Add a new section')}</button>
+      ))}
       {error && <p role="alert" className="text-[13px] font-medium text-sale">{error}</p>}
     </div>
   );
@@ -297,6 +314,26 @@ export default function ProductEditor() {
   const { data: cats, reload: reloadCats } = useApi('/owner/categories');
   const [newCat, setNewCat] = useState(null); // { name, parent } while the inline "add section" form is open
   const [catBusy, setCatBusy] = useState(false);
+  const [customType, setCustomType] = useState('');
+  const addTypeSection = async ({ name: raw }) => {
+    const name = (raw || '').trim();
+    if (name.length < 2) { toast({ tone: 'error', title: L('اكتب اسم القسم', 'Enter a section name') }); return false; }
+    try {
+      const r = await api('/owner/categories', { method: 'POST', body: { name_ar: name, name_en: name, parent_id: null } });
+      await reloadCats?.();
+      set({ category_id: String(r.category.id), moda_key: '' });
+      setCustomType(name);
+      toast({ title: r.pending ? L(`اتضاف «${name}» في متجرك. هيظهر في السوق بعد موافقة الإدارة`, `Added “${name}”. It shows on the marketplace once the admin accepts it`) : L(`اتضاف قسم «${name}» في متجرك`, `Added “${name}” to your store`) });
+      return true;
+    } catch (x) {
+      if (x.code === 'section_exists') {
+        const ex = (cats?.items || []).find((c) => nz(tr(c.name)) === nz(name) || nz(c.name?.ar) === nz(name));
+        if (ex) { set({ category_id: String(ex.id), moda_key: '' }); setCustomType(name); toast({ title: L(`اخترنا قسم «${name}» الموجود عندك`, `Selected your existing “${name}” section`) }); return true; }
+      }
+      toast({ tone: 'error', title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى من الأقسام الخاصة (12)', 'Custom section limit reached (12)') : (errorMessage ? errorMessage(t, x) : (x.message || 'Error')) });
+      return false;
+    }
+  };
   const addCat = async () => {
     const name = (newCat?.name || '').trim();
     const parent = newCat?.parent || '';
@@ -386,7 +423,7 @@ export default function ProductEditor() {
     if (f.name_ar.trim().length < 2) e.name_ar = t('field.required');
     if (!Number(f.price)) e.price = t('field.price_required');
     if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
-    if (status === 'active' && !(f.audience && f.moda_key)) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
+    if (status === 'active' && !(f.audience && (f.moda_key || customType))) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
     if (!f.media.length && status === 'active') e.media = t('editor.needImage');
     setErrors(e);
     return e;
@@ -437,7 +474,7 @@ export default function ProductEditor() {
   }
 
   const margin = f.cost && f.price ? Math.round(((f.price - f.cost) / f.price) * 100) : null;
-  const done = { images: f.media.length > 0, type: !!(f.audience && f.moda_key), name: f.name_ar.trim().length >= 2, pricing: Number(f.price) > 0 };
+  const done = { images: f.media.length > 0, type: !!(f.audience && (f.moda_key || customType)), name: f.name_ar.trim().length >= 2, pricing: Number(f.price) > 0 };
   const steps = [['images', L('الصور', 'Photos')], ['type', L('النوع', 'Type')], ['name', L('الاسم', 'Name')], ['pricing', L('السعر', 'Price')]];
   const doneCount = steps.filter(([k]) => done[k]).length;
   const goTo = (k) => document.getElementById(k)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -454,7 +491,7 @@ export default function ProductEditor() {
   const stepErr = (i) => {
     const e = {};
     if (i === 0 && !f.media.length) e.media = t('editor.needImage');
-    if (i === 1 && !(f.audience && f.moda_key)) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
+    if (i === 1 && !(f.audience && (f.moda_key || customType))) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
     if (i === 2 && f.name_ar.trim().length < 2) e.name_ar = t('field.required');
     if (i === 3) {
       if (!Number(f.price)) e.price = t('field.price_required');
@@ -592,7 +629,7 @@ export default function ProductEditor() {
       </Card>)}
 
       {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('إيه المنتج؟', 'What is it?')} hint={L('اختار الفئة والنوع مرة واحدة، وإحنا نظبط القسم والمقاسات.', 'Pick it once — we set the department and sizes.')} done={done.type}>
-        <TypePicker tree={tree} audience={f.audience} typeKey={f.moda_key} suggested={suggested} error={errors.type} onChange={set} />
+        <TypePicker tree={tree} audience={f.audience} typeKey={f.moda_key} suggested={suggested} error={errors.type} onChange={(p) => { if (p.moda_key) setCustomType(''); set(p); }} customName={customType && !f.moda_key ? customType : ''} onAddSection={addTypeSection} />
       </Card>)}
 
       {(!isNew || step === 2) && (<Card id="name" bare={isNew} step={3} title={L('الاسم والوصف', 'Name & description')} done={done.name}>
@@ -727,18 +764,18 @@ export default function ProductEditor() {
   );
   const previewRow = (
     <div className="overflow-hidden rounded-2xl border border-line bg-elevated shadow-sm">
-      <div className="flex items-start gap-4 p-4">
+      <div className="flex flex-col gap-4 p-4">
         {f.media[0] ? (
-          <div className="relative shrink-0">
-            <img src={`${f.media[0].base}/sm.webp`} alt="" className="h-28 w-24 rounded-xl object-cover ring-1 ring-line" style={{ backgroundColor: f.media[0].color }} />
+          <div className="relative">
+            <img src={`${f.media[0].base}/md.webp`} onError={(e) => { const u = `${f.media[0].base}/sm.webp`; if (e.currentTarget.src !== new URL(u, location.href).href) e.currentTarget.src = u; }} alt="" className="mx-auto aspect-[4/5] w-full max-w-sm rounded-xl object-cover ring-1 ring-line" style={{ backgroundColor: f.media[0].color }} />
             {f.media.length > 1 && (
-              <span className="absolute bottom-1.5 start-1.5 rounded-md bg-black/75 px-1.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
+              <span className="absolute bottom-2 start-2 rounded-md bg-black/75 px-1.5 py-0.5 text-[11px] font-semibold text-white backdrop-blur-sm">
                 {L(`${f.media.length} صور`, `${f.media.length} photos`)}
               </span>
             )}
           </div>
         ) : (
-          <div className="grid h-28 w-24 shrink-0 place-items-center rounded-xl bg-secondary/50 text-muted ring-1 ring-line">
+          <div className="mx-auto grid aspect-[4/5] w-full max-w-sm place-items-center rounded-xl bg-secondary/50 text-muted ring-1 ring-line">
             <Package className="h-8 w-8" />
           </div>
         )}
