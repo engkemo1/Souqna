@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, ExternalLink, LogIn, Link2, Package, Trash2, Pin, Copy, Pencil } from 'lucide-react';
+import { Plus, ExternalLink, LogIn, Link2, Package, Trash2, Pin, Copy, Pencil, Search, Check, X, ChevronDown } from 'lucide-react';
 import { PageHeader, FilterTabs, SearchInput } from '../../components/dash/Kit.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -12,30 +12,109 @@ import { cx } from '../../components/ui/cx.js';
 import { tokenStore } from '../../lib/api.js';
 import { adminApi, useAdminApi, fmtMoney, fmtNum, fmtDateTime, useAdminDepartments } from './adminApi.js';
 import { LocationPicker } from '../../components/ui/MapView.jsx';
+import PlaceAutocomplete from '../../components/ui/PlaceAutocomplete.jsx';
 
+const nzAr = (x) => String(x || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').trim();
+
+/** أقسام المحل: أقسام رئيسية قابلة للطي، بحث سريع، وملخص بالمختار (زي لوحات التجار الكبرى). */
 const DeptPicker = ({ value, onChange, depts }) => {
-  const act = depts.list.filter((d) => d.active);
+  const act = useMemo(() => depts.list.filter((d) => d.active), [depts.list]);
+  const [term, setTerm] = useState('');
+  const [open, setOpen] = useState({});
+  const toast = useToast();
+  const [adding, setAdding] = useState(false);
+  const [nf, setNf] = useState({ name: '', parent: '' });
+  const [busy, setBusy] = useState(false);
   const kids = (slug) => act.filter((d) => d.parent === slug);
-  const toggle = (d) => onChange(value.includes(d) ? value.filter((x) => x !== d) : [...value, d]);
-  const chip = (d, label) => {
-    const on = value.includes(d);
-    return <button key={d} type="button" aria-pressed={on} onClick={() => toggle(d)}
-      className={cx('h-9 rounded-full border px-3.5 text-sm font-medium transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{label}</button>;
+  const subtree = (slug) => [slug, ...kids(slug).flatMap((k) => subtree(k.slug))];
+  const toggle = (slug) => onChange(value.includes(slug) ? value.filter((x) => x !== slug) : [...value, slug]);
+  const tops = act.filter((d) => !d.parent);
+  const t = nzAr(term);
+  const Box = ({ on }) => <span className={cx('grid h-[18px] w-[18px] shrink-0 place-items-center rounded-md border transition', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-canvas')}>{on && <Check className="h-3 w-3" strokeWidth={3} />}</span>;
+  const Row = ({ d, depth = 0, sub }) => {
+    const on = value.includes(d.slug);
+    return (
+      <button type="button" aria-pressed={on} onClick={() => toggle(d.slug)} style={{ paddingInlineStart: 8 + depth * 18 }}
+        className={cx('flex min-h-[2.5rem] w-full items-center gap-2.5 rounded-lg pe-2 text-start text-sm transition hover:bg-fg/[0.05]', on && 'bg-fg/[0.06] font-semibold')}>
+        <Box on={on} /><span className="min-w-0 flex-1 truncate">{d.name_ar}{sub && <span className="ms-2 text-xs font-normal text-muted">{sub}</span>}</span>
+      </button>
+    );
   };
+  const Nested = ({ d, depth }) => <>{kids(d.slug).map((k) => <div key={k.slug}><Row d={k} depth={depth} /><Nested d={k} depth={depth + 1} /></div>)}</>;
   const known = new Set(act.map((d) => d.slug));
-  const walk = (parent, depth) => kids(parent).flatMap((d) => [
-    <div key={d.slug} className="flex flex-wrap items-center gap-2" style={{ paddingInlineStart: depth * 18 }}>{chip(d.slug, d.name_ar)}</div>,
-    ...walk(d.slug, depth + 1),
-  ]);
+  const orphans = value.filter((v) => !known.has(v));
+  const addDept = async () => {
+    const name = nf.name.trim();
+    if (name.length < 2) { toast({ tone: 'error', title: 'اكتب اسم القسم' }); return; }
+    setBusy(true);
+    try {
+      const slug = `custom_${Date.now().toString(36)}`;
+      await adminApi('/departments', { method: 'POST', body: { name_ar: name, name_en: name, slug, sizes: [], parent: nf.parent || null } });
+      await depts.reload?.();
+      onChange([...new Set([...value, slug])]);
+      if (nf.parent) setOpen((o) => ({ ...o, [nf.parent]: true }));
+      setNf({ name: '', parent: nf.parent }); setAdding(false); setTerm('');
+      toast({ title: `اتضاف قسم «${name}» واتختار` });
+    } catch (x) { toast({ tone: 'error', title: x.message || 'مقدرناش نضيف القسم' }); } finally { setBusy(false); }
+  };
+  const hits = t ? act.filter((d) => nzAr(d.name_ar).includes(t)) : [];
   return (
     <div className="space-y-3" role="group">
-      {act.filter((d) => !d.parent).map((top) => (
-        <div key={top.slug} className="rounded-2xl border border-line p-3">
-          <div className="mb-2 flex flex-wrap gap-2">{chip(top.slug, `${top.name_ar} (كل الأقسام)`)}</div>
-          <div className="space-y-2">{walk(top.slug, 1)}</div>
+      <div className="relative">
+        <Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+        <Input value={term} onChange={(e) => setTerm(e.target.value)} className="ps-10" placeholder="ابحث عن قسم: فساتين، جزم، عبايات…" aria-label="بحث في الأقسام" />
+      </div>
+      {value.length > 0 && (
+        <div className="rounded-xl bg-secondary/50 p-3">
+          <div className="mb-2 flex items-center justify-between"><p className="text-[13px] font-semibold">المختار ({value.length})</p><button type="button" onClick={() => onChange([])} className="text-[13px] font-semibold text-sale hover:underline">مسح الكل</button></div>
+          <div className="flex flex-wrap gap-1.5">{value.map((v) => <button key={v} type="button" onClick={() => toggle(v)} className="inline-flex h-7 items-center gap-1 rounded-full bg-canvas px-2.5 text-xs font-medium ring-1 ring-line-strong hover:ring-sale">{depts.label(v)}<X className="h-3 w-3 text-muted" /></button>)}</div>
         </div>
-      ))}
-      {value.filter((v) => !known.has(v)).length > 0 && <div className="flex flex-wrap gap-2">{value.filter((v) => !known.has(v)).map((d) => chip(d, depts.label(d)))}</div>}
+      )}
+      {t ? (
+        <div className="rounded-xl border border-line p-1.5">
+          {hits.length === 0 ? <p className="py-6 text-center text-sm text-muted">مفيش قسم بالاسم ده.</p> : hits.map((d) => <Row key={d.slug} d={d} sub={d.parent ? depts.label(d.parent) : null} />)}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {tops.map((top) => {
+            const all = subtree(top.slug); const picked = all.filter((x) => value.includes(x)).length;
+            const isOpen = open[top.slug] ?? picked > 0; const hasKids = kids(top.slug).length > 0;
+            const topOn = value.includes(top.slug);
+            return (
+              <div key={top.slug} className="overflow-hidden rounded-2xl border border-line">
+                <div className="flex items-center gap-1 pe-2">
+                  <button type="button" onClick={() => setOpen({ ...open, [top.slug]: !isOpen })} aria-expanded={isOpen} className="flex min-h-[3rem] flex-1 items-center gap-2 px-3 text-start">
+                    <ChevronDown className={cx('h-4 w-4 shrink-0 text-muted transition-transform', !isOpen && 'rtl:rotate-90 -rotate-90')} />
+                    <span className="flex-1 text-[15px] font-bold">{top.name_ar}</span>
+                    {hasKids && <span className="text-xs text-muted">{all.length - 1} قسم</span>}
+                    {picked > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-fg px-1.5 text-[11px] font-bold text-canvas">{picked}</span>}
+                  </button>
+                  <button type="button" aria-pressed={topOn} onClick={() => toggle(top.slug)} className={cx('h-8 shrink-0 rounded-full border px-3 text-xs font-semibold transition', topOn ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{topOn ? 'كل الأقسام ✓' : 'كل الأقسام'}</button>
+                </div>
+                {isOpen && hasKids && (
+                  <div className="grid gap-x-2 gap-y-0.5 border-t border-line bg-secondary/20 p-2 sm:grid-cols-2">
+                    {kids(top.slug).map((k) => <div key={k.slug}><Row d={k} /><Nested d={k} depth={1} /></div>)}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {adding ? (
+        <div className="space-y-2.5 rounded-2xl border border-dashed border-line-strong p-3">
+          <p className="text-sm font-semibold">إضافة قسم جديد</p>
+          <Input value={nf.name} onChange={(e) => setNf({ ...nf, name: e.target.value })} placeholder={term ? `اسم القسم (مثال: ${term})` : 'اسم القسم بالعربي'} aria-label="اسم القسم الجديد" onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addDept(); } }} />
+          <select value={nf.parent} onChange={(e) => setNf({ ...nf, parent: e.target.value })} aria-label="يتبع قسم" className="h-11 w-full rounded-xl border border-line-strong bg-canvas px-3 text-sm">
+            <option value="">قسم رئيسي (مستقل)</option>
+            {act.filter((d) => !d.parent).map((d) => <option key={d.slug} value={d.slug}>تحت: {d.name_ar}</option>)}
+          </select>
+          <div className="flex gap-2"><button type="button" disabled={busy} onClick={addDept} className="h-10 flex-1 rounded-xl bg-fg text-sm font-semibold text-canvas disabled:opacity-60">{busy ? '…' : 'إضافة واختيار'}</button><button type="button" onClick={() => setAdding(false)} className="h-10 rounded-xl border border-line-strong px-4 text-sm">إلغاء</button></div>
+        </div>
+      ) : (
+        <button type="button" onClick={() => { setAdding(true); setNf({ name: term.trim(), parent: '' }); }} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-dashed border-line-strong text-sm font-semibold text-muted transition hover:border-fg hover:text-fg"><Plus className="h-4 w-4" />{t && hits.length === 0 ? `مش لاقي «${term.trim()}»؟ أضفه كقسم جديد` : 'مش لاقي القسم؟ أضف قسم جديد'}</button>
+      )}
+      {orphans.length > 0 && <div className="flex flex-wrap gap-2">{orphans.map((d) => <button key={d} type="button" onClick={() => toggle(d)} className="h-8 rounded-full border border-line-strong px-3 text-xs">{depts.label(d)} ✕</button>)}</div>}
       {!depts.list.length && <p className="text-sm text-muted">جارٍ التحميل…</p>}
     </div>
   );
@@ -84,8 +163,39 @@ function CreateSheet({ open, onClose, onDone, depts }) {
             <Field label="إيميل الدخول" error={errs.email}><Input type="email" dir="ltr" required value={f.email} onChange={set('email')} className="text-start" /></Field>
             <Field label="رقم التليفون" error={errs.phone}><Input dir="ltr" inputMode="tel" required pattern="01[0125][0-9]{8}" value={f.phone} onChange={set('phone')} className="text-start" /></Field>
             <Field label="واتساب المحل (لو مختلف)" optional error={errs.whatsapp}><Input dir="ltr" inputMode="tel" pattern="01[0125][0-9]{8}" value={f.whatsapp} onChange={set('whatsapp')} className="text-start" /></Field>
-            <Field label="العنوان" optional><Input value={f.address} onChange={set('address')} placeholder="شارع ...، بنها" /></Field>
-            <div className="sm:col-span-2"><p className="mb-2 text-sm font-medium">موقع المحل على الخريطة</p><LocationPicker lat={f.lat ?? null} lng={f.lng ?? null} onChange={(la, ln) => setF({ ...f, lat: la, lng: ln, map_url: `https://www.google.com/maps?q=${la},${ln}` })} height={220} /></div>
+            <Field label="العنوان" optional>
+              <PlaceAutocomplete
+                value={f.address}
+                onChange={(v) => setF((prev) => ({ ...prev, address: v }))}
+                onSelect={(place) => {
+                  if (place.lat && place.lng) {
+                    setF((prev) => ({
+                      ...prev,
+                      address: place.name || place.shortName || prev.address,
+                      lat: place.lat,
+                      lng: place.lng,
+                      map_url: `https://www.google.com/maps?q=${place.lat},${place.lng}`,
+                    }));
+                  }
+                }}
+                placeholder="ابحث عن شارع أو معلم (مثلاً: شارع كلية التجارة، مسجد الخضر)…"
+              />
+            </Field>
+            <div className="sm:col-span-2">
+              <p className="mb-2 text-sm font-medium">موقع المحل على الخريطة</p>
+              <LocationPicker
+                lat={f.lat ?? null}
+                lng={f.lng ?? null}
+                onChange={(la, ln, place) => setF((prev) => ({
+                  ...prev,
+                  lat: la,
+                  lng: ln,
+                  map_url: `https://www.google.com/maps?q=${la},${ln}`,
+                  address: !prev.address?.trim() && place?.shortName ? place.shortName : prev.address,
+                }))}
+                height={220}
+              />
+            </div>
             <Field label="بيفتح الساعة"><Input type="time" dir="ltr" value={f.opens_at} onChange={set('opens_at')} /></Field>
             <Field label="بيقفل الساعة"><Input type="time" dir="ltr" value={f.closes_at} onChange={set('closes_at')} /></Field>
           </div>
@@ -173,7 +283,13 @@ function EditSheet({ store, onClose, onChanged, depts }) {
           </div>
           <div><p className="mb-2 text-sm font-medium">الأقسام</p><DeptPicker depts={depts} value={f.departments} onChange={(v) => setF({ ...f, departments: v })} /></div>
           <div><p className="mb-2 text-sm font-medium">موقع المحل على الخريطة</p><LocationPicker lat={f.lat} lng={f.lng} onChange={(la, ln) => setF({ ...f, lat: la, lng: ln })} height={220} /></div>
-          <Field label="منطقة استلام الطلبات" hint="اكتب نفس المنطقة للمحلات القريبة التي يمكن للمندوب جمع طلباتها في جولة واحدة. اتركها فارغة لو المحل يحتاج مسارًا منفصلًا."><Input value={f.delivery_zone} onChange={(e) => setF({ ...f, delivery_zone: e.target.value })} maxLength={80} placeholder="مثال: وسط بنها" /></Field>
+          <Field label="منطقة استلام الطلبات" hint="اكتب نفس المنطقة للمحلات القريبة التي يمكن للمندوب جمع طلباتها في جولة واحدة. اتركها فارغة لو المحل يحتاج مسارًا منفصلًا.">
+            <PlaceAutocomplete
+              value={f.delivery_zone || ''}
+              onChange={(v) => setF({ ...f, delivery_zone: v })}
+              placeholder="مثال: وسط بنها، كفر الجزار، شبرا الخيمة…"
+            />
+          </Field>
           <div className="space-y-3 rounded-2xl border border-line p-4">
             <Switch checked={!f.hidden} onChange={(v) => setF({ ...f, hidden: !v })} label="ظاهر في الصفحة الرئيسية" />
             <Switch checked={!!f.show_when_empty} onChange={(v) => setF({ ...f, show_when_empty: v })} label="إظهار حتى لو فاضي" />

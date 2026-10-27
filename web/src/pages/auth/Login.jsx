@@ -3,12 +3,16 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff, Sparkles } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
+import { api } from '../../lib/api.js';
 import { Field, Input } from '../../components/ui/Field.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import AuthShell from './AuthShell.jsx';
+import InstallStoreApp from '../../components/auth/InstallStoreApp.jsx';
+import { useStoreAppManifest } from '../../lib/pwa.js';
 
 export default function Login() {
+  useStoreAppManifest();
   const { t } = useI18n();
   const { login, user } = useAuth();
   const navigate = useNavigate();
@@ -23,12 +27,16 @@ export default function Login() {
     setBusy(true);
     setError(null);
     try {
-      await login(creds.email, creds.password);
+      await login(creds.email.trim(), creds.password);
       navigate(params.get('next') || '/dashboard', { replace: true });
     } catch (err) {
       setError(err);
       setBusy(false);
     }
+  };
+  const forgot = async () => {
+    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) { setError({ message: 'اكتب الإيميل الأول وبعدين دوس «نسيت الباسورد».' }); return; }
+    try { const r = await api('/auth/forgot', { method: 'POST', body: { email: form.email.trim() } }); window.open(r.wa, '_blank', 'noopener'); } catch (e) { setError(e); }
   };
   const demo = () => { const c = { email: 'ahmed@banhalook.app', password: 'demo1234' }; setForm(c); submit(null, c); };
 
@@ -50,16 +58,18 @@ export default function Login() {
       <div className="my-7 flex items-center gap-4 text-xs text-muted"><span className="h-px flex-1 bg-line" />{t('common.or')}<span className="h-px flex-1 bg-line" /></div>
 
       <form onSubmit={submit} noValidate className="space-y-4">
-        <Field label={t('auth.email')} error={fe.email}><Input type="email" autoComplete="email" dir="ltr" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="text-start" /></Field>
+        <Field label={t('auth.email')} error={fe.email}><Input type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} dir="ltr" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="text-start" /></Field>
         <Field label={t('auth.password')} error={fe.password}>
           <div className="relative">
-            <Input type={show ? 'text' : 'password'} autoComplete="current-password" dir="ltr" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pe-12 text-start" />
+            <Input type={show ? 'text' : 'password'} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} dir="ltr" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pe-12 text-start" />
             <button type="button" onClick={() => setShow((s) => !s)} aria-label={t('auth.showPassword')} className="absolute end-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-muted hover:text-fg">{show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>
           </div>
         </Field>
         {error && !Object.keys(fe).length && <p role="alert" className="rounded-xl bg-sale/10 px-4 py-3 text-sm font-medium text-sale">{errorMessage(t, error)}</p>}
         <Button type="submit" full size="lg" loading={busy}>{t('auth.signIn')}</Button>
+        <button type="button" onClick={forgot} className="w-full text-center text-sm font-medium text-brand hover:underline">نسيت الباسورد؟ كلّم Twist على واتساب</button>
       </form>
+      <InstallStoreApp className="mt-8" />
       <p className="mt-8 text-center text-sm text-muted">{t('app.name')} · {t('app.tagline')}</p>
     </AuthShell>
   );

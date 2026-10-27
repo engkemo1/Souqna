@@ -6,7 +6,7 @@ import { useStore, sp } from '../../lib/store.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { exchangeLabel, exchangeSentence } from '../../lib/returns.js';
-import { useFavorites, useMarketCart } from '../../lib/cart.jsx';
+import { useFavorites } from '../../lib/cart.jsx';
 import { formatNumber } from '../../lib/format.js';
 import Gallery from '../../components/store/Gallery.jsx';
 import VariantPicker, { resolveVariant } from '../../components/store/VariantPicker.jsx';
@@ -51,7 +51,8 @@ function Accordion({ title, children, defaultOpen }) {
 
 /** "Tell me if the price drops" + "follow this store": need a (free, optional) account because the alerts have to reach someone. */
 function ProductAlerts({ product, store }) {
-  const { t, tr } = useI18n();
+  const { t, tr, lang } = useI18n();
+  const soldOutNow = product.stock === 'out';
   const me = useBuyer();
   const toast = useToast();
   const nav = useNavigate();
@@ -67,7 +68,7 @@ function ProductAlerts({ product, store }) {
   const toggleFollow = guard(async () => { if (follow) await api(`/buyer/follows/${store.slug}`, { method: 'DELETE' }); else await api('/buyer/follows', { method: 'POST', body: { slug: store.slug } }); setFollow(!follow); });
   return (
     <div className="mt-4 flex flex-wrap gap-2">
-      <button type="button" onClick={toggleWatch} aria-pressed={watch} className={cx('inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition', watch ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-line-strong hover:bg-fg/[0.04]')}><Bell className="h-4 w-4" />{watch ? t('acc.watching') : t('acc.watch')}</button>
+      <button type="button" onClick={toggleWatch} aria-pressed={watch} className={cx('inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition', watch ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-line-strong hover:bg-fg/[0.04]')}><Bell className="h-4 w-4" />{soldOutNow ? (watch ? (lang === 'ar' ? 'هنبلغك لما يتوفر' : 'We will tell you when it is back') : (lang === 'ar' ? 'أخبرني لما يتوفر' : 'Notify me when back in stock')) : (watch ? t('acc.watching') : t('acc.watch'))}</button>
       <button type="button" onClick={toggleFollow} aria-pressed={follow} className={cx('inline-flex items-center gap-1.5 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition', follow ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-line-strong hover:bg-fg/[0.04]')}>{follow ? t('acc.followingS', { s: tr(store.name) }) : t('acc.follow', { s: tr(store.name) })}</button>
     </div>
   );
@@ -105,7 +106,6 @@ export default function Product() {
   const { pslug } = useParams();
   const nav = useNavigate();
   const { store } = useStore();
-  const marketCart = useMarketCart();
   const { t, tr, lang } = useI18n();
   const { data, error, loading, reload } = useApi(`/stores/${store.slug}/products/${pslug}`);
   const favs = useFavorites(store.slug);
@@ -166,16 +166,6 @@ export default function Product() {
       setAddState('done');
       setTimeout(() => setAddState('idle'), 1600);
     }, 280);
-  };
-
-  const onAddMarketplace = () => {
-    if (needsSize) { setSizeError(true); return; }
-    if (available <= 0) return;
-    const selectedColor = p.colors?.find((x) => x.hex === color);
-    marketCart.add({ productId: p.id, variantId: variant?.id ?? null, slug: p.slug, name: p.name, price: p.price, compareAt: p.compareAt,
-      image: p.media?.[0] || p.image, color: color || null, colorName: selectedColor ? { ar: selectedColor.name_ar, en: selectedColor.name_en } : null,
-      size: size && size !== 'One size' ? size : null, qty: Math.min(qty, available) }, store);
-    toast({ title: lang === 'ar' ? 'اتضاف لسلة Twist' : 'Added to Twist basket', tone: 'info', action: { label: lang === 'ar' ? 'افتحي السلة' : 'Open basket', onClick: () => nav('/market-cart') } });
   };
 
   const share = async () => {
@@ -249,9 +239,6 @@ export default function Product() {
             <QtyStepper value={qty} onChange={setQty} max={Math.max(1, Math.min(20, available || 1))} label={t('product.quantity')} />
             <div className="flex-1"><AddButton state={addState} disabled={ctaDisabled} onClick={onAdd} label={ctaLabel} /></div>
           </div>
-          <Button variant="outline" full className="mt-3" disabled={ctaDisabled} icon={ShoppingBag} onClick={onAddMarketplace}>
-            {lang === 'ar' ? 'أضف لسلة Twist' : 'Add to Twist basket'}
-          </Button>
 
           <ProductAlerts product={p} store={store} />
 

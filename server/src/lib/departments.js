@@ -3,10 +3,15 @@ import { q, insert } from '../db/index.js';
 import { AppError } from './errors.js';
 import { json } from '../db/index.js';
 
+export const PENDING_RE = /^c\d+_/;
 export const listDepartments = ({ all = false } = {}) =>
   q.all(`SELECT d.*, (SELECT COUNT(*) FROM stores s WHERE s.departments LIKE '%,' || d.slug || ',%') AS stores_count
          FROM departments d ${all ? '' : 'WHERE d.active=1'} ORDER BY d.sort, d.id`)
-    .map((d) => ({ id: d.id, slug: d.slug, name: { ar: d.name_ar, en: d.name_en }, name_ar: d.name_ar, name_en: d.name_en, sizes: json(d.sizes_json, []), image: d.image || null, sort: d.sort, active: !!d.active, parent: d.parent_slug || null, stores_count: d.stores_count }));
+    .map((d) => {
+      const pending = !d.active && PENDING_RE.test(d.slug); // a section an owner added; waits for the platform admin to accept it
+      return { id: d.id, slug: d.slug, name: { ar: d.name_ar, en: d.name_en }, name_ar: d.name_ar, name_en: d.name_en, sizes: json(d.sizes_json, []), image: d.image || null, sort: d.sort, active: !!d.active, parent: d.parent_slug || null, stores_count: d.stores_count,
+        ...(pending ? { pending: true, requesters: q.all('SELECT s.name_ar FROM categories c JOIN stores s ON s.id=c.store_id WHERE c.slug=?', [d.slug.replace(/_/g, '-')]).map((x) => x.name_ar) } : {}) };
+    });
 
 const deptRows = () => q.all('SELECT slug, name_ar, name_en, parent_slug FROM departments');
 /** القسم + كل اللي تحته (قسم رئيسي ← أقسام ← أنواع). الأسماء القديمة بتتحول لمكانها الجديد. */

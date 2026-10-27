@@ -7,6 +7,16 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Twist Store" />
+    <script>
+      // Login and dashboard pages install as "لوحة المحل" and open straight on the dashboard (decided before the browser reads the manifest).
+      (function () {
+        var p = location.pathname;
+        if (p === '/login' || p === '/dashboard' || p.indexOf('/dashboard/') === 0) {
+          document.querySelector('link[rel="manifest"]').setAttribute('href', '/store-app.webmanifest');
+          document.querySelector('meta[name="apple-mobile-web-app-title"]').setAttribute('content', 'لوحة المحل');
+        }
+      })();
+    </script>
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="description" content="Twist (تويست) بنها: منصة تسوق محلية لمحلات الملابس. اكتشف الموضة، قارن الأسعار واطلب أونلاين. ولأصحاب المحلات: متجر باسمك من غير عمولة على البيع." />
     <link rel="canonical" href="https://twistegy.com/" />

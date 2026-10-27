@@ -5,6 +5,8 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { useNav } from './DashboardLayout.jsx';
 import { StoreLogo } from '../../components/store/StoreChrome.jsx';
 import AppAlertsCard from '../../components/dash/AppAlertsCard.jsx';
+import InstallStoreApp from '../../components/auth/InstallStoreApp.jsx';
+import BiometricToggle from '../../components/auth/BiometricToggle.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 
 export default function More() {
@@ -20,6 +22,8 @@ export default function More() {
         <a href={`/s/${store.slug}`} target="_blank" rel="noreferrer" aria-label={t('dash.viewStore')} className="grid h-11 w-11 place-items-center rounded-full bg-secondary text-brand"><ExternalLink className="h-5 w-5" /></a>
       </div>
       <AppAlertsCard className="mb-5" />
+      <InstallStoreApp className="mb-5" />
+      <BiometricToggle className="mb-5" />
       {nav.map((g, i) => (
         <div key={i} className="mb-5">
           {g.group && <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted">{g.group}</p>}

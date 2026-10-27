@@ -98,3 +98,21 @@ export function useBuyerPush() {
   }, [refresh]);
   return { supported, ...state, enable, disable };
 }
+
+/** While the shop owner is on the login / dashboard screens, the page installs as "لوحة المحل" and opens on the dashboard. */
+export function useStoreAppManifest() {
+  useEffect(() => {
+    const link = document.querySelector('link[rel="manifest"]');
+    const title = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+    const prev = { href: link?.getAttribute('href'), title: title?.getAttribute('content') };
+    link?.setAttribute('href', '/store-app.webmanifest');
+    title?.setAttribute('content', 'لوحة المحل');
+    return () => {
+      if (prev.href) link?.setAttribute('href', prev.href);
+      if (prev.title) title?.setAttribute('content', prev.title);
+    };
+  }, []);
+}
+
+/** Ask the browser not to wipe the saved sign-in when it is short on space. */
+export function keepStorage() { try { navigator.storage?.persist?.(); } catch { /* ignore */ } }

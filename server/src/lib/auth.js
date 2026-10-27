@@ -3,7 +3,7 @@ import { config } from '../config.js';
 import { q } from '../db/index.js';
 import { AppError } from './errors.js';
 
-export const signToken = (user) => jwt.sign({ sub: user.id }, config.jwtSecret, { expiresIn: '30d' });
+export const signToken = (user) => jwt.sign({ sub: user.id }, config.jwtSecret, { expiresIn: '365d' });
 
 export function requireOwner(req, _res, next) {
   const header = req.headers.authorization || '';

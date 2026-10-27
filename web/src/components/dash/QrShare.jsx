@@ -53,6 +53,7 @@ export default function QrShare({ open, onClose, kind = 'store', url, name, pric
 
         {isStore ? (
           <div className="mt-3 grid w-full gap-2">
+            <Button full variant="secondary" onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(`${name}\n${url}`)}`, '_blank', 'noopener')}>ابعت لينك المحل على واتساب</Button>
             <Button full icon={Printer} onClick={printPoster}>{t('qr.printPoster')}</Button>
             <Button full variant="outline" icon={LayoutGrid} onClick={printCards}>{t('qr.printCards')}</Button>
           </div>

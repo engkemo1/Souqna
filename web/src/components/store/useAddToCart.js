@@ -2,10 +2,8 @@ import { useCallback } from 'react';
 import { useCart } from '../../lib/cart.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useToast } from '../ui/Toast.jsx';
-import { useIsDesktop } from '../../lib/hooks.js';
 import { pickSrc } from '../../lib/image.js';
 import { useNavigate } from 'react-router-dom';
-import { sp } from '../../lib/store.jsx';
 
 /** Fly a thumbnail from `fromEl` to the cart icon — a subtle, fast confirmation. */
 function flyToCart(fromEl, src) {
@@ -34,7 +32,6 @@ export function useAddToCart(slug) {
   const cart = useCart(slug);
   const { t, tr } = useI18n();
   const toast = useToast();
-  const desktop = useIsDesktop();
   const navigate = useNavigate();
 
   return useCallback(({ product, variant, color, size, qty = 1, fromEl }) => {
@@ -54,7 +51,7 @@ export function useAddToCart(slug) {
       qty,
     });
     flyToCart(fromEl, pickSrc(image, 400));
-    if (desktop) setTimeout(() => cart.open(), 450);
-    else toast({ title: t('product.added'), description: tr(product.name), image: pickSrc(image, 160), action: { label: t('cart.viewCart'), onClick: () => navigate(sp(slug, 'cart')) } });
-  }, [cart, desktop, toast, t, tr, navigate, slug]);
+    // One basket for all of Twist: confirm in place and let the shopper keep browsing.
+    toast({ title: t('product.added'), description: tr(product.name), image: pickSrc(image, 160), action: { label: t('cart.viewCart'), onClick: () => navigate('/market-cart') } });
+  }, [cart, toast, t, tr, navigate]);
 }

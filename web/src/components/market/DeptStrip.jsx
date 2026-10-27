@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, LayoutGrid } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import SmartImage from '../ui/SmartImage.jsx';
 
@@ -32,56 +32,22 @@ const defaultImg = (slug) => (DEFAULT_IMG[slug] ? `https://images.unsplash.com/$
 // رجالي / حريمي / أطفال أقسام رئيسية: بتفتح كل منتجات الفئة (أحذية، جلاليب، شباشب، إكسسوارات…) مش القسم الواحد بس.
 const AUDIENCE_DEPTS = ['women', 'men', 'kids'];
 
-function DeptCard({ dept, lang, fmt, priority }) {
+function DeptCard({ dept, lang, priority }) {
   const [imgErr, setImgErr] = useState(false);
   const name = dept.name?.[lang] || dept.name?.ar || dept.slug;
-  const localUrl = `/departments/${dept.slug}.jpg`;
-  const url = dept.image || localUrl || defaultImg(dept.slug);
-
+  const url = dept.image || `/departments/${dept.slug}.jpg` || defaultImg(dept.slug);
   return (
-    <Link to={AUDIENCE_DEPTS.includes(dept.slug) ? `/search?audience=${dept.slug}` : `/search?department=${dept.slug}`} className="group block focus:outline-none" aria-label={name}>
-      <div className="relative aspect-[4/5] overflow-hidden rounded-[22px] bg-neutral-100 shadow-[0_4px_16px_rgba(0,0,0,0.06)] ring-1 ring-black/5 transition duration-300 ease-out group-hover:-translate-y-1.5 group-hover:shadow-[0_16px_30px_-10px_rgba(3,36,77,0.22)] group-focus-visible:ring-2 group-focus-visible:ring-brand">
+    <Link to={AUDIENCE_DEPTS.includes(dept.slug) ? `/search?audience=${dept.slug}` : `/search?department=${dept.slug}`} className="group flex w-[78px] shrink-0 snap-start flex-col items-center gap-2 text-center focus:outline-none sm:w-[100px]" aria-label={name}>
+      <span className="relative block h-[70px] w-[70px] overflow-hidden rounded-full bg-neutral-100 ring-1 ring-black/10 transition duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_12px_24px_-10px_rgba(3,36,77,0.35)] group-focus-visible:ring-2 group-focus-visible:ring-brand sm:h-[90px] sm:w-[90px]">
         {!imgErr && url ? (
-          <img
-            src={url}
-            alt=""
-            loading={priority ? 'eager' : 'lazy'}
-            decoding="async"
-            onError={() => setImgErr(true)}
-            className="h-full w-full object-cover transition-transform duration-500 ease-out group-hover:scale-105"
-          />
+          <img src={url} alt="" loading={priority ? 'eager' : 'lazy'} decoding="async" onError={() => setImgErr(true)} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
         ) : dept.cover ? (
-          <SmartImage
-            media={dept.cover}
-            alt=""
-            className="h-full w-full transition-transform duration-500 group-hover:scale-105"
-            sizes="(min-width:1024px) 16vw, (min-width:640px) 25vw, 46vw"
-          />
+          <SmartImage media={dept.cover} alt="" className="h-full w-full" sizes="90px" />
         ) : (
-          <div className="grid h-full w-full place-items-center bg-neutral-50 text-5xl opacity-80" aria-hidden="true">
-            {DEPT_EMOJI[dept.slug] || '🛍️'}
-          </div>
+          <span className="grid h-full w-full place-items-center text-3xl" aria-hidden="true">{DEPT_EMOJI[dept.slug] || '🛍️'}</span>
         )}
-
-        {/* تدرج هادئ وناعم أسفل الكارت لقراءة الاسم بوضوح بدون أي ألوان صناعية أو كتل ملونة */}
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/75 via-black/35 to-transparent" />
-
-        <div className="absolute inset-x-0 bottom-0 p-3.5 text-white">
-          <p className="truncate text-[15px] font-black leading-tight drop-shadow sm:text-base">{name}</p>
-          {dept.products > 0 && (
-            <p className="mt-1 text-[11px] font-bold text-white/90 drop-shadow-xs">
-              {fmt(dept.products)} {lang === 'ar' ? 'منتج' : 'items'}
-            </p>
-          )}
-        </div>
-
-        <span
-          className="absolute end-2.5 top-2.5 grid h-7 w-7 place-items-center rounded-full bg-white/90 text-neutral-800 opacity-0 shadow-sm transition group-hover:opacity-100 group-focus-visible:opacity-100"
-          aria-hidden="true"
-        >
-          <ArrowRight className="h-3.5 w-3.5 rtl:rotate-180" />
-        </span>
-      </div>
+      </span>
+      <span className="line-clamp-2 text-[12.5px] font-bold leading-tight text-fg sm:text-[13.5px]">{name}</span>
     </Link>
   );
 }
@@ -94,7 +60,8 @@ export default function DeptStrip({ departments = [] }) {
   const list = useMemo(() => {
     const liveMap = new Map((departments || []).map((d) => [d.slug, d]));
     // الأقسام الرئيسية بس (اللي من غير أب)؛ لو الأدمن ضاف قسم رئيسي جديد بيظهر هنا لوحده.
-    const tops = (departments || []).filter((d) => !d.parent);
+    // أي قسم رئيسي فاضي (قديم أو جديد) بيتشال من الشريط تلقائي؛ رجالي/حريمي/أطفال دايماً موجودين.
+    const tops = (departments || []).filter((d) => !d.parent && (AUDIENCE_DEPTS.includes(d.slug) || (d.products || 0) > 0));
     const base = tops.length ? tops.map((d) => ({ slug: d.slug, name: d.name })) : DEFAULT_DEPTS;
     return base.map((def) => {
       const live = liveMap.get(def.slug);
@@ -130,11 +97,12 @@ export default function DeptStrip({ departments = [] }) {
         </Link>
       </div>
 
-      {/* عرض الأقسام مباشرة في شبكة متناسقة بدون أي تبويبات أو ألوان مصطنعة */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8">
-        {list.map((d, i) => (
-          <DeptCard key={d.slug} dept={d} lang={lang} fmt={fmt} priority={i < 6} />
-        ))}
+      <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-2 no-scrollbar sm:mx-0 sm:flex-wrap sm:justify-start sm:gap-x-4 sm:gap-y-6 sm:overflow-visible sm:px-0">
+        <Link to="/search" className="group flex w-[78px] shrink-0 snap-start flex-col items-center gap-2 text-center sm:w-[100px]" aria-label={t('market.seeAll')}>
+          <span className="grid h-[70px] w-[70px] place-items-center rounded-full bg-fg text-canvas transition group-hover:-translate-y-1 sm:h-[90px] sm:w-[90px]"><LayoutGrid className="h-6 w-6" /></span>
+          <span className="text-[12.5px] font-bold leading-tight sm:text-[13.5px]">{lang === 'ar' ? 'كل الأقسام' : 'All'}</span>
+        </Link>
+        {list.map((d, i) => <DeptCard key={d.slug} dept={d} lang={lang} priority={i < 8} />)}
       </div>
     </section>
   );

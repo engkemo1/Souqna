@@ -139,7 +139,14 @@ export default function Departments() {
   const [edit, setEdit] = useState(null);
   const [newParent, setNewParent] = useState('');
   const [local, setLocal] = useState(null);
-  const raw = local || data?.departments || [];
+  const everything = local || data?.departments || [];
+  const raw = everything.filter((d) => !d.pending);
+  const pendingList = everything.filter((d) => d.pending);
+  const [busyId, setBusyId] = useState(null);
+  const decide = async (d, verb) => {
+    setBusyId(d.id);
+    try { const r = await adminApi(`/departments/${d.id}/${verb}`, { method: 'POST' }); setLocal(r.departments); toast({ title: verb === 'approve' ? 'اتقبل وبقى ظاهر في السوق' : 'اترفض (فاضل في المحل بس)' }); } catch (x) { toast({ tone: 'error', title: x.message }); } finally { setBusyId(null); }
+  };
   const byS = new Map(raw.map((d) => [d.slug, d]));
   const depthOf = (d) => { let n = 0; for (let p = d.parent; p && n < 4; p = byS.get(p)?.parent) n++; return n; };
   const pathOf = (d) => { const parts = []; for (let x = d, i = 0; x && i < 4; x = byS.get(x.parent), i++) parts.unshift(x.name_ar); return parts.join(' › '); };
@@ -154,6 +161,25 @@ export default function Departments() {
   return (
     <div>
       <PageHeader title="الأقسام" subtitle="الأقسام اللي بتظهر للعملاء وبتختار منها المحلات اللي بتبيعه. القسم والمقاسات بتتحدد تلقائي لكل منتج من (الفئة ← النوع) اللي صاحب المحل بيختاره." actions={<Button icon={Plus} onClick={() => setEdit('new')}>قسم جديد</Button>} />
+      {pendingList.length > 0 && (
+        <section className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4" aria-label="طلبات أقسام جديدة">
+          <p className="mb-3 text-base font-bold">طلبات أقسام جديدة ({pendingList.length})</p>
+          <ul className="space-y-2">
+            {pendingList.map((d) => (
+              <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-white p-3 ring-1 ring-line">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold">{d.name_ar}{d.parent && <span className="ms-2 text-xs font-normal text-muted">تحت: {raw.find((x) => x.slug === d.parent)?.name_ar || d.parent}</span>}</p>
+                  <p className="text-xs text-muted">طلب من: {(d.requesters || []).join('، ') || '—'}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="xs" disabled={busyId === d.id} onClick={() => decide(d, 'approve')}>قبول وإظهار في السوق</Button>
+                  <Button size="xs" variant="danger-ghost" disabled={busyId === d.id} onClick={() => decide(d, 'reject')}>رفض</Button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : !list.length ? <EmptyState title="مفيش أقسام" body="أضف أول قسم." /> : (
         <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {list.map((d) => (

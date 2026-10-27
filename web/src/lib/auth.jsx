@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { api, tokenStore, setUnauthorizedHandler } from './api.js';
 import { invalidate } from './hooks.js';
+import { bioDisable } from './biometric.js';
+import { keepStorage } from './pwa.js';
 
 export const AuthContext = createContext(null);
 
@@ -9,6 +11,7 @@ export function AuthProvider({ children }) {
 
   const logout = useCallback(() => {
     tokenStore.set(null);
+    bioDisable();
     invalidate('/owner');
     setState({ user: null, store: null, ready: true });
   }, []);
@@ -17,7 +20,7 @@ export function AuthProvider({ children }) {
     setUnauthorizedHandler(logout);
     if (!tokenStore.get()) return;
     api('/auth/me')
-      .then(({ user, store }) => setState({ user, store, ready: true }))
+      .then(({ user, store, token }) => { if (token) tokenStore.set(token); keepStorage(); setState({ user, store, ready: true }); })
       // Only a refused token ends the session. No network (the cashier working offline) must never sign anyone out.
       .catch((e) => { if (e?.status === 401) logout(); else setState({ user: null, store: null, ready: true }); });
   }, [logout]);

@@ -42,6 +42,7 @@ export const config = {
     template: process.env.WA_TEMPLATE || 'new_order',
     serviceTemplate: process.env.WA_SERVICE_TEMPLATE || 'service_request',
     platformTemplate: process.env.WA_PLATFORM_TEMPLATE || 'delivery_request',
+    alertTemplate: process.env.WA_ALERT_TEMPLATE || '', // optional: approved template with ONE variable ({{1}} = the message) for team alerts
     lang: process.env.WA_TEMPLATE_LANG || 'ar',
     apiBase: process.env.WA_API_BASE || 'https://graph.facebook.com/v21.0',
   },

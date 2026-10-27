@@ -23,6 +23,7 @@ export default function MarketCart() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
   const { data: market } = useApi('/marketplace?q=&category=all&sort=featured');
+  const { data: pfs } = useApi('/marketplace/free-shipping');
   const storeBySlug = new Map((market?.stores || []).map((s) => [s.slug, s]));
   const groups = Object.values(cart.items.reduce((acc, line) => {
     (acc[line.storeSlug] ||= { slug: line.storeSlug, name: line.storeName, items: [] }).items.push(line);
@@ -31,6 +32,9 @@ export default function MarketCart() {
 
   return <div className="min-h-dvh"><MarketHeader /><main className="container max-w-4xl py-8 sm:py-12">
     <div className="mb-7 flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary text-brand"><ShoppingBag className="h-6 w-6" /></span><div><h1 className="font-display text-2xl font-bold sm:text-3xl">{ar ? 'سلة Twist' : 'Twist basket'}</h1><p className="mt-1 text-sm text-muted">{ar ? 'منتجاتك من كل المحلات في مكان واحد' : 'Your picks from all stores, together'}</p></div></div>
+    {pfs?.enabled && groups.length > 0 && (cart.subtotal >= pfs.over
+      ? <p className="mb-5 rounded-2xl bg-success/10 px-4 py-3 text-sm font-semibold text-success">{ar ? 'التوصيل مجاني على طلبك من Twist' : 'Delivery is free on your Twist order'}</p>
+      : <p className="mb-5 rounded-2xl bg-secondary px-4 py-3 text-sm font-medium">{ar ? `ضيف ${formatMoney(pfs.over - cart.subtotal, lang)} كمان والتوصيل يبقى مجاني` : `Add ${formatMoney(pfs.over - cart.subtotal, lang)} more for free delivery`}</p>)}
     {!groups.length ? <div className="rounded-3xl border border-line bg-elevated px-5 py-16 text-center"><ShoppingBag className="mx-auto h-10 w-10 text-muted" /><h2 className="mt-4 text-lg font-semibold">{ar ? 'السلة لسه فاضية' : 'Your basket is empty'}</h2><p className="mt-2 text-sm text-muted">{ar ? 'ضيف منتجات من صفحات المحلات لسلة Twist.' : 'Add products from store pages to this basket.'}</p><Button to="/search" className="mt-6">{ar ? 'اكتشف المنتجات' : 'Explore products'}</Button></div> : <>
       <div className="space-y-5">{groups.map((group) => <section key={group.slug} className="overflow-hidden rounded-3xl border border-line bg-elevated">
         <header className="flex items-center justify-between gap-3 border-b border-line bg-canvas px-4 py-3.5 sm:px-5"><Link to={`/s/${group.slug}`} className="inline-flex items-center gap-2 font-semibold hover:text-brand"><Store className="h-4 w-4" />{group.name?.[lang] || group.name?.ar || group.slug}</Link><span className="text-xs text-muted">{group.items.length} {ar ? 'منتج' : 'items'}</span></header>

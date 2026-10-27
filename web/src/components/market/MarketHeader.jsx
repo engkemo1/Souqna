@@ -10,6 +10,7 @@ import MobileBottomNav from './MobileBottomNav.jsx';
 import Button from '../ui/Button.jsx';
 import { cx } from '../ui/cx.js';
 import { useMarketCart } from '../../lib/cart.jsx';
+import { useAuth } from '../../lib/auth.jsx';
 
 const TOP_CATEGORIES = [
   { slug: 'women', label: 'cat.women', href: '/search?audience=women' },
@@ -28,6 +29,8 @@ export default function MarketHeader() {
   const scrolled = useScrolled(10);
   const me = useBuyer();
   const cart = useMarketCart();
+  const { user: owner } = useAuth() || {};
+  const ar = lang === 'ar';
   const handleSectionLink = (id) => (event) => {
     setMobileMenuOpen(false);
     if (window.location.pathname !== '/') return;
@@ -84,6 +87,9 @@ export default function MarketHeader() {
             <ChevronDown className="h-3.5 w-3.5 opacity-60" />
           </button>
 
+          {/* Store owners: sign in / open the dashboard */}
+          <Link to={owner ? '/dashboard' : '/login'} className="inline-flex h-9 items-center rounded-full border border-line px-3 text-xs font-semibold text-fg transition hover:bg-fg/[0.06]">{owner ? (ar ? 'لوحة المحل' : 'Dashboard') : (ar ? 'دخول المحلات' : 'Store login')}</Link>
+
           {/* Owner login button */}
           <Button size="sm" variant="ghost" to="/join" className="hidden text-xs font-semibold md:inline-flex">
             {t('market.openStore')}
@@ -96,6 +102,7 @@ export default function MarketHeader() {
         <div className="container flex items-center justify-start gap-6 overflow-x-auto px-2 text-[13px] font-medium text-fg/80 scrollbar-none 2xl:justify-center sm:gap-8">
           <Link to="/stores" className="shrink-0 font-bold text-brand transition hover:text-brand/80">{t('market.exploreStores')}</Link>
           <a href="/#products" onClick={handleSectionLink('products')} className="shrink-0 font-bold text-fg transition hover:text-brand">{t('market.browseProducts')}</a>
+          <Link to="/track" className="shrink-0 font-bold text-fg transition hover:text-brand">{ar ? 'تتبّع طلبي' : 'Track order'}</Link>
           {TOP_CATEGORIES.map((cat) => (
             <Link key={cat.slug} to={cat.href} className="shrink-0 transition hover:text-brand hover:font-semibold">
               {t(cat.label)}
@@ -109,7 +116,9 @@ export default function MarketHeader() {
         <div className="container grid gap-2 py-4">
           <Link to="/stores" onClick={() => setMobileMenuOpen(false)} className="rounded-xl bg-btn px-4 py-3 text-center text-sm font-bold text-white">{t('market.exploreStores')}</Link>
           <a href="/#products" onClick={handleSectionLink('products')} className="rounded-xl border border-line px-4 py-3 text-center text-sm font-bold text-fg">{t('market.browseProducts')}</a>
+          <Link to="/track" onClick={() => setMobileMenuOpen(false)} className="rounded-xl border border-line px-4 py-3 text-center text-sm font-bold text-fg">{ar ? 'تتبّع طلبي' : 'Track order'}</Link>
           <Link to="/join" onClick={() => setMobileMenuOpen(false)} className="rounded-xl border border-line px-4 py-3 text-center text-sm font-bold text-fg">{t('market.openStore')}</Link>
+          <Link to={owner ? '/dashboard' : '/login'} onClick={() => setMobileMenuOpen(false)} className="rounded-xl bg-secondary px-4 py-3 text-center text-sm font-bold text-brand">{owner ? (ar ? 'لوحة المحل' : 'Dashboard') : (ar ? 'تسجيل دخول المحل' : 'Store login')}</Link>
           <div className="grid grid-cols-2 gap-2 pt-1">
             <Link to="/favorites" onClick={() => setMobileMenuOpen(false)} className="rounded-xl bg-secondary px-3 py-2.5 text-center text-sm font-medium">{t('store.favorites')}</Link>
             <Link to="/account" onClick={() => setMobileMenuOpen(false)} className="rounded-xl bg-secondary px-3 py-2.5 text-center text-sm font-medium">{t('acc.title')}</Link>

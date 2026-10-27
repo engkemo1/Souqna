@@ -43,7 +43,7 @@ function VisualPanel() {
         className={`rounded-xl border p-3 text-start transition disabled:cursor-not-allowed disabled:opacity-60 ${f.model === id ? 'border-fg bg-secondary' : 'border-line-strong hover:border-fg'}`}>
         <p className="font-semibold">{title}</p><p className="mt-0.5 text-[12.5px] text-muted">{body}</p>
         {id === 'clip' && !available && <p className="mt-1.5 text-[12px] font-medium text-sale">النموذج مش قادر يتحمّل دلوقتي ({P.clip?.error}) — البحث شغال بمقارنة الألوان لحد ما يتصلح.</p>}
-        {id === 'jina' && !available && <p className="mt-1.5 text-[12px] font-medium text-sale">أضف <span dir="ltr">JINA_API_KEY</span> في Railway لتفعيل الاختيار.</p>}
+        {id === 'jina' && !available && <p className="mt-1.5 text-[12px] font-medium text-sale">أضف <span dir="ltr">JINA_API_KEY</span> في ملف <span dir="ltr">.env</span> على السيرفر لتفعيل الاختيار.</p>}
       </button>
     );
   };
@@ -130,7 +130,7 @@ function StylistPanel() {
                 <button key={id} type="button" disabled={miss} onClick={() => setF({ ...f, provider: id })} aria-pressed={f.provider === id}
                   className={'rounded-xl border p-3 text-start transition ' + (f.provider === id ? 'border-fg bg-secondary' : 'border-line-strong hover:border-fg') + (miss ? ' cursor-not-allowed opacity-60' : '')}>
                   <p className="font-semibold">{title}</p><p className="mt-0.5 text-[12.5px] text-muted">{body}</p>
-                  {miss && <p className="mt-1.5 text-[12px] font-medium text-sale">محتاج متغير <span dir="ltr">{need}</span> في Railway{id === 'cloudflare' ? ' (و CF_ACCOUNT_ID أو R2_ACCOUNT_ID)' : ''}</p>}
+                  {miss && <p className="mt-1.5 text-[12px] font-medium text-sale">محتاج متغير <span dir="ltr">{need}</span> في ملف .env على السيرفر{id === 'cloudflare' ? ' (و CF_ACCOUNT_ID أو R2_ACCOUNT_ID)' : ''}</p>}
                 </button>
               );
             })}
@@ -720,10 +720,10 @@ function BackupPanel({ data, reload }) {
   const localDate = b?.at ? fmtDateTime(b.at.slice(0, 19).replace('T', ' ')) : '';
   const offsiteDate = offsite.last?.at ? fmtDateTime(offsite.last.at.slice(0, 19).replace('T', ' ')) : '';
   return (
-    <Panel title="النسخ الاحتياطي" subtitle="النسخ المحلية منفصلة عن نسخ Railway المدمجة وCloudflare R2">
+    <Panel title="النسخ الاحتياطي" subtitle="النسخ المحلية منفصلة عن نسخة Cloudflare R2">
       <div className="space-y-4">
         <section>
-          <p className="font-medium">نسخة على قرص Railway الدائم — قاعدة البيانات والصور</p>
+          <p className="font-medium">نسخة على قرص السيرفر — قاعدة البيانات والصور</p>
           <p className="mt-1 text-sm text-muted">{data.backupDir ? (b ? 'آخر نسخة: ' + localDate + ' — ' + (b.bytes / 1048576).toFixed(1) + ' ميجا، صور جديدة: ' + (b.media?.copied || 0) : 'مفيش نسخة لسه — هتتاخد تلقائياً بعد تشغيل السيرفر بدقيقة.') : 'غير مفعّلة: اضبط BACKUP_DIR على مجلد مربوط بقرص دائم.'}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {data.backupDir && <Button size="sm" variant="outline" icon={DatabaseBackup} loading={busy === 'run'} onClick={run}>خد نسخة محلية دلوقتي</Button>}
@@ -731,7 +731,7 @@ function BackupPanel({ data, reload }) {
           </div>
         </section>
         <section className="border-t border-line pt-4">
-          <p className="font-medium">نسخة خارج Railway على Cloudflare R2 — قاعدة البيانات فقط</p>
+          <p className="font-medium">نسخة خارج السيرفر على Cloudflare R2 — قاعدة البيانات فقط</p>
           <p className="mt-1 text-sm text-muted">{offsite.enabled ? (offsite.last ? 'آخر رفع ناجح: ' + offsiteDate + ' — ' + (offsite.last.bytes / 1048576).toFixed(1) + ' ميجا.' : 'الإعداد موجود، لكن لسه مفيش رفع ناجح مسجل. شغّل نسخة دلوقتي للتأكد.') : 'غير مفعّلة. اضبط R2_ACCOUNT_ID وBACKUP_R2_BUCKET وR2_ACCESS_KEY_ID وR2_SECRET_ACCESS_KEY، أو مفاتيح BACKUP_R2 المخصصة.'}</p>
           <p className="mt-2 text-[12px] text-muted">استخدم bucket منفصل وخاص (Private) مع صلاحية كتابة للمفاتيح. CF_AI_TOKEN خاص بالذكاء الاصطناعي ولا يصلح للنسخ الاحتياطي. نسخة R2 تشمل قاعدة البيانات فقط؛ الصور تحتاج BACKUP_DIR على قرص دائم.</p>
           <div className="mt-3">
@@ -771,7 +771,7 @@ function ResourcePanel() {
               <div className="my-3 h-2 overflow-hidden rounded-full bg-line"><div className={`h-full rounded-full ${diskPercent > 90 ? 'bg-sale' : 'bg-brand'}`} style={{ width: `${diskPercent}%` }} /></div>
               <p className="text-sm text-muted">المتاح: {fmtBytes(disk.freeBytes)} · {diskPercent.toFixed(1)}% مستخدم</p>
               <p className="mt-2 break-all text-xs text-muted" dir="ltr">{disk.path}</p>
-              <p className="mt-2 text-xs text-muted">ده حجم نظام الملفات على قرص قاعدة البيانات؛ حد Railway أو حجم الـVolume راجعه من لوحة الاستضافة.</p>
+              <p className="mt-2 text-xs text-muted">ده حجم نظام الملفات على قرص قاعدة البيانات؛ حجم القرص راجعه من لوحة الاستضافة (Hostinger).</p>
               {diskPercent >= 85 && <p className="mt-3 rounded-xl bg-sale/10 px-3 py-2 text-sm font-medium text-sale">المساحة قربت تمتلئ؛ راجع الملفات أو كبّر الـVolume.</p>}
             </> : <p className="text-sm text-muted">تعذر قراءة مساحة القرص{disk?.error ? `: ${disk.error}` : ' من السيرفر'}.</p>}
             <p className="mt-3 border-t border-line pt-3 text-sm text-muted">حجم قاعدة البيانات: <b className="text-fg">{database?.bytes != null ? fmtBytes(database.bytes) : 'غير متاح'}</b></p>
@@ -780,7 +780,7 @@ function ResourcePanel() {
             <div className="mb-3 flex items-center gap-2"><Database className="h-5 w-5 text-brand" /><h3 className="font-semibold">ذاكرة التطبيق</h3></div>
             <p className="text-sm">استهلاك العملية: <b>{fmtBytes(data?.memory?.rssBytes)}</b></p>
             <p className="mt-1 text-sm text-muted">ذاكرة JavaScript: {fmtBytes(data?.memory?.heapUsedBytes)} من {fmtBytes(data?.memory?.heapTotalBytes)}</p>
-            <p className="mt-2 text-xs text-muted">ده استهلاك تطبيق Node نفسه، مش حد الذاكرة أو الفاتورة. راجع Metrics في Railway للحد الكامل.</p>
+            <p className="mt-2 text-xs text-muted">ده استهلاك تطبيق Node نفسه، مش حد الذاكرة أو الفاتورة. راجع Metrics في لوحة الاستضافة (Hostinger) للحد الكامل.</p>
           </section>
           <section className="rounded-2xl border border-line bg-secondary/30 p-4">
             <div className="mb-3 flex items-center gap-2"><Cloud className="h-5 w-5 text-brand" /><h3 className="font-semibold">Cloudflare R2</h3></div>

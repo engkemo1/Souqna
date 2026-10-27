@@ -104,3 +104,19 @@ export function notifyPlatformService(requestId) {
     .then((r) => console.log(r.sent ? `[whatsapp] service request ${requestId} → team` : `[whatsapp] service request ${requestId} skipped: ${r.skipped}`))
     .catch((e) => console.error(`[whatsapp] service request ${requestId} failed: ${e.message}`));
 }
+
+/** Short team alert (new store, new section request). Needs an approved one-variable template named in WA_ALERT_TEMPLATE; skipped otherwise. */
+export async function sendPlatformAlert(text) {
+  if (!isWhatsAppConfigured() || !config.wa.alertTemplate) return { skipped: 'not_configured' };
+  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', to: config.platformWa, type: 'template',
+      template: { name: config.wa.alertTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: [{ type: 'text', text: String(text).replace(/\s+/g, ' ').slice(0, 300) }] }] } }),
+  });
+  if (!res.ok) throw new Error(`whatsapp ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
+  return { sent: true, to: config.platformWa };
+}
+export function notifyPlatformAlert(text) {
+  sendPlatformAlert(text).catch((e) => console.error(`[whatsapp] team alert failed: ${e.message}`));
+}

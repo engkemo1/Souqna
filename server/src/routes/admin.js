@@ -9,7 +9,8 @@ import { signToken } from '../lib/auth.js';
 import { slugify, latinSlug } from '../lib/util.js';
 import { config } from '../config.js';
 import { h, AppError } from '../lib/errors.js';
-import { listDepartments, assertDepartments, ensureDeptCategories, deptAncestors } from '../lib/departments.js';
+import { listDepartments, assertDepartments, ensureDeptCategories, deptAncestors, PENDING_RE } from '../lib/departments.js';
+import { notifyStore } from '../lib/push.js';
 import ownerRoutes from './owner.js';
 import { purgeMediaFiles } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
@@ -30,7 +31,7 @@ import { isWhatsAppConfigured, notifyPlatformDelivery } from '../lib/whatsapp.js
 import { mountCashierAdmin } from './admin-cashier.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { CASHIER_SYSTEMS, CASHIER_IDS, CASHIER_LINK_STATUSES } from '../lib/cashier-catalog.js';
-import { deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing, getZonePolicy, saveZonePolicy, zoneKey } from '../lib/deliveryRates.js';
+import { getPlatformFreeShipping, savePlatformFreeShipping, deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing, getZonePolicy, saveZonePolicy, zoneKey } from '../lib/deliveryRates.js';
 
 function makeSetupLink(req, uid) {
   const token = crypto.randomBytes(24).toString('base64url');
@@ -450,6 +451,16 @@ r.get('/delivery-rates', h((_req, res) => {
   }));
   res.json({ items, pricing });
 }));
+r.get('/free-shipping', h((_req, res) => res.json(getPlatformFreeShipping())));
+/** One tap: switch store-level free shipping off for every store (each owner can switch it on again for their own store). */
+r.post('/free-shipping/close-all', h((_req, res) => {
+  const changes = q.run('UPDATE stores SET free_shipping_over=0 WHERE free_shipping_over<>0').changes;
+  res.json({ closed: changes });
+}));
+r.put('/free-shipping', h((req, res) => {
+  const d = z.object({ enabled: z.boolean(), over: z.coerce.number().int().min(0).max(1000000).default(0) }).parse(req.body);
+  res.json(savePlatformFreeShipping(d));
+}));
 r.put('/delivery-rates/pricing', h((req, res) => {
   const pricing = z.object({ baseFee: z.coerce.number().int().min(0).max(5000), includedKm: z.coerce.number().min(0).max(100), perKm: z.coerce.number().int().min(0).max(1000), extraPickupStopFee: z.coerce.number().int().min(0).max(1000).default(0), extraPickupZoneFee: z.coerce.number().int().min(0).max(2000).default(0) }).parse(req.body);
   res.json({ pricing: saveDeliveryPricing(pricing) });
@@ -687,7 +698,7 @@ r.get('/status', h((_req, res) => {
       { id: 'admin', ok: config.adminKey.length >= 16, label: 'ADMIN_KEY قوي (16+ حرف)', fix: 'اضبط ADMIN_KEY بقيمة طويلة.' },
       { id: 'totp', ok: !!config.adminTotpSecret, label: 'تأكيد خطوتين لدخول الأدمن', fix: 'شغّل npm run admin-totp -w server واضبط ADMIN_TOTP_SECRET.' },
       { id: 'backup', ok: !!lastBackup() && Date.now() - Date.parse(lastBackup().at) < 36 * 3600e3, label: 'نسخة احتياطية يومية (قاعدة البيانات + الصور)', fix: 'اضبط BACKUP_DIR على مجلد على قرص دائم.' },
-      { id: 'offsite', ok: offsiteEnabled && !!lastOffsite() && Date.now() - Date.parse(lastOffsite().at) < 36 * 3600e3, label: 'نسخة احتياطية خارج Railway (Cloudflare R2 خاص)', fix: 'اضبط R2_ACCOUNT_ID وBACKUP_R2_BUCKET وR2_ACCESS_KEY_ID وR2_SECRET_ACCESS_KEY (أو مفاتيح النسخ المخصصة)، وتأكد أن الـ bucket خاص والمفاتيح لها صلاحية الكتابة عليه. CF_AI_TOKEN ليس مفتاح R2.' },
+      { id: 'offsite', ok: offsiteEnabled && !!lastOffsite() && Date.now() - Date.parse(lastOffsite().at) < 36 * 3600e3, label: 'نسخة احتياطية خارج السيرفر (Cloudflare R2 خاص)', fix: 'اضبط R2_ACCOUNT_ID وBACKUP_R2_BUCKET وR2_ACCESS_KEY_ID وR2_SECRET_ACCESS_KEY (أو مفاتيح النسخ المخصصة)، وتأكد أن الـ bucket خاص والمفاتيح لها صلاحية الكتابة عليه. CF_AI_TOKEN ليس مفتاح R2.' },
       { id: 'media-r2', ok: r2Enabled, optional: true, label: 'تخزين صور المنتجات على Cloudflare R2', fix: 'لو رفع الصور بيفشل، راجع R2_ACCOUNT_ID وR2_BUCKET وR2_ACCESS_KEY_ID وR2_SECRET_ACCESS_KEY وR2_PUBLIC_URL. استخدم bucket الصور العام banha-media، وخلي BACKUP_R2_BUCKET خاصاً للنسخ فقط.' },
       { id: 'demo-pw', ok: !demoPasswordsUnchanged(), label: 'باسورد حساب تاون ستايل التجريبي اتغيّر', fix: 'npm run set-password -w server -- townstyle@banhalook.app' },
       { id: 'register', ok: !config.allowRegister, label: 'التسجيل العام مقفول', fix: 'شيل ALLOW_REGISTER=1.' },
@@ -917,7 +928,7 @@ r.put('/visual/demand/owners', h((req, res) => {
 }));
 r.put('/visual', h((req, res) => {
   const body = z.object({ enabled: z.boolean().optional(), model: z.enum(['color', 'jina', 'clip']).optional(), dailyFree: z.coerce.number().int().min(0).max(1000).optional(), minSimilarity: z.coerce.number().int().min(0).max(100).optional() }).parse(req.body);
-  if (body.model === 'jina' && !process.env.JINA_API_KEY) throw new AppError(422, 'jina_key_required', 'أضف مفتاح JINA_API_KEY في Railway أولًا.');
+  if (body.model === 'jina' && !process.env.JINA_API_KEY) throw new AppError(422, 'jina_key_required', 'أضف مفتاح JINA_API_KEY في ملف .env على السيرفر أولًا.');
   saveVisualSettings(body);
   if (body.model) triggerReindex(1000);
   res.json(visualStatus());
@@ -980,10 +991,13 @@ r.get('/notifications', h((req, res) => {
       CASE WHEN o.delivery_group IS NULL THEN 1 ELSE (SELECT COUNT(*) FROM orders g WHERE COALESCE(g.delivery_route_id,g.delivery_group,'order:' || g.id)=COALESCE(o.delivery_route_id,o.delivery_group,'order:' || o.id) AND g.status IN ('processing','shipped','delivered')) END AS group_ready_count
     FROM order_events e JOIN orders o ON o.id=e.order_id JOIN stores s ON s.id=o.store_id
     WHERE o.delivery_by='platform' AND e.status='processing' AND e.created_at >= ? ORDER BY e.created_at DESC, e.id DESC LIMIT 10`, [since]);
+  const pendingDepts = q.all('SELECT id, slug, name_ar FROM departments WHERE active=0 ORDER BY id DESC LIMIT 50').filter((d) => PENDING_RE.test(d.slug));
   const services = q.all("SELECT r.id, r.plan, r.type, r.created_at AS at, s.name_ar AS store_name FROM service_requests r JOIN stores s ON s.id=r.store_id WHERE r.created_at > ? ORDER BY r.created_at DESC LIMIT 10", [since]);
   res.json({
     services, servicesNew: q.val("SELECT COUNT(*) FROM service_requests WHERE status='new'"),
     sourcing: q.all("SELECT id, number, title, created_at AS at FROM sourcing_requests WHERE created_at > ? ORDER BY created_at DESC LIMIT 10", [since]), sourcingNew: q.val("SELECT COUNT(*) FROM sourcing_requests WHERE status IN ('new','approved')"),
+    deptsPending: pendingDepts.length, deptPendingItems: pendingDepts.map((d) => ({ id: d.id, name: d.name_ar })),
+    newStores: q.all('SELECT id, name_ar FROM stores WHERE created_at > ? ORDER BY id DESC LIMIT 10', [since]),
     items, readyItems, now: new Date().toISOString().slice(0, 19).replace('T', ' '),
     open: q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform' AND status NOT IN ('delivered','cancelled')"),
     ready: q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform' AND status='processing'"),
@@ -1140,7 +1154,7 @@ r.post('/stores', h((req, res) => {
     while (q.get('SELECT id FROM stores WHERE slug=?', [slug])) slug = `${base}-${++i}`;
     const code = d.store_name.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || 'SQ';
     const sid = insert('stores', {
-      show_when_empty: 1,
+      show_when_empty: 1, free_shipping_over: 0,
       owner_id: uid, slug, code, delivery_mode: 'platform', name_ar: d.store_name, name_en: d.store_name, category: d.departments.length === 1 ? d.departments[0] : 'mixed', departments: encodeDepartments(d.departments),
       phone: d.phone, whatsapp: d.whatsapp || d.phone, city: 'Banha', auto_whatsapp: d.auto_whatsapp ? 1 : 0,
       address_ar: d.address || null, address_en: d.address || null, map_url: d.map_url || null, lat: d.lat ?? null, lng: d.lng ?? null,
@@ -1317,6 +1331,36 @@ r.delete('/departments/:id', h((req, res) => {
   if (q.val('SELECT COUNT(*) FROM departments WHERE parent_slug=?', [d.slug])) throw new AppError(409, 'department_has_children', 'Delete or move the sections under it first.');
   if (used) throw new AppError(409, 'department_in_use', `${used} stores use this department — deactivate it instead, or move the stores first.`);
   q.run('DELETE FROM departments WHERE id=?', [d.id]);
+  res.json({ departments: listDepartments({ all: true }) });
+}));
+
+/** Sections owners asked to publish on the marketplace: accept = it becomes a real department for every store that asked, reject = it stays private to the store. */
+function pendingDept(id) {
+  const d = q.get('SELECT * FROM departments WHERE id=?', [Number(id)]);
+  if (!d || d.active || !PENDING_RE.test(d.slug)) throw new AppError(404, 'not_found', 'Request not found.');
+  return d;
+}
+r.post('/departments/:id/approve', h((req, res) => {
+  const d = pendingDept(req.params.id);
+  const catSlug = d.slug.replace(/_/g, '-');
+  const stores = q.all('SELECT DISTINCT store_id FROM categories WHERE slug=?', [catSlug]).map((x) => x.store_id);
+  if (d.parent_slug && !q.get('SELECT 1 AS x FROM departments WHERE slug=? AND active=1', [d.parent_slug])) throw new AppError(409, 'parent_inactive', 'Activate the main section first.');
+  tx(() => {
+    q.run('UPDATE departments SET active=1 WHERE id=?', [d.id]);
+    for (const sid of stores) {
+      const have = decodeDepartments(q.val('SELECT departments FROM stores WHERE id=?', [sid]));
+      if (!have.includes(d.slug)) q.run('UPDATE stores SET departments=? WHERE id=?', [encodeDepartments([...have, d.slug]), sid]);
+    }
+  });
+  for (const sid of stores) notifyStore(sid, { title: 'اتقبل القسم الجديد ✅', body: `قسم «${d.name_ar}» بقى ظاهر في سوق تويست.`, url: '/dashboard/products' });
+  res.json({ departments: listDepartments({ all: true }) });
+}));
+r.post('/departments/:id/reject', h((req, res) => {
+  const d = pendingDept(req.params.id);
+  const stores = q.all('SELECT DISTINCT store_id FROM categories WHERE slug=?', [d.slug.replace(/_/g, '-')]).map((x) => x.store_id);
+  if (q.val('SELECT COUNT(*) FROM departments WHERE parent_slug=?', [d.slug])) throw new AppError(409, 'department_has_children', 'Other sections are under it.');
+  q.run('DELETE FROM departments WHERE id=?', [d.id]);
+  for (const sid of stores) notifyStore(sid, { title: 'القسم الجديد', body: `قسم «${d.name_ar}» هيفضل ظاهر في متجرك بس، مش في سوق تويست.`, url: '/dashboard/products' });
   res.json({ departments: listDepartments({ all: true }) });
 }));
 

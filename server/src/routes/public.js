@@ -21,7 +21,7 @@ import { getModaPrompts } from '../lib/modaPrompts.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
 import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
-import { computeBasketDelivery, splitSharedDeliveryFee } from '../lib/deliveryRates.js';
+import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, getPlatformFreeShipping } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert } from '../lib/whatsapp.js';
 import {
@@ -728,18 +728,22 @@ r.post('/stores/:slug/quote', h((req, res) => {
 }));
 
 r.post('/marketplace/delivery-fee', h((req, res) => {
-  const body = z.object({ governorate: z.string().trim().min(2).max(40), city: z.string().trim().min(2).max(60), stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems })).min(1).max(20) }).parse(req.body);
+  const body = z.object({ governorate: z.string().trim().min(2).max(40), city: z.string().trim().min(2).max(60), phone: z.string().max(20).optional().nullable(), stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems, coupon: z.string().trim().max(40).optional().nullable() })).min(1).max(20) }).parse(req.body);
   if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
-  const storeQuotes = body.stores.map(({ slug, items }) => quote(loadStore(slug), items));
+  const storeQuotes = body.stores.map(({ slug, items, coupon }) => quote(loadStore(slug), items, coupon, { phone: body.phone }));
   const bd = computeBasketDelivery(body.stores.map((s) => s.slug), body.governorate, body.city);
-  const split = splitSharedDeliveryFee(bd.fee, storeQuotes.map((qt) => ({ freeShipping: qt.shipping === 0 })));
+  const platformFree = platformFreeApplies(storeQuotes.reduce((sum, qt) => sum + qt.subtotal - qt.discount, 0));
+  const split = splitSharedDeliveryFee(bd.fee, storeQuotes.map((qt) => ({ freeShipping: platformFree || qt.shipping === 0 })));
   const needsFee = storeQuotes.some((qt) => qt.shipping > 0);
   res.json({
-    fee: needsFee ? split.customerFee : 0, feeStatus: 'confirmed', fullRouteFee: bd.fee, storeShares: split.storeShares,
+    platformFree,
+    fee: needsFee && !platformFree ? split.customerFee : 0, feeStatus: 'confirmed', fullRouteFee: bd.fee, storeShares: split.storeShares,
     matched: bd.matched || bd.zones.every((z) => z.custom), scope: bd.scope, pickupStops: bd.stopCount, pickupZones: bd.zones.length,
     breakdown: { zones: bd.zones.map(({ courierCost, ...z }) => z), subtotal: bd.subtotal, percent: bd.percent, discount: bd.discount, total: bd.fee },
   });
 }));
+
+r.get('/marketplace/free-shipping', h((_req, res) => res.json(getPlatformFreeShipping())));
 
 r.get('/marketplace/delivery-areas', h((_req, res) => {
   const rows = q.all("SELECT id, governorate, city, fee, distance_km FROM delivery_rates WHERE city <> '*' ORDER BY id");
@@ -810,7 +814,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
 }));
 
 const marketplaceOrderSchema = orderSchema.omit({ coupon: true, items: true }).extend({
-  stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems })).min(1).max(20),
+  stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems, coupon: z.string().trim().max(40).optional().nullable() })).min(1).max(20),
   expectedShipping: z.number().int().min(0).max(5000).optional(),
   expectedTotal: z.number().int().min(0).max(10000000).optional(),
 });
@@ -820,19 +824,23 @@ r.post('/marketplace/orders', h((req, res) => {
   const body = marketplaceOrderSchema.parse(req.body);
   if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
   const result = tx(() => {
-    const prepared = body.stores.map(({ slug, items }) => {
+    const prepared = body.stores.map(({ slug, items, coupon }) => {
       const store = loadStore(slug);
-      const qt = quote(store, items);
+      const qt = quote(store, items, coupon, { phone: body.phone });
       if (qt.hasErrors) throw new AppError(409, 'cart_changed', 'Some items are no longer available.', { slug, lines: qt.lines });
+      if (coupon && qt.couponError) throw new AppError(409, qt.couponError, 'This coupon can no longer be applied.'); // never charge more than the customer was shown
       return { store, qt };
     });
+    // A fixed-amount or free-delivery Twist code is one gift per basket, not one per store.
+    if (prepared.filter(({ qt }) => qt.coupon?.source === 'platform' && qt.coupon.type !== 'percentage').length > 1) throw new AppError(409, 'coupon_one_store', 'This code applies to one store in the basket.');
     // A marketplace checkout is one customer delivery even though each shop
     // still receives and fulfils its own sub-order. Charge one platform fee.
     // Store thresholds decide whether the shared destination-based delivery fee applies.
     const needsFee = prepared.some(({ qt }) => qt.shipping > 0);
     const pendingFee = false; // the fee is always known up front now (pickup-zone prices)
     const fullRouteFee = computeBasketDelivery(prepared.map(({ store }) => store.slug), body.governorate, body.city).fee;
-    const split = splitSharedDeliveryFee(fullRouteFee, prepared.map(({ qt }) => ({ freeShipping: qt.shipping === 0 })));
+    const platformFree = platformFreeApplies(prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0));
+    const split = splitSharedDeliveryFee(fullRouteFee, prepared.map(({ qt }) => ({ freeShipping: platformFree || qt.shipping === 0 })));
     const marketplaceShipping = pendingFee ? 0 : split.customerFee;
     const marketplaceTotal = prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0) + marketplaceShipping;
     if ((!pendingFee && body.expectedShipping != null && body.expectedShipping !== marketplaceShipping)
@@ -858,17 +866,18 @@ r.post('/marketplace/orders', h((req, res) => {
       const orderId = insert('orders', {
         store_id: store.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
         governorate: body.governorate, city: body.city, address: body.address, notes: body.notes,
-        status: 'pending', delivery_fee_status: pendingFee ? 'pending' : 'confirmed', delivery_fee_quote: null, delivery_by: 'platform', delivery_group: deliveryGroup, delivery_route_id: deliveryGroup, delivery_mode: 'pooled', subtotal: qt.subtotal, discount: 0, shipping, total: qt.subtotal + shipping,
+        status: 'pending', delivery_fee_status: pendingFee ? 'pending' : 'confirmed', delivery_fee_quote: null, delivery_by: 'platform', delivery_group: deliveryGroup, delivery_route_id: deliveryGroup, delivery_mode: 'pooled', subtotal: qt.subtotal, discount: qt.discount, shipping, total: qt.subtotal - qt.discount + shipping,
         shipping_free: qt.shipping === 0 ? 1 : 0,
-        platform_discount: 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
+        coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
       });
+      if (qt.coupon) q.run(`UPDATE ${qt.coupon.source === 'platform' ? 'platform_coupons' : 'offers'} SET usage_count=usage_count+1 WHERE id=?`, [qt.coupon.id]);
       for (const line of qt.lines) {
         insert('order_items', { order_id: orderId, product_id: line.productId, variant_id: line.variantId, name_ar: line.name.ar, name_en: line.name.en, media_id: line.mediaId, color: line.color, size: line.size, price: line.price, qty: line.qty });
         if (line.variantId) q.run('UPDATE variants SET stock=MAX(0, stock-?) WHERE id=?', [line.qty, line.variantId]);
         q.run('UPDATE products SET stock=MAX(0, stock-?), sold_count=sold_count+? WHERE id=?', [line.qty, line.qty, line.productId]);
       }
       insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
-      return { orderId, number, trackToken, total: qt.subtotal + shipping, subtotal: qt.subtotal, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, store: { ar: store.name_ar, en: store.name_en } };
+      return { orderId, number, trackToken, total: qt.subtotal - qt.discount + shipping, subtotal: qt.subtotal, discount: qt.discount, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, store: { ar: store.name_ar, en: store.name_en } };
     });
     return orders;
   });

@@ -52,7 +52,7 @@ function LivePreview({ theme, store, products, device, lang }) {
   return (
     <div className={cx('mx-auto overflow-hidden rounded-[28px] border-[6px] border-neutral-900 bg-neutral-900 shadow-lift transition-all duration-500', mobile ? 'max-w-[300px]' : 'max-w-full')}>
       <div style={Object.fromEntries(Object.entries(theme.cssVars).filter(([k]) => k.startsWith('--')))} className="bg-canvas text-fg" dir={lang === 'ar' ? 'rtl' : 'ltr'} lang={lang}>
-        <div className="bg-footer py-1.5 text-center text-[10px] font-medium text-on-footer">{t('store.freeShippingOver', { v: money(store.freeShippingOver) })}</div>
+        <div className="bg-footer py-1.5 text-center text-[10px] font-medium text-on-footer">{store.freeShippingOver > 0 ? t('store.freeShippingOver', { v: money(store.freeShippingOver) }) : t('store.cod')}</div>
         <div className="flex items-center justify-between bg-header px-3.5 py-2.5 text-on-header">
           <div className="flex items-center gap-2"><StoreLogo store={store} size={26} className="h-[26px] w-[26px]" /><span className="font-display text-sm font-bold">{tr(store.name)}</span></div>
           {!mobile && <div className="flex gap-3 text-xs font-medium opacity-80"><span>{t('store.home')}</span><span>{t('store.shopAll')}</span><span className="text-sale">{t('store.onSale')}</span></div>}

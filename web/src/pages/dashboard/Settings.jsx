@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Camera, Palette, ArrowUpRight, Trash2 } from 'lucide-react';
+import { Camera, Palette, ArrowUpRight, Trash2, Eye, EyeOff } from 'lucide-react';
 import { useApi, invalidate } from '../../lib/hooks.js';
 import { api, upload } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
+import { useDashBase } from '../../lib/dashBase.js';
 import DesignHelp from '../../components/dash/DesignHelp.jsx';
 import { LocationPicker } from '../../components/ui/MapView.jsx';
 import PlaceAutocomplete from '../../components/ui/PlaceAutocomplete.jsx';
@@ -13,7 +14,7 @@ import SmartImage from '../../components/ui/SmartImage.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
 import Button from '../../components/ui/Button.jsx';
-import { Field, Input, Textarea, Select } from '../../components/ui/Field.jsx';
+import { Field, Input, Textarea, Select, Switch } from '../../components/ui/Field.jsx';
 import { ErrorState, errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useDepartments } from '../../lib/departments.js';
@@ -96,7 +97,43 @@ function ImageSlot({ label, media, slot, ratio, onUploaded, onDelete, deleteBusy
   );
 }
 
+function ChangePassword() {
+  const toast = useToast();
+  const [v, setV] = useState({ current: '', next: '' });
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const submit = async (e) => {
+    e.preventDefault();
+    if (v.next.trim().length < 8) { setErr('الباسورد الجديد لازم يكون 8 حروف أو أكتر.'); return; }
+    setBusy(true); setErr('');
+    try {
+      await api('/auth/change-password', { method: 'POST', body: { current: v.current, password: v.next } });
+      setV({ current: '', next: '' });
+      toast({ title: 'اتغيّر الباسورد' });
+    } catch (e2) { setErr(e2.fields?.current ? 'الباسورد الحالي غلط.' : (e2.message || 'حصلت مشكلة، جرّب تاني.')); }
+    setBusy(false);
+  };
+  const attrs = { dir: 'ltr', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false, type: show ? 'text' : 'password' };
+  return (
+    <Panel title="تغيير الباسورد">
+      <form onSubmit={submit} className="grid gap-4 sm:max-w-sm">
+        <Field label="الباسورد الحالي"><Input {...attrs} autoComplete="current-password" value={v.current} onChange={(e) => setV({ ...v, current: e.target.value })} /></Field>
+        <Field label="الباسورد الجديد" hint="8 حروف أو أكتر">
+          <div className="relative">
+            <Input {...attrs} autoComplete="new-password" className="pe-12" value={v.next} onChange={(e) => setV({ ...v, next: e.target.value })} />
+            <button type="button" onClick={() => setShow((x) => !x)} aria-label={show ? 'إخفاء الباسورد' : 'إظهار الباسورد'} className="absolute end-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-muted hover:text-fg">{show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>
+          </div>
+        </Field>
+        {err && <p role="alert" className="text-sm font-medium text-sale">{err}</p>}
+        <div><Button type="submit" loading={busy} disabled={!v.current || !v.next}>تغيير الباسورد</Button></div>
+      </form>
+    </Panel>
+  );
+}
+
 export default function Settings() {
+  const dashBase = useDashBase();
   const { t } = useI18n();
   const { setStore } = useAuth();
   const toast = useToast();
@@ -245,7 +282,13 @@ export default function Settings() {
           <Panel title={t('settings.shipping')}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('settings.shippingFee')}><Input inputMode="numeric" suffix={t('common.currency')} value={f.shipping_fee} onChange={(e) => setF({ ...f, shipping_fee: e.target.value.replace(/\D/g, '') })} /></Field>
-              <Field label={t('settings.freeOver')}><Input inputMode="numeric" suffix={t('common.currency')} value={f.free_shipping_over} onChange={(e) => setF({ ...f, free_shipping_over: e.target.value.replace(/\D/g, '') })} /></Field>
+              <div className="sm:col-span-2">
+                <Switch checked={Number(f.free_shipping_over) > 0} onChange={(on) => setF({ ...f, free_shipping_over: on ? (Number(f.free_shipping_over) > 0 ? f.free_shipping_over : '1500') : '0' })}
+                  label="شحن مجاني لمحلي" description="مقفول لحد ما تفتحه. لو فتحته، الزبون ميدفعش شحن لما طلبه من محلك يوصل للحد اللي تحدده." />
+                {Number(f.free_shipping_over) > 0 && (
+                  <Field className="mt-3 sm:max-w-xs" label={t('settings.freeOver')}><Input inputMode="numeric" suffix={t('common.currency')} value={f.free_shipping_over} onChange={(e) => setF({ ...f, free_shipping_over: e.target.value.replace(/\D/g, '') })} /></Field>
+                )}
+              </div>
               <Field label={t('settings.returnDays')} hint={t('settings.returnDaysHint')}><Input inputMode="numeric" suffix={t('settings.days')} value={f.return_days} onChange={(e) => setF({ ...f, return_days: e.target.value.replace(/\D/g, '').slice(0, 2) })} /></Field>
               <Field label={t('settings.badgeAr')} hint={t('settings.badgeHint')}><Input dir="rtl" value={f.offer_badge_ar} onChange={set('offer_badge_ar')} maxLength={30} /></Field>
               <Field label={t('settings.badgeEn')}><Input dir="ltr" value={f.offer_badge_en} onChange={set('offer_badge_en')} maxLength={30} /></Field>
@@ -281,6 +324,7 @@ export default function Settings() {
           </Link>
         </div>
       </div>
+      {dashBase === '/dashboard' && <div className="mt-6"><ChangePassword /></div>}
       {dirty && (
         <div className="fixed inset-x-0 bottom-[calc(64px+var(--safe-b))] z-20 border-t border-line bg-elevated/95 px-4 py-3 backdrop-blur-md md:hidden">
           <Button full onClick={save} loading={busy}>{t('common.save')}</Button>

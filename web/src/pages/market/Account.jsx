@@ -6,6 +6,7 @@ import { useApi, invalidate } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useBuyer } from '../../lib/buyer.jsx';
 import { useBuyerPush } from '../../lib/pwa.js';
+import { useMarketCart } from '../../lib/cart.jsx';
 import { formatMoney } from '../../lib/format.js';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -64,6 +65,23 @@ function Orders() {
   const { t, tr, lang } = useI18n();
   const toast = useToast();
   const { data, reload } = useApi('/buyer/orders');
+  const cart = useMarketCart();
+  const nav = useNavigate();
+  const [again, setAgain] = useState('');
+  const ar = lang === 'ar';
+  const reorder = async (o) => {
+    setAgain(o.number);
+    try {
+      const r = await api(`/buyer/orders/${encodeURIComponent(o.number)}/reorder`, { method: 'POST', body: {} });
+      if (!r.lines.length) { toast({ tone: 'error', title: ar ? 'المنتجات دي مش متاحة دلوقتي.' : 'These items are not available right now.' }); }
+      else {
+        r.lines.forEach((l) => cart.add(l, { slug: r.store.slug, name: r.store.name }));
+        if (r.skipped.length) toast({ tone: 'info', title: ar ? `${r.skipped.length} منتج مش متاح دلوقتي واتشال` : `${r.skipped.length} item(s) unavailable were left out` });
+        nav('/market-cart');
+      }
+    } catch (x) { toast({ tone: 'error', title: errorMessage(t, x) }); }
+    setAgain('');
+  };
   const [open, setOpen] = useState(false); const [f, setF] = useState({ number: '', phone: '' }); const [busy, setBusy] = useState(false);
   const claim = async (e) => {
     e.preventDefault(); setBusy(true);
@@ -76,10 +94,12 @@ function Orders() {
     <div className="space-y-3">
       {!data.items.length && <EmptyState icon={ShoppingBag} title={t('acc.orders')} body={t('acc.noOrders')} />}
       {data.items.map((o) => (
-        <Link key={o.token} to={`/track/${o.token}`} className="block rounded-2xl border border-line bg-elevated p-4 transition hover:border-fg/30">
+        <div key={o.token} className="rounded-2xl border border-line bg-elevated p-4 transition hover:border-fg/30"><Link to={`/track/${o.token}`} className="block">
           <div className="flex items-center justify-between gap-3"><div><p className="font-mono font-semibold" dir="ltr">{o.number}</p><p className="text-[13px] text-muted">{tr(o.store.name)} · {formatMoney(o.total, lang)}</p>{o.deliveryGroupTotal != null && <p className="text-xs font-medium text-brand">{t('cart.marketTotal')}: {formatMoney(o.deliveryGroupTotal, lang)}</p>}{o.status !== 'cancelled' && o.deliveryFeeStatus === 'pending' && <p className="text-xs text-amber-700">{lang === 'ar' ? 'رسوم التوصيل لسه هتتحدد' : 'Delivery fee is still being determined'}</p>}{o.status !== 'cancelled' && o.deliveryFeeStatus === 'offered' && <p className="text-xs text-amber-700">{lang === 'ar' ? `مطلوب موافقتك على رسوم توصيل ${formatMoney(o.deliveryFeeQuote, lang)}` : `Approve the ${formatMoney(o.deliveryFeeQuote, lang)} delivery fee`}</p>}{o.status !== 'cancelled' && o.deliveryFeeStatus === 'rejected' && <p className="text-xs text-red-700">{lang === 'ar' ? 'تم رفض رسوم التوصيل، والطلب متوقف' : 'Delivery fee declined; order is paused'}</p>}</div><span className={cx('rounded-full px-3 py-1 text-[13px] font-semibold', STATUS_TONE[o.status])}>{t(`track.s.${o.status}`)}</span></div>
           <div className="mt-3 flex gap-2">{o.items.slice(0, 5).map((i, k) => <SmartImage key={k} media={i.image} ratio="4 / 5" sizes="48px" className="w-12 rounded-lg" />)}</div>
         </Link>
+        {o.status !== 'cancelled' && <Button size="sm" variant="outline" className="mt-3" loading={again === o.number} onClick={() => reorder(o)}>{ar ? 'اطلب تاني' : 'Order again'}</Button>}
+        </div>
       ))}
       <button type="button" onClick={() => setOpen((v) => !v)} className="text-sm font-semibold text-brand">{t('acc.claim')}</button>
       {open && (

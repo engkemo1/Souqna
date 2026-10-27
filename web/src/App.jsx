@@ -42,6 +42,7 @@ const Checkout = lazy(() => import('./pages/store/Checkout.jsx'));
 const OrderSuccess = lazy(() => import('./pages/store/OrderSuccess.jsx'));
 
 const DashboardLayout = lazy(() => import('./pages/dashboard/DashboardLayout.jsx'));
+const BiometricGate = lazy(() => import('./components/auth/BiometricGate.jsx'));
 const Overview = lazy(() => import('./pages/dashboard/Overview.jsx'));
 const Orders = lazy(() => import('./pages/dashboard/Orders.jsx'));
 const OrderDetail = lazy(() => import('./pages/dashboard/OrderDetail.jsx'));
@@ -132,7 +133,7 @@ const router = createBrowserRouter([
       },
       {
         path: '/dashboard',
-        element: <DashboardLayout />,
+        element: <BiometricGate><DashboardLayout /></BiometricGate>,
         children: [
           { index: true, element: <Overview /> },
           { path: 'orders', element: <Orders /> },

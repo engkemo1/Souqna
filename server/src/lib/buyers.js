@@ -57,6 +57,15 @@ export function notifyPriceDrop(productId, oldPrice, newPrice) {
     notifyBuyer(w.buyer_id, { kind: 'price', title: 'السعر نزل 🔻', body: `${p.name_ar}: كان ${egp(oldPrice)} وبقى ${egp(newPrice)}`, url: `/s/${p.sslug}/p/${p.slug}` });
   }
 }
+/** A sold-out product is available again: tell everyone who asked to be notified. */
+export function notifyBackInStock(productId) {
+  const p = q.get('SELECT p.name_ar, p.slug, s.slug AS sslug FROM products p JOIN stores s ON s.id=p.store_id WHERE p.id=?', [productId]);
+  if (!p) return;
+  for (const w of q.all('SELECT buyer_id FROM buyer_watches WHERE product_id=?', [productId])) {
+    notifyBuyer(w.buyer_id, { kind: 'stock', title: 'اتوفر تاني ✅', body: `${p.name_ar} رجع متاح. الحق اطلبه قبل ما يخلص.`, url: `/s/${p.sslug}/p/${p.slug}` });
+  }
+}
+
 export function notifyFollowers(storeId, { kind, title, body }) {
   const s = q.get('SELECT slug FROM stores WHERE id=?', [storeId]);
   for (const f of q.all('SELECT buyer_id FROM buyer_follows WHERE store_id=?', [storeId])) notifyBuyer(f.buyer_id, { kind, title, body, url: `/s/${s.slug}` });

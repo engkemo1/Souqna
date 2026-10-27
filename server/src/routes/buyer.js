@@ -152,6 +152,26 @@ r.post('/orders/claim', h((req, res) => {
   res.json({ items: orderRows(req.buyer.id) });
 }));
 
+/** "Order again": the lines of an old order, re-priced and re-checked against today's stock. Out-of-stock pieces are listed in `skipped`. */
+r.post('/orders/:number/reorder', h((req, res) => {
+  const o = q.get('SELECT o.id, s.slug AS s_slug, s.name_ar AS s_ar, s.name_en AS s_en FROM orders o JOIN stores s ON s.id=o.store_id WHERE UPPER(o.number)=UPPER(?) AND o.buyer_id=?', [req.params.number, req.buyer.id]);
+  if (!o) throw notFound('Order');
+  const items = q.all('SELECT * FROM order_items WHERE order_id=?', [o.id]);
+  const lines = [];
+  const skipped = [];
+  for (const it of items) {
+    const p = it.product_id ? q.get("SELECT * FROM products WHERE id=? AND status='active'", [it.product_id]) : null;
+    const v = p && it.variant_id ? q.get('SELECT * FROM variants WHERE id=? AND product_id=?', [it.variant_id, p.id]) : null;
+    const available = !p ? 0 : it.variant_id && !v ? 0 : p.track_stock ? (v ? v.stock : p.stock) : 99;
+    if (available <= 0) { skipped.push({ ar: it.name_ar, en: it.name_en }); continue; }
+    const mediaId = q.val('SELECT media_id FROM product_media WHERE product_id=? ORDER BY is_primary DESC, position LIMIT 1', [p.id]) || it.media_id;
+    lines.push({ productId: p.id, variantId: v?.id ?? null, slug: p.slug, name: { ar: p.name_ar, en: p.name_en }, price: p.price, compareAt: p.compare_at_price || null,
+      mediaId, color: it.color || null, size: it.size || null, qty: Math.min(it.qty, available, 20) });
+  }
+  const media = mediaMap(lines.map((l) => l.mediaId));
+  res.json({ store: { slug: o.s_slug, name: { ar: o.s_ar, en: o.s_en } }, lines: lines.map(({ mediaId, ...l }) => ({ ...l, image: media.get(mediaId) || null })), skipped });
+}));
+
 /* ------------------------------------------------ wardrobe: what this shopper actually bought (delivered orders) */
 r.get('/wardrobe', h((req, res) => {
   const rows = q.all(`SELECT oi.product_id, oi.name_ar, oi.name_en, oi.color, oi.size, oi.media_id, o.created_at, p.slug AS pslug, p.department, s.slug AS sslug, s.name_ar AS s_ar, s.name_en AS s_en

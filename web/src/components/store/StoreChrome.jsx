@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { SEASONS } from '@souqna/shared/layout';
 import { Search, Heart, ShoppingBag, Home, LayoutGrid, ChevronLeft, ChevronRight, MapPin, Phone, Instagram, Facebook, Star, Truck, RefreshCcw, Banknote, Store, ShieldCheck, Sparkles, Clock, Award } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
-import { useCart, useFavorites, useMarketCart } from '../../lib/cart.jsx';
+import { useFavorites, useMarketCart, useRegisterStore } from '../../lib/cart.jsx';
 import { useStore, sp } from '../../lib/store.jsx';
 import { exchangeLabel, exchangeSentence } from '../../lib/returns.js';
 import { useScrollDirection, useScrolled } from '../../lib/hooks.js';
@@ -73,11 +73,11 @@ export function AnnouncementBar() {
   const seasonText = season ? (lang === 'ar' ? season.announce_ar : season.announce_en) : '';
   const items = custom?.enabled && customText ? [
     customText,
-    t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) }),
+    ...(store.freeShippingOver > 0 ? [t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) })] : []),
     ...offers.slice(0, 1).map((o) => `${t('store.useCode')} ${o.code} — ${tr(o.title)}`),
   ] : [
     ...(seasonText ? [seasonText] : []),
-    t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) }),
+    ...(store.freeShippingOver > 0 ? [t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) })] : []),
     ...offers.slice(0, 2).map((o) => `${t('store.useCode')} ${o.code} — ${tr(o.title)}`),
     t('store.cod'),
   ];
@@ -106,7 +106,7 @@ export function AnnouncementBar() {
 export function StoreHeader() {
   const { store, categories } = useStore();
   const { t, tr, isRtl } = useI18n();
-  const cart = useCart(store.slug);
+  useRegisterStore(store);
   const marketCart = useMarketCart();
   const favs = useFavorites(store.slug);
   const hidden = useScrollDirection();
@@ -150,9 +150,7 @@ export function StoreHeader() {
           <LangToggle compact className="lg:hidden" />
           <LangToggle className="hidden lg:inline-flex" />
           <IconButton to={sp(store.slug, 'favorites')} label={t('store.favorites')} icon={Heart} className="hidden lg:inline-grid" badge={<CountBadge n={favs.count} />} />
-          <IconButton label={t('store.cart')} icon={ShoppingBag} onClick={cart.open} data-cart-target className="hidden lg:inline-grid" badge={<CountBadge n={cart.count} bumpKey={cart.bump} />} />
-          <IconButton to={sp(store.slug, 'cart')} label={t('store.cart')} icon={ShoppingBag} data-cart-target className="lg:hidden" badge={<CountBadge n={cart.count} bumpKey={cart.bump} />} />
-          <IconButton to="/market-cart" label={isRtl ? 'سلة Twist' : 'Twist basket'} icon={ShoppingBag} badge={<CountBadge n={marketCart.count} />} />
+          <IconButton to="/market-cart" label={isRtl ? 'سلة Twist' : 'Twist basket'} icon={ShoppingBag} data-cart-target badge={<CountBadge n={marketCart.count} bumpKey={marketCart.bump} />} />
         </div>
       </div>
     </header>
@@ -163,21 +161,21 @@ export function StoreHeader() {
 export function BottomNav() {
   const { store } = useStore();
   const { t } = useI18n();
-  const cart = useCart(store.slug);
+  const cart = useMarketCart();
   const favs = useFavorites(store.slug);
   const items = [
     { to: '', end: true, icon: Home, label: t('store.home') },
     { to: 'categories', icon: LayoutGrid, label: t('store.categories') },
     { to: 'search', icon: Search, label: t('store.search') },
     { to: 'favorites', icon: Heart, label: t('store.favorites'), n: favs.count },
-    { to: 'cart', icon: ShoppingBag, label: t('store.cart'), n: cart.count, cart: true },
+    { to: 'cart', abs: '/market-cart', icon: ShoppingBag, label: t('store.cart'), n: cart.count, cart: true },
   ];
   return (
     <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-header/95 text-on-header backdrop-blur-md pb-safe lg:hidden">
       <ul className="mx-auto grid h-[var(--bottom-nav-h)] max-w-lg grid-cols-5">
         {items.map((it) => (
           <li key={it.to}>
-            <NavLink to={sp(store.slug, it.to)} end={it.end} className="group relative flex h-full flex-col items-center justify-center gap-1 text-xs font-medium">
+            <NavLink to={it.abs || sp(store.slug, it.to)} end={it.end} className="group relative flex h-full flex-col items-center justify-center gap-1 text-xs font-medium">
               {({ isActive }) => (
                 <>
                   {isActive && <motion.span layoutId="bn-pill" className="absolute top-1.5 h-8 w-14 rounded-full bg-fg/[0.08]" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
@@ -218,7 +216,7 @@ export function TrustStrip({ className }) {
   };
 
   const defaultItems = [
-    { icon: Truck, title: t('store.delivery'), body: t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) }) },
+    ...(store.freeShippingOver > 0 ? [{ icon: Truck, title: t('store.delivery'), body: t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) }) }] : []),
     { icon: Banknote, title: t('store.cod'), body: t('market.why1b') },
     ...(exchangeLabel(t, store) ? [{ icon: RefreshCcw, title: exchangeLabel(t, store), body: t('store.exchangeBody') }] : []),
   ];

@@ -15,6 +15,7 @@ import cashierRoutes from './routes/cashier.js';
 import posRoutes from './routes/pos.js';
 import { errorHandler } from './lib/errors.js';
 import buyerRoutes from './routes/buyer.js';
+import { startDailySummary } from './lib/daily-summary.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -173,6 +174,7 @@ export { app };
 // Allow boot.js to hand us an already-listening server (so the health-check
 // listener stays alive during the slow first-boot DB setup).
 export function startServer(existingServer) {
+  startDailySummary();
   if (existingServer) {
     // Reuse the existing bound socket — no new port needed.
     // the warm-up handler answers {status:'starting'} to every request — drop it, or it would keep answering first

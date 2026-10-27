@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "node --watch --no-warnings --env-file-if-exists=../.env src/index.js",
+    "dev": "node --no-warnings --env-file-if-exists=../.env src/index.js",
     "start": "node --no-warnings --env-file-if-exists=../.env src/index.js",
     "test:stylist": "node --test src/lib/stylist-ranking.test.js",
     "test:moda": "node --test test/moda.test.js test/moda-quality.test.js test/moda-brain.test.js test/moda-curate.test.js test/moda-understand.test.js test/product-types.test.js",

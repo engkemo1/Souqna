@@ -87,14 +87,16 @@ function TypePicker({ tree, audience, typeKey, onChange, error, suggested }) {
   const { lang } = useI18n();
   const L = (ar, en) => (lang === 'ar' ? ar : en);
   const [q, setQ] = useState('');
-  const [fam, setFam] = useState('all');
+  const [fam, setFam] = useState('');
   const [open, setOpen] = useState(!typeKey);
   useEffect(() => { setOpen(!typeKey); }, [typeKey]);
   if (!tree) return <Skeleton className="h-32 rounded-xl" />;
   const found = tree.families.flatMap((f) => f.types.map((t) => ({ ...t, family: f }))).find((t) => t.key === typeKey);
   const aud = tree.audiences.find((a) => a.key === audience);
   const term = nz(q);
-  const list = tree.families.map((f) => ({ ...f, types: f.types.filter((t) => (!audience || t.audiences.includes(audience)) && (!term || nz(t.ar).includes(term))) })).filter((f) => f.types.length && (fam === 'all' || fam === f.key || term));
+  const avail = tree.families.map((f) => ({ ...f, types: f.types.filter((t) => !audience || t.audiences.includes(audience)) })).filter((f) => f.types.length);
+  const activeFam = avail.some((f) => f.key === fam) ? fam : avail[0]?.key;
+  const shown = term ? avail.map((f) => ({ ...f, types: f.types.filter((t) => nz(t.ar).includes(term)) })).filter((f) => f.types.length) : avail.filter((f) => f.key === activeFam);
   const pickAudience = (key) => { const cur = found; onChange({ audience: key, moda_key: cur && !cur.audiences.includes(key) ? '' : typeKey }); };
   return (
     <div className="space-y-4">
@@ -114,21 +116,31 @@ function TypePicker({ tree, audience, typeKey, onChange, error, suggested }) {
       ) : (
         <div className="space-y-3">
           <div className="relative"><Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><Input value={q} onChange={(e) => setQ(e.target.value)} className="ps-10" placeholder={L('ابحث عن النوع: قميص، جزمة، فستان…', 'Search type: shirt, shoes, dress…')} aria-label={L('بحث في الأنواع', 'Search types')} /></div>
-          {!term && (
-            <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-              {[{ key: 'all', ar: L('الكل', 'All') }, ...tree.families.filter((f) => f.types.some((t) => t.audiences.includes(audience)))].map((f) => <button key={f.key} type="button" onClick={() => setFam(f.key)} className={cx('h-8 shrink-0 rounded-full px-3.5 text-[13px] font-semibold transition', fam === f.key ? 'bg-brand text-white' : 'bg-fg/[0.06] text-muted hover:text-fg')}>{f.ar}</button>)}
-            </div>
-          )}
-          <div className="max-h-[22rem] space-y-4 overflow-y-auto rounded-xl pe-1">
-            {list.length === 0 && <p className="py-6 text-center text-sm text-muted">{L('مفيش نوع بالاسم ده. جرّب كلمة تانية أو اتصفح الأقسام.', 'No type matches. Try another word or browse.')}</p>}
-            {list.map((f) => (
-              <div key={f.key}>
-                {(fam === 'all' || term) && <p className="mb-1.5 text-[12.5px] font-semibold text-muted">{f.ar}</p>}
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {f.types.map((t) => <button key={t.key} type="button" onClick={() => { onChange({ moda_key: t.key }); setOpen(false); setQ(''); }} className={cx('min-h-[2.75rem] rounded-xl border px-3 py-2 text-start text-sm font-medium transition active:scale-[0.98]', typeKey === t.key ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{t.ar}</button>)}
-                </div>
+          <div className="overflow-hidden rounded-2xl border border-line md:grid md:grid-cols-[12rem_minmax(0,1fr)]">
+            {!term && (
+              <nav aria-label={L('مجموعات الأنواع', 'Type groups')} className="flex gap-1.5 overflow-x-auto border-b border-line bg-secondary/40 p-2 no-scrollbar md:block md:space-y-1 md:overflow-visible md:border-b-0 md:border-e">
+                {avail.map((f) => {
+                  const on = f.key === activeFam;
+                  return <button key={f.key} type="button" aria-pressed={on} onClick={() => setFam(f.key)} className={cx('flex h-10 shrink-0 items-center justify-between gap-3 rounded-xl px-3.5 text-sm font-semibold transition md:w-full', on ? 'bg-fg text-canvas' : 'text-muted hover:bg-fg/[0.06] hover:text-fg')}><span>{f.ar}</span><span className={cx('text-xs font-medium', on ? 'text-canvas/70' : 'text-muted')}>{f.types.length}</span></button>;
+                })}
+              </nav>
+            )}
+            <div className={cx('p-3 sm:p-4', term && 'md:col-span-2')}>
+              {shown.length === 0 && <p className="py-8 text-center text-sm text-muted">{L('مفيش نوع بالاسم ده. جرّب كلمة تانية أو اتصفح المجموعات.', 'No type matches. Try another word or browse.')}</p>}
+              <div className="space-y-5">
+                {shown.map((f) => (
+                  <div key={f.key}>
+                    {term && <p className="mb-2 text-[12.5px] font-semibold text-muted">{f.ar}</p>}
+                    <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+                      {f.types.map((t) => {
+                        const on = typeKey === t.key;
+                        return <button key={t.key} type="button" onClick={() => { onChange({ moda_key: t.key }); setOpen(false); setQ(''); }} className={cx('flex min-h-[3rem] items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-start text-sm font-medium transition active:scale-[0.98]', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg hover:bg-fg/[0.03]')}><span>{t.ar}</span>{on && <Check className="h-4 w-4 shrink-0" />}</button>;
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
         </div>
       )}
@@ -282,7 +294,22 @@ export default function ProductEditor() {
   const navigate = useNavigate();
   const desktop = useIsDesktop();
   const { data, error, loading, reload } = useApi(isNew ? null : `/owner/products/${id}`, { keepPrevious: false });
-  const { data: cats } = useApi('/owner/categories');
+  const { data: cats, reload: reloadCats } = useApi('/owner/categories');
+  const [newCat, setNewCat] = useState(null); // { name, parent } while the inline "add section" form is open
+  const [catBusy, setCatBusy] = useState(false);
+  const addCat = async () => {
+    const name = (newCat?.name || '').trim();
+    const parent = newCat?.parent || '';
+    if (name.length < 2) { toast({ tone: 'error', title: L('اكتب اسم القسم', 'Enter a section name') }); return; }
+    setCatBusy(true);
+    try {
+      const r = await api('/owner/categories', { method: 'POST', body: { name_ar: name, name_en: name, parent_id: parent ? Number(parent) : null } });
+      await reloadCats?.();
+      set({ category_id: String(r.category.id) });
+      setNewCat(null);
+      toast({ title: r.pending ? L(`اتضاف «${name}» في متجرك. هيظهر في السوق بعد موافقة الإدارة`, `Added “${name}” to your store. It shows on the marketplace once the admin accepts it`) : L(`اتضاف قسم «${name}» في متجرك`, `Added “${name}” to your store`) });
+    } catch (x) { toast({ tone: 'error', title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى من الأقسام الخاصة (12)', 'Custom section limit reached (12)') : (errorMessage ? errorMessage(x) : (x.message || 'Error')) }); } finally { setCatBusy(false); }
+  };
   const { data: tree } = useApi('/owner/product-types');
   const [f, setF] = useState(EMPTY);
   const [initial, setInitial] = useState(EMPTY);
@@ -411,12 +438,26 @@ export default function ProductEditor() {
         <Field label={t('editor.status')}>
           <Segmented value={f.status} onChange={(s) => set({ status: s })} className="w-full [&>button]:flex-1" options={['active', 'draft'].map((s) => ({ value: s, label: t(`products.status.${s}`) }))} />
         </Field>
-        {cats?.items?.length > 0 && (
+        {cats?.items && (
           <Field label={L('المجموعة في متجرك', 'Collection in your store')} optional={t('common.optional')} hint={L('بترتّب منتجاتك في صفحة المحل (زي: هوديز، شتوي).', 'Groups products on your store page.')}>
             <Select value={f.category_id} onChange={(e) => set({ category_id: e.target.value })}>
               <option value="">{L('من غير مجموعة', 'No collection')}</option>
               {cats.items.filter((c) => !c.parentId).flatMap((c) => [c, ...cats.items.filter((k) => k.parentId === c.id)]).map((c) => <option key={c.id} value={c.id}>{c.parentId ? '— ' : ''}{tr(c.name)}</option>)}
             </Select>
+            {newCat ? (
+              <div className="mt-3 space-y-2.5 rounded-xl border border-dashed border-line-strong p-3">
+                <Input value={newCat.name} onChange={(e) => setNewCat({ ...newCat, name: e.target.value })} placeholder={L('اسم القسم الجديد (مثال: هوديز)', 'New section name')} aria-label={L('اسم القسم الجديد', 'New section name')} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCat(); } }} />
+                {(cats?.items || []).some((c) => !c.parentId) && (
+                  <Select value={newCat.parent} onChange={(e) => setNewCat({ ...newCat, parent: e.target.value })}>
+                    <option value="">{L('قسم رئيسي مستقل', 'Standalone main section')}</option>
+                    {cats.items.filter((c) => !c.parentId).map((c) => <option key={c.id} value={c.id}>{tr(c.name)}</option>)}
+                  </Select>
+                )}
+                <div className="flex gap-2"><button type="button" disabled={catBusy} onClick={addCat} className="h-10 flex-1 rounded-xl bg-fg text-sm font-semibold text-canvas disabled:opacity-60">{catBusy ? '…' : L('إضافة واختيار', 'Add & select')}</button><button type="button" onClick={() => setNewCat(null)} className="h-10 rounded-xl border border-line-strong px-4 text-sm">{L('إلغاء', 'Cancel')}</button></div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => setNewCat({ name: '', parent: '' })} className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-brand hover:bg-brand/10"><Plus className="h-3.5 w-3.5" />{L('مش لاقي القسم؟ أضف قسم جديد', 'Add a new section')}</button>
+            )}
           </Field>
         )}
         <Switch label={t('editor.featured')} description={t('editor.featuredHint')} checked={f.featured} onChange={(v) => set({ featured: v })} />

@@ -92,7 +92,7 @@ export function CartSummary({ slug, onNavigate, compact }) {
       <div className="flex justify-between text-base"><span className="text-muted">{t('cart.subtotal')}</span><span className="font-semibold tabular">{formatMoney(cart.subtotal, lang)}</span></div>
       {!compact && (
         <div className="flex justify-between text-base"><span className="text-muted">{t('cart.shipping')}</span>
-          <span className="tabular">{cart.subtotal >= store.freeShippingOver ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(store.shippingFee, lang)}</span>
+          <span className="tabular">{store.freeShippingOver > 0 && cart.subtotal >= store.freeShippingOver ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(store.shippingFee, lang)}</span>
         </div>
       )}
       <Button full size="lg" to={sp(slug, 'checkout')} onClick={onNavigate}>{t('cart.checkout')}</Button>

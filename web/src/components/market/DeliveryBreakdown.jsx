@@ -7,27 +7,27 @@ import { formatMoney } from '../../lib/format.js';
  * Checkout delivery explainer: a map with one coloured pin per pickup zone + the price of each zone,
  * then the multi-zone discount, so the customer sees exactly why the delivery costs what it does.
  */
-export default function DeliveryBreakdown({ breakdown, lang }) {
+export default function DeliveryBreakdown({ breakdown, lang, dest: externalDest }) {
   const ar = lang === 'ar';
-  const [dest, setDest] = useState(null);
+  const [internalDest, setInternalDest] = useState(null);
   const [busy, setBusy] = useState(false);
   if (!breakdown?.zones?.length) return null;
+  const dest = externalDest || internalDest;
   const { zones, subtotal, percent, discount, total } = breakdown;
   const multi = zones.length > 1;
-  const hasCoords = zones.some((z) => z.stores.some((s) => Number.isFinite(s.lat) && Number.isFinite(s.lng)));
   const locate = () => {
     if (!navigator.geolocation) return;
     setBusy(true);
-    navigator.geolocation.getCurrentPosition((p) => { setBusy(false); setDest({ lat: p.coords.latitude, lng: p.coords.longitude }); }, () => setBusy(false), { timeout: 10000 });
+    navigator.geolocation.getCurrentPosition((p) => { setBusy(false); setInternalDest({ lat: p.coords.latitude, lng: p.coords.longitude }); }, () => setBusy(false), { timeout: 10000 });
   };
   const m = (n) => formatMoney(n, lang);
   return (
     <div className="mt-4 rounded-2xl border border-line bg-fg/[0.02] p-3 sm:p-4">
-      <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><Route className="h-4 w-4" />{multi ? (ar ? `طلبك من ${zones.length} مناطق — مندوب واحد يلمّهم` : `Your order spans ${zones.length} pickup areas — one courier collects them`) : (ar ? 'استلام الطلب من منطقة واحدة' : 'Pickup from one area')}</p>
-      {hasCoords && <>
-        <DeliveryMap zones={zones} dest={dest} height={230} destLabel={ar ? 'عنوانك' : 'Your address'} />
-        <button type="button" onClick={locate} disabled={busy} className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"><LocateFixed className="h-3.5 w-3.5" />{busy ? '…' : (ar ? 'اعرض موقعي على الخريطة' : 'Show my location')}</button>
-      </>}
+      <p className="mb-2.5 flex items-center gap-2 text-sm font-semibold"><Route className="h-4 w-4 text-brand" />{multi ? (ar ? `مسار التوصيل من ${zones.length} مناطق` : `Delivery route from ${zones.length} areas`) : (ar ? 'مسار استلام وتوصيل الطلب' : 'Order delivery route')}</p>
+      <DeliveryMap zones={zones} dest={dest} height={220} destLabel={ar ? 'عنوانك' : 'Your address'} />
+      {!dest && (
+        <button type="button" onClick={locate} disabled={busy} className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-brand hover:underline"><LocateFixed className="h-3.5 w-3.5" />{busy ? '…' : (ar ? 'اعرض موقعي على مسار التوصيل' : 'Show my location on route')}</button>
+      )}
       <ul className="mt-3 space-y-2 text-sm">
         {zones.map((z, i) => (
           <li key={z.key} className="flex items-start justify-between gap-3">

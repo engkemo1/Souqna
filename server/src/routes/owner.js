@@ -5,16 +5,17 @@ import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartme
 import { extractSwatches } from '../lib/logo-palette.js';
 import { q, tx, insert, update, json } from '../db/index.js';
 import { config } from '../config.js';
-import { assertDepartments, inferDepartment, ensureDeptCategories, deptSubtree } from '../lib/departments.js';
+import { assertDepartments, inferDepartment, ensureDeptCategories, deptSubtree, deptAncestors } from '../lib/departments.js';
 import { productTypeTree, deriveDepartment, audienceOrNull, AUDIENCE_KEYS } from '../lib/product-types.js';
 import { inferGender, inferKey } from '../lib/moda/products.js';
 import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
+import { notifyPlatformAlert } from '../lib/whatsapp.js';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { requireOwner } from '../lib/auth.js';
 import { vapidPublicKey, sendTest } from '../lib/push.js';
 import { clampInt, nowIso, slugify } from '../lib/util.js';
-import { notifyBuyer, notifyOrderStatus, notifyPriceDrop, notifyFollowers } from '../lib/buyers.js';
+import { notifyBuyer, notifyOrderStatus, notifyPriceDrop, notifyBackInStock, notifyFollowers } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { weeklyReport } from '../lib/report.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled } from '../lib/visual-demand.js';
@@ -694,13 +695,20 @@ function saveProduct(storeId, data, existing) {
       const item = loadKnowledge().items.get(data.moda_key);
       if (!item || item.virtual) throw badRequest('invalid_moda_type', 'Pick a real garment type from Moda taxonomy.');
     }
+    // A product filed in a section the owner created lives in that section's marketplace department too (when the store sells it).
+    let wantedDept = data.department;
+    if (data.category_id) {
+      const cc = q.get('SELECT slug FROM categories WHERE id=? AND store_id=?', [data.category_id, storeId]);
+      const ds = cc && /^c\d+-/.test(cc.slug) ? cc.slug.replace(/-/g, '_') : null;
+      if (ds && decodeDepartments(q.val('SELECT departments FROM stores WHERE id=?', [storeId])).includes(ds) && q.get('SELECT 1 AS x FROM departments WHERE slug=? AND active=1', [ds])) wantedDept = ds;
+    }
     const mediaIds = data.media.filter((id) => q.val('SELECT id FROM media WHERE id=? AND store_id=?', [id, storeId]));
     const variants = data.variants.filter((v) => v.color || v.size);
     const stock = variants.length ? variants.reduce((s, v) => s + v.stock, 0) : data.stock;
     const row = {
       name_ar: data.name_ar, name_en: data.name_en || data.name_ar, description_ar: data.description_ar, description_en: data.description_en,
       price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null, ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
-      category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, data.department, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
+      category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, wantedDept, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };
@@ -748,6 +756,7 @@ r.put('/products/:id', h((req, res) => {
   saveProduct(req.store.id, data, p);
   invalidateModaCatalogue();
   notifyPriceDrop(p.id, p.price, data.price);
+  if (p.track_stock && p.stock <= 0 && q.val('SELECT stock FROM products WHERE id=?', [p.id]) > 0) notifyBackInStock(p.id);
   triggerReindex();
   const saved = q.get('SELECT * FROM products WHERE id=?', [p.id]);
   res.json({ product: { ...serializeProductDetail(saved), modaKey: saved.moda_key || '' } });
@@ -772,6 +781,7 @@ r.patch('/products/:id', h((req, res) => {
   update('products', p.id, { price: body.price, compare_at_price: body.compare_at_price === undefined ? undefined : body.compare_at_price || null, stock: body.stock, status: body.status, featured: body.featured === undefined ? undefined : Number(body.featured), updated_at: nowIso() });
   if (body.price !== undefined) notifyPriceDrop(p.id, p.price, body.price);
   const np = q.get('SELECT * FROM products WHERE id=?', [p.id]);
+  if (p.track_stock && p.stock <= 0 && np.stock > 0) notifyBackInStock(p.id);
   invalidateModaCatalogue();
   res.json({ product: { id: np.id, price: np.price, compareAt: np.compare_at_price, stock: np.stock, status: np.status, stockStatus: stockStatus(np), featured: !!np.featured } });
 }));
@@ -780,11 +790,13 @@ r.patch('/variants/:id', h((req, res) => {
   const v = q.get('SELECT v.*, p.store_id FROM variants v JOIN products p ON p.id=v.product_id WHERE v.id=?', [req.params.id]);
   if (!v || v.store_id !== req.store.id) throw notFound('Variant');
   const { stock } = z.object({ stock: z.coerce.number().int().min(0).max(100000) }).parse(req.body);
+  const stockBefore = q.val('SELECT stock FROM products WHERE id=?', [v.product_id]);
   tx(() => {
     q.run('UPDATE variants SET stock=? WHERE id=?', [stock, v.id]);
     q.run('UPDATE products SET stock=(SELECT COALESCE(SUM(stock),0) FROM variants WHERE product_id=?), updated_at=? WHERE id=?', [v.product_id, nowIso(), v.product_id]);
   });
   const p = q.get('SELECT * FROM products WHERE id=?', [v.product_id]);
+  if (p.track_stock && stockBefore <= 0 && p.stock > 0) notifyBackInStock(p.id);
   invalidateModaCatalogue();
   res.json({ variant: { id: v.id, stock }, product: { id: p.id, stock: p.stock, stockStatus: stockStatus(p) } });
 }));
@@ -1062,14 +1074,39 @@ function checkCatParent(storeId, parentId, selfId) {
 const catSchema = z.object({ name_ar: z.string().trim().min(1).max(40), name_en: z.string().trim().min(1).max(40), media_id: z.number().int().nullable().optional(), parent_id: z.number().int().nullable().optional() });
 r.post('/categories', h((req, res) => {
   const d = catSchema.parse(req.body);
-  // Store owners only add sub-categories; the top-level categories are managed by the platform admin.
-  if (!req.adminStore && !d.parent_id) throw badRequest('top_level_admin_only', 'Choose a main category to add this sub-category under.');
+  // Owners can add their own sections (top-level or under a main one); platform (system) sections stay admin-managed.
+  const norm = (x) => String(x || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ًٌٍَُِّْ]/g, '').replace(/\s+/g, ' ').trim();
+  const mine = q.all('SELECT name_ar, name_en, system FROM categories WHERE store_id=?', [req.store.id]);
+  if (!req.adminStore && mine.filter((c) => !c.system).length >= 12) throw badRequest('too_many_sections', 'You reached the maximum number of sections.');
+  if (mine.some((c) => norm(c.name_ar) === norm(d.name_ar) || norm(c.name_en) === norm(d.name_en))) throw badRequest('section_exists', 'A section with this name already exists.');
   const parentId = checkCatParent(req.store.id, d.parent_id, null);
-  let slug = slugify(d.name_en), i = 1;
-  while (q.val('SELECT id FROM categories WHERE store_id=? AND slug=?', [req.store.id, slug])) slug = `${slugify(d.name_en)}-${++i}`;
-  const sort = (q.val('SELECT MAX(sort) FROM categories WHERE store_id=?', [req.store.id]) || 0) + 1;
-  const id = insert('categories', { store_id: req.store.id, slug, name_ar: d.name_ar, name_en: d.name_en, media_id: d.media_id ?? null, parent_id: parentId, sort });
-  res.status(201).json({ category: serializeCategory({ ...q.get('SELECT * FROM categories WHERE id=?', [id]), count: 0 }) });
+  // The section shows in this store right away. It is also filed as a REQUEST for a platform department: it only reaches the marketplace
+  // (strip, search filters, store listing) once the platform admin accepts it. Same name under the same parent = one shared request/department.
+  let official = false;
+  const created = tx(() => {
+    const parentCat = parentId ? q.get('SELECT slug FROM categories WHERE id=?', [parentId]) : null;
+    let parentDept = parentCat ? parentCat.slug.replace(/-/g, '_') : null;
+    if (parentDept && (!q.get('SELECT 1 AS x FROM departments WHERE slug=?', [parentDept]) || deptAncestors(parentDept).length >= 2)) parentDept = null;
+    const cands = q.all('SELECT slug, name_ar, active FROM departments WHERE COALESCE(parent_slug, \'\')=?', [parentDept || '']).filter((x) => norm(x.name_ar) === norm(d.name_ar));
+    const same = cands.find((x) => x.active) || cands.find((x) => /^c\d+_/.test(x.slug));
+    let deptSlug = same?.slug;
+    official = !!same?.active;
+    if (!deptSlug) {
+      deptSlug = `c${req.store.id}_${Date.now().toString(36)}`;
+      insert('departments', { slug: deptSlug, name_ar: d.name_ar, name_en: d.name_en, sizes_json: '[]', sort: (q.val('SELECT COALESCE(MAX(sort),0)+1 FROM departments') || 1), active: 0, parent_slug: parentDept });
+    }
+    const slug = deptSlug.replace(/_/g, '-');
+    if (q.get('SELECT id FROM categories WHERE store_id=? AND slug=?', [req.store.id, slug])) throw badRequest('section_exists', 'A section with this name already exists.');
+    if (official) { // that department already exists on the platform: the store simply starts selling in it
+      const have = decodeDepartments(q.val('SELECT departments FROM stores WHERE id=?', [req.store.id]));
+      if (!have.includes(deptSlug)) q.run('UPDATE stores SET departments=? WHERE id=?', [encodeDepartments([...have, deptSlug]), req.store.id]);
+    }
+    const sort = (q.val('SELECT MAX(sort) FROM categories WHERE store_id=?', [req.store.id]) || 0) + 1;
+    return insert('categories', { store_id: req.store.id, slug, name_ar: d.name_ar, name_en: d.name_en, media_id: d.media_id ?? null, parent_id: parentId, sort });
+  });
+  if (!official) notifyPlatformAlert(`طلب قسم جديد «${d.name_ar}» من محل ${req.store.name_ar || req.store.slug}`);
+  invalidateModaCatalogue();
+  res.status(201).json({ category: serializeCategory({ ...q.get('SELECT * FROM categories WHERE id=?', [created]), count: 0 }), pending: !official });
 }));
 r.put('/categories/:id', h((req, res) => {
   const c = q.get('SELECT * FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
