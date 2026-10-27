@@ -11,6 +11,10 @@ import AuthShell from './AuthShell.jsx';
 import InstallStoreApp from '../../components/auth/InstallStoreApp.jsx';
 import { useStoreAppManifest } from '../../lib/pwa.js';
 
+// The demo account only exists on a seeded dev database. On the live site it is not shown (and the old demo shops are gone).
+const PLATFORM_WA = '201206928670'; // Twist team WhatsApp (same default as the server's PLATFORM_WA)
+const SHOW_DEMO = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO === '1';
+
 export default function Login() {
   useStoreAppManifest();
   const { t } = useI18n();
@@ -34,13 +38,20 @@ export default function Login() {
       setBusy(false);
     }
   };
+  const [waUrl, setWaUrl] = useState('');
   const forgot = async () => {
-    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) { setError({ message: 'اكتب الإيميل الأول وبعدين دوس «نسيت الباسورد».' }); return; }
-    try { const r = await api('/auth/forgot', { method: 'POST', body: { email: form.email.trim() } }); window.open(r.wa, '_blank', 'noopener'); } catch (e) { setError(e); }
+    const email = form.email.trim();
+    const hasEmail = /^\S+@\S+\.\S+$/.test(email);
+    const text = `أهلاً Twist، نسيت باسورد لوحة المحل.${hasEmail ? ` الإيميل: ${email}.` : ''} محتاج لينك باسورد جديد.`;
+    let url = `https://wa.me/${PLATFORM_WA}?text=${encodeURIComponent(text)}`;
+    if (hasEmail) { try { const r = await api('/auth/forgot', { method: 'POST', body: { email } }); if (r?.wa) url = r.wa; } catch { /* the plain WhatsApp link below still works */ } }
+    setError(null);
+    setWaUrl(url);
+    window.location.href = url; // a normal navigation: pop-ups opened after an await are blocked on phones
   };
   const demo = () => { const c = { email: 'ahmed@banhalook.app', password: 'demo1234' }; setForm(c); submit(null, c); };
 
-  useEffect(() => { if (params.get('demo') === '1' && !user) demo(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (SHOW_DEMO && params.get('demo') === '1' && !user) demo(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   if (user && !busy) return <Navigate to="/dashboard" replace />;
   const fe = fieldErrors(t, error);
 
@@ -49,11 +60,13 @@ export default function Login() {
       <h1 className="font-display text-3xl font-bold">{t('auth.loginTitle')}</h1>
       <p className="mt-2 text-muted">{t('auth.loginBody')}</p>
 
+      {SHOW_DEMO && (
       <button type="button" onClick={demo} disabled={busy}
         className="group mt-8 flex w-full items-center gap-4 rounded-2xl border border-dashed border-primary/40 bg-secondary p-4 text-start transition hover:border-primary active:scale-[.99] disabled:opacity-60">
         <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary text-on-primary"><Sparkles className="h-5 w-5" /></span>
         <span><span className="block font-semibold text-brand">{t('auth.demo')}</span><span className="block text-sm text-muted">{t('auth.demoHint')}</span></span>
       </button>
+      )}
 
       <div className="my-7 flex items-center gap-4 text-xs text-muted"><span className="h-px flex-1 bg-line" />{t('common.or')}<span className="h-px flex-1 bg-line" /></div>
 
@@ -68,6 +81,7 @@ export default function Login() {
         {error && !Object.keys(fe).length && <p role="alert" className="rounded-xl bg-sale/10 px-4 py-3 text-sm font-medium text-sale">{errorMessage(t, error)}</p>}
         <Button type="submit" full size="lg" loading={busy}>{t('auth.signIn')}</Button>
         <button type="button" onClick={forgot} className="w-full text-center text-sm font-medium text-brand hover:underline">نسيت الباسورد؟ كلّم Twist على واتساب</button>
+        {waUrl && <a href={waUrl} target="_blank" rel="noopener noreferrer" className="block w-full rounded-xl bg-secondary px-4 py-3 text-center text-sm font-semibold text-brand">لو واتساب مفتحش، اضغط هنا لفتحه</a>}
       </form>
       <InstallStoreApp className="mt-8" />
       <p className="mt-8 text-center text-sm text-muted">{t('app.name')} · {t('app.tagline')}</p>

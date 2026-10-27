@@ -12,6 +12,7 @@
       (function () {
         var p = location.pathname;
         if (p === '/login' || p === '/dashboard' || p.indexOf('/dashboard/') === 0) {
+          window.__storeManifest = true;
           document.querySelector('link[rel="manifest"]').setAttribute('href', '/store-app.webmanifest');
           document.querySelector('meta[name="apple-mobile-web-app-title"]').setAttribute('content', 'لوحة المحل');
         }

@@ -7,6 +7,9 @@ import { cx } from '../ui/cx.js';
 export default function InstallStoreApp({ className }) {
   const { installed, canPrompt, ios, install } = useInstall();
   const [help, setHelp] = useState(false);
+  // The browser binds its install prompt to the manifest the page was LOADED with. If the owner got here by an in-app link from the
+  // marketplace, that was the shop-front manifest (opens the home page) - reload once so the dashboard manifest is the one installed.
+  const onInstall = () => { if (typeof window !== 'undefined' && !window.__storeManifest) { window.location.reload(); return; } install(); };
   if (installed) return null;
   return (
     <div className={cx('rounded-2xl border border-line bg-elevated p-4', className)}>
@@ -15,7 +18,7 @@ export default function InstallStoreApp({ className }) {
         <div className="min-w-0 flex-1"><p className="font-semibold">ثبّت لوحة المحل على موبايلك</p><p className="text-sm text-muted">أيقونة على الشاشة الرئيسية، وتفضل مسجّل دخولك لحد ما تعمل خروج.</p></div>
       </div>
       {canPrompt ? (
-        <button type="button" onClick={install} className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-btn font-semibold text-on-btn"><Download className="h-4 w-4" />تثبيت التطبيق</button>
+        <button type="button" onClick={onInstall} className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-btn font-semibold text-on-btn"><Download className="h-4 w-4" />تثبيت التطبيق</button>
       ) : (
         <>
           <button type="button" onClick={() => setHelp((v) => !v)} className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-btn font-semibold text-on-btn"><Download className="h-4 w-4" />إزاي أثبّته؟</button>
