@@ -53,7 +53,7 @@ async function pool(items, size, fn) {
   return out;
 }
 
-const img = (rel, storeId, kind = 'product', alt = null) => processImage(fs.readFileSync(path.join(ASSETS, rel)), { storeId, kind, alt });
+const img = (rel, storeId, kind = 'product', alt = null) => processImage(fs.readFileSync(path.join(ASSETS, rel)), { storeId, kind, alt, fast: true });
 
 /* ---------------------------------------------------------- stores */
 

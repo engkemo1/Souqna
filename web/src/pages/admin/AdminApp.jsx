@@ -7,6 +7,7 @@ import Button from '../../components/ui/Button.jsx';
 import { Field, Input } from '../../components/ui/Field.jsx';
 import Brand from '../../components/market/Brand.jsx';
 import { cx } from '../../components/ui/cx.js';
+import { useAppManifest } from '../../lib/pwa.js';
 import { adminApi, adminKey, adminSession, setAdminAuthFail, fmtMoney } from './adminApi.js';
 
 const NAV_GROUPS = [
@@ -18,6 +19,7 @@ const NAV_GROUPS = [
     { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
     { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
     { to: '/admin/buyers', icon: Users, label: 'حسابات العملاء' },
+    { to: '/admin/photos', icon: Camera, label: 'أحدث الصور' },
   ] },
   { label: 'الطلبات والتشغيل', items: [
     { to: '/admin/orders', icon: ShoppingBag, label: 'الطلبات' },
@@ -370,6 +372,7 @@ function Shell({ onLogout }) {
 
 export default function AdminApp() {
   useTheme(DASHBOARD_THEME);
+  useAppManifest('/admin-app.webmanifest', 'إدارة Twist');
   const [authed, setAuthed] = useState(() => !!adminKey.get());
   useEffect(() => { setAdminAuthFail(() => { adminKey.set(''); setAuthed(false); }); }, []);
   const logout = () => { adminKey.set(''); setAuthed(false); };

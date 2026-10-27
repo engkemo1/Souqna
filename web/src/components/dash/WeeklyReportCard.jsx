@@ -6,7 +6,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
 import { cx } from '../ui/cx.js';
 
-/** "تقرير الأسبوع": numbers from the database + short, concrete advice (AI-written when Moda's provider is on). */
+/** "تقرير الأسبوع": numbers from the database + short, concrete advice (AI-written when Twila's provider is on). */
 export default function WeeklyReportCard({ className }) {
   const { t, lang } = useI18n();
   const { data, loading } = useApi('/owner/report/weekly');

@@ -105,6 +105,7 @@ const storeSchema = z.object({
   departments: z.array(z.string().max(31)).min(1, 'departments_required').max(40).optional(),
   phone: z.string().trim().max(20).optional(), whatsapp: z.string().trim().max(20).optional(),
   hero_mode: z.enum(['auto', 'cover', 'slider']).optional(),
+  photo_style: z.enum(['white', 'cream', 'original']).optional(),
   logo_initials: z.string().trim().max(2).optional(),
   logo_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   lat: z.coerce.number().min(-90).max(90).nullable().optional(), lng: z.coerce.number().min(-180).max(180).nullable().optional(),
@@ -128,6 +129,17 @@ r.put('/store', h((req, res) => {
   if (body.departments) ensureDeptCategories(req.store.id, decodeDepartments(body.departments));
   const s = q.get('SELECT * FROM stores WHERE id=?', [req.store.id]);
   res.json({ store: serializeStore(s) });
+}));
+
+/** Product-photo look (white | cream | original), changeable right from the photo uploader. Applies to photos uploaded from now on. */
+r.get('/photo-style', h((req, res) => {
+  const v = q.val('SELECT photo_style FROM stores WHERE id=?', [req.store.id]);
+  res.json({ style: ['white', 'cream', 'original'].includes(v) ? v : 'white' });
+}));
+r.put('/photo-style', h((req, res) => {
+  const { style } = z.object({ style: z.enum(['white', 'cream', 'original']) }).parse(req.body);
+  q.run('UPDATE stores SET photo_style=? WHERE id=?', [style, req.store.id]);
+  res.json({ style });
 }));
 
 r.put('/store/theme', h((req, res) => {
@@ -524,6 +536,18 @@ r.post('/media', upload.array('files', 12), h(async (req, res) => {
   res.status(201).json({ media: out });
 }));
 
+/** Re-do ONE photo in another look, from its stored original. Creates a fresh photo (new file, so no stale cache); the owner's editor swaps it in. */
+r.post('/media/:id/restyle', h(async (req, res) => {
+  const { style } = z.object({ style: z.enum(['white', 'cream', 'original', 'asis']) }).parse(req.body);
+  const m = getMedia(Number(req.params.id));
+  if (!m || m.store_id !== req.store.id || m.kind !== 'product') throw new AppError(404, 'not_found', 'Photo not found.');
+  let src;
+  try { src = await readMediaFile(m, 'source.jpg'); } catch { throw badRequest('no_source', 'This photo was uploaded before the new look, so its original is not stored. Please upload it again.'); }
+  const fresh = await processImage(src, { storeId: req.store.id, kind: 'product', style });
+  if (!m.attached) await deleteMedia(m); // never saved on a product: nothing refers to it, tidy up
+  res.json({ media: serializeMedia(fresh) });
+}));
+
 const aiHits = new Map();
 /** AI listing helper: fill the name, description and colours from the product photo. */
 r.post('/ai/product', h(async (req, res) => {
@@ -574,6 +598,7 @@ r.get('/products', h((req, res) => {
   if (category) { where.push('p.category_id=?'); params.push(Number(category)); }
   if (stock === 'low') where.push('p.track_stock=1 AND p.stock>0 AND p.stock<=p.low_stock_at');
   if (stock === 'out') where.push('p.track_stock=1 AND p.stock<=0');
+  if (req.query.photo === 'weak') where.push('(COALESCE((SELECT m.quality FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.is_primary=1 LIMIT 1), 100) < 50)');
   if (term) { const like = `%${String(term).slice(0, 60)}%`; where.push('(p.name_ar LIKE ? OR p.name_en LIKE ? OR p.sku LIKE ?)'); params.push(like, like, like); }
   const order = { newest: 'p.created_at DESC', oldest: 'p.created_at ASC', price_asc: 'p.price ASC', price_desc: 'p.price DESC', stock: 'p.stock ASC', best: 'p.sold_count DESC', name: 'p.name_en ASC' }[sort] || 'p.created_at DESC';
   const limit = clampInt(req.query.limit, 1, 100, 24);
@@ -590,6 +615,7 @@ r.get('/products', h((req, res) => {
       SUM(track_stock=1 AND stock>0 AND stock<=low_stock_at) AS low, SUM(track_stock=1 AND stock<=0) AS out_
      FROM products WHERE store_id=? AND status<>'archived'`, [sid],
   );
+  const weak = q.val(`SELECT COUNT(*) FROM products p WHERE p.store_id=? AND p.status<>'archived' AND (COALESCE((SELECT m.quality FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.is_primary=1 LIMIT 1), 100) < 50)`, [sid]);
   res.json({
     items: rows.map((p) => ({
       id: p.id, slug: p.slug, name: bi(p, 'name'), price: p.price, compareAt: p.compare_at_price, sku: p.sku, status: p.status,
@@ -597,8 +623,24 @@ r.get('/products', h((req, res) => {
       category: p.cat_en ? { ar: p.cat_ar, en: p.cat_en } : null, variantCount: p.variant_count, image: images.get(p.id) || null, updatedAt: p.updated_at,
     })),
     total, page, pages: Math.max(1, Math.ceil(total / limit)),
-    counts: { all: counts.all_ || 0, active: counts.active || 0, draft: counts.draft || 0, low: counts.low || 0, out: counts.out_ || 0 },
+    counts: { all: counts.all_ || 0, active: counts.active || 0, draft: counts.draft || 0, low: counts.low || 0, out: counts.out_ || 0, weak: weak || 0 },
   });
+}));
+
+/* Returns & exchanges: the store-wide period lives in store settings (return_days, default 3). A piece can opt out; one tap applies it to every product. */
+r.get('/returns', h((req, res) => {
+  const sid = req.store.id;
+  res.json({
+    days: q.val('SELECT return_days FROM stores WHERE id=?', [sid]) ?? 3,
+    total: q.val("SELECT COUNT(*) FROM products WHERE store_id=? AND status<>'archived'", [sid]) || 0,
+    noReturn: q.val("SELECT COUNT(*) FROM products WHERE store_id=? AND status<>'archived' AND no_return=1", [sid]) || 0,
+  });
+}));
+r.post('/returns/bulk', h((req, res) => {
+  const { no_return } = z.object({ no_return: z.boolean() }).parse(req.body);
+  const info = q.run("UPDATE products SET no_return=? WHERE store_id=? AND status<>'archived'", [no_return ? 1 : 0, req.store.id]);
+  invalidateModaCatalogue();
+  res.json({ ok: true, changed: info?.changes ?? 0, noReturn: no_return });
 }));
 
 r.get('/products/:id', h((req, res) => {
@@ -607,7 +649,7 @@ r.get('/products/:id', h((req, res) => {
   res.json({
     product: {
       ...serializeProductDetail(p),
-      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '', audience: p.audience || '', badgeText: p.badge_text || '', badgeTone: p.badge_tone || '', ...suggestTypeFor(p),
+      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, noReturn: !!p.no_return, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '', audience: p.audience || '', badgeText: p.badge_text || '', badgeTone: p.badge_tone || '', ...suggestTypeFor(p),
       compareAt: p.compare_at_price, sold: p.sold_count, views: p.views,
     },
   });
@@ -661,6 +703,7 @@ const productSchema = z.object({
   track_stock: z.boolean().optional().default(true),
   stock: z.coerce.number().int().min(0).max(100000).optional().default(0),
   low_stock_at: z.coerce.number().int().min(0).max(1000).optional().default(5),
+  no_return: z.boolean().optional(),
   media: z.array(z.number().int()).max(30).default([]),
   primary_media_id: z.number().int().nullable().optional(),
   seo_title: z.string().trim().max(70).optional().nullable(),
@@ -693,7 +736,7 @@ function saveProduct(storeId, data, existing) {
     if (data.category_id && !q.val('SELECT id FROM categories WHERE id=? AND store_id=?', [data.category_id, storeId])) throw badRequest('invalid_category', 'Category not found.');
     if (data.moda_key) {
       const item = loadKnowledge().items.get(data.moda_key);
-      if (!item || item.virtual) throw badRequest('invalid_moda_type', 'Pick a real garment type from Moda taxonomy.');
+      if (!item || item.virtual) throw badRequest('invalid_moda_type', 'Pick a real garment type from Twila taxonomy.');
     }
     // A product filed in a section the owner created lives in that section's marketplace department too (when the store sells it).
     let wantedDept = data.department;
@@ -710,7 +753,7 @@ function saveProduct(storeId, data, existing) {
       price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null, ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
       category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, wantedDept, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
-      stock, low_stock_at: data.low_stock_at, seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
+      stock, low_stock_at: data.low_stock_at, ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };
     let id;
     if (existing) {

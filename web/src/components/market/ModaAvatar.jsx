@@ -5,7 +5,7 @@ import { MODA_IMG } from './modaImg.js';
 const StatesModa = lazy(() => import('./StatesModa.jsx'));
 
 /**
- * Moda's avatar. Default = the bundled 3D portrait: small sizes are a face-crop circle, the big one (`living`) is the animated portrait
+ * Twila's avatar. Default = the bundled 3D portrait: small sizes are a face-crop circle, the big one (`living`) is the animated portrait
  * (real expression frames: blinks and moves her mouth while talking). An image uploaded from the admin replaces it everywhere with a simpler CSS-animated version.
  */
 export default function ModaAvatar({ src, size = 48, talking = false, thinking = false, ring = true, tilt = false, living = false, className = '' }) {

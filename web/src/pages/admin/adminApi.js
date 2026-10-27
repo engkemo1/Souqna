@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 const KEY = 'bo.adminKey';
+const SKEY = 'bo.adminSession';
+// Kept on this device (not just this tab) so the installed admin app opens straight in. The session proof still expires on the server.
+const store = {
+  get(k) { try { return localStorage.getItem(k) || sessionStorage.getItem(k) || ''; } catch { return ''; } },
+  set(k, v) { try { if (v) localStorage.setItem(k, v); else { localStorage.removeItem(k); sessionStorage.removeItem(k); } } catch { /* ignore */ } },
+};
 export const adminKey = {
-  get() { try { return sessionStorage.getItem(KEY) || ''; } catch { return ''; } },
-  set(v) { try { v ? sessionStorage.setItem(KEY, v) : sessionStorage.removeItem(KEY); if (!v) sessionStorage.removeItem('bo.adminSession'); } catch { /* ignore */ } },
+  get() { return store.get(KEY); },
+  set(v) { store.set(KEY, v); if (!v) store.set(SKEY, ''); },
 };
 
 export const adminSession = {
-  get() { try { return sessionStorage.getItem('bo.adminSession') || ''; } catch { return ''; } },
-  set(v) { try { v ? sessionStorage.setItem('bo.adminSession', v) : sessionStorage.removeItem('bo.adminSession'); } catch { /* ignore */ } },
+  get() { return store.get(SKEY); },
+  set(v) { store.set(SKEY, v); },
 };
 
 export class AdminError extends Error {

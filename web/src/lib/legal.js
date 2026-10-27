@@ -13,8 +13,8 @@ export const LEGAL = {
           'لو عملت حساب (اختياري): الاسم ورقم الموبايل وباسورد متشفّر (إحنا مش بنشوف الباسورد)، بالإضافة لخزانتك والمنتجات اللي بتتابعها وإشعاراتك.',
           'التقييمات: نص التقييم وأي صور بترفعها، وبيظهروا للناس باسمك الأول فقط.',
           'طلبات "مش لاقي في بنها": الوصف والصورة (لو رفعتها) وبيانات التواصل والعنوان اللي بتكتبها.',
-          'المساعد مودة: الرسائل والصور اللي بتبعتها للمساعد بتتبعت لمزوّد الذكاء الاصطناعي (Anthropic أو Cloudflare) عشان يرد عليك. لو عامل حساب، بنحفظ آخر 20 محادثة نصية في حسابك عشان تقدر ترجع لها أو تمسحها من سجل المحادثات. صور الشات نفسها مش بتتحفظ في السجل. من غير حساب، المحادثة بتفضل على جهازك طول ما الصفحة مفتوحة بس. وممكن نحتفظ بنص قصير عن تفضيلاتك وتقييماتك لمودة على جهازك، وتقدر تمسح التفضيلات من داخل المحادثة.',
-          'لو قيّمت رد مودة، بنحفظ تقييمك وطلبك والرد والقطع المقترحة وسبب التقييم (لو اخترته) في سجل محدود يراجعه فريق Twist لتحسين جودة التنسيق. تقدر تتجنب إرسال التقييم، وفريق الإدارة يقدر يحذف السجل.',
+          'المساعد تويلا: الرسائل والصور اللي بتبعتها للمساعد بتتبعت لمزوّد الذكاء الاصطناعي (Anthropic أو Cloudflare) عشان يرد عليك. لو عامل حساب، بنحفظ آخر 20 محادثة نصية في حسابك عشان تقدر ترجع لها أو تمسحها من سجل المحادثات. صور الشات نفسها مش بتتحفظ في السجل. من غير حساب، المحادثة بتفضل على جهازك طول ما الصفحة مفتوحة بس. وممكن نحتفظ بنص قصير عن تفضيلاتك وتقييماتك لتويلا على جهازك، وتقدر تمسح التفضيلات من داخل المحادثة.',
+          'لو قيّمت رد تويلا، بنحفظ تقييمك وطلبك والرد والقطع المقترحة وسبب التقييم (لو اخترته) في سجل محدود يراجعه فريق Twist لتحسين جودة التنسيق. تقدر تتجنب إرسال التقييم، وفريق الإدارة يقدر يحذف السجل.',
           'بيانات تقنية بسيطة: عدد زيارات كل متجر في اليوم (إجمالي بدون هوية)، ونوع المتصفح وعنوان الـIP لأغراض الأمان ومنع الإساءة.',
         ]],
         ['بنستخدم بياناتك في إيه', [
@@ -31,7 +31,7 @@ export const LEGAL = {
           'الجهات الرسمية لو القانون طلب ده.',
         ]],
         ['الكوكيز والتخزين على جهازك', [
-          'مش بنستخدم كوكيز إعلانية. بنحفظ على جهازك حاجات ضرورية للتشغيل والتخصيص زي السلة والمفضلة واللغة ودخول حسابك وتفضيلات مودة؛ وتقدر تمسح ذاكرة التفضيلات من داخل محادثتها.',
+          'مش بنستخدم كوكيز إعلانية. بنحفظ على جهازك حاجات ضرورية للتشغيل والتخصيص زي السلة والمفضلة واللغة ودخول حسابك وتفضيلات تويلا؛ وتقدر تمسح ذاكرة التفضيلات من داخل محادثتها.',
           'لو فعّلت الإشعارات، المتصفح بيحفظ اشتراكك عشان نقدر نبعتلك تنبيهات، وتقدر توقفها في أي وقت من إعدادات المتصفح.',
         ]],
         ['الاحتفاظ بالبيانات والأمان', [
@@ -58,8 +58,8 @@ export const LEGAL = {
           'If you create an account (optional): your name, mobile number and a hashed password (we never see it), plus your wardrobe, the products you watch and your notifications.',
           'Reviews: the review text and any photos you upload; they are shown with your first name only.',
           '"Can\'t find it in Banha" requests: the description, photo (if you add one), contact details and address you enter.',
-          'The Moda assistant: messages and photos you send are passed to our AI provider (Anthropic or Cloudflare) so it can answer. If you have an account, we save your latest 20 text conversations to your account so you can revisit or delete them from chat history. Chat photos are not saved in that history. Without an account, the conversation stays on your device only while the page is open. A short note of your preferences and Moda ratings may also be kept on your device; you can clear the learned preference memory in the chat.',
-          'If you rate a Moda reply, we store your rating, request, reply, suggested pieces and any selected reason in a limited feedback log for the Twist team to review and improve styling quality. Rating is optional, and administrators can delete the feedback record.',
+          'The Twila assistant: messages and photos you send are passed to our AI provider (Anthropic or Cloudflare) so it can answer. If you have an account, we save your latest 20 text conversations to your account so you can revisit or delete them from chat history. Chat photos are not saved in that history. Without an account, the conversation stays on your device only while the page is open. A short note of your preferences and Twila ratings may also be kept on your device; you can clear the learned preference memory in the chat.',
+          'If you rate a Twila reply, we store your rating, request, reply, suggested pieces and any selected reason in a limited feedback log for the Twist team to review and improve styling quality. Rating is optional, and administrators can delete the feedback record.',
           'Basic technical data: aggregate daily visit counts per store (not tied to a person), and browser type and IP address for security and abuse prevention.',
         ]],
         ['How we use your data', [
@@ -76,7 +76,7 @@ export const LEGAL = {
           'Public authorities where the law requires it.',
         ]],
         ['Cookies and on-device storage', [
-          'We do not use advertising cookies. We store only what the site needs on your device for operation and personalisation: cart, favourites, language, sign-in and Moda preferences; you can clear the learned preference memory in the chat.',
+          'We do not use advertising cookies. We store only what the site needs on your device for operation and personalisation: cart, favourites, language, sign-in and Twila preferences; you can clear the learned preference memory in the chat.',
           'If you enable notifications, your browser stores your subscription so we can send alerts; you can stop them at any time in your browser settings.',
         ]],
         ['Retention and security', [
@@ -124,8 +124,8 @@ export const LEGAL = {
           'التقييمات بتكون من مشترين حقيقيين استلموا الطلب. ممنوع أي محتوى مسيء أو مخالف للقانون أو ينتهك حقوق غيرك. بنحتفظ بحق إخفاء أي تقييم مخالف.',
           'بترفع صورك وتقييماتك وإنت مسؤول عنها، وبتسمح لنا نعرضها على المنصة.',
         ]],
-        ['المساعد مودة (ذكاء اصطناعي)', [
-          'مودة بتقترح منتجات وإطلالات بالذكاء الاصطناعي وممكن تغلط. المنتجات والأسعار بتيجي من كتالوج المتاجر الحقيقي، لكن لازم تراجع التفاصيل والمقاس قبل ما تشتري. اقتراحات المقاس إرشادية مش ضمان.',
+        ['المساعد تويلا (ذكاء اصطناعي)', [
+          'تويلا بتقترح منتجات وإطلالات بالذكاء الاصطناعي وممكن تغلط. المنتجات والأسعار بتيجي من كتالوج المتاجر الحقيقي، لكن لازم تراجع التفاصيل والمقاس قبل ما تشتري. اقتراحات المقاس إرشادية مش ضمان.',
         ]],
         ['الاستخدام المسموح', [
           'ممنوع محاولة اختراق الموقع أو إساءة استخدامه أو سحب بياناته بشكل آلي أو انتحال شخصية.',
@@ -163,7 +163,7 @@ export const LEGAL = {
           'Reviews come from real buyers who received their order. Abusive, unlawful or infringing content is not allowed, and we may hide any review that breaks these rules.',
           'You are responsible for the photos and reviews you upload and you allow us to display them on the platform.',
         ]],
-        ['Moda assistant (AI)', ['Moda suggests products and outfits using AI and can make mistakes. Products and prices come from the stores\' real catalogue, but please check the details and size before you buy. Size suggestions are guidance, not a guarantee.']],
+        ['Twila assistant (AI)', ['Twila suggests products and outfits using AI and can make mistakes. Products and prices come from the stores\' real catalogue, but please check the details and size before you buy. Size suggestions are guidance, not a guarantee.']],
         ['Acceptable use', ['Do not attempt to hack or abuse the site, scrape its data automatically, or impersonate others.']],
         ['Limits of liability', ['We try to keep information accurate and up to date but cannot guarantee it is error-free. The seller store is responsible for its products and their quality; we are responsible for running the platform and for the delivery services we provide ourselves, within the limits of the law.']],
         ['Returns and exchanges', ['Each store sets its own exchange and return policy and period (usually 3 days from receiving the order), shown on the store page. This does not affect your rights under the Egyptian Consumer Protection Law.']],

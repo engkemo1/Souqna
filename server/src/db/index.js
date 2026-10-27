@@ -34,6 +34,9 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   db.exec("UPDATE stores SET delivery_mode='platform' WHERE delivery_mode<>'platform'");
   db.exec(`CREATE TABLE IF NOT EXISTS pickup_zones (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, fee INTEGER NOT NULL DEFAULT 0 CHECK (fee >= 0 AND fee <= 5000), courier_cost INTEGER NOT NULL DEFAULT 0 CHECK (courier_cost >= 0 AND courier_cost <= 5000), created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   // every store is shown by default, even before it has products (the admin can switch it off per store)
+  // the stylist was renamed from «مودة» to «تويلا»: carry over names the admin saved before (only if still the old default)
+  db.prepare("UPDATE app_settings SET value='تويلا' WHERE key='stylist_name_ar' AND value='مودة'").run();
+  db.prepare("UPDATE app_settings SET value='Twila' WHERE key='stylist_name_en' AND value='Moda'").run();
   if (db.prepare("INSERT OR IGNORE INTO app_settings(key,value) VALUES('show_empty_default_v1','1')").run().changes) db.exec('UPDATE stores SET show_when_empty=1');
   if (!cols.includes('delivery_zone')) db.exec("ALTER TABLE stores ADD COLUMN delivery_zone TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('search_indexable')) db.exec('ALTER TABLE stores ADD COLUMN search_indexable INTEGER NOT NULL DEFAULT 1');
@@ -53,19 +56,22 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!cols.includes('logo_color')) db.exec("ALTER TABLE stores ADD COLUMN logo_color TEXT NOT NULL DEFAULT '#1B1B1B'");
   if (!cols.includes('same_day_date')) db.exec('ALTER TABLE stores ADD COLUMN same_day_date TEXT');
   if (!cols.includes('same_day_until')) db.exec("ALTER TABLE stores ADD COLUMN same_day_until TEXT NOT NULL DEFAULT '18:00'");
+  if (!cols.includes('photo_style')) db.exec("ALTER TABLE stores ADD COLUMN photo_style TEXT NOT NULL DEFAULT 'white'");
   if (!cols.includes('customization_json')) db.exec("ALTER TABLE stores ADD COLUMN customization_json TEXT NOT NULL DEFAULT '{}'");
   db.exec("UPDATE stores SET departments=',' || category || ',' WHERE departments='' AND category NOT IN ('mixed','')");
   const mcols = db.prepare('PRAGMA table_info(media)').all().map((c) => c.name);
   if (!mcols.includes('remote')) db.exec('ALTER TABLE media ADD COLUMN remote INTEGER NOT NULL DEFAULT 0');
+  if (!mcols.includes('quality')) db.exec('ALTER TABLE media ADD COLUMN quality INTEGER'); // 0-100 photo quality score (null = older photo)
   const dcols = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);
   if (!dcols.includes('image')) db.exec('ALTER TABLE departments ADD COLUMN image TEXT');
   const pcols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!pcols.includes('department')) db.exec('ALTER TABLE products ADD COLUMN department TEXT');
-  if (!pcols.includes('style_level')) db.exec('ALTER TABLE products ADD COLUMN style_level INTEGER'); // درجة الرسمية 1-5 اللي صاحب المحل حددها لمودة (فاضي = تلقائي)
+  if (!pcols.includes('no_return')) db.exec('ALTER TABLE products ADD COLUMN no_return INTEGER NOT NULL DEFAULT 0'); // 1 = this piece is not returnable / exchangeable
+  if (!pcols.includes('style_level')) db.exec('ALTER TABLE products ADD COLUMN style_level INTEGER'); // درجة الرسمية 1-5 اللي صاحب المحل حددها لتويلا (فاضي = تلقائي)
   if (!pcols.includes('badge_text')) db.exec('ALTER TABLE products ADD COLUMN badge_text TEXT'); // شارة مخصصة على كارت المنتج (مثلاً: قطن مصري 100%)
   if (!pcols.includes('badge_tone')) db.exec('ALTER TABLE products ADD COLUMN badge_tone TEXT');
   if (!pcols.includes('audience')) db.exec('ALTER TABLE products ADD COLUMN audience TEXT'); // الفئة: men|women|boys|girls|kids|unisex (فاضي = مستنتج من الاسم)
-  if (!pcols.includes('moda_key')) db.exec('ALTER TABLE products ADD COLUMN moda_key TEXT'); // نوع القطعة الصريح لمحرك مودة (فاضي = تلقائي)
+  if (!pcols.includes('moda_key')) db.exec('ALTER TABLE products ADD COLUMN moda_key TEXT'); // نوع القطعة الصريح لمحرك تويلا (فاضي = تلقائي)
   // Cashier linking: barcodes (matched together with sku when a cashier file or API call arrives).
   if (!pcols.includes('barcode')) db.exec('ALTER TABLE products ADD COLUMN barcode TEXT');
   const vcols = db.prepare('PRAGMA table_info(variants)').all().map((c) => c.name);

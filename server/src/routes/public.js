@@ -10,6 +10,8 @@ import { randomBytes } from 'node:crypto';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { clampInt, nowIso } from '../lib/util.js';
 import { mediaMap, processImage } from '../lib/media.js';
+// Soft ranking: a product whose main photo scored clearly weak (<50) sits just below the others of the same standing. Older photos (no score) are never demoted.
+const WEAK_PHOTO = `(CASE WHEN COALESCE((SELECT m.quality FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.is_primary=1 LIMIT 1), 100) < 50 THEN 1 ELSE 0 END)`;
 import { sameDaySql, cairoNow } from '../lib/sameDay.js';
 import { buyerFromReq } from '../lib/buyers.js';
 import { recomputeRatings } from '../lib/reviews.js';
@@ -23,7 +25,7 @@ import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
 import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, getPlatformFreeShipping } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
-import { sendNewOrderAlert } from '../lib/whatsapp.js';
+import { sendNewOrderAlert, notifyPlatformAlert } from '../lib/whatsapp.js';
 import {
   serializeStore, serializeCards, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi,
 } from '../lib/serialize.js';
@@ -207,7 +209,7 @@ r.get('/search', h((req, res) => {
   const rel = scoreSql.length ? `(${scoreSql.join(' + ')}) DESC, ` : '';
   const orderParams = [];
   const order = {
-    relevance: `${rel}p.featured DESC, p.sold_count DESC, p.id DESC`, price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: 'p.created_at DESC', best: 'p.sold_count DESC',
+    relevance: `${rel}p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC, p.id DESC`, price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: 'p.created_at DESC', best: 'p.sold_count DESC',
     discount: '(1.0*p.price/COALESCE(p.compare_at_price,p.price)) ASC, p.sold_count DESC', rating: 'p.rating DESC, p.rating_count DESC, p.sold_count DESC',
   }[sort] || 'p.sold_count DESC';
   if (sort === 'relevance' || !['price_asc', 'price_desc', 'newest', 'best', 'discount', 'rating'].includes(sort)) orderParams.push(...scoreParams);
@@ -328,7 +330,7 @@ r.get('/visual-search/shared/:token', h((req, res) => {
   res.set('Cache-Control', 'no-store').type('image/jpeg').send(v.buf);
 }));
 
-/* ---------------------------------------------------------- stylist chat ("مودة") */
+/* ---------------------------------------------------------- stylist chat ("تويلا") */
 const chatHits = new Map();
 const brainHits = new Map();
 const curatorHits = new Map();
@@ -374,14 +376,14 @@ r.post('/stylist', h(async (req, res) => {
   if (recent.length >= 200 || recent.filter((t) => now - t < 3600e3).length >= 40) throw new AppError(429, 'rate_limited', 'Too many messages, try again later.');
   if (st.dailyFree && recent.filter((t) => t > new Date().setHours(0, 0, 0, 0)).length >= st.dailyFree) throw new AppError(429, 'stylist_quota', 'Daily free messages used up.');
   chatHits.set(ip, [...recent, now]);
-  // a signed-in shopper's wardrobe (what she/he really bought) lets Moda build looks around it
+  // a signed-in shopper's wardrobe (what she/he really bought) lets Twila build looks around it
   const me = buyerFromReq(req); let profile = body.profile;
   if (me) {
     const owned = q.all("SELECT oi.name_ar, oi.color FROM order_items oi JOIN orders o ON o.id=oi.order_id WHERE o.buyer_id=? AND o.status='delivered' ORDER BY o.id DESC LIMIT 8", [me.id]);
     if (owned.length) profile = { ...(profile || {}), owns: owned.map((x) => [x.name_ar, x.color].filter(Boolean).join(' ')).join('، ').slice(0, 300), ...(me.name ? { name: me.name.split(' ')[0] } : {}) };
   }
   try {
-    // Photos still use the vision-capable provider. Text chat uses the local, rule-based Moda engine and live shop inventory.
+    // Photos still use the vision-capable provider. Text chat uses the local, rule-based Twila engine and live shop inventory.
     if (body.image || body.image2) return res.json(await runStylist(body.messages, { image: body.image, image2: body.image2, profile, session: body.session, answers: body.answers }));
     const modaProfile = { ...(profile || {}) };
     const rows = modaCatalogRows();
@@ -603,13 +605,13 @@ r.get('/stores/:slug/products', h((req, res) => {
     params.push(...list);
   }
   const order = {
-    featured: 'p.featured DESC, p.sold_count DESC',
+    featured: `p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC`,
     newest: 'p.created_at DESC',
     price_asc: 'p.price ASC',
     price_desc: 'p.price DESC',
     best: 'p.sold_count DESC',
     discount: '(1.0*p.price/COALESCE(p.compare_at_price,p.price)) ASC',
-  }[sort] || 'p.featured DESC, p.sold_count DESC';
+  }[sort] || `p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC`;
 
   const limit = clampInt(req.query.limit, 1, 48, 24);
   const page = clampInt(req.query.page, 1, 1000, 1);
@@ -719,6 +721,18 @@ r.post('/stores/:slug/page-view', h((req, res) => {
 
 const cartItems = z.array(z.object({ productId: z.coerce.number().int(), variantId: z.coerce.number().int().nullable().optional(), qty: z.coerce.number().int().min(1).max(20) })).min(1).max(50);
 
+/* Pieces in a basket that cannot be exchanged (the piece opted out, or the whole store accepts no exchanges), so the shopper knows before ordering. */
+r.post('/marketplace/final-sale', h((req, res) => {
+  const body = z.object({ items: z.array(z.object({ slug: z.string().trim().min(1).max(80), productId: z.coerce.number().int() })).min(1).max(60) }).parse(req.body);
+  const seen = new Set(); const items = [];
+  for (const it of body.items) {
+    const key = `${it.slug}:${it.productId}`; if (seen.has(key)) continue; seen.add(key);
+    const row = q.get(`SELECT p.id, p.name_ar, p.name_en, p.no_return, s.return_days FROM products p JOIN stores s ON s.id=p.store_id WHERE s.slug=? AND p.id=?`, [it.slug, it.productId]);
+    if (row && (row.no_return || (row.return_days ?? 3) <= 0)) items.push({ productId: row.id, slug: it.slug, name: { ar: row.name_ar, en: row.name_en || row.name_ar } });
+  }
+  res.json({ items });
+}));
+
 r.post('/stores/:slug/quote', h((req, res) => {
   const s = loadStore(req.params.slug);
   const body = z.object({ items: cartItems, coupon: z.string().max(40).optional().nullable(), phone: z.string().max(20).optional().nullable() }).parse(req.body);
@@ -809,6 +823,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
       .catch((e) => console.error(`[whatsapp] ${result.number} failed: ${e.message}`));
   }
   notifyStore(s.id, { title: `طلب جديد 🛍️ ${result.number}`, body: `${body.name} · ${result.total} ج.م`, url: `/dashboard/orders/${result.orderId}`, tag: `order-${result.orderId}` });
+  notifyPlatformAlert(`طلب جديد من ${s.name_ar} 🛍️ ${result.number} بقيمة ${result.total} ج.م للعميل ${body.name}`);
   delete result.orderId;
   res.status(201).json({ order: result });
 }));
@@ -886,6 +901,7 @@ r.post('/marketplace/orders', h((req, res) => {
     // Store notifications are best-effort, after all sub-orders have committed atomically.
     if (store.auto_whatsapp) sendNewOrderAlert(store, order.orderId).catch((e) => console.error(`[whatsapp] ${order.number} failed: ${e.message}`));
     notifyStore(store.id, { title: `طلب جديد 🛍️ ${order.number}`, body: `${body.name} · ${order.total} ج.م`, url: `/dashboard/orders/${order.orderId}`, tag: `order-${order.orderId}` });
+    notifyPlatformAlert(`طلب تويست جديد 🛍️ ${order.number} من ${store.name_ar} بقيمة ${order.total} ج.م للعميل ${body.name}`);
     // Marketplace orders are always delivered by Twist, regardless of the
     // store's default delivery preference. Dispatch is notified when ready.
   }

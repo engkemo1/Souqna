@@ -1,5 +1,5 @@
 /**
- * محرك مودة: رسالة (أو إجابة زرار) → رد جاهز. بدون موديل في المسار الأساسي.
+ * محرك تويلا: رسالة (أو إجابة زرار) → رد جاهز. بدون موديل في المسار الأساسي.
  * runModa(messages, { products, profile, now, weatherMock, imageText, session, answers, llmExtract, fetcher })
  * بيرجع { ...response, session, parsed } — session بيتخزن عند العميل/السيرفر ويتبعت في الطلب الجاي.
  */

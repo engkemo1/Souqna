@@ -98,7 +98,7 @@ app.use('/api', (_req, res) => res.status(404).json({ error: { code: 'not_found'
 
 // Serve the built web app (single-origin deployment).
 if (fs.existsSync(config.webDist)) {
-  app.use(express.static(config.webDist, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); if (/\/(sw\.js|manifest\.webmanifest|offline\.html)$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
+  app.use(express.static(config.webDist, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); if (/\/(sw\.js|offline\.html)$|\.webmanifest$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const withSeo = (html, { title, description, url, image }) => html
     .replace(/<title>.*?<\/title>/, `<title>${esc(title)}</title>`)
@@ -160,7 +160,20 @@ if (fs.existsSync(config.webDist)) {
       res.set('Cache-Control', 'no-cache').type('html').send(html);
     } catch (e) { next(); }
   });
-  app.get('*', (_req, res) => res.sendFile(path.join(config.webDist, 'index.html')));
+  // The owner's and the admin's screens install as their own apps. The right manifest is written into the page by the server,
+  // so "Add to home screen" opens the dashboard / admin even before any script has run.
+  const APP_SHELLS = [
+    [/^\/(login|dashboard)(\/|$)/, '/store-app.webmanifest', 'لوحة المحل'],
+    [/^\/admin(\/|$)/, '/admin-app.webmanifest', 'إدارة Twist'],
+  ];
+  app.get('*', (req, res) => {
+    const hit = APP_SHELLS.find(([re]) => re.test(req.path));
+    if (!hit) return res.sendFile(path.join(config.webDist, 'index.html'));
+    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8')
+      .replace('<link rel="manifest" href="/manifest.webmanifest" />', `<link rel="manifest" href="${hit[1]}" />`)
+      .replace('<meta name="apple-mobile-web-app-title" content="Twist Store" />', `<meta name="apple-mobile-web-app-title" content="${hit[2]}" />`);
+    res.set('Cache-Control', 'no-cache').type('html').send(html);
+  });
 }
 
 app.use(errorHandler);

@@ -42,7 +42,7 @@ r.use(requireBuyer);
 
 r.get('/me', h((req, res) => res.json({ buyer: out(req.buyer), unread: unread(req.buyer.id) })));
 
-/* ------------------------------------------------ Moda chat history (signed-in buyers only; photos are never persisted) */
+/* ------------------------------------------------ Twila chat history (signed-in buyers only; photos are never persisted) */
 const chatMessagesSchema = z.array(z.record(z.any())).min(2).max(40);
 function cleanChatMessages(messages) {
   return messages.map((message) => {
@@ -62,7 +62,7 @@ function cleanChatMessages(messages) {
     };
   }).filter(Boolean);
 }
-const chatTitle = (messages) => String(messages.find((m) => m.role === 'user')?.content || 'محادثة مودة').replace(/[\r\n]+/g, ' ').trim().slice(0, 64) || 'محادثة مودة';
+const chatTitle = (messages) => String(messages.find((m) => m.role === 'user')?.content || 'محادثة تويلا').replace(/[\r\n]+/g, ' ').trim().slice(0, 64) || 'محادثة تويلا';
 const chatSession = (value) => {
   if (value == null) return null;
   const encoded = JSON.stringify(value);
@@ -84,7 +84,7 @@ r.get('/chats/:id', h((req, res) => {
 const saveChat = (req, res, create) => {
   const body = z.object({ id: z.number().int().positive().optional(), messages: chatMessagesSchema, session: z.record(z.any()).optional().nullable() }).parse(req.body);
   const messages = cleanChatMessages(body.messages);
-  if (messages.length < 2 || !messages.some((message) => message.role === 'user') || !messages.some((message) => message.role === 'assistant')) throw new AppError(422, 'validation_failed', 'A saved chat needs a shopper message and a Moda reply.');
+  if (messages.length < 2 || !messages.some((message) => message.role === 'user') || !messages.some((message) => message.role === 'assistant')) throw new AppError(422, 'validation_failed', 'A saved chat needs a shopper message and a Twila reply.');
   const encoded = JSON.stringify(messages);
   if (encoded.length > 300000) throw new AppError(413, 'payload_too_large', 'This conversation is too long to save.');
   const session = chatSession(body.session);

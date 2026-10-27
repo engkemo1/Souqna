@@ -55,7 +55,7 @@ function ModaFeedback({ question, reply, items, productIds, t, onRated }) {
 }
 
 /** Floating shopping assistant: chat in text or voice, answers come with real products from Banha stores. */
-/** خطوات التحليل أثناء الانتظار: العميل يشوف مودة بتعمل إيه بدل ما يستنى قدام "بفكّر…". */
+/** خطوات التحليل أثناء الانتظار: العميل يشوف تويلا بتعمل إيه بدل ما يستنى قدام "بفكّر…". */
 function AnalysisSteps({ t }) {
   const steps = ['stylist.step1', 'stylist.step2', 'stylist.step3', 'stylist.step4', 'stylist.step5'];
   const [i, setI] = useState(0);

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 
 /**
- * Moda's portrait, brought to life in a WebGL shader (no 3D model needed):
+ * Twila's portrait, brought to life in a WebGL shader (no 3D model needed):
  * real blinking eyelids, eyes that follow your finger/mouse, lips that open while she talks, brows that lift when she thinks,
  * hair that sways, earrings that swing, a gentle breathing motion and a head that turns toward you.
  * All feature positions are in the 1254px design space of /moda/moda.webp.

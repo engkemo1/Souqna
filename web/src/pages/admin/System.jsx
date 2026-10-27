@@ -619,7 +619,7 @@ function LookOfDayPanel() {
   );
 }
 
-/* اقتراحات مودة الجاهزة: الأزرار السريعة في الرئيسية + الرسائل المثال في أول الشات. بتتعدّل من هنا أو المساعد الذكي يقترحها. */
+/* اقتراحات تويلا الجاهزة: الأزرار السريعة في الرئيسية + الرسائل المثال في أول الشات. بتتعدّل من هنا أو المساعد الذكي يقترحها. */
 const stripFlag = ({ understood, ...rest }) => rest;
 function ModaPromptsPanel() {
   const toast = useToast();
@@ -642,14 +642,14 @@ function ModaPromptsPanel() {
   }, 'المساعد اقترح قايمة جديدة. راجعها وبعدين اضغط حفظ');
   const setHero = (i, patch) => setF((c) => ({ ...c, hero: c.hero.map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
   const setChip = (i, patch) => setF((c) => ({ ...c, chips: c.chips.map((p, k) => (k === i ? { ...p, ...patch } : p)) }));
-  const warn = (flag) => !dirty && flag === false && <p className="mt-1 text-xs text-sale">مودة مش هتفهم الرسالة دي (مفيش فيها مناسبة أو قطعة واضحة). عدّلها.</p>;
+  const warn = (flag) => !dirty && flag === false && <p className="mt-1 text-xs text-sale">تويلا مش هتفهم الرسالة دي (مفيش فيها مناسبة أو قطعة واضحة). عدّلها.</p>;
   return (
     <Panel title="الاقتراحات الجاهزة" subtitle="الأزرار السريعة في الصفحة الرئيسية والرسائل المثال اللي بتظهر في أول الشات" className="lg:col-span-2">
       <div className="space-y-6">
         <section className="space-y-3">
           <div>
             <p className="font-semibold">الأزرار السريعة (الصفحة الرئيسية)</p>
-            <p className="text-xs text-muted">الزرار له اسم قصير، والرسالة هي اللي بتتبعت لمودة لما الزبون يدوس عليه. اذكر فيها مناسبة أو قطعة واضحة (فرح، جامعة، شغل، كوتشي...).</p>
+            <p className="text-xs text-muted">الزرار له اسم قصير، والرسالة هي اللي بتتبعت لتويلا لما الزبون يدوس عليه. اذكر فيها مناسبة أو قطعة واضحة (فرح، جامعة، شغل، كوتشي...).</p>
           </div>
           {f.hero.map((p, i) => (
             <div key={i} className="space-y-2 rounded-xl border border-line bg-elevated p-3">

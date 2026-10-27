@@ -71,6 +71,7 @@ const AdminSubscriptions = lazy(() => import('./pages/admin/Subscriptions.jsx'))
 const AdminServices = lazy(() => import('./pages/admin/Services.jsx'));
 const AdminSourcing = lazy(() => import('./pages/admin/Sourcing.jsx'));
 const AdminBuyers = lazy(() => import('./pages/admin/Buyers.jsx'));
+const AdminPhotos = lazy(() => import('./pages/admin/Photos.jsx'));
 const AdminReports = lazy(() => import('./pages/admin/Reports.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
 const AdminHomepageAds = lazy(() => import('./pages/admin/HomepageAds.jsx'));
@@ -171,6 +172,7 @@ const router = createBrowserRouter([
           { path: 'services', element: <AdminServices /> },
           { path: 'sourcing', element: <AdminSourcing /> },
           { path: 'buyers', element: <AdminBuyers /> },
+          { path: 'photos', element: <AdminPhotos /> },
           { path: 'coupons', element: <AdminCoupons /> },
           { path: 'ads', element: <AdminHomepageAds /> },
           { path: 'reports', element: <AdminReports /> },

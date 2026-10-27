@@ -1,0 +1,19 @@
+{
+  "id": "/admin",
+  "name": "إدارة Twist",
+  "short_name": "إدارة Twist",
+  "description": "لوحة إدارة منصة Twist",
+  "lang": "ar",
+  "dir": "rtl",
+  "start_url": "/admin?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#03244D",
+  "icons": [
+    { "src": "/brand/twist-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/twist-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/brand/twist-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

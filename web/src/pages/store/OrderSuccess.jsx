@@ -1,11 +1,13 @@
+import { useEffect } from 'react';
 import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Check, Copy, PhoneCall, Package, Truck, PackageSearch } from 'lucide-react';
+import { Check, Copy, PhoneCall, Package, Truck, PackageSearch, MessageCircle } from 'lucide-react';
 import { trackUrl } from '../../lib/recentOrders.js';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
+import { SALES_WHATSAPP } from '../../config/contact.js';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -24,6 +26,30 @@ export default function OrderSuccess() {
   const { data, error, reload } = useApi(token ? `/track/${token}` : null);
   const o = data?.order;
   const name = state?.name || o?.firstName || '';
+
+  const rawWa = store?.whatsapp || store?.phone;
+  const targetWa = rawWa ? (rawWa.replace(/\D/g, '').startsWith('20') ? rawWa.replace(/\D/g, '') : `20${rawWa.replace(/\D/g, '').replace(/^0/, '')}`) : SALES_WHATSAPP;
+  const itemsText = (o?.items || []).map((it) => `• ${it.qty}× ${tr(it.name)}${it.size ? ` (${it.size})` : ''}`).join('\n');
+  const waMsg = [
+    `طلب جديد من المتجر 🛍️`,
+    `رقم الطلب: ${number}`,
+    (o?.customer_name || name) ? `الاسم: ${o?.customer_name || name}` : null,
+    o?.phone ? `الموبايل: ${o.phone}` : (state?.phone ? `الموبايل: ${state.phone}` : null),
+    o?.address ? `العنوان: ${[o.address, o.city, o.governorate ? t(`gov.${o.governorate}`) : null].filter(Boolean).join('، ')}` : null,
+    itemsText ? `-----------------------\nالمنتجات:\n${itemsText}` : null,
+    o?.total ? `-----------------------\nالإجمالي: ${formatMoney(o.total, lang)}` : null,
+    token ? `رابط متابعة الطلب:\n${trackUrl(token)}` : null,
+  ].filter(Boolean).join('\n');
+  const waUrl = `https://api.whatsapp.com/send?phone=${targetWa}&text=${encodeURIComponent(waMsg)}`;
+
+  useEffect(() => {
+    if (state?.autoOpenWa && waUrl) {
+      const timer = setTimeout(() => {
+        window.open(waUrl, '_blank');
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [state?.autoOpenWa, waUrl]);
 
   return (
     <div className="container max-w-2xl pt-10 sm:pt-16">
@@ -48,6 +74,27 @@ export default function OrderSuccess() {
             {o && <StatusBadge status={o.status} t={t} />}
             <button type="button" onClick={() => { navigator.clipboard?.writeText(number); toast({ title: t('common.copied') }); }} aria-label={t('common.copy')} className="grid h-10 w-10 place-items-center rounded-full hover:bg-fg/[0.06]"><Copy className="h-4 w-4" /></button>
           </div>
+        </div>
+
+        {/* WhatsApp confirmation banner */}
+        <div className="mt-5 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 p-4 sm:p-5 text-center">
+          <p className="text-base font-bold text-fg">
+            {lang === 'ar' ? 'تأكيد واستلام أسرع لطلبك عبر واتساب 💬' : 'Faster confirmation via WhatsApp 💬'}
+          </p>
+          <p className="mt-1 text-xs sm:text-sm text-muted">
+            {lang === 'ar'
+              ? 'اضغط هنا لإرسال تفاصيل طلبك للإدارة على واتساب مباشرة لتأكيد الاستلام وبدء التجهيز فوراً.'
+              : 'Tap below to send your order details directly via WhatsApp for instant confirmation.'}
+          </p>
+          <a
+            href={waUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3.5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] font-bold text-white shadow-sm transition hover:bg-[#20ba59] active:scale-[0.99] sm:w-auto sm:px-8"
+          >
+            <MessageCircle className="h-5 w-5 fill-white text-white" />
+            {lang === 'ar' ? 'إرسال تفاصيل الطلب على واتساب' : 'Send order to WhatsApp'}
+          </a>
         </div>
 
         <div className="mt-6 border-t border-line pt-5">

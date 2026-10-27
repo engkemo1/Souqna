@@ -11,10 +11,11 @@
       // Login and dashboard pages install as "لوحة المحل" and open straight on the dashboard (decided before the browser reads the manifest).
       (function () {
         var p = location.pathname;
-        if (p === '/login' || p === '/dashboard' || p.indexOf('/dashboard/') === 0) {
+        var admin = p === '/admin' || p.indexOf('/admin/') === 0;
+        if (admin || p === '/login' || p === '/dashboard' || p.indexOf('/dashboard/') === 0) {
           window.__storeManifest = true;
-          document.querySelector('link[rel="manifest"]').setAttribute('href', '/store-app.webmanifest');
-          document.querySelector('meta[name="apple-mobile-web-app-title"]').setAttribute('content', 'لوحة المحل');
+          document.querySelector('link[rel="manifest"]').setAttribute('href', admin ? '/admin-app.webmanifest' : '/store-app.webmanifest');
+          document.querySelector('meta[name="apple-mobile-web-app-title"]').setAttribute('content', admin ? 'إدارة Twist' : 'لوحة المحل');
         }
       })();
     </script>
@@ -43,7 +44,15 @@
             "name": "Twist",
             "alternateName": ["تويست", "تويست بنها", "تويست ستور", "Twist Banha", "Twist Store", "Twistegy"],
             "url": "https://twistegy.com/",
-            "logo": "https://twistegy.com/brand/twist-logo.png"
+            "logo": "https://twistegy.com/brand/twist-logo.png",
+            "email": "storetwist007@gmail.com",
+            "telephone": "+201206928670",
+            "address": { "@type": "PostalAddress", "addressLocality": "Banha", "addressRegion": "Qalyubia", "addressCountry": "EG" },
+            "sameAs": [
+              "https://www.facebook.com/profile.php?id=61595798750009",
+              "https://www.instagram.com/twiststore2026",
+              "https://www.tiktok.com/@twiststore0"
+            ]
           },
           {
             "@type": "WebSite",

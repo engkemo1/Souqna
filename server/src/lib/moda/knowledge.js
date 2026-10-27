@@ -1,6 +1,6 @@
 /**
  * تحميل ملفات المعرفة (server/src/knowledge/*.json) وبناء فهارس البحث.
- * الملفات بيانات، فتعديلها بيغيّر سلوك مودة من غير كود.
+ * الملفات بيانات، فتعديلها بيغيّر سلوك تويلا من غير كود.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';

@@ -8,6 +8,7 @@ import MarketHeader from '../../components/market/MarketHeader.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Button from '../../components/ui/Button.jsx';
 import RecentlyViewed from '../../components/market/RecentlyViewed.jsx';
+import FinalSaleNote from '../../components/market/FinalSaleNote.jsx';
 
 /** Progress toward a store's free-shipping threshold; nudges the shopper to add a little more. */
 function FreeShipBar({ over, subtotal, name }) {
@@ -46,6 +47,7 @@ export default function MarketCart() {
         <div className="flex justify-between bg-canvas px-4 py-3 text-sm sm:px-5"><span className="text-muted">{ar ? 'مجموع منتجات المحل' : 'Store items subtotal'}</span><strong>{formatMoney(group.items.reduce((s, l) => s + l.qty * l.price, 0), lang)}</strong></div>
         <FreeShipBar over={storeBySlug.get(group.slug)?.freeShippingOver} subtotal={group.items.reduce((s, l) => s + l.qty * l.price, 0)} name={group.name?.[lang] || group.name?.ar || group.slug} />
       </section>)}</div>
+      <FinalSaleNote items={cart.items} className="mt-5" />
       <section className="mt-6 rounded-3xl border border-line bg-elevated p-5 sm:p-6"><div className="flex justify-between text-lg font-bold"><span>{ar ? 'إجمالي المنتجات' : 'Items subtotal'}</span><span>{formatMoney(cart.subtotal, lang)}</span></div><p className="mt-2 text-sm leading-6 text-muted">{ar ? 'Twist هتجمع الطلبات الجاهزة من المحلات وتوصلها برسوم توصيل واحدة. رسوم الشحن المجاني يحددها كل محل من إعداداته.' : 'Twist collects ready orders from stores and delivers them for one fee. Each store sets its free-delivery threshold in its settings.'}</p><div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between"><button type="button" onClick={cart.clear} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm text-muted hover:bg-fg/[0.05]"><Trash2 className="h-4 w-4" />{ar ? 'فضّي السلة' : 'Empty basket'}</button><Button to="/market-checkout" iconEnd={ArrowRight}>{ar ? 'كمّل الطلب' : 'Continue to checkout'}</Button></div></section>
     </>}
   </main><RecentlyViewed /></div>;

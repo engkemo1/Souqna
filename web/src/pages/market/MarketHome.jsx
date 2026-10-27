@@ -7,6 +7,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
 import { sp } from '../../lib/store.jsx';
 import Brand from '../../components/market/Brand.jsx';
+import SocialLinks from '../../components/market/SocialLinks.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import StylistChat from '../../components/market/StylistChat.jsx';
 import ModaAvatar from '../../components/market/ModaAvatar.jsx';
@@ -265,7 +266,8 @@ export default function MarketHome() {
 
       <footer className="container mt-16 flex flex-col items-center justify-between gap-4 border-t border-line py-10 text-sm text-muted sm:flex-row">
         <Brand />
-        <div className="flex flex-col items-center gap-2 sm:items-end">
+        <div className="flex flex-col items-center gap-3 sm:items-end">
+          <SocialLinks />
           <nav className="flex flex-wrap justify-center gap-x-4 gap-y-1">{[['privacy', 'legal.privacy'], ['terms', 'legal.terms']].map(([k, l]) => <Link key={k} to={`/legal/${k}`} className="hover:text-fg">{t(l)}</Link>)}</nav>
           <p>© {new Date().getFullYear()} {t('market.footer')}</p>
         </div>

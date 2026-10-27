@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw, Banknote, PackageX } from 'lucide-react';
+import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw, Banknote, PackageX, Ban } from 'lucide-react';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
-import { exchangeLabel, exchangeSentence } from '../../lib/returns.js';
+import { exchangeLabel, exchangeSentence, returnDaysOf } from '../../lib/returns.js';
 import { useFavorites } from '../../lib/cart.jsx';
 import { formatNumber } from '../../lib/format.js';
 import Gallery from '../../components/store/Gallery.jsx';
@@ -246,7 +246,9 @@ export default function Product() {
             {p.sameDay && <li className="flex items-center gap-3 font-semibold text-emerald-800"><Truck className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('sameday.productLine', { time: new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(`2000-01-01T${store.sameDayUntil || '18:00'}:00`)) })}</li>}
             <li className="flex items-center gap-3"><Truck className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.delivery')}</li>
             <li className="flex items-center gap-3"><Banknote className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.cod')}</li>
-            {exchangeLabel(t, store) && <li className="flex items-center gap-3"><RefreshCcw className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{exchangeLabel(t, store)}</li>}
+            {p.noReturn || returnDaysOf(store) <= 0
+              ? <li className="flex items-center gap-3 font-semibold"><Ban className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('product.noReturn')}</li>
+              : exchangeLabel(t, store) && <li className="flex items-center gap-3"><RefreshCcw className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{exchangeLabel(t, store)}</li>}
           </ul>
 
           <div className="mt-6 border-t border-line">
@@ -258,7 +260,7 @@ export default function Product() {
                 {p.sizes.length > 0 && <><dt>{t('product.size')}</dt><dd className="font-medium text-fg">{p.sizes.join(' · ')}</dd></>}
               </dl>
             </Accordion>
-            <Accordion title={t('product.shipping')}><p>{t('product.shippingBody', { ex: exchangeSentence(t, store) }).trim()}</p></Accordion>
+            <Accordion title={t('product.shipping')}><p>{t('product.shippingBody', { ex: exchangeSentence(t, store, p) }).trim()}</p></Accordion>
           </div>
         </section>
       </div>

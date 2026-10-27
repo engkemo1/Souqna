@@ -1,5 +1,5 @@
 /**
- * مخطط مودة: من الرسالة المفهومة (parse) + المنتجات المثرّاة + الوقت والجو → خطة لبس.
+ * مخطط تويلا: من الرسالة المفهومة (parse) + المنتجات المثرّاة + الوقت والجو → خطة لبس.
  * الكود هو اللي يقرر القطع من المخزون. مفيش موديل هنا.
  */
 import { loadKnowledge } from './knowledge.js';
@@ -367,7 +367,7 @@ export function planOutfit(parsed, products, env = {}) {
 
   const slotTotal = fills.reduce((t, f) => t + f.slotsCount, 0);
   // Gather every recommendation-critical detail in the same clarification turn.
-  // Moda must not reveal a provisional look between these answers.
+  // Twila must not reveal a provisional look between these answers.
   if (!budget && !parsed.flags?.budgetFlexible && (persons.length > 1 || slotTotal > 2) && state !== 'none' && state !== 'no_look') asks.push('budget');
   if (context && !parsed.daypart && (K.contexts.get(context)?.formality?.[1] || 0) >= 4 && state !== 'none' && state !== 'no_look') asks.push('time_if_dressy');
   if (parsed.garments.length === 1 && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && !parsed.flags?.cheapest && state !== 'none' && state !== 'no_look') asks.push('color_preference');

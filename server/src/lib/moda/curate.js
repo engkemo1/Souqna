@@ -1,5 +1,5 @@
 /**
- * "منسّق مودة" (Gemini/Claude): الموديل هو اللي بيرشّح الطقم، بس من منتجاتنا الحقيقية الأول.
+ * "منسّق تويلا" (Gemini/Claude): الموديل هو اللي بيرشّح الطقم، بس من منتجاتنا الحقيقية الأول.
  * - بنديله قايمة منتجات حقيقية (id + نوع + لون + سعر + رسمية) مفلترة على الفئة والمناسبة.
  * - لو قطعة مش لاقيلها حاجة مناسبة في القايمة، بيقترحها "من بره" (productId=null + وصف قصير)
  *   وبتتحول لزرار "اطلبه" عشان Twist تجيبها وتبلّغ العميل.
@@ -43,12 +43,12 @@ export function candidatePool(rows, aud, K, { context = null, max = 48, perKey =
 
 const line = (p, K) => `${p.id} | ${p.key} (${itemAr(K, p.key)}) | ${clean(p.name_ar || p.name_en, 60)} | ${(p.colorKeys || []).slice(0, 2).join('/') || '-'} | ${Math.round(p.price)} | f${p.formality ?? '?'}`;
 
-export function curatorPrompt({ K, pools, persons, context, budget, adv, eventTime, parsed, baseline, lang = 'ar', assistantName = 'مودة' }) {
+export function curatorPrompt({ K, pools, persons, context, budget, adv, eventTime, parsed, baseline, lang = 'ar', assistantName = 'تويلا' }) {
   const weather = adv ? `~${adv.temp}°C${adv.fabrics_ar?.length ? `, suited fabrics: ${adv.fabrics_ar.slice(0, 3).join(', ')}` : ''}${adv.notes?.includes('rain') ? ', rain expected' : ''}` : 'unknown';
   const formality = context ? K.contexts.get(context)?.formality : null;
   const asked = (parsed.garments || []).map((g) => `${g.key}${g.color ? `(${g.color})` : ''}`).join(', ');
   return [
-    `You are ${assistantName} (مودة), the expert fashion stylist of "Twist", an online marketplace of local clothing stores in Banha, Egypt. You are curating a complete outfit for each person from the REAL stock lists below.`,
+    `You are ${assistantName} (تويلا), the expert fashion stylist of "Twist", an online marketplace of local clothing stores in Banha, Egypt. You are curating a complete outfit for each person from the REAL stock lists below.`,
     'Style knowledge: match the dress code of the occasion, keep the colours coherent (a small palette, partners may echo each other), respect the weather, make every look complete (e.g. suit/shirt/shoes, or dress/shoes/bag), and never pick sporty or casual pieces (hoodies, shorts, sport shoes) for a formal occasion. The only exception: plain minimalist white or black leather sneakers may go with a classic suit/blazer look at an engagement or wedding guest event, and only when no formal shoe/loafer fits; they are listed in stock only if allowed. Judge each item by its real name and type, not only its label.',
     `Occasion: ${context || 'not specified'}${formality ? ` (formality ${formality[0]}-${formality[1]} out of 5)` : ''}. Time: ${eventTime?.isNight ? 'evening/night' : 'daytime'}. Weather: ${weather}.`,
     budget ? `Total budget for everyone together: ${budget} EGP. The sum of the prices of the chosen products MUST NOT exceed it; split it sensibly between people. If a complete look cannot fit, choose fewer/cheaper pieces and say so in the note.` : 'No budget limit was given.',
@@ -103,7 +103,7 @@ export function buildCuratedPlan(out, { plan, pools, persons, budget, K }) {
 
 /** callFn(system, messages) → string|object. بيرجّع async ({plan, rows, parsed, adv, eventTime, K, lang, assistantName}) => plan|null */
 export function makeCurator(callFn, { timeoutMs = 16000 } = {}) {
-  return async ({ plan, rows, parsed, adv, eventTime, K, lang = 'ar', assistantName = 'مودة' }) => {
+  return async ({ plan, rows, parsed, adv, eventTime, K, lang = 'ar', assistantName = 'تويلا' }) => {
     const persons = plan.persons || [];
     if (!persons.length || !plan.context && !(parsed.garments || []).length) return null;
     const pools = Object.fromEntries(persons.map((a) => [a, candidatePool(rows, a, K, { context: plan.context })]));

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink, ShoppingBag, QrCode } from 'lucide-react';
+import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink, ShoppingBag, QrCode, Camera } from 'lucide-react';
 import { useApi, useDebounced, useIsDesktop, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -186,6 +186,14 @@ function SellSheet({ product, onClose, onSold }) {
   );
 }
 
+const weakQ = (p) => typeof p.image?.q === 'number' && p.image.q < 50;
+function WeakDot({ t }) {
+  return <span title={t('products.weakPhoto')} className="absolute bottom-2.5 start-2.5 inline-flex items-center gap-1 rounded-full bg-amber-500/95 px-2 py-0.5 text-[11px] font-medium text-white"><Camera className="h-3 w-3" />{t('products.weakPhoto')}</span>;
+}
+function WeakTag({ p, t }) {
+  return weakQ(p) ? <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-400/15 dark:text-amber-200"><Camera className="h-3 w-3" />{t('products.weakPhoto')}</span> : null;
+}
+
 export default function Products() {
   const base = useDashBase();
   const { t, tr, lang } = useI18n();
@@ -201,20 +209,22 @@ export default function Products() {
   const [sort, setSort] = useState('newest');
   const [page, setPage] = useState(1);
   const [view, setView] = useState('list');
+  const [weakOnly, setWeakOnly] = useState(false);
   const [quick, setQuick] = useState(null);
   const [sellP, setSellP] = useState(null);
   const [del, setDel] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const q = useDebounced(term.trim(), 300);
-  useEffect(() => setPage(1), [tab, q, category, sort]);
+  useEffect(() => setPage(1), [tab, q, category, sort, weakOnly]);
 
   const query = useMemo(() => {
     const p = { q, sort, page, limit: 24 };
     if (['active', 'draft'].includes(tab)) p.status = tab;
     if (['low', 'out'].includes(tab)) p.stock = tab;
     if (category) p.category = category;
+    if (weakOnly) p.photo = 'weak';
     return `/owner/products?${new URLSearchParams(p)}`;
-  }, [q, sort, page, tab, category]);
+  }, [q, sort, page, tab, category, weakOnly]);
   const { data, error, loading, reload, mutate } = useApi(query);
   const { data: cats } = useApi('/owner/categories');
 
@@ -245,6 +255,13 @@ export default function Products() {
         <EmptyState icon={Package} title={t('products.empty')} body={t('products.emptyBody')} action={<Button size="lg" icon={Plus} to={`${base}/products/new`}>{t('products.add')}</Button>} />
       ) : (
         <>
+          {(c?.weak > 0 || weakOnly) && (
+            <button type="button" onClick={() => setWeakOnly((v) => !v)} className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-start text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+              <Camera className="h-4 w-4 shrink-0" />
+              <span className="flex-1">{weakOnly ? t('products.weakShowAll') : t('products.weakBanner', { n: formatNumber(c?.weak || 0, lang) })}</span>
+              <span className="shrink-0 font-semibold underline-offset-2 hover:underline">{weakOnly ? t('common.all') : t('products.weakReview')}</span>
+            </button>
+          )}
           <FilterTabs value={tab} onChange={setTab} options={[
             { value: 'all', label: t('common.all'), count: c?.all },
             { value: 'active', label: t('products.status.active'), count: c?.active },
@@ -289,7 +306,7 @@ export default function Products() {
                             <Link to={`${base}/products/${p.id}`} className="flex items-center gap-3.5">
                               <SmartImage media={p.image} ratio="4 / 5" sizes="56px" className="w-12 shrink-0 rounded-lg" />
                               <span className="min-w-0"><span className="block max-w-[320px] truncate font-medium group-hover:text-brand">{tr(p.name)}</span>
-                                <span className="block text-[13px] text-muted">{p.category ? tr(p.category) : '—'}{p.variantCount ? ` · ${t('products.variants', { n: p.variantCount })}` : ''}</span></span>
+                                <span className="block text-[13px] text-muted">{p.category ? tr(p.category) : '—'}{p.variantCount ? ` · ${t('products.variants', { n: p.variantCount })}` : ''}<WeakTag p={p} t={t} /></span></span>
                             </Link>
                           </td>
                           <td className="py-3"><StatusPill status={p.status} t={t} /></td>
@@ -315,7 +332,7 @@ export default function Products() {
                   {data.items.map((p) => desktop ? (
                     <div key={p.id} className="group overflow-hidden rounded-2xl border border-line bg-elevated">
                       <Link to={`${base}/products/${p.id}`} className="relative block"><SmartImage media={p.image} ratio="4 / 5" sizes="20vw" imgClassName="group-hover:scale-[1.03]" />
-                        <span className="absolute start-2.5 top-2.5"><StatusPill status={p.status} t={t} /></span></Link>
+                        <span className="absolute start-2.5 top-2.5"><StatusPill status={p.status} t={t} /></span>{weakQ(p) && <WeakDot t={t} />}</Link>
                       <div className="p-3.5">
                         <p className="truncate font-medium">{tr(p.name)}</p>
                         <div className="mt-1.5 flex items-center justify-between"><span className="font-semibold tabular">{formatMoney(p.price, lang)}</span><StockPill p={p} t={t} lang={lang} /></div>
@@ -328,6 +345,7 @@ export default function Products() {
                       <Link to={`${base}/products/${p.id}`} className="min-w-0 flex-1">
                         <p className="truncate font-medium">{tr(p.name)}</p>
                         <p className="mt-0.5 font-semibold tabular">{formatMoney(p.price, lang)}{p.compareAt && <span className="ms-2 text-xs font-normal text-muted line-through">{formatMoney(p.compareAt, lang)}</span>}</p>
+                        {weakQ(p) && <p className="mt-1"><WeakTag p={p} t={t} /></p>}
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">{p.status !== 'active' && <StatusPill status={p.status} t={t} />}<StockPill p={p} t={t} lang={lang} /></div>
                       </Link>
                       <button type="button" onClick={() => setSellP(p)} aria-label={t('products.sell')} className="grid h-11 shrink-0 place-items-center gap-0.5 rounded-xl bg-btn px-3 text-[11px] font-semibold text-white transition active:scale-90"><ShoppingBag className="h-4 w-4" />{t('products.sell')}</button>

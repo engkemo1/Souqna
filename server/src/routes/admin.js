@@ -12,7 +12,7 @@ import { h, AppError } from '../lib/errors.js';
 import { listDepartments, assertDepartments, ensureDeptCategories, deptAncestors, PENDING_RE } from '../lib/departments.js';
 import { notifyStore } from '../lib/push.js';
 import ownerRoutes from './owner.js';
-import { purgeMediaFiles } from '../lib/media.js';
+import { purgeMediaFiles, serializeMedia } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled, setDemandForOwners } from '../lib/visual-demand.js';
 import { testProvider, stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
@@ -768,7 +768,7 @@ r.put('/stylist', h((req, res) => {
   res.json(stylistStatus());
 }));
 
-/* ---- Moda's admin-taught style memory ---- */
+/* ---- Twila's admin-taught style memory ---- */
 const trainingPieceSchema = z.object({ label: z.string().trim().min(1).max(50), productId: z.coerce.number().int().positive() });
 const trainingExampleSchema = z.object({
   audience: z.enum(['women', 'men', 'kids']), age: z.string().trim().max(40).optional().default(''),
@@ -807,7 +807,7 @@ r.post('/stylist/training/lessons/:id/approve', h((req, res) => {
   res.json({ lesson });
 }));
 
-/* ---- deterministic Moda test studio (no external model/API calls) ---- */
+/* ---- deterministic Twila test studio (no external model/API calls) ---- */
 const modaLabScenarioSchema = z.object({
   id: z.string().max(80).optional(), name: z.string().trim().max(80).optional().default(''),
   message: z.string().trim().min(2).max(400), expectedGarment: z.string().max(80).optional().default(''),
@@ -867,7 +867,7 @@ const manualLookSchema = z.object({
   coverImage: z.string().trim().max(500).optional().default('').refine(lookImageOk, 'Invalid look image.'), title: z.string().trim().max(100).optional().default(''),
   description: z.string().trim().max(240).optional().default(''), badge: z.string().trim().max(40).optional().default(''),
 });
-/* ---- اقتراحات مودة الجاهزة: الأزرار السريعة + الرسائل المثال ---- */
+/* ---- اقتراحات تويلا الجاهزة: الأزرار السريعة + الرسائل المثال ---- */
 const promptsSchema = z.object({
   hero: z.array(z.object({ ar: z.string().max(60), en: z.string().max(80).optional().default(''), askAr: z.string().max(300), askEn: z.string().max(300).optional().default('') })).max(8),
   chips: z.array(z.object({ ar: z.string().max(300), en: z.string().max(300).optional().default('') })).max(6),
@@ -950,6 +950,21 @@ r.post('/backup/run', h((_req, res) => {
 }));
 
 /* ---------------------------------------------------------- shopper accounts (support: look up by phone, set a temporary password) */
+/** Latest product photos with their quality score (read-only), weakest-first filter for spotting what spoils the look. */
+r.get('/photos', h((req, res) => {
+  const weak = req.query.weak === '1';
+  const rows = q.all(`SELECT m.*, s.slug AS store_slug, s.name_ar AS store_name,
+      (SELECT p.id FROM product_media pm JOIN products p ON p.id=pm.product_id WHERE pm.media_id=m.id LIMIT 1) AS product_id,
+      (SELECT p.name_ar FROM product_media pm JOIN products p ON p.id=pm.product_id WHERE pm.media_id=m.id LIMIT 1) AS product_name
+    FROM media m JOIN stores s ON s.id=m.store_id
+    WHERE m.kind='product' ${weak ? 'AND m.quality IS NOT NULL AND m.quality < 50' : ''}
+    ORDER BY m.id DESC LIMIT 60`);
+  res.json({
+    items: rows.map((m) => ({ id: m.id, quality: m.quality, createdAt: m.created_at, store: { slug: m.store_slug, name: m.store_name }, product: m.product_id ? { id: m.product_id, name: m.product_name } : null, media: serializeMedia(m) })),
+    total: q.val("SELECT COUNT(*) FROM media WHERE kind='product'"),
+    weak: q.val("SELECT COUNT(*) FROM media WHERE kind='product' AND quality IS NOT NULL AND quality < 50"),
+  });
+}));
 r.get('/buyers', h((req, res) => {
   const term = String(req.query.q || '').replace(/\D/g, '');
   const items = q.all(`SELECT b.id, b.name, b.phone, b.created_at, (SELECT COUNT(*) FROM orders o WHERE o.buyer_id=b.id) AS orders FROM buyers b ${term ? 'WHERE b.phone LIKE ?' : ''} ORDER BY b.id DESC LIMIT 50`, term ? [`%${term}%`] : []);

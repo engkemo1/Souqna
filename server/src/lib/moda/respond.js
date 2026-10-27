@@ -1,5 +1,5 @@
 /**
- * صياغة رد مودة. كل جملة بتيجي من phrases.json (عامية)، والكود بس بيختار ويعبّي المتغيرات.
+ * صياغة رد تويلا. كل جملة بتيجي من phrases.json (عامية)، والكود بس بيختار ويعبّي المتغيرات.
  * مفيش نص بيتولّد من موديل هنا.
  */
 import { loadKnowledge } from './knowledge.js';
@@ -40,7 +40,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   const L = lang === 'en' ? 'en' : 'ar';
   const P = { ...K.phrases.ar, ...(L === 'en' ? K.phrases.en : {}) };
   const name = typeof assistantName === 'string' ? assistantName : assistantName?.[L];
-  const say = (key, vars = {}) => fill(pick(P[key], `${seed}:${key}`), { name: name || (L === 'en' ? 'Moda' : 'مودة'), ...vars });
+  const say = (key, vars = {}) => fill(pick(P[key], `${seed}:${key}`), { name: name || (L === 'en' ? 'Twila' : 'تويلا'), ...vars });
 
   // ---------- محادثة ----------
   if (plan.state === 'chat') {

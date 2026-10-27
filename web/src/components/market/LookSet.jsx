@@ -130,7 +130,7 @@ function Showcase({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, 
           </div>
         </div>
         <div className="mt-3 flex flex-wrap items-center gap-2">
-          <span className="text-[12px] font-semibold text-muted">{ar ? 'اطلب من مودة:' : 'Ask Moda:'}</span>
+          <span className="text-[12px] font-semibold text-muted">{ar ? 'اطلب من تويلا:' : 'Ask Twila:'}</span>
           {chips.map(([label, text]) => <button key={label} type="button" onClick={() => ask(text)} className="rounded-full border border-line bg-elevated px-3 py-1.5 text-[12px] font-semibold transition hover:border-fg/30 hover:bg-[#F6F8FB]">{label}</button>)}
         </div>
       </div>
@@ -138,7 +138,7 @@ function Showcase({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, 
   );
 }
 
-/** Look-detail page: product cards row, one total + add-everything bar, share and quick "ask Moda" tweaks. */
+/** Look-detail page: product cards row, one total + add-everything bar, share and quick "ask Twila" tweaks. */
 function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, storeLinks }) {
   const ar = lang === 'ar';
   const picks = looks.map((l) => ({ label: l.label, p: l.items[l.pick] })).filter((x) => x.p);

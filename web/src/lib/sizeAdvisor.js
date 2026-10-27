@@ -1,4 +1,4 @@
-/** Moda's size suggestion: a transparent rule of thumb from the shopper's height/weight (or foot length), matched to the sizes the product really has. */
+/** Twila's size suggestion: a transparent rule of thumb from the shopper's height/weight (or foot length), matched to the sizes the product really has. */
 const LETTERS = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'];
 const norm = (s) => String(s).toUpperCase().replace(/\s/g, '').replace('XXXL', '3XL').replace('2XL', 'XXL');
 const WEIGHT_CUTS = { m: [58, 68, 80, 92, 104, 116], f: [50, 58, 68, 78, 90, 102] }; // upper bound of XS, S, M, L, XL, XXL

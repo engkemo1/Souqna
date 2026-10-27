@@ -5,6 +5,7 @@ import { Banknote, ChevronDown, Lock, Tag, X, ShoppingBag } from 'lucide-react';
 import { GOVERNORATES } from '@souqna/shared';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useCart } from '../../lib/cart.jsx';
+import FinalSaleNote from '../../components/market/FinalSaleNote.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { rememberOrder } from '../../lib/recentOrders.js';
 import { api } from '../../lib/api.js';
@@ -152,7 +153,7 @@ export default function Checkout() {
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
       cart.clear();
       rememberOrder({ number: order.number, token: order.trackToken, store: store.name });
-      navigate(sp(store.slug, `order/${order.number}?t=${order.trackToken}`), { replace: true, state: { name: form.name.split(' ')[0], phone: form.phone } });
+      navigate(sp(store.slug, `order/${order.number}?t=${order.trackToken}`), { replace: true, state: { name: form.name.split(' ')[0], phone: form.phone, autoOpenWa: true } });
     } catch (err) {
       setPlacing(false);
       if (err.code?.startsWith('coupon_')) {
@@ -230,6 +231,7 @@ export default function Checkout() {
             </label>
           </section>
 
+          <FinalSaleNote items={cart.items.map((l) => ({ ...l, storeSlug: l.storeSlug || store.slug }))} className="mt-6" />
           <div className="mt-8 hidden lg:block">
             <Button type="submit" size="lg" full loading={placing} disabled={blocked || !quote}>{t('checkout.placeOrder', { v: total })}</Button>
             <p className="mt-3 flex items-center justify-center gap-1.5 text-[13px] text-muted"><Lock className="h-3.5 w-3.5" />{t('checkout.secure')}</p>

@@ -10,6 +10,7 @@ import { useLocalState } from '../../lib/hooks.js';
 import { rememberOrder } from '../../lib/recentOrders.js';
 import { Field, Input, Select, Textarea } from '../../components/ui/Field.jsx';
 import Button from '../../components/ui/Button.jsx';
+import FinalSaleNote from '../../components/market/FinalSaleNote.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import DeliveryBreakdown from '../../components/market/DeliveryBreakdown.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
@@ -157,7 +158,7 @@ export default function MarketCheckout() {
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
       for (const order of result.orders) rememberOrder({ number: order.number, token: order.trackToken, store: order.store?.[lang] || order.store?.ar || order.storeSlug });
       cart.clear();
-      navigate('/market-order-success', { replace: true, state: { orders: result.orders, name: form.name.split(' ')[0] } });
+      navigate('/market-order-success', { replace: true, state: { orders: result.orders, name: form.name.split(' ')[0], phone: form.phone, autoOpenWa: true } });
     } catch (e) {
       if (e.code?.startsWith('coupon_')) { setCouponMsg(couponErrorText(e.code)); setAppliedCode(null); setError(couponErrorText(e.code)); setBusy(false); return; }
       if (e.code === 'delivery_fee_changed' || e.code === 'cart_changed') setQuoteVersion((version) => version + 1);
@@ -200,6 +201,7 @@ export default function MarketCheckout() {
           </div>
         </div></section>
         <section className="flex items-center gap-4 rounded-3xl border-2 border-fg bg-elevated p-4"><Banknote className="h-6 w-6 shrink-0" /><span><strong className="block">{ar ? 'الدفع عند الاستلام' : 'Cash on delivery'}</strong><span className="text-sm text-muted">{feePending ? (ar ? 'رسوم التوصيل لسه مش مؤكدة. Twist هتتواصل معاك بالسعر النهائي قبل إرسال المندوب.' : 'Delivery is not priced yet. Twist will contact you with the final fee before dispatch.') : (ar ? 'هتدفعي إجمالي طلبك مرة واحدة لمندوب Twist.' : 'Pay the order total once to the Twist courier.')}</span></span></section>
+        <FinalSaleNote items={cart.items} />
         {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
         <Button type="submit" size="lg" full loading={busy} disabled={!quotes || !deliveryQuote || hasErrors}>{feePending ? (ar ? `إرسال الطلب · ${formatMoney(subtotal, lang)} منتجات` : `Place order · ${formatMoney(subtotal, lang)} items`) : groups.length > 1 ? (ar ? `تأكيد ${groups.length} طلبات · ${formatMoney(total, lang)}` : `Confirm ${groups.length} orders · ${formatMoney(total, lang)}`) : (ar ? `تأكيد الطلب · ${formatMoney(total, lang)}` : `Place order · ${formatMoney(total, lang)}`)}</Button>
         <p className="flex items-center justify-center gap-2 text-xs text-muted"><Lock className="h-3.5 w-3.5" />{ar ? 'كل محل هيستلم طلبه ويديره بشكل منفصل.' : 'Each store receives and manages its own order.'}</p>

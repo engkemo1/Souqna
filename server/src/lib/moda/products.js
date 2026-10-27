@@ -120,7 +120,7 @@ export function isMinimalSneaker(key, name, colorKeys) {
   return key === 'sneakers' && !SPORTY_RE.test(name || '') && Boolean(colorKeys?.length) && colorKeys.length <= 2 && colorKeys.every((c) => MINIMAL_COLORS.has(c));
 }
 
-/** يضيف حقول مودة لصف المنتج (بدون تعديل الأصل). */
+/** يضيف حقول تويلا لصف المنتج (بدون تعديل الأصل). */
 export function enrichProduct(row, K = loadKnowledge()) {
   const name = `${row.name_ar || ''} ${row.name_en || ''}`;
   const explicitItem = K.items.get(row.moda_key);

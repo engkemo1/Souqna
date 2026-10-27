@@ -1,9 +1,9 @@
 /**
- * الاقتراحات الجاهزة لمودة (بتتعدّل من الأدمن → المساعد الذكي):
- *  - hero:  الأزرار السريعة في الصفحة الرئيسية ("إطلالة فرح"، "طقم جامعة"...) — الزرار له اسم قصير ورسالة بتتبعت لمودة.
- *  - chips: الرسائل المثال اللي بتظهر في أول الشات ("ممكن تسأل مودة مثلاً").
+ * الاقتراحات الجاهزة لتويلا (بتتعدّل من الأدمن → المساعد الذكي):
+ *  - hero:  الأزرار السريعة في الصفحة الرئيسية ("إطلالة فرح"، "طقم جامعة"...) — الزرار له اسم قصير ورسالة بتتبعت لتويلا.
+ *  - chips: الرسائل المثال اللي بتظهر في أول الشات ("ممكن تسأل تويلا مثلاً").
  * بتتخزن في app_settings. لو الأدمن ماغيّرش حاجة بنرجع للقيم الافتراضية.
- * كل رسالة بنفحصها بالمحلل بتاع مودة (parseMessage) ونقول للأدمن لو مودة مش هتفهمها، عشان زرار ما يطلعش "بايظ".
+ * كل رسالة بنفحصها بالمحلل بتاع تويلا (parseMessage) ونقول للأدمن لو تويلا مش هتفهمها، عشان زرار ما يطلعش "بايظ".
  */
 import { q } from '../db/index.js';
 import { parseMessage } from './moda/parse.js';
@@ -41,7 +41,7 @@ export function normalizePrompts(input) {
   return { hero, chips };
 }
 
-/** هل مودة هتفهم الرسالة دي (فيها مناسبة أو قطعة)؟ */
+/** هل تويلا هتفهم الرسالة دي (فيها مناسبة أو قطعة)؟ */
 export function promptUnderstood(text) {
   try {
     const p = parseMessage(String(text || ''));
@@ -84,12 +84,12 @@ export function resetModaPrompts() {
   return adminModaPrompts();
 }
 
-/** المساعد الذكي يقترح قايمة جديدة (للمراجعة بس، مابتتحفظش لوحدها). بنشيل أي رسالة مودة مش هتفهمها. */
+/** المساعد الذكي يقترح قايمة جديدة (للمراجعة بس، مابتتحفظش لوحدها). بنشيل أي رسالة تويلا مش هتفهمها. */
 export async function suggestPrompts(callFn) {
   const K = loadKnowledge();
   const occasions = [...K.contexts.values()].filter((c) => c.key !== 'condolence').map((c) => c.ar).join('، ');
   const system = [
-    'You write ready-made suggestion buttons and example messages for "Moda (مودة)", the fashion-stylist chat of "Twist", an online marketplace of local clothing stores in Banha, Egypt.',
+    'You write ready-made suggestion buttons and example messages for "Twila (تويلا)", the fashion-stylist chat of "Twist", an online marketplace of local clothing stores in Banha, Egypt.',
     'Write in warm Egyptian Arabic (and a short natural English version). Reply with ONE JSON object only, no prose:',
     '{"hero":[{"ar":"short button label (2-3 words)","en":"...","askAr":"the message sent to the stylist","askEn":"..."}],"chips":[{"ar":"a full natural sentence a customer would type","en":"..."}]}',
     `hero: exactly 6 items. Each askAr MUST clearly name ONE occasion or garment the shop can dress (occasions we know: ${occasions}). Never mention prices, brands or stores.`,

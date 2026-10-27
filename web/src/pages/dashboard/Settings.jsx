@@ -22,7 +22,47 @@ import PageTransition from '../../components/PageTransition.jsx';
 import BrandPaletteCard from '../../components/dash/BrandPaletteCard.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'opens_at', 'closes_at', 'day_off', 'return_days', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'opens_at', 'closes_at', 'day_off', 'return_days', 'instagram', 'facebook', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
+
+/** Exchange & return policy: one clear period choice (saved with the page) plus a note on pieces excluded one by one. */
+function ReturnsBox({ days, onDays }) {
+  const { t } = useI18n();
+  const toast = useToast();
+  const { data, reload } = useApi('/owner/returns');
+  const [busy, setBusy] = useState(false);
+  const reset = async () => {
+    setBusy(true);
+    try {
+      await api('/owner/returns/bulk', { method: 'POST', body: { no_return: false } });
+      await reload(); invalidate('/owner/products');
+      toast({ title: t('settings.allowReturnAllDone') });
+    } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); }
+    setBusy(false);
+  };
+  const cur = String(days ?? '');
+  const presets = ['0', '1', '3', '7', '14'];
+  const values = presets.includes(cur) || cur === '' ? presets : [...presets, cur].sort((a, b) => Number(a) - Number(b));
+  const label = (v) => (v === '0' ? t('settings.noReturnChip') : t('settings.dayN', { n: Number(v) }));
+  return (
+    <div className="sm:col-span-2 rounded-2xl border border-line bg-surface p-4">
+      <p className="text-sm font-semibold">{t('settings.returnsTitle')}</p>
+      <p className="mt-0.5 text-[12.5px] text-muted">{t('settings.returnDaysHint')}</p>
+      <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label={t('settings.returnsTitle')}>
+        {values.map((v) => (
+          <button key={v} type="button" role="radio" aria-checked={cur === v} onClick={() => onDays(v)}
+            className={'h-9 rounded-full px-4 text-[13px] font-semibold ring-1 transition active:scale-95 ' + (cur === v ? 'bg-btn text-on-btn ring-transparent' : 'ring-line hover:bg-fg/[0.05]')}>{label(v)}</button>
+        ))}
+      </div>
+      <p className="mt-2 text-[12.5px] leading-relaxed text-muted">{Number(days) > 0 ? t('settings.returnsOn', { n: Number(days) }) : t('settings.returnsOff')}</p>
+      {data && data.noReturn > 0 && Number(days) > 0 && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+          <p className="text-[13px] text-muted">{t('settings.returnsCount', { a: data.noReturn, b: data.total })}</p>
+          <Button size="sm" variant="secondary" disabled={busy} onClick={reset}>{t('settings.allowReturnAll')}</Button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function HeroModePicker({ value, onChange }) {
   const { t } = useI18n();
@@ -34,6 +74,32 @@ function HeroModePicker({ value, onChange }) {
         {opts.map(([v, label, hint]) => (
           <label key={v} className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 ring-1 transition ${value === v ? 'bg-fg/[0.04] ring-fg' : 'ring-line hover:bg-fg/[0.02]'}`}>
             <input type="radio" name="hero_mode" value={v} checked={value === v} onChange={() => onChange(v)} className="mt-1" />
+            <span><span className="block text-sm font-semibold">{label}</span><span className="block text-[13px] text-muted">{hint}</span></span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
+function PhotoStylePicker({ value, onChange }) {
+  const { t } = useI18n();
+  const opts = [
+    ['white', t('settings.photoWhite'), t('settings.photoWhiteHint'), '#ffffff'],
+    ['cream', t('settings.photoCream'), t('settings.photoCreamHint'), '#f5efe6'],
+    ['original', t('settings.photoOriginal'), t('settings.photoOriginalHint'), null],
+  ];
+  return (
+    <fieldset className="mt-5">
+      <legend className="mb-1 text-sm font-medium">{t('settings.photoStyle')}</legend>
+      <p className="mb-2 text-[13px] text-muted">{t('settings.photoStyleNote')}</p>
+      <div className="grid gap-2">
+        {opts.map(([v, label, hint, bg]) => (
+          <label key={v} className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 ring-1 transition ${value === v ? 'bg-fg/[0.04] ring-fg' : 'ring-line hover:bg-fg/[0.02]'}`}>
+            <input type="radio" name="photo_style" value={v} checked={value === v} onChange={() => onChange(v)} className="mt-1" />
+            <span className="relative grid h-14 w-11 shrink-0 place-items-center overflow-hidden rounded-lg ring-1 ring-line" style={bg ? { background: bg } : { background: 'linear-gradient(135deg,#9aa4b2,#4b5563 55%,#cbd5e1)' }} aria-hidden="true">
+              <span className="h-7 w-6 rounded-[5px] bg-[#1d4e89] shadow-sm" />
+            </span>
             <span><span className="block text-sm font-semibold">{label}</span><span className="block text-[13px] text-muted">{hint}</span></span>
           </label>
         ))}
@@ -144,13 +210,14 @@ export default function Settings() {
   const [busy, setBusy] = useState(false);
   const [deleteBusy, setDeleteBusy] = useState('');
   const [initial, setInitial] = useState('');
+  const [brandKey, setBrandKey] = useState(0);
 
   useEffect(() => {
     if (!data) return;
     const s = data.store;
     const x = ({
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
-      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
+      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', photo_style: s.photoStyle || 'white', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '',
       return_days: String(s.returnDays ?? 3), shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
       logo_initials: s.logoInitials || (s.name.ar || s.name.en || s.code || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: s.logoColor || '#1B1B1B',
     });
@@ -184,7 +251,6 @@ export default function Settings() {
     } catch (e) { setErrors(fieldErrors(t, e)); toast({ tone: 'error', title: errorMessage(t, e) }); }
     setBusy(false);
   };
-  const [brandKey, setBrandKey] = useState(0);
   const onImage = (slot) => (media, brand) => {
     if (slot === 'logo') { invalidate('/owner/store'); setBrandKey((k) => k + 1); if (brand?.status === 'applied') toast({ title: 'ألوان المتجر اتحدّثت من اللوجو' }); }
     const s = { ...data.store, [slot]: media };
@@ -289,7 +355,7 @@ export default function Settings() {
                   <Field className="mt-3 sm:max-w-xs" label={t('settings.freeOver')}><Input inputMode="numeric" suffix={t('common.currency')} value={f.free_shipping_over} onChange={(e) => setF({ ...f, free_shipping_over: e.target.value.replace(/\D/g, '') })} /></Field>
                 )}
               </div>
-              <Field label={t('settings.returnDays')} hint={t('settings.returnDaysHint')}><Input inputMode="numeric" suffix={t('settings.days')} value={f.return_days} onChange={(e) => setF({ ...f, return_days: e.target.value.replace(/\D/g, '').slice(0, 2) })} /></Field>
+              <ReturnsBox days={f.return_days} onDays={(v) => setF({ ...f, return_days: v })} />
               <Field label={t('settings.badgeAr')} hint={t('settings.badgeHint')}><Input dir="rtl" value={f.offer_badge_ar} onChange={set('offer_badge_ar')} maxLength={30} /></Field>
               <Field label={t('settings.badgeEn')}><Input dir="ltr" value={f.offer_badge_en} onChange={set('offer_badge_en')} maxLength={30} /></Field>
             </div>
@@ -314,6 +380,7 @@ export default function Settings() {
                 <AutoCover onDone={onImage('cover')} />
                 <DesignHelp what="cover" className="mt-3" />
                 <HeroModePicker value={f.hero_mode} onChange={(v) => setF({ ...f, hero_mode: v })} />
+                <PhotoStylePicker value={f.photo_style} onChange={(v) => setF({ ...f, photo_style: v })} />
               </div>
             </div>
           </Panel>

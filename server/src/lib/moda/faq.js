@@ -1,5 +1,5 @@
 /**
- * أسئلة الخدمة اللي بتتسأل لمودة وهي مش طلب لبس: مين أنت، فين طلبي، الشحن، الدفع، الاستبدال، إلغاء الطلب…
+ * أسئلة الخدمة اللي بتتسأل لتويلا وهي مش طلب لبس: مين أنت، فين طلبي، الشحن، الدفع، الاستبدال، إلغاء الطلب…
  * الإجابات هنا بس من حاجات موجودة فعلًا في المنصة (تتبع الطلب، الدفع عند الاستلام، الاستبدال حسب سياسة كل محل (افتراضي 3 أيام)، الشحن بيتحسب لكل محل).
  * أي حاجة مش مضمونة ما بتتقالش: بنوجّه العميل للمحل أو للصفحة المناسبة بدل ما نخترع رقم أو وعد.
  */
@@ -47,7 +47,7 @@ export const FAQ_ANSWERS = {
     shipping_where: 'في سلة Twist، مصاريف التوصيل بتتحدد حسب المدينة أو المنطقة وبتظهر مرة واحدة قبل تأكيد الطلب. لو بتطلب من صفحة محل، هتشوف شروط الشحن الخاصة بالمحل في السلة.',
     shipping_cost: 'في سلة Twist، مصاريف التوصيل بتتحدد حسب المدينة أو المنطقة، وبتدفع مرة واحدة حتى لو طلبت من أكتر من محل. الشحن المجاني يظهر لما كل المحلات في السلة تكون مؤهلة له. في سلة المحل، تطبق شروط الشحن الخاصة بالمحل.',
     shipping_time: 'مدة التوصيل بتختلف من محل لمحل، ومعظم المحلات بتوضحها في صفحتها. وبعد ما تطلب تقدر تتابع الطلب من صفحة «تتبع الطلب».',
-    about_ai: 'أنا مودة، مساعدة تسوق بالذكاء الاصطناعي في Twist (مش إنسان). مقدرش أحدد الموديل اللي بيشغّلني، لكن شغلي أرشحلك لبس من محلات بنها وأجاوب على أسئلتك عن الطلب والموقع.',
+    about_ai: 'أنا تويلا، مساعدة تسوق بالذكاء الاصطناعي في Twist (مش إنسان). مقدرش أحدد الموديل اللي بيشغّلني، لكن شغلي أرشحلك لبس من محلات بنها وأجاوب على أسئلتك عن الطلب والموقع.',
     howareyou: 'الحمد لله تمام، شكرًا لسؤالك! قولي بتدور على إيه النهارده أو لأي مناسبة وأرشحلك.',
     identity: 'أنا {name}، مساعدة التسوق في Twist. برشحلك لبس من محلات بنها حسب المناسبة والميزانية والألوان اللي بتحبها، وبجاوب على أسئلة الطلب والشحن والاستبدال.',
     smalltalk: 'أنا متخصصة في اللبس والتسوق من محلات بنها. قولي بتدور على إيه أو لأي مناسبة وأرشحلك.',
@@ -74,7 +74,7 @@ export const FAQ_ANSWERS = {
     shipping_where: 'In the Twist marketplace basket, one delivery fee is calculated for your area and shown before you confirm, even when your order includes multiple stores. A store-page basket follows that store\'s shipping terms.',
     shipping_cost: 'The Twist marketplace basket has one area-based delivery fee, charged once for orders from multiple stores. Each store\'s free-shipping threshold applies to its own items; the shared fee is waived only when every store in the basket qualifies. A store-page basket follows that store\'s shipping terms.',
     shipping_time: 'Delivery time differs by store and most stores explain it on their page. After ordering you can follow it on the "Track order" page.',
-    about_ai: 'I\'m Moda, an AI shopping assistant at Twist (not a human). I can\'t say which model powers me, but I suggest outfits from Banha stores and answer questions about orders and the site.',
+    about_ai: 'I\'m Twila, an AI shopping assistant at Twist (not a human). I can\'t say which model powers me, but I suggest outfits from Banha stores and answer questions about orders and the site.',
     howareyou: 'Doing great, thanks for asking! Tell me what you\'re looking for or the occasion and I\'ll suggest something.',
     identity: 'I\'m {name}, the shopping assistant at Twist. I recommend outfits from Banha stores by occasion, budget and colours, and I can answer questions about orders, shipping and exchanges.',
     smalltalk: 'I\'m focused on fashion and shopping from Banha stores. Tell me what you\'re looking for or the occasion and I\'ll suggest something.',
@@ -106,5 +106,5 @@ export function matchFaq(text) {
 export const faqAnswer = (id, { lang = 'ar', name = null } = {}) => {
   const L = lang === 'en' ? 'en' : 'ar';
   const tpl = FAQ_ANSWERS[L][id];
-  return tpl ? tpl.replace('{name}', name || (L === 'en' ? 'Moda' : 'مودة')) : null;
+  return tpl ? tpl.replace('{name}', name || (L === 'en' ? 'Twila' : 'تويلا')) : null;
 };

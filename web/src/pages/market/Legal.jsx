@@ -2,7 +2,8 @@ import { Link, useParams, Navigate } from 'react-router-dom';
 import { Phone, MessageCircle } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { LEGAL, LEGAL_UPDATED } from '../../lib/legal.js';
-import { SALES_PHONE, SALES_WHATSAPP } from '../../config/contact.js';
+import { SALES_PHONE, SALES_WHATSAPP, CONTACT_EMAIL, CONTACT_ADDRESS } from '../../config/contact.js';
+import SocialLinks from '../../components/market/SocialLinks.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 
 const TABS = [['privacy', 'legal.privacy'], ['terms', 'legal.terms']];
@@ -35,7 +36,10 @@ export default function Legal() {
           <div className="mt-3 flex flex-wrap gap-3 text-sm font-semibold">
             <a className="inline-flex items-center gap-2 rounded-full border border-line-strong px-4 py-2" href={`https://wa.me/${SALES_WHATSAPP}`} target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4" />WhatsApp</a>
             <a className="inline-flex items-center gap-2 rounded-full border border-line-strong px-4 py-2" href={`tel:${SALES_PHONE}`} dir="ltr"><Phone className="h-4 w-4" />{SALES_PHONE}</a>
+            <a className="inline-flex items-center gap-2 rounded-full border border-line-strong px-4 py-2" href={`mailto:${CONTACT_EMAIL}`} dir="ltr">{CONTACT_EMAIL}</a>
           </div>
+          <p className="mt-3 text-sm text-muted">{lang === 'ar' ? CONTACT_ADDRESS.ar : CONTACT_ADDRESS.en}</p>
+          <SocialLinks className="mt-3" />
         </section>
       </main>
     </div>

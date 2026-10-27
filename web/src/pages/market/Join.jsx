@@ -42,7 +42,7 @@ function GoldButton({ href, icon: Icon, children, primary }) {
 }
 
 const MODA_POINTS = [
-  'الزبونة تكتب أو تقول: «عايزة فستان لخطوبة بـ 2000 جنيه» ومودة تعرضلها قطع حقيقية من محلات بنها، منها منتجاتك.',
+  'الزبونة تكتب أو تقول: «عايزة فستان لخطوبة بـ 2000 جنيه» وتويلا تعرضلها قطع حقيقية من محلات بنها، منها منتجاتك.',
   'تبعتلها صورة لبس عجبتها وتلاقيلها الأقرب ليها عندك وعند غيرك.',
   'بتقترح طقم كامل (فستان + طرحة + جزمة)، فالزبونة تشتري أكتر من قطعة من محلك.',
   'من غير ما تدفع إعلان: منتجاتك بتظهر لوحدها لما تناسب طلب زبونة.',
@@ -57,14 +57,14 @@ function ModaPitch() {
         <div className="grid place-items-center"><ModaAvatar size={260} talking={talk} living tilt /></div>
         <div>
           <p className="inline-flex items-center gap-2 rounded-full border border-line bg-[#03244D]/5 px-3.5 py-1 text-sm text-brand"><Sparkles className="h-4 w-4" /> جديد</p>
-          <h2 className="mt-3 font-display text-3xl font-bold text-[#03244D] sm:text-4xl">قابل «مودة»… الفاشونيستا اللي بتجيبلك زباين</h2>
+          <h2 className="mt-3 font-display text-3xl font-bold text-[#03244D] sm:text-4xl">قابل «تويلا»… الفاشونيستا اللي بتجيبلك زباين</h2>
           <p className="mt-3 text-lg leading-relaxed text-[#43516a]">مساعدة ذكية بتتكلم بالمصري وبتفهم الصوت والصور. الزبونة تقولها اللي محتاجاه، وهي تختار من منتجات متاجر بنها بأسعارها الحقيقية.</p>
           <ul className="mt-5 space-y-3">
             {MODA_POINTS.map((x) => <li key={x} className="flex items-start gap-3 text-base leading-relaxed text-[#26344e]"><Check className="mt-1 h-5 w-5 shrink-0 text-brand" />{x}</li>)}
           </ul>
-          <p className="mt-5 text-sm text-muted">كل ما منتجاتك أوصافها وألوانها أوضح، كل ما مودة تعرضها أكتر. وإحنا بنساعدك في ده.</p>
+          <p className="mt-5 text-sm text-muted">كل ما منتجاتك أوصافها وألوانها أوضح، كل ما تويلا تعرضها أكتر. وإحنا بنساعدك في ده.</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link to="/" className="inline-flex items-center gap-2 rounded-full bg-btn px-6 py-3 text-base font-bold text-white hover:brightness-110"><Sparkles className="h-5 w-5" />جرّب مودة بنفسك</Link>
+            <Link to="/" className="inline-flex items-center gap-2 rounded-full bg-btn px-6 py-3 text-base font-bold text-white hover:brightness-110"><Sparkles className="h-5 w-5" />جرّب تويلا بنفسك</Link>
           </div>
         </div>
       </motion.div>

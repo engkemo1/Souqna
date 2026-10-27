@@ -8,7 +8,7 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import { ErrorState } from '../../components/ui/States.jsx';
 
-/** A look someone shared from Moda: the pieces, the total, and a way into each product. */
+/** A look someone shared from Twila: the pieces, the total, and a way into each product. */
 export default function LookShare() {
   const { token } = useParams();
   const { t, tr, lang } = useI18n();

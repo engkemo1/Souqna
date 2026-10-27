@@ -1,5 +1,5 @@
 /**
- * "مودة" — the shopping stylist.
+ * "تويلا" — the shopping stylist.
  * One LLM call turns the conversation into a plan (what pieces to look for, budget). The SERVER then searches the real
  * catalogue and picks products, so every price/stock/store shown comes from the database — the model never invents products.
  * Providers (admin → النظام): Anthropic (ANTHROPIC_API_KEY) or Cloudflare Workers AI (CF_AI_TOKEN).
@@ -20,7 +20,7 @@ import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates, slotO
 const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ـ/g, '').replace(/[ًٌٍَُِّْ]/g, '').trim();
 
 /* ---------------- settings ---------------- */
-const DEF = { stylist_enabled: '1', stylist_provider: '', stylist_daily: '15', stylist_name_ar: 'مودة', stylist_name_en: 'Moda', stylist_avatar: '' };
+const DEF = { stylist_enabled: '1', stylist_provider: '', stylist_daily: '15', stylist_name_ar: 'تويلا', stylist_name_en: 'Twila', stylist_avatar: '' };
 const STYLIST_TRAINING_KEY = 'moda_training_data';
 const MODA_LAB_KEY = 'moda_test_scenarios';
 const STYLIST_FEEDBACK_KEY = 'moda_feedback';
@@ -275,7 +275,7 @@ export function teachFromStylistFeedback(id, answer) {
   const items = readStylistFeedback();
   const item = items.find((entry) => entry.id === id);
   if (!item) return null;
-  const lesson = addStylistTrainingLesson({ topic: item.reason || 'تحسين اقتراحات مودة', question: item.question, answer, tags: item.reason || '' });
+  const lesson = addStylistTrainingLesson({ topic: item.reason || 'تحسين اقتراحات تويلا', question: item.question, answer, tags: item.reason || '' });
   const current = readStylistTraining();
   const lessons = current.lessons.map((entry) => entry.id === lesson.lesson?.id && entry.status === 'draft' ? { ...entry, sourceFeedbackId: id } : entry);
   writeStylistTraining({ ...current, lessons });
@@ -367,7 +367,7 @@ const parseJson = (t) => {
   // a generic "unavailable" error. Product matching requires structured JSON,
   // so treat prose as a normal fashion chat reply and never invent catalogue items.
   if (start < 0) {
-    const say = text.replace(/^\s*(?:assistant|مودة)\s*[:：-]\s*/i, '').slice(0, 700).trim();
+    const say = text.replace(/^\s*(?:assistant|تويلا|مودة)\s*[:：-]\s*/i, '').slice(0, 700).trim();
     if (say) return { intent: 'chat', say, tips: '', budget: null, slots: [] };
     throw new Error('empty reply from AI provider');
   }
@@ -385,7 +385,7 @@ const parseJson = (t) => {
   throw new Error('incomplete JSON in reply');
 };
 
-// External styling research used to shape Moda's learning rules:
+// External styling research used to shape Twila's learning rules:
 // Stitch Fix StyleFile + Style Shuffle (style dimensions and repeated visual feedback):
 // https://newsroom.stitchfix.com/blog/stitch-fix-rolls-out-stylefile-its-style-personality-resource-to-all-clients/
 // https://newsroom.stitchfix.com/blog/10-billion-interactions-and-counting-on-style-shuffle-the-data-powering-your-personalized-shopping-experience/
@@ -505,7 +505,7 @@ function findCandidates(slot, limit = 4) {
 }
 
 
-/* ---------------- مودة v2: محرك بقواعد وبيانات (بدون موديل في المسار الأساسي) ---------------- */
+/* ---------------- تويلا v2: محرك بقواعد وبيانات (بدون موديل في المسار الأساسي) ---------------- */
 let modaRowsCache = { at: 0, rows: null };
 export function invalidateModaCatalogue() { modaRowsCache = { at: 0, rows: null }; }
 function modaCatalogue() {
@@ -519,7 +519,7 @@ function modaCatalogue() {
 export const modaEngineEnabled = () => (process.env.STYLIST_ENGINE || 'moda') !== 'legacy';
 
 
-/** عقل مودة (موديل لغة): بيرجّع دالة أو null لو مفيش مزوّد AI متظبط. المحرك بيشتغل من غيره عادي. */
+/** عقل تويلا (موديل لغة): بيرجّع دالة أو null لو مفيش مزوّد AI متظبط. المحرك بيشتغل من غيره عادي. */
 function modaChainCall() {
   if (process.env.MODA_BRAIN === '0') return null;
   const chain = ['anthropic', 'gemini', 'cloudflare'].filter((k) => providerReady[k]());

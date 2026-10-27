@@ -13,7 +13,7 @@ const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}');
 const save = (b) => {
   try {
     localStorage.setItem(KEY, JSON.stringify(b));
-    // Moda (the stylist) remembers it too, so she does not ask again
+    // Twila (the stylist) remembers it too, so she does not ask again
     const p = JSON.parse(localStorage.getItem('moda.profile') || '{}');
     const bits = [b.height && `${b.height}cm`, b.weight && `${b.weight}kg`].filter(Boolean).join(' / ');
     localStorage.setItem('moda.profile', JSON.stringify({ ...p, ...(bits ? { size: bits } : {}), ...(b.sex ? { gender: b.sex === 'f' ? 'woman' : 'man' } : {}) }));

@@ -1,6 +1,6 @@
 /**
  * شجرة تصنيف المنتج (على طريقة Amazon): الفئة (لمين؟) ← المجموعة ← نوع القطعة.
- * مصدرها الوحيد قاموس مودة (taxonomy.json)، فنفس النوع اللي صاحب المحل بيختاره هو اللي مودة والبحث بيفهموه.
+ * مصدرها الوحيد قاموس تويلا (taxonomy.json)، فنفس النوع اللي صاحب المحل بيختاره هو اللي تويلا والبحث بيفهموه.
  * من النوع + الفئة بنستنتج تلقائيًا: القسم (للتوافق مع أقسام المنصة)، المقاسات المناسبة، ودرجة الرسمية المقترحة.
  */
 import { loadKnowledge } from './moda/knowledge.js';
@@ -93,7 +93,7 @@ export function deriveDepartment(key, audience, storeDepartments = [], K = loadK
   return null;
 }
 
-/** الفئة اللي المنتج بيتبع لها بالمصطلح اللي مودة فاهمه (men|women|boys|girls|kids|unisex). */
+/** الفئة اللي المنتج بيتبع لها بالمصطلح اللي تويلا فاهمه (men|women|boys|girls|kids|unisex). */
 export const audienceOrNull = (a) => (AUDIENCE_KEYS.has(a) ? a : null);
 
 /** الشجرة اللي المحرر بيعرضها. */

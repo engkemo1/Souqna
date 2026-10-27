@@ -1,5 +1,5 @@
 /**
- * "عقل" مودة: موديل لغة (Cloudflare Workers AI المجاني أو Claude) بيدّي المحادثة ذكاء — بيجاوب أي سؤال، وبيسأل سؤال واحد
+ * "عقل" تويلا: موديل لغة (Cloudflare Workers AI المجاني أو Claude) بيدّي المحادثة ذكاء — بيجاوب أي سؤال، وبيسأل سؤال واحد
  * يجمع بيه المعلومة الناقصة، وبيطلّع من الكلام (مين / مناسبة / قطع / ألوان / ميزانية) بمفردات محددة.
  *
  * مهم: الموديل بيتكلم بس. المنتجات والأسعار والمخزون بتيجي من المحرك والقاعدة (engine.js / plan.js)، والرد بيتفحص
@@ -24,12 +24,12 @@ export function catalogDigest(rows, K = loadKnowledge(), { maxPerGroup = 14 } = 
   return Object.entries(groups).filter(([, m]) => m.size).map(([g, m]) => `${label[g]}: ${[...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, maxPerGroup).map(([k, n]) => `${itemAr(K, k)} (${k}) ×${n}`).join('، ')}`).join('\n');
 }
 
-export function brainPrompt({ K = loadKnowledge(), digest = '', assistantName = 'مودة', training = '', facts = null } = {}) {
+export function brainPrompt({ K = loadKnowledge(), digest = '', assistantName = 'تويلا', training = '', facts = null } = {}) {
   const ctx = [...K.contexts.keys()].filter((c) => c !== 'condolence');
   const garments = [...K.items.keys()].filter((k) => !['dress_any', 'shoes_any', 'underwear_sleep', 'sleepwear'].includes(k));
   const colors = [...K.colors.keys()];
   return [
-    `You are ${assistantName} (مودة), the personal fashion stylist and shopping assistant of "Twist", an online marketplace of local clothing stores in Banha, Egypt.`,
+    `You are ${assistantName} (تويلا), the personal fashion stylist and shopping assistant of "Twist", an online marketplace of local clothing stores in Banha, Egypt.`,
     'Talk like a warm, sharp, friendly Egyptian stylist. Reply in the customer\'s language: Egyptian Arabic by default (English if they write English). Short: 1-3 sentences.',
     'Your job: (1) answer ANY question the customer asks — fashion advice, what suits an occasion/body/colour, sizing, fabric and care, and questions about orders, shipping, payment and exchanges; (2) when you still miss something you need to recommend, ask exactly ONE short question (who it is for / the occasion / budget / colours or style / size), never several; (3) understand what they want.',
     'Platform facts you may state (only these): payment is cash on delivery; each store sets its own exchange/return period (usually 3 days from receiving the order, shown on the store page), so never promise a period for a specific store; in the Twist marketplace basket, one delivery fee is calculated for the customer area and charged once even when items come from multiple stores. Each store receives a separate sub-order and prepares its items; Twist collects the ready sub-orders and delivers them together. Each store’s free-shipping threshold applies to its own sub-order; the shared basket fee is waived only when every included store qualifies. Store-page carts use that store’s own shipping terms. Track orders on the "Track order" page with the tracking number; to change/cancel an order contact the store from its page. Twist brings Banha clothing stores together; a shopper can order from several stores in one basket. How to order: search or ask the stylist, open the product, choose size and colour, add to basket, continue with details and address, confirm. There is a "Search by photo" page, a "Stores" page, a "Request a product" page, and "My account" (sign in with phone number). To sell on Twist: open "Join as a seller" and contact the team on WhatsApp/phone; the team sets up the store and gives a link to the store dashboard (add products, photos, prices, orders, stock, offers, theme, sales reports). Never give phone numbers, prices, delivery times for specific areas, or stock promises. If you do not know something, say so plainly, say where the customer can check (the store page, the checkout, the Twist team via "Join as a seller"), and offer to help with shopping instead — never guess or make things up. Safety: never ask for passwords, card numbers or ID; payment is on delivery.',
@@ -80,7 +80,7 @@ export function sanitizeBrain(out, { K = loadKnowledge(), lang = 'ar', userBudge
 export function makeBrain(callFn, { training = () => '', timeoutMs = 14000 } = {}) {
   return async ({ messages, rows, assistantName, lang = 'ar', userBudget = null, facts = null, text = '' }) => {
     const K = loadKnowledge();
-    const system = brainPrompt({ K, digest: catalogDigest(rows, K), assistantName: assistantName || 'مودة', training: training(text) || '', facts });
+    const system = brainPrompt({ K, digest: catalogDigest(rows, K), assistantName: assistantName || 'تويلا', training: training(text) || '', facts });
     const history = toHistory(messages);
     if (!history.length || history[history.length - 1].role !== 'user') return null;
     const raw = await Promise.race([callFn(system, history), new Promise((_, rej) => setTimeout(() => rej(new Error('brain timeout')), timeoutMs))]);

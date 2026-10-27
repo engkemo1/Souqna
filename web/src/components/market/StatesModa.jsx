@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MODA_IMG } from './modaImg.js';
 
-// pieces cut from Moda's expression sheet and aligned to the main portrait (1254px design space): [file, x, y, w, h]
+// pieces cut from Twila's expression sheet and aligned to the main portrait (1254px design space): [file, x, y, w, h]
 const P = {
   eyeL: ['eyeL_c', 414, 372, 212, 136],
   eyeR: ['eyeR_c', 626, 324, 204, 144],
@@ -13,8 +13,8 @@ const P = {
 const MOUTHS = ['m1', 'm2', 'm3', 'smile', 'm2', 'm1', 'm3'];
 const D = 1254;
 
-/** Moda built from real expression frames: blinks, mouth moves while she talks, gentle sway. No WebGL, just stacked images. */
-export default function StatesModa({ size = 220, talking = false, thinking = false, src = MODA_IMG, label = 'Moda' }) {
+/** Twila built from real expression frames: blinks, mouth moves while she talks, gentle sway. No WebGL, just stacked images. */
+export default function StatesModa({ size = 220, talking = false, thinking = false, src = MODA_IMG, label = 'Twila' }) {
   const [eyes, setEyes] = useState(false);
   const [mouth, setMouth] = useState(null);
   const talkRef = useRef(talking);

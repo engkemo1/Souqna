@@ -16,6 +16,34 @@ if (typeof window !== 'undefined') {
   window.addEventListener('appinstalled', () => { deferredPrompt = null; window.dispatchEvent(new Event('bo:installable')); });
 }
 
+/** Which browser / device the owner is on, and the exact "add to home screen" steps for it. Pure text, no side effects. */
+export function installGuide(ua = typeof navigator !== 'undefined' ? navigator.userAgent : '') {
+  const ios = /iphone|ipad|ipod/i.test(ua) || (typeof navigator !== 'undefined' && navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const android = /android/i.test(ua);
+  const inApp = /FBAN|FBAV|FB_IAB|Instagram|Messenger|TikTok|musical_ly|Snapchat|Line\/|Twitter|LinkedInApp|; wv\)/i.test(ua);
+  if (inApp) {
+    return { browser: 'متصفح التطبيق (فيسبوك / إنستجرام / واتساب…)', inApp: true,
+      steps: ['المتصفح اللي جوّا التطبيق مبيسمحش بالتثبيت.', ios ? 'اضغط على ⋯ أو أيقونة المتصفح واختار «فتح في Safari».' : 'اضغط على ⋮ واختار «فتح في Chrome» أو «فتح في المتصفح».', 'بعد ما يفتح، كمّل من نفس الزرار هنا.'] };
+  }
+  if (ios) {
+    if (/CriOS/.test(ua)) return { browser: 'Chrome على الآيفون', steps: ['اضغط أيقونة المشاركة في شريط العنوان (أو ⋯ ثم «مشاركة»).', 'اختار «إضافة إلى الشاشة الرئيسية».', 'اضغط «إضافة» وافتح التطبيق من الأيقونة.', 'لو مش ظاهرة عندك، افتح اللينك في Safari.'] };
+    if (/EdgiOS/.test(ua)) return { browser: 'Edge على الآيفون', steps: ['اضغط ⋯ تحت ثم «مشاركة».', 'اختار «إضافة إلى الشاشة الرئيسية».', 'اضغط «إضافة». لو مش ظاهرة، افتح اللينك في Safari.'] };
+    if (/FxiOS|OPiOS|OPT\//.test(ua)) return { browser: 'متصفح تاني على الآيفون', steps: ['افتح نفس اللينك في Safari (انسخه من الزرار تحت).', 'اضغط مشاركة ثم «إضافة إلى الشاشة الرئيسية».', 'اضغط «إضافة».'] };
+    return { browser: 'Safari على الآيفون', steps: ['اضغط زرار المشاركة (المربع والسهم) تحت. وعلى الآيباد هتلاقيه فوق.', 'انزل واختار «إضافة إلى الشاشة الرئيسية».', 'اضغط «إضافة» وافتح التطبيق من الأيقونة.'] };
+  }
+  if (android) {
+    if (/SamsungBrowser/.test(ua)) return { browser: 'Samsung Internet', steps: ['اضغط ≡ (القائمة) تحت.', 'اختار «إضافة صفحة إلى» ثم «الشاشة الرئيسية» (أو «تثبيت التطبيق» لو ظهرت).', 'أكّد بـ «إضافة».'] };
+    if (/Firefox/.test(ua)) return { browser: 'Firefox على الأندرويد', steps: ['اضغط ⋮ (القائمة).', 'اختار «تثبيت» أو «إضافة إلى الشاشة الرئيسية».', 'أكّد بـ «إضافة».'] };
+    if (/EdgA/.test(ua)) return { browser: 'Edge على الأندرويد', steps: ['اضغط ⋯ تحت.', 'اختار «إضافة إلى الهاتف» ثم «الشاشة الرئيسية».', 'أكّد بـ «إضافة».'] };
+    if (/OPR\//.test(ua)) return { browser: 'Opera على الأندرويد', steps: ['اضغط ⋮ ثم «الشاشة الرئيسية».', 'أكّد بـ «إضافة».'] };
+    return { browser: 'Chrome على الأندرويد', steps: ['اضغط ⋮ فوق.', 'اختار «تثبيت التطبيق» (أو «إضافة إلى الشاشة الرئيسية»).', 'اضغط «تثبيت».'] };
+  }
+  if (/Edg\//.test(ua)) return { browser: 'Edge على الكمبيوتر', steps: ['اضغط أيقونة التثبيت في آخر شريط العنوان (أو ⋯ ثم «التطبيقات» ثم «تثبيت هذا الموقع كتطبيق»).', 'اضغط «تثبيت».'] };
+  if (/Firefox/.test(ua)) return { browser: 'Firefox على الكمبيوتر', steps: ['Firefox على الكمبيوتر مبيثبتش التطبيقات.', 'افتح اللينك في Chrome أو Edge وثبّته من هناك.'] };
+  if (/Safari/.test(ua) && !/Chrome|Chromium/.test(ua)) return { browser: 'Safari على الماك', steps: ['من قايمة «ملف» اختار «إضافة إلى Dock».', 'اضغط «إضافة».'] };
+  return { browser: 'Chrome على الكمبيوتر', steps: ['اضغط أيقونة التثبيت في آخر شريط العنوان (أو ⋮ ثم «حفظ ومشاركة» ثم «تثبيت الصفحة كتطبيق»).', 'اضغط «تثبيت».'] };
+}
+
 /** Install-to-home-screen state. `canPrompt` = the browser offers a native install dialog; `ios` = needs the manual Share → Add steps. */
 export function useInstall() {
   const [, tick] = useState(0);
@@ -99,20 +127,21 @@ export function useBuyerPush() {
   return { supported, ...state, enable, disable };
 }
 
-/** While the shop owner is on the login / dashboard screens, the page installs as "لوحة المحل" and opens on the dashboard. */
-export function useStoreAppManifest() {
+/** While the shop owner (or the admin) is on their screens, the page installs as its own app and opens on that dashboard. */
+export function useAppManifest(href = '/store-app.webmanifest', name = 'لوحة المحل') {
   useEffect(() => {
     const link = document.querySelector('link[rel="manifest"]');
     const title = document.querySelector('meta[name="apple-mobile-web-app-title"]');
     const prev = { href: link?.getAttribute('href'), title: title?.getAttribute('content') };
-    link?.setAttribute('href', '/store-app.webmanifest');
-    title?.setAttribute('content', 'لوحة المحل');
+    link?.setAttribute('href', href);
+    title?.setAttribute('content', name);
     return () => {
       if (prev.href) link?.setAttribute('href', prev.href);
       if (prev.title) title?.setAttribute('content', prev.title);
     };
-  }, []);
+  }, [href, name]);
 }
+export const useStoreAppManifest = () => useAppManifest('/store-app.webmanifest', 'لوحة المحل');
 
 /** Ask the browser not to wipe the saved sign-in when it is short on space. */
 export function keepStorage() { try { navigator.storage?.persist?.(); } catch { /* ignore */ } }

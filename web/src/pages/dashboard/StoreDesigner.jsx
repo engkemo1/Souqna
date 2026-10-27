@@ -289,7 +289,7 @@ export default function StoreDesigner() {
         <div className="xl:hidden"><Button variant="outline" full onClick={() => setShowPreview(true)}><Smartphone className="h-4 w-4" />{L('معاينة حية للمتجر', 'Live store preview')}</Button></div>
         <CompletenessMeter store={data.store} L={L} />
 
-        <Panel title={L('مودة تصمّم متجرك', 'Moda designs your store')} subtitle={L('احكيلها نوع محلك والإحساس اللي عايزه، وهي تقترح قالب وألوان وجمل جاهزة بالعامية. إنت اللي بتقرر وتعدّل.', 'Tell Moda your store type and vibe; she suggests a template, colours and copy.')}>
+        <Panel title={L('تويلا تصمّم متجرك', 'Twila designs your store')} subtitle={L('احكيلها نوع محلك والإحساس اللي عايزه، وهي تقترح قالب وألوان وجمل جاهزة بالعامية. إنت اللي بتقرر وتعدّل.', 'Tell Twila your store type and vibe; she suggests a template, colours and copy.')}>
           <div className="space-y-4">
             <div><p className="mb-2 text-sm font-semibold">{L('نوع المحل', 'Store type')}</p><div className="flex flex-wrap gap-2">{KIND.map(([v, l]) => <button key={v} type="button" aria-pressed={ai.kind === v} onClick={() => setAi((a) => ({ ...a, kind: v }))} className={chip(ai.kind === v)}>{l}</button>)}</div></div>
             <div><p className="mb-2 text-sm font-semibold">{L('الإحساس', 'Vibe')}</p><div className="flex flex-wrap gap-2">{VIBE.map(([v, l]) => <button key={v} type="button" aria-pressed={ai.vibe === v} onClick={() => setAi((a) => ({ ...a, vibe: v }))} className={chip(ai.vibe === v)}>{l}</button>)}</div></div>

@@ -16,7 +16,8 @@ export function exchangeLabel(t, store) {
 }
 
 /** A full sentence for the product page "shipping & returns" block. */
-export function exchangeSentence(t, store) {
+export function exchangeSentence(t, store, product) {
   const n = returnDaysOf(store);
-  return n > 0 ? t('product.exchangeSentence', { n }) : '';
+  if (product?.noReturn) return t('product.noReturn') + '.';
+  return n > 0 ? t('product.exchangeSentence', { n }) : t('product.noReturn') + '.';
 }

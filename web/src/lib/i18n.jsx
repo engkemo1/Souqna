@@ -17,7 +17,7 @@ export function I18nProvider({ children }) {
   const [lang, setLang] = useState(initialLang);
   const { data: market } = useApi('/marketplace?q=&category=all&sort=featured');
   const [nameOverride, setNameOverride] = useState(null);
-  const assistantName = nameOverride?.[lang] || market?.features?.stylistName?.[lang] || (lang === 'ar' ? 'مودة' : 'Moda');
+  const assistantName = nameOverride?.[lang] || market?.features?.stylistName?.[lang] || (lang === 'ar' ? 'تويلا' : 'Twila');
 
   useEffect(() => {
     const update = (event) => { if (event.detail?.name) setNameOverride(event.detail.name); };
@@ -33,7 +33,7 @@ export function I18nProvider({ children }) {
 
   const t = useCallback((key, vars) => {
     let s = messages[lang][key] ?? messages.en[key] ?? key;
-    s = s.replaceAll('مودة', assistantName).replaceAll('Moda', assistantName);
+    s = s.replaceAll('تويلا', assistantName).replaceAll('Twila', assistantName).replaceAll('مودة', assistantName).replaceAll('Moda', assistantName);
     if (vars) for (const [k, v] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, v);
     return s;
   }, [assistantName, lang]);

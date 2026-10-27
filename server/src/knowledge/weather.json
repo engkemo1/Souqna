@@ -78,7 +78,7 @@
     ],
     "sunrise_sunset": "بتتحسب محليًا بالكود (معادلة فلكية بالإحداثيات والتاريخ). مفيش API.",
     "default_provider": "met_norway",
-    "default_provider_note": "المحرك يستخدم MET Norway فقط، مع نسب المصدر في رد مودة. Open-Meteo Free غير مستخدم تجاريًا؛ يتطلب ترخيص API مدفوعًا إن أردنا الرجوع إليه."
+    "default_provider_note": "المحرك يستخدم MET Norway فقط، مع نسب المصدر في رد تويلا. Open-Meteo Free غير مستخدم تجاريًا؛ يتطلب ترخيص API مدفوعًا إن أردنا الرجوع إليه."
   },
 
   "customer_location": {
