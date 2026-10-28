@@ -544,11 +544,51 @@ CREATE TABLE IF NOT EXISTS pos_sales (
   customer_phone TEXT NOT NULL DEFAULT '',
   note TEXT NOT NULL DEFAULT '',
   device_at TEXT NOT NULL,                  -- when the sale really happened (device clock)
+  shift_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(store_id, uuid),
   UNIQUE(store_id, number)
 );
 CREATE INDEX IF NOT EXISTS idx_pos_sales_day ON pos_sales(store_id, device_at);
+
+-- A cashier device has its own register and cash drawer session. Shifts are never deleted.
+CREATE TABLE IF NOT EXISTS pos_registers (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  device_key TEXT NOT NULL,
+  name TEXT NOT NULL DEFAULT 'الكاشير الرئيسي',
+  last_seen_at TEXT NOT NULL DEFAULT (datetime('now')),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(store_id, device_key)
+);
+CREATE TABLE IF NOT EXISTS pos_shifts (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  register_id INTEGER NOT NULL REFERENCES pos_registers(id) ON DELETE CASCADE,
+  state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','closed')),
+  opening_cash INTEGER NOT NULL DEFAULT 0 CHECK (opening_cash >= 0),
+  opened_by TEXT NOT NULL DEFAULT '',
+  opened_at TEXT NOT NULL DEFAULT (datetime('now')),
+  closed_by TEXT NOT NULL DEFAULT '',
+  closed_at TEXT,
+  counted_cash INTEGER,
+  expected_cash INTEGER,
+  difference INTEGER,
+  note TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_pos_shifts_register ON pos_shifts(store_id, register_id, id DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_one_open_shift_per_register ON pos_shifts(register_id) WHERE state='open';
+CREATE TABLE IF NOT EXISTS pos_cash_movements (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  shift_id INTEGER NOT NULL REFERENCES pos_shifts(id) ON DELETE CASCADE,
+  kind TEXT NOT NULL CHECK (kind IN ('in','out')),
+  amount INTEGER NOT NULL CHECK (amount > 0),
+  reason TEXT NOT NULL,
+  created_by TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pos_cash_movements_shift ON pos_cash_movements(shift_id, id);
 
 CREATE TABLE IF NOT EXISTS pos_sale_items (
   id INTEGER PRIMARY KEY,
@@ -578,6 +618,7 @@ CREATE TABLE IF NOT EXISTS pos_returns (
   method TEXT NOT NULL DEFAULT 'cash',
   reason TEXT NOT NULL DEFAULT '',
   cashier_name TEXT NOT NULL DEFAULT '',
+  shift_id INTEGER,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   UNIQUE(store_id, uuid)
 );
@@ -599,3 +640,24 @@ CREATE TABLE IF NOT EXISTS stock_movements (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_stock_mov ON stock_movements(store_id, id DESC);
+CREATE TABLE IF NOT EXISTS pos_stock_receipts (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  uuid TEXT NOT NULL,
+  product_id INTEGER NOT NULL,
+  variant_id INTEGER,
+  quantity INTEGER NOT NULL CHECK (quantity > 0),
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(store_id, uuid)
+);
+
+-- Explicitly approved, store-private corrections to product photo suggestions.
+CREATE TABLE IF NOT EXISTS pos_ai_product_lessons (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  suggested_json TEXT NOT NULL,
+  corrected_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_pos_ai_product_lessons_store ON pos_ai_product_lessons(store_id, id DESC);

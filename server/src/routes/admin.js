@@ -8,7 +8,7 @@ import { q, tx, insert, update } from '../db/index.js';
 import { signToken } from '../lib/auth.js';
 import { slugify, latinSlug } from '../lib/util.js';
 import { config } from '../config.js';
-import { h, AppError } from '../lib/errors.js';
+import { h, AppError, badRequest } from '../lib/errors.js';
 import { listDepartments, assertDepartments, ensureDeptCategories, deptAncestors, PENDING_RE } from '../lib/departments.js';
 import { notifyStore } from '../lib/push.js';
 import ownerRoutes from './owner.js';
@@ -17,6 +17,7 @@ import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.
 import { unmetDemand, demandTotals, demandForOwnersEnabled, setDemandForOwners } from '../lib/visual-demand.js';
 import { testProvider, stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
 import { llmChain } from '../lib/stylist.js';
+import { geminiUsage, saveGeminiLimit } from '../lib/ai-usage.js';
 import { adminModaPrompts, saveModaPrompts, resetModaPrompts, suggestPrompts } from '../lib/modaPrompts.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage } from '../lib/deptImage.js';
 import { notifyBuyer, notifyOrderStatus } from '../lib/buyers.js';
@@ -178,6 +179,10 @@ r.put('/cashier-sync/stores/:slug', h((req, res) => {
   }).parse(req.body);
   const store = q.get('SELECT id FROM stores WHERE slug=?', [req.params.slug]);
   if (!store) throw new AppError(404, 'not_found', 'Store not found.');
+  const system = body.cashierId && CASHIER_SYSTEMS.find((c) => c.id === body.cashierId);
+  if (body.status === 'active' && system?.connector !== 'ready') {
+    throw badRequest('cashier_connector_planned', 'الربط المباشر للنظام ده لسه مش جاهز. اختار استيراد ملف أو مفتاح API لحد ما يتنفذ الموصل.');
+  }
   if (!body.cashierId) q.run('DELETE FROM store_cashier_links WHERE store_id=?', [store.id]);
   else {
     q.run(`INSERT INTO store_cashier_links(store_id,cashier_id,status,note,updated_at) VALUES(?,?,?,?,datetime('now'))
@@ -750,6 +755,14 @@ r.get('/resources', h(async (_req, res) => {
     if (r2MetricsCache.value) r2 = { configured: true, accountId: true, ...r2MetricsCache.value, measuredAt: new Date(r2MetricsCache.at).toISOString() };
   }
   res.json({ disk, database, memory: { rssBytes: memory.rss, heapUsedBytes: memory.heapUsed, heapTotalBytes: memory.heapTotal }, r2, checkedAt: new Date().toISOString() });
+}));
+
+/* ---- Gemini: how much of the daily free limit is used (photo checks + Moda) ---- */
+r.get('/ai-usage', h((_req, res) => res.json({ gemini: geminiUsage({ configured: providerReady.gemini() }) })));
+r.put('/ai-usage', h((req, res) => {
+  const b = z.object({ geminiDailyLimit: z.coerce.number().int().min(0).max(1000000) }).parse(req.body);
+  saveGeminiLimit(b.geminiDailyLimit);
+  res.json({ gemini: geminiUsage({ configured: providerReady.gemini() }) });
 }));
 
 /* ---- stylist chat settings ---- */

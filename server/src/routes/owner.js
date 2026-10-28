@@ -5,7 +5,7 @@ import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartme
 import { extractSwatches } from '../lib/logo-palette.js';
 import { q, tx, insert, update, json } from '../db/index.js';
 import { config } from '../config.js';
-import { assertDepartments, inferDepartment, ensureDeptCategories, deptSubtree, deptAncestors } from '../lib/departments.js';
+import { assertDepartments, inferDepartment, ensureDeptCategories, deptSubtree, deptAncestors, listDepartments } from '../lib/departments.js';
 import { productTypeTree, deriveDepartment, audienceOrNull, AUDIENCE_KEYS } from '../lib/product-types.js';
 import { inferGender, inferKey } from '../lib/moda/products.js';
 import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
@@ -22,11 +22,11 @@ import { weeklyReport } from '../lib/report.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled } from '../lib/visual-demand.js';
 import { cairoNow } from '../lib/sameDay.js';
 import { triggerReindex } from '../lib/visual.js';
-import { describeProduct, invalidateModaCatalogue } from '../lib/stylist.js';
+import { describeProduct, invalidateModaCatalogue, providerReady, stylistSettings } from '../lib/stylist.js';
 import { loadKnowledge } from '../lib/moda/knowledge.js';
 import { normalizeDesignPatch, BADGE_TONES } from '@souqna/shared/layout';
 import { designSuggestion } from '../lib/store-designer.js';
-import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMediaFile, previewStyles } from '../lib/media.js';
+import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMediaFile, previewStyles, matchProductPhotos } from '../lib/media.js';
 import {
   serializeStore, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi, stockStatus,
 } from '../lib/serialize.js';
@@ -558,6 +558,29 @@ r.post('/media/:id/restyle', h(async (req, res) => {
 
 const aiHits = new Map();
 /** AI listing helper: fill the name, description and colours from the product photo. */
+r.get('/ai/product/status', h((_req, res) => {
+  const departments = decodeDepartments(_req.store.departments);
+  const { provider } = stylistSettings();
+  res.json({ configured: !!providerReady[provider]?.(), provider, departments: listDepartments().filter((d) => departments.includes(d.slug)).map((d) => ({ slug: d.slug, name: d.name })) });
+}));
+
+r.post('/ai/product/learn', h((req, res) => {
+  const learnFields = ['name_ar', 'name_en', 'description_ar', 'description_en', 'department'];
+  const fields = Object.fromEntries(learnFields.map((key) => [key, z.string().max(key.startsWith('description') ? 600 : key === 'department' ? 31 : 60).optional()]));
+  const body = z.object({ suggested: z.object(fields).strict(), corrected: z.object(fields).strict() }).strict().parse(req.body);
+  const compared = learnFields.filter((key) => Object.hasOwn(body.suggested, key));
+  const safe = (obj) => Object.fromEntries(compared.map((key) => [key, String(obj[key] || '').replace(/[\u0000-\u001F\u007F]/g, ' ').trim().slice(0, key.startsWith('description') ? 600 : key === 'department' ? 31 : 60)]));
+  const suggested = safe(body.suggested); const corrected = safe(body.corrected);
+  const allowedDepartments = decodeDepartments(req.store.departments);
+  if (suggested.department && !allowedDepartments.includes(suggested.department)) suggested.department = '';
+  if (corrected.department && !allowedDepartments.includes(corrected.department)) corrected.department = '';
+  const changed = compared.some((key) => suggested[key] !== corrected[key]);
+  if (!changed) return res.json({ learned: false });
+  q.run('INSERT INTO pos_ai_product_lessons(store_id,suggested_json,corrected_json) VALUES(?,?,?)', [req.store.id, JSON.stringify(suggested), JSON.stringify(corrected)]);
+  q.run('DELETE FROM pos_ai_product_lessons WHERE store_id=? AND id NOT IN (SELECT id FROM pos_ai_product_lessons WHERE store_id=? ORDER BY id DESC LIMIT 24)', [req.store.id, req.store.id]);
+  res.json({ learned: true });
+}));
+
 r.post('/ai/product', h(async (req, res) => {
   const b = z.object({ mediaId: z.coerce.number().int().positive(), hint: z.string().max(120).optional() }).parse(req.body);
   const m = q.get('SELECT * FROM media WHERE id=? AND store_id=?', [b.mediaId, req.store.id]);
@@ -565,10 +588,12 @@ r.post('/ai/product', h(async (req, res) => {
   const day = new Date().toISOString().slice(0, 10); const key = `${req.store.id}:${day}`;
   const used = aiHits.get(key) || 0;
   if (used >= 40) throw new AppError(429, 'rate_limited', 'Daily AI limit reached for this store.');
+  const examples = q.all('SELECT suggested_json AS suggested, corrected_json AS corrected FROM pos_ai_product_lessons WHERE store_id=? ORDER BY id DESC LIMIT 3', [req.store.id])
+    .map((x) => ({ suggested: json(x.suggested, {}), corrected: json(x.corrected, {}) }));
   let src; for (const f of ['md.jpg', 'md.webp', 'sm.jpg', 'sm.webp', 'original.jpg']) { try { src = await readMediaFile(m, f); break; } catch { /* next */ } }
   if (!src) throw notFound('Image');
   try {
-    const suggestion = await describeProduct(src, { hint: b.hint, departments: decodeDepartments(req.store.departments) });
+    const suggestion = await describeProduct(src, { hint: b.hint, departments: decodeDepartments(req.store.departments), examples });
     aiHits.set(key, used + 1);
     res.json({ suggestion });
   } catch (e) {
@@ -727,7 +752,9 @@ function uniqueSlug(storeId, base, exceptId = 0) {
 
 /** A barcode must identify one product/variant inside a store, otherwise cashier files can't be matched safely. */
 function assertBarcodesFree(storeId, data, existingId) {
-  const norm = (v) => String(v || '').trim().replace(/\.0+$/, '').toLowerCase();
+  const norm = (v) => String(v || '').trim().toLowerCase()
+    .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\.0+$/, '');
   const mine = [data.barcode, ...data.variants.map((v) => v.barcode)].map(norm).filter(Boolean);
   if (new Set(mine).size !== mine.length) throw new AppError(409, 'barcode_in_use', 'The same barcode is used twice in this product.', { barcode: 'barcode_in_use' });
   if (!mine.length) return;
@@ -796,6 +823,7 @@ r.post('/products', h((req, res) => {
   const id = saveProduct(req.store.id, data, null);
   invalidateModaCatalogue();
   triggerReindex();
+  matchProductPhotos(id); // in the background: all photos of the product end up with the same kind of background
   const saved = q.get('SELECT * FROM products WHERE id=?', [id]);
   res.status(201).json({ product: { ...serializeProductDetail(saved), modaKey: saved.moda_key || '' } });
 }));
@@ -806,6 +834,7 @@ r.put('/products/:id', h((req, res) => {
   const data = productSchema.parse(req.body);
   saveProduct(req.store.id, data, p);
   invalidateModaCatalogue();
+  matchProductPhotos(p.id);
   notifyPriceDrop(p.id, p.price, data.price);
   if (p.track_stock && p.stock <= 0 && q.val('SELECT stock FROM products WHERE id=?', [p.id]) > 0) notifyBackInStock(p.id);
   triggerReindex();

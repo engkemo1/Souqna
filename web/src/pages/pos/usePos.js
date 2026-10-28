@@ -18,6 +18,9 @@ export function usePos() {
   const [phase, setPhase] = useState('loading'); // loading | ready | signin | blocked | empty
   const [blocked, setBlocked] = useState(null);
   const [store, setStore] = useState(null);
+  const [register, setRegister] = useState(null);
+  const [shift, setShift] = useState(null);
+  const [closedShift, setClosedShift] = useState(null);
   const [products, setProducts] = useState([]);
   const [reservations, setReservations] = useState([]);
   const [savedAt, setSavedAt] = useState(null);
@@ -27,6 +30,8 @@ export function usePos() {
   const [safeStorage, setSafeStorage] = useState(true);
   const [busy, setBusy] = useState(false);
   const storeRef = useRef(null);
+  const registerRef = useRef(null);
+  const shiftRef = useRef(null);
   const productsRef = useRef([]);
   const reservationsRef = useRef([]);
   const queueRef = useRef([]);
@@ -37,7 +42,7 @@ export function usePos() {
 
   const persistCatalog = useCallback(async (s, list, when) => {
     const db = dbRef.current; if (!db || !s) return;
-    await db.set(`catalog:${s.id}`, { store: s, products: list, reservations: reservationsRef.current, savedAt: when });
+    await db.set(`catalog:${s.id}`, { store: s, products: list, reservations: reservationsRef.current, savedAt: when, register: registerRef.current, shift: shiftRef.current });
     await db.set('last', s.id);
   }, []);
 
@@ -54,19 +59,67 @@ export function usePos() {
   const refresh = useCallback(async () => {
     try {
       const d = await api('/pos/bootstrap');
+      const localDeviceKey = await dbRef.current?.get('deviceKey');
+      const deviceKey = localDeviceKey || globalThis.crypto?.randomUUID?.() || `device-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      if (!localDeviceKey) await dbRef.current?.set('deviceKey', deviceKey);
+      const resolved = await api('/pos/registers/resolve', { method: 'POST', body: { deviceKey, name: 'الكاشير الرئيسي' } });
+      registerRef.current = resolved.register; setRegister(resolved.register);
+      shiftRef.current = resolved.shift; setShift(resolved.shift); setClosedShift(resolved.shift ? null : resolved.lastShift);
       if (!storeRef.current || storeRef.current.id !== d.store.id) { storeRef.current = d.store; setStore(d.store); await loadQueue(d.store.id); }
       const list = applyLocalStock(d.products, pendingItems());
       const when = d.serverTime;
       setR(openOnly(d.reservations));
       setP(list); setSavedAt(when); setAuthExpired(false); setBlocked(null); setPhase('ready');
       await persistCatalog(d.store, list, when);
-      return true;
+      return { products: list, shift: resolved.shift };
     } catch (e) {
       if (e.status === 401) { setAuthExpired(true); return false; }
       if (e.status === 403) { setBlocked({ code: e.code, message: e.message }); setPhase('blocked'); return false; }
       return false; // no network: keep working from the saved snapshot
     }
   }, [loadQueue, persistCatalog]);
+
+  const openShift = useCallback(async (openingCash) => {
+    if (!registerRef.current) throw new Error('جهاز الكاشير لسه ما اتسجلش.');
+    const r = await api('/pos/shifts/open', { method: 'POST', body: { registerId: registerRef.current.id, openingCash } });
+    shiftRef.current = r.shift; setShift(r.shift); setClosedShift(null);
+    if (storeRef.current) await persistCatalog(storeRef.current, productsRef.current, savedAt);
+    return r.shift;
+  }, [persistCatalog, savedAt]);
+
+  const moveCash = useCallback(async ({ kind, amount, reason }) => {
+    if (!shiftRef.current) throw new Error('مفيش وردية مفتوحة.');
+    const r = await api(`/pos/shifts/${shiftRef.current.id}/movements`, { method: 'POST', body: { kind, amount, reason } });
+    shiftRef.current = r.shift; setShift(r.shift);
+    if (storeRef.current) await persistCatalog(storeRef.current, productsRef.current, savedAt);
+    return r.shift;
+  }, [persistCatalog, savedAt]);
+
+  const closeShift = useCallback(async ({ countedCash, note = '' }) => {
+    if (!shiftRef.current) throw new Error('مفيش وردية مفتوحة.');
+    const r = await api(`/pos/shifts/${shiftRef.current.id}/close`, { method: 'POST', body: { countedCash, note } });
+    shiftRef.current = null; setShift(null); setClosedShift(r.shift);
+    if (storeRef.current) await persistCatalog(storeRef.current, productsRef.current, savedAt);
+    return r.shift;
+  }, [persistCatalog, savedAt]);
+
+  const receiveStock = useCallback(async ({ uuid, productId, variantId = null, quantity, note = '' }) => {
+    const received = await api('/pos/stock/receive', { method: 'POST', body: { uuid, productId, variantId, quantity, note } });
+    const refreshed = await refresh();
+    if (refreshed) return refreshed;
+    // The stock receipt is already committed. Keep the server's returned snapshot so a later register-resolution hiccup
+    // cannot leave this screen showing the old quantity or invite the cashier to receive it again.
+    if (received?.products && received.store) {
+      if (!storeRef.current || storeRef.current.id !== received.store.id) {
+        storeRef.current = received.store; setStore(received.store); await loadQueue(received.store.id);
+      }
+      const list = applyLocalStock(received.products, pendingItems());
+      setP(list); setR(openOnly(received.reservations)); setSavedAt(received.serverTime);
+      await persistCatalog(received.store, list, received.serverTime);
+      return { products: list, shift: shiftRef.current };
+    }
+    return refreshed;
+  }, [loadQueue, persistCatalog, refresh]);
 
   const sync = useCallback(async () => {
     if (syncing.current || !navigator.onLine || !storeRef.current) return null;
@@ -100,6 +153,8 @@ export function usePos() {
       const snap = last ? await db.get(`catalog:${last}`) : null;
       if (snap && !dead) {
         storeRef.current = snap.store; setStore(snap.store); setP(snap.products); setSavedAt(snap.savedAt);
+        registerRef.current = snap.register || null; setRegister(snap.register || null);
+        shiftRef.current = snap.shift || null; setShift(snap.shift || null);
         await loadQueue(snap.store.id); setR(openOnly(snap.reservations)); setPhase('ready');
       }
       if (!tokenStore.get() && !snap) { setPhase('signin'); return; }
@@ -125,10 +180,11 @@ export function usePos() {
    */
   const checkout = useCallback(async ({ cart, discount, payments, customerName, customerPhone, reservation = null }) => {
     const db = dbRef.current; const s = storeRef.current;
+    if (!shiftRef.current) throw new Error('افتح الوردية قبل تسجيل البيع.');
     const counter = ((await db.get(`counter:${s.id}`)) || 0) + 1;
     await db.set(`counter:${s.id}`, counter);
     const uuid = newUuid();
-    const { body, receipt } = buildSale({ uuid, localNo: `م-${pad(counter)}`, createdAt: new Date().toISOString(), cart, discount, payments, customerName, customerPhone, reservation });
+    const { body, receipt } = buildSale({ uuid, localNo: `م-${pad(counter)}`, createdAt: new Date().toISOString(), cart, discount, payments, customerName, customerPhone, reservation, shiftId: shiftRef.current.id });
     const moved = stockItems(body.items, reservation);
     const entry = { uuid, storeId: s.id, state: 'pending', body, receipt, error: null, ...(reservation ? { stockItems: moved } : {}) };
     await db.putSale(entry);
@@ -151,5 +207,5 @@ export function usePos() {
     await dbRef.current.deleteSale(uuid); setQ(queueRef.current.filter((x) => x.uuid !== uuid));
   }, []);
 
-  return { phase, blocked, store, products, reservations, savedAt, queue, online, authExpired, safeStorage, busy, checkout, sync, refresh, retry, discard, db: dbRef };
+  return { phase, blocked, store, register, shift, closedShift, openShift, moveCash, closeShift, receiveStock, products, reservations, savedAt, queue, online, authExpired, safeStorage, busy, checkout, sync, refresh, retry, discard, db: dbRef };
 }

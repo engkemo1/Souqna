@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Wifi, WifiOff, Search, Plus, Minus, Trash2, Receipt, RotateCcw, CalendarDays, CloudUpload, ShoppingCart, Printer, X, ArrowRight, AlertTriangle, ScanBarcode, Check, CalendarCheck, Phone } from 'lucide-react';
-import { api } from '../../lib/api.js';
+import { Wifi, WifiOff, Search, Plus, Minus, Trash2, Receipt, RotateCcw, CalendarDays, CloudUpload, ShoppingCart, Printer, X, ArrowRight, AlertTriangle, ScanBarcode, Check, CalendarCheck, Phone, Camera, PackagePlus, Sparkles, LoaderCircle } from 'lucide-react';
+import { api, upload } from '../../lib/api.js';
 import { useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { cx } from '../../components/ui/cx.js';
+import SmartImage from '../../components/ui/SmartImage.jsx';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
-import { addToCart, buildIndex, createScanBuffer, lookupCode, productStock, reservationCart, searchProducts, setQty, settle, totals } from '../../lib/pos/engine.js';
+import { addToCart, applyPhotoSuggestion, buildIndex, createScanBuffer, lookupCode, normCode, productStock, reservationCart, returnRefundPreview, searchProducts, setQty, settle, totals } from '../../lib/pos/engine.js';
 import { egp, printHtml, receiptHtml } from '../../lib/pos/receipt.js';
 import { usePos } from './usePos.js';
 
 const METHODS = [['cash', 'نقدي'], ['card', 'بطاقة'], ['wallet', 'محفظة']];
 const METHOD_NAME = Object.fromEntries(METHODS);
+const AI_COLOR_AR = { Black: 'أسود', White: 'أبيض', Grey: 'رمادي', Navy: 'كحلي', Blue: 'أزرق', Red: 'أحمر', Burgundy: 'نبيتي', Green: 'أخضر', Olive: 'زيتي', Beige: 'بيج', Brown: 'بني', Yellow: 'أصفر', Orange: 'برتقالي', Purple: 'موف', Pink: 'وردي' };
+const AI_SIZE_KIND_AR = { clothes: 'ملابس (مثل S وM وL)', pants: 'بناطيل (مقاس رقمي)', shoes: 'أحذية (مقاس أوروبي)', kids: 'ملابس أطفال', length: 'طول عباية أو جلابية', free: 'فري سايز' };
 const timeOf = (iso) => new Intl.DateTimeFormat('ar-EG-u-nu-latn', { timeZone: 'Africa/Cairo', hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
 const today = () => new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Cairo' });
 const num = (v) => Math.max(0, Math.round(Number(String(v).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))) || 0));
@@ -43,9 +46,91 @@ function Modal({ title, onClose, children, wide, footer }) {
   );
 }
 
+function CameraScannerModal({ onClose, onDetected }) {
+  const videoRef = useRef(null);
+  const [status, setStatus] = useState('starting');
+  const [error, setError] = useState('');
+  useEffect(() => {
+    let stopped = false;
+    let controls = null;
+    let reader = null;
+    (async () => {
+      try {
+        if (!navigator.mediaDevices?.getUserMedia) throw new Error('المتصفح ده مش بيسمح بتشغيل الكاميرا. استخدم قارئ USB أو البحث بالكود.');
+        const { BrowserMultiFormatReader } = await import('@zxing/browser');
+        if (stopped) return;
+        reader = new BrowserMultiFormatReader();
+        controls = await reader.decodeFromConstraints(
+          { audio: false, video: { facingMode: { ideal: 'environment' } } },
+          videoRef.current,
+          (result, _decodeError, activeControls) => {
+            if (result && !stopped) {
+              stopped = true; activeControls?.stop();
+              onDetected(result.getText());
+            }
+          },
+        );
+        if (!stopped) setStatus('scanning');
+      } catch (e) {
+        if (!stopped) { setStatus('error'); setError(e?.name === 'NotAllowedError' ? 'اسمح للمتصفح باستخدام الكاميرا، وبعدها جرّب تاني.' : (e?.message || 'مش قادرين نشغّل الكاميرا.')); }
+      }
+    })();
+    return () => { stopped = true; controls?.stop(); reader?.reset?.(); };
+  }, [onDetected]);
+  return <Modal title="امسح باركود بالكاميرا" onClose={onClose}>
+    <div className="space-y-3">
+      <div className="overflow-hidden rounded-2xl bg-black"><video ref={videoRef} className="aspect-[4/3] w-full object-cover" muted playsInline autoPlay /></div>
+      {status === 'starting' && <p className="text-center text-sm text-muted">بنجهّز الكاميرا… اسمح بالوصول لو المتصفح سأل.</p>}
+      {status === 'scanning' && <p className="text-center text-sm text-muted">وجّه الكاميرا للباركود وخليه واضح جوه الصورة.</p>}
+      {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
+    </div>
+  </Modal>;
+}
+
 const Stat = ({ label, value, strong }) => (
   <div className="flex items-center justify-between py-1.5 text-sm"><span className="text-muted">{label}</span><span className={cx('tabular-nums', strong && 'text-base font-bold')}>{value}</span></div>
 );
+
+function ShiftModal({ shift, online, canClose, onClose, onMove, onCloseShift }) {
+  const [mode, setMode] = useState('');
+  const [amount, setAmount] = useState('');
+  const [reason, setReason] = useState('');
+  const [counted, setCounted] = useState(String(shift.expectedCash ?? 0));
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  useEffect(() => setCounted(String(shift.expectedCash ?? 0)), [shift.id, shift.expectedCash]);
+  const delta = num(counted) - (shift.expectedCash || 0);
+  const submitMove = async (e) => {
+    e.preventDefault(); setError('');
+    if (num(amount) < 1 || reason.trim().length < 2) { setError('اكتب المبلغ والسبب.'); return; }
+    setBusy(true);
+    try { await onMove({ kind: mode, amount: num(amount), reason: reason.trim() }); setMode(''); setAmount(''); setReason(''); }
+    catch (x) { setError(x.message); } finally { setBusy(false); }
+  };
+  const submitClose = async () => {
+    setError(''); setBusy(true);
+    try { await onCloseShift({ countedCash: num(counted), note: note.trim() }); }
+    catch (x) { setError(x.message); setBusy(false); }
+  };
+  if (mode) return <Modal title={mode === 'in' ? 'إضافة نقدية للدرج' : 'سحب نقدية من الدرج'} onClose={() => setMode('')} footer={<Button full size="lg" loading={busy} onClick={() => document.getElementById('pos-cash-movement')?.requestSubmit()}>{mode === 'in' ? 'تأكيد الإضافة' : 'تأكيد السحب'}</Button>}>
+    <form id="pos-cash-movement" onSubmit={submitMove} className="space-y-3"><label className="block"><span className="mb-1 block text-sm font-semibold">المبلغ · جنيه</span><input autoFocus inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-14 w-full rounded-xl border border-line px-3 text-xl font-bold tabular-nums" placeholder="0" /></label><label className="block"><span className="mb-1 block text-sm font-semibold">السبب</span><input value={reason} onChange={(e) => setReason(e.target.value)} className="h-12 w-full rounded-xl border border-line px-3" placeholder={mode === 'in' ? 'مثال: فكة للدرج' : 'مثال: مصروف توصيل'} /></label>{error && <p role="alert" className="rounded-lg bg-sale/10 p-2 text-sm text-sale">{error}</p>}</form>
+  </Modal>;
+  return <Modal title="الوردية والدرج" onClose={onClose} wide footer={<Button full size="lg" loading={busy} disabled={!online || !canClose} onClick={submitClose}>إغلاق الوردية</Button>}>
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {[['رصيد بداية الوردية', shift.openingCash], ['مبيعات نقدي', shift.cashSales], ['مرتجعات نقدي', shift.cashRefunds], ['إضافات للدرج', shift.cashIn], ['سحوبات من الدرج', shift.cashOut], ['المفروض في الدرج', shift.expectedCash]].map(([label, value]) => <div key={label} className="rounded-xl bg-surface p-3"><div className="text-xs text-muted">{label}</div><div className="mt-1 font-bold tabular-nums">{egp(value)}</div></div>)}
+    </div>
+    <div className="mt-4 flex flex-wrap gap-2"><Button variant="secondary" icon={Plus} onClick={() => setMode('in')}>إضافة نقدية</Button><Button variant="secondary" icon={Minus} onClick={() => setMode('out')}>سحب نقدية</Button></div>
+    <div className="mt-4 rounded-2xl border border-line p-3">
+      <label className="block"><span className="mb-1 block text-sm font-semibold">عدّ النقد الموجود فعليًا</span><input inputMode="numeric" value={counted} onChange={(e) => setCounted(e.target.value)} className="h-12 w-full rounded-xl border border-line px-3 text-lg font-bold tabular-nums" /></label>
+      <div className={cx('mt-2 text-sm font-semibold', delta === 0 ? 'text-success' : 'text-amber-700')}>{delta === 0 ? 'الدرج مطابق للحساب' : `الفرق عن المتوقع: ${delta > 0 ? '+' : '−'}${egp(Math.abs(delta))}`}</div>
+      <label className="mt-3 block"><span className="mb-1 block text-xs text-muted">ملاحظة (اختياري)</span><input value={note} onChange={(e) => setNote(e.target.value)} className="h-10 w-full rounded-lg border border-line px-3 text-sm" placeholder="سبب فرق الدرج إن وجد" /></label>
+    </div>
+    {!online && <p className="mt-3 text-sm text-amber-800">إغلاق الوردية يحتاج اتصالًا بالإنترنت. تقدر تكمل البيع من الوردية المفتوحة.</p>}
+    {!canClose && <p className="mt-3 text-sm text-amber-800">ابعت الفواتير المعلّقة أو كمّل البيع المفتوح قبل إغلاق الوردية.</p>}
+    {error && <p role="alert" className="mt-3 rounded-lg bg-sale/10 p-2 text-sm text-sale">{error}</p>}
+  </Modal>;
+}
 
 /* ------------------------------------------------------------------ pickers */
 
@@ -66,12 +151,205 @@ function VariantPicker({ product, onPick, onClose }) {
   );
 }
 
+function QuickProductModal({ initialName = '', initialBarcode = '', online, onClose, onSaved }) {
+  const [name, setName] = useState(initialName);
+  const [nameEnglish, setNameEnglish] = useState('');
+  const [price, setPrice] = useState('');
+  const [stock, setStock] = useState('1');
+  const [barcode, setBarcode] = useState(initialBarcode);
+  const [photo, setPhoto] = useState(null);
+  const [photoMedia, setPhotoMedia] = useState(null);
+  const [description, setDescription] = useState('');
+  const [descriptionEnglish, setDescriptionEnglish] = useState('');
+  const [department, setDepartment] = useState('');
+  const [aiColors, setAiColors] = useState([]);
+  const [aiSizeKind, setAiSizeKind] = useState('');
+  const [aiProviderStatus, setAiProviderStatus] = useState(null);
+  const [aiDraft, setAiDraft] = useState(null);
+  const [learnCorrection, setLearnCorrection] = useState(true);
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMessage, setAiMessage] = useState('');
+  const [withVariants, setWithVariants] = useState(false);
+  const [variants, setVariants] = useState([{ color: '', size: '', stock: '1', barcode: '' }]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!online) return;
+    let active = true;
+    api('/owner/ai/product/status').then((status) => { if (active) setAiProviderStatus(status); }).catch(() => { if (active) setAiProviderStatus({ checkFailed: true }); });
+    return () => { active = false; };
+  }, [online]);
+
+  const uploadPhoto = async () => {
+    if (!photo) return [];
+    if (photoMedia?.file === photo) return photoMedia.media;
+    const form = new FormData(); form.append('files', photo);
+    const uploaded = await upload('/owner/media?kind=product', form);
+    const items = uploaded.media || [];
+    setPhotoMedia({ file: photo, media: items });
+    return items;
+  };
+
+  const suggestFromPhoto = async () => {
+    if (!photo) { setError('صوّر المنتج أو اختار صورته الأول.'); return; }
+    if (!online) { setError('اقتراح البيانات من الصورة محتاج إنترنت.'); return; }
+    setError(''); setAiMessage(''); setAiBusy(true);
+    try {
+      const [media] = await uploadPhoto();
+      if (!media?.id) throw new Error('ماقدرناش نجهّز الصورة للتحليل.');
+      const { suggestion } = await api('/owner/ai/product', { method: 'POST', body: { mediaId: media.id, hint: name.trim() || undefined } });
+      const { patch, draft } = applyPhotoSuggestion(suggestion, { name_ar: name, name_en: nameEnglish, description_ar: description, description_en: descriptionEnglish, department }, aiDraft || {});
+      if (patch.name_ar) setName(patch.name_ar);
+      if (patch.name_en) setNameEnglish(patch.name_en);
+      if (patch.description_ar) setDescription(patch.description_ar);
+      if (patch.description_en) setDescriptionEnglish(patch.description_en);
+      if (patch.department) setDepartment(patch.department);
+      if (draft) setAiDraft(draft);
+      let filled = Object.keys(patch).length;
+      const colors = (suggestion?.colors || []).filter((c) => AI_COLOR_AR[c]);
+      if (colors.length) { setAiColors(colors); filled++; }
+      if (suggestion?.size_kind && AI_SIZE_KIND_AR[suggestion.size_kind]) { setAiSizeKind(suggestion.size_kind); filled++; }
+      setAiMessage(filled ? 'راجعنا الصورة وملّينا البيانات الناقصة. تقدر تعدّل أي اقتراح قبل الحفظ.' : 'حللنا الصورة؛ بياناتك المكتوبة محفوظة. مفيش اقتراحات إضافية مناسبة للحقول الفاضية.');
+    } catch (x) {
+      const messages = {
+        ai_unavailable: 'مساعد الصور محتاج تفعيل مزود الذكاء الاصطناعي من إعدادات Twist.',
+        stylist_unavailable: 'مساعد الصور مشغول أو حصل عطل مؤقت. الصورة محفوظة؛ جرّب تاني بعد شوية.',
+        rate_limited: 'وصل المحل للحد اليومي لاقتراحات الصور. جرّب بكرة.',
+        invalid_image: 'الصورة دي مش واضحة أو نوعها غير مدعوم. اختار صورة تانية.',
+      };
+      setError(messages[x.code] || (x.code === 'network' ? 'الاتصال فصل أثناء تحليل الصورة. الصورة محفوظة؛ اتأكد من الإنترنت وجرّب تاني.' : (x.message || 'ماقدرناش نقرا تفاصيل الصورة.')));
+    } finally { setAiBusy(false); }
+  };
+
+  const addSuggestedColor = (color) => {
+    const label = AI_COLOR_AR[color];
+    if (!label) return;
+    setWithVariants(true);
+    setVariants((rows) => rows.some((v) => v.color.trim() === label) ? rows : [...rows, { color: label, size: '', stock: '0', barcode: '' }]);
+  };
+
+  const save = async (e) => {
+    e.preventDefault(); setError('');
+    if (aiBusy) { setError('استنى لما تحليل الصورة يخلص قبل حفظ الصنف.'); return; }
+    if (!online) { setError('إضافة الصنف محتاجة اتصال بالإنترنت. البيع الحالي يفضل شغال أوفلاين.'); return; }
+    if (name.trim().length < 2) { setError('اكتب اسم واضح للصنف.'); return; }
+    if (num(price) < 1) { setError('اكتب سعر البيع.'); return; }
+    const rows = withVariants ? variants.filter((v) => v.color.trim() || v.size.trim()) : [];
+    if (withVariants && !rows.length) { setError('أضف مقاس أو لون واحد على الأقل.'); return; }
+    if (rows.some((v) => num(v.stock) < 0)) { setError('راجع كميات المقاسات والألوان.'); return; }
+    setBusy(true);
+    try {
+      const media = (await uploadPhoto()).map((m) => m.id);
+      const body = {
+        name_ar: name.trim(), name_en: nameEnglish.trim(), description_ar: description.trim(), description_en: descriptionEnglish.trim(), price: num(price), barcode: barcode.trim() || null, department: department || null,
+        status: 'active', track_stock: true, stock: withVariants ? 0 : num(stock),
+        variants: rows.map((v) => ({ color: v.color.trim() || null, size: v.size.trim() || null, stock: num(v.stock), barcode: v.barcode.trim() || null })),
+        media, primary_media_id: media[0] || null,
+      };
+      const result = await api('/owner/products', { method: 'POST', body });
+      const p = result.product;
+      const corrected = { name_ar: name.trim(), name_en: nameEnglish.trim(), description_ar: description.trim(), description_en: descriptionEnglish.trim(), department };
+      if (learnCorrection && aiDraft && Object.keys(aiDraft).some((key) => aiDraft[key] !== corrected[key])) {
+        try { await api('/owner/ai/product/learn', { method: 'POST', body: { suggested: aiDraft, corrected } }); } catch { /* Product creation must succeed even if learning feedback cannot be recorded. */ }
+      }
+      onSaved({
+        id: p.id, name: p.name, sku: p.sku || '', barcode: p.barcode || '', price: p.price,
+        track: true, stock: p.stockCount ?? (withVariants ? rows.reduce((sum, v) => sum + num(v.stock), 0) : num(stock)),
+        variants: (p.variants || []).map((v) => ({ ...v, color: v.color || '', size: v.size || '', sku: v.sku || '', barcode: v.barcode || '', held: 0 })),
+        sold: 0, category: p.category?.name || '', image: p.media?.[0] || null,
+      });
+    } catch (x) { setError(x.code === 'barcode_in_use' ? 'الباركود ده متسجل قبل كده لصنف تاني.' : (x.message || 'ماقدرناش نحفظ الصنف.')); } finally { setBusy(false); }
+  };
+
+  return (
+    <Modal title="إضافة صنف سريع" onClose={onClose} wide footer={
+      <Button full size="lg" loading={busy || aiBusy} disabled={!online || aiBusy} icon={PackagePlus} onClick={() => document.getElementById('pos-quick-product-form')?.requestSubmit()}>
+        حفظ الصنف وإضافته للبيع
+      </Button>}>
+      <form id="pos-quick-product-form" onSubmit={save} className="space-y-4">
+        <div className="rounded-2xl bg-primary/5 p-3 text-sm text-muted">هيتسجل في كتالوج المحل ويظهر في الكاشير والمتجر. لو مفيش باركود، هتلاقيه بعد كده بالبحث عن اسمه.</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block sm:col-span-2"><span className="mb-1 block text-sm font-semibold">اسم الصنف</span><input autoFocus value={name} onChange={(x) => setName(x.target.value)} placeholder="مثال: تيشيرت قطن أسود" className="h-12 w-full rounded-xl border border-line px-3 focus:outline-none focus:shadow-ring" /></label>
+          <label className="block"><span className="mb-1 block text-sm font-semibold">سعر البيع · جنيه</span><input inputMode="numeric" value={price} onChange={(x) => setPrice(x.target.value)} placeholder="مثال: ٤٥٠" className="h-12 w-full rounded-xl border border-line px-3 tabular-nums focus:outline-none focus:shadow-ring" /></label>
+          {!withVariants && <label className="block"><span className="mb-1 block text-sm font-semibold">الكمية المتاحة</span><input inputMode="numeric" value={stock} onChange={(x) => setStock(x.target.value)} placeholder="1" className="h-12 w-full rounded-xl border border-line px-3 tabular-nums focus:outline-none focus:shadow-ring" /></label>}
+          <label className="block sm:col-span-2"><span className="mb-1 block text-sm font-semibold">الباركود <span className="font-normal text-muted">اختياري</span></span><input dir="ltr" value={barcode} onChange={(x) => setBarcode(x.target.value)} placeholder="سيبه فاضي وابحث بالاسم وقت البيع" className="h-12 w-full rounded-xl border border-line px-3 focus:outline-none focus:shadow-ring" /></label>
+          {aiProviderStatus?.departments?.length > 0 && <label className="block sm:col-span-2"><span className="mb-1 block text-sm font-semibold">قسم المتجر <span className="font-normal text-muted">اختياري — راجعه قبل الحفظ</span></span><select value={department} onChange={(e) => setDepartment(e.target.value)} className="h-12 w-full rounded-xl border border-line bg-elevated px-3"><option value="">سيبه فاضي</option>{aiProviderStatus.departments.map((d) => <option key={d.slug} value={d.slug}>{d.name.ar}</option>)}</select></label>}
+        </div>
+        <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-line p-3"><input type="checkbox" checked={withVariants} onChange={(e) => setWithVariants(e.target.checked)} className="h-4 w-4 accent-primary" /><span><span className="block text-sm font-semibold">الصنف له مقاسات أو ألوان مختلفة</span><span className="block text-xs text-muted">سجّل رصيد كل مقاس/لون لوحده</span></span></label>
+        {withVariants && <div className="space-y-2">
+          {variants.map((v, i) => <div key={i} className="grid grid-cols-[1fr_1fr_74px_1fr_36px] gap-1.5">
+            <input value={v.color} onChange={(e) => setVariants((list) => list.map((x, j) => j === i ? { ...x, color: e.target.value } : x))} placeholder="اللون" aria-label="اللون" className="h-10 min-w-0 rounded-lg border border-line px-2 text-sm" />
+            <input value={v.size} onChange={(e) => setVariants((list) => list.map((x, j) => j === i ? { ...x, size: e.target.value } : x))} placeholder="المقاس" aria-label="المقاس" className="h-10 min-w-0 rounded-lg border border-line px-2 text-sm" />
+            <input inputMode="numeric" value={v.stock} onChange={(e) => setVariants((list) => list.map((x, j) => j === i ? { ...x, stock: e.target.value } : x))} placeholder="العدد" aria-label="العدد" className="h-10 min-w-0 rounded-lg border border-line px-2 text-sm tabular-nums" />
+            <input dir="ltr" value={v.barcode} onChange={(e) => setVariants((list) => list.map((x, j) => j === i ? { ...x, barcode: e.target.value } : x))} placeholder="Barcode" aria-label="باركود المقاس" className="h-10 min-w-0 rounded-lg border border-line px-2 text-sm" />
+            <button type="button" aria-label="حذف التركيبة" onClick={() => setVariants((list) => list.length > 1 ? list.filter((_, j) => j !== i) : list)} className="grid h-10 w-9 place-items-center rounded-lg text-muted hover:bg-sale/10 hover:text-sale"><X className="h-4 w-4" /></button>
+          </div>)}
+          <button type="button" onClick={() => setVariants((list) => [...list, { color: '', size: '', stock: '0', barcode: '' }])} className="inline-flex h-10 items-center gap-1.5 rounded-lg px-2 text-sm font-semibold text-primary hover:bg-primary/5"><Plus className="h-4 w-4" />إضافة لون أو مقاس</button>
+        </div>}
+        <label className={cx('flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-line-strong p-3', !aiBusy && 'hover:bg-fg/[0.03]', aiBusy && 'cursor-wait opacity-70')}><input type="file" accept="image/*" capture="environment" disabled={aiBusy || busy} className="sr-only" onChange={(e) => { setPhoto(e.target.files?.[0] || null); setPhotoMedia(null); setAiColors([]); setAiSizeKind(''); setAiDraft(null); setAiMessage(''); setError(''); }} /><span className="grid h-11 w-11 place-items-center rounded-xl bg-surface"><Camera className="h-5 w-5 text-primary" /></span><span><span className="block text-sm font-semibold">صورة للمتجر <span className="font-normal text-muted">اختياري</span></span><span className="block text-xs text-muted">صوّرها دلوقتي أو اختار صورة من الجهاز</span></span>{photo && <span className="ms-auto max-w-36 truncate text-xs text-success">{photo.name}</span>}</label>
+        {photo && <div className="flex flex-wrap items-center gap-2"><Button type="button" variant="secondary" size="sm" icon={aiBusy ? LoaderCircle : Sparkles} loading={aiBusy} disabled={!online || busy || (aiProviderStatus && !aiProviderStatus.configured && !aiProviderStatus.checkFailed)} onClick={suggestFromPhoto}>حلّل الصورة واملأ البيانات الناقصة</Button><span className="text-xs text-muted">الاقتراحات ماتغيّرش بيانات كتبتها، والسعر بتحدده بنفسك.</span></div>}
+        {photo && aiProviderStatus && !aiProviderStatus.configured && !aiProviderStatus.checkFailed && <p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">مساعد الصورة غير مفعّل على الخادم حاليًا. اطلب من إدارة Twist إعداد مزود الذكاء الاصطناعي؛ تقدر تكمل إضافة الصنف يدويًا والصورة هتتحفظ.</p>}
+        {aiMessage && <p role="status" className="rounded-xl bg-success/10 p-3 text-sm text-success">{aiMessage}</p>}
+        {aiDraft && <label className="flex cursor-pointer items-start gap-2 rounded-lg bg-primary/5 p-3 text-xs text-muted"><input type="checkbox" checked={learnCorrection} onChange={(e) => setLearnCorrection(e.target.checked)} className="mt-0.5 accent-primary" /><span>استخدم تعديلي على اقتراح المساعد كمثال للمحل ده فقط في المرات الجاية. بيانات المحلات ماتتشاركش.</span></label>}
+        {aiColors.length > 0 && <div className="rounded-xl border border-line p-3"><p className="text-sm font-semibold">ألوان مقترحة من الصورة</p><p className="mt-1 text-xs text-muted">اختار اللون اللي موجود فعلًا. كل لون جديد بيتضاف بكمية صفر لحد ما تدخل رصيدك.</p><div className="mt-2 flex flex-wrap gap-2">{aiColors.map((color) => { const label = AI_COLOR_AR[color]; const chosen = variants.some((v) => v.color.trim() === label); return <button key={color} type="button" aria-pressed={chosen} onClick={() => addSuggestedColor(color)} className={cx('rounded-full border px-3 py-1.5 text-sm', chosen ? 'border-success bg-success/10 text-success' : 'border-line hover:border-primary')}>{label}{chosen ? ' · مضاف' : ' · أضف'}</button>; })}</div>{aiSizeKind && <p className="mt-3 text-xs text-muted">تخمين نوع المقاس: {AI_SIZE_KIND_AR[aiSizeKind]}. راجع المقاسات الفعلية من التوريد قبل الحفظ.</p>}</div>}
+        {description && <label className="block"><span className="mb-1 block text-sm font-semibold">وصف للمتجر <span className="font-normal text-muted">اختياري</span></span><textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} className="w-full rounded-xl border border-line px-3 py-2 text-sm" /></label>}
+        {(nameEnglish || descriptionEnglish) && <details className="rounded-xl border border-line p-3"><summary className="cursor-pointer text-sm font-semibold">بيانات بالإنجليزي (اختياري)</summary><label className="mt-3 block"><span className="mb-1 block text-xs text-muted">اسم المنتج بالإنجليزي</span><input dir="ltr" value={nameEnglish} onChange={(e) => setNameEnglish(e.target.value)} className="h-10 w-full rounded-lg border border-line px-3 text-sm" /></label><label className="mt-3 block"><span className="mb-1 block text-xs text-muted">وصف بالإنجليزي</span><textarea dir="ltr" rows={3} value={descriptionEnglish} onChange={(e) => setDescriptionEnglish(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 text-sm" /></label></details>}
+        {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
+      </form>
+    </Modal>
+  );
+}
+
+function ReceiveStockModal({ products, initialProduct = null, online, onClose, onReceive }) {
+  const eligible = products.filter((p) => p.track);
+  const [query, setQuery] = useState(initialProduct?.name || '');
+  const [productId, setProductId] = useState(initialProduct ? String(initialProduct.id) : '');
+  const [variantId, setVariantId] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const requestAttempt = useRef(null);
+  const needle = query.trim().toLowerCase();
+  const codeNeedle = normCode(query);
+  const matches = eligible.filter((p) => !needle || `${p.name} ${p.barcode} ${p.sku}`.toLowerCase().includes(needle) || [p.barcode, p.sku, ...(p.variants || []).flatMap((v) => [v.barcode, v.sku])].some((code) => code && normCode(code).includes(codeNeedle))).slice(0, 8);
+  const product = eligible.find((p) => String(p.id) === productId);
+  const submit = async (e) => {
+    e.preventDefault(); setError('');
+    if (!product) { setError('اختار الصنف الأول.'); return; }
+    if (product.variants.length && !variantId) { setError('اختار اللون أو المقاس.'); return; }
+    if (num(quantity) < 1) { setError('اكتب الكمية اللي وصلت.'); return; }
+    setBusy(true);
+    try {
+      const payload = { productId: product.id, variantId: variantId ? Number(variantId) : null, quantity: num(quantity), note: note.trim() };
+      const fingerprint = JSON.stringify(payload);
+      if (requestAttempt.current?.fingerprint !== fingerprint) requestAttempt.current = { fingerprint, uuid: globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}` };
+      await onReceive({ ...payload, uuid: requestAttempt.current.uuid });
+      onClose();
+    }
+    catch (x) { setError(x.message || 'ماقدرناش نزود الرصيد.'); } finally { setBusy(false); }
+  };
+  return <Modal title="استلام بضاعة" onClose={onClose} footer={<Button full size="lg" loading={busy} disabled={!online} icon={PackagePlus} onClick={() => document.getElementById('pos-stock-receive')?.requestSubmit()}>تحديث رصيد الصنف</Button>}>
+    <form id="pos-stock-receive" onSubmit={submit} className="space-y-4">
+      <label className="block"><span className="mb-1 block text-sm font-semibold">دور على الصنف</span><input autoFocus value={query} onChange={(e) => { setQuery(e.target.value); setProductId(''); setVariantId(''); }} placeholder="اسم أو باركود" className="h-12 w-full rounded-xl border border-line px-3" /></label>
+      {!product && <div className="max-h-52 space-y-1 overflow-y-auto">{matches.map((p) => <button key={p.id} type="button" onClick={() => { setProductId(String(p.id)); setQuery(p.name); setVariantId(''); }} className="flex w-full items-center justify-between rounded-xl border border-line px-3 py-2.5 text-start hover:border-primary"><span className="min-w-0 truncate font-medium">{p.name}</span><span className="ms-3 shrink-0 text-xs text-muted">رصيد {productStock(p)}</span></button>)}{!matches.length && <p className="p-3 text-sm text-muted">مش لاقيين صنف بيتابع المخزون.</p>}</div>}
+      {product && <div className="rounded-xl bg-surface p-3"><div className="font-semibold">{product.name}</div><div className="text-sm text-muted">الرصيد الحالي: {productStock(product)}</div></div>}
+      {product?.variants.length > 0 && <label className="block"><span className="mb-1 block text-sm font-semibold">اللون / المقاس</span><select value={variantId} onChange={(e) => setVariantId(e.target.value)} className="h-12 w-full rounded-xl border border-line bg-elevated px-3"><option value="">اختار التركيبة</option>{product.variants.map((v) => <option key={v.id} value={v.id}>{[v.color, v.size].filter(Boolean).join(' · ')} — رصيد {v.stock}</option>)}</select></label>}
+      <label className="block"><span className="mb-1 block text-sm font-semibold">الكمية اللي وصلت</span><input inputMode="numeric" value={quantity} onChange={(e) => setQuantity(e.target.value)} placeholder="مثال: 12" className="h-14 w-full rounded-xl border border-line px-3 text-xl font-bold tabular-nums" /></label>
+      <label className="block"><span className="mb-1 block text-sm font-semibold">ملاحظة <span className="font-normal text-muted">اختياري</span></span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="مثال: استلام فاتورة المورد ١٢٤" className="h-11 w-full rounded-xl border border-line px-3" /></label>
+      {!online && <p className="text-sm text-amber-800">استلام البضاعة يحتاج إنترنت عشان رصيد المتجر يتحدّث فورًا.</p>}{error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
+    </form>
+  </Modal>;
+}
+
 function PaySheet({ total, onClose, onConfirm, busy }) {
   const [rows, setRows] = useState([{ method: 'cash', amount: String(total) }]);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const pays = rows.map((r) => ({ method: r.method, amount: num(r.amount) }));
   const s = settle(total, pays);
+  const cashPaid = pays.filter((p) => p.method === 'cash').reduce((sum, p) => sum + p.amount, 0);
   const set = (i, patch) => setRows((r) => r.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const add = (method) => setRows((r) => [...r, { method, amount: String(Math.max(0, total - pays.reduce((a, p) => a + p.amount, 0))) }]);
   const cashIdx = rows.findIndex((r) => r.method === 'cash');
@@ -100,6 +378,7 @@ function PaySheet({ total, onClose, onConfirm, busy }) {
       <div className="mt-4 rounded-2xl border border-line p-3">
         <Stat label="المدفوع" value={egp(s.paid)} />
         {s.remaining > 0 && <Stat label="لسه مطلوب" value={egp(s.remaining)} strong />}
+        {s.paid - total > cashPaid && <p role="alert" className="rounded-xl bg-sale/10 px-3 py-2 text-sm text-sale">المبلغ الزيادة أكبر من النقدي، ومينفعش نرجّع باقي على البطاقة أو المحفظة. قلّل المبلغ أو زوّد النقدي.</p>}
         {s.change > 0 && <div className="flex items-center justify-between rounded-xl bg-success/10 px-3 py-2 text-success"><span className="font-semibold">الباقي للعميل</span><span className="text-xl font-bold tabular-nums">{egp(s.change)}</span></div>}
       </div>
       <details className="mt-4 text-sm"><summary className="cursor-pointer text-muted">بيانات العميل (اختياري)</summary>
@@ -126,7 +405,7 @@ function ReceiptModal({ storeName, sale, onClose, autoPrint }) {
 
 /* ------------------------------------------------------------------ invoices, returns, day */
 
-function InvoiceModal({ target: refSale, store, onClose, onChanged }) {
+function InvoiceModal({ target: refSale, store, shiftId, onClose, onChanged }) {
   const toast = useToast();
   const [sale, setSale] = useState(null);
   const [err, setErr] = useState(null);
@@ -137,16 +416,12 @@ function InvoiceModal({ target: refSale, store, onClose, onChanged }) {
   useEffect(() => {
     api(refSale.number ? `/pos/sales/number/${refSale.number}` : `/pos/sales/${refSale.id}`).then((d) => setSale(d.sale)).catch((e) => setErr(e.status === 0 ? 'محتاج نت عشان تفتح الفواتير القديمة.' : e.status === 404 ? 'مفيش فاتورة بالرقم ده.' : e.message));
   }, [refSale]);
-  const preview = sale ? sale.items.reduce((s, it) => {
-    const q = back[it.id] || 0; if (!q) return s;
-    const net = it.price * it.qty - it.discount; const share = sale.subtotal ? Math.round((net * sale.discount) / sale.subtotal) : 0;
-    return s + Math.round((net - share) / it.qty) * q;
-  }, 0) : 0;
+  const preview = sale ? returnRefundPreview(sale.items, sale, back) : 0;
   const confirm = async () => {
     setBusy(true);
     try {
       const items = Object.entries(back).filter(([, q]) => q > 0).map(([saleItemId, qty]) => ({ saleItemId: Number(saleItemId), qty }));
-      const r = await api('/pos/returns', { method: 'POST', body: { uuid: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, saleId: sale.id, items, method, reason } });
+      const r = await api('/pos/returns', { method: 'POST', body: { uuid: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, saleId: sale.id, items, method, reason, shiftId } });
       setSale(r.sale); setBack({}); toast({ title: `تم المرتجع — ${egp(r.refund)}` }); onChanged?.();
     } catch (e) { toast({ tone: 'error', title: e.status === 0 ? 'المرتجع محتاج نت' : e.message }); } finally { setBusy(false); }
   };
@@ -287,6 +562,10 @@ export default function Pos() {
   const [autoPrint, setAutoPrint] = useState(() => { try { return localStorage.getItem('twist.pos.autoprint') !== '0'; } catch { return true; } });
   const [offlineReady, setOfflineReady] = useState(false);
   const [res, setRes] = useState(null); // the reservation being sold, if any
+  const [category, setCategory] = useState('');
+  const [openingCash, setOpeningCash] = useState('0');
+  const [openingBusy, setOpeningBusy] = useState(false);
+  const [barcodeToRegister, setBarcodeToRegister] = useState('');
   const searchRef = useRef(null);
 
   // Ask the service worker to keep this page and its build files, so the cashier opens with no internet from now on.
@@ -303,7 +582,11 @@ export default function Pos() {
   }, []);
 
   const index = useMemo(() => buildIndex(products), [products]);
-  const shown = useMemo(() => searchProducts(products, text), [products, text]);
+  const categories = useMemo(() => [...new Set(products.map((p) => p.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar')), [products]);
+  const inCategory = useMemo(() => category ? products.filter((p) => p.category === category) : products, [products, category]);
+  const shown = useMemo(() => searchProducts(inCategory, text), [inCategory, text]);
+  const popular = useMemo(() => [...products].sort((a, b) => (b.sold || 0) - (a.sold || 0)).slice(0, 5), [products]);
+  const lowStock = useMemo(() => products.filter((p) => p.track && p.lowStockAt > 0 && productStock(p) <= p.lowStockAt).sort((a, b) => productStock(a) - productStock(b)).slice(0, 5), [products]);
   const t = totals(cart, { type: disc.type, value: num(disc.value) });
   const waiting = queue.filter((e) => e.state === 'pending').length;
   const failed = queue.filter((e) => e.state === 'failed').length;
@@ -317,12 +600,16 @@ export default function Pos() {
 
   const scan = useCallback((code) => {
     const r = lookupCode(index, code);
-    if (!r) { toast({ tone: 'error', title: 'الكود ده مش موجود', description: code }); return false; }
+    if (!r) { setBarcodeToRegister(code); setText(code); toast({ tone: 'info', title: 'الباركود مش مسجل', description: 'تقدر تضيف الصنف بنفس الكود من هنا.' }); return false; }
+    setBarcodeToRegister('');
     if (r.ambiguous) { toast({ tone: 'error', title: 'الكود ده مكرر على أكتر من صنف', description: 'دوّر بالاسم واختار الصنف.' }); setText(code); return false; }
     const { product, variant } = r.hit;
     if (!variant && product.variants.length) setPicker(product); else add(product, variant);
     setText(''); return true;
   }, [index, add, toast]);
+  const cameraDetected = useCallback((code) => {
+    scan(code); setModal(null); searchRef.current?.focus();
+  }, [scan]);
 
   // barcode scanners type like a keyboard: fast characters then Enter
   useEffect(() => {
@@ -342,6 +629,7 @@ export default function Pos() {
     if (e.key !== 'Enter' || !text.trim()) return;
     e.preventDefault();
     if (lookupCode(index, text)) { scan(text.trim()); return; }
+    if (shown.length === 0 && normCode(text).length >= 4) { setBarcodeToRegister(text.trim()); return; }
     if (shown.length === 1) { const p = shown[0]; if (p.variants.length) setPicker(p); else add(p, null); setText(''); }
   };
 
@@ -367,11 +655,26 @@ export default function Pos() {
   if (pos.phase === 'empty' || pos.phase === 'offline-empty') return (
     <div className="grid min-h-dvh place-items-center p-6 text-center"><div className="max-w-sm"><WifiOff className="mx-auto h-10 w-10 text-muted" /><h1 className="mt-3 text-xl font-bold">لازم تفتح الكاشير مرة واحدة والنت شغال</h1><p className="mt-2 text-muted">أول مرة بس بنحمّل فيها المنتجات على الجهاز. بعدها يشتغل من غير نت.</p><Button className="mt-5" onClick={() => window.location.reload()}>حاول تاني</Button></div></div>);
 
+  if (pos.phase === 'ready' && !pos.shift) return (
+    <div className="grid min-h-dvh place-items-center bg-canvas p-4 text-fg" dir="rtl"><div className="w-full max-w-lg rounded-3xl border border-line bg-elevated p-6 shadow-lift sm:p-8">
+      <div className="mb-5 flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-primary/10 text-primary"><Receipt className="h-6 w-6" /></span><div><p className="text-sm text-muted">{store?.name}</p><h1 className="text-2xl font-bold">ابدأ وردية جديدة</h1></div></div>
+      <p className="mb-5 text-sm leading-6 text-muted">عدّ الفكة الموجودة في الدرج قبل أول بيعة. في نهاية الوردية هنقارن المبلغ الفعلي بالمبيعات والحركات المسجلة.</p>
+      <label className="block"><span className="mb-1 block text-sm font-semibold">رصيد بداية الدرج · جنيه</span><input inputMode="numeric" value={openingCash} onChange={(e) => setOpeningCash(e.target.value)} className="h-14 w-full rounded-xl border border-line px-4 text-xl font-bold tabular-nums focus:outline-none focus:shadow-ring" /></label>
+      {!online && <p className="mt-3 rounded-xl bg-amber-100 p-3 text-sm text-amber-900">مفيش وردية مفتوحة محفوظة على الجهاز. اتصل بالإنترنت لفتح وردية جديدة.</p>}
+      <Button full size="lg" className="mt-4" disabled={!online || openingBusy} loading={openingBusy} onClick={async () => { setOpeningBusy(true); try { await pos.openShift(num(openingCash)); toast({ title: 'الوردية بدأت' }); } catch (e) { toast({ tone: 'error', title: e.message }); } finally { setOpeningBusy(false); } }}>فتح الوردية</Button>
+      {pos.closedShift && <div className="mt-5 rounded-2xl border border-line p-4"><p className="font-semibold">آخر وردية مقفولة</p><div className="mt-2 grid grid-cols-2 gap-2 text-sm"><Stat label="المتوقع" value={egp(pos.closedShift.expectedCash)} /><Stat label="المعدود" value={egp(pos.closedShift.countedCash)} /><Stat label="الفرق" value={egp(pos.closedShift.difference)} /></div></div>}
+      <Link to="/dashboard" className="mt-5 block text-center text-sm font-medium text-muted hover:text-fg">رجوع للوحة التحكم</Link>
+    </div></div>);
+
   return (
     <div className="flex h-dvh flex-col bg-canvas text-fg" dir="rtl">
       <header className="flex items-center gap-2 border-b border-line bg-elevated px-3 py-2.5 sm:px-4">
         <Link to="/dashboard" aria-label="لوحة التحكم" className="grid h-10 w-10 place-items-center rounded-full hover:bg-fg/[0.07]"><ArrowRight className="h-5 w-5" /></Link>
         <h1 className="min-w-0 flex-1 truncate text-base font-bold sm:text-lg">كاشير · {store?.name}</h1>
+        <button type="button" onClick={() => setModal('quick-product')} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-semibold text-white hover:opacity-90"><PackagePlus className="h-4 w-4" /><span className="hidden sm:inline">صنف جديد</span></button>
+        <button type="button" onClick={() => setModal('camera-scan')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]" aria-label="مسح باركود بالكاميرا"><Camera className="h-4 w-4" /><span className="hidden sm:inline">مسح بالكاميرا</span></button>
+        <button type="button" onClick={() => setModal('receive-stock')} disabled={!online} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05] disabled:opacity-50"><Plus className="h-4 w-4" /><span className="hidden sm:inline">استلام بضاعة</span></button>
+        <button type="button" onClick={() => setModal('shift')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]"><CalendarCheck className="h-4 w-4" /><span className="hidden sm:inline">الوردية</span></button>
         <span className={cx('hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold sm:inline-flex', online ? 'bg-success/10 text-success' : 'bg-amber-100 text-amber-900')}>{online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}{online ? 'متصل' : 'أوفلاين'}</span>
         {offlineReady && <span className="hidden text-xs text-muted lg:inline">جاهز للأوفلاين</span>}
         {(waiting > 0 || failed > 0) && <button type="button" onClick={() => setModal('queue')} className={cx('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold', failed ? 'bg-sale/10 text-sale' : 'bg-amber-100 text-amber-900')}><CloudUpload className="h-3.5 w-3.5" />{failed ? `${failed} مرفوضة` : `${waiting} مستنية`}</button>}
@@ -388,17 +691,21 @@ export default function Pos() {
         <section className="flex min-h-0 flex-col">
           <div className="border-b border-line p-3">
             <div className="relative"><Search className="pointer-events-none absolute start-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
-              <input ref={searchRef} autoFocus value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onSearchKey} placeholder="ابحث بالاسم أو امسح الباركود (F2)" aria-label="بحث عن منتج" className="h-12 w-full rounded-2xl border border-line bg-elevated ps-11 pe-4 text-base focus:outline-none focus:shadow-ring" />
+              <input ref={searchRef} autoFocus value={text} onChange={(e) => { setText(e.target.value); setBarcodeToRegister(''); }} onKeyDown={onSearchKey} placeholder="اكتب اسم المنتج أو امسح الباركود" aria-label="بحث عن منتج أو مسح باركود" className="h-12 w-full rounded-2xl border border-line bg-elevated ps-11 pe-4 text-base focus:outline-none focus:shadow-ring" />
               <ScanBarcode className="pointer-events-none absolute end-3 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" /></div>
+            {!text && popular.length > 0 && <div className="mt-3 flex items-center gap-2 overflow-x-auto pb-1"><span className="shrink-0 text-xs font-semibold text-muted">الأكثر مبيعًا</span>{popular.map((p) => <button key={p.id} type="button" onClick={() => p.variants.length ? setPicker(p) : add(p, null)} className="shrink-0 rounded-xl border border-line bg-elevated px-3 py-2 text-start hover:border-primary"><span className="block max-w-36 truncate text-xs font-semibold">{p.name}</span><span className="mt-0.5 block text-[11px] tabular-nums text-muted">{egp(p.price)}</span></button>)}</div>}
+            {!text && lowStock.length > 0 && <div className="mt-2 flex items-center gap-2 overflow-x-auto pb-1"><span className="shrink-0 text-xs font-semibold text-amber-800">قرب يخلص</span>{lowStock.map((p) => <button key={p.id} type="button" onClick={() => setModal({ receiveStockProduct: p })} disabled={!online} className="shrink-0 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-start disabled:opacity-50"><span className="block max-w-36 truncate text-xs font-semibold">{p.name}</span><span className="mt-0.5 block text-[11px] text-amber-800">متبقي {productStock(p)} · استلام</span></button>)}</div>}
+            {categories.length > 0 && <div className="mt-2 flex gap-2 overflow-x-auto pb-1"><button type="button" onClick={() => setCategory('')} className={cx('shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold', !category ? 'bg-btn text-on-btn' : 'bg-surface text-muted hover:text-fg')}>كل الأصناف</button>{categories.map((c) => <button key={c} type="button" onClick={() => setCategory(c)} className={cx('shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold', category === c ? 'bg-btn text-on-btn' : 'bg-surface text-muted hover:text-fg')}>{c}</button>)}</div>}
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-3 pb-24 md:pb-3">
-            {shown.length === 0 ? <p className="py-16 text-center text-muted">مفيش منتج بالاسم ده.</p> : (
+            {shown.length === 0 ? <div className="mx-auto grid max-w-md justify-items-center gap-3 py-12 text-center"><p className="text-sm text-muted">{barcodeToRegister ? 'الباركود ده مش مربوط بصنف لسه.' : (text ? 'مش لاقيين الصنف بالاسم ده.' : 'مفيش أصناف في القسم ده.')}</p><Button icon={PackagePlus} onClick={() => setModal(barcodeToRegister ? { newProductBarcode: barcodeToRegister } : 'quick-product')} disabled={!online}>{barcodeToRegister ? 'أضف الصنف بالباركود ده' : 'أضف الصنف من هنا'}</Button>{!online && <p className="text-xs text-muted">إضافة صنف جديد تحتاج إنترنت. البيع من الكتالوج المحمّل يفضل متاح.</p>}</div> : (
               <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 xl:grid-cols-4">
                 {shown.map((p) => { const st = productStock(p); const out = p.track && st <= 0; return (
-                  <li key={p.id}><button type="button" data-testid="product" onClick={() => (p.variants.length ? setPicker(p) : add(p, null))} className="flex h-full w-full flex-col rounded-2xl border border-line bg-elevated p-3 text-start transition hover:border-primary active:scale-[.98]">
-                    <span className="line-clamp-2 min-h-[2.5rem] font-medium leading-snug">{p.name}</span>
+                  <li key={p.id}><button type="button" data-testid="product" onClick={() => (p.variants.length ? setPicker(p) : add(p, null))} className="group flex h-full w-full flex-col overflow-hidden rounded-2xl border border-line bg-elevated text-start transition hover:border-primary active:scale-[.98]">
+                    <SmartImage media={p.image} alt={p.name} ratio="4 / 3" sizes="(max-width: 640px) 50vw, 25vw" className="w-full bg-surface" />
+                    <span className="flex w-full flex-1 flex-col p-3"><span className="line-clamp-2 min-h-[2.5rem] font-medium leading-snug">{p.name}</span>
                     <span className="mt-2 text-lg font-bold tabular-nums">{egp(p.price)}</span>
-                    <span className={cx('mt-1 text-xs', out ? 'text-sale' : 'text-muted')}>{p.track ? (out ? 'نفد' : `متاح ${st}`) : 'بدون رصيد'}{p.variants.length ? ` · ${p.variants.length} موديل` : ''}{p.held ? ` · محجوز ${p.held}` : ''}</span></button></li>); })}
+                    <span className={cx('mt-1 text-xs', out ? 'text-sale' : 'text-muted')}>{p.track ? (out ? 'نفد' : `متاح ${st}`) : 'بدون رصيد'}{p.variants.length ? ` · ${p.variants.length} لون/مقاس` : ''}{p.held ? ` · محجوز ${p.held}` : ''}</span></span></button></li>); })}
               </ul>)}
           </div>
         </section>
@@ -435,13 +742,24 @@ export default function Pos() {
       {!cartOpen && cart.length > 0 && <button type="button" onClick={() => setCartOpen(true)} className="fixed inset-x-3 bottom-3 z-30 flex h-14 items-center justify-between rounded-2xl bg-btn px-5 font-semibold text-on-btn shadow-lift md:hidden"><span className="inline-flex items-center gap-2"><ShoppingCart className="h-5 w-5" />السلة ({t.pieces})</span><span className="tabular-nums">{egp(t.total)}</span></button>}
 
       {picker && <VariantPicker product={picker} onClose={() => setPicker(null)} onPick={(v) => { add(picker, v); setPicker(null); searchRef.current?.focus(); }} />}
+      {modal === 'camera-scan' && <CameraScannerModal onClose={() => setModal(null)} onDetected={cameraDetected} />}
+      {(modal === 'quick-product' || modal?.newProductBarcode) && <QuickProductModal initialName={modal?.newProductBarcode ? '' : text} initialBarcode={modal?.newProductBarcode || ''} online={online} onClose={() => setModal(null)} onSaved={async (p) => {
+        try { await pos.refresh(); } catch { /* The product is already saved; still add it to this register's local catalog. */ }
+        setText(''); setCategory(''); setModal(null);
+        if (p.variants.length) setPicker(p); else add(p, null);
+      }} />}
+      {(modal === 'receive-stock' || modal?.receiveStockProduct) && <ReceiveStockModal products={products} initialProduct={modal?.receiveStockProduct} online={online} onClose={() => setModal(null)} onReceive={pos.receiveStock} />}
       {modal === 'pay' && <PaySheet total={t.total} busy={paying} onClose={() => setModal(null)} onConfirm={pay} />}
       {modal === 'receipt' && receipt && <ReceiptModal storeName={store.name} sale={receipt} autoPrint={autoPrint} onClose={() => { setModal(null); searchRef.current?.focus(); }} />}
       {modal === 'reservations' && <ReservationsModal list={pos.reservations} onClose={() => setModal(null)} onPick={loadReservation} />}
       {modal === 'queue' && <QueueModal queue={queue} online={online} sync={pos.sync} retry={pos.retry} discard={pos.discard} onClose={() => setModal(null)} />}
       {modal === 'day' && <DayModal pending={waiting} onClose={() => setModal(null)} onOpen={(ref) => setModal({ invoice: ref })} />}
       {modal === 'invoice-find' && <FindInvoice onClose={() => setModal(null)} onOpen={(ref) => setModal({ invoice: ref })} />}
-      {modal?.invoice && <InvoiceModal target={modal.invoice} store={store} onClose={() => setModal(null)} onChanged={pos.refresh} />}
+      {modal?.invoice && <InvoiceModal target={modal.invoice} store={store} shiftId={pos.shift?.id} onClose={() => setModal(null)} onChanged={pos.refresh} />}
+      {modal === 'shift' && pos.shift && <ShiftModal shift={pos.shift} online={online} canClose={!cart.length && queue.length === 0} onClose={() => setModal(null)} onMove={pos.moveCash} onCloseShift={async (data) => {
+        const closed = await pos.closeShift(data); setModal(null);
+        toast({ title: 'الوردية اتقفلت', description: closed.difference ? `فرق الدرج ${egp(closed.difference)}` : 'الدرج مطابق للمبيعات.' });
+      }} />}
     </div>
   );
 }

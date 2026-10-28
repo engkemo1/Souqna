@@ -64,7 +64,7 @@ let queue = Promise.resolve();
 const serial = (fn) => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
 
 /** Alpha mask (one byte per pixel, same size as the photo), plus `risky` when the outline may have dropped part of the product. */
-async function foregroundMask(buffer, width, height) {
+async function foregroundMask(buffer, width, height, { check = true } = {}) {
   let risky = false;
   const s = await getSession();
   const { data } = await sharp(buffer).removeAlpha().resize(SIZE, SIZE, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
@@ -181,8 +181,73 @@ async function foregroundMask(buffer, width, height) {
     if (i < n - SIZE) push(i + SIZE);
   }
   for (let i = 0; i < n; i++) if (!outside[i] && m[i] > 0) m[i] = 255; // only a gap the model is fully sure is background stays open
+  if (!risky && check) risky = await outlineSuspicious(m, data);
   const alpha = await sharp(m, { raw: { width: SIZE, height: SIZE, channels: 1 } }).resize(width, height, { fit: 'fill' }).extractChannel(0).raw().toBuffer();
   return { alpha, risky };
+}
+
+/**
+ * A last, general check of the finished outline, whatever went wrong (a rack pole, a shelf, a shadow, a hand, a lost
+ * sleeve). It does not guess the cause; it looks for the two traces every wrong cut leaves:
+ *  1. The outline cuts THROUGH something: on a real product edge the colour changes from product to background; where the
+ *     cut slices a pole, a shelf, a wall, a shadow or the fabric itself, both sides of the line look the same.
+ *  2. A thin strip of "product" running into the photo's border: a rack pole, a rail, a cable. A product cut off by the
+ *     frame (a model shot at the thighs, a trouser leg) meets the border along a wide stretch, not a thin one.
+ * Any doubt → true, and the caller keeps the real background.
+ */
+async function outlineSuspicious(m, data) {
+  const n = SIZE * SIZE;
+  const raw1 = { raw: { width: SIZE, height: SIZE, channels: 1 } }, raw3 = { raw: { width: SIZE, height: SIZE, channels: 3 } };
+  const fg = Buffer.alloc(n), fgRgb = Buffer.alloc(n * 3), bgRgb = Buffer.alloc(n * 3);
+  for (let i = 0; i < n; i++) {
+    const t = m[i] >= 128 ? fgRgb : bgRgb; if (m[i] >= 128) fg[i] = 255;
+    t[i * 3] = data[i * 3]; t[i * 3 + 1] = data[i * 3 + 1]; t[i * 3 + 2] = data[i * 3 + 2];
+  }
+  const [wF, cF, cB] = await Promise.all([
+    sharp(fg, raw1).blur(3).extractChannel(0).raw().toBuffer(),
+    sharp(fgRgb, raw3).blur(3).raw().toBuffer(),
+    sharp(bgRgb, raw3).blur(3).raw().toBuffer(),
+  ]);
+  const B = 4; // the photo's own border is not an outline
+  const low = new Uint8Array(n);
+  let line = 0, flat = 0;
+  for (let y = B; y < SIZE - B; y++) for (let x = B; x < SIZE - B; x++) {
+    const i = y * SIZE + x;
+    if (!fg[i] || (fg[i - 1] && fg[i + 1] && fg[i - SIZE] && fg[i + SIZE])) continue; // outline pixels only
+    const a = wF[i] / 255; if (a < 0.15 || a > 0.85) continue;
+    line++;
+    let d = 0;
+    for (let c = 0; c < 3; c++) { const f = cF[i * 3 + c] / a, g = cB[i * 3 + c] / (1 - a); d += (f - g) * (f - g); }
+    if (Math.sqrt(d) < 16) { low[i] = 1; flat++; }
+  }
+  // the longest connected run of "same colour on both sides" (small gaps bridged)
+  let longest = 0;
+  const seen = new Uint8Array(n), st = new Int32Array(n);
+  for (let s0 = 0; s0 < n; s0++) {
+    if (!low[s0] || seen[s0]) continue;
+    let top = 0, count = 0; st[top++] = s0; seen[s0] = 1;
+    while (top) {
+      const i = st[--top], x = i % SIZE, y = (i / SIZE) | 0; count++;
+      for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) {
+        const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= SIZE || yy >= SIZE) continue;
+        const j = yy * SIZE + xx; if (low[j] && !seen[j]) { seen[j] = 1; st[top++] = j; }
+      }
+    }
+    if (count > longest) longest = count;
+  }
+  // thin strips reaching the border
+  let thin = 0;
+  for (const at of [(k) => k, (k) => (SIZE - 1) * SIZE + k, (k) => k * SIZE, (k) => k * SIZE + SIZE - 1]) {
+    let run = 0;
+    for (let k = 0; k <= SIZE; k++) {
+      if (k < SIZE && m[at(k)] >= 128) { run++; continue; }
+      if (run > 0 && run < SIZE * 0.08) thin = Math.max(thin, run);
+      run = 0;
+    }
+  }
+  const bad = longest > 60 || thin > 0;
+  if (process.env.CUTOUT_DEBUG_DIR || bad) console.log(`[cutout] outline check: same-colour run ${longest}px of ${line} (${flat} flat), thin border strip ${thin}px${bad ? ' → keeping the real background' : ''}`);
+  return bad;
 }
 
 /**
@@ -231,7 +296,7 @@ export async function productBox(buffer) {
   try {
     return await serial(async () => {
       const { width, height } = await sharp(buffer).metadata();
-      const { alpha } = await foregroundMask(buffer, width, height);
+      const { alpha } = await foregroundMask(buffer, width, height, { check: false }); // only where the product is, for framing
       let x0 = width, y0 = height, x1 = -1, y1 = -1, on = 0;
       for (let y = 0, i = 0; y < height; y++) for (let x = 0; x < width; x++, i++) {
         if (alpha[i] < 60) continue; // low threshold: thin straps and soft edges still count as product

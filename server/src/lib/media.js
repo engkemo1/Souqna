@@ -25,7 +25,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
-import { cutoutOnto, cutoutLayer, productBox } from './cutout.js';
+import { cutoutLayer, productBox } from './cutout.js';
+import { reviewCutout, reviewUnavailableCount } from './cutout-review.js';
 import { IMAGE_SIZES } from '@souqna/shared';
 import { config } from '../config.js';
 import { q, insert, tx } from '../db/index.js';
@@ -277,7 +278,16 @@ async function frameOnProduct(base) {
   return null;
 }
 
-async function productCanvas(data, style = 'original', analysis = null) {
+/** The product on a plain colour, only when both the local checks and the review are sure the cut is right; else null. */
+async function trustedCut(data, rgb) {
+  const layer = await cutoutLayer(data);
+  if (!layer) return null;
+  const cut = await layer.onto(rgb);
+  return (await reviewCutout(data, cut)) ? cut : null;
+}
+
+// `report.cut` tells the caller what happened to a busy backdrop: true = replaced, false = kept (cut not trusted or not allowed)
+async function productCanvas(data, style = 'original', analysis = null, { noCut = false, report = null } = {}) {
   const meta = await sharp(data).metadata();
   const { width: sw, height: sh } = meta;
   let an = analysis || await analyzePhoto(data);
@@ -285,7 +295,8 @@ async function productCanvas(data, style = 'original', analysis = null) {
   // Busy backdrop but the owner wants white/cream: cut the product out (pixels untouched) onto the plain colour,
   // then treat it like a studio shot. If the model is unavailable or unsure, the photo keeps the old treatment.
   if (style !== 'original' && STYLE_BG[style] && !an.studio) {
-    const cut = await cutoutOnto(data, STYLE_BG[style]);
+    const cut = noCut ? null : await trustedCut(data, STYLE_BG[style]);
+    if (report) report.cut = Boolean(cut);
     if (cut) { data = cut; an = { ...an, studio: true, cut: true, bg: [...STYLE_BG[style]] }; }
   }
 
@@ -391,9 +402,11 @@ export async function previewStyles(buffer) {
   }
   const cut = await cutoutLayer(small);
   if (!cut) return out;
+  const onWhite = await cut.onto(STYLE_BG.white);
+  if (!(await reviewCutout(small, onWhite))) return out; // shown as "this photo keeps its real background"
   for (const style of ['white', 'cream']) {
     const bg = STYLE_BG[style];
-    out[style] = await thumb(await productCanvas(await cut.onto(bg), style, { ...an, studio: true, cut: true, bg: [...bg] }));
+    out[style] = await thumb(await productCanvas(style === 'white' ? onWhite : await cut.onto(bg), style, { ...an, studio: true, cut: true, bg: [...bg] }));
   }
   return out;
 }
@@ -428,7 +441,7 @@ export async function reprocessProductMedia(m) {
   ]);
 }
 
-export async function processImage(buffer, { storeId, kind = 'product', alt = null, fast = false, style: styleOverride = null }) {
+export async function processImage(buffer, { storeId, kind = 'product', alt = null, fast = false, style: styleOverride = null, noCut = false }) {
   let meta;
   try {
     meta = await sharp(buffer, { failOn: 'error' }).metadata();
@@ -447,6 +460,7 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
   // Normalise: honour EXIF orientation, sRGB, strip metadata, cap size.
   const base = sharp(buffer).rotate().toColourspace('srgb');
   let normalised, quality = null, sourceJpeg = null;
+  const report = {};
   if (kind === 'product') {
     // Uniform look, done automatically (the owner does nothing): see productCanvas().
     // Transparent PNG cut-outs land on white; weak photos are accepted and only score low (never refused).
@@ -463,7 +477,7 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
       quality = await scoreQuality(cleaned, meta.width || 0, meta.height || 0, an);
       normalised = style === 'asis'
         ? await sharp(cleaned).jpeg(ORIGINAL_JPEG).toBuffer({ resolveWithObject: true }) // exactly as shot: only rotated + size-capped
-        : await productCanvas(await refinePhoto(lit), style, an);
+        : await productCanvas(await refinePhoto(lit), style, an, { noCut, report });
       // keep the untouched (rotated, size-capped) photo so we can always go back to it
       sourceJpeg = await sharp(cleaned).resize({ width: 2800, height: 2800, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 88, mozjpeg: true, chromaSubsampling: '4:4:4' }).toBuffer();
     }
@@ -515,6 +529,7 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
     alt,
     quality,
     canvas_v: kind === 'product' ? CANVAS_VERSION : null,
+    bg_cut: report.cut === undefined ? null : report.cut ? 1 : 0,
   });
   return getMedia(id);
 }
@@ -536,8 +551,41 @@ async function plainLook(m) {
   return null;
 }
 
-/** Bumped whenever the product-photo treatment gets a fix worth re-applying to older photos. 3 = outline repair (no lost hems/cuffs). */
-export const CANVAS_VERSION = 3;
+/**
+ * Bumped whenever the product-photo treatment gets a fix worth re-applying to older photos.
+ * 3 = outline repair (no lost hems/cuffs). 4 = every cut is checked (outline check + AI review) before it is used.
+ */
+export const CANVAS_VERSION = 4;
+
+/**
+ * All photos of one product should look alike: if one of them had to keep its real background (the cut was not
+ * trusted), the others are put back on their real background too, instead of a mix of white and shop shelves.
+ * Runs after a product is saved; never throws.
+ */
+export async function matchProductPhotos(productId) {
+  try {
+    const rows = q.all('SELECT m.* FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=? ORDER BY pm.is_primary DESC, pm.position', [productId]);
+    if (!rows.some((m) => m.bg_cut === 0) || !rows.some((m) => m.bg_cut === 1)) return 0;
+    let n = 0;
+    for (const m of rows.filter((x) => x.bg_cut === 1)) {
+      let src; try { src = await readMediaFile(m, 'source.jpg'); } catch { continue; }
+      const look = await plainLook(m);
+      const fresh = await processImage(src, { storeId: m.store_id, kind: 'product', style: look || storePhotoStyle(m.store_id), noCut: true });
+      tx(() => {
+        q.run('UPDATE media SET key=?, width=?, height=?, sizes=?, original_ext=?, bytes=?, color=?, lqip=?, remote=?, quality=?, canvas_v=?, bg_cut=0 WHERE id=?',
+          [fresh.key, fresh.width, fresh.height, fresh.sizes, fresh.original_ext, fresh.bytes, fresh.color, fresh.lqip, fresh.remote, fresh.quality ?? null, CANVAS_VERSION, m.id]);
+        q.run('DELETE FROM media WHERE id=?', [fresh.id]);
+      });
+      await purgeMediaFiles(m);
+      n++;
+    }
+    if (n) console.log(`[media] product ${productId}: ${n} photo(s) put back on their real background to match the others`);
+    return n;
+  } catch (e) {
+    console.error(`[media] matching photos of product ${productId} failed: ${e.message}`);
+    return 0;
+  }
+}
 
 /**
  * Re-make an older product photo that needs one of the later fixes:
@@ -562,10 +610,14 @@ export async function refreshProductPhoto(m, { dry = false } = {}) {
   const framed = !near && !look && (m.canvas_v ?? 0) < 2; // old bars around a non-4:5 photo
   if (!look && !framed) return 'fine';
   if (dry) return 'would';
+  const missed = reviewUnavailableCount();
   const fresh = await processImage(src, { storeId: m.store_id, kind: 'product', style: look || storePhotoStyle(m.store_id) });
+  // The AI review could not be asked (daily limit reached, no network): the new photo was not really checked, so keep
+  // the old one as it is and try again on the next run instead of downgrading it.
+  if (reviewUnavailableCount() !== missed) { await deleteMedia(fresh); return 'later'; }
   tx(() => {
-    q.run('UPDATE media SET key=?, width=?, height=?, sizes=?, original_ext=?, bytes=?, color=?, lqip=?, remote=?, quality=?, canvas_v=? WHERE id=?',
-      [fresh.key, fresh.width, fresh.height, fresh.sizes, fresh.original_ext, fresh.bytes, fresh.color, fresh.lqip, fresh.remote, fresh.quality ?? null, CANVAS_VERSION, m.id]);
+    q.run('UPDATE media SET key=?, width=?, height=?, sizes=?, original_ext=?, bytes=?, color=?, lqip=?, remote=?, quality=?, canvas_v=?, bg_cut=? WHERE id=?',
+      [fresh.key, fresh.width, fresh.height, fresh.sizes, fresh.original_ext, fresh.bytes, fresh.color, fresh.lqip, fresh.remote, fresh.quality ?? null, CANVAS_VERSION, fresh.bg_cut ?? null, m.id]);
     q.run('DELETE FROM media WHERE id=?', [fresh.id]);
   });
   await purgeMediaFiles(m); // the old key's files

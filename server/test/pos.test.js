@@ -8,7 +8,7 @@ import http from 'node:http';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'souqna-pos-'));
 process.env.DB_FILE = path.join(tmp, 'test.db');
 
-const { q } = await import('../src/db/index.js');
+const { q, db } = await import('../src/db/index.js');
 const express = (await import('express')).default;
 const { errorHandler } = await import('../src/lib/errors.js');
 const { signToken } = await import('../src/lib/auth.js');
@@ -35,7 +35,11 @@ before(async () => {
   server = http.createServer(app); await new Promise((r) => server.listen(0, r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
-after(() => { server.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
+after(async () => {
+  await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+  db.close();
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
 
 const call = async (p, { tok = tokA, body, method } = {}) => {
   const res = await fetch(base + p, { method: method || (body ? 'POST' : 'GET'), headers: { 'content-type': 'application/json', authorization: `Bearer ${tok}` }, body: body ? JSON.stringify(body) : undefined });
@@ -68,6 +72,22 @@ test('a sale deducts stock, numbers the invoice, and a retry with the same uuid 
   assert.equal(q.val('SELECT COUNT(*) FROM pos_sales WHERE store_id=?', [storeA]), 1);
 });
 
+test('stock receipt adds inventory once and rejects reusing its id with changed data', async () => {
+  const before = stockOf(bag, 'products');
+  const body = { uuid: 'receive-stock-001', productId: bag, quantity: 3, note: 'توريد صباحي' };
+  const first = await call('/api/pos/stock/receive', { body });
+  assert.equal(first.status, 201);
+  assert.equal(stockOf(bag, 'products'), before + 3);
+  const retry = await call('/api/pos/stock/receive', { body });
+  assert.equal(retry.status, 201);
+  assert.equal(retry.json.movement.duplicate, true);
+  assert.equal(stockOf(bag, 'products'), before + 3);
+  const conflict = await call('/api/pos/stock/receive', { body: { ...body, quantity: 4 } });
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.json.error.code, 'stock_receipt_key_reused');
+  assert.equal(stockOf(bag, 'products'), before + 3);
+});
+
 test('payments record only what stayed in the drawer (change is taken out of cash)', async () => {
   const sum = q.val('SELECT SUM(amount) FROM pos_payments');
   assert.equal(sum, 270);
@@ -93,6 +113,22 @@ test('a failed sale leaves no half-saved invoice or stock change', async () => {
   assert.equal(stockOf(bag, 'products'), before);
 });
 
+test('a sale cannot repeat the same product variant in multiple lines', async () => {
+  const before = stockOf(bag, 'products');
+  const r = await call('/api/pos/sales', { body: sale({ items: [{ productId: bag, qty: 1, price: 50 }, { productId: bag, qty: 1, price: 50 }] }) });
+  assert.equal(r.status, 422);
+  assert.equal(r.json.error.code, 'duplicate_sale_line');
+  assert.equal(stockOf(bag, 'products'), before);
+});
+
+test('a fully discounted invoice can be saved without a payment method', async () => {
+  const r = await call('/api/pos/sales', { body: sale({ discount: 50, payments: [] }) });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.total, 0);
+  assert.equal(r.json.paid, 0);
+  assert.deepEqual(r.json.payments, []);
+});
+
 test('returns: restock, share of discount refunded, cannot exceed what was sold', async () => {
   const s = (await call('/api/pos/sales', { body: sale({ items: [{ productId: bag, qty: 2, price: 50 }], discount: 10, payments: [{ method: 'cash', amount: 90 }] }) })).json;
   const before = stockOf(bag, 'products');
@@ -105,6 +141,27 @@ test('returns: restock, share of discount refunded, cannot exceed what was sold'
   assert.equal(dup.json.duplicate, true); assert.equal(stockOf(bag, 'products'), before + 1);
   const tooMany = await call('/api/pos/returns', { body: { uuid: 'return-uuid-2', saleId: s.id, items: [{ saleItemId: item, qty: 2 }] } });
   assert.equal(tooMany.json.error.code, 'too_many');
+  const duplicateLine = await call('/api/pos/returns', { body: { uuid: 'return-uuid-3', saleId: s.id, items: [{ saleItemId: item, qty: 1 }, { saleItemId: item, qty: 1 }] } });
+  assert.equal(duplicateLine.status, 422);
+  assert.equal(duplicateLine.json.error.code, 'duplicate_return_item');
+  assert.equal(stockOf(bag, 'products'), before + 1);
+});
+
+test('partial returns distribute pound rounding without refunding more than the sale line', async () => {
+  const s = (await call('/api/pos/sales', { body: sale({ items: [{ productId: bag, qty: 3, price: 10, discount: 1 }], payments: [{ method: 'cash', amount: 29 }] }) })).json;
+  const item = s.items[0].id;
+  const first = await call('/api/pos/returns', { body: { uuid: 'round-return-1', saleId: s.id, items: [{ saleItemId: item, qty: 2 }] } });
+  const second = await call('/api/pos/returns', { body: { uuid: 'round-return-2', saleId: s.id, items: [{ saleItemId: item, qty: 1 }] } });
+  assert.equal(first.json.refund, 19);
+  assert.equal(second.json.refund, 10);
+  assert.equal(first.json.refund + second.json.refund, 29);
+});
+
+test('invoice discounts are allocated across lines without losing or inventing pounds', async () => {
+  const s = (await call('/api/pos/sales', { body: sale({ items: [{ productId: bag, qty: 1, price: 1 }, { productId: shirt, variantId: l, qty: 1, price: 1 }], discount: 1, payments: [{ method: 'cash', amount: 1 }] }) })).json;
+  const first = await call('/api/pos/returns', { body: { uuid: 'split-return-1', saleId: s.id, items: [{ saleItemId: s.items[0].id, qty: 1 }] } });
+  const second = await call('/api/pos/returns', { body: { uuid: 'split-return-2', saleId: s.id, items: [{ saleItemId: s.items[1].id, qty: 1 }] } });
+  assert.equal(first.json.refund + second.json.refund, 1);
 });
 
 test("a store cannot see or return another store's invoice", async () => {
@@ -126,8 +183,9 @@ test('an invoice can be found by its number, only inside its own store', async (
 test('day summary adds payments by method and subtracts refunds', async () => {
   const d = (await call('/api/pos/summary')).json;
   assert.ok(d.invoices >= 3);
-  assert.equal(d.refunds, 45);
-  assert.equal(d.byMethod.cash, q.val("SELECT SUM(amount) FROM pos_payments WHERE method='cash'") - 45);
+  const refunds = q.val('SELECT SUM(refund) FROM pos_returns WHERE store_id=?', [storeA]) || 0;
+  assert.equal(d.refunds, refunds);
+  assert.equal(d.byMethod.cash, q.val("SELECT SUM(amount) FROM pos_payments WHERE method='cash'") - refunds);
 });
 
 test('expired subscription blocks selling but still accepts offline sales made before the cut-off', async () => {

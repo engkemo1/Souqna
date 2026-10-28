@@ -1,13 +1,13 @@
 /**
  * Catalogue of cashier / POS systems a store can be linked to.
  * `connector` says how far the integration is implemented:
- *   'planned' – listed so the admin can record the store's system; no connector code yet
- *   'ready'   – works end to end and was tested (file import, store API key)
+ *   'planned' – listed so the admin can record the store's system; no direct connector code yet
+ *   'ready'   – the cashier path is implemented (native POS, file import, or store API key)
  * Nothing here syncs data by itself: when a connector is built, flip its `connector`
  * value and add its adapter. IDs are stored in store_cashier_links.cashier_id, never rename them.
  */
 export const CASHIER_SYSTEMS = [
-  { id: 'twist', name: 'كاشير Twist (إضافي)', kind: 'native', connector: 'planned', note: 'الكاشير المدمج في Souqna للمحلات اللي معندهاش كاشير' },
+  { id: 'twist', name: 'كاشير Twist (إضافي)', kind: 'native', connector: 'ready', note: 'كاشير Souqna المدمج: بيع ومخزون وورديات' },
   { id: 'file_import', name: 'استيراد ملف Excel / CSV', kind: 'file', connector: 'ready', note: 'يصلح لأي برنامج بيصدّر منتجات ومخزون' },
   { id: 'api_key', name: 'مفتاح ربط API', kind: 'api_key', connector: 'ready', note: 'الكاشير أو مبرمجه يبعت المخزون والمبيعات لمفتاح خاص بالمحل' },
   { id: 'odoo', name: 'Odoo', kind: 'api', connector: 'planned', note: 'له API رسمي موثّق' },

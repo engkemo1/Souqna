@@ -15,6 +15,7 @@ const products = [
 test('codes: arabic digits, trailing .0, case; duplicates are ambiguous, never guessed', () => {
   const idx = E.buildIndex(products);
   assert.equal(E.lookupCode(idx, '٦٢٩١٠٠٠٠٠٠٠٠١').hit.variant.id, 11);
+  assert.equal(E.lookupCode(idx, '۶۲۹۱۰۰۰۰۰۰۰۰۱').hit.variant.id, 11);
   assert.equal(E.lookupCode(idx, '6291000000099.0').hit.product.id, 2);
   assert.equal(E.lookupCode(idx, 'sh-r-l').hit.variant.id, 12);
   assert.equal(E.lookupCode(idx, 'bag-1').ambiguous, true);
@@ -25,6 +26,16 @@ test('search finds by arabic name without hamza/ta-marbuta differences, by size 
   assert.deepEqual(E.searchProducts(products, 'شنطه').map((p) => p.id), [2]);
   assert.deepEqual(E.searchProducts(products, 'قميص M').map((p) => p.id), [1]);
   assert.deepEqual(E.searchProducts(products, '6291000000002').map((p) => p.id), [1]);
+});
+
+test('photo suggestions preserve manual fields and track department-only corrections', () => {
+  const { applyPhotoSuggestion } = E;
+  const first = applyPhotoSuggestion({ name_ar: 'فستان', department: 'women' }, { name_ar: 'اسم كتبه المحل', department: '' });
+  assert.deepEqual(first.patch, { department: 'women' });
+  assert.deepEqual(first.draft, { department: 'women' });
+  const next = applyPhotoSuggestion({ name_ar: 'اسم جديد', description_ar: 'وصف واضح' }, { name_ar: 'اسم كتبه المحل', description_ar: '' }, first.draft);
+  assert.deepEqual(next.patch, { description_ar: 'وصف واضح' });
+  assert.deepEqual(next.draft, { department: 'women', description_ar: 'وصف واضح' });
 });
 
 test('cart totals with line and invoice discounts (amount and percent), never negative', () => {
@@ -40,11 +51,25 @@ test('cart totals with line and invoice discounts (amount and percent), never ne
   assert.equal(E.setQty(cart, cart[1].key, 0).length, 1);
 });
 
+test('cart quantity stays inside the server limit even after repeated scans', () => {
+  let cart = [];
+  for (let i = 0; i < 1005; i++) cart = E.addToCart(cart, products[1]);
+  assert.equal(cart[0].qty, 1000);
+});
+
+test('return preview matches server discount allocation and partial-return rounding', () => {
+  const items = [{ id: 1, price: 1, qty: 1, discount: 0, returnedQty: 0 }, { id: 2, price: 1, qty: 1, discount: 0, returnedQty: 0 }];
+  assert.equal(E.returnRefundPreview(items, { subtotal: 2, discount: 1 }, { 1: 1, 2: 1 }), 1);
+  const partial = [{ id: 3, price: 10, qty: 3, discount: 1, returnedQty: 0 }];
+  assert.equal(E.returnRefundPreview(partial, { subtotal: 29, discount: 0 }, { 3: 2 }), 19);
+});
+
 test('change only comes out of cash', () => {
   assert.deepEqual(E.settle(270, [{ method: 'cash', amount: 300 }]), { paid: 300, remaining: 0, change: 30, ok: true });
   assert.equal(E.settle(270, [{ method: 'card', amount: 300 }]).change, 0);
   assert.equal(E.settle(270, [{ method: 'card', amount: 200 }, { method: 'cash', amount: 100 }]).change, 30);
   assert.equal(E.settle(270, [{ method: 'cash', amount: 100 }]).remaining, 170);
+  assert.equal(E.settle(270, [{ method: 'card', amount: 300 }, { method: 'cash', amount: 0 }]).ok, false);
 });
 
 test('buildSale refuses an empty cart or an underpaid invoice and shapes the server body', () => {
@@ -54,6 +79,8 @@ test('buildSale refuses an empty cart or an underpaid invoice and shapes the ser
   const s = E.buildSale({ uuid: 'u-1', localNo: 'D-1', createdAt: '2026-10-20T10:00:00Z', cart, discount: { type: 'percent', value: 10 }, payments: [{ method: 'cash', amount: 100 }, { method: 'card', amount: 0 }] });
   assert.deepEqual(s.body.items, [{ productId: 2, variantId: null, qty: 2, price: 50, discount: 0 }]);
   assert.equal(s.body.discount, 10); assert.equal(s.body.payments.length, 1); assert.equal(s.receipt.change, 10);
+  const free = E.buildSale({ uuid: 'free-1', localNo: 'D-2', createdAt: '2026-10-20T10:00:00Z', cart, discount: { type: 'percent', value: 100 }, payments: [] });
+  assert.equal(free.receipt.total, 0); assert.deepEqual(free.body.payments, []);
 });
 
 test('optimistic stock lowers variants and plain products, never below zero, skips untracked', () => {

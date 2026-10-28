@@ -72,6 +72,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   const mcols = db.prepare('PRAGMA table_info(media)').all().map((c) => c.name);
   if (!mcols.includes('remote')) db.exec('ALTER TABLE media ADD COLUMN remote INTEGER NOT NULL DEFAULT 0');
   if (!mcols.includes('quality')) db.exec('ALTER TABLE media ADD COLUMN quality INTEGER'); // 0-100 photo quality score (null = older photo)
+  if (!mcols.includes('bg_cut')) db.exec('ALTER TABLE media ADD COLUMN bg_cut INTEGER'); // 1 = background replaced, 0 = a plain look was wanted but the real background was kept
   if (!mcols.includes('canvas_v')) db.exec('ALTER TABLE media ADD COLUMN canvas_v INTEGER'); // 2 = made with the product-framing canvas (no bars); null = older
   const dcols = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);
   if (!dcols.includes('image')) db.exec('ALTER TABLE departments ADD COLUMN image TEXT');
@@ -109,6 +110,9 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!ocols.includes('delivery_by')) db.exec("ALTER TABLE orders ADD COLUMN delivery_by TEXT NOT NULL DEFAULT 'store'");
   const pscols = db.prepare('PRAGMA table_info(pos_sales)').all().map((c) => c.name);
   if (pscols.length && !pscols.includes('order_id')) db.exec('ALTER TABLE pos_sales ADD COLUMN order_id INTEGER'); // the store reservation this sale completed
+  if (pscols.length && !pscols.includes('shift_id')) db.exec('ALTER TABLE pos_sales ADD COLUMN shift_id INTEGER');
+  const prcols = db.prepare('PRAGMA table_info(pos_returns)').all().map((c) => c.name);
+  if (prcols.length && !prcols.includes('shift_id')) db.exec('ALTER TABLE pos_returns ADD COLUMN shift_id INTEGER');
   if (!ocols.includes('reserve_until')) db.exec('ALTER TABLE orders ADD COLUMN reserve_until TEXT'); // pickup reservations (delivery_by=\'pickup\'): held until
   if (!ocols.includes('delivery_group')) db.exec('ALTER TABLE orders ADD COLUMN delivery_group TEXT');
   if (!ocols.includes('delivery_route_id')) db.exec('ALTER TABLE orders ADD COLUMN delivery_route_id TEXT');

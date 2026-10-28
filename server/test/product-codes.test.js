@@ -9,11 +9,12 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'souqna-codes-'));
 process.env.DB_FILE = path.join(tmp, 'test.db');
 process.env.MEDIA_DIR = path.join(tmp, 'media');
 
-const { q } = await import('../src/db/index.js');
+const { q, db } = await import('../src/db/index.js');
 const express = (await import('express')).default;
 const { errorHandler } = await import('../src/lib/errors.js');
 const { signToken } = await import('../src/lib/auth.js');
 const { default: ownerRoutes } = await import('../src/routes/owner.js');
+const { normalizeProductDescription } = await import('../src/lib/stylist.js');
 
 let server; let base; let tokenA; let tokenB;
 before(async () => {
@@ -27,12 +28,53 @@ before(async () => {
   server = http.createServer(app); await new Promise((r) => server.listen(0, r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
-after(() => { server.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
+after(async () => {
+  await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+  db.close();
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
 
 const call = async (token, method, p, body) => {
   const res = await fetch(base + '/api/owner' + p, { method, headers: { 'content-type': 'application/json', authorization: `Bearer ${token}` }, body: body ? JSON.stringify(body) : undefined });
   return { status: res.status, json: await res.json() };
 };
+test('owner can check whether the product photo assistant is configured without exposing credentials', async () => {
+  const r = await call(tokenA, 'GET', '/ai/product/status');
+  assert.equal(r.status, 200);
+  assert.equal(typeof r.json.configured, 'boolean');
+  assert.ok(['anthropic', 'cloudflare'].includes(r.json.provider));
+  assert.ok(Array.isArray(r.json.departments));
+  assert.ok(r.json.departments.every((d) => d.slug === 'women'));
+  assert.equal('apiKey' in r.json, false);
+});
+test('photo assistant output is bounded and cannot invent colors, departments, or size kinds', () => {
+  const result = normalizeProductDescription({
+    name_ar: `فستان\n${'طويل'.repeat(30)}`,
+    description_ar: `${'وصف '.repeat(200)}`,
+    colors: ['Black', 'Black', 'Invisible Neon', 'Red', 'Blue', 'Green'],
+    department: 'administrator', size_kind: 'invented',
+  }, ['women', 'men']);
+  assert.equal(result.name_ar.includes('\n'), false);
+  assert.equal(result.name_ar.length, 60);
+  assert.equal(result.description_ar.length, 600);
+  assert.deepEqual(result.colors, ['Black', 'Red', 'Blue']);
+  assert.equal(result.department, null);
+  assert.equal(result.size_kind, null);
+});
+test('product photo corrections become private, bounded examples only for the correcting store', async () => {
+  const suggested = { name_ar: 'حذاء', description_ar: 'حذاء مميز.' };
+  const corrected = { name_ar: 'سنيكرز أبيض', description_ar: 'سنيكرز أبيض بتصميم بسيط.' };
+  const learned = await call(tokenA, 'POST', '/ai/product/learn', { suggested, corrected });
+  assert.deepEqual(learned.json, { learned: true });
+  assert.equal(q.val('SELECT COUNT(*) FROM pos_ai_product_lessons WHERE store_id=1'), 1);
+  assert.equal(q.val('SELECT COUNT(*) FROM pos_ai_product_lessons WHERE store_id=2'), 0);
+  const noChange = await call(tokenA, 'POST', '/ai/product/learn', { suggested: corrected, corrected });
+  assert.deepEqual(noChange.json, { learned: false });
+  assert.equal(q.val('SELECT COUNT(*) FROM pos_ai_product_lessons WHERE store_id=1'), 1);
+  const partial = await call(tokenA, 'POST', '/ai/product/learn', { suggested: { description_ar: 'وصف مقترح' }, corrected: { name_ar: 'اسم كتبه صاحب المحل', description_ar: 'وصف مقترح' } });
+  assert.deepEqual(partial.json, { learned: false }, 'pre-existing manual fields are not mistaken for AI corrections');
+  assert.equal(q.val('SELECT COUNT(*) FROM pos_ai_product_lessons WHERE store_id=1'), 1);
+});
 const red = { name_ar: 'أحمر', name_en: 'Red', hex: '#FF0000' };
 const base_ = (extra) => ({ name_ar: 'قميص', name_en: 'Shirt', price: 100, status: 'active', colors: [red], sizes: ['M', 'L'], track_stock: true, ...extra });
 const variantRows = (pid) => q.all('SELECT id,size,sku,barcode,stock FROM variants WHERE product_id=? ORDER BY id', [pid]);

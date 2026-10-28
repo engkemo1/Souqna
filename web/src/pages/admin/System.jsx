@@ -86,6 +86,57 @@ function VisualPanel() {
   );
 }
 
+/** How much of Gemini's free daily limit is used (product photo checks + Moda). Google does not report what is left, so we count. */
+function GeminiUsagePanel() {
+  const toast = useToast();
+  const { data, reload } = useAdminApi('/ai-usage');
+  const [limit, setLimit] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const g = data?.gemini;
+  if (!g) return <Panel title="Gemini — الحد اليومي"><Skeleton className="h-28 w-full" /></Panel>;
+  const shown = limit ?? String(g.limit || '');
+  const t = g.today;
+  const pct = g.limit ? Math.min(100, Math.round((t.total / g.limit) * 100)) : null;
+  const at = (iso) => (iso ? new Intl.DateTimeFormat('ar-EG-u-nu-latn', { timeZone: 'Africa/Cairo', weekday: 'long', hour: 'numeric', minute: '2-digit' }).format(new Date(iso)) : '—');
+  const near = pct != null && pct >= 80;
+  const save = async () => {
+    setBusy(true);
+    try { await adminApi('/ai-usage', { method: 'PUT', body: { geminiDailyLimit: Number(shown) || 0 } }); toast({ title: 'اتحفظ' }); setLimit(null); reload(); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy(false);
+  };
+  return (
+    <Panel title="Gemini — الحد اليومي" subtitle="فحص صور المنتجات قبل تغيير الخلفية + المساعد الذكي">
+      {!g.configured ? <p className="text-sm text-muted">Gemini مش متوصل (محتاج <span dir="ltr">GEMINI_API_KEY</span> في ملف .env على السيرفر).</p> : (
+        <div className="space-y-4">
+          <div className={'rounded-xl px-3 py-2.5 text-sm font-medium ' + (g.stopped ? 'bg-sale/10 text-sale' : near ? 'bg-amber-100 text-amber-900' : 'bg-success/10 text-success')}>
+            {g.stopped ? `الحد خلص النهارده. بيرجع ${at(g.resetsAt)}. لحد ما يرجع: الصور بتتساب بخلفيتها الحقيقية.` : near ? `قرّب يخلص — بيتجدد ${at(g.resetsAt)}` : `شغال — بيتجدد ${at(g.resetsAt)}`}
+          </div>
+          <div>
+            <div className="flex items-end justify-between gap-2"><span className="text-sm text-muted">النهارده</span><span className="text-2xl font-bold tabular-nums">{t.total}{g.limit ? <span className="text-base font-medium text-muted"> / {g.limit}</span> : null}</span></div>
+            {pct != null && <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-fg/10"><div className={'h-full rounded-full ' + (g.stopped || pct >= 95 ? 'bg-sale' : near ? 'bg-amber-500' : 'bg-success')} style={{ width: `${pct}%` }} /></div>}
+            <dl className="mt-3 grid grid-cols-2 gap-2 text-[13px]">
+              <div className="rounded-lg bg-secondary/60 px-3 py-2"><dt className="text-muted">فحص صور</dt><dd className="font-semibold tabular-nums">{t.kinds.photo_check || 0}</dd></div>
+              <div className="rounded-lg bg-secondary/60 px-3 py-2"><dt className="text-muted">المساعد الذكي</dt><dd className="font-semibold tabular-nums">{t.kinds.moda || 0}</dd></div>
+              <div className="rounded-lg bg-secondary/60 px-3 py-2"><dt className="text-muted">اترفض عشان الحد</dt><dd className="font-semibold tabular-nums">{t.limited}</dd></div>
+              <div className="rounded-lg bg-secondary/60 px-3 py-2"><dt className="text-muted">أخطاء تانية</dt><dd className="font-semibold tabular-nums">{t.failed}</dd></div>
+            </dl>
+          </div>
+          {g.history.length > 1 && (
+            <div><p className="mb-1.5 text-sm font-medium">آخر 7 أيام</p>
+              <ul className="space-y-1 text-[13px]">{g.history.map((d) => <li key={d.day} className="flex justify-between gap-3"><span className="text-muted" dir="ltr">{d.day}</span><span className="tabular-nums">{d.total}{d.limited ? <span className="text-sale"> · وقف {d.limited}</span> : null}</span></li>)}</ul>
+            </div>)}
+          <label className="block max-w-xs"><span className="mb-1.5 block text-sm font-medium">الحد اليومي بتاعك</span>
+            <Input type="number" dir="ltr" min={0} value={shown} onChange={(e) => setLimit(e.target.value)} placeholder="مثلاً 500" className="text-start" />
+            <span className="mt-1 block text-[12px] text-muted">جوجل مش بيقول للبرنامج فاضل قد إيه، فاكتب الرقم من Google AI Studio (Rate limits ← عمود RPD في صف الموديل المكتوب تحت «فحص الصور»). 0 = من غير شريط.</span></label>
+          {(g.models.photo_check || g.models.moda) && <p className="text-[12px] text-muted">الموديل اللي شغال: {g.models.photo_check && <>فحص الصور <span dir="ltr" className="font-medium text-fg">{g.models.photo_check}</span></>}{g.models.photo_check && g.models.moda ? ' · ' : ''}{g.models.moda && <>المساعد <span dir="ltr" className="font-medium text-fg">{g.models.moda}</span></>}</p>}
+          <Button onClick={save} loading={busy} disabled={shown === String(g.limit || '')}>حفظ</Button>
+          {g.lastError && <p className="rounded-xl bg-fg/[0.04] px-3 py-2 text-[12px] text-muted" dir="ltr">{g.lastError}</p>}
+        </div>)}
+    </Panel>
+  );
+}
+
 function StylistPanel() {
   const toast = useToast();
   const { data, reload } = useAdminApi('/stylist');
@@ -822,11 +873,11 @@ function StoreCashierRow({ link, systems, onSaved }) {
       <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">نظام الكاشير</span>
         <Select value={f.cashierId} onChange={(e) => setF({ ...f, cashierId: e.target.value })}>
           <option value="">بدون</option>
-          {systems.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          {systems.map((c) => <option key={c.id} value={c.id}>{c.name}{c.connector !== 'ready' ? ' · الربط المباشر قيد التنفيذ' : ''}</option>)}
         </Select></label>
       <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">الحالة</span>
         <Select value={f.status} disabled={!f.cashierId} onChange={(e) => setF({ ...f, status: e.target.value })}>
-          {['pending', 'active', 'paused'].map((k) => <option key={k} value={k}>{LINK_STATUS_AR[k]}</option>)}
+          {['pending', 'active', 'paused'].map((k) => <option key={k} value={k} disabled={k === 'active' && system?.connector !== 'ready'}>{LINK_STATUS_AR[k]}{k === 'active' && system?.connector !== 'ready' ? ' · اختار ملف أو API' : ''}</option>)}
         </Select></label>
       <label className="block min-w-0"><span className="mb-1 block text-xs font-medium text-muted">ملاحظة</span>
         <Input value={f.note} maxLength={300} placeholder={system?.id === 'other' ? 'اسم البرنامج' : system?.note || ''} onChange={(e) => setF({ ...f, note: e.target.value })} /></label>
@@ -850,7 +901,7 @@ function CashierSyncPanel() {
             try { await adminApi('/cashier-sync', { method: 'PUT', body: { enabled } }); toast({ title: enabled ? 'تم تسجيل قرار الإطلاق' : 'تم إيقاف الإتاحة' }); reload(); }
             catch (x) { toast({ tone: 'error', title: x.message }); }
           }} label="قرار إطلاق الميزة" description="المفتاح مقفول افتراضياً. تغييره يسجل قرار الإطلاق فقط؛ لن تظهر للتجار أو تبدأ المزامنة قبل تنفيذ موصل مدعوم." />
-          <p className="rounded-xl bg-fg/[0.04] p-3 text-sm text-muted">حالة التنفيذ: {data?.ready ? 'جاهز' : 'لا توجد موصلات كاشير أو استيراد ملفات منفذة بعد'}. استيراد الملفات ومفتاح الربط شغّالين لأي برنامج كاشير. باقي الأنظمة في القائمة موصلاتها المباشرة لسه قيد التنفيذ، وتتربط في الوقت ده بملف أو مفتاح.</p>
+          <p className="rounded-xl bg-fg/[0.04] p-3 text-sm text-muted">المتاح حاليًا: كاشير Twist، واستيراد ملف، وربط API عام. الربط المباشر مع باقي برامج الكاشير لسه قيد التنفيذ؛ استخدم الملف أو API لحد ما يتوفر موصل البرنامج.</p>
         </div>
       </Panel>
       <Panel title="كاشير كل محل" subtitle="اختر البرنامج اللي بيستخدمه المحل، وهنظبط الموصل المناسب له في الكود" className="lg:col-span-3">
@@ -894,6 +945,7 @@ export default function System() {
           </Panel>
           <BackupPanel data={data} reload={reload} />
           <ResourcePanel />
+          <GeminiUsagePanel />
           <Panel title="السيرفر">
             <dl className="space-y-3 text-sm">
               {[['البيئة', data.env], ['Node', data.node], ['شغال من', uptime(data.uptimeSec)], ['تخزين الصور', data.mediaR2Enabled ? 'Cloudflare R2' : 'قرص السيرفر (R2 غير مفعّل)'], ['واتساب API', data.whatsappConfigured ? 'متوصل' : 'غير متوصل'], ['قالب واتساب', data.template], ['التسجيل العام', data.registrationOpen ? 'مفتوح' : 'مقفول']].map(([k, v]) => (

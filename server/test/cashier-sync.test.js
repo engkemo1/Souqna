@@ -8,7 +8,7 @@ import http from 'node:http';
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'souqna-cashier-'));
 process.env.DB_FILE = path.join(tmp, 'test.db');
 
-const { q } = await import('../src/db/index.js');
+const { q, db } = await import('../src/db/index.js');
 const express = (await import('express')).default;
 const { errorHandler } = await import('../src/lib/errors.js');
 const { readTable, guessMapping, parseQty, normCode } = await import('../src/lib/cashier-table.js');
@@ -38,7 +38,11 @@ before(async () => {
   server = http.createServer(app); await new Promise((r) => server.listen(0, r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
-after(() => { server.close(); fs.rmSync(tmp, { recursive: true, force: true }); });
+after(async () => {
+  await new Promise((resolve, reject) => server.close((err) => err ? reject(err) : resolve()));
+  db.close();
+  fs.rmSync(tmp, { recursive: true, force: true });
+});
 
 const stockOf = (sku, store = storeA) => q.val('SELECT v.stock FROM variants v JOIN products p ON p.id=v.product_id WHERE v.sku=? AND p.store_id=?', [sku, store]);
 const call = async (p, { key, body, method = 'POST' } = {}) => {

@@ -1,6 +1,7 @@
 import { q, tx } from '../db/index.js';
 import { cashierAccess } from './cashier-access.js';
 import { AppError } from './errors.js';
+import { mediaMap } from './media.js';
 
 /**
  * The Twist cashier. Sales are made on the device (possibly offline) and arrive later, one by one, with a uuid.
@@ -29,6 +30,88 @@ const isoTime = (t) => (t ? `${String(t).replace(' ', 'T')}Z` : t);
 const money = (n) => Math.round(Number(n) || 0);
 const key = (productId, variantId) => `${productId}:${variantId || 0}`;
 
+/* ------------------------------------------------------------------ register and shift cash control */
+
+function shiftTotals(storeId, shift) {
+  const cashSales = q.val("SELECT COALESCE(SUM(pp.amount),0) FROM pos_payments pp JOIN pos_sales s ON s.id=pp.sale_id WHERE s.store_id=? AND s.shift_id=? AND pp.method='cash'", [storeId, shift.id]) || 0;
+  const cashRefunds = q.val("SELECT COALESCE(SUM(refund),0) FROM pos_returns WHERE store_id=? AND shift_id=? AND method='cash'", [storeId, shift.id]) || 0;
+  const cashIn = q.val("SELECT COALESCE(SUM(amount),0) FROM pos_cash_movements WHERE store_id=? AND shift_id=? AND kind='in'", [storeId, shift.id]) || 0;
+  const cashOut = q.val("SELECT COALESCE(SUM(amount),0) FROM pos_cash_movements WHERE store_id=? AND shift_id=? AND kind='out'", [storeId, shift.id]) || 0;
+  const expectedCash = shift.opening_cash + cashSales - cashRefunds + cashIn - cashOut;
+  return { openingCash: shift.opening_cash, cashSales, cashRefunds, cashIn, cashOut, expectedCash };
+}
+
+export function resolveRegister(storeId, deviceKey, name = 'الكاشير الرئيسي') {
+  q.run('INSERT OR IGNORE INTO pos_registers(store_id,device_key,name) VALUES(?,?,?)', [storeId, deviceKey, name]);
+  const register = q.get('SELECT id, name FROM pos_registers WHERE store_id=? AND device_key=?', [storeId, deviceKey]);
+  q.run("UPDATE pos_registers SET last_seen_at=datetime('now') WHERE id=?", [register.id]);
+  const shift = q.get("SELECT * FROM pos_shifts WHERE store_id=? AND register_id=? AND state='open' ORDER BY id DESC LIMIT 1", [storeId, register.id]);
+  const lastShift = q.get('SELECT * FROM pos_shifts WHERE store_id=? AND register_id=? ORDER BY id DESC LIMIT 1', [storeId, register.id]);
+  return { register, shift: shift ? { id: shift.id, state: shift.state, openedAt: isoTime(shift.opened_at), openedBy: shift.opened_by, ...shiftTotals(storeId, shift) } : null, lastShift: lastShift ? readShift(storeId, lastShift.id) : null };
+}
+
+export function openShift(storeId, registerId, openingCash, cashierName = '') {
+  const register = q.get('SELECT id FROM pos_registers WHERE id=? AND store_id=?', [registerId, storeId]);
+  if (!register) throw new AppError(404, 'register_not_found', 'Cashier device not found.');
+  if (q.get("SELECT id FROM pos_shifts WHERE register_id=? AND state='open'", [registerId])) throw new AppError(409, 'shift_already_open', 'This register already has an open shift.');
+  const id = Number(q.run('INSERT INTO pos_shifts(store_id,register_id,opening_cash,opened_by) VALUES(?,?,?,?)', [storeId, registerId, openingCash, cashierName]).lastInsertRowid);
+  const shift = q.get('SELECT * FROM pos_shifts WHERE id=?', [id]);
+  return { id, state: 'open', openedAt: isoTime(shift.opened_at), openedBy: shift.opened_by, ...shiftTotals(storeId, shift) };
+}
+
+function openShiftRow(storeId, shiftId) {
+  const shift = q.get("SELECT * FROM pos_shifts WHERE id=? AND store_id=? AND state='open'", [shiftId, storeId]);
+  if (!shift) throw new AppError(409, 'shift_not_open', 'افتح وردية جديدة قبل تسجيل حركة نقدية.');
+  return shift;
+}
+
+export function addCashMovement(storeId, shiftId, { kind, amount, reason }, cashierName = '') {
+  openShiftRow(storeId, shiftId);
+  const id = Number(q.run('INSERT INTO pos_cash_movements(store_id,shift_id,kind,amount,reason,created_by) VALUES(?,?,?,?,?,?)', [storeId, shiftId, kind, amount, reason, cashierName]).lastInsertRowid);
+  return { id, kind, amount, reason, createdBy: cashierName, createdAt: new Date().toISOString() };
+}
+
+export function closeShift(storeId, shiftId, countedCash, cashierName = '', note = '') {
+  const shift = openShiftRow(storeId, shiftId);
+  const totals = shiftTotals(storeId, shift);
+  const difference = countedCash - totals.expectedCash;
+  q.run("UPDATE pos_shifts SET state='closed',closed_by=?,closed_at=datetime('now'),counted_cash=?,expected_cash=?,difference=?,note=? WHERE id=? AND state='open'",
+    [cashierName, countedCash, totals.expectedCash, difference, note, shiftId]);
+  const closed = q.get('SELECT closed_at FROM pos_shifts WHERE id=?', [shiftId]);
+  return { ...shift, state: 'closed', closedBy: cashierName, closedAt: isoTime(closed.closed_at), countedCash, difference, note, ...totals };
+}
+
+export function readShift(storeId, shiftId) {
+  const shift = q.get('SELECT * FROM pos_shifts WHERE id=? AND store_id=?', [shiftId, storeId]);
+  if (!shift) return null;
+  const movements = q.all('SELECT id,kind,amount,reason,created_by AS createdBy,created_at AS createdAt FROM pos_cash_movements WHERE shift_id=? ORDER BY id', [shiftId]);
+  return { id: shift.id, state: shift.state, openedAt: isoTime(shift.opened_at), closedAt: isoTime(shift.closed_at), openedBy: shift.opened_by, closedBy: shift.closed_by, countedCash: shift.counted_cash, difference: shift.difference, note: shift.note, movements, ...shiftTotals(storeId, shift) };
+}
+
+/** Receive new stock at the register and leave an auditable movement. */
+export function receiveStock(storeId, { uuid, productId, variantId = null, quantity, note = '' }) {
+  return tx(() => {
+    const existing = q.get('SELECT product_id AS productId, variant_id AS variantId, quantity, note FROM pos_stock_receipts WHERE store_id=? AND uuid=?', [storeId, uuid]);
+    if (existing) {
+      if (existing.productId !== productId || existing.variantId !== variantId || existing.quantity !== quantity || existing.note !== note) throw new AppError(409, 'stock_receipt_key_reused', 'رقم عملية الاستلام اتستخدم قبل كده لبيانات مختلفة.');
+      return { productId, variantId, quantity, duplicate: true };
+    }
+    const product = q.get('SELECT id, track_stock AS track FROM products WHERE id=? AND store_id=?', [productId, storeId]);
+    if (!product) throw new AppError(404, 'product_not_found', 'الصنف مش موجود في المحل.');
+    if (!product.track) throw new AppError(409, 'stock_untracked', 'الصنف ده مش بيتابع رصيد المخزون.');
+    const hasVariants = q.val('SELECT COUNT(*) FROM variants WHERE product_id=?', [productId]) > 0;
+    if (hasVariants && !variantId) throw new AppError(422, 'variant_required', 'اختار اللون أو المقاس الأول.');
+    if (!hasVariants && variantId) throw new AppError(422, 'invalid_variant', 'الصنف ده ملوش ألوان أو مقاسات.');
+    if (variantId && !q.get('SELECT id FROM variants WHERE id=? AND product_id=?', [variantId, productId])) throw new AppError(404, 'variant_not_found', 'اللون أو المقاس مش موجود.');
+    if (variantId) q.run('UPDATE variants SET stock=stock+? WHERE id=?', [quantity, variantId]);
+    else q.run('UPDATE products SET stock=stock+? WHERE id=?', [quantity, productId]);
+    if (hasVariants) recompute(productId);
+    q.run('INSERT INTO pos_stock_receipts(store_id,uuid,product_id,variant_id,quantity,note) VALUES(?,?,?,?,?,?)', [storeId, uuid, productId, variantId, quantity, note]);
+    q.run("INSERT INTO stock_movements(store_id,product_id,variant_id,delta,reason,ref) VALUES(?,?,?,?,?,?)", [storeId, productId, variantId, quantity, 'pos_receive', uuid]);
+    return { productId, variantId, quantity };
+  });
+}
+
 /** Open "reserve & try in store" requests: the pieces are already taken out of stock and wait in the shop for the shopper. */
 export function openReservations(storeId) {
   const orders = q.all("SELECT id, number, customer_name AS name, phone, status, reserve_until AS until, total FROM orders WHERE store_id=? AND delivery_by='pickup' AND status IN ('pending','confirmed') ORDER BY created_at LIMIT 200", [storeId]);
@@ -43,7 +126,12 @@ const recompute = (productId) => q.run("UPDATE products SET stock=(SELECT COALES
 
 /** Everything the screen needs to sell without the internet. */
 export function bootstrap(store) {
-  const products = q.all("SELECT id, name_ar AS name, sku, barcode, price, track_stock AS trackStock, stock, colors_json AS colors, sizes_json AS sizes FROM products WHERE store_id=? AND status='active' ORDER BY name_ar LIMIT 5000", [store.id]);
+  const products = q.all(`SELECT p.id, p.name_ar AS name, p.sku, p.barcode, p.price, p.track_stock AS trackStock, p.stock, p.low_stock_at AS lowStockAt,
+      p.sold_count AS sold, c.name_ar AS category,
+      (SELECT media_id FROM product_media pm WHERE pm.product_id=p.id ORDER BY pm.is_primary DESC, pm.position LIMIT 1) AS mediaId
+    FROM products p LEFT JOIN categories c ON c.id=p.category_id
+    WHERE p.store_id=? AND p.status='active' ORDER BY p.name_ar LIMIT 5000`, [store.id]);
+  const photos = mediaMap(products.map((p) => p.mediaId));
   const vs = q.all('SELECT v.id, v.product_id AS productId, v.color, v.size, v.sku, v.barcode, v.stock FROM variants v JOIN products p ON p.id=v.product_id WHERE p.store_id=?', [store.id]);
   const by = new Map();
   for (const v of vs) { if (!by.has(v.productId)) by.set(v.productId, []); by.get(v.productId).push({ id: v.id, color: v.color || '', size: v.size || '', sku: v.sku || '', barcode: v.barcode || '', stock: v.stock }); }
@@ -55,7 +143,7 @@ export function bootstrap(store) {
   const withHeld = (x, pid, vid) => { const n = held.get(key(pid, vid)); return n ? { ...x, held: n } : x; };
   return {
     store: { id: store.id, name: store.name_ar || store.name_en || '', slug: store.slug },
-    products: products.map((p) => withHeld({ id: p.id, name: p.name, sku: p.sku || '', barcode: p.barcode || '', price: p.price, track: !!p.trackStock, stock: p.stock, variants: (by.get(p.id) || []).map((v) => withHeld(v, p.id, v.id)) }, p.id, null)),
+    products: products.map((p) => withHeld({ id: p.id, name: p.name, sku: p.sku || '', barcode: p.barcode || '', price: p.price, track: !!p.trackStock, stock: p.stock, lowStockAt: p.lowStockAt, sold: p.sold || 0, category: p.category || '', image: photos.get(p.mediaId) || null, variants: (by.get(p.id) || []).map((v) => withHeld(v, p.id, v.id)) }, p.id, null)),
     reservations,
     nextNumber,
     serverTime: new Date().toISOString(),
@@ -66,10 +154,21 @@ export function bootstrap(store) {
 export function saveSale(store, input, cashierName = '') {
   const existing = q.get('SELECT id, number FROM pos_sales WHERE store_id=? AND uuid=?', [store.id, input.uuid]);
   if (existing) return { duplicate: true, ...readSale(store.id, existing.id) };
+  const shiftId = input.shiftId ?? null;
+  if (shiftId) {
+    const shift = q.get('SELECT id,state,closed_at,register_id FROM pos_shifts WHERE id=? AND store_id=?', [shiftId, store.id]);
+    if (!shift) throw new AppError(422, 'invalid_shift', 'الوردية المرتبطة بالفاتورة مش موجودة.');
+    const beforeClose = shift.state === 'closed' && shift.closed_at && Date.parse(input.createdAt) <= Date.parse(`${shift.closed_at.replace(' ', 'T')}Z`);
+    if (shift.state !== 'open' && !beforeClose) throw new AppError(409, 'shift_closed', 'الوردية اتقفلت قبل وقت البيع ده.');
+  }
 
   return tx(() => {
     const lines = [];
+    const seenLines = new Set();
     for (const it of input.items) {
+      const lineKey = key(it.productId, it.variantId);
+      if (seenLines.has(lineKey)) throw new AppError(422, 'duplicate_sale_line', 'الصنف أو المقاس مكرر في الفاتورة. اجمع الكمية في سطر واحد.');
+      seenLines.add(lineKey);
       const p = q.get('SELECT id, name_ar AS name, sku, barcode, track_stock AS track, stock FROM products WHERE id=? AND store_id=?', [it.productId, store.id]);
       if (!p) throw new AppError(422, 'unknown_product', `A product in this sale no longer exists (#${it.productId}).`);
       const hasVariants = q.val('SELECT COUNT(*) FROM variants WHERE product_id=?', [p.id]) > 0;
@@ -91,6 +190,7 @@ export function saveSale(store, input, cashierName = '') {
     const paid = input.payments.reduce((s, p) => s + money(p.amount), 0);
     if (paid < total) throw new AppError(422, 'underpaid', 'The paid amount is less than the invoice total.');
     const cashPaid = input.payments.filter((p) => p.method === 'cash').reduce((s, p) => s + money(p.amount), 0);
+    if (paid - total > cashPaid) throw new AppError(422, 'change_requires_cash', 'The change exceeds the cash tendered; card and wallet overpayments cannot be refunded as cash.');
     const change = Math.min(paid - total, cashPaid); // change can only come out of cash
 
     const number = (q.val('SELECT COALESCE(MAX(number),0) FROM pos_sales WHERE store_id=?', [store.id]) || 0) + 1;
@@ -109,9 +209,9 @@ export function saveSale(store, input, cashierName = '') {
     }
 
     const saleId = Number(q.run(
-      `INSERT INTO pos_sales(store_id, uuid, number, local_no, subtotal, discount, total, paid, change_due, cashier_name, customer_name, customer_phone, note, device_at, order_id)
-       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [store.id, input.uuid, number, input.localNo || '', subtotal, discount, total, paid, change, cashierName, input.customerName || order?.customer_name || '', input.customerPhone || order?.phone || '', input.note || '', sqlTime(input.createdAt), order?.id ?? null]).lastInsertRowid);
+      `INSERT INTO pos_sales(store_id, uuid, number, local_no, subtotal, discount, total, paid, change_due, cashier_name, customer_name, customer_phone, note, device_at, order_id, shift_id)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [store.id, input.uuid, number, input.localNo || '', subtotal, discount, total, paid, change, cashierName, input.customerName || order?.customer_name || '', input.customerPhone || order?.phone || '', input.note || '', sqlTime(input.createdAt), order?.id ?? null, shiftId]).lastInsertRowid);
 
     const touched = new Set();
     for (const l of lines) {
@@ -177,7 +277,7 @@ function closeReservation(store, order, orderItems, left, number) {
 
 export function readSale(storeId, id) {
   const s = q.get(
-    `SELECT id, uuid, number, local_no AS localNo, subtotal, discount, total, paid, change_due AS change, cashier_name AS cashier, customer_name AS customerName, customer_phone AS customerPhone, note, device_at AS createdAt,
+    `SELECT id, uuid, number, local_no AS localNo, subtotal, discount, total, paid, change_due AS change, cashier_name AS cashier, customer_name AS customerName, customer_phone AS customerPhone, note, device_at AS createdAt, shift_id AS shiftId,
        (SELECT o.number FROM orders o WHERE o.id=pos_sales.order_id) AS reservationNumber
      FROM pos_sales WHERE id=? AND store_id=?`, [id, storeId]);
   if (!s) return null;
@@ -199,19 +299,38 @@ export function saveReturn(store, input, cashierName = '') {
   if (!sale) throw new AppError(404, 'not_found', 'Invoice not found.');
   return tx(() => {
     let refund = 0; const touched = new Set(); const rows = [];
+    const seenItems = new Set();
+    const allItems = q.all('SELECT id, price, qty, discount FROM pos_sale_items WHERE sale_id=? ORDER BY id', [sale.id]);
+    const baseSubtotal = allItems.reduce((sum, item) => sum + item.price * item.qty - item.discount, 0);
+    const discountBudget = Math.min(sale.discount, baseSubtotal);
+    const allocations = allItems.map((item) => {
+      const net = item.price * item.qty - item.discount;
+      const exact = baseSubtotal > 0 ? (net * discountBudget) / baseSubtotal : 0;
+      const floor = Math.floor(exact);
+      return { id: item.id, net, share: floor, remainder: exact - floor };
+    });
+    let undistributed = discountBudget - allocations.reduce((sum, item) => sum + item.share, 0);
+    for (const item of [...allocations].sort((a, b) => b.remainder - a.remainder || a.id - b.id).slice(0, undistributed)) item.share++;
+    const discountByLine = new Map(allocations.map((item) => [item.id, item.share]));
     for (const r of input.items) {
+      if (seenItems.has(r.saleItemId)) throw new AppError(422, 'duplicate_return_item', 'سطر الفاتورة مكرر في المرتجع. اجمع الكمية في سطر واحد.');
+      seenItems.add(r.saleItemId);
       const it = q.get('SELECT * FROM pos_sale_items WHERE id=? AND sale_id=?', [r.saleItemId, sale.id]);
       if (!it) throw new AppError(422, 'bad_item', 'This line is not on the invoice.');
       const qty = Math.floor(r.qty);
       if (qty > it.qty - it.returned_qty) throw new AppError(422, 'too_many', `Only ${it.qty - it.returned_qty} of "${it.name}" can still be returned.`);
       // the customer gets back what they paid for that piece, including their share of the invoice discount
       const lineNet = it.price * it.qty - it.discount;
-      const share = sale.subtotal > 0 ? Math.round((lineNet * sale.discount) / sale.subtotal) : 0;
-      const unit = Math.round((lineNet - share) / it.qty);
-      const amount = unit * qty;
+      // Allocate integer-pound rounding cumulatively so several partial returns can never refund more than this line's net.
+      const refundable = Math.max(0, lineNet - (discountByLine.get(it.id) || 0));
+      const before = it.returned_qty;
+      const after = before + qty;
+      const amount = Math.round((refundable * after) / it.qty) - Math.round((refundable * before) / it.qty);
       rows.push({ it, qty, amount }); refund += amount;
     }
-    const returnId = Number(q.run('INSERT INTO pos_returns(store_id, sale_id, uuid, refund, method, reason, cashier_name) VALUES(?,?,?,?,?,?,?)', [store.id, sale.id, input.uuid, refund, input.method, input.reason || '', cashierName]).lastInsertRowid);
+    const shiftId = input.shiftId ?? null;
+    if (shiftId) openShiftRow(store.id, shiftId);
+    const returnId = Number(q.run('INSERT INTO pos_returns(store_id, sale_id, uuid, refund, method, reason, cashier_name, shift_id) VALUES(?,?,?,?,?,?,?,?)', [store.id, sale.id, input.uuid, refund, input.method, input.reason || '', cashierName, shiftId]).lastInsertRowid);
     for (const { it, qty, amount } of rows) {
       q.run('UPDATE pos_sale_items SET returned_qty=returned_qty+? WHERE id=?', [qty, it.id]);
       q.run('INSERT INTO pos_return_items(return_id, sale_item_id, qty, amount) VALUES(?,?,?,?)', [returnId, it.id, qty, amount]);

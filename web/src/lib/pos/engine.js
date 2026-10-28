@@ -5,7 +5,8 @@
 
 const AR_DIGITS = '٠١٢٣٤٥٦٧٨٩';
 export const normCode = (v) => String(v ?? '').trim().toLowerCase()
-  .replace(/[٠-٩]/g, (d) => AR_DIGITS.indexOf(d)).replace(/\.0+$/, '');
+  .replace(/[٠-٩]/g, (d) => AR_DIGITS.indexOf(d))
+  .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\.0+$/, '');
 
 export const normText = (v) => String(v ?? '').toLowerCase()
   .replace(/[ً-ٰٟـ]/g, '')
@@ -50,6 +51,17 @@ export function searchProducts(products, text, limit = 60) {
 
 export const productStock = (p) => (p.variants?.length ? p.variants.reduce((s, v) => s + v.stock, 0) : p.stock);
 
+/** Fill only blank listing fields from a photo suggestion and retain exactly what AI supplied for later correction. */
+export function applyPhotoSuggestion(suggestion = {}, current = {}, previousDraft = {}) {
+  const patch = {};
+  for (const key of ['name_ar', 'name_en', 'description_ar', 'description_en', 'department']) {
+    const value = String(suggestion[key] || '').trim();
+    if (value && !String(current[key] || '').trim()) patch[key] = value;
+  }
+  const draft = { ...previousDraft, ...patch };
+  return { patch, draft: Object.keys(draft).length ? draft : null };
+}
+
 /* ------------------------------------------------------------------ cart */
 
 export const lineKey = (productId, variantId) => `${productId}:${variantId || 0}`;
@@ -57,11 +69,11 @@ export const lineKey = (productId, variantId) => `${productId}:${variantId || 0}
 export function addToCart(cart, product, variant = null, qty = 1) {
   const key = lineKey(product.id, variant?.id);
   const i = cart.findIndex((l) => l.key === key);
-  if (i >= 0) return cart.map((l, j) => (j === i ? { ...l, qty: l.qty + qty } : l));
+  if (i >= 0) return cart.map((l, j) => (j === i ? { ...l, qty: Math.min(1000, l.qty + qty) } : l));
   return [...cart, {
     key, productId: product.id, variantId: variant?.id ?? null, name: product.name,
     color: variant?.color || '', size: variant?.size || '', sku: variant?.sku || product.sku || '', barcode: variant?.barcode || product.barcode || '',
-    price: product.price, qty, discount: 0, track: !!product.track, stock: variant ? variant.stock : product.stock,
+    price: product.price, qty: Math.min(1000, Math.max(1, Math.floor(qty))), discount: 0, track: !!product.track, stock: variant ? variant.stock : product.stock,
   }];
 }
 export const setQty = (cart, key, qty) => (qty < 1 ? cart.filter((l) => l.key !== key) : cart.map((l) => (l.key === key ? { ...l, qty: Math.min(1000, Math.floor(qty)) } : l)));
@@ -76,17 +88,42 @@ export function totals(cart, discount = { type: 'amount', value: 0 }) {
   return { subtotal, discount: disc, total: subtotal - disc, pieces: cart.reduce((s, l) => s + l.qty, 0) };
 }
 
+/** Keep the return confirmation preview identical to the server's integer-pound refund allocation. */
+export function returnRefundPreview(items, invoice, selected = {}) {
+  const baseSubtotal = items.reduce((sum, item) => sum + item.price * item.qty - item.discount, 0);
+  const discountBudget = Math.min(invoice.discount || 0, baseSubtotal);
+  const shares = items.map((item) => {
+    const net = item.price * item.qty - item.discount;
+    const exact = baseSubtotal > 0 ? (net * discountBudget) / baseSubtotal : 0;
+    const floor = Math.floor(exact);
+    return { id: item.id, net, share: floor, remainder: exact - floor };
+  });
+  const left = discountBudget - shares.reduce((sum, item) => sum + item.share, 0);
+  for (const item of [...shares].sort((a, b) => b.remainder - a.remainder || a.id - b.id).slice(0, left)) item.share++;
+  const byId = new Map(shares.map((item) => [item.id, item]));
+  return items.reduce((sum, item) => {
+    const qty = Math.min(item.qty - (item.returnedQty || 0), Math.max(0, selected[item.id] || 0));
+    if (!qty) return sum;
+    const line = byId.get(item.id);
+    const refundable = Math.max(0, line.net - line.share);
+    const before = item.returnedQty || 0;
+    return sum + Math.round((refundable * (before + qty)) / item.qty) - Math.round((refundable * before) / item.qty);
+  }, 0);
+}
+
 /* ------------------------------------------------------------------ payments */
 
 export function settle(total, payments) {
   const paid = payments.reduce((s, p) => s + (Math.round(p.amount) || 0), 0);
   const cash = payments.filter((p) => p.method === 'cash').reduce((s, p) => s + (Math.round(p.amount) || 0), 0);
-  return { paid, remaining: Math.max(0, total - paid), change: Math.min(Math.max(0, paid - total), cash), ok: paid >= total };
+  const excess = Math.max(0, paid - total);
+  const change = Math.min(excess, cash);
+  return { paid, remaining: Math.max(0, total - paid), change, ok: paid >= total && excess <= cash };
 }
 
 /* ------------------------------------------------------------------ the sale record */
 
-export function buildSale({ uuid, localNo, createdAt, cart, discount, payments, customerName = '', customerPhone = '', note = '', reservation = null }) {
+export function buildSale({ uuid, localNo, createdAt, cart, discount, payments, customerName = '', customerPhone = '', note = '', reservation = null, shiftId = null }) {
   const t = totals(cart, discount);
   const s = settle(t.total, payments);
   if (!cart.length) throw new Error('empty_cart');
@@ -95,6 +132,7 @@ export function buildSale({ uuid, localNo, createdAt, cart, discount, payments, 
   return {
     body: {
       uuid, localNo, createdAt,
+      ...(shiftId ? { shiftId } : {}),
       items: cart.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, price: l.price, discount: l.discount })),
       discount: t.discount, payments: clean,
       ...(customerName ? { customerName } : {}), ...(customerPhone ? { customerPhone } : {}), ...(note ? { note } : {}),
