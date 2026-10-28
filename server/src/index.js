@@ -15,6 +15,9 @@ import cashierRoutes from './routes/cashier.js';
 import posRoutes from './routes/pos.js';
 import { errorHandler } from './lib/errors.js';
 import buyerRoutes from './routes/buyer.js';
+import waRoutes from './routes/wa.js';
+import { prefetchCutoutModel } from './lib/cutout.js';
+import './lib/wa-products.js'; // registers the WhatsApp → product handler (dormant unless WA_ENABLED=1)
 import { startDailySummary } from './lib/daily-summary.js';
 
 const app = express();
@@ -24,7 +27,7 @@ app.set('trust proxy', 1);
 app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' }, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
 app.use(compression());
 app.use(cors());
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/wa/')) req.rawBody = buf; } }));
 
 const SITE_ORIGIN = 'https://twistegy.com';
 const xml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
@@ -91,6 +94,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/cashier/v1', cashierRoutes);
 app.use('/api/pos', posRoutes);
+prefetchCutoutModel(); // background-removal model, fetched once per container
+app.use('/api/wa', waRoutes);
 app.use('/api/buyer', buyerRoutes);
 app.use('/api/owner', ownerRoutes);
 app.use('/api', publicRoutes);

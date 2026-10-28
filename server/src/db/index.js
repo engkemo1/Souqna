@@ -32,6 +32,12 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!cols.includes('lng')) db.exec('ALTER TABLE stores ADD COLUMN lng REAL');
   // delivery is always done by Twist - no more per-store delivery choice
   db.exec("UPDATE stores SET delivery_mode='platform' WHERE delivery_mode<>'platform'");
+  db.exec(`CREATE TABLE IF NOT EXISTS wa_links (out_id TEXT PRIMARY KEY, store_id INTEGER NOT NULL, product_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+  { const pc = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
+    if (!pc.includes('expires_at')) db.exec('ALTER TABLE products ADD COLUMN expires_at INTEGER'); // ms; set for products added by WhatsApp (auto-hidden after it)
+    if (!pc.includes('source')) db.exec('ALTER TABLE products ADD COLUMN source TEXT'); }
+  db.exec(`CREATE TABLE IF NOT EXISTS wa_otps (phone TEXT PRIMARY KEY, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, tries INTEGER NOT NULL DEFAULT 0, sent_at INTEGER NOT NULL)`);
+  db.exec(`CREATE TABLE IF NOT EXISTS wa_inbound (id TEXT PRIMARY KEY, from_wa TEXT NOT NULL, type TEXT NOT NULL, body TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   db.exec(`CREATE TABLE IF NOT EXISTS pickup_zones (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, fee INTEGER NOT NULL DEFAULT 0 CHECK (fee >= 0 AND fee <= 5000), courier_cost INTEGER NOT NULL DEFAULT 0 CHECK (courier_cost >= 0 AND courier_cost <= 5000), created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   // every store is shown by default, even before it has products (the admin can switch it off per store)
   // the stylist was renamed from «مودة» to «تويلا»: carry over names the admin saved before (only if still the old default)
@@ -63,6 +69,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   const mcols = db.prepare('PRAGMA table_info(media)').all().map((c) => c.name);
   if (!mcols.includes('remote')) db.exec('ALTER TABLE media ADD COLUMN remote INTEGER NOT NULL DEFAULT 0');
   if (!mcols.includes('quality')) db.exec('ALTER TABLE media ADD COLUMN quality INTEGER'); // 0-100 photo quality score (null = older photo)
+  if (!mcols.includes('canvas_v')) db.exec('ALTER TABLE media ADD COLUMN canvas_v INTEGER'); // 2 = made with the product-framing canvas (no bars); null = older
   const dcols = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);
   if (!dcols.includes('image')) db.exec('ALTER TABLE departments ADD COLUMN image TEXT');
   const pcols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);

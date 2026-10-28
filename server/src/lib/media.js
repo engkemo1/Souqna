@@ -25,16 +25,24 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import sharp from 'sharp';
+import { cutoutOnto, cutoutLayer, productBox } from './cutout.js';
 import { IMAGE_SIZES } from '@souqna/shared';
 import { config } from '../config.js';
-import { q, insert } from '../db/index.js';
+import { q, insert, tx } from '../db/index.js';
 import { badRequest } from './errors.js';
 import { r2Enabled, r2Put, r2Delete, r2Get } from './r2.js';
 
 /** One WebP rendition. Settings chosen by SSIM measurement on real catalogue photos: ~-16% bytes for a <0.005 SSIM change (invisible). */
-export const renderWebp = (buf, name, width) =>
-  sharp(buf).resize({ width, withoutEnlargement: true }).webp({ quality: name === 'thumb' ? 66 : 74, effort: 6, smartSubsample: true }).toBuffer();
-const ORIGINAL_JPEG = { quality: 82, mozjpeg: true };
+/** `crisp`: product photos get a light output sharpening after downscaling (shrinking softens fine detail). */
+export const renderWebp = (buf, name, width, crisp = false) => {
+  let p = sharp(buf).resize({ width, withoutEnlargement: true });
+  if (crisp) p = p.sharpen({ sigma: 0.5, m1: 0.3, m2: 1.0, x1: 3, y2: 4, y3: 6 });
+  return p.webp({ quality: name === 'thumb' ? 66 : 74, effort: 6, smartSubsample: true }).toBuffer();
+};
+const ORIGINAL_JPEG = { quality: 90, mozjpeg: true, chromaSubsampling: '4:4:4' }; // the master every rendition is made from: keep it clean
+// Between processing steps: practically lossless and full colour resolution (re-saving with normal JPEG settings each step
+// smears thin coloured lines — stripes, prints, stitching).
+export const MID_JPEG = { quality: 100, chromaSubsampling: '4:4:4' };
 
 /** Write / delete one stored file of a media row, on R2 or on the local disk. */
 export async function writeMediaFile(m, file, buf) {
@@ -157,6 +165,81 @@ async function scoreQuality(data, sw, sh, an) {
   return Math.max(0, Math.min(100, Math.round(res + sharp_ + expo + contrast)));
 }
 
+/** How crisp a photo is (spread of the Laplacian at 512 px): ~5 very soft, ~10 soft, 20+ sharp. */
+async function measureSharpness(data) {
+  try {
+    const lap = await sharp(data).resize({ width: 512, height: 512, fit: 'inside', withoutEnlargement: true }).greyscale()
+      .convolve({ width: 3, height: 3, kernel: [0, 1, 0, 1, -4, 1, 0, 1, 0] }).raw().toBuffer();
+    let m = 0; for (const v of lap) m += v; m /= lap.length;
+    let v2 = 0; for (const v of lap) v2 += (v - m) ** 2;
+    return Math.sqrt(v2 / lap.length);
+  } catch { return 20; }
+}
+
+/**
+ * Honest clarity boost for product photos — it never invents detail, so the item looks exactly like the real one:
+ *  - small photos (long side < 1200 px) are enlarged with a high-quality filter after a whisper of smoothing
+ *    (hides JPEG blocks so they are not sharpened into the picture);
+ *  - edge-aware sharpening: flat areas (skin, plain fabric, backdrop) are barely touched, edges get the boost,
+ *    with tight limits so no bright/dark halos appear; softer photos get a bit more.
+ */
+async function refinePhoto(data) {
+  const meta = await sharp(data).metadata();
+  const long = Math.max(meta.width || 0, meta.height || 0);
+  if (!long) return data;
+  const soft = (await measureSharpness(data)) < 10;
+  const f = long < 1200 ? Math.min(2, 1200 / long) : 1;
+  let p = sharp(data);
+  if (f > 1) p = sharp(await p.blur(0.5).toBuffer()).resize({ width: Math.round(meta.width * f), kernel: 'lanczos3' });
+  p = p.sharpen({ sigma: f > 1 ? 0.75 * f : 0.7, m1: 0.4, m2: soft ? 2.0 : 1.5, x1: 3, y2: 6, y3: 10 });
+  return p.jpeg(MID_JPEG).toBuffer();
+}
+
+/**
+ * Undo a coloured light (yellow bulb, bluish daylight) — judged ONLY from the light backdrop around the edges of the photo
+ * (sheet, wall, floor), never from the product, so a garment that really is yellow or beige keeps its colour.
+ * The bright, low-colour pixels of the outer band should be neutral; if they lean clearly one way, the whole photo is
+ * shifted back by most of that amount (capped, so it can never swing colours). Nothing happens on a neutral backdrop.
+ */
+export async function neutralLight(data) {
+  try {
+    const { data: px, info } = await sharp(data).resize({ width: 512, height: 512, fit: 'inside' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const { width: w, height: h } = info;
+    const ring = [];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (x >= w * 0.15 && x < w * 0.85 && y >= h * 0.12 && y < h * 0.88) continue; // centre = where the product usually is
+      const i = (y * w + x) * 3, r = px[i], g = px[i + 1], b = px[i + 2];
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      if (mx < 120 || (mx - mn) / mx > 0.25) continue; // only light, nearly neutral surfaces
+      ring.push([r, g, b, r + g + b]);
+    }
+    if (ring.length < w * h * 0.03) return data; // not enough backdrop to judge
+    ring.sort((a, c) => c[3] - a[3]);
+    const top = ring.slice(0, Math.max(50, Math.round(ring.length * 0.5))); // the brightest half: the backdrop itself, not its shadows
+    const m = [0, 1, 2].map((c) => top.reduce((s2, p) => s2 + p[c], 0) / top.length);
+    const avg = (m[0] + m[1] + m[2]) / 3;
+    if (avg < 150 || (Math.max(...m) - Math.min(...m)) / avg < 0.05) return data; // dark backdrop or already neutral
+    const gains = m.map((v) => Math.max(0.85, Math.min(1.18, 1 + 0.85 * (avg / v - 1))));
+    return await sharp(data).linear(gains, [0, 0, 0]).jpeg(MID_JPEG).toBuffer();
+  } catch { return data; }
+}
+
+/**
+ * After levelling, a real backdrop is only *almost* the canvas colour (paper grain, JPEG noise); pasted on the exact colour it
+ * would show as a faint rectangle. Pixels very close to the backdrop colour become exactly it (soft hand-over, so the
+ * product's own light edges are untouched).
+ */
+async function snapBackdrop(buf, rgb) {
+  const { data: px, info } = await sharp(buf).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 0; i < px.length; i += 3) {
+    const d = Math.max(Math.abs(px[i] - rgb[0]), Math.abs(px[i + 1] - rgb[1]), Math.abs(px[i + 2] - rgb[2]));
+    if (d >= 20) continue;
+    const k = d <= 8 ? 1 : (20 - d) / 12;
+    px[i] = Math.round(px[i] + (rgb[0] - px[i]) * k); px[i + 1] = Math.round(px[i + 1] + (rgb[1] - px[i + 1]) * k); px[i + 2] = Math.round(px[i + 2] + (rgb[2] - px[i + 2]) * k);
+  }
+  return sharp(px, { raw: { width: info.width, height: info.height, channels: 3 } }).jpeg(MID_JPEG).toBuffer();
+}
+
 /** Gentle automatic correction: lift a dark photo, add a touch of contrast to a flat one. Skipped when the photo is already fine. */
 function enhance(pipeline, an) {
   if (an.imgMean < 95) pipeline = pipeline.gamma(Math.min(1.6, 1 + (95 - an.imgMean) / 120));
@@ -170,32 +253,89 @@ function enhance(pipeline, an) {
  *    (no visible rectangle), centre the product with an even margin and a very soft contact shadow — the marketplace "white background" look.
  *  - anything else (people, street, busy scenes), or style "original": near-4:5 → gentle cover crop; otherwise the whole photo is kept on a clean backdrop matching its own edge colours.
  */
+/**
+ * Crop a non-4:5 photo to a 4:5 window centred on the product (found by the cut-out model), keeping the real background.
+ * null when the model is unavailable or the product (with a small margin) does not fit inside such a window.
+ */
+async function frameOnProduct(base) {
+  const box = await productBox(base);
+  if (!box) return null;
+  const { width: W, height: H } = await sharp(base).metadata();
+  const r = CANVAS_W / CANVAS_H;
+  // roomy margin first; a tighter one only if the photo is too narrow for it; never cut into the product
+  for (const share of [0.12, 0.05]) {
+    const m = Math.round(Math.max(box.w, box.h) * share);
+    const bx0 = Math.max(0, box.x - m), by0 = Math.max(0, box.y - m), bx1 = Math.min(W, box.x + box.w + m), by1 = Math.min(H, box.y + box.h + m);
+    let rw, rh;
+    if (W / H > r) { rh = H; rw = Math.min(W, Math.round(H * r)); if (bx1 - bx0 > rw) continue; } // too wide: full height, slide horizontally
+    else { rw = W; rh = Math.min(H, Math.round(W / r)); if (by1 - by0 > rh) continue; } // too tall: full width, slide vertically
+    const left = Math.round(Math.min(Math.max((bx0 + bx1) / 2 - rw / 2, 0), W - rw));
+    const top = Math.round(Math.min(Math.max((by0 + by1) / 2 - rh / 2, 0), H - rh));
+    const cw = Math.max(480, Math.min(CANVAS_W, Math.round(rw / 2) * 2));
+    return sharp(base).extract({ left, top, width: rw, height: rh }).resize(cw, Math.round(cw * 1.25), { fit: 'fill' });
+  }
+  return null;
+}
+
 async function productCanvas(data, style = 'original', analysis = null) {
   const meta = await sharp(data).metadata();
   const { width: sw, height: sh } = meta;
-  const an = analysis || await analyzePhoto(data);
+  let an = analysis || await analyzePhoto(data);
+
+  // Busy backdrop but the owner wants white/cream: cut the product out (pixels untouched) onto the plain colour,
+  // then treat it like a studio shot. If the model is unavailable or unsure, the photo keeps the old treatment.
+  if (style !== 'original' && STYLE_BG[style] && !an.studio) {
+    const cut = await cutoutOnto(data, STYLE_BG[style]);
+    if (cut) { data = cut; an = { ...an, studio: true, cut: true, bg: [...STYLE_BG[style]] }; }
+  }
 
   if (style !== 'original' && STYLE_BG[style] && an.studio) {
     const target = STYLE_BG[style];
     const gains = an.bg.map((v, i) => Math.max(0.88, Math.min(1.17, target[i] / Math.max(v, 1))));
-    const leveled = await enhance(sharp(data).linear(gains, [0, 0, 0]), an).jpeg({ quality: 95 }).toBuffer();
-    let prod = leveled, pw = sw, ph = sh;
+    let leveled = await enhance(sharp(data).linear(gains, [0, 0, 0]), an).jpeg(MID_JPEG).toBuffer();
+    if (!an.cut) leveled = await snapBackdrop(leveled, target);
+    let prod = leveled, pw = sw, ph = sh, offL = 0, offT = 0;
     try {
-      const t = await sharp(leveled).trim({ background: hex(target), threshold: 14 }).jpeg({ quality: 95 }).toBuffer({ resolveWithObject: true });
-      if (t.info.width * t.info.height >= sw * sh * 0.12 && t.info.width > 40 && t.info.height > 40) { prod = t.data; pw = t.info.width; ph = t.info.height; }
+      const t = await sharp(leveled).trim({ background: hex(target), threshold: 14 }).jpeg(MID_JPEG).toBuffer({ resolveWithObject: true });
+      if (t.info.width * t.info.height >= sw * sh * (an.cut ? 0.01 : 0.12) && t.info.width > 40 && t.info.height > 40) {
+        prod = t.data; pw = t.info.width; ph = t.info.height;
+        offL = Math.abs(t.info.trimOffsetLeft || 0); offT = Math.abs(t.info.trimOffsetTop || 0);
+      }
     } catch { /* nothing to trim */ }
-    const M = 0.07;
-    const cw = Math.max(480, Math.min(CANVAS_W, Math.round(Math.max(pw / (1 - 2 * M), (ph / (1 - 2 * M)) * 0.8) / 2) * 2));
+    // A product the photographer cut off at a border (a model framed at the thighs, a sleeve out of shot) stays flush
+    // with that border; margins and the floor shadow only go where the product really ends. Floating a cut-off product looks wrong.
+    // "Cut off" only when a real share of the product sits on that border, not a shadow, a floor line or a few stray pixels.
+    const filled = async (side) => {
+      const k = 3;
+      const box = { l: { left: 0, top: 0, width: Math.min(k, pw), height: ph }, r: { left: Math.max(0, pw - k), top: 0, width: Math.min(k, pw), height: ph },
+        t: { left: 0, top: 0, width: pw, height: Math.min(k, ph) }, b: { left: 0, top: Math.max(0, ph - k), width: pw, height: Math.min(k, ph) } }[side];
+      const { data: px } = await sharp(prod).extract(box).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      let on = 0;
+      for (let i = 0; i < px.length; i += 3) if (Math.abs(px[i] - target[0]) + Math.abs(px[i + 1] - target[1]) + Math.abs(px[i + 2] - target[2]) > 60) on++;
+      return on / (px.length / 3) >= 0.2;
+    };
+    const touch = {
+      l: offL <= 2 && await filled('l'), t: offT <= 2 && await filled('t'),
+      r: offL + pw >= sw - 2 && await filled('r'), b: offT + ph >= sh - 2 && await filled('b'),
+    };
+    const M = 0.1; // breathing room around the product (too tight looks cropped)
+    const mL = touch.l ? 0 : M, mR = touch.r ? 0 : M, mT = touch.t ? 0 : M, mB = touch.b ? 0 : M;
+    const cw = Math.max(480, Math.min(CANVAS_W, Math.round(Math.max(pw / (1 - mL - mR), (ph / (1 - mT - mB)) * 0.8) / 2) * 2));
     const ch = Math.round(cw * 1.25);
-    const fit = await sharp(prod).resize({ width: Math.round(cw * (1 - 2 * M)), height: Math.round(ch * (1 - 2 * M)), fit: 'inside' }).toBuffer({ resolveWithObject: true });
-    const left = Math.round((cw - fit.info.width) / 2), top = Math.round((ch - fit.info.height) / 2);
-    const shW = Math.round(fit.info.width * 0.72), shH = Math.max(8, Math.round(ch * 0.03));
-    const shadow = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${shW}" height="${shH * 3}"><defs><filter id="b" x="-20%" y="-100%" width="140%" height="300%"><feGaussianBlur stdDeviation="${(shH * 0.55).toFixed(1)}"/></filter></defs><ellipse cx="${shW / 2}" cy="${shH * 1.5}" rx="${shW / 2.1}" ry="${shH * 0.7}" fill="#000" fill-opacity="0.10" filter="url(#b)"/></svg>`);
+    const availW = Math.round(cw * (1 - mL - mR)), availH = Math.round(ch * (1 - mT - mB));
+    const fit = await sharp(prod).resize({ width: availW, height: availH, fit: 'inside' }).toBuffer({ resolveWithObject: true });
+    const fw = fit.info.width, fh = fit.info.height;
+    const left = touch.l && !touch.r ? 0 : touch.r && !touch.l ? cw - fw : Math.round(cw * mL + (availW - fw) / 2);
+    const top = touch.t && !touch.b ? 0 : touch.b && !touch.t ? ch - fh
+      : Math.max(0, Math.round(ch * mT + (availH - fh) / 2 - (touch.b ? 0 : ch * 0.015))); // a touch above centre: room for the shadow
+    const layers = [{ input: fit.data, left, top }];
+    if (!touch.b) {
+      const shW = Math.round(fw * 0.72), shH = Math.max(8, Math.round(ch * 0.03));
+      const shadow = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${shW}" height="${shH * 3}"><defs><filter id="b" x="-20%" y="-100%" width="140%" height="300%"><feGaussianBlur stdDeviation="${(shH * 0.55).toFixed(1)}"/></filter></defs><ellipse cx="${shW / 2}" cy="${shH * 1.5}" rx="${shW / 2.1}" ry="${shH * 0.7}" fill="#000" fill-opacity="0.10" filter="url(#b)"/></svg>`);
+      layers.unshift({ input: shadow, left: Math.round(left + (fw - shW) / 2), top: Math.max(0, Math.min(ch - shH * 3, top + fh - Math.round(shH * 1.6))) });
+    }
     return sharp({ create: { width: cw, height: ch, channels: 3, background: { r: target[0], g: target[1], b: target[2] } } })
-      .composite([
-        { input: shadow, left: Math.round((cw - shW) / 2), top: Math.max(0, Math.min(ch - shH * 3, top + fit.info.height - Math.round(shH * 1.6))) },
-        { input: fit.data, left, top },
-      ])
+      .composite(layers)
       .jpeg(ORIGINAL_JPEG).toBuffer({ resolveWithObject: true });
   }
 
@@ -203,38 +343,59 @@ async function productCanvas(data, style = 'original', analysis = null) {
   const isNear = Math.abs(sw / sh - target) / target <= 0.12;
   const cw = Math.max(480, Math.min(CANVAS_W, Math.round(Math.max(sw, sh * 0.8) / 2) * 2));
   const ch = Math.round(cw * 1.25);
-  const base = await enhance(sharp(data), an).jpeg({ quality: 95 }).toBuffer();
+  const base = await enhance(sharp(data), an).jpeg(MID_JPEG).toBuffer();
   let pipeline;
   if (isNear) {
     pipeline = sharp(base).resize(cw, ch, { fit: 'cover', position: sharp.strategy.attention });
+  } else if ((pipeline = await frameOnProduct(base))) {
+    // Not 4:5, but the product fits in a 4:5 window of the photo: crop around it (real background, no bars)
   } else {
-    // Not 4:5: keep the whole photo and extend it with a clean backdrop that continues the photo's own edge colours
-    // (each empty bar takes the colour of the photo edge it touches) instead of a blurred copy of the picture.
+    // Not 4:5 and the product is too wide/tall to crop around: keep the whole photo and let its own edges run on into
+    // the empty space (each edge row/column stretched outwards, then softened), so the cloth, wall or floor simply
+    // continues — no flat bars, no mirrored copy, no visible frame.
     const fg = await sharp(base).resize({ width: cw, height: ch, fit: 'inside' }).toBuffer({ resolveWithObject: true });
     const fw = fg.info.width, fh = fg.info.height;
-    const edge = async (left, top, w, h) => {
-      const piece = await sharp(fg.data).extract({ left, top, width: Math.max(1, w), height: Math.max(1, h) }).png().toBuffer();
-      const st = await sharp(piece).stats();
-      return st.channels.slice(0, 3).map((c) => Math.round(c.mean));
-    };
-    let bgBuf;
-    try {
-      const strip = Math.max(2, Math.round(Math.min(fw, fh) * 0.03));
-      const vertical = fh < ch; // bars above/below
-      const [c1, c2] = vertical
-        ? await Promise.all([edge(0, 0, fw, strip), edge(0, fh - strip, fw, strip)])
-        : await Promise.all([edge(0, 0, strip, fh), edge(fw - strip, 0, strip, fh)]);
-      const rgb = (c) => `rgb(${c[0]},${c[1]},${c[2]})`;
-      const svg = Buffer.from(vertical
-        ? `<svg xmlns="http://www.w3.org/2000/svg" width="${cw}" height="${ch}"><rect width="${cw}" height="${Math.ceil(ch / 2)}" fill="${rgb(c1)}"/><rect y="${Math.floor(ch / 2)}" width="${cw}" height="${Math.ceil(ch / 2)}" fill="${rgb(c2)}"/></svg>`
-        : `<svg xmlns="http://www.w3.org/2000/svg" width="${cw}" height="${ch}"><rect width="${Math.ceil(cw / 2)}" height="${ch}" fill="${rgb(c1)}"/><rect x="${Math.floor(cw / 2)}" width="${Math.ceil(cw / 2)}" height="${ch}" fill="${rgb(c2)}"/></svg>`);
-      bgBuf = await sharp(svg).jpeg({ quality: 95 }).toBuffer();
-    } catch {
-      bgBuf = await sharp({ create: { width: cw, height: ch, channels: 3, background: { r: 245, g: 244, b: 240 } } }).jpeg().toBuffer();
-    }
-    pipeline = sharp(bgBuf).composite([{ input: fg.data, gravity: 'centre' }]);
+    const padT = Math.floor((ch - fh) / 2), padB = ch - fh - padT, padL = Math.floor((cw - fw) / 2), padR = cw - fw - padL;
+    const stretched = await sharp(fg.data).extend({ top: padT, bottom: padB, left: padL, right: padR, extendWith: 'copy' }).toBuffer();
+    const soft = await sharp(stretched).blur(Math.max(8, Math.round(Math.max(cw, ch) * 0.012))).toBuffer();
+    // feather the join so the sharp photo melts into the softened extension
+    const fade = Math.max(6, Math.round(Math.min(fw, fh) * 0.03));
+    const vertical = fh < ch;
+    const mask = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${fw}" height="${fh}"><defs><linearGradient id="g" x1="0" y1="0" x2="${vertical ? 0 : 1}" y2="${vertical ? 1 : 0}">`
+      + `<stop offset="0" stop-color="#000"/><stop offset="${(fade / (vertical ? fh : fw)).toFixed(4)}" stop-color="#fff"/><stop offset="${(1 - fade / (vertical ? fh : fw)).toFixed(4)}" stop-color="#fff"/><stop offset="1" stop-color="#000"/>`
+      + `</linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/></svg>`);
+    const alpha = await sharp(mask).resize(fw, fh).extractChannel(0).raw().toBuffer();
+    const { data: rgb } = await sharp(fg.data).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const rgba = Buffer.alloc(fw * fh * 4);
+    for (let i = 0; i < fw * fh; i++) { rgba[i * 4] = rgb[i * 3]; rgba[i * 4 + 1] = rgb[i * 3 + 1]; rgba[i * 4 + 2] = rgb[i * 3 + 2]; rgba[i * 4 + 3] = alpha[i]; }
+    const top = await sharp(rgba, { raw: { width: fw, height: fh, channels: 4 } }).png().toBuffer();
+    pipeline = sharp(soft).composite([{ input: top, left: padL, top: padT }]);
   }
   return pipeline.jpeg(ORIGINAL_JPEG).toBuffer({ resolveWithObject: true });
+}
+
+/**
+ * Real preview for the upload sheet: how this photo looks on white and on cream (small data URLs).
+ * Busy backdrops are cut out once and laid on both colours. { white: null } when the backdrop cannot be changed.
+ */
+export async function previewStyles(buffer) {
+  const small = await sharp(buffer, { failOn: 'error' }).rotate().toColourspace('srgb').flatten({ background: '#ffffff' })
+    .resize({ width: 900, height: 900, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer()
+    .then(neutralLight);
+  const an = await analyzePhoto(small);
+  const thumb = async (img) => `data:image/jpeg;base64,${(await sharp(img.data).resize({ width: 360 }).jpeg({ quality: 78 }).toBuffer()).toString('base64')}`;
+  const out = { studio: an.studio, white: null, cream: null };
+  if (an.studio) {
+    for (const style of ['white', 'cream']) out[style] = await thumb(await productCanvas(small, style, an));
+    return out;
+  }
+  const cut = await cutoutLayer(small);
+  if (!cut) return out;
+  for (const style of ['white', 'cream']) {
+    const bg = STYLE_BG[style];
+    out[style] = await thumb(await productCanvas(await cut.onto(bg), style, { ...an, studio: true, cut: true, bg: [...bg] }));
+  }
+  return out;
 }
 
 /** Re-render an existing product image from its stored original into the uniform 4:5 canvas (used by the one-off migration). */
@@ -290,19 +451,21 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
     // Uniform look, done automatically (the owner does nothing): see productCanvas().
     // Transparent PNG cut-outs land on white; weak photos are accepted and only score low (never refused).
     const style = styleOverride || storePhotoStyle(storeId); // per-photo override: white | cream | original | asis
+    // keep more pixels than the final canvas needs: the product is often only part of the frame
     const cleaned = await base.clone().flatten({ background: '#ffffff' })
-      .resize({ width: MAX_ORIGINAL, height: MAX_ORIGINAL, fit: 'inside', withoutEnlargement: true })
-      .jpeg({ quality: 92 }).toBuffer();
+      .resize({ width: 3200, height: 3200, fit: 'inside', withoutEnlargement: true })
+      .jpeg(MID_JPEG).toBuffer();
     if (fast) { // demo seeding: skip the analysis so the build stays quick
       normalised = await productCanvas(cleaned, 'original', { studio: false, bg: [128, 128, 128], imgMean: 128, imgStd: 60 });
     } else {
-      const an = await analyzePhoto(cleaned);
+      const lit = style === 'asis' ? cleaned : await neutralLight(cleaned); // remove a yellow/blue light cast
+      const an = await analyzePhoto(lit);
       quality = await scoreQuality(cleaned, meta.width || 0, meta.height || 0, an);
       normalised = style === 'asis'
         ? await sharp(cleaned).jpeg(ORIGINAL_JPEG).toBuffer({ resolveWithObject: true }) // exactly as shot: only rotated + size-capped
-        : await productCanvas(cleaned, style, an);
+        : await productCanvas(await refinePhoto(lit), style, an);
       // keep the untouched (rotated, size-capped) photo so we can always go back to it
-      sourceJpeg = await sharp(cleaned).resize({ width: 2000, height: 2000, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
+      sourceJpeg = await sharp(cleaned).resize({ width: 2800, height: 2800, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 88, mozjpeg: true, chromaSubsampling: '4:4:4' }).toBuffer();
     }
   } else {
     normalised = await base
@@ -318,10 +481,11 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
   const generated = [];
   let bytes = normalised.data.length;
   for (const [name, w] of Object.entries(set)) {
-    // never upscale; always keep the smallest rendition so cards have something light to load
-    if (w > width && generated.length) continue;
+    // never upscale; the first size above the photo's width is still made, at the photo's full width
+    // (otherwise a 700 px photo would only have a 400 px file and look soft on phones)
+    if (w > width && generated.some((g) => g.width >= width)) continue;
     const target = Math.min(w, width);
-    const webp = await renderWebp(normalised.data, name, target);
+    const webp = await renderWebp(normalised.data, name, target, kind === 'product');
     await fs.writeFile(path.join(dir, `${name}.webp`), webp);
     bytes += webp.length;
     generated.push({ name, width: target });
@@ -350,8 +514,35 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
     lqip: `data:image/webp;base64,${lqipBuf.toString('base64')}`,
     alt,
     quality,
+    canvas_v: kind === 'product' ? 2 : null,
   });
   return getMedia(id);
+}
+
+/**
+ * Re-make an older product photo that got the "picture inside a frame" look (a non-4:5 photo shown whole with bars).
+ * Works from the untouched source.jpg kept since the photo upload; the row keeps its id (products, search and orders
+ * still point to it) but gets a NEW key, so browsers and the CDN cannot show the old cached file.
+ * Returns what happened: 'no_source' | 'fine' | 'asis' | 'studio' | 'would' (dry run) | 'done'.
+ */
+export async function refreshProductPhoto(m, { dry = false } = {}) {
+  if (m.canvas_v >= 2) return 'fine'; // made (or already re-made) with the new framing
+  let src;
+  try { src = await readMediaFile(m, 'source.jpg'); } catch { return 'no_source'; }
+  const meta = await sharp(src).metadata();
+  const r = CANVAS_W / CANVAS_H;
+  if (Math.abs(meta.width / meta.height - r) / r <= 0.12) return 'fine'; // was already ~4:5: no frame was added
+  if (Math.abs(m.width / m.height - r) / r > 0.03) return 'asis'; // owner chose "exactly as shot": leave it
+  if ((await analyzePhoto(src)).studio) return 'studio'; // plain light backdrop: already a clean studio canvas
+  if (dry) return 'would';
+  const fresh = await processImage(src, { storeId: m.store_id, kind: 'product', style: storePhotoStyle(m.store_id) });
+  tx(() => {
+    q.run('UPDATE media SET key=?, width=?, height=?, sizes=?, original_ext=?, bytes=?, color=?, lqip=?, remote=?, quality=?, canvas_v=2 WHERE id=?',
+      [fresh.key, fresh.width, fresh.height, fresh.sizes, fresh.original_ext, fresh.bytes, fresh.color, fresh.lqip, fresh.remote, fresh.quality ?? null, m.id]);
+    q.run('DELETE FROM media WHERE id=?', [fresh.id]);
+  });
+  await purgeMediaFiles(m); // the old key's files
+  return 'done';
 }
 
 export function getMedia(id) {

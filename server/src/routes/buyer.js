@@ -7,6 +7,9 @@ import { signBuyer, requireBuyer } from '../lib/buyers.js';
 import { vapidPublicKey } from '../lib/push.js';
 import { mediaMap } from '../lib/media.js';
 import { bi } from '../lib/serialize.js';
+import crypto from 'node:crypto';
+import { config } from '../config.js';
+import { waAuthReady, sendAuthCode } from '../lib/wa.js';
 
 const r = Router();
 const normPhone = (v) => { const d = String(v || '').replace(/\D/g, ''); return d.startsWith('20') && d.length === 12 ? `0${d.slice(2)}` : d; };
@@ -35,6 +38,47 @@ r.post('/login', h((req, res) => {
   throttle(`login:${req.ip}:${b.phone}`);
   const buyer = q.get('SELECT * FROM buyers WHERE phone=?', [b.phone]);
   if (!buyer || !bcrypt.compareSync(b.password, buyer.password_hash)) throw new AppError(401, 'invalid_credentials', 'Number or password is incorrect.');
+  res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });
+}));
+
+/* ------------------------------------------------ sign in with a WhatsApp code (no password) */
+const OTP_TTL = 10 * 60e3, OTP_RESEND = 45e3, OTP_TRIES = 5;
+const otpHash = (phone, code) => crypto.createHmac('sha256', config.jwtSecret).update(`${phone}:${code}`).digest('hex');
+
+r.get('/otp/available', (_req, res) => res.json({ whatsapp: waAuthReady() }));
+
+r.post('/otp/send', h(async (req, res) => {
+  const b = z.object({ phone: phoneSchema }).parse(req.body);
+  if (!waAuthReady()) throw new AppError(503, 'wa_unavailable', 'WhatsApp sign-in is not available right now.');
+  throttle(`otp-ip:${req.ip}`, 12);
+  throttle(`otp-phone:${b.phone}`, 5);
+  const prev = q.get('SELECT sent_at FROM wa_otps WHERE phone=?', [b.phone]);
+  const now = Date.now();
+  if (prev && now - prev.sent_at < OTP_RESEND) throw new AppError(429, 'otp_wait', 'Please wait a little before asking for a new code.', { wait: Math.ceil((OTP_RESEND - (now - prev.sent_at)) / 1000) });
+  const code = String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
+  try { await sendAuthCode(b.phone, code); } catch (e) {
+    console.error(`[wa] sign-in code to ${b.phone} failed: ${e.message}`);
+    throw new AppError(502, 'wa_send_failed', 'We could not send the code on WhatsApp. Check the number has WhatsApp.');
+  }
+  q.run('INSERT INTO wa_otps (phone, code_hash, expires_at, tries, sent_at) VALUES (?,?,?,0,?) ON CONFLICT(phone) DO UPDATE SET code_hash=excluded.code_hash, expires_at=excluded.expires_at, tries=0, sent_at=excluded.sent_at', [b.phone, otpHash(b.phone, code), now + OTP_TTL, now]);
+  res.json({ sent: true, isNew: !q.get('SELECT 1 AS x FROM buyers WHERE phone=?', [b.phone]), resendIn: OTP_RESEND / 1000 });
+}));
+
+r.post('/otp/verify', h((req, res) => {
+  const b = z.object({ phone: phoneSchema, code: z.string().trim().regex(/^\d{6}$/, 'code_invalid'), name: z.string().trim().min(2, 'required').max(60).optional() }).parse(req.body);
+  throttle(`otpv:${req.ip}`, 20);
+  const row = q.get('SELECT * FROM wa_otps WHERE phone=?', [b.phone]);
+  if (!row || row.expires_at < Date.now()) throw new AppError(400, 'otp_expired', 'The code expired. Ask for a new one.', { code: 'otp_expired' });
+  if (row.tries >= OTP_TRIES) throw new AppError(429, 'otp_locked', 'Too many wrong codes. Ask for a new one.', { code: 'otp_locked' });
+  const ok = crypto.timingSafeEqual(Buffer.from(otpHash(b.phone, b.code)), Buffer.from(row.code_hash));
+  if (!ok) { q.run('UPDATE wa_otps SET tries=tries+1 WHERE phone=?', [b.phone]); throw new AppError(400, 'otp_wrong', 'The code is not correct.', { code: 'otp_wrong' }); }
+  let buyer = q.get('SELECT * FROM buyers WHERE phone=?', [b.phone]);
+  if (!buyer) {
+    if (!b.name) return res.status(200).json({ needName: true }); // code stays valid until the name is sent
+    const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10) });
+    buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
+  }
+  q.run('DELETE FROM wa_otps WHERE phone=?', [b.phone]);
   res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });
 }));
 

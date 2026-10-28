@@ -16,7 +16,7 @@ export function BuyerProvider({ children }) {
   const login = useCallback(async (body) => done(await api('/buyer/login', { method: 'POST', body })), [done]);
   const register = useCallback(async (body) => done(await api('/buyer/register', { method: 'POST', body })), [done]);
   const logout = useCallback(() => { buyerTokenStore.set(null); setState({ buyer: null, unread: 0, ready: true }); }, []);
-  const value = useMemo(() => ({ ...state, login, register, logout, refresh, setUnread: (n) => setState((s) => ({ ...s, unread: n })) }), [state, login, register, logout, refresh]);
+  const value = useMemo(() => ({ ...state, login, register, logout, refresh, acceptSession: done, setUnread: (n) => setState((s) => ({ ...s, unread: n })) }), [state, login, register, logout, refresh, done]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 export const useBuyer = () => useContext(Ctx);

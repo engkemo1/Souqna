@@ -25,7 +25,7 @@ import { describeProduct, invalidateModaCatalogue } from '../lib/stylist.js';
 import { loadKnowledge } from '../lib/moda/knowledge.js';
 import { normalizeDesignPatch, BADGE_TONES } from '@souqna/shared/layout';
 import { designSuggestion } from '../lib/store-designer.js';
-import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMediaFile } from '../lib/media.js';
+import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMediaFile, previewStyles } from '../lib/media.js';
 import {
   serializeStore, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi, stockStatus,
 } from '../lib/serialize.js';
@@ -537,6 +537,12 @@ r.post('/media', upload.array('files', 12), h(async (req, res) => {
 }));
 
 /** Re-do ONE photo in another look, from its stored original. Creates a fresh photo (new file, so no stale cache); the owner's editor swaps it in. */
+/** Upload sheet preview: the first photo on white / cream, exactly as the server will make it. Nothing is saved. */
+r.post('/media/preview', upload.single('file'), h(async (req, res) => {
+  if (!req.file) throw badRequest('no_file', 'Please choose an image.');
+  try { res.json(await previewStyles(req.file.buffer)); } catch { throw badRequest('invalid_image', 'This file is not a supported image.'); }
+}));
+
 r.post('/media/:id/restyle', h(async (req, res) => {
   const { style } = z.object({ style: z.enum(['white', 'cream', 'original', 'asis']) }).parse(req.body);
   const m = getMedia(Number(req.params.id));
@@ -677,7 +683,7 @@ function suggestTypeFor(p) {
   } catch { return {}; }
 }
 
-const productSchema = z.object({
+export const productSchema = z.object({
   name_ar: z.string().trim().min(2, 'required').max(120),
   name_en: z.string().trim().max(120).optional().default(''), // اختياري: لو فاضي بنستخدم الاسم العربي
   audience: z.string().max(12).nullable().optional(),
@@ -730,7 +736,7 @@ function assertBarcodesFree(storeId, data, existingId) {
   if (mine.some((b) => taken.has(b))) throw new AppError(409, 'barcode_in_use', 'This barcode already belongs to another product in your store.', { barcode: 'barcode_in_use' });
 }
 
-function saveProduct(storeId, data, existing) {
+export function saveProduct(storeId, data, existing) {
   return tx(() => {
     assertBarcodesFree(storeId, data, existing?.id);
     if (data.category_id && !q.val('SELECT id FROM categories WHERE id=? AND store_id=?', [data.category_id, storeId])) throw badRequest('invalid_category', 'Category not found.');

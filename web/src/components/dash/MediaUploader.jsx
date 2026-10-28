@@ -22,12 +22,20 @@ async function compress(file) {
   if (!/^image\/(jpeg|png|webp)$/.test(file.type) || file.size < 1.2 * 1024 * 1024) return file;
   try {
     const bmp = await createImageBitmap(file);
-    const scale = Math.min(1, 2400 / Math.max(bmp.width, bmp.height));
+    // 3200 px keeps fine fabric detail (stripes, prints) for the server's clean-up; halve in steps so stripes do not shimmer (moiré)
+    const target = Math.min(1, 3200 / Math.max(bmp.width, bmp.height));
+    let src = bmp, w = bmp.width, h = bmp.height;
+    while (w * 0.5 >= bmp.width * target) {
+      const c = document.createElement('canvas'); c.width = Math.round(w * 0.5); c.height = Math.round(h * 0.5);
+      const g = c.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(src, 0, 0, c.width, c.height);
+      src = c; w = c.width; h = c.height;
+    }
     const canvas = document.createElement('canvas');
-    canvas.width = Math.round(bmp.width * scale);
-    canvas.height = Math.round(bmp.height * scale);
-    canvas.getContext('2d').drawImage(bmp, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.9));
+    canvas.width = Math.round(bmp.width * target);
+    canvas.height = Math.round(bmp.height * target);
+    const ctx = canvas.getContext('2d'); ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise((r) => canvas.toBlob(r, 'image/jpeg', 0.92));
     return blob && blob.size < file.size ? new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' }) : file;
   } catch { return file; }
 }
@@ -162,42 +170,53 @@ function Tile({ item, index, total, onRemove, onPrimary, onMove, onRetry, onRest
 function PreviewSheet({ t, files, onConfirm, onCancel }) {
   const toast = useToast();
   const [style, setStyle] = useState('white');
-  const [info, setInfo] = useState(undefined);
+  const [info, setInfo] = useState(undefined); // quick on-device look (undefined = still working, null = could not read)
+  const [srv, setSrv] = useState(undefined); // the server's real result for white/cream (undefined = still working)
   const [skip, setSkip] = useState(false);
   useEffect(() => {
     let off = false;
+    setSrv(undefined);
     api('/owner/photo-style').then((r) => { if (!off) setStyle(r.style); }).catch(() => {});
     previewLooks(files[0]).then((r) => { if (!off) setInfo(r); });
+    compress(files[0]).then((f) => { const fd = new FormData(); fd.append('file', f); return upload('/owner/media/preview', fd); })
+      .then((r) => { if (!off) setSrv(r); }).catch(() => { if (!off) setSrv(null); });
     return () => { off = true; };
   }, [files]);
   const opts = [['white', t('settings.photoWhite')], ['cream', t('settings.photoCream')], ['original', t('settings.photoOriginal')]];
+  const busy = !info?.studio && srv === undefined; // busy backdrop: waiting for the server to cut it out
+  const fixed = info && !info.studio && srv !== undefined && !srv?.white; // backdrop cannot be changed for this photo
+  const look = (v) => (v === 'original' ? info?.looks?.original : srv?.[v] || (info?.studio ? info.looks[v] : null));
   const go = async () => {
-    try { if (!(info && !info.studio)) await api('/owner/photo-style', { method: 'PUT', body: { style } }); } catch (e) { toast({ tone: 'error', title: e.message || t('editor.uploadFailed') }); }
+    try { if (!fixed) await api('/owner/photo-style', { method: 'PUT', body: { style } }); } catch (e) { toast({ tone: 'error', title: e.message || t('editor.uploadFailed') }); }
     try { if (skip) localStorage.setItem('souqna.skipPhotoPreview', '1'); } catch { /* storage unavailable */ }
     onConfirm(style);
   };
+  const note = fixed ? t('editor.pvNoStudio') : busy ? t('editor.pvCutting') : info && !info.studio ? t('editor.pvCut') : t('editor.pvNote');
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={t('editor.pvTitle')}>
       <div className="max-h-[92vh] w-full overflow-y-auto rounded-t-3xl bg-elevated p-4 shadow-lift sm:max-w-lg sm:rounded-3xl">
         <div className="flex items-center justify-between"><h3 className="text-base font-bold">{t('editor.pvTitle')}</h3>
           <button type="button" onClick={onCancel} aria-label={t('common.cancel')} className="grid h-9 w-9 place-items-center rounded-full hover:bg-fg/[0.06]"><X className="h-4 w-4" /></button></div>
-        {info && !info.studio ? (
+        {fixed ? (
           <div className="mx-auto mt-3 w-40 rounded-2xl p-1.5 text-center ring-1 ring-line">
             <span className="block aspect-[4/5] overflow-hidden rounded-xl bg-surface"><img src={info.looks.original} alt="" className="h-full w-full object-cover" /></span>
           </div>
         ) : (
         <div className="mt-3 grid grid-cols-3 gap-2.5">
-          {opts.map(([v, label]) => (
-            <button key={v} type="button" onClick={() => setStyle(v)} aria-pressed={style === v} className={cx('rounded-2xl p-1.5 text-center text-xs font-semibold ring-1 transition active:scale-[.98]', style === v ? 'bg-fg/[0.05] ring-2 ring-fg' : 'ring-line')}>
-              <span className="block aspect-[4/5] overflow-hidden rounded-xl bg-surface">
-                {info ? <img src={info.looks[v]} alt="" className="h-full w-full object-cover" /> : info === null ? <img src={URL.createObjectURL(files[0])} alt="" className="h-full w-full object-cover" onLoad={(e) => URL.revokeObjectURL(e.currentTarget.src)} /> : <span className="block h-full w-full animate-pulse bg-fg/[0.06]" />}
-              </span>
-              <span className="mt-1.5 block">{label}</span>
-            </button>
-          ))}
+          {opts.map(([v, label]) => {
+            const src = look(v);
+            return (
+              <button key={v} type="button" onClick={() => setStyle(v)} aria-pressed={style === v} className={cx('rounded-2xl p-1.5 text-center text-xs font-semibold ring-1 transition active:scale-[.98]', style === v ? 'bg-fg/[0.05] ring-2 ring-fg' : 'ring-line')}>
+                <span className="block aspect-[4/5] overflow-hidden rounded-xl bg-surface">
+                  {src ? <img src={src} alt="" className="h-full w-full object-cover" /> : info === null && !busy ? <img src={URL.createObjectURL(files[0])} alt="" className="h-full w-full object-cover" onLoad={(e) => URL.revokeObjectURL(e.currentTarget.src)} /> : <span className="block h-full w-full animate-pulse bg-fg/[0.06]" />}
+                </span>
+                <span className="mt-1.5 block">{label}</span>
+              </button>
+            );
+          })}
         </div>
         )}
-        <p className="mt-3 text-[12.5px] leading-relaxed text-muted">{info && !info.studio ? t('editor.pvNoStudio') : t('editor.pvNote')}</p>
+        <p className="mt-3 text-[12.5px] leading-relaxed text-muted">{note}</p>
         {files.length > 1 && <p className="mt-1 text-[12.5px] text-muted">{t('editor.pvMany', { n: files.length })}</p>}
         <label className="mt-3 flex items-center gap-2 text-[13px] text-muted"><input type="checkbox" checked={skip} onChange={(e) => setSkip(e.target.checked)} className="h-4 w-4" />{t('editor.pvSkip')}</label>
         <div className="mt-4 flex gap-2">

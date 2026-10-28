@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useNavigate, useParams } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, Plus, X, Check, Eye, Info, Package, Sparkles, Loader2, Search, Pencil, Circle, ExternalLink, CheckCircle2, MessageCircle } from 'lucide-react';
+import { Trash2, ChevronDown, Plus, X, Check, Eye, Info, Package, Sparkles, Loader2, Search, Pencil, Circle, ExternalLink, CheckCircle2, MessageCircle } from 'lucide-react';
 import { onColor } from '@souqna/shared/theme';
 import { useApi, useIsDesktop, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
@@ -315,6 +315,18 @@ export default function ProductEditor() {
   const [newCat, setNewCat] = useState(null); // { name, parent } while the inline "add section" form is open
   const [catBusy, setCatBusy] = useState(false);
   const [customType, setCustomType] = useState('');
+  const [delOpen, setDelOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const doDelete = async () => {
+    setDeleting(true);
+    try {
+      const r = await api(`/owner/products/${id}`, { method: 'DELETE' });
+      invalidate('/owner/products'); invalidate('/owner/overview'); invalidate(`/stores/${store.slug}`);
+      setSaving(true);
+      toast({ title: r.archived ? t('products.archived') : t('products.deleted') });
+      navigate(`${base}/products`, { replace: true });
+    } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); setDeleting(false); setDelOpen(false); }
+  };
   const addTypeSection = async ({ name: raw }) => {
     const name = (raw || '').trim();
     if (name.length < 2) { toast({ tone: 'error', title: L('اكتب اسم القسم', 'Enter a section name') }); return false; }
@@ -913,6 +925,8 @@ export default function ProductEditor() {
           </motion.div>
         )}
       </AnimatePresence>
+      <div className="mt-6 flex justify-center"><button type="button" onClick={() => setDelOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-xl px-5 text-sm font-semibold text-sale hover:bg-sale/10"><Trash2 className="h-4 w-4" />{L('حذف المنتج', 'Delete product')}</button></div>
+      <ConfirmDialog open={delOpen} onClose={() => setDelOpen(false)} danger title={t('common.delete')} body={t('products.confirmDelete', { name: tr({ ar: f.name_ar, en: f.name_en || f.name_ar }) })} confirmLabel={t('common.delete')} loading={deleting} onConfirm={doDelete} />
       <LeaveGuard blocker={blocker} t={t} />
     </div>
   );

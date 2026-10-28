@@ -45,5 +45,14 @@ export const config = {
     alertTemplate: process.env.WA_ALERT_TEMPLATE || '', // optional: approved template with ONE variable ({{1}} = the message) for team alerts
     lang: process.env.WA_TEMPLATE_LANG || 'ar',
     apiBase: process.env.WA_API_BASE || 'https://graph.facebook.com/v21.0',
+    // Inbound webhook (Meta → /api/wa/webhook). verifyToken: any secret string you also type in Meta's Webhooks screen.
+    // Master switch for the new WhatsApp features (webhook, sign-in codes, products by WhatsApp). Off unless WA_ENABLED=1.
+    enabled: process.env.WA_ENABLED === '1',
+    verifyToken: process.env.WA_VERIFY_TOKEN || '',
+    // App secret (Meta App → Settings → Basic). When set, every webhook call must carry a valid X-Hub-Signature-256.
+    appSecret: process.env.WA_APP_SECRET || '',
+    // Approved AUTHENTICATION template (copy-code button) used for customer sign-in codes.
+    authTemplate: process.env.WA_AUTH_TEMPLATE || '',
+    authLang: process.env.WA_AUTH_LANG || process.env.WA_TEMPLATE_LANG || 'ar',
   },
 };

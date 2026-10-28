@@ -22,6 +22,7 @@
     "backup": "node --no-warnings --env-file-if-exists=../.env src/scripts/backup.js",
     "admin-totp": "node --no-warnings --env-file-if-exists=../.env src/scripts/admin-totp.js",
     "set-password": "node --no-warnings --env-file-if-exists=../.env src/scripts/set-password.js",
+    "media:refresh": "node --no-warnings --env-file-if-exists=../.env src/scripts/refresh-photos.js",
     "reprocess-media": "node --no-warnings --env-file-if-exists=../.env src/scripts/reprocess-media.js",
     "train:visual": "node --no-warnings --env-file-if-exists=../.env src/scripts/train-visual.js",
     "testset:visual": "node --no-warnings src/scripts/fetch-test-set.js",

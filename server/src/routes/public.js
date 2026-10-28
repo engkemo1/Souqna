@@ -892,7 +892,7 @@ r.post('/marketplace/orders', h((req, res) => {
         q.run('UPDATE products SET stock=MAX(0, stock-?), sold_count=sold_count+? WHERE id=?', [line.qty, line.qty, line.productId]);
       }
       insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
-      return { orderId, number, trackToken, total: qt.subtotal - qt.discount + shipping, subtotal: qt.subtotal, discount: qt.discount, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, store: { ar: store.name_ar, en: store.name_en } };
+      return { orderId, number, trackToken, total: qt.subtotal - qt.discount + shipping, subtotal: qt.subtotal, discount: qt.discount, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, storeWhatsapp: store.whatsapp || store.phone || null, store: { ar: store.name_ar, en: store.name_en } };
     });
     return orders;
   });

@@ -34,7 +34,7 @@ function StatusPill({ status, t }) {
 }
 
 /** Bottom-sheet quick edit: price, compare-at, status and stock per variant — built for phones. */
-function QuickEdit({ product, onClose, onSaved }) {
+function QuickEdit({ product, onClose, onSaved, onDelete }) {
   const base = useDashBase();
   const { t, tr, lang } = useI18n();
   const toast = useToast();
@@ -119,6 +119,7 @@ function QuickEdit({ product, onClose, onSaved }) {
             <QtyStepper min={0} max={9999} value={Number(form.stock) || 0} onChange={(n) => setForm({ ...form, stock: n })} />
           )}
         </div>
+        {onDelete && <button type="button" onClick={() => onDelete(product)} className="flex h-11 w-full items-center justify-center gap-2 rounded-xl border border-sale/40 text-sm font-semibold text-sale transition active:scale-[.98]"><Trash2 className="h-4 w-4" />{t('common.delete')}</button>}
       </div>
     </Sheet>
   );
@@ -328,7 +329,7 @@ export default function Products() {
                   </table>
                 </div>
               ) : (
-                <div className={cx('grid gap-3', desktop ? 'grid-cols-4 gap-5 xl:grid-cols-5' : 'sm:grid-cols-2')}>
+                <div className={cx('grid gap-3', desktop ? 'grid-cols-4 gap-5 xl:grid-cols-5' : 'grid-cols-[minmax(0,1fr)] sm:grid-cols-2')}>
                   {data.items.map((p) => desktop ? (
                     <div key={p.id} className="group overflow-hidden rounded-2xl border border-line bg-elevated">
                       <Link to={`${base}/products/${p.id}`} className="relative block"><SmartImage media={p.image} ratio="4 / 5" sizes="20vw" imgClassName="group-hover:scale-[1.03]" />
@@ -362,7 +363,7 @@ export default function Products() {
       )}
 
       <SellSheet product={sellP && (data?.items.find((x) => x.id === sellP.id) || sellP)} onClose={() => setSellP(null)} onSold={onSaved} />
-      <QuickEdit product={quick} onClose={() => setQuick(null)} onSaved={onSaved} />
+      <QuickEdit product={quick} onClose={() => setQuick(null)} onSaved={onSaved} onDelete={(p) => { setQuick(null); setTimeout(() => setDel(p), 150); }} />
       <ConfirmDialog open={!!del} onClose={() => setDel(null)} danger title={t('common.delete')} body={del ? t('products.confirmDelete', { name: tr(del.name) }) : ''}
         confirmLabel={t('common.delete')} loading={deleting} onConfirm={doDelete} />
       {/* storefront link for context */}
