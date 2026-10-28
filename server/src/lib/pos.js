@@ -27,6 +27,18 @@ export function posGate(storeId, { deviceAt = null, sync = false } = {}) {
 const sqlTime = (iso) => new Date(iso).toISOString().replace('T', ' ').slice(0, 19);
 const isoTime = (t) => (t ? `${String(t).replace(' ', 'T')}Z` : t);
 const money = (n) => Math.round(Number(n) || 0);
+const key = (productId, variantId) => `${productId}:${variantId || 0}`;
+
+/** Open "reserve & try in store" requests: the pieces are already taken out of stock and wait in the shop for the shopper. */
+export function openReservations(storeId) {
+  const orders = q.all("SELECT id, number, customer_name AS name, phone, status, reserve_until AS until, total FROM orders WHERE store_id=? AND delivery_by='pickup' AND status IN ('pending','confirmed') ORDER BY created_at LIMIT 200", [storeId]);
+  for (const o of orders) {
+    o.items = q.all('SELECT product_id AS productId, variant_id AS variantId, name_ar AS name, color, size, price, qty FROM order_items WHERE order_id=? ORDER BY id', [o.id])
+      .map((i) => ({ ...i, color: i.color || '', size: i.size || '' }));
+  }
+  return orders;
+}
+
 const recompute = (productId) => q.run("UPDATE products SET stock=(SELECT COALESCE(SUM(stock),0) FROM variants WHERE product_id=?), updated_at=datetime('now') WHERE id=?", [productId, productId]);
 
 /** Everything the screen needs to sell without the internet. */
@@ -36,9 +48,15 @@ export function bootstrap(store) {
   const by = new Map();
   for (const v of vs) { if (!by.has(v.productId)) by.set(v.productId, []); by.get(v.productId).push({ id: v.id, color: v.color || '', size: v.size || '', sku: v.sku || '', barcode: v.barcode || '', stock: v.stock }); }
   const nextNumber = (q.val('SELECT COALESCE(MAX(number),0) FROM pos_sales WHERE store_id=?', [store.id]) || 0) + 1;
+  const reservations = openReservations(store.id);
+  const held = new Map(); // how many pieces of each item are waiting for a reservation
+  const hold = (k, n) => held.set(k, (held.get(k) || 0) + n);
+  for (const o of reservations) for (const i of o.items) { hold(key(i.productId, i.variantId), i.qty); if (i.variantId) hold(key(i.productId, null), i.qty); }
+  const withHeld = (x, pid, vid) => { const n = held.get(key(pid, vid)); return n ? { ...x, held: n } : x; };
   return {
     store: { id: store.id, name: store.name_ar || store.name_en || '', slug: store.slug },
-    products: products.map((p) => ({ id: p.id, name: p.name, sku: p.sku || '', barcode: p.barcode || '', price: p.price, track: !!p.trackStock, stock: p.stock, variants: by.get(p.id) || [] })),
+    products: products.map((p) => withHeld({ id: p.id, name: p.name, sku: p.sku || '', barcode: p.barcode || '', price: p.price, track: !!p.trackStock, stock: p.stock, variants: (by.get(p.id) || []).map((v) => withHeld(v, p.id, v.id)) }, p.id, null)),
+    reservations,
     nextNumber,
     serverTime: new Date().toISOString(),
   };
@@ -76,27 +94,43 @@ export function saveSale(store, input, cashierName = '') {
     const change = Math.min(paid - total, cashPaid); // change can only come out of cash
 
     const number = (q.val('SELECT COALESCE(MAX(number),0) FROM pos_sales WHERE store_id=?', [store.id]) || 0) + 1;
+
+    // A shopper who reserved online came to the shop. Those pieces already left the stock when they reserved,
+    // so they must not be taken out a second time. A reservation that was cancelled meanwhile gave its pieces back:
+    // then the sale takes them out normally.
+    const order = input.reservationId ? q.get("SELECT * FROM orders WHERE id=? AND store_id=? AND delivery_by='pickup'", [input.reservationId, store.id]) : null;
+    const reserved = new Map();
+    const orderItems = order && ['pending', 'confirmed', 'delivered'].includes(order.status) ? q.all('SELECT * FROM order_items WHERE order_id=?', [order.id]) : [];
+    for (const i of orderItems) reserved.set(key(i.product_id, i.variant_id), (reserved.get(key(i.product_id, i.variant_id)) || 0) + i.qty);
+    for (const l of lines) {
+      const k = key(l.p.id, l.v?.id);
+      l.covered = Math.min(l.qty, reserved.get(k) || 0);
+      if (l.covered) reserved.set(k, reserved.get(k) - l.covered);
+    }
+
     const saleId = Number(q.run(
-      `INSERT INTO pos_sales(store_id, uuid, number, local_no, subtotal, discount, total, paid, change_due, cashier_name, customer_name, customer_phone, note, device_at)
-       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [store.id, input.uuid, number, input.localNo || '', subtotal, discount, total, paid, change, cashierName, input.customerName || '', input.customerPhone || '', input.note || '', sqlTime(input.createdAt)]).lastInsertRowid);
+      `INSERT INTO pos_sales(store_id, uuid, number, local_no, subtotal, discount, total, paid, change_due, cashier_name, customer_name, customer_phone, note, device_at, order_id)
+       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      [store.id, input.uuid, number, input.localNo || '', subtotal, discount, total, paid, change, cashierName, input.customerName || order?.customer_name || '', input.customerPhone || order?.phone || '', input.note || '', sqlTime(input.createdAt), order?.id ?? null]).lastInsertRowid);
 
     const touched = new Set();
     for (const l of lines) {
       const target = l.v || l.p;
       const tracked = !!l.p.track;
-      const over = tracked && l.qty > target.stock;
-      if (tracked) {
-        const next = Math.max(0, target.stock - l.qty);
+      const fresh = l.qty - l.covered; // pieces that were not waiting for this reservation
+      const over = tracked && fresh > target.stock;
+      if (tracked && fresh > 0) {
+        const next = Math.max(0, target.stock - fresh);
         if (l.v) { q.run('UPDATE variants SET stock=? WHERE id=?', [next, l.v.id]); touched.add(l.p.id); }
         else q.run('UPDATE products SET stock=? WHERE id=?', [next, l.p.id]);
-        q.run('INSERT INTO stock_movements(store_id, product_id, variant_id, delta, reason, ref) VALUES(?,?,?,?,?,?)', [store.id, l.p.id, l.v?.id ?? null, -Math.min(l.qty, target.stock), 'pos_sale', `#${number}`]);
+        q.run('INSERT INTO stock_movements(store_id, product_id, variant_id, delta, reason, ref) VALUES(?,?,?,?,?,?)', [store.id, l.p.id, l.v?.id ?? null, -Math.min(fresh, target.stock), 'pos_sale', `#${number}`]);
       }
-      q.run("UPDATE products SET sold_count=sold_count+?, updated_at=datetime('now') WHERE id=?", [l.qty, l.p.id]);
+      if (fresh > 0) q.run("UPDATE products SET sold_count=sold_count+?, updated_at=datetime('now') WHERE id=?", [fresh, l.p.id]);
       q.run(
         `INSERT INTO pos_sale_items(sale_id, product_id, variant_id, name, color, size, sku, barcode, price, qty, discount, oversold) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
         [saleId, l.p.id, l.v?.id ?? null, l.p.name, l.v?.color || '', l.v?.size || '', l.v?.sku || l.p.sku || '', l.v?.barcode || l.p.barcode || '', l.price, l.qty, l.lineDiscount, over ? 1 : 0]);
     }
+    if (order && ['pending', 'confirmed'].includes(order.status)) closeReservation(store, order, orderItems, reserved, number);
     for (const id of touched) recompute(id);
     // change is taken out of the cash line so the day's cash total is what really sits in the drawer
     let giveBack = change;
@@ -109,11 +143,45 @@ export function saveSale(store, input, cashierName = '') {
   });
 }
 
+/**
+ * The reservation ends as "bought in the shop". Pieces the shopper tried and left go back on sale, and the order keeps
+ * only what was really bought, so the shop's online reports and the shopper's page tell the truth.
+ */
+function closeReservation(store, order, orderItems, left, number) {
+  const now = new Date().toISOString();
+  let subtotal = 0;
+  for (const i of orderItems) {
+    const k = key(i.product_id, i.variant_id);
+    const back = Math.min(i.qty, left.get(k) || 0);
+    if (back) left.set(k, left.get(k) - back);
+    if (back) {
+      if (i.variant_id) q.run('UPDATE variants SET stock=stock+? WHERE id=?', [back, i.variant_id]);
+      q.run('UPDATE products SET stock=stock+?, sold_count=MAX(0,sold_count-?) WHERE id=?', [back, back, i.product_id]);
+      if (i.variant_id) recompute(i.product_id);
+      if (back === i.qty) q.run('DELETE FROM order_items WHERE id=?', [i.id]);
+      else q.run('UPDATE order_items SET qty=? WHERE id=?', [i.qty - back, i.id]);
+    }
+    subtotal += i.price * (i.qty - back);
+  }
+  if (!subtotal) {
+    // nothing of the reservation was bought (they took something else): it simply ends, without counting as a no-show
+    q.run("UPDATE orders SET status='cancelled', updated_at=? WHERE id=?", [now, order.id]);
+    q.run('INSERT INTO order_events(order_id, status, note, created_at) VALUES(?,?,?,?)', [order.id, 'cancelled', `pos #${number}`, now]);
+    if (order.customer_id) q.run('UPDATE customers SET orders_count=MAX(0,orders_count-1), total_spent=MAX(0,total_spent-?) WHERE id=?', [order.total, order.customer_id]);
+    return;
+  }
+  q.run("UPDATE orders SET status='delivered', subtotal=?, total=?, updated_at=? WHERE id=?", [subtotal, subtotal, now, order.id]);
+  q.run('INSERT INTO order_events(order_id, status, note, created_at) VALUES(?,?,?,?)', [order.id, 'delivered', `pos #${number}`, now]);
+  if (order.customer_id && subtotal !== order.total) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [order.total - subtotal, order.customer_id]);
+}
+
 export function readSale(storeId, id) {
   const s = q.get(
-    `SELECT id, uuid, number, local_no AS localNo, subtotal, discount, total, paid, change_due AS change, cashier_name AS cashier, customer_name AS customerName, customer_phone AS customerPhone, note, device_at AS createdAt
+    `SELECT id, uuid, number, local_no AS localNo, subtotal, discount, total, paid, change_due AS change, cashier_name AS cashier, customer_name AS customerName, customer_phone AS customerPhone, note, device_at AS createdAt,
+       (SELECT o.number FROM orders o WHERE o.id=pos_sales.order_id) AS reservationNumber
      FROM pos_sales WHERE id=? AND store_id=?`, [id, storeId]);
   if (!s) return null;
+  if (!s.reservationNumber) delete s.reservationNumber;
   s.createdAt = isoTime(s.createdAt);
   s.items = q.all('SELECT id, product_id AS productId, variant_id AS variantId, name, color, size, sku, barcode, price, qty, discount, returned_qty AS returnedQty, oversold FROM pos_sale_items WHERE sale_id=? ORDER BY id', [id]);
   s.payments = q.all('SELECT method, amount FROM pos_payments WHERE sale_id=? ORDER BY id', [id]);

@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Wifi, WifiOff, Search, Plus, Minus, Trash2, Receipt, RotateCcw, CalendarDays, CloudUpload, ShoppingCart, Printer, X, ArrowRight, AlertTriangle, ScanBarcode, Check } from 'lucide-react';
+import { Wifi, WifiOff, Search, Plus, Minus, Trash2, Receipt, RotateCcw, CalendarDays, CloudUpload, ShoppingCart, Printer, X, ArrowRight, AlertTriangle, ScanBarcode, Check, CalendarCheck, Phone } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
-import { addToCart, buildIndex, createScanBuffer, lookupCode, productStock, searchProducts, setQty, settle, totals } from '../../lib/pos/engine.js';
+import { addToCart, buildIndex, createScanBuffer, lookupCode, productStock, reservationCart, searchProducts, setQty, settle, totals } from '../../lib/pos/engine.js';
 import { egp, printHtml, receiptHtml } from '../../lib/pos/receipt.js';
 import { usePos } from './usePos.js';
 
@@ -58,7 +58,7 @@ function VariantPicker({ product, onPick, onClose }) {
           <button key={v.id} type="button" onClick={() => onPick(v)}
             className={cx('rounded-2xl border p-3 text-start transition active:scale-[.97]', v.stock <= 0 && product.track ? 'border-sale/40 bg-sale/5' : 'border-line bg-surface hover:border-primary')}>
             <div className="font-semibold">{[v.color, v.size].filter(Boolean).join(' · ') || 'موديل'}</div>
-            <div className={cx('mt-0.5 text-xs', v.stock <= 0 && product.track ? 'text-sale' : 'text-muted')}>{product.track ? (v.stock > 0 ? `متاح ${v.stock}` : 'نفد من المخزون') : 'بدون متابعة مخزون'}</div>
+            <div className={cx('mt-0.5 text-xs', v.stock <= 0 && product.track ? 'text-sale' : 'text-muted')}>{product.track ? (v.stock > 0 ? `متاح ${v.stock}` : 'نفد من المخزون') : 'بدون متابعة مخزون'}{v.held ? ` · محجوز ${v.held}` : ''}</div>
           </button>
         ))}
       </div>
@@ -222,6 +222,35 @@ function DayModal({ onClose, onOpen, pending }) {
   );
 }
 
+/** "Reserve & try in store" requests waiting in the shop. The shopper arrives, the cashier loads their pieces and sells. */
+function ReservationsModal({ list, onClose, onPick }) {
+  const [text, setText] = useState('');
+  const k = text.trim().replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).toLowerCase();
+  const shown = k ? list.filter((r) => [r.number, r.name, r.phone].join(' ').toLowerCase().includes(k)) : list;
+  return (
+    <Modal title="حجوزات القياس" onClose={onClose} wide>
+      <input autoFocus value={text} onChange={(e) => setText(e.target.value)} placeholder="رقم الحجز أو اسم العميل أو موبايله" className="mb-3 h-12 w-full rounded-2xl border border-line px-4 focus:outline-none focus:shadow-ring" />
+      {shown.length === 0 ? <p className="py-8 text-center text-muted">{list.length ? 'مفيش حجز بالبيانات دي.' : 'مفيش حجوزات مستنية.'}</p> : (
+        <ul className="space-y-2.5">
+          {shown.map((r) => (
+            <li key={r.id} className="rounded-2xl border border-line p-3">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <span className="font-semibold">{r.name}</span>
+                <span className="inline-flex items-center gap-1 text-sm text-muted" dir="ltr"><Phone className="h-3.5 w-3.5" />{r.phone}</span>
+                <span className="font-mono text-xs text-muted" dir="ltr">{r.number}</span>
+                <span className={cx('ms-auto rounded-full px-2.5 py-1 text-xs font-semibold', r.status === 'confirmed' ? 'bg-success/10 text-success' : 'bg-amber-100 text-amber-900')}>
+                  {r.status === 'confirmed' ? `محجوز لحد ${timeOf(r.until)}` : 'لسه مستني تأكيد'}
+                </span>
+              </div>
+              <ul className="mt-2 text-sm text-muted">{r.items.map((i, j) => <li key={j}>{i.qty > 1 ? `${i.qty} × ` : ''}{i.name}{[i.color, i.size].filter(Boolean).length ? ` · ${[i.color, i.size].filter(Boolean).join(' · ')}` : ''}</li>)}</ul>
+              <div className="mt-2.5 flex items-center justify-between gap-2"><span className="font-semibold tabular-nums">{egp(r.total)}</span><Button size="sm" icon={ShoppingCart} onClick={() => onPick(r)}>العميل وصل — حمّل في السلة</Button></div>
+            </li>))}
+        </ul>)}
+      <p className="mt-3 text-xs text-muted">القطع دي متشالة من المخزون من وقت الحجز، فبيعها هنا مش هيخصمها تاني. اللي العميل ميخدهوش يرجع للبيع لوحده.</p>
+    </Modal>
+  );
+}
+
 function QueueModal({ queue, onClose, retry, discard, sync, online }) {
   return (
     <Modal title="فواتير مستنية الإرسال" onClose={onClose} wide footer={<Button full icon={CloudUpload} disabled={!online} onClick={sync}>{online ? 'ابعت دلوقتي' : 'مفيش نت'}</Button>}>
@@ -257,6 +286,7 @@ export default function Pos() {
   const [paying, setPaying] = useState(false);
   const [autoPrint, setAutoPrint] = useState(() => { try { return localStorage.getItem('twist.pos.autoprint') !== '0'; } catch { return true; } });
   const [offlineReady, setOfflineReady] = useState(false);
+  const [res, setRes] = useState(null); // the reservation being sold, if any
   const searchRef = useRef(null);
 
   // Ask the service worker to keep this page and its build files, so the cashier opens with no internet from now on.
@@ -280,7 +310,9 @@ export default function Pos() {
 
   const add = useCallback((product, variant) => {
     setCart((c) => addToCart(c, product, variant));
-    if (product.track && (variant ? variant.stock : product.stock) <= 0) toast({ tone: 'info', title: 'الرصيد صفر', description: `${product.name} — البيع هيتسجل بدون رصيد` });
+    const held = (variant || product).held;
+    if (held) toast({ tone: 'info', title: 'فيه قطعة من دي محجوزة لعميل', description: 'لو ده صاحب الحجز، افتحه من «حجوزات» عشان القطعة متتخصمش مرتين.' });
+    else if (product.track && (variant ? variant.stock : product.stock) <= 0) toast({ tone: 'info', title: 'الرصيد صفر', description: `${product.name} — البيع هيتسجل بدون رصيد` });
   }, [toast]);
 
   const scan = useCallback((code) => {
@@ -313,12 +345,16 @@ export default function Pos() {
     if (shown.length === 1) { const p = shown[0]; if (p.variants.length) setPicker(p); else add(p, null); setText(''); }
   };
 
-  const clearAll = () => { setCart([]); setDisc({ type: 'amount', value: '' }); setText(''); setCartOpen(false); searchRef.current?.focus(); };
+  const loadReservation = (r) => {
+    if (cart.length && !window.confirm('السلة فيها حاجات. نشيلها ونحمّل الحجز؟')) return;
+    setCart(reservationCart(products, r)); setDisc({ type: 'amount', value: '' }); setRes(r); setModal(null); setCartOpen(true);
+  };
+  const clearAll = () => { setRes(null); setCart([]); setDisc({ type: 'amount', value: '' }); setText(''); setCartOpen(false); searchRef.current?.focus(); };
 
   const pay = async ({ payments, customerName, customerPhone }) => {
     setPaying(true);
     try {
-      const r = await pos.checkout({ cart, discount: { type: disc.type, value: num(disc.value) }, payments, customerName, customerPhone });
+      const r = await pos.checkout({ cart, discount: { type: disc.type, value: num(disc.value) }, payments, customerName: customerName || res?.name || '', customerPhone: customerPhone || res?.phone || '', reservation: res });
       setReceipt(r); setModal('receipt'); clearAll();
     } catch (e) { toast({ tone: 'error', title: 'مقدرناش نحفظ الفاتورة على الجهاز', description: e.message }); } finally { setPaying(false); }
   };
@@ -339,6 +375,7 @@ export default function Pos() {
         <span className={cx('hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold sm:inline-flex', online ? 'bg-success/10 text-success' : 'bg-amber-100 text-amber-900')}>{online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}{online ? 'متصل' : 'أوفلاين'}</span>
         {offlineReady && <span className="hidden text-xs text-muted lg:inline">جاهز للأوفلاين</span>}
         {(waiting > 0 || failed > 0) && <button type="button" onClick={() => setModal('queue')} className={cx('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold', failed ? 'bg-sale/10 text-sale' : 'bg-amber-100 text-amber-900')}><CloudUpload className="h-3.5 w-3.5" />{failed ? `${failed} مرفوضة` : `${waiting} مستنية`}</button>}
+        {pos.reservations.length > 0 && <button type="button" onClick={() => setModal('reservations')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]"><CalendarCheck className="h-4 w-4" /><span className="hidden sm:inline">حجوزات</span><span className="rounded-full bg-btn px-1.5 text-xs font-bold text-on-btn tabular-nums">{pos.reservations.length}</span></button>}
         <button type="button" onClick={() => setModal('invoice-find')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]"><RotateCcw className="h-4 w-4" /><span className="hidden sm:inline">مرتجع</span></button>
         <button type="button" onClick={() => setModal('day')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]"><CalendarDays className="h-4 w-4" /><span className="hidden sm:inline">اليوم</span></button>
         <label className="hidden cursor-pointer items-center gap-1.5 text-xs text-muted lg:flex"><input type="checkbox" checked={autoPrint} onChange={(e) => { setAutoPrint(e.target.checked); try { localStorage.setItem('twist.pos.autoprint', e.target.checked ? '1' : '0'); } catch { /* ignore */ } }} />طباعة تلقائية</label>
@@ -361,7 +398,7 @@ export default function Pos() {
                   <li key={p.id}><button type="button" data-testid="product" onClick={() => (p.variants.length ? setPicker(p) : add(p, null))} className="flex h-full w-full flex-col rounded-2xl border border-line bg-elevated p-3 text-start transition hover:border-primary active:scale-[.98]">
                     <span className="line-clamp-2 min-h-[2.5rem] font-medium leading-snug">{p.name}</span>
                     <span className="mt-2 text-lg font-bold tabular-nums">{egp(p.price)}</span>
-                    <span className={cx('mt-1 text-xs', out ? 'text-sale' : 'text-muted')}>{p.track ? (out ? 'نفد' : `متاح ${st}`) : 'بدون رصيد'}{p.variants.length ? ` · ${p.variants.length} موديل` : ''}</span></button></li>); })}
+                    <span className={cx('mt-1 text-xs', out ? 'text-sale' : 'text-muted')}>{p.track ? (out ? 'نفد' : `متاح ${st}`) : 'بدون رصيد'}{p.variants.length ? ` · ${p.variants.length} موديل` : ''}{p.held ? ` · محجوز ${p.held}` : ''}</span></button></li>); })}
               </ul>)}
           </div>
         </section>
@@ -369,6 +406,7 @@ export default function Pos() {
         <aside className={cx('flex min-h-0 flex-col border-s border-line bg-elevated max-md:fixed max-md:inset-x-0 max-md:bottom-0 max-md:z-40 max-md:max-h-[85dvh] max-md:rounded-t-3xl max-md:shadow-sheet', !cartOpen && 'max-md:hidden')} aria-label="السلة">
           <div className="flex items-center justify-between border-b border-line px-4 py-3"><h2 className="font-semibold">السلة {t.pieces > 0 && <span className="text-muted">({t.pieces})</span>}</h2>
             <div className="flex gap-1">{cart.length > 0 && <button type="button" onClick={clearAll} className="rounded-lg px-2.5 py-1.5 text-sm text-sale hover:bg-sale/10">فضّي</button>}<button type="button" onClick={() => setCartOpen(false)} aria-label="إغلاق" className="grid h-9 w-9 place-items-center rounded-full hover:bg-fg/[0.07] md:hidden"><X className="h-5 w-5" /></button></div></div>
+          {res && <div className="flex items-center gap-2 border-b border-line bg-success/10 px-4 py-2.5 text-sm text-success"><CalendarCheck className="h-4 w-4 shrink-0" /><span className="min-w-0 flex-1 truncate font-semibold">حجز {res.name} · <span dir="ltr">{res.number}</span></span><button type="button" onClick={() => setRes(null)} className="text-xs underline">مش حجز</button></div>}
           <div className="min-h-0 flex-1 overflow-y-auto">
             {cart.length === 0 ? <div className="grid h-full min-h-[160px] place-items-center p-6 text-center text-muted"><div><ShoppingCart className="mx-auto mb-2 h-8 w-8 opacity-40" />امسح باركود أو اختار منتج</div></div> : (
               <ul className="divide-y divide-line">
@@ -399,6 +437,7 @@ export default function Pos() {
       {picker && <VariantPicker product={picker} onClose={() => setPicker(null)} onPick={(v) => { add(picker, v); setPicker(null); searchRef.current?.focus(); }} />}
       {modal === 'pay' && <PaySheet total={t.total} busy={paying} onClose={() => setModal(null)} onConfirm={pay} />}
       {modal === 'receipt' && receipt && <ReceiptModal storeName={store.name} sale={receipt} autoPrint={autoPrint} onClose={() => { setModal(null); searchRef.current?.focus(); }} />}
+      {modal === 'reservations' && <ReservationsModal list={pos.reservations} onClose={() => setModal(null)} onPick={loadReservation} />}
       {modal === 'queue' && <QueueModal queue={queue} online={online} sync={pos.sync} retry={pos.retry} discard={pos.discard} onClose={() => setModal(null)} />}
       {modal === 'day' && <DayModal pending={waiting} onClose={() => setModal(null)} onOpen={(ref) => setModal({ invoice: ref })} />}
       {modal === 'invoice-find' && <FindInvoice onClose={() => setModal(null)} onOpen={(ref) => setModal({ invoice: ref })} />}

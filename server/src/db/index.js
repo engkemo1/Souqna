@@ -107,6 +107,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   }
   const ocols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!ocols.includes('delivery_by')) db.exec("ALTER TABLE orders ADD COLUMN delivery_by TEXT NOT NULL DEFAULT 'store'");
+  const pscols = db.prepare('PRAGMA table_info(pos_sales)').all().map((c) => c.name);
+  if (pscols.length && !pscols.includes('order_id')) db.exec('ALTER TABLE pos_sales ADD COLUMN order_id INTEGER'); // the store reservation this sale completed
   if (!ocols.includes('reserve_until')) db.exec('ALTER TABLE orders ADD COLUMN reserve_until TEXT'); // pickup reservations (delivery_by=\'pickup\'): held until
   if (!ocols.includes('delivery_group')) db.exec('ALTER TABLE orders ADD COLUMN delivery_group TEXT');
   if (!ocols.includes('delivery_route_id')) db.exec('ALTER TABLE orders ADD COLUMN delivery_route_id TEXT');

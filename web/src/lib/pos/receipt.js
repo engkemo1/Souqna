@@ -25,6 +25,7 @@ hr{border:0;border-top:1px dashed #000;margin:6px 0}table{width:100%;border-coll
 </style></head><body>
 <h1>${esc(storeName)}</h1><div class="c s">${esc(ref)}${copy ? ' — نسخة' : ''}</div><div class="c s">${esc(when(sale.createdAt))}</div>
 ${sale.customerName ? `<div class="c s">العميل: ${esc(sale.customerName)}</div>` : ''}
+${sale.reservationNumber ? `<div class="c s">حجز رقم ${esc(sale.reservationNumber)}</div>` : ''}
 <hr><table>${rows}</table><hr>
 <div class="r"><span>الإجمالي قبل الخصم</span><span>${egp(sale.subtotal)}</span></div>
 ${sale.discount ? `<div class="r"><span>الخصم</span><span>− ${egp(sale.discount)}</span></div>` : ''}

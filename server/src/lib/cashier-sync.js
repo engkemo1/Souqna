@@ -18,8 +18,13 @@ export function loadIndex(storeId) {
        FROM products p WHERE p.store_id=?`, [storeId]);
   const byBarcode = new Map(); const bySku = new Map();
   const add = (map, key, entry) => { if (!key) return; const k = normCode(key); if (!k) return; (map.get(k) || map.set(k, []).get(k)).push(entry); };
-  for (const v of variants) { const e = { kind: 'variant', ...v }; add(byBarcode, v.barcode, e); add(bySku, v.sku, e); }
-  for (const p of products) if (!p.variantCount) { const e = { kind: 'product', ...p }; add(byBarcode, p.barcode, e); add(bySku, p.sku, e); }
+  // Pieces reserved online ("reserve & try in store") still sit on the shop's shelf, so the shop's own cashier counts
+  // them; on Twist they are already taken out. Without this, a stock update would put a reserved piece back on sale.
+  const held = new Map();
+  for (const h of q.all(`SELECT i.product_id AS p, i.variant_id AS v, SUM(i.qty) AS n FROM order_items i JOIN orders o ON o.id=i.order_id
+      WHERE o.store_id=? AND o.delivery_by='pickup' AND o.status IN ('pending','confirmed') GROUP BY i.product_id, i.variant_id`, [storeId])) held.set(h.v ? `v${h.v}` : `p${h.p}`, h.n);
+  for (const v of variants) { const e = { kind: 'variant', ...v, held: held.get(`v${v.id}`) || 0 }; add(byBarcode, v.barcode, e); add(bySku, v.sku, e); }
+  for (const p of products) if (!p.variantCount) { const e = { kind: 'product', ...p, held: held.get(`p${p.id}`) || 0 }; add(byBarcode, p.barcode, e); add(bySku, p.sku, e); }
   const productsWithVariants = new Map();
   for (const p of products) if (p.variantCount) { add(productsWithVariants, p.sku, p); add(productsWithVariants, p.barcode, p); }
   return { variants, products, byBarcode, bySku, productsWithVariants };
@@ -81,8 +86,9 @@ export function planImport(storeId, rows, mapping) {
       if (pr !== null && pr !== e.price) priceDiffs++;
     }
     if (e.kind === 'variant' && m.how === 'sku' && normCode(barcode) && !e.barcode && !index.byBarcode.has(normCode(barcode))) learn.push({ variantId: e.id, barcode: String(barcode).trim() });
-    if (e.stock === qty) { unchanged++; return; }
-    changes.push({ kind: e.kind, id: e.id, productId: e.kind === 'variant' ? e.productId : e.id, name: e.name, color: e.color || '', size: e.size || '', from: e.stock, to: qty, clamped, line });
+    const free = Math.max(0, qty - e.held); // pieces reserved online are on the shelf but not free to sell
+    if (e.stock === free) { unchanged++; return; }
+    changes.push({ kind: e.kind, id: e.id, productId: e.kind === 'variant' ? e.productId : e.id, name: e.name, color: e.color || '', size: e.size || '', from: e.stock, to: free, clamped, line, ...(e.held ? { held: e.held } : {}) });
   });
   return { total: rows.length, changes, skipped, learn, unchanged, priceDiffs };
 }
@@ -115,12 +121,13 @@ export function pushStock(storeId, items) {
   tx(() => {
     for (const it of items) {
       const label = it.sku || it.barcode || '';
-      const qty = Math.min(Math.max(Math.floor(Number(it.stock)), 0), MAX_STOCK);
-      if (!Number.isFinite(qty)) { results.push({ ref: label, status: 'bad_quantity' }); continue; }
+      const counted = Math.min(Math.max(Math.floor(Number(it.stock)), 0), MAX_STOCK);
+      if (!Number.isFinite(counted)) { results.push({ ref: label, status: 'bad_quantity' }); continue; }
       const m = matchKey(index, it.barcode, it.sku);
       if (m.skip) { results.push({ ref: label, status: m.skip }); continue; }
       const e = m.entry;
       if (!e.trackStock) { results.push({ ref: label, status: 'not_tracked' }); continue; }
+      const qty = Math.max(0, counted - e.held); // what is free to sell
       let status = 'unchanged';
       if (e.stock !== qty) {
         status = 'updated';

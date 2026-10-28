@@ -4,6 +4,8 @@ import { h, AppError } from '../lib/errors.js';
 import { requireOwner } from '../lib/auth.js';
 import { posGate, bootstrap, saveSale, saveReturn, readSale, daySummary, listSales, saleIdByNumber } from '../lib/pos.js';
 import { refreshCatalogueCache } from '../lib/cashier-sync.js';
+import { q } from '../db/index.js';
+import { notifyOrderStatus } from '../lib/buyers.js';
 
 /** Twist cashier API (store owner sign-in). Mounted at /api/pos. */
 const r = Router();
@@ -31,13 +33,19 @@ const saleBody = z.object({
   customerName: z.string().trim().max(80).optional(),
   customerPhone: z.string().trim().max(30).optional(),
   note: z.string().trim().max(300).optional(),
+  reservationId: int.positive().optional(), // a "reserve & try in store" request the shopper came for
 });
 
 r.post('/sales', h(async (req, res) => {
   const body = saleBody.parse(req.body);
   posGate(req.store.id, { deviceAt: body.createdAt, sync: true });
+  const before = body.reservationId ? q.val('SELECT status FROM orders WHERE id=? AND store_id=?', [body.reservationId, req.store.id]) : null;
   const out = saveSale(req.store, body, req.user.name || '');
   if (!out.duplicate) await refreshCatalogueCache();
+  if (!out.duplicate && body.reservationId) {
+    const st = q.val('SELECT status FROM orders WHERE id=? AND store_id=?', [body.reservationId, req.store.id]);
+    if (st === 'delivered' && before !== 'delivered') try { notifyOrderStatus(body.reservationId, 'delivered'); } catch { /* best effort */ }
+  }
   res.json(out);
 }));
 

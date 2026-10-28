@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, tokenStore } from '../../lib/api.js';
 import { openPosDb } from '../../lib/pos/db.js';
-import { applyLocalStock, buildSale, newUuid, syncQueue } from '../../lib/pos/engine.js';
+import { applyLocalStock, buildSale, newUuid, stockItems, syncQueue } from '../../lib/pos/engine.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const pad = (n) => String(n).padStart(4, '0');
@@ -19,6 +19,7 @@ export function usePos() {
   const [blocked, setBlocked] = useState(null);
   const [store, setStore] = useState(null);
   const [products, setProducts] = useState([]);
+  const [reservations, setReservations] = useState([]);
   const [savedAt, setSavedAt] = useState(null);
   const [queue, setQueue] = useState([]);
   const [online, setOnline] = useState(typeof navigator === 'undefined' ? true : navigator.onLine);
@@ -27,14 +28,16 @@ export function usePos() {
   const [busy, setBusy] = useState(false);
   const storeRef = useRef(null);
   const productsRef = useRef([]);
+  const reservationsRef = useRef([]);
   const queueRef = useRef([]);
 
   const setQ = (list) => { queueRef.current = list; setQueue(list); };
   const setP = (list) => { productsRef.current = list; setProducts(list); };
+  const setR = (list) => { reservationsRef.current = list; setReservations(list); };
 
   const persistCatalog = useCallback(async (s, list, when) => {
     const db = dbRef.current; if (!db || !s) return;
-    await db.set(`catalog:${s.id}`, { store: s, products: list, savedAt: when });
+    await db.set(`catalog:${s.id}`, { store: s, products: list, reservations: reservationsRef.current, savedAt: when });
     await db.set('last', s.id);
   }, []);
 
@@ -43,7 +46,9 @@ export function usePos() {
     setQ(list); return list;
   }, []);
 
-  const pendingItems = () => queueRef.current.filter((e) => e.state === 'pending').flatMap((e) => e.body.items);
+  const pendingItems = () => queueRef.current.filter((e) => e.state === 'pending').flatMap((e) => e.stockItems || e.body.items);
+  // a reservation sold on this device but not sent yet is already finished here
+  const openOnly = (list) => { const done = new Set(queueRef.current.map((e) => e.body.reservationId).filter(Boolean)); return (list || []).filter((r) => !done.has(r.id)); };
 
   /** Ask the server for the catalogue. Sales that have not reached the server yet are re-applied on top of its stock. */
   const refresh = useCallback(async () => {
@@ -52,6 +57,7 @@ export function usePos() {
       if (!storeRef.current || storeRef.current.id !== d.store.id) { storeRef.current = d.store; setStore(d.store); await loadQueue(d.store.id); }
       const list = applyLocalStock(d.products, pendingItems());
       const when = d.serverTime;
+      setR(openOnly(d.reservations));
       setP(list); setSavedAt(when); setAuthExpired(false); setBlocked(null); setPhase('ready');
       await persistCatalog(d.store, list, when);
       return true;
@@ -94,7 +100,7 @@ export function usePos() {
       const snap = last ? await db.get(`catalog:${last}`) : null;
       if (snap && !dead) {
         storeRef.current = snap.store; setStore(snap.store); setP(snap.products); setSavedAt(snap.savedAt);
-        await loadQueue(snap.store.id); setPhase('ready');
+        await loadQueue(snap.store.id); setR(openOnly(snap.reservations)); setPhase('ready');
       }
       if (!tokenStore.get() && !snap) { setPhase('signin'); return; }
       const ok = await refresh();
@@ -117,16 +123,18 @@ export function usePos() {
    * Saves the sale on the device first (so it can never be lost), lowers the local stock, then tries to send it.
    * Waits a moment for the server's official number so the receipt can carry it; otherwise the receipt is temporary.
    */
-  const checkout = useCallback(async ({ cart, discount, payments, customerName, customerPhone }) => {
+  const checkout = useCallback(async ({ cart, discount, payments, customerName, customerPhone, reservation = null }) => {
     const db = dbRef.current; const s = storeRef.current;
     const counter = ((await db.get(`counter:${s.id}`)) || 0) + 1;
     await db.set(`counter:${s.id}`, counter);
     const uuid = newUuid();
-    const { body, receipt } = buildSale({ uuid, localNo: `م-${pad(counter)}`, createdAt: new Date().toISOString(), cart, discount, payments, customerName, customerPhone });
-    const entry = { uuid, storeId: s.id, state: 'pending', body, receipt, error: null };
+    const { body, receipt } = buildSale({ uuid, localNo: `م-${pad(counter)}`, createdAt: new Date().toISOString(), cart, discount, payments, customerName, customerPhone, reservation });
+    const moved = stockItems(body.items, reservation);
+    const entry = { uuid, storeId: s.id, state: 'pending', body, receipt, error: null, ...(reservation ? { stockItems: moved } : {}) };
     await db.putSale(entry);
     setQ([...queueRef.current, entry]);
-    const next = applyLocalStock(productsRef.current, body.items);
+    if (reservation) setR(reservationsRef.current.filter((r) => r.id !== reservation.id));
+    const next = applyLocalStock(productsRef.current, moved);
     setP(next); persistCatalog(s, next, savedAt);
     if (navigator.onLine) await Promise.race([sync(), sleep(2500)]);
     return { ...receipt, number: numbers.current.get(uuid) ?? null };
@@ -143,5 +151,5 @@ export function usePos() {
     await dbRef.current.deleteSale(uuid); setQ(queueRef.current.filter((x) => x.uuid !== uuid));
   }, []);
 
-  return { phase, blocked, store, products, savedAt, queue, online, authExpired, safeStorage, busy, checkout, sync, refresh, retry, discard, db: dbRef };
+  return { phase, blocked, store, products, reservations, savedAt, queue, online, authExpired, safeStorage, busy, checkout, sync, refresh, retry, discard, db: dbRef };
 }

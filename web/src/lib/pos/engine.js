@@ -86,7 +86,7 @@ export function settle(total, payments) {
 
 /* ------------------------------------------------------------------ the sale record */
 
-export function buildSale({ uuid, localNo, createdAt, cart, discount, payments, customerName = '', customerPhone = '', note = '' }) {
+export function buildSale({ uuid, localNo, createdAt, cart, discount, payments, customerName = '', customerPhone = '', note = '', reservation = null }) {
   const t = totals(cart, discount);
   const s = settle(t.total, payments);
   if (!cart.length) throw new Error('empty_cart');
@@ -98,14 +98,45 @@ export function buildSale({ uuid, localNo, createdAt, cart, discount, payments, 
       items: cart.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, price: l.price, discount: l.discount })),
       discount: t.discount, payments: clean,
       ...(customerName ? { customerName } : {}), ...(customerPhone ? { customerPhone } : {}), ...(note ? { note } : {}),
+      ...(reservation ? { reservationId: reservation.id } : {}),
     },
     // what the receipt needs while the server has not numbered the invoice yet
     receipt: {
       uuid, localNo, createdAt, number: null,
       items: cart.map((l) => ({ name: l.name, color: l.color, size: l.size, price: l.price, qty: l.qty, discount: l.discount })),
       subtotal: t.subtotal, discount: t.discount, total: t.total, paid: s.paid, change: s.change, payments: clean, customerName,
+      ...(reservation ? { reservationNumber: reservation.number } : {}),
     },
   };
+}
+
+/**
+ * The lines of a sale that really leave the shelf now. Pieces bought for a reservation were already taken out of
+ * stock when the shopper reserved them, so they are not taken out again.
+ */
+export function stockItems(items, reservation = null) {
+  if (!reservation) return items;
+  const left = new Map();
+  for (const i of reservation.items || []) left.set(lineKey(i.productId, i.variantId), (left.get(lineKey(i.productId, i.variantId)) || 0) + i.qty);
+  return items.map((i) => {
+    const k = lineKey(i.productId, i.variantId);
+    const covered = Math.min(i.qty, left.get(k) || 0);
+    if (covered) left.set(k, left.get(k) - covered);
+    return { ...i, qty: i.qty - covered };
+  }).filter((i) => i.qty > 0);
+}
+
+/** Cart lines for a reservation the shopper came for, priced as reserved, using the catalogue when the item is there. */
+export function reservationCart(products, reservation) {
+  let cart = [];
+  for (const i of reservation.items) {
+    const p = products.find((x) => x.id === i.productId);
+    const v = p && i.variantId ? p.variants?.find((x) => x.id === i.variantId) : null;
+    const base = p || { id: i.productId, name: i.name, sku: '', barcode: '', price: i.price, track: false, stock: 0, variants: [] };
+    cart = addToCart(cart, { ...base, price: i.price }, v || (i.variantId ? { id: i.variantId, color: i.color, size: i.size, sku: '', barcode: '', stock: 0 } : null), i.qty);
+  }
+  // reserved pieces are waiting in the shop, so "more than stock" does not apply to them
+  return cart.map((l) => ({ ...l, stock: l.stock + l.qty, reserved: l.qty }));
 }
 
 /** Optimistic local stock so the screen shows what is left even before the server has heard about the sale. */
