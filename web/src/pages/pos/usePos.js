@@ -167,12 +167,12 @@ export function usePos() {
   }, [loadQueue, refresh, sync]);
 
   useEffect(() => {
-    const on = () => { setOnline(true); sync(); };
+    const on = () => { setOnline(true); refresh().catch(() => false).finally(() => sync()); };
     const off = () => setOnline(false);
     window.addEventListener('online', on); window.addEventListener('offline', off);
     const id = setInterval(() => { if (navigator.onLine) sync(); }, 20000);
     return () => { window.removeEventListener('online', on); window.removeEventListener('offline', off); clearInterval(id); };
-  }, [sync]);
+  }, [refresh, sync]);
 
   /**
    * Saves the sale on the device first (so it can never be lost), lowers the local stock, then tries to send it.
@@ -186,7 +186,7 @@ export function usePos() {
     const uuid = newUuid();
     const { body, receipt } = buildSale({ uuid, localNo: `م-${pad(counter)}`, createdAt: new Date().toISOString(), cart, discount, payments, customerName, customerPhone, reservation, shiftId: shiftRef.current.id });
     const moved = stockItems(body.items, reservation);
-    const entry = { uuid, storeId: s.id, state: 'pending', body, receipt, error: null, ...(reservation ? { stockItems: moved } : {}) };
+    const entry = { uuid, storeId: s.id, state: 'pending', body, receipt, error: null, ...(reservation ? { stockItems: moved, reservationSnapshot: reservation } : {}) };
     await db.putSale(entry);
     setQ([...queueRef.current, entry]);
     if (reservation) setR(reservationsRef.current.filter((r) => r.id !== reservation.id));
@@ -204,8 +204,19 @@ export function usePos() {
   }, [sync]);
 
   const discard = useCallback(async (uuid) => {
-    await dbRef.current.deleteSale(uuid); setQ(queueRef.current.filter((x) => x.uuid !== uuid));
-  }, []);
+    const entry = queueRef.current.find((x) => x.uuid === uuid);
+    if (!entry) return;
+    await dbRef.current.deleteSale(uuid);
+    setQ(queueRef.current.filter((x) => x.uuid !== uuid));
+    const restored = applyLocalStock(productsRef.current, entry.stockItems || entry.body.items, 1);
+    setP(restored);
+    if (entry.reservationSnapshot && !reservationsRef.current.some((r) => r.id === entry.reservationSnapshot.id)) {
+      setR([...reservationsRef.current, entry.reservationSnapshot].sort((a, b) => String(a.until || '').localeCompare(String(b.until || ''))));
+    }
+    if (storeRef.current) await persistCatalog(storeRef.current, restored, savedAt);
+    // Refresh the authoritative stock and reservation list when online; local recovery above also works offline.
+    if (navigator.onLine) await refresh();
+  }, [persistCatalog, refresh, savedAt]);
 
   return { phase, blocked, store, register, shift, closedShift, openShift, moveCash, closeShift, receiveStock, products, reservations, savedAt, queue, online, authExpired, safeStorage, busy, checkout, sync, refresh, retry, discard, db: dbRef };
 }

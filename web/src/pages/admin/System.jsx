@@ -110,7 +110,7 @@ function GeminiUsagePanel() {
       {!g.configured ? <p className="text-sm text-muted">Gemini مش متوصل (محتاج <span dir="ltr">GEMINI_API_KEY</span> في ملف .env على السيرفر).</p> : (
         <div className="space-y-4">
           <div className={'rounded-xl px-3 py-2.5 text-sm font-medium ' + (g.stopped ? 'bg-sale/10 text-sale' : near ? 'bg-amber-100 text-amber-900' : 'bg-success/10 text-success')}>
-            {g.stopped ? `الحد خلص النهارده. بيرجع ${at(g.resetsAt)}. لحد ما يرجع: الصور بتتساب بخلفيتها الحقيقية.` : near ? `قرّب يخلص — بيتجدد ${at(g.resetsAt)}` : `شغال — بيتجدد ${at(g.resetsAt)}`}
+            {g.stopped ? `الحد خلص النهارده. بيرجع ${at(g.resetsAt)}. لحد ما يرجع: لو Claude متوصل بيراجع هو؛ لو لأ، صور اللوحة بتتقص بالفحص المحلي وصاحب المحل شايفها قبل الحفظ، وتصليح الصور القديمة بيستنى.` : near ? `قرّب يخلص — بيتجدد ${at(g.resetsAt)}` : `شغال — بيتجدد ${at(g.resetsAt)}`}
           </div>
           <div>
             <div className="flex items-end justify-between gap-2"><span className="text-sm text-muted">النهارده</span><span className="text-2xl font-bold tabular-nums">{t.total}{g.limit ? <span className="text-base font-medium text-muted"> / {g.limit}</span> : null}</span></div>

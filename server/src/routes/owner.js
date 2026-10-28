@@ -534,7 +534,8 @@ r.post('/media', upload.array('files', 12), h(async (req, res) => {
   if (!files.length) throw badRequest('no_file', 'Please choose at least one image.');
   const kind = ['product', 'banner', 'category', 'logo', 'cover'].includes(req.query.kind) ? req.query.kind : 'product';
   const out = [];
-  for (const f of files) out.push(serializeMedia(await processImage(f.buffer, { storeId: req.store.id, kind })));
+  // the owner is uploading from the dashboard and sees every photo: they are the last check of a cut-out
+  for (const f of files) out.push(serializeMedia(await processImage(f.buffer, { storeId: req.store.id, kind, ownerSees: true })));
   res.status(201).json({ media: out });
 }));
 
@@ -551,7 +552,7 @@ r.post('/media/:id/restyle', h(async (req, res) => {
   if (!m || m.store_id !== req.store.id || m.kind !== 'product') throw new AppError(404, 'not_found', 'Photo not found.');
   let src;
   try { src = await readMediaFile(m, 'source.jpg'); } catch { throw badRequest('no_source', 'This photo was uploaded before the new look, so its original is not stored. Please upload it again.'); }
-  const fresh = await processImage(src, { storeId: req.store.id, kind: 'product', style });
+  const fresh = await processImage(src, { storeId: req.store.id, kind: 'product', style, ownerSees: true }); // the owner picked this look and sees it
   if (!m.attached) await deleteMedia(m); // never saved on a product: nothing refers to it, tidy up
   res.json({ media: serializeMedia(fresh) });
 }));

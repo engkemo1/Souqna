@@ -279,15 +279,15 @@ async function frameOnProduct(base) {
 }
 
 /** The product on a plain colour, only when both the local checks and the review are sure the cut is right; else null. */
-async function trustedCut(data, rgb) {
+async function trustedCut(data, rgb, ownerSees = false) {
   const layer = await cutoutLayer(data);
   if (!layer) return null;
   const cut = await layer.onto(rgb);
-  return (await reviewCutout(data, cut)) ? cut : null;
+  return (await reviewCutout(data, cut, { ownerSees })) ? cut : null;
 }
 
 // `report.cut` tells the caller what happened to a busy backdrop: true = replaced, false = kept (cut not trusted or not allowed)
-async function productCanvas(data, style = 'original', analysis = null, { noCut = false, report = null } = {}) {
+async function productCanvas(data, style = 'original', analysis = null, { noCut = false, report = null, ownerSees = false } = {}) {
   const meta = await sharp(data).metadata();
   const { width: sw, height: sh } = meta;
   let an = analysis || await analyzePhoto(data);
@@ -295,7 +295,7 @@ async function productCanvas(data, style = 'original', analysis = null, { noCut 
   // Busy backdrop but the owner wants white/cream: cut the product out (pixels untouched) onto the plain colour,
   // then treat it like a studio shot. If the model is unavailable or unsure, the photo keeps the old treatment.
   if (style !== 'original' && STYLE_BG[style] && !an.studio) {
-    const cut = noCut ? null : await trustedCut(data, STYLE_BG[style]);
+    const cut = noCut ? null : await trustedCut(data, STYLE_BG[style], ownerSees);
     if (report) report.cut = Boolean(cut);
     if (cut) { data = cut; an = { ...an, studio: true, cut: true, bg: [...STYLE_BG[style]] }; }
   }
@@ -403,7 +403,7 @@ export async function previewStyles(buffer) {
   const cut = await cutoutLayer(small);
   if (!cut) return out;
   const onWhite = await cut.onto(STYLE_BG.white);
-  if (!(await reviewCutout(small, onWhite))) return out; // shown as "this photo keeps its real background"
+  if (!(await reviewCutout(small, onWhite, { ownerSees: true }))) return out; // shown as "this photo keeps its real background"
   for (const style of ['white', 'cream']) {
     const bg = STYLE_BG[style];
     out[style] = await thumb(await productCanvas(style === 'white' ? onWhite : await cut.onto(bg), style, { ...an, studio: true, cut: true, bg: [...bg] }));
@@ -441,7 +441,7 @@ export async function reprocessProductMedia(m) {
   ]);
 }
 
-export async function processImage(buffer, { storeId, kind = 'product', alt = null, fast = false, style: styleOverride = null, noCut = false }) {
+export async function processImage(buffer, { storeId, kind = 'product', alt = null, fast = false, style: styleOverride = null, noCut = false, ownerSees = false }) {
   let meta;
   try {
     meta = await sharp(buffer, { failOn: 'error' }).metadata();
@@ -477,7 +477,7 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
       quality = await scoreQuality(cleaned, meta.width || 0, meta.height || 0, an);
       normalised = style === 'asis'
         ? await sharp(cleaned).jpeg(ORIGINAL_JPEG).toBuffer({ resolveWithObject: true }) // exactly as shot: only rotated + size-capped
-        : await productCanvas(await refinePhoto(lit), style, an, { noCut, report });
+        : await productCanvas(await refinePhoto(lit), style, an, { noCut, report, ownerSees });
       // keep the untouched (rotated, size-capped) photo so we can always go back to it
       sourceJpeg = await sharp(cleaned).resize({ width: 2800, height: 2800, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 88, mozjpeg: true, chromaSubsampling: '4:4:4' }).toBuffer();
     }

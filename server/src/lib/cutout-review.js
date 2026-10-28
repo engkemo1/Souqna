@@ -2,16 +2,17 @@
  * A second pair of eyes on every background removal: Gemini looks at the photo before and after and says whether the
  * product came out complete and alone. The local checks in cutout.js catch the usual traces of a wrong cut; this catches
  * the rest (a hand, a chair, a reflection, a hanger, a missing sleeve, whatever the case).
- * The cut is used only when Gemini clearly approves. No answer (no network, limit reached, unclear reply) = not approved,
- * and the photo keeps its real background. Without a Gemini key the local checks alone decide (the old behaviour).
+ * The cut is used only when a reviewer clearly approves. Gemini first (each model has its own free daily limit, so a used-up
+ * model hands over to the next), then Claude when ANTHROPIC_API_KEY is set. When nobody can answer, see reviewCutout().
+ * Without any key the local checks alone decide (the old behaviour).
  * CUTOUT_REVIEW=0 turns the review off.
  */
 import crypto from 'node:crypto';
 import sharp from 'sharp';
-import { recordAi } from './ai-usage.js';
+import { recordAi, usageDay } from './ai-usage.js';
 
 const key = () => process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-export const reviewEnabled = () => process.env.CUTOUT_REVIEW !== '0' && Boolean(key());
+export const reviewEnabled = () => process.env.CUTOUT_REVIEW !== '0' && Boolean(key() || process.env.ANTHROPIC_API_KEY);
 
 // Flash-Lite: on the free tier it allows ~25x more requests a day than Flash (500 vs 20) and is enough to judge a cut.
 // A name Google has retired answers 404 and the next one is tried.
@@ -34,15 +35,22 @@ Reply with ONE JSON object only:
  "problem": "a few words about what is wrong, or empty"}
 Be strict: a small piece of rack or wall left beside the product, or a missing piece of the product, means false.`;
 
-async function ask(original, result) {
-  const img = async (b) => ({ inlineData: { mimeType: 'image/jpeg', data: (await sharp(b).resize({ width: 640, height: 640, fit: 'inside' }).jpeg({ quality: 85 }).toBuffer()).toString('base64') } });
+const b64 = async (b) => (await sharp(b).resize({ width: 640, height: 640, fit: 'inside' }).jpeg({ quality: 85 }).toBuffer()).toString('base64');
+const parse = (text) => JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+class Limited extends Error {}
+const usedUp = new Map(); // model -> the (Pacific) day Google said its limit was reached
+
+/** Gemini. Every model has its own daily limit, so when one is used up the next one is tried. */
+async function askGemini(original, result) {
   const body = {
-    contents: [{ role: 'user', parts: [{ text: PROMPT }, await img(original), await img(result)] }],
+    contents: [{ role: 'user', parts: [{ text: PROMPT }, { inlineData: { mimeType: 'image/jpeg', data: await b64(original) } }, { inlineData: { mimeType: 'image/jpeg', data: await b64(result) } }] }],
     generationConfig: { temperature: 0, maxOutputTokens: 200, responseMimeType: 'application/json' },
   };
   const base = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta';
-  let last = null;
+  let last = null, limited = false;
+  const day = usageDay();
   for (const model of [...new Set([goodModel, ...MODELS()].filter(Boolean))]) {
+    if (usedUp.get(model) === day) { limited = true; continue; } // already told "limit reached" today: don't ask again until it renews
     const res = await fetch(`${base}/models/${model}:generateContent`, {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key() }, body: JSON.stringify(body), signal: AbortSignal.timeout(25000),
     });
@@ -50,22 +58,57 @@ async function ask(original, result) {
     if (res.ok) {
       goodModel = model;
       recordAi('gemini', 'photo_check', 'ok', '', model);
-      const text = (j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('');
-      return JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
+      return parse((j.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join(''));
     }
     last = new Error(`Gemini ${res.status} (${model}): ${JSON.stringify(j.error || j).slice(0, 160)}`);
-    if (res.status !== 404) recordAi('gemini', 'photo_check', res.status === 429 ? 'limited' : 'failed', last.message, model);
-    if (res.status !== 404) break; // only a retired model name is worth another try
+    if (res.status === 404) continue; // retired name
+    recordAi('gemini', 'photo_check', res.status === 429 ? 'limited' : 'failed', last.message, model);
+    if (res.status === 429) { limited = true; usedUp.set(model, day); if (goodModel === model) goodModel = null; continue; } // this model's day is used up: next model
+    break; // a real error (bad key, network): the other models would fail the same way
   }
-  throw last || new Error('no Gemini model');
+  throw limited ? new Limited(last?.message || 'Gemini limit') : (last || new Error('no Gemini model'));
+}
+
+/** Claude, only when its key is set on the server (paid per use; a photo check costs a fraction of a cent). */
+const anthropicKey = () => process.env.ANTHROPIC_API_KEY || '';
+async function askClaude(original, result) {
+  const img = async (b) => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: await b64(b) } });
+  const model = process.env.CUTOUT_REVIEW_CLAUDE || 'claude-haiku-4-5';
+  const res = await fetch(process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages', {
+    method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': anthropicKey(), 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({ model, max_tokens: 200, temperature: 0, messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT }, await img(original), await img(result)] }] }),
+    signal: AbortSignal.timeout(30000),
+  });
+  if (!res.ok) {
+    const msg = `Claude ${res.status}: ${(await res.text()).slice(0, 160)}`;
+    recordAi('anthropic', 'photo_check', res.status === 429 ? 'limited' : 'failed', msg, model);
+    throw new Error(msg);
+  }
+  const j = await res.json();
+  recordAi('anthropic', 'photo_check', 'ok', '', model);
+  return parse((j.content || []).map((c) => c.text || '').join(''));
+}
+
+/** The reviewers, in order. Gemini first (free), then Claude if configured. */
+async function ask(original, result) {
+  const errors = [];
+  if (key()) { try { return await askGemini(original, result); } catch (e) { errors.push(e.message); } }
+  if (anthropicKey()) { try { return await askClaude(original, result); } catch (e) { errors.push(e.message); } }
+  throw new Error(errors.join(' | ') || 'no reviewer configured');
 }
 
 // how many times the review could not be asked (no answer at all), so a batch job can tell "not trusted" from "not checked"
 let unavailable = 0;
 export const reviewUnavailableCount = () => unavailable;
 
-/** true = the cut-out may be used. */
-export async function reviewCutout(original, result) {
+/**
+ * true = the cut-out may be used.
+ * `ownerSees`: the shop owner is looking at the result right now (the preview before upload, or they picked the white
+ * background themselves). When no AI reviewer can answer (every daily limit used up, no network), the local checks
+ * decide and the owner's own eyes are the last check. Without an owner (re-making old photos, WhatsApp uploads) an
+ * unchecked cut is never used.
+ */
+export async function reviewCutout(original, result, { ownerSees = false } = {}) {
   if (!reviewEnabled()) return true;
   const fp = await fingerprint(original).catch(() => null);
   const hit = fp && cache.get(fp);
@@ -77,7 +120,8 @@ export async function reviewCutout(original, result) {
     if (!ok) console.log(`[cutout] review said no (${String(v?.problem || 'unclear').slice(0, 120)}): keeping the real background`);
   } catch (e) {
     unavailable++;
-    console.error(`[cutout] review unavailable (${e.message}): keeping the real background`);
+    if (ownerSees) { console.log(`[cutout] no AI reviewer answered (${e.message.slice(0, 160)}): local checks passed, the owner sees the result`); return true; }
+    console.error(`[cutout] review unavailable (${e.message.slice(0, 200)}): keeping the real background`);
     return false; // not cached: next time it may work
   }
   if (fp) {
