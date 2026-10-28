@@ -121,6 +121,18 @@ test('a barcode can belong to only one product/variant in a store, but other sto
   assert.equal(other.status, 201); // different store
 });
 
+test('barcodes cannot collide with product or variant SKUs in the same store', async () => {
+  const productSku = await call(tokenA, 'POST', '/products', base_({ name_en: 'Sku item', name_ar: 'صنف كود', colors: [], sizes: [], variants: [], sku: 'sku-cross-1' }));
+  assert.equal(productSku.status, 201);
+  const productBarcode = await call(tokenA, 'POST', '/products', base_({ name_en: 'Barcode item', name_ar: 'صنف باركود', colors: [], sizes: [], variants: [], barcode: 'SKU-CROSS-1' }));
+  assert.equal(productBarcode.status, 409);
+
+  const variantSku = await call(tokenA, 'POST', '/products', base_({ name_en: 'Variant sku', name_ar: 'مقاس بكود', variants: [{ color: red.hex, size: 'M', stock: 1, sku: 'variant-cross-2' }] }));
+  assert.equal(variantSku.status, 201);
+  const variantBarcode = await call(tokenA, 'POST', '/products', base_({ name_en: 'Variant barcode', name_ar: 'باركود مقاس', colors: [], sizes: [], variants: [], barcode: 'VARIANT-CROSS-2' }));
+  assert.equal(variantBarcode.status, 409);
+});
+
 test('editing a product does not collide with its own barcode', async () => {
   const pid = q.val("SELECT id FROM products WHERE slug='hat' AND store_id=(SELECT id FROM stores WHERE slug='a')");
   const put = await call(tokenA, 'PUT', `/products/${pid}`, base_({ name_en: 'Hat', name_ar: 'قبعة', colors: [], sizes: [], variants: [], barcode: '777', price: 120 }));

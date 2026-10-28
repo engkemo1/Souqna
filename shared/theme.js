@@ -24,6 +24,7 @@ export const AA_LARGE = 3;
 export const THEME_PRESETS = {
   noir:       { primary: '#111111', secondary: '#F3F1EC', accent: '#C2410C', background: '#FFFFFF', text: '#141414', button: '#111111', header: '#FFFFFF', footer: '#111111' },
   ivory:      { primary: '#3F3A33', secondary: '#F4EEE4', accent: '#B4532A', background: '#FBF8F3', text: '#26221D', button: '#3F3A33', header: '#FBF8F3', footer: '#26221D' },
+  candy:      { primary: '#FF6B3D', secondary: '#FFF1E6', accent: '#14B8A6', background: '#FFFCF8', text: '#1F2340', button: '#1F2340', header: '#FFFCF8', footer: '#1F2340' },
   rose:       { primary: '#9F3A4D', secondary: '#FBEFF1', accent: '#C2185B', background: '#FFFFFF', text: '#2A1A1E', button: '#9F3A4D', header: '#FFFFFF', footer: '#2A1A1E' },
   indigo:     { primary: '#26338C', secondary: '#EEF0FA', accent: '#E0592A', background: '#FFFFFF', text: '#151933', button: '#26338C', header: '#FFFFFF', footer: '#151933' },
   pine:       { primary: '#17483B', secondary: '#ECF3EF', accent: '#D97745', background: '#FFFFFF', text: '#13201C', button: '#17483B', header: '#FFFFFF', footer: '#0F2620' },

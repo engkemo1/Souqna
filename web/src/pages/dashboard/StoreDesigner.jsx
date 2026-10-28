@@ -27,11 +27,11 @@ const SECTION_LABEL = {
 const KIND = [['women', 'حريمي'], ['men', 'رجالي'], ['kids', 'أطفال'], ['sport', 'رياضي'], ['wedding', 'فساتين ومناسبات'], ['shoes', 'أحذية'], ['mixed', 'كل حاجة']];
 const VIBE = [['luxury', 'فخم'], ['soft', 'ناعم'], ['street', 'شبابي'], ['simple', 'بسيط'], ['deals', 'عروض'], ['classic', 'كلاسيك']];
 const OPT = {
-  hero: { auto: ['تلقائي', 'Auto'], cover: ['صورة غلاف', 'Cover'], slider: ['بنرات', 'Slider'], split: ['مقسوم', 'Split'], compact: ['مضغوط', 'Compact'] },
-  card: { round: ['مدوّر', 'Rounded'], flat: ['حاد/بدون حدود', 'Flat'], soft: ['ناعم بخلفية', 'Soft'], bordered: ['بإطار', 'Bordered'] },
-  cat: { tiles: ['مربعات كبيرة', 'Tiles'], circles: ['دواير', 'Circles'], list: ['أزرار نصية', 'Pills'] },
+  hero: { auto: ['تلقائي', 'Auto'], cover: ['صورة غلاف', 'Cover'], slider: ['بنرات', 'Slider'], split: ['مقسوم', 'Split'], compact: ['مضغوط', 'Compact'], playful: ['مرح للأطفال', 'Playful'] },
+  card: { round: ['مدوّر', 'Rounded'], flat: ['حاد/بدون حدود', 'Flat'], soft: ['ناعم بخلفية', 'Soft'], bordered: ['بإطار', 'Bordered'], bubble: ['ملوّن فقاعات', 'Bubbly'] },
+  cat: { tiles: ['مربعات كبيرة', 'Tiles'], circles: ['دواير', 'Circles'], list: ['أزرار نصية', 'Pills'], bubbles: ['فقاعات ملونة', 'Bubbles'] },
   grid: { cozy: ['متوازن', 'Balanced'], dense: ['كثيف', 'Dense'], airy: ['واسع', 'Airy'] },
-  type: { normal: ['عادي', 'Normal'], light: ['خفيف وأنيق', 'Light'], bold: ['تقيل وجريء', 'Bold'] },
+  type: { normal: ['عادي', 'Normal'], light: ['خفيف وأنيق', 'Light'], bold: ['تقيل وجريء', 'Bold'], rounded: ['مدوّر طفولي', 'Rounded'] },
 };
 const OPT_TITLE = { hero: ['شكل الغلاف', 'Hero'], card: ['شكل كارت المنتج', 'Product card'], cat: ['شكل التصنيفات', 'Categories'], grid: ['كثافة المنتجات', 'Product density'], type: ['شكل الخط', 'Type style'] };
 const STANDARD = SECTION_IDS.filter((s) => !OPTIONAL_SECTIONS.includes(s));
@@ -44,14 +44,15 @@ function Thumb({ tpl, palette }) {
   const ink = p.text;
   const soft = (c, t) => mix(c, p.background, t);
   const photo = (i = 0) => ({ background: `linear-gradient(${150 + i * 25}deg, ${soft(p.primary, 0.78)}, ${soft(p.accent, 0.62)})` });
-  const radius = { round: 7, flat: 0, soft: 10, bordered: 3 }[tpl.card];
+  const radius = { round: 7, flat: 0, soft: 10, bordered: 3, bubble: 11 }[tpl.card];
+  const KT = ['#FFE4D6', '#DDF0FF', '#E2F7DF', '#FFF3C4', '#EFE5FF', '#FFE1EC'];
   const bar = (w, o = 0.55, h = 3) => <span className="block rounded-full" style={{ width: w, height: h, background: ink, opacity: o }} />;
   const weight = tpl.type === 'bold' ? 4 : tpl.type === 'light' ? 2 : 3;
   const cols = tpl.grid === 'dense' ? 4 : tpl.grid === 'airy' ? 2 : 3;
   const btn = (w = 22) => <span className="block rounded-full" style={{ width: w, height: 6, background: p.button }} />;
 
   const product = (i, sale) => (
-    <span key={i} className="relative block min-w-0 flex-1" style={{ background: tpl.card === 'soft' ? p.secondary : 'transparent', borderRadius: radius, border: tpl.card === 'bordered' ? `1px solid ${ink}2e` : 'none', padding: tpl.card === 'soft' || tpl.card === 'bordered' ? 2 : 0 }}>
+    <span key={i} className="relative block min-w-0 flex-1" style={{ background: tpl.card === 'soft' ? p.secondary : tpl.card === 'bubble' ? KT[i % 6] : 'transparent', borderRadius: radius, border: tpl.card === 'bordered' ? `1px solid ${ink}2e` : 'none', padding: tpl.card === 'soft' || tpl.card === 'bordered' || tpl.card === 'bubble' ? 2 : 0 }}>
       <span className="grid aspect-[4/5] place-items-center" style={{ ...photo(i), borderRadius: tpl.card === 'soft' ? 7 : radius }}><Shirt style={{ width: 11, height: 11, color: p.background, opacity: 0.7 }} /></span>
       {sale && <span className="absolute start-0.5 top-0.5 rounded-sm px-[3px] text-[5px] font-bold leading-[8px] text-white" style={{ background: '#be2626' }}>-30%</span>}
       <span className="mt-[3px] block"><span className="block h-[2px] w-4/5 rounded-full" style={{ background: ink, opacity: 0.5 }} /><span className="mt-[2px] block h-[2px] w-2/5 rounded-full" style={{ background: p.accent }} /></span>
@@ -64,6 +65,16 @@ function Thumb({ tpl, palette }) {
     </span>
   );
   const hero = () => {
+    if (tpl.hero === 'playful') {
+      return (
+        <span key="hero" className="relative flex h-[62px] overflow-hidden" style={{ background: p.secondary }}>
+          <span className="absolute -start-3 -top-4 h-9 w-9 rounded-full" style={{ background: KT[1] }} />
+          <span className="absolute -bottom-4 end-6 h-10 w-10 rounded-full" style={{ background: KT[3] }} />
+          <span className="relative flex flex-1 flex-col justify-center gap-1 px-2">{bar('78%', 0.9, weight + 1)}<span className="block rounded-full" style={{ width: '50%', height: 2, background: p.accent }} /><span className="block rounded-full" style={{ width: 26, height: 7, background: p.primary }} /></span>
+          <span className="relative my-auto me-2 grid h-[44px] w-[44px] place-items-center" style={{ ...photo(1), borderRadius: '46% 54% 42% 58% / 52% 44% 56% 48%', border: '2px solid #fff' }}><Shirt style={{ width: 16, height: 16, color: p.background, opacity: 0.7 }} /></span>
+        </span>
+      );
+    }
     if (tpl.hero === 'split') {
       return (
         <span key="hero" className="flex h-[58px]" style={{ background: p.secondary }}>
@@ -93,7 +104,8 @@ function Thumb({ tpl, palette }) {
   };
   const categories = () => (
     <span key="categories" className="block px-1.5">
-      {tpl.cat === 'circles' ? <span className="flex justify-around">{[0, 1, 2, 3].map((i) => <span key={i} className="grid h-[17px] w-[17px] place-items-center rounded-full" style={{ ...photo(i), boxShadow: `0 0 0 1.5px ${p.accent}` }} />)}</span>
+      {tpl.cat === 'bubbles' ? <span className="flex justify-around">{[0, 1, 2, 3].map((i) => <span key={i} className="grid h-[18px] w-[18px] place-items-center rounded-full" style={{ background: KT[i], boxShadow: '0 0 0 2px #fff inset' }} />)}</span>
+        : tpl.cat === 'circles' ? <span className="flex justify-around">{[0, 1, 2, 3].map((i) => <span key={i} className="grid h-[17px] w-[17px] place-items-center rounded-full" style={{ ...photo(i), boxShadow: `0 0 0 1.5px ${p.accent}` }} />)}</span>
         : tpl.cat === 'list' ? <span className="flex gap-1">{[26, 20, 24].map((w, i) => <span key={i} className="block rounded-full" style={{ width: w, height: 8, border: `1px solid ${ink}55`, background: i === 0 ? ink : 'transparent', opacity: i === 0 ? 0.85 : 1 }} />)}</span>
           : <span className="flex gap-1">{[0, 1, 2].map((i) => <span key={i} className="relative block h-[26px] flex-1 overflow-hidden" style={{ ...photo(i), borderRadius: radius }}><span className="absolute inset-x-1 bottom-1 block rounded-full" style={{ height: 2, background: p.background }} /></span>)}</span>}
     </span>

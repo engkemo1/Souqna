@@ -13,6 +13,7 @@ import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import cashierRoutes from './routes/cashier.js';
 import posRoutes from './routes/pos.js';
+import posRemoteRoutes from './routes/pos-remote.js';
 import { errorHandler } from './lib/errors.js';
 import buyerRoutes from './routes/buyer.js';
 import waRoutes from './routes/wa.js';
@@ -94,6 +95,7 @@ app.get('/api/health', (_req, res) => res.json({ ok: true }));
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/cashier/v1', cashierRoutes);
+app.use('/api/pos-remote', posRemoteRoutes); // phone used as a barcode scanner for the cashier on a computer
 app.use('/api/pos', posRoutes);
 prefetchCutoutModel(); // background-removal model, fetched once per container
 startReservationSweeper(); // releases in-store reservations nobody collected
@@ -173,6 +175,9 @@ if (fs.existsSync(config.webDist)) {
     [/^\/(login|dashboard)(\/|$)/, '/store-app.webmanifest', 'لوحة المحل'],
     [/^\/admin(\/|$)/, '/admin-app.webmanifest', 'إدارة Twist'],
   ];
+  // A build file that does not exist (an old name after a deploy) is a 404, never the HTML page: otherwise a browser or
+  // the offline cache would keep the page as if it were the script and the screen would break until a reload.
+  app.get(/^\/assets\//, (_req, res) => res.status(404).type('text/plain').send('Not found'));
   app.get('*', (req, res) => {
     const hit = APP_SHELLS.find(([re]) => re.test(req.path));
     if (!hit) return res.sendFile(path.join(config.webDist, 'index.html'));

@@ -2,10 +2,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { h, AppError } from '../lib/errors.js';
 import { requireOwner } from '../lib/auth.js';
-import { posGate, bootstrap, saveSale, saveReturn, readSale, daySummary, listSales, saleIdByNumber, resolveRegister, openShift, addCashMovement, closeShift, readShift, receiveStock } from '../lib/pos.js';
+import { posGate, bootstrap, openReservations, saveSale, saveReturn, readSale, daySummary, listSales, saleIdByNumber, resolveRegister, openShift, addCashMovement, closeShift, readShift, receiveStock } from '../lib/pos.js';
 import { refreshCatalogueCache } from '../lib/cashier-sync.js';
 import { q } from '../db/index.js';
 import { notifyOrderStatus } from '../lib/buyers.js';
+import { createPairing, revokePairing } from '../lib/pos-remote.js';
 
 /** Twist cashier API (store owner sign-in). Mounted at /api/pos. */
 const r = Router();
@@ -13,11 +14,24 @@ r.use(requireOwner);
 
 const int = z.coerce.number().int();
 const uuid = z.string().trim().min(8).max(64);
-const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
+const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+});
 
 r.get('/bootstrap', h((req, res) => {
   const access = posGate(req.store.id);
   res.json({ ...bootstrap(req.store), access: { state: access.state, endsAt: access.endsAt, graceDays: access.graceDays } });
+}));
+
+// "Phone as barcode scanner": a pairing for this cashier screen (shown as a QR), and unpairing
+r.post('/remote', h((req, res) => {
+  posGate(req.store.id);
+  res.status(201).json(createPairing(req.store.id));
+}));
+r.delete('/remote/:token', h((req, res) => {
+  revokePairing(req.store.id, String(req.params.token));
+  res.json({ ok: true });
 }));
 
 r.post('/registers/resolve', h((req, res) => {
@@ -41,7 +55,7 @@ r.get('/shifts/:id', h((req, res) => {
 
 r.post('/shifts/:id/movements', h((req, res) => {
   posGate(req.store.id);
-  const body = z.object({ kind: z.enum(['in', 'out']), amount: int.min(1).max(100_000_000), reason: z.string().trim().min(2).max(160) }).parse(req.body);
+  const body = z.object({ kind: z.enum(['in', 'out']), amount: int.min(1).max(100_000_000), reason: z.string().trim().min(2).max(160), uuid: uuid.optional() }).parse(req.body);
   const movement = addCashMovement(req.store.id, int.positive().parse(req.params.id), body, req.user.name || '');
   res.status(201).json({ movement, shift: readShift(req.store.id, int.positive().parse(req.params.id)) });
 }));
@@ -90,6 +104,13 @@ r.post('/sales', h(async (req, res) => {
   res.json(out);
 }));
 
+// Light, frequent refresh of the open reservations (the full catalogue is not re-sent), so two registers never both see
+// a reservation one of them already sold.
+r.get('/reservations', h((req, res) => {
+  posGate(req.store.id, { sync: true });
+  res.json({ reservations: openReservations(req.store.id) });
+}));
+
 r.get('/sales', h((req, res) => {
   posGate(req.store.id, { sync: true });
   const p = z.object({ day: day.optional(), before: int.optional(), limit: int.min(1).max(100).default(50) }).parse(req.query);
@@ -114,7 +135,7 @@ r.post('/returns', h(async (req, res) => {
   posGate(req.store.id);
   const body = z.object({
     uuid, saleId: int.positive(),
-    items: z.array(z.object({ saleItemId: int.positive(), qty: int.min(1).max(1000) })).min(1).max(200),
+    items: z.array(z.object({ saleItemId: int.positive(), qty: int.min(1).max(1000), defective: z.boolean().default(false) })).min(1).max(200),
     method: z.enum(['cash', 'card', 'wallet']).default('cash'),
     reason: z.string().trim().max(200).optional(),
     restock: z.boolean().default(true),

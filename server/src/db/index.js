@@ -10,12 +10,26 @@ fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
 export const db = new DatabaseSync(config.dbFile);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
 db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
+{
+  const cols = db.prepare('PRAGMA table_info(pos_sale_items)').all().map((c) => c.name);
+  if (!cols.includes('no_return')) db.exec('ALTER TABLE pos_sale_items ADD COLUMN no_return INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('return_until')) db.exec('ALTER TABLE pos_sale_items ADD COLUMN return_until TEXT');
+}
+{
+  const cols = db.prepare('PRAGMA table_info(pos_return_items)').all().map((c) => c.name);
+  if (!cols.includes('defective')) db.exec('ALTER TABLE pos_return_items ADD COLUMN defective INTEGER NOT NULL DEFAULT 0');
+}
 db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   ('subscription_monthly_fee','0'),
   ('subscription_reminder_days','5'),
   ('subscription_reminder_template','أهلاً {store}، نذكّرك إن اشتراك متجرك على Twist مستحق بمبلغ {amount} ج.م. موعد التجديد {due_date}. ابعتلنا صورة التحويل أو تواصل معانا لتأكيد الدفع. شكراً لثقتك في Twist.'),
   ('cashier_sync_enabled','0')`);
 db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KEY, store_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
+{
+  const eventCols = db.prepare('PRAGMA table_info(cashier_events)').all().map((c) => c.name);
+  if (!eventCols.includes('request_hash')) db.exec('ALTER TABLE cashier_events ADD COLUMN request_hash TEXT');
+  if (!eventCols.includes('result_json')) db.exec('ALTER TABLE cashier_events ADD COLUMN result_json TEXT');
+}
 // Lightweight migrations for databases created by earlier versions.
 {
   const cols = db.prepare('PRAGMA table_info(stores)').all().map((c) => c.name);
@@ -108,6 +122,9 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   }
   const ocols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!ocols.includes('delivery_by')) db.exec("ALTER TABLE orders ADD COLUMN delivery_by TEXT NOT NULL DEFAULT 'store'");
+  const pcmcols = db.prepare('PRAGMA table_info(pos_cash_movements)').all().map((c) => c.name);
+  if (pcmcols.length && !pcmcols.includes('uuid')) db.exec('ALTER TABLE pos_cash_movements ADD COLUMN uuid TEXT'); // same request sent twice = one movement
+  if (pcmcols.length) db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_cash_movements_uuid ON pos_cash_movements(store_id, uuid) WHERE uuid IS NOT NULL');
   const pscols = db.prepare('PRAGMA table_info(pos_sales)').all().map((c) => c.name);
   if (pscols.length && !pscols.includes('order_id')) db.exec('ALTER TABLE pos_sales ADD COLUMN order_id INTEGER'); // the store reservation this sale completed
   if (pscols.length && !pscols.includes('shift_id')) db.exec('ALTER TABLE pos_sales ADD COLUMN shift_id INTEGER');

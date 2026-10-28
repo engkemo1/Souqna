@@ -9,7 +9,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { useFavorites } from '../../lib/cart.jsx';
 import { useToast } from '../ui/Toast.jsx';
 import { sp } from '../../lib/store.jsx';
-import { useDesign, GRID_CLASS } from '../../lib/design.js';
+import { useDesign, GRID_CLASS, kidTint } from '../../lib/design.js';
 import { cx } from '../ui/cx.js';
 import SameDayBadge from './SameDayBadge.jsx';
 
@@ -24,8 +24,11 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
   const href = sp(slug, `p/${p.slug}`);
   const out = p.stock === 'out';
   const { card } = useDesign();
-  const imgR = card === 'flat' ? 'rounded-none' : card === 'bordered' ? 'rounded-md' : 'rounded-2xl';
-  const wrap = card === 'soft' ? 'rounded-3xl bg-surface p-2.5' : card === 'bordered' ? 'rounded-lg p-2 ring-1 ring-line' : '';
+  const bubble = card === 'bubble'; // kids template: pastel card, bubbly corners, a little bounce
+  const tint = bubble ? kidTint(index) : null;
+  const imgR = card === 'flat' ? 'rounded-none' : card === 'bordered' ? 'rounded-md' : bubble ? 'rounded-[22px]' : 'rounded-2xl';
+  const wrap = card === 'soft' ? 'rounded-3xl bg-surface p-2.5' : card === 'bordered' ? 'rounded-lg p-2 ring-1 ring-line'
+    : bubble ? 'rounded-[28px] p-2 pb-3 transition duration-300 [@media(hover:hover)]:hover:-translate-y-1.5 [@media(hover:hover)]:hover:shadow-[0_18px_40px_-18px_rgba(31,35,64,0.35)]' : '';
   const tone = { brand: 'bg-primary text-on-primary', sale: 'bg-sale text-white', dark: 'bg-neutral-900 text-white', gold: 'bg-amber-400 text-neutral-900', green: 'bg-emerald-600 text-white' }[p.badge?.tone] || 'bg-primary text-on-primary';
 
   const toggleFav = (e) => {
@@ -43,8 +46,9 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
       viewport={{ once: true, margin: '0px 0px -40px 0px' }}
       transition={{ duration: 0.5, delay: Math.min(index % 4, 3) * 0.06, ease: [0.22, 1, 0.36, 1] }}
       className={cx('group relative flex min-w-0 flex-col', wrap)}
+      style={tint ? { background: tint.bg } : undefined}
     >
-      <Link to={href} className={cx('relative block overflow-hidden bg-surface focus-visible:shadow-ring', imgR)} aria-label={tr(p.name)}>
+      <Link to={href} className={cx('relative block overflow-hidden focus-visible:shadow-ring', bubble ? 'bg-white/70' : 'bg-surface', imgR)} aria-label={tr(p.name)}>
         <SmartImage
           media={p.image}
           alt={tr(p.name)}
@@ -103,7 +107,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
         </span>
       </button>
 
-      <div className="flex flex-1 flex-col pt-3">
+      <div className={cx('flex flex-1 flex-col pt-3', bubble && 'px-1.5')}>
         {showStore && p.store && <span className="mb-0.5 truncate text-xs font-medium text-muted">{tr(p.store.name)}</span>}
         <div className="flex items-start justify-between gap-2">
           <Link to={href} className="line-clamp-2 min-h-[2.5em] text-[13.5px] font-medium leading-snug text-fg hover:text-brand sm:text-base">{tr(p.name)}</Link>
@@ -111,11 +115,13 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
           {!out && onQuickAdd && (
             <button type="button" onClick={() => onQuickAdd(p)} aria-label={t('product.addToCart')}
               className="-me-1.5 -mt-1.5 grid h-10 w-10 shrink-0 place-items-center rounded-full text-fg transition active:scale-90 [@media(hover:hover)]:hidden">
-              <span className="grid h-8 w-8 place-items-center rounded-full border border-line-strong"><ShoppingBag className="h-4 w-4" /></span>
+              {bubble
+                ? <span className="kid-wiggle grid h-9 w-9 place-items-center rounded-full text-white shadow-sm" style={{ background: tint.ink }}><ShoppingBag className="h-4 w-4" /></span>
+                : <span className="grid h-8 w-8 place-items-center rounded-full border border-line-strong"><ShoppingBag className="h-4 w-4" /></span>}
             </button>
           )}
         </div>
-        <Price value={p.price} compareAt={p.compareAt} size="sm" className="mt-1.5 sm:[&>span:first-child]:text-base" />
+        <Price value={p.price} compareAt={p.compareAt} size="sm" className={cx('mt-1.5 sm:[&>span:first-child]:text-base', bubble && '[&>span:first-child]:font-extrabold')} />
         <ColorDots colors={p.colors} className="mt-2" />
       </div>
     </motion.article>

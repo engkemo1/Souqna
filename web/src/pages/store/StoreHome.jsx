@@ -21,7 +21,8 @@ import FreeShippingBar from '../../components/store/FreeShippingBar.jsx';
 import FlashBanner from '../../components/store/FlashBanner.jsx';
 import TickerStrip from '../../components/store/TickerStrip.jsx';
 import { HeroSplit, HeroCompact } from '../../components/store/HeroVariants.jsx';
-import { useDesign } from '../../lib/design.js';
+import { HeroPlayful } from '../../components/store/HeroPlayful.jsx';
+import { useDesign, kidTint } from '../../lib/design.js';
 
 export function SectionHeader({ title, eyebrow, to, className = '' }) {
   const { t } = useI18n();
@@ -29,7 +30,7 @@ export function SectionHeader({ title, eyebrow, to, className = '' }) {
     <div className={`mb-6 flex items-end justify-between gap-4 sm:mb-8 ${className}`}>
       <div>
         {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
-        <h2 className="font-display text-display-sm font-bold">{title}</h2>
+        <h2 className="section-title font-display text-display-sm font-bold">{title}</h2>
       </div>
       {to && (
         <Link to={to} className="group inline-flex shrink-0 items-center gap-1.5 pb-1 text-sm font-semibold text-fg">
@@ -76,6 +77,31 @@ function CategoryTiles() {
   const { cat } = useDesign();
   const categories = allCategories.filter((c) => (c.count ?? 0) > 0); // empty categories are not shown to shoppers
   if (!categories.length) return null;
+  if (cat === 'bubbles') {
+    // kids template: big colourful bubbles that wiggle, with "All" first
+    const items = [{ id: 'all', slug: null, name: null }, ...categories];
+    return (
+      <section className="container mt-10 sm:mt-14">
+        <SectionHeader title={t('store.shopByCategory')} />
+        <div className={`scroll-x -mx-4 gap-4 px-4 pb-2 sm:mx-0 sm:flex sm:flex-wrap sm:gap-7 sm:px-0 ${items.length <= 7 ? 'sm:justify-center' : ''}`}>
+          {items.map((c, i) => {
+            const tint = kidTint(i);
+            return (
+              <Link key={c.id} to={sp(store.slug, c.slug ? `shop?category=${c.slug}` : 'shop')} className="group flex w-[92px] shrink-0 flex-col items-center gap-2 text-center sm:w-[120px]">
+                <span className="kid-wiggle relative grid aspect-square w-full place-items-center rounded-full p-1.5 shadow-[0_8px_0_-2px_rgba(31,35,64,0.08)] transition group-active:scale-95" style={{ background: tint.bg }}>
+                  {c.slug
+                    ? <span className="block h-full w-full overflow-hidden rounded-full bg-white ring-4 ring-white">{c.image ? <SmartImage media={c.image} ratio="1 / 1" sizes="120px" imgClassName="group-hover:scale-[1.08] duration-700" /> : <span className="grid h-full w-full place-items-center text-2xl font-extrabold" style={{ color: tint.ink }}>{String(tr(c.name)).trim().slice(0, 2)}</span>}</span>
+                    : <span className="kid-title text-xl" style={{ color: tint.ink }}>{t('common.all')}</span>}
+                  <span className="absolute -end-0.5 -top-0.5 h-4 w-4 rounded-full ring-[3px] ring-canvas" style={{ background: tint.ink }} />
+                </span>
+                <span className="line-clamp-2 text-[13px] font-bold sm:text-sm">{c.slug ? tr(c.name) : t('common.all')}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
   if (cat === 'circles') {
     return (
       <section className="container mt-14 sm:mt-20">
@@ -197,6 +223,7 @@ export default function StoreHome() {
         if (design.hero === 'cover') node = <StoreHero />;
         else if (design.hero === 'slider') node = hasBanners ? sliderHero : <StoreHero />;
         else if (design.hero === 'split') node = <HeroSplit banners={banners} />;
+        else if (design.hero === 'playful') node = <HeroPlayful banners={banners} />;
         else if (design.hero === 'compact') node = hasBanners ? (<><HeroCompact /><HeroSlider banners={banners} slug={store.slug} /></>) : <HeroCompact />;
         else node = (store.heroMode === 'cover' ? false : hasBanners) ? sliderHero : <StoreHero />;
         return <div key="hero">{node}</div>;

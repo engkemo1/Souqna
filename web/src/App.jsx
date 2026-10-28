@@ -29,6 +29,7 @@ const Legal = lazy(() => import('./pages/market/Legal.jsx'));
 const Request = lazy(() => import('./pages/market/Request.jsx'));
 const BanhaRunner = lazy(() => import('./pages/market/BanhaRunner.jsx'));
 const Pos = lazy(() => import('./pages/pos/Pos.jsx'));
+const RemoteScanner = lazy(() => import('./pages/pos/RemoteScanner.jsx'));
 const ContactSupport = lazy(() => import('./pages/market/ContactSupport.jsx'));
 const Feedback = lazy(() => import('./pages/market/Feedback.jsx'));
 
@@ -118,6 +119,7 @@ const router = createBrowserRouter([
       { path: '/request/:token', element: <Request /> },
       { path: '/play/banha', element: <BanhaRunner /> },
       { path: '/pos', element: <Pos /> },
+      { path: '/scan/:token', element: <RemoteScanner /> }, // a phone used as the cashier's barcode scanner
       {
         path: '/s/:slug',
         element: <StoreLayout />,

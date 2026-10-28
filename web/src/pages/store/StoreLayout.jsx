@@ -44,6 +44,11 @@ export default function StoreLayout() {
     return { ...apiData, store: { ...apiData.store, theme, customization: { ...cz, design: preview.design || cz.design, sectionsOrder: preview.sectionsOrder || cz.sectionsOrder, hiddenSections: preview.hiddenSections || cz.hiddenSections, flash: preview.flash || cz.flash } } };
   }, [apiData, preview]);
   useTheme(data?.store?.theme?.cssVars);
+  // the kids template's rounded font is only downloaded by stores that use it
+  const typeStyle = data ? resolveDesign(data.store.customization).type : null;
+  useEffect(() => {
+    if (typeStyle === 'rounded') { import('@fontsource/baloo-bhaijaan-2/700.css'); import('@fontsource/baloo-bhaijaan-2/800.css'); }
+  }, [typeStyle]);
 
   // Warm the chunks of the pages a shopper reaches next, so tapping the cart/product never waits on (or fails to fetch) a lazy bundle.
   useEffect(() => {

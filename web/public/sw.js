@@ -43,13 +43,16 @@ async function posShell(req) {
   }
 }
 
+/** A real build file, never the HTML page a missing file can come back as (after a deploy the old names are gone). */
+const realAsset = (res) => res.ok && !String(res.headers.get('content-type') || '').includes('text/html');
+
 /** Build files have a hash in their name, so a cached copy is always the right copy. */
 async function hashedAsset(req) {
   const cache = await caches.open(ASSET_CACHE);
   const hit = await cache.match(req);
   if (hit) return hit;
   const res = await fetch(req);
-  if (res.ok) { cache.put(req, res.clone()).then(() => trim(cache, MAX_CACHED_ASSETS)).catch(() => {}); }
+  if (realAsset(res)) { cache.put(req, res.clone()).then(() => trim(cache, MAX_CACHED_ASSETS)).catch(() => {}); }
   return res;
 }
 
@@ -105,7 +108,7 @@ self.addEventListener('message', (e) => {
     try {
       const assets = await caches.open(ASSET_CACHE);
       const urls = (d.urls || []).filter((u) => { try { const x = new URL(u, self.location.origin); return x.origin === self.location.origin && x.pathname.startsWith('/assets/'); } catch { return false; } });
-      await Promise.all(urls.map(async (u) => { if (!(await assets.match(u))) { const r = await fetch(u); if (r.ok) await assets.put(u, r); } }));
+      await Promise.all(urls.map(async (u) => { if (!(await assets.match(u))) { const r = await fetch(u); if (realAsset(r)) await assets.put(u, r); } }));
       const shell = await caches.open(SHELL_CACHE);
       const page = await fetch(POS_SHELL, { cache: 'no-cache' });
       if (page.ok) await shell.put(POS_SHELL, page);

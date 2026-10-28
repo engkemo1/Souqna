@@ -46,7 +46,7 @@ const BLOCK_DAYS = 14;
  */
 export function reserveRecord(phone) {
   const ns = q.get(`SELECT COUNT(DISTINCT o.id) AS n, MAX(e.created_at) AS last FROM orders o JOIN order_events e ON e.order_id=o.id
-    WHERE o.phone=? AND o.delivery_by='pickup' AND e.status='cancelled' AND e.note IN ('expired','no_show') AND e.created_at >= datetime('now', ?)`, [phone, NO_SHOW_WINDOW]);
+    WHERE o.phone=? AND o.delivery_by='pickup' AND o.status='cancelled' AND e.status='cancelled' AND e.note IN ('expired','no_show') AND e.created_at >= datetime('now', ?)`, [phone, NO_SHOW_WINDOW]);
   const bought = q.val("SELECT COUNT(*) FROM orders WHERE phone=? AND delivery_by='pickup' AND status='delivered'", [phone]) || 0;
   let blockedUntil = null;
   if ((ns?.n || 0) >= NO_SHOW_LIMIT && ns.last) {

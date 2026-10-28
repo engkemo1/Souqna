@@ -38,7 +38,7 @@ const hasKey = (i) => !!(i.sku || i.barcode);
 
 r.post('/stock', h(async (req, res) => {
   const body = z.object({
-    items: z.array(z.object({ sku: code, barcode: code, stock: z.coerce.number().min(-100000).max(100000) }).refine(hasKey, { message: 'sku or barcode required' })).min(1).max(1000),
+    items: z.array(z.object({ sku: code, barcode: code, stock: z.coerce.number().int().min(-100000).max(100000) }).refine(hasKey, { message: 'sku or barcode required' })).min(1).max(1000),
   }).parse(req.body);
   const out = pushStock(req.cashierStoreId, body.items);
   if (out.updated) await refreshCatalogueCache();
@@ -49,7 +49,7 @@ r.post('/sales', h(async (req, res) => {
   const body = z.object({
     externalId: z.string().trim().min(1).max(80),
     type: z.enum(['sale', 'return']).default('sale'),
-    items: z.array(z.object({ sku: code, barcode: code, qty: z.coerce.number().min(1).max(1000) }).refine(hasKey, { message: 'sku or barcode required' })).min(1).max(200),
+    items: z.array(z.object({ sku: code, barcode: code, qty: z.coerce.number().int().min(1).max(1000) }).refine(hasKey, { message: 'sku or barcode required' })).min(1).max(200),
   }).parse(req.body);
   const out = pushSale(req.cashierStoreId, body);
   if (!out.duplicate) await refreshCatalogueCache();

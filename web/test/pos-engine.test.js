@@ -62,6 +62,8 @@ test('return preview matches server discount allocation and partial-return round
   assert.equal(E.returnRefundPreview(items, { subtotal: 2, discount: 1 }, { 1: 1, 2: 1 }), 1);
   const partial = [{ id: 3, price: 10, qty: 3, discount: 1, returnedQty: 0 }];
   assert.equal(E.returnRefundPreview(partial, { subtotal: 29, discount: 0 }, { 3: 2 }), 19);
+  const free = [{ id: 4, price: 10, qty: 1, discount: 10, returnedQty: 0 }];
+  assert.equal(E.returnRefundPreview(free, { subtotal: 0, discount: 0 }, { 4: 1 }), 0);
 });
 
 test('change only comes out of cash', () => {
@@ -89,6 +91,8 @@ test('optimistic stock lowers variants and plain products, never below zero, ski
   assert.equal(next[1].stock, 3); assert.equal(next[2].stock, 0);
   assert.equal(products[0].variants[0].stock, 2, 'input not mutated');
   assert.equal(E.applyLocalStock(next, [{ productId: 2, variantId: null, qty: 1 }], +1)[1].stock, 4);
+  const multipleQueued = E.applyLocalStock(products, [{ productId: 1, variantId: 11, qty: 1 }, { productId: 1, variantId: 11, qty: 1 }]);
+  assert.equal(multipleQueued[0].variants[0].stock, 0, 'quantities from separate queued sales must add together');
 });
 
 test('queue: oldest first, success removes, a refusal is marked failed and the rest go on', async () => {
@@ -126,9 +130,12 @@ test('scanner buffer: fast characters + Enter = a scan; slow typing is not', () 
 
 test('memory db keeps sales per store only', async () => {
   const db = createMemoryDb();
-  await db.putSale({ uuid: 'x', storeId: 1 }); await db.putSale({ uuid: 'y', storeId: 2 });
+  const snap = { store: { id: 1 }, products: [{ id: 9, stock: 2 }] };
+  await db.putSaleWithCatalog({ uuid: 'x', storeId: 1 }, snap); await db.putSale({ uuid: 'y', storeId: 2 });
   assert.deepEqual((await db.sales(1)).map((s) => s.uuid), ['x']);
-  await db.deleteSale('x'); assert.equal((await db.sales(1)).length, 0);
+  assert.deepEqual(await db.get('catalog:1'), snap); assert.equal(await db.get('last'), 1);
+  await db.deleteSaleWithCatalog('x', 1, { ...snap, products: [{ id: 9, stock: 3 }] });
+  assert.equal((await db.sales(1)).length, 0); assert.equal((await db.get('catalog:1')).products[0].stock, 3);
 });
 
 test('receipt escapes names, shows the temporary label until numbered', () => {

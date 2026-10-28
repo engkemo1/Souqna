@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
-import { q, tx } from '../db/index.js';
+import { q, tx, json } from '../db/index.js';
+import { AppError } from './errors.js';
 import { normCode, parseQty } from './cashier-table.js';
 
 const MAX_STOCK = 100000;
@@ -32,15 +33,23 @@ export function loadIndex(storeId) {
 
 /** barcode first, then sku. Returns { entry } or { skip: reason }. */
 function matchKey(index, barcode, sku) {
-  for (const [key, map, how] of [[barcode, index.byBarcode, 'barcode'], [sku, index.bySku, 'sku']]) {
-    const k = normCode(key);
-    if (!k) continue;
+  const resolve = (raw, map, how) => {
+    const k = normCode(raw);
+    if (!k) return null;
     const hits = map.get(k);
     if (hits?.length === 1) return { entry: hits[0], how };
     if (hits?.length > 1) return { skip: 'ambiguous' };
     if (index.productsWithVariants.has(k)) return { skip: 'has_variants' };
+    return null;
+  };
+  const byBarcode = resolve(barcode, index.byBarcode, 'barcode');
+  const bySku = resolve(sku, index.bySku, 'sku');
+  if (byBarcode?.skip || bySku?.skip) return { skip: byBarcode?.skip || bySku?.skip };
+  if (byBarcode?.entry && bySku?.entry) {
+    const a = byBarcode.entry; const b = bySku.entry;
+    if (a.kind !== b.kind || a.id !== b.id) return { skip: 'conflicting_codes' };
   }
-  return { skip: 'not_found' };
+  return byBarcode || bySku || { skip: 'not_found' };
 }
 
 /* ------------------------------------------------------------------ file import: plan then apply */
@@ -117,7 +126,7 @@ export function applyPlan(storeId, plan, { source = 'file', message = '' } = {})
 
 export function pushStock(storeId, items) {
   const index = loadIndex(storeId);
-  const results = []; const changes = []; const touchedProducts = new Set();
+  const results = []; const changes = []; const touchedProducts = new Set(); const touchedItems = new Set();
   tx(() => {
     for (const it of items) {
       const label = it.sku || it.barcode || '';
@@ -126,6 +135,9 @@ export function pushStock(storeId, items) {
       const m = matchKey(index, it.barcode, it.sku);
       if (m.skip) { results.push({ ref: label, status: m.skip }); continue; }
       const e = m.entry;
+      const itemKey = `${e.kind}:${e.id}`;
+      if (touchedItems.has(itemKey)) { results.push({ ref: label, status: 'duplicate_in_request' }); continue; }
+      touchedItems.add(itemKey);
       if (!e.trackStock) { results.push({ ref: label, status: 'not_tracked' }); continue; }
       const qty = Math.max(0, counted - e.held); // what is free to sell
       let status = 'unchanged';
@@ -147,8 +159,12 @@ export function pushStock(storeId, items) {
 
 /** A sale (or a return) the cashier already completed. `externalId` makes retries safe. */
 export function pushSale(storeId, { externalId, type = 'sale', items }) {
-  const dup = q.get('SELECT 1 FROM cashier_events WHERE store_id=? AND external_id=?', [storeId, externalId]);
-  if (dup) return { duplicate: true, results: [] };
+  const requestHash = crypto.createHash('sha256').update(JSON.stringify({ type, items: items.map((i) => ({ sku: normCode(i.sku), barcode: normCode(i.barcode), qty: Math.floor(Number(i.qty)) })).sort((a, b) => `${a.barcode}|${a.sku}|${a.qty}`.localeCompare(`${b.barcode}|${b.sku}|${b.qty}`)) })).digest('hex');
+  const dup = q.get('SELECT request_hash AS requestHash, result_json AS resultJson FROM cashier_events WHERE store_id=? AND external_id=?', [storeId, externalId]);
+  if (dup) {
+    if (dup.requestHash && dup.requestHash !== requestHash) throw new AppError(409, 'external_id_reused', 'رقم العملية اتستخدم قبل كده ببيانات مختلفة.');
+    return { ...(json(dup.resultJson, { results: [], applied: 0 }) || {}), duplicate: true };
+  }
   const index = loadIndex(storeId);
   const results = []; let applied = 0;
   tx(() => {
@@ -173,9 +189,9 @@ export function pushSale(storeId, { externalId, type = 'sale', items }) {
       results.push({ ref: label, status: 'applied' });
     }
     for (const id of touchedProducts) recomputeProductStock(id);
-    q.run('INSERT INTO cashier_events(store_id, external_id, kind) VALUES(?,?,?)', [storeId, externalId, type]);
     const bad = results.filter((r) => r.status !== 'applied').length;
     writeLog(storeId, { source: 'api', kind: type, ok: bad ? 0 : 1, matched: applied, updated: applied, unmatched: bad, message: externalId.slice(0, 80), details: { skipped: results.filter((r) => r.status !== 'applied') } });
+    q.run('INSERT INTO cashier_events(store_id, external_id, kind, request_hash, result_json) VALUES(?,?,?,?,?)', [storeId, externalId, type, requestHash, JSON.stringify({ results, applied })]);
   });
   return { duplicate: false, results, applied };
 }

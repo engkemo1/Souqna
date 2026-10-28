@@ -179,8 +179,12 @@ export function reservationCart(products, reservation) {
 
 /** Optimistic local stock so the screen shows what is left even before the server has heard about the sale. */
 export function applyLocalStock(products, items, sign = -1) {
-  const by = new Map(items.map((i) => [lineKey(i.productId, i.variantId), i]));
-  const qtyFor = (pid, vid) => by.get(lineKey(pid, vid))?.qty || 0;
+  const by = new Map();
+  for (const item of items) {
+    const k = lineKey(item.productId, item.variantId);
+    by.set(k, (by.get(k) || 0) + (Number(item.qty) || 0));
+  }
+  const qtyFor = (pid, vid) => by.get(lineKey(pid, vid)) || 0;
   return products.map((p) => {
     if (!p.track) return p;
     if (p.variants?.length) {

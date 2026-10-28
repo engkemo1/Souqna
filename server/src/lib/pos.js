@@ -65,9 +65,14 @@ function openShiftRow(storeId, shiftId) {
   return shift;
 }
 
-export function addCashMovement(storeId, shiftId, { kind, amount, reason }, cashierName = '') {
+export function addCashMovement(storeId, shiftId, { kind, amount, reason, uuid = null }, cashierName = '') {
+  // the same request sent again (the answer was lost on a weak connection) must not take the money out twice
+  if (uuid) {
+    const dup = q.get('SELECT id, kind, amount, reason, created_by AS createdBy, created_at AS createdAt FROM pos_cash_movements WHERE store_id=? AND uuid=?', [storeId, uuid]);
+    if (dup) return { ...dup, createdAt: isoTime(dup.createdAt), duplicate: true };
+  }
   openShiftRow(storeId, shiftId);
-  const id = Number(q.run('INSERT INTO pos_cash_movements(store_id,shift_id,kind,amount,reason,created_by) VALUES(?,?,?,?,?,?)', [storeId, shiftId, kind, amount, reason, cashierName]).lastInsertRowid);
+  const id = Number(q.run('INSERT INTO pos_cash_movements(store_id,shift_id,kind,amount,reason,created_by,uuid) VALUES(?,?,?,?,?,?,?)', [storeId, shiftId, kind, amount, reason, cashierName, uuid]).lastInsertRowid);
   return { id, kind, amount, reason, createdBy: cashierName, createdAt: new Date().toISOString() };
 }
 
@@ -79,6 +84,31 @@ export function closeShift(storeId, shiftId, countedCash, cashierName = '', note
     [cashierName, countedCash, totals.expectedCash, difference, note, shiftId]);
   const closed = q.get('SELECT closed_at FROM pos_shifts WHERE id=?', [shiftId]);
   return { ...shift, state: 'closed', closedBy: cashierName, closedAt: isoTime(closed.closed_at), countedCash, difference, note, ...totals };
+}
+
+/**
+ * A sale made offline before the shift was closed can reach the server after the close. It belongs to that shift, so the
+ * stored "expected cash" and "difference" are worked out again (the counted cash stays what the cashier counted).
+ */
+function refreshClosedShift(storeId, shiftId) {
+  const shift = q.get("SELECT * FROM pos_shifts WHERE id=? AND store_id=? AND state='closed'", [shiftId, storeId]);
+  if (!shift) return;
+  const totals = shiftTotals(storeId, shift);
+  q.run('UPDATE pos_shifts SET expected_cash=?, difference=? WHERE id=?', [totals.expectedCash, (shift.counted_cash ?? 0) - totals.expectedCash, shiftId]);
+}
+
+/**
+ * Which shift a sale belongs to. Never refuses a sale (it is real money already taken): a sale made before its shift was
+ * closed stays in that shift; one made after (another tab closed the shift meanwhile) goes to the register's open shift,
+ * or to no shift at all.
+ */
+function shiftForSale(storeId, shiftId, createdAt) {
+  if (!shiftId) return null;
+  const shift = q.get('SELECT id,state,closed_at,register_id FROM pos_shifts WHERE id=? AND store_id=?', [shiftId, storeId]);
+  if (!shift) return null;
+  if (shift.state === 'open') return shift.id;
+  if (shift.closed_at && Date.parse(createdAt) <= Date.parse(`${shift.closed_at.replace(' ', 'T')}Z`)) return shift.id;
+  return q.val("SELECT id FROM pos_shifts WHERE store_id=? AND register_id=? AND state='open' ORDER BY id DESC LIMIT 1", [storeId, shift.register_id]) ?? null;
 }
 
 export function readShift(storeId, shiftId) {
@@ -154,13 +184,7 @@ export function bootstrap(store) {
 export function saveSale(store, input, cashierName = '') {
   const existing = q.get('SELECT id, number FROM pos_sales WHERE store_id=? AND uuid=?', [store.id, input.uuid]);
   if (existing) return { duplicate: true, ...readSale(store.id, existing.id) };
-  const shiftId = input.shiftId ?? null;
-  if (shiftId) {
-    const shift = q.get('SELECT id,state,closed_at,register_id FROM pos_shifts WHERE id=? AND store_id=?', [shiftId, store.id]);
-    if (!shift) throw new AppError(422, 'invalid_shift', 'الوردية المرتبطة بالفاتورة مش موجودة.');
-    const beforeClose = shift.state === 'closed' && shift.closed_at && Date.parse(input.createdAt) <= Date.parse(`${shift.closed_at.replace(' ', 'T')}Z`);
-    if (shift.state !== 'open' && !beforeClose) throw new AppError(409, 'shift_closed', 'الوردية اتقفلت قبل وقت البيع ده.');
-  }
+  const shiftId = shiftForSale(store.id, input.shiftId ?? null, input.createdAt);
 
   return tx(() => {
     const lines = [];
@@ -169,7 +193,7 @@ export function saveSale(store, input, cashierName = '') {
       const lineKey = key(it.productId, it.variantId);
       if (seenLines.has(lineKey)) throw new AppError(422, 'duplicate_sale_line', 'الصنف أو المقاس مكرر في الفاتورة. اجمع الكمية في سطر واحد.');
       seenLines.add(lineKey);
-      const p = q.get('SELECT id, name_ar AS name, sku, barcode, track_stock AS track, stock FROM products WHERE id=? AND store_id=?', [it.productId, store.id]);
+      const p = q.get('SELECT id, name_ar AS name, sku, barcode, no_return AS noReturn, track_stock AS track, stock FROM products WHERE id=? AND store_id=?', [it.productId, store.id]);
       if (!p) throw new AppError(422, 'unknown_product', `A product in this sale no longer exists (#${it.productId}).`);
       const hasVariants = q.val('SELECT COUNT(*) FROM variants WHERE product_id=?', [p.id]) > 0;
       let v = null;
@@ -198,8 +222,18 @@ export function saveSale(store, input, cashierName = '') {
     // A shopper who reserved online came to the shop. Those pieces already left the stock when they reserved,
     // so they must not be taken out a second time. A reservation that was cancelled meanwhile gave its pieces back:
     // then the sale takes them out normally.
-    const order = input.reservationId ? q.get("SELECT * FROM orders WHERE id=? AND store_id=? AND delivery_by='pickup'", [input.reservationId, store.id]) : null;
+    let order = input.reservationId ? q.get("SELECT * FROM orders WHERE id=? AND store_id=? AND delivery_by='pickup'", [input.reservationId, store.id]) : null;
+    // Already sold once at a cashier (two registers, one with an old list): its pieces were used by that first sale, so
+    // this one takes stock like any normal sale and is not linked to the reservation.
+    if (order && q.get('SELECT 1 FROM pos_sales WHERE store_id=? AND order_id=?', [store.id, order.id])) order = null;
+    // The reservation ran out (or was cancelled) AFTER the shopper had already bought it offline: the sale is what really
+    // happened, so the reservation is brought back as bought. Its pieces went back on sale when it was cancelled, so the
+    // sale takes them out normally.
+    const cancelledAt = order?.status === 'cancelled' ? q.val("SELECT MAX(created_at) FROM order_events WHERE order_id=? AND status='cancelled'", [order.id]) : null;
+    const revive = Boolean(cancelledAt && Date.parse(input.createdAt) <= Date.parse(/Z$|[+-]\d\d:?\d\d$/.test(cancelledAt) ? cancelledAt : `${cancelledAt.replace(' ', 'T')}Z`));
+    if (order?.status === 'cancelled' && !revive) order = null;
     const reserved = new Map();
+    // a reservation the shop already marked "collected" on the dashboard (no cashier sale yet) still covers its pieces
     const orderItems = order && ['pending', 'confirmed', 'delivered'].includes(order.status) ? q.all('SELECT * FROM order_items WHERE order_id=?', [order.id]) : [];
     for (const i of orderItems) reserved.set(key(i.product_id, i.variant_id), (reserved.get(key(i.product_id, i.variant_id)) || 0) + i.qty);
     for (const l of lines) {
@@ -227,10 +261,13 @@ export function saveSale(store, input, cashierName = '') {
       }
       if (fresh > 0) q.run("UPDATE products SET sold_count=sold_count+?, updated_at=datetime('now') WHERE id=?", [fresh, l.p.id]);
       q.run(
-        `INSERT INTO pos_sale_items(sale_id, product_id, variant_id, name, color, size, sku, barcode, price, qty, discount, oversold) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`,
-        [saleId, l.p.id, l.v?.id ?? null, l.p.name, l.v?.color || '', l.v?.size || '', l.v?.sku || l.p.sku || '', l.v?.barcode || l.p.barcode || '', l.price, l.qty, l.lineDiscount, over ? 1 : 0]);
+        `INSERT INTO pos_sale_items(sale_id, product_id, variant_id, name, color, size, sku, barcode, price, qty, discount, no_return, return_until, oversold) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [saleId, l.p.id, l.v?.id ?? null, l.p.name, l.v?.color || '', l.v?.size || '', l.v?.sku || l.p.sku || '', l.v?.barcode || l.p.barcode || '', l.price, l.qty, l.lineDiscount,
+          l.p.noReturn || (q.val('SELECT return_days FROM stores WHERE id=?', [store.id]) ?? 3) <= 0 ? 1 : 0,
+          addDays(cairoDay(input.createdAt), q.val('SELECT return_days FROM stores WHERE id=?', [store.id]) ?? 3), over ? 1 : 0]);
     }
     if (order && ['pending', 'confirmed'].includes(order.status)) closeReservation(store, order, orderItems, reserved, number);
+    if (revive) reviveReservation(order, lines, number);
     for (const id of touched) recompute(id);
     // change is taken out of the cash line so the day's cash total is what really sits in the drawer
     let giveBack = change;
@@ -239,6 +276,7 @@ export function saveSale(store, input, cashierName = '') {
       if (p.method === 'cash' && giveBack > 0) { const cut = Math.min(giveBack, amt); amt -= cut; giveBack -= cut; }
       if (amt > 0) q.run('INSERT INTO pos_payments(sale_id, method, amount) VALUES(?,?,?)', [saleId, p.method, amt]);
     }
+    if (shiftId) refreshClosedShift(store.id, shiftId); // after the payments: they are what the drawer total counts
     return { duplicate: false, ...readSale(store.id, saleId) };
   });
 }
@@ -275,6 +313,26 @@ function closeReservation(store, order, orderItems, left, number) {
   if (order.customer_id && subtotal !== order.total) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [order.total - subtotal, order.customer_id]);
 }
 
+/** A reservation that was cancelled after the shopper had in fact bought it: it becomes "bought", with what was bought. */
+function reviveReservation(order, lines, number) {
+  const now = new Date().toISOString();
+  const sold = new Map();
+  for (const l of lines) sold.set(key(l.p.id, l.v?.id), (sold.get(key(l.p.id, l.v?.id)) || 0) + l.qty);
+  let subtotal = 0;
+  for (const i of q.all('SELECT * FROM order_items WHERE order_id=?', [order.id])) {
+    const k = key(i.product_id, i.variant_id);
+    const took = Math.min(i.qty, sold.get(k) || 0);
+    if (took) sold.set(k, sold.get(k) - took);
+    if (!took) q.run('DELETE FROM order_items WHERE id=?', [i.id]);
+    else if (took !== i.qty) q.run('UPDATE order_items SET qty=? WHERE id=?', [took, i.id]);
+    subtotal += i.price * took;
+  }
+  if (!subtotal) return; // they bought something else: the reservation stays cancelled
+  q.run("UPDATE orders SET status='delivered', subtotal=?, total=?, updated_at=? WHERE id=?", [subtotal, subtotal, now, order.id]);
+  q.run('INSERT INTO order_events(order_id, status, note, created_at) VALUES(?,?,?,?)', [order.id, 'delivered', `pos #${number}`, now]);
+  if (order.customer_id) q.run('UPDATE customers SET orders_count=orders_count+1, total_spent=total_spent+? WHERE id=?', [subtotal, order.customer_id]);
+}
+
 export function readSale(storeId, id) {
   const s = q.get(
     `SELECT id, uuid, number, local_no AS localNo, subtotal, discount, total, paid, change_due AS change, cashier_name AS cashier, customer_name AS customerName, customer_phone AS customerPhone, note, device_at AS createdAt, shift_id AS shiftId,
@@ -283,9 +341,17 @@ export function readSale(storeId, id) {
   if (!s) return null;
   if (!s.reservationNumber) delete s.reservationNumber;
   s.createdAt = isoTime(s.createdAt);
-  s.items = q.all('SELECT id, product_id AS productId, variant_id AS variantId, name, color, size, sku, barcode, price, qty, discount, returned_qty AS returnedQty, oversold FROM pos_sale_items WHERE sale_id=? ORDER BY id', [id]);
+  s.items = q.all('SELECT id, product_id AS productId, variant_id AS variantId, name, color, size, sku, barcode, price, qty, discount, returned_qty AS returnedQty, no_return AS noReturn, return_until AS returnUntil, oversold FROM pos_sale_items WHERE sale_id=? ORDER BY id', [id]);
   s.payments = q.all('SELECT method, amount FROM pos_payments WHERE sale_id=? ORDER BY id', [id]);
-  s.returns = q.all('SELECT id, refund, method, reason, created_at AS createdAt FROM pos_returns WHERE sale_id=? ORDER BY id', [id]).map((r) => ({ ...r, createdAt: isoTime(r.createdAt) }));
+  // pos_payments keeps the cash that stayed in the drawer (tendered minus change); the receipt shows what was handed over
+  if (s.change > 0) {
+    const cash = s.payments.find((p) => p.method === 'cash');
+    if (cash) cash.amount += s.change; else s.payments.push({ method: 'cash', amount: s.change });
+  }
+  s.returns = q.all('SELECT id, refund, method, reason, created_at AS createdAt FROM pos_returns WHERE sale_id=? ORDER BY id', [id]).map((r) => ({
+    ...r, createdAt: isoTime(r.createdAt),
+    items: q.all('SELECT sale_item_id AS saleItemId, qty, amount, defective FROM pos_return_items WHERE return_id=? ORDER BY id', [r.id]),
+  }));
   return s;
 }
 
@@ -319,6 +385,9 @@ export function saveReturn(store, input, cashierName = '') {
       if (!it) throw new AppError(422, 'bad_item', 'This line is not on the invoice.');
       const qty = Math.floor(r.qty);
       if (qty > it.qty - it.returned_qty) throw new AppError(422, 'too_many', `Only ${it.qty - it.returned_qty} of "${it.name}" can still be returned.`);
+      if (!r.defective && it.return_until && (it.no_return || cairoDay(new Date().toISOString()) > it.return_until)) {
+        throw new AppError(409, it.no_return ? 'item_not_returnable' : 'return_window_ended', it.no_return ? `"${it.name}" غير قابل للاسترجاع حسب سياسة المحل. لو فيه عيب، علّمه كصنف به عيب.` : `مدة استرجاع "${it.name}" انتهت في ${it.return_until}.`);
+      }
       // the customer gets back what they paid for that piece, including their share of the invoice discount
       const lineNet = it.price * it.qty - it.discount;
       // Allocate integer-pound rounding cumulatively so several partial returns can never refund more than this line's net.
@@ -326,17 +395,21 @@ export function saveReturn(store, input, cashierName = '') {
       const before = it.returned_qty;
       const after = before + qty;
       const amount = Math.round((refundable * after) / it.qty) - Math.round((refundable * before) / it.qty);
-      rows.push({ it, qty, amount }); refund += amount;
+      rows.push({ it, qty, amount, defective: !!r.defective }); refund += amount;
     }
-    const shiftId = input.shiftId ?? null;
-    if (shiftId) openShiftRow(store.id, shiftId);
+    let shiftId = input.shiftId ?? null;
+    if (shiftId) {
+      const sh = q.get('SELECT id, state, register_id FROM pos_shifts WHERE id=? AND store_id=?', [shiftId, store.id]);
+      if (!sh) shiftId = null;
+      else if (sh.state !== 'open') shiftId = q.val("SELECT id FROM pos_shifts WHERE store_id=? AND register_id=? AND state='open' ORDER BY id DESC LIMIT 1", [store.id, sh.register_id]) ?? null;
+    }
     const returnId = Number(q.run('INSERT INTO pos_returns(store_id, sale_id, uuid, refund, method, reason, cashier_name, shift_id) VALUES(?,?,?,?,?,?,?,?)', [store.id, sale.id, input.uuid, refund, input.method, input.reason || '', cashierName, shiftId]).lastInsertRowid);
-    for (const { it, qty, amount } of rows) {
+    for (const { it, qty, amount, defective } of rows) {
       q.run('UPDATE pos_sale_items SET returned_qty=returned_qty+? WHERE id=?', [qty, it.id]);
-      q.run('INSERT INTO pos_return_items(return_id, sale_item_id, qty, amount) VALUES(?,?,?,?)', [returnId, it.id, qty, amount]);
+      q.run('INSERT INTO pos_return_items(return_id, sale_item_id, qty, amount, defective) VALUES(?,?,?,?,?)', [returnId, it.id, qty, amount, defective ? 1 : 0]);
       const p = it.product_id ? q.get('SELECT id, track_stock AS track FROM products WHERE id=? AND store_id=?', [it.product_id, store.id]) : null;
       if (p) {
-        if (p.track && input.restock) {
+        if (p.track && input.restock && !defective) {
           if (it.variant_id) { q.run('UPDATE variants SET stock=stock+? WHERE id=?', [qty, it.variant_id]); touched.add(p.id); }
           else q.run('UPDATE products SET stock=stock+? WHERE id=?', [qty, p.id]);
           q.run('INSERT INTO stock_movements(store_id, product_id, variant_id, delta, reason, ref) VALUES(?,?,?,?,?,?)', [store.id, p.id, it.variant_id, qty, 'pos_return', `#${sale.number}`]);
@@ -360,13 +433,22 @@ export function daySummary(storeId, day) {
   const pieces = q.val('SELECT COALESCE(SUM(i.qty),0) FROM pos_sale_items i JOIN pos_sales s ON s.id=i.sale_id WHERE s.store_id=? AND s.device_at >= ? AND s.device_at < ?', [storeId, ...range(day)]) || 0;
   return { day, invoices: sales.length, pieces, gross: sales.reduce((s, x) => s + x.total, 0), discounts: sales.reduce((s, x) => s + x.discount, 0), refunds, net: sales.reduce((s, x) => s + x.total, 0) - refunds, byMethod };
 }
-// a Cairo calendar day as UTC bounds (Egypt is UTC+2/+3; we widen by using the offset for that date)
+// a Cairo calendar day as UTC bounds. Egypt changes its clock twice a year, so a day can be 23 or 25 hours long:
+// each end is the real instant Cairo's clock showed 00:00.
+const cairoOffsetMin = (t) => {
+  const v = new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', timeZoneName: 'shortOffset' }).formatToParts(new Date(t)).find((x) => x.type === 'timeZoneName').value; // "GMT+2" / "GMT+3"
+  const m = v.match(/GMT([+-])(\d+)(?::(\d+))?/);
+  return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] || 0)) : 120;
+};
+function cairoMidnight(day) {
+  const wall = Date.parse(`${day}T00:00:00Z`);
+  let t = wall - cairoOffsetMin(wall) * 60e3;
+  t = wall - cairoOffsetMin(t) * 60e3; // second pass: the offset at the instant itself
+  return t;
+}
 function range(day) {
-  const probe = new Date(`${day}T12:00:00Z`);
-  const off = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', timeZoneName: 'shortOffset' }).formatToParts(probe).find((x) => x.type === 'timeZoneName').value.replace('GMT', '').replace('+', '') || 2);
-  const start = new Date(`${day}T00:00:00Z`).getTime() - off * 3600_000;
   const iso = (t) => new Date(t).toISOString().replace('T', ' ').slice(0, 19);
-  return [iso(start), iso(start + 86400_000)];
+  return [iso(cairoMidnight(day)), iso(cairoMidnight(addDays(day, 1)))];
 }
 
 export function listSales(storeId, { day = null, limit = 50, beforeId = null }) {

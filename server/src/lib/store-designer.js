@@ -8,7 +8,7 @@ import { THEME_PRESETS } from '@souqna/shared/theme';
 import { checkText } from './moda/guard.js';
 import { llmChain } from './stylist.js';
 
-const KIND_TEMPLATE = { men: 'menswear', women: 'boutique', kids: 'lookbook', sport: 'streetwear', wedding: 'atelier', shoes: 'lookbook', mixed: 'classic' };
+const KIND_TEMPLATE = { men: 'menswear', women: 'boutique', kids: 'playground', sport: 'streetwear', wedding: 'atelier', shoes: 'lookbook', mixed: 'classic' };
 const VIBE_TEMPLATE = { luxury: 'atelier', soft: 'boutique', street: 'streetwear', simple: 'editorial', deals: 'deals', classic: 'menswear' };
 const KIND_AR = { men: 'ملابس رجالي', women: 'ملابس حريمي', kids: 'ملابس أطفال', sport: 'ملابس رياضية', wedding: 'فساتين وبدل مناسبات', shoes: 'أحذية', mixed: 'ملابس للعيلة كلها' };
 const KIND_TAGLINE = {
@@ -22,7 +22,8 @@ const hasClaims = (s) => /\d\s*(جنيه|ج\.?م|EGP|%|٪)|\d{4}|خصم|مجان
 const okText = (s) => !!s && !hasClaims(s) && checkText(s, { lang: 'ar', maxLen: 400 }).ok;
 
 export function rulesSuggestion({ kind = '', vibe = '' } = {}) {
-  const template = VIBE_TEMPLATE[vibe] || KIND_TEMPLATE[kind] || 'classic';
+  // a kids' shop gets the kids template whatever the vibe (only a luxury kids' boutique keeps its vibe's look)
+  const template = (kind === 'kids' && vibe !== 'luxury' ? 'playground' : null) || VIBE_TEMPLATE[vibe] || KIND_TEMPLATE[kind] || 'classic';
   const preset = TEMPLATES[template].preset || 'noir';
   return {
     template, preset, source: 'rules',

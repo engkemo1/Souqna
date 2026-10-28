@@ -4,6 +4,8 @@ import { openPosDb } from '../../lib/pos/db.js';
 import { applyLocalStock, buildSale, newUuid, stockItems, syncQueue } from '../../lib/pos/engine.js';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+/** A request that hangs on a bad connection must not block every later sync: give up after `ms` (counts as "no network"). */
+const withTimeout = (path, opts, ms = 20000) => { const ac = new AbortController(); const t = setTimeout(() => ac.abort(), ms); return api(path, { ...opts, signal: ac.signal }).finally(() => clearTimeout(t)); };
 const pad = (n) => String(n).padStart(4, '0');
 
 /**
@@ -51,7 +53,7 @@ export function usePos() {
     setQ(list); return list;
   }, []);
 
-  const pendingItems = () => queueRef.current.filter((e) => e.state === 'pending').flatMap((e) => e.stockItems || e.body.items);
+  const queuedItems = () => queueRef.current.flatMap((e) => e.stockItems || e.body.items);
   // a reservation sold on this device but not sent yet is already finished here
   const openOnly = (list) => { const done = new Set(queueRef.current.map((e) => e.body.reservationId).filter(Boolean)); return (list || []).filter((r) => !done.has(r.id)); };
 
@@ -66,7 +68,7 @@ export function usePos() {
       registerRef.current = resolved.register; setRegister(resolved.register);
       shiftRef.current = resolved.shift; setShift(resolved.shift); setClosedShift(resolved.shift ? null : resolved.lastShift);
       if (!storeRef.current || storeRef.current.id !== d.store.id) { storeRef.current = d.store; setStore(d.store); await loadQueue(d.store.id); }
-      const list = applyLocalStock(d.products, pendingItems());
+      const list = applyLocalStock(d.products, queuedItems());
       const when = d.serverTime;
       setR(openOnly(d.reservations));
       setP(list); setSavedAt(when); setAuthExpired(false); setBlocked(null); setPhase('ready');
@@ -87,9 +89,9 @@ export function usePos() {
     return r.shift;
   }, [persistCatalog, savedAt]);
 
-  const moveCash = useCallback(async ({ kind, amount, reason }) => {
+  const moveCash = useCallback(async ({ kind, amount, reason, uuid }) => {
     if (!shiftRef.current) throw new Error('مفيش وردية مفتوحة.');
-    const r = await api(`/pos/shifts/${shiftRef.current.id}/movements`, { method: 'POST', body: { kind, amount, reason } });
+    const r = await api(`/pos/shifts/${shiftRef.current.id}/movements`, { method: 'POST', body: { kind, amount, reason, uuid } });
     shiftRef.current = r.shift; setShift(r.shift);
     if (storeRef.current) await persistCatalog(storeRef.current, productsRef.current, savedAt);
     return r.shift;
@@ -113,7 +115,7 @@ export function usePos() {
       if (!storeRef.current || storeRef.current.id !== received.store.id) {
         storeRef.current = received.store; setStore(received.store); await loadQueue(received.store.id);
       }
-      const list = applyLocalStock(received.products, pendingItems());
+      const list = applyLocalStock(received.products, queuedItems());
       setP(list); setR(openOnly(received.reservations)); setSavedAt(received.serverTime);
       await persistCatalog(received.store, list, received.serverTime);
       return { products: list, shift: shiftRef.current };
@@ -129,7 +131,7 @@ export function usePos() {
     try {
       const out = await syncQueue({
         entries: queueRef.current,
-        send: (body) => api('/pos/sales', { method: 'POST', body }),
+        send: (body) => withTimeout('/pos/sales', { method: 'POST', body }),
         onResult: async (entry, r) => {
           const db = dbRef.current;
           if (r.ok) { numbers.current.set(entry.uuid, r.sale.number); await db.deleteSale(entry.uuid); setQ(queueRef.current.filter((x) => x.uuid !== entry.uuid)); }
@@ -139,8 +141,30 @@ export function usePos() {
       if (out.stopped === 'auth') setAuthExpired(true);
       if (out.done.length && !queueRef.current.some((e) => e.state === 'pending')) await refresh();
       return out;
-    } finally { syncing.current = false; setBusy(false); }
+    } finally {
+      syncing.current = false; setBusy(false);
+      // a sale made while this round was running was not in it: send it now instead of waiting for the next tick
+      if (navigator.onLine && queueRef.current.some((e) => e.state === 'pending' && !waiting.includes(e))) setTimeout(() => syncRef.current?.(), 0);
+    }
   }, [refresh]);
+  const syncRef = useRef(null);
+  syncRef.current = sync;
+
+  // Reservations change on the server (another register sold one, the shop confirmed one, one ran out): keep the list
+  // fresh with a light request, so this register never sells a reservation another one already sold.
+  const refreshReservations = useCallback(async () => {
+    if (!navigator.onLine || !storeRef.current) return;
+    try {
+      const r = await withTimeout('/pos/reservations', {}, 15000);
+      setR(openOnly(r.reservations));
+    } catch { /* offline or blocked: keep the list we have */ }
+  }, []);
+  useEffect(() => {
+    const id = setInterval(refreshReservations, 45000);
+    const onFocus = () => { if (document.visibilityState === 'visible') refreshReservations(); };
+    document.addEventListener('visibilitychange', onFocus);
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onFocus); };
+  }, [refreshReservations]);
 
   // open: snapshot first (works offline), then the server
   useEffect(() => {
@@ -187,11 +211,13 @@ export function usePos() {
     const { body, receipt } = buildSale({ uuid, localNo: `م-${pad(counter)}`, createdAt: new Date().toISOString(), cart, discount, payments, customerName, customerPhone, reservation, shiftId: shiftRef.current.id });
     const moved = stockItems(body.items, reservation);
     const entry = { uuid, storeId: s.id, state: 'pending', body, receipt, error: null, ...(reservation ? { stockItems: moved, reservationSnapshot: reservation } : {}) };
-    await db.putSale(entry);
-    setQ([...queueRef.current, entry]);
-    if (reservation) setR(reservationsRef.current.filter((r) => r.id !== reservation.id));
+    const nextQueue = [...queueRef.current, entry];
+    const nextReservations = reservation ? reservationsRef.current.filter((r) => r.id !== reservation.id) : reservationsRef.current;
     const next = applyLocalStock(productsRef.current, moved);
-    setP(next); persistCatalog(s, next, savedAt);
+    await db.putSaleWithCatalog(entry, { store: s, products: next, reservations: nextReservations, savedAt, register: registerRef.current, shift: shiftRef.current });
+    setQ(nextQueue);
+    if (reservation) setR(nextReservations);
+    setP(next);
     if (navigator.onLine) await Promise.race([sync(), sleep(2500)]);
     return { ...receipt, number: numbers.current.get(uuid) ?? null };
   }, [persistCatalog, savedAt, sync]);
@@ -206,17 +232,18 @@ export function usePos() {
   const discard = useCallback(async (uuid) => {
     const entry = queueRef.current.find((x) => x.uuid === uuid);
     if (!entry) return;
-    await dbRef.current.deleteSale(uuid);
-    setQ(queueRef.current.filter((x) => x.uuid !== uuid));
+    const nextQueue = queueRef.current.filter((x) => x.uuid !== uuid);
     const restored = applyLocalStock(productsRef.current, entry.stockItems || entry.body.items, 1);
-    setP(restored);
-    if (entry.reservationSnapshot && !reservationsRef.current.some((r) => r.id === entry.reservationSnapshot.id)) {
-      setR([...reservationsRef.current, entry.reservationSnapshot].sort((a, b) => String(a.until || '').localeCompare(String(b.until || ''))));
-    }
-    if (storeRef.current) await persistCatalog(storeRef.current, restored, savedAt);
+    const nextReservations = entry.reservationSnapshot && !reservationsRef.current.some((r) => r.id === entry.reservationSnapshot.id)
+      ? [...reservationsRef.current, entry.reservationSnapshot].sort((a, b) => String(a.until || '').localeCompare(String(b.until || '')))
+      : reservationsRef.current;
+    if (storeRef.current) await dbRef.current.deleteSaleWithCatalog(uuid, storeRef.current.id, { store: storeRef.current, products: restored, reservations: nextReservations, savedAt, register: registerRef.current, shift: shiftRef.current });
+    else await dbRef.current.deleteSale(uuid);
+    setQ(nextQueue); setP(restored);
+    if (nextReservations !== reservationsRef.current) setR(nextReservations);
     // Refresh the authoritative stock and reservation list when online; local recovery above also works offline.
     if (navigator.onLine) await refresh();
   }, [persistCatalog, refresh, savedAt]);
 
-  return { phase, blocked, store, register, shift, closedShift, openShift, moveCash, closeShift, receiveStock, products, reservations, savedAt, queue, online, authExpired, safeStorage, busy, checkout, sync, refresh, retry, discard, db: dbRef };
+  return { phase, blocked, store, register, shift, closedShift, openShift, moveCash, closeShift, receiveStock, products, reservations, refreshReservations, savedAt, queue, online, authExpired, safeStorage, busy, checkout, sync, refresh, retry, discard, db: dbRef };
 }

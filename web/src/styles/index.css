@@ -230,3 +230,19 @@
 @keyframes ticker-scroll-rtl { from { transform: translateX(0); } to { transform: translateX(25%); } }
 .ticker-track { animation: ticker-scroll 28s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }
+
+/* ---- Kids template ("عالم الأطفال"): rounded playful headings and gentle motion ---- */
+[data-type='rounded'] :is(h1, h2, h3, .font-display, .kid-title) { font-family: 'Baloo Bhaijaan 2', 'IBM Plex Sans Arabic', system-ui, sans-serif; font-weight: 800; letter-spacing: 0; }
+.kid-title { font-family: 'Baloo Bhaijaan 2', 'IBM Plex Sans Arabic', system-ui, sans-serif; font-weight: 800; }
+.kid-frame { border-radius: 46% 54% 42% 58% / 52% 44% 56% 48%; }
+@keyframes kid-float { 0%, 100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(-8px) rotate(4deg); } }
+@keyframes kid-spin { from { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } to { transform: rotate(-8deg); } }
+@keyframes kid-wiggle { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-4deg); } 75% { transform: rotate(4deg); } }
+.kid-float { animation: kid-float 4.5s ease-in-out infinite; }
+.kid-spin { animation: kid-spin 6s ease-in-out infinite; }
+.kid-wiggle:hover, .group:hover .kid-wiggle { animation: kid-wiggle 0.5s ease-in-out; }
+@media (prefers-reduced-motion: reduce) { .kid-float, .kid-spin, .kid-wiggle:hover, .group:hover .kid-wiggle { animation: none; } }
+/* a hand-drawn squiggle under section titles in the kids template */
+[data-tpl='playground'] .section-title { position: relative; display: inline-block; padding-bottom: 12px; }
+[data-tpl='playground'] .section-title::after { content: ''; position: absolute; inset-inline-start: 0; bottom: 0; width: min(120px, 70%); height: 10px; background: rgb(var(--c-accent)); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10'%3E%3Cpath d='M2 6c10-6 18-6 28 0s18 6 28 0 18-6 28 0 18 6 30 0' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / 100% 100%; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 10'%3E%3Cpath d='M2 6c10-6 18-6 28 0s18 6 28 0 18-6 28 0 18 6 30 0' fill='none' stroke='black' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat center / 100% 100%; }
+[data-tpl='playground'] .eyebrow { color: rgb(var(--c-primary-ink, var(--c-primary))); }

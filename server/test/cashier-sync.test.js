@@ -95,6 +95,25 @@ test('import plan: matches by sku/barcode, flags the rest, never touches other s
   assert.equal(reasons[10], 'bad_quantity');
 });
 
+test('matching both a barcode and SKU that point to different items is rejected safely', () => {
+  const otherId = Number(q.run("INSERT INTO products(store_id,slug,name_ar,name_en,price,sku,stock) VALUES(?,?,?,?,100,?,?)", [storeA, 'sku-conflict', 'conflict', 'conflict', 'CROSS-1', 3]).lastInsertRowid);
+  const bagBefore = q.val("SELECT stock FROM products WHERE store_id=? AND slug='bag'", [storeA]);
+  const p = sync.planImport(storeA, [['CROSS-1', '6291000000099', '1']], { sku: 0, barcode: 1, stock: 2 });
+  assert.equal(p.changes.length, 0);
+  assert.equal(p.skipped[0].reason, 'conflicting_codes');
+  const api = sync.pushStock(storeA, [{ sku: 'CROSS-1', barcode: '6291000000099', stock: 1 }]);
+  assert.equal(api.results[0].status, 'conflicting_codes');
+  assert.equal(q.val('SELECT stock FROM products WHERE id=?', [otherId]), 3);
+  assert.equal(q.val("SELECT stock FROM products WHERE store_id=? AND slug='bag'", [storeA]), bagBefore);
+});
+
+test('absolute stock updates cannot silently overwrite the same item twice in one request', () => {
+  const body = q.get("SELECT sku, barcode FROM products WHERE store_id=? AND slug='bag'", [storeA]);
+  const result = sync.pushStock(storeA, [{ sku: body.sku, stock: 2 }, { barcode: body.barcode, stock: 7 }]);
+  assert.deepEqual(result.results.map((r) => r.status), ['updated', 'duplicate_in_request']);
+  assert.equal(q.val("SELECT stock FROM products WHERE store_id=? AND slug='bag'", [storeA]), 2);
+});
+
 test('apply writes absolute stock, recomputes product total, logs it, and is repeatable', () => {
   const rows = [['SH-R-M', '', '10'], ['SH-R-L', '', '2'], ['BAG-1', '', '4']];
   const plan = sync.planImport(storeA, rows, { sku: 0, barcode: 1, stock: 2 });
@@ -132,6 +151,10 @@ test('push API is closed until the platform switch is on AND the store link is a
   assert.equal(stockOf('SH-R-M'), 6);
   assert.equal(stockOf('SH-R-M', storeB), 5); // other store untouched
   assert.ok(sync.keyInfo(storeA).lastUsedAt);
+  const fractionalStock = await call('/api/cashier/v1/stock', { key, body: { items: [{ sku: 'SH-R-M', stock: 1.5 }] } });
+  assert.equal(fractionalStock.status, 422);
+  const fractionalSale = await call('/api/cashier/v1/sales', { key, body: { externalId: 'fractional-qty', items: [{ sku: 'SH-R-M', qty: 1.5 }] } });
+  assert.equal(fractionalSale.status, 422);
 });
 
 test('sales are applied once even if the cashier retries; returns add stock back', async () => {
@@ -141,7 +164,10 @@ test('sales are applied once even if the cashier retries; returns add stock back
   const a = await call('/api/cashier/v1/sales', { key, body: sale });
   const b = await call('/api/cashier/v1/sales', { key, body: sale });
   assert.equal(a.json.duplicate, false); assert.equal(b.json.duplicate, true);
+  assert.deepEqual(b.json.results, a.json.results); assert.equal(b.json.applied, a.json.applied);
   assert.equal(stockOf('SH-R-M'), before - 2);
+  const reused = await call('/api/cashier/v1/sales', { key, body: { ...sale, items: [{ sku: 'SH-R-M', qty: 1 }] } });
+  assert.equal(reused.status, 409); assert.equal(reused.json.error.code, 'external_id_reused');
   assert.equal(q.val("SELECT sold_count FROM products WHERE slug='shirt' AND store_id=?", [storeA]), 2);
   await call('/api/cashier/v1/sales', { key, body: { externalId: 'RET-1', type: 'return', items: [{ sku: 'SH-R-M', qty: 1 }] } });
   assert.equal(stockOf('SH-R-M'), before - 1);

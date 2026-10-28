@@ -509,6 +509,8 @@ CREATE TABLE IF NOT EXISTS cashier_events (
   store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   external_id TEXT NOT NULL,
   kind TEXT NOT NULL,
+  request_hash TEXT,
+  result_json TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (store_id, external_id)
 );
@@ -598,6 +600,8 @@ CREATE TABLE IF NOT EXISTS pos_sale_items (
   sku TEXT NOT NULL DEFAULT '', barcode TEXT NOT NULL DEFAULT '',
   price INTEGER NOT NULL, qty INTEGER NOT NULL, discount INTEGER NOT NULL DEFAULT 0,
   returned_qty INTEGER NOT NULL DEFAULT 0,
+  no_return INTEGER NOT NULL DEFAULT 0,
+  return_until TEXT,
   oversold INTEGER NOT NULL DEFAULT 0       -- 1 = stock on the server was lower than what was sold
 );
 CREATE INDEX IF NOT EXISTS idx_pos_items_sale ON pos_sale_items(sale_id);
@@ -626,7 +630,8 @@ CREATE TABLE IF NOT EXISTS pos_return_items (
   id INTEGER PRIMARY KEY,
   return_id INTEGER NOT NULL REFERENCES pos_returns(id) ON DELETE CASCADE,
   sale_item_id INTEGER NOT NULL REFERENCES pos_sale_items(id) ON DELETE CASCADE,
-  qty INTEGER NOT NULL, amount INTEGER NOT NULL
+  qty INTEGER NOT NULL, amount INTEGER NOT NULL,
+  defective INTEGER NOT NULL DEFAULT 0
 );
 
 -- Every stock change made by the cashier, so a number can always be explained.

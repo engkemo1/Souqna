@@ -147,6 +147,24 @@ test('returns: restock, share of discount refunded, cannot exceed what was sold'
   assert.equal(stockOf(bag, 'products'), before + 1);
 });
 
+test('return policy is saved on the invoice and defective items bypass it without restocking', async () => {
+  q.run('UPDATE stores SET return_days=0 WHERE id=?', [storeA]);
+  q.run('UPDATE products SET no_return=1 WHERE id=?', [bag]);
+  const s = (await call('/api/pos/sales', { body: sale() })).json;
+  q.run('UPDATE stores SET return_days=3 WHERE id=?', [storeA]);
+  q.run('UPDATE products SET no_return=0 WHERE id=?', [bag]);
+  assert.equal(s.items[0].noReturn, 1);
+  assert.equal(s.items[0].returnUntil, new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo' }).format(new Date(s.createdAt)));
+  const before = stockOf(bag, 'products');
+  const rejected = await call('/api/pos/returns', { body: { uuid: 'policy-denied-1', saleId: s.id, items: [{ saleItemId: s.items[0].id, qty: 1 }] } });
+  assert.equal(rejected.status, 409);
+  assert.equal(rejected.json.error.code, 'item_not_returnable');
+  const defective = await call('/api/pos/returns', { body: { uuid: 'policy-defective-1', saleId: s.id, items: [{ saleItemId: s.items[0].id, qty: 1, defective: true }] } });
+  assert.equal(defective.status, 200);
+  assert.equal(stockOf(bag, 'products'), before, 'defective items are never added back to stock');
+  assert.equal(defective.json.sale.returns.at(-1).items[0].defective, 1, 'the exception is recorded for audit');
+});
+
 test('partial returns distribute pound rounding without refunding more than the sale line', async () => {
   const s = (await call('/api/pos/sales', { body: sale({ items: [{ productId: bag, qty: 3, price: 10, discount: 1 }], payments: [{ method: 'cash', amount: 29 }] }) })).json;
   const item = s.items[0].id;
@@ -186,6 +204,7 @@ test('day summary adds payments by method and subtracts refunds', async () => {
   const refunds = q.val('SELECT SUM(refund) FROM pos_returns WHERE store_id=?', [storeA]) || 0;
   assert.equal(d.refunds, refunds);
   assert.equal(d.byMethod.cash, q.val("SELECT SUM(amount) FROM pos_payments WHERE method='cash'") - refunds);
+  assert.equal((await call('/api/pos/summary?day=2026-99-99')).status, 422);
 });
 
 test('expired subscription blocks selling but still accepts offline sales made before the cut-off', async () => {

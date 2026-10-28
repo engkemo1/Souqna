@@ -15,6 +15,8 @@ export function createMemoryDb() {
     async sales(storeId) { return [...sales.values()].filter((s) => s.storeId === storeId); },
     async putSale(e) { sales.set(e.uuid, structuredClone(e)); },
     async deleteSale(uuid) { sales.delete(uuid); },
+    async putSaleWithCatalog(e, snapshot) { sales.set(e.uuid, structuredClone(e)); kv.set(`catalog:${e.storeId}`, structuredClone(snapshot)); kv.set('last', e.storeId); },
+    async deleteSaleWithCatalog(uuid, storeId, snapshot) { sales.delete(uuid); kv.set(`catalog:${storeId}`, structuredClone(snapshot)); kv.set('last', storeId); },
   };
 }
 
@@ -42,6 +44,24 @@ export async function openPosDb(idb = globalThis.indexedDB) {
       async sales(storeId) { return wrap(store('sales').index('storeId').getAll(storeId)); },
       async putSale(e) { await wrap(store('sales', 'readwrite').put(e)); },
       async deleteSale(uuid) { await wrap(store('sales', 'readwrite').delete(uuid)); },
+      async putSaleWithCatalog(e, snapshot) {
+        await new Promise((resolve, reject) => {
+          const transaction = db.transaction(['sales', 'kv'], 'readwrite');
+          transaction.objectStore('sales').put(e);
+          transaction.objectStore('kv').put(snapshot, `catalog:${e.storeId}`);
+          transaction.objectStore('kv').put(e.storeId, 'last');
+          transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); transaction.onabort = () => reject(transaction.error || new Error('transaction aborted'));
+        });
+      },
+      async deleteSaleWithCatalog(uuid, storeId, snapshot) {
+        await new Promise((resolve, reject) => {
+          const transaction = db.transaction(['sales', 'kv'], 'readwrite');
+          transaction.objectStore('sales').delete(uuid);
+          transaction.objectStore('kv').put(snapshot, `catalog:${storeId}`);
+          transaction.objectStore('kv').put(storeId, 'last');
+          transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); transaction.onabort = () => reject(transaction.error || new Error('transaction aborted'));
+        });
+      },
     };
   } catch {
     return createMemoryDb();

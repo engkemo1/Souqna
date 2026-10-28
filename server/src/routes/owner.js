@@ -756,14 +756,31 @@ function assertBarcodesFree(storeId, data, existingId) {
   const norm = (v) => String(v || '').trim().toLowerCase()
     .replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
     .replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/\.0+$/, '');
-  const mine = [data.barcode, ...data.variants.map((v) => v.barcode)].map(norm).filter(Boolean);
-  if (new Set(mine).size !== mine.length) throw new AppError(409, 'barcode_in_use', 'The same barcode is used twice in this product.', { barcode: 'barcode_in_use' });
-  if (!mine.length) return;
+  const claims = [];
+  const claim = (code, target) => { const value = norm(code); if (value) claims.push({ value, target }); };
+  claim(data.sku, 'product');
+  const oldProduct = existingId ? q.get('SELECT barcode FROM products WHERE id=? AND store_id=?', [existingId, storeId]) : null;
+  claim(data.barcode === undefined ? oldProduct?.barcode : data.barcode, 'product');
+  data.variants.forEach((v, i) => {
+    const old = v.id && existingId ? q.get('SELECT sku,barcode FROM variants WHERE id=? AND product_id=?', [v.id, existingId]) : null;
+    const target = v.id ? `variant:${v.id}` : `new-variant:${i}`;
+    claim(v.sku === undefined ? old?.sku : v.sku, target);
+    claim(v.barcode === undefined ? old?.barcode : v.barcode, target);
+  });
+  const localTargets = new Map();
+  for (const c of claims) {
+    const previous = localTargets.get(c.value);
+    if (previous && previous !== c.target) throw new AppError(409, 'barcode_in_use', 'The same code is assigned to more than one product or size in this store.', { barcode: 'barcode_in_use' });
+    localTargets.set(c.value, c.target);
+  }
+  if (!localTargets.size) return;
   const taken = new Set([
-    ...q.all('SELECT barcode FROM products WHERE store_id=? AND barcode IS NOT NULL AND id<>?', [storeId, existingId || 0]),
-    ...q.all('SELECT v.barcode FROM variants v JOIN products p ON p.id=v.product_id WHERE p.store_id=? AND v.barcode IS NOT NULL AND p.id<>?', [storeId, existingId || 0]),
-  ].map((r) => norm(r.barcode)));
-  if (mine.some((b) => taken.has(b))) throw new AppError(409, 'barcode_in_use', 'This barcode already belongs to another product in your store.', { barcode: 'barcode_in_use' });
+    ...q.all('SELECT sku AS code FROM products WHERE store_id=? AND sku IS NOT NULL AND id<>?', [storeId, existingId || 0]),
+    ...q.all('SELECT barcode AS code FROM products WHERE store_id=? AND barcode IS NOT NULL AND id<>?', [storeId, existingId || 0]),
+    ...q.all('SELECT v.sku AS code FROM variants v JOIN products p ON p.id=v.product_id WHERE p.store_id=? AND v.sku IS NOT NULL AND p.id<>?', [storeId, existingId || 0]),
+    ...q.all('SELECT v.barcode AS code FROM variants v JOIN products p ON p.id=v.product_id WHERE p.store_id=? AND v.barcode IS NOT NULL AND p.id<>?', [storeId, existingId || 0]),
+  ].map((r) => norm(r.code)));
+  if ([...localTargets.keys()].some((code) => taken.has(code))) throw new AppError(409, 'barcode_in_use', 'This code already belongs to another product or size in your store.', { barcode: 'barcode_in_use' });
 }
 
 export function saveProduct(storeId, data, existing) {

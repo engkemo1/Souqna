@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Wifi, WifiOff, Search, Plus, Minus, Trash2, Receipt, RotateCcw, CalendarDays, CloudUpload, ShoppingCart, Printer, X, ArrowRight, AlertTriangle, ScanBarcode, Check, CalendarCheck, Phone, Camera, PackagePlus, Sparkles, LoaderCircle } from 'lucide-react';
+import { Wifi, WifiOff, Search, Plus, Minus, Trash2, Receipt, RotateCcw, CalendarDays, CloudUpload, ShoppingCart, Printer, X, ArrowRight, AlertTriangle, ScanBarcode, Check, CalendarCheck, Phone, Camera, PackagePlus, Sparkles, LoaderCircle, Smartphone, Unlink } from 'lucide-react';
+import { qrSvg } from '../../lib/qr/index.js';
 import { api, upload } from '../../lib/api.js';
 import { useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { cx } from '../../components/ui/cx.js';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
-import { addToCart, applyPhotoSuggestion, buildIndex, createScanBuffer, lookupCode, normCode, productStock, reservationCart, returnRefundPreview, searchProducts, setQty, settle, totals } from '../../lib/pos/engine.js';
+import { addToCart, applyPhotoSuggestion, buildIndex, newUuid, createScanBuffer, lookupCode, normCode, productStock, reservationCart, returnRefundPreview, searchProducts, setQty, settle, totals } from '../../lib/pos/engine.js';
 import { egp, printHtml, receiptHtml } from '../../lib/pos/receipt.js';
 import { usePos } from './usePos.js';
+import CameraScanner from '../../components/pos/CameraScanner.jsx';
 
 const METHODS = [['cash', 'نقدي'], ['card', 'بطاقة'], ['wallet', 'محفظة']];
 const METHOD_NAME = Object.fromEntries(METHODS);
@@ -46,45 +48,42 @@ function Modal({ title, onClose, children, wide, footer }) {
   );
 }
 
-function CameraScannerModal({ onClose, onDetected }) {
-  const videoRef = useRef(null);
-  const [status, setStatus] = useState('starting');
+/** Pair a phone as a barcode scanner for this cashier screen: a QR the phone opens, and its live status. */
+function PhoneScannerModal({ remote, phoneAt, online, onCreate, onUnpair, onClose }) {
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => {
-    let stopped = false;
-    let controls = null;
-    let reader = null;
-    (async () => {
-      try {
-        if (!navigator.mediaDevices?.getUserMedia) throw new Error('المتصفح ده مش بيسمح بتشغيل الكاميرا. استخدم قارئ USB أو البحث بالكود.');
-        const { BrowserMultiFormatReader } = await import('@zxing/browser');
-        if (stopped) return;
-        reader = new BrowserMultiFormatReader();
-        controls = await reader.decodeFromConstraints(
-          { audio: false, video: { facingMode: { ideal: 'environment' } } },
-          videoRef.current,
-          (result, _decodeError, activeControls) => {
-            if (result && !stopped) {
-              stopped = true; activeControls?.stop();
-              onDetected(result.getText());
-            }
-          },
-        );
-        if (!stopped) setStatus('scanning');
-      } catch (e) {
-        if (!stopped) { setStatus('error'); setError(e?.name === 'NotAllowedError' ? 'اسمح للمتصفح باستخدام الكاميرا، وبعدها جرّب تاني.' : (e?.message || 'مش قادرين نشغّل الكاميرا.')); }
-      }
-    })();
-    return () => { stopped = true; controls?.stop(); reader?.reset?.(); };
-  }, [onDetected]);
-  return <Modal title="امسح باركود بالكاميرا" onClose={onClose}>
-    <div className="space-y-3">
-      <div className="overflow-hidden rounded-2xl bg-black"><video ref={videoRef} className="aspect-[4/3] w-full object-cover" muted playsInline autoPlay /></div>
-      {status === 'starting' && <p className="text-center text-sm text-muted">بنجهّز الكاميرا… اسمح بالوصول لو المتصفح سأل.</p>}
-      {status === 'scanning' && <p className="text-center text-sm text-muted">وجّه الكاميرا للباركود وخليه واضح جوه الصورة.</p>}
-      {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
-    </div>
-  </Modal>;
+  const url = remote ? `${window.location.origin}/scan/${remote.token}` : '';
+  const qr = useMemo(() => (url ? qrSvg(url, { size: 220, logo: false }) : ''), [url]);
+  const recent = phoneAt && Date.now() - Date.parse(phoneAt) < 40000;
+  const run = async (fn) => { setBusy(true); setError(''); try { await fn(); } catch (x) { setError(x.status === 0 ? 'محتاج نت.' : x.message); } setBusy(false); };
+  return (
+    <Modal title="الموبايل كقارئ باركود" onClose={onClose}>
+      {!remote ? (
+        <div className="space-y-4">
+          <p className="text-sm leading-relaxed text-muted">استخدم كاميرا أي موبايل كقارئ باركود للكاشير ده: تمسح بالموبايل والصنف ينزل في السلة على الكمبيوتر. مش محتاج تسجيل دخول على الموبايل ولا تطبيق.</p>
+          <Button full size="lg" icon={Smartphone} loading={busy} disabled={!online} onClick={() => run(onCreate)}>{online ? 'اعمل كود الربط' : 'محتاج نت'}</Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className={cx('rounded-xl px-3 py-2.5 text-sm font-semibold', recent ? 'bg-success/10 text-success' : 'bg-amber-100 text-amber-900')}>{recent ? 'الموبايل متوصل — امسح بيه دلوقتي' : 'مستنيين الموبايل يفتح الكود'}</div>
+          <div className="mx-auto w-[220px] overflow-hidden rounded-2xl bg-white p-2 ring-1 ring-line" dangerouslySetInnerHTML={{ __html: qr }} />
+          <ol className="list-decimal space-y-1.5 ps-5 text-sm leading-relaxed">
+            <li>افتح كاميرا الموبايل ووجّهها للكود ده، وافتح اللينك اللي يظهر.</li>
+            <li>اسمح للصفحة تستخدم الكاميرا.</li>
+            <li>امسح الباركود بالموبايل: الصنف ينزل في السلة هنا، والموبايل يصفّر ويكتب اسم الصنف.</li>
+          </ol>
+          <p className="break-all rounded-lg bg-fg/[0.04] px-3 py-2 text-xs text-muted" dir="ltr">{url}</p>
+          <p className="text-xs text-muted">الربط فاضل شغال 30 يوم على الجهاز ده، حتى لو قفلت الصفحة. الموبايل والكمبيوتر لازم يكون عليهم نت. اللينك ده بيبعت أكواد للكاشير ده بس، ومحدش يقدر يشوف بيه أسعار أو فواتير.</p>
+          <Button variant="secondary" icon={Unlink} loading={busy} onClick={() => run(onUnpair)}>فك الربط (لو الموبايل ضاع أو اتغيّر)</Button>
+        </div>
+      )}
+      {error && <p role="alert" className="mt-3 rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
+    </Modal>
+  );
+}
+
+function CameraScannerModal({ onClose, onDetected }) {
+  return <Modal title="امسح باركود بالكاميرا" onClose={onClose}><CameraScanner onCode={onDetected} /></Modal>;
 }
 
 const Stat = ({ label, value, strong }) => (
@@ -96,16 +95,22 @@ function ShiftModal({ shift, online, canClose, onClose, onMove, onCloseShift }) 
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
   const [counted, setCounted] = useState(String(shift.expectedCash ?? 0));
+  const typed = useRef(false); // once the cashier typed what they counted, a background refresh must not overwrite it
+  const moveAttempt = useRef(null); // same movement retried after a lost answer = same id, recorded once
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  useEffect(() => setCounted(String(shift.expectedCash ?? 0)), [shift.id, shift.expectedCash]);
+  useEffect(() => { typed.current = false; }, [shift.id]);
+  useEffect(() => { if (!typed.current) setCounted(String(shift.expectedCash ?? 0)); }, [shift.id, shift.expectedCash]);
   const delta = num(counted) - (shift.expectedCash || 0);
   const submitMove = async (e) => {
     e.preventDefault(); setError('');
     if (num(amount) < 1 || reason.trim().length < 2) { setError('اكتب المبلغ والسبب.'); return; }
     setBusy(true);
-    try { await onMove({ kind: mode, amount: num(amount), reason: reason.trim() }); setMode(''); setAmount(''); setReason(''); }
+    const body = { kind: mode, amount: num(amount), reason: reason.trim() };
+    const fingerprint = JSON.stringify(body);
+    if (moveAttempt.current?.fingerprint !== fingerprint) moveAttempt.current = { fingerprint, uuid: newUuid() };
+    try { await onMove({ ...body, uuid: moveAttempt.current.uuid }); moveAttempt.current = null; setMode(''); setAmount(''); setReason(''); }
     catch (x) { setError(x.message); } finally { setBusy(false); }
   };
   const submitClose = async () => {
@@ -122,7 +127,7 @@ function ShiftModal({ shift, online, canClose, onClose, onMove, onCloseShift }) 
     </div>
     <div className="mt-4 flex flex-wrap gap-2"><Button variant="secondary" icon={Plus} onClick={() => setMode('in')}>إضافة نقدية</Button><Button variant="secondary" icon={Minus} onClick={() => setMode('out')}>سحب نقدية</Button></div>
     <div className="mt-4 rounded-2xl border border-line p-3">
-      <label className="block"><span className="mb-1 block text-sm font-semibold">عدّ النقد الموجود فعليًا</span><input inputMode="numeric" value={counted} onChange={(e) => setCounted(e.target.value)} className="h-12 w-full rounded-xl border border-line px-3 text-lg font-bold tabular-nums" /></label>
+      <label className="block"><span className="mb-1 block text-sm font-semibold">عدّ النقد الموجود فعليًا</span><input inputMode="numeric" value={counted} onChange={(e) => { typed.current = true; setCounted(e.target.value); }} className="h-12 w-full rounded-xl border border-line px-3 text-lg font-bold tabular-nums" /></label>
       <div className={cx('mt-2 text-sm font-semibold', delta === 0 ? 'text-success' : 'text-amber-700')}>{delta === 0 ? 'الدرج مطابق للحساب' : `الفرق عن المتوقع: ${delta > 0 ? '+' : '−'}${egp(Math.abs(delta))}`}</div>
       <label className="mt-3 block"><span className="mb-1 block text-xs text-muted">ملاحظة (اختياري)</span><input value={note} onChange={(e) => setNote(e.target.value)} className="h-10 w-full rounded-lg border border-line px-3 text-sm" placeholder="سبب فرق الدرج إن وجد" /></label>
     </div>
@@ -412,17 +417,25 @@ function InvoiceModal({ target: refSale, store, shiftId, onClose, onChanged }) {
   const [back, setBack] = useState({});
   const [method, setMethod] = useState('cash');
   const [reason, setReason] = useState('');
+  const [defective, setDefective] = useState({});
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     api(refSale.number ? `/pos/sales/number/${refSale.number}` : `/pos/sales/${refSale.id}`).then((d) => setSale(d.sale)).catch((e) => setErr(e.status === 0 ? 'محتاج نت عشان تفتح الفواتير القديمة.' : e.status === 404 ? 'مفيش فاتورة بالرقم ده.' : e.message));
   }, [refSale]);
+  const returnAttempt = useRef(null);
   const preview = sale ? returnRefundPreview(sale.items, sale, back) : 0;
+  const hasSelectedItems = Object.values(back).some((qty) => qty > 0);
+  const hasDefectiveItems = Object.entries(back).some(([id, qty]) => qty > 0 && defective[id]);
   const confirm = async () => {
     setBusy(true);
     try {
-      const items = Object.entries(back).filter(([, q]) => q > 0).map(([saleItemId, qty]) => ({ saleItemId: Number(saleItemId), qty }));
-      const r = await api('/pos/returns', { method: 'POST', body: { uuid: crypto.randomUUID?.() || `${Date.now()}-${Math.random()}`, saleId: sale.id, items, method, reason, shiftId } });
-      setSale(r.sale); setBack({}); toast({ title: `تم المرتجع — ${egp(r.refund)}` }); onChanged?.();
+      const items = Object.entries(back).filter(([, q]) => q > 0).map(([saleItemId, qty]) => ({ saleItemId: Number(saleItemId), qty, defective: !!defective[saleItemId] }));
+      // pressing Confirm again after a lost answer sends the SAME return id, so the server records it once
+      const fingerprint = JSON.stringify({ saleId: sale.id, items, method, reason });
+      if (returnAttempt.current?.fingerprint !== fingerprint) returnAttempt.current = { fingerprint, uuid: newUuid() };
+      const r = await api('/pos/returns', { method: 'POST', body: { uuid: returnAttempt.current.uuid, saleId: sale.id, items, method, reason, shiftId } });
+      returnAttempt.current = null;
+      setSale(r.sale); setBack({}); setDefective({}); toast({ title: `تم المرتجع — ${egp(r.refund)}` }); onChanged?.();
     } catch (e) { toast({ tone: 'error', title: e.status === 0 ? 'المرتجع محتاج نت' : e.message }); } finally { setBusy(false); }
   };
   const reprint = () => {
@@ -433,7 +446,7 @@ function InvoiceModal({ target: refSale, store, shiftId, onClose, onChanged }) {
   return (
     <Modal title={sale ? `فاتورة رقم ${sale.number}` : 'فاتورة'} onClose={onClose} wide
       footer={sale && <div className="flex flex-wrap items-center gap-2"><Button variant="secondary" icon={Printer} onClick={reprint}>إعادة طباعة</Button>
-        <Button className="ms-auto" disabled={!preview} loading={busy} icon={RotateCcw} onClick={confirm}>{preview ? `تأكيد مرتجع ${egp(preview)}` : 'اختار الأصناف للمرتجع'}</Button></div>}>
+        <Button className="ms-auto" disabled={!hasSelectedItems} loading={busy} icon={RotateCcw} onClick={confirm}>{preview ? `تأكيد مرتجع ${egp(preview)}` : hasSelectedItems ? 'تأكيد استلام الصنف بدون رد مبلغ' : 'اختار الأصناف للمرتجع'}</Button></div>}>
       {err && <p className="py-8 text-center text-muted">{err}</p>}
       {!sale && !err && <p className="py-8 text-center text-muted">جاري التحميل…</p>}
       {sale && (<>
@@ -444,7 +457,8 @@ function InvoiceModal({ target: refSale, store, shiftId, onClose, onChanged }) {
             return (
               <li key={it.id} className="flex items-center gap-3 p-3">
                 <div className="min-w-0 flex-1"><div className="truncate font-medium">{it.name}</div>
-                  <div className="text-xs text-muted">{[it.color, it.size].filter(Boolean).join(' · ')} {it.qty} × {egp(it.price)}{it.returnedQty ? ` · اترجّع ${it.returnedQty}` : ''}{it.oversold ? ' · اتباع بدون رصيد' : ''}</div></div>
+                  <div className="text-xs text-muted">{[it.color, it.size].filter(Boolean).join(' · ')} {it.qty} × {egp(it.price)}{it.returnedQty ? ` · اترجّع ${it.returnedQty}` : ''}{it.oversold ? ' · اتباع بدون رصيد' : ''}{it.noReturn ? ' · غير قابل للاسترجاع' : it.returnUntil ? ` · آخر يوم للاسترجاع ${it.returnUntil}` : ''}</div>
+                  {(back[it.id] || 0) > 0 && <label className="mt-1 flex items-center gap-1 text-xs text-amber-800"><input type="checkbox" checked={!!defective[it.id]} onChange={(e) => setDefective((d) => ({ ...d, [it.id]: e.target.checked }))} />القطعة دي فيها عيب؛ لا ترجع للمخزون</label>}</div>
                 {left > 0 ? (
                   <div className="flex items-center gap-1.5">
                     <button type="button" aria-label="أقل" className="grid h-9 w-9 place-items-center rounded-full border border-line" onClick={() => setBack((b) => ({ ...b, [it.id]: Math.max(0, (b[it.id] || 0) - 1) }))}><Minus className="h-4 w-4" /></button>
@@ -456,10 +470,10 @@ function InvoiceModal({ target: refSale, store, shiftId, onClose, onChanged }) {
         </ul>
         <div className="mt-3"><Stat label="الإجمالي" value={egp(sale.total)} strong />{sale.discount > 0 && <Stat label="خصم" value={egp(sale.discount)} />}
           {sale.payments.map((p, i) => <Stat key={i} label={METHOD_NAME[p.method]} value={egp(p.amount)} />)}
-          {sale.returns.map((r) => <Stat key={r.id} label={`مرتجع ${timeOf(r.createdAt)}`} value={`− ${egp(r.refund)}`} />)}</div>
-        {preview > 0 && (<div className="mt-3 flex items-center gap-2 text-sm"><span className="text-muted">رجّع الفلوس:</span>
+          {sale.returns.map((r) => <Stat key={r.id} label={`مرتجع ${timeOf(r.createdAt)}${r.items?.some((i) => i.defective) ? ' · به عيب' : ''}`} value={`− ${egp(r.refund)}`} />)}</div>
+        {(preview > 0 || hasDefectiveItems) && (<div className="mt-3 flex items-center gap-2 text-sm">{preview > 0 && <><span className="text-muted">رجّع الفلوس:</span>
           <select value={method} onChange={(e) => setMethod(e.target.value)} className="h-10 rounded-xl border border-line px-2">{METHODS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
-          <input value={reason} onChange={(e) => setReason(e.target.value)} placeholder="السبب (اختياري)" className="h-10 min-w-0 flex-1 rounded-xl border border-line px-3" /></div>)}
+          </>}<input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={hasDefectiveItems ? 'وصف العيب (اختياري)' : 'السبب (اختياري)'} className="h-10 min-w-0 flex-1 rounded-xl border border-line px-3" /></div>)}
       </>)}
     </Modal>
   );
@@ -568,6 +582,13 @@ export default function Pos() {
   const [barcodeToRegister, setBarcodeToRegister] = useState('');
   const searchRef = useRef(null);
 
+  // Load the camera scanner quietly once (online), so it is in the offline cache before anyone needs it without internet.
+  useEffect(() => {
+    if (!navigator.onLine) return undefined;
+    const t = setTimeout(() => { import('@zxing/browser').catch(() => {}); }, 5000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Ask the service worker to keep this page and its build files, so the cashier opens with no internet from now on.
   useEffect(() => {
     try { localStorage.setItem('twist.pos.seen', '1'); } catch { /* ignore */ }
@@ -607,6 +628,59 @@ export default function Pos() {
     if (!variant && product.variants.length) setPicker(product); else add(product, variant);
     setText(''); return true;
   }, [index, add, toast]);
+  // ---- phone used as a barcode scanner (paired by QR); codes arrive over a live connection
+  const [remote, setRemote] = useState(null); // { token }
+  const [phoneAt, setPhoneAt] = useState(null);
+  const remoteKey = store ? `remote:${store.id}` : null;
+  useEffect(() => {
+    if (!remoteKey) return;
+    pos.db.current?.get(remoteKey).then((v) => setRemote(v || null)).catch(() => {});
+  }, [remoteKey, pos.db, pos.phase]);
+  const remoteScan = useRef(null);
+  remoteScan.current = (code) => {
+    if (modal && modal !== 'phone-scanner') return { ok: false, text: 'فيه شاشة مفتوحة على الكاشير، قفلها الأول وامسح تاني' };
+    if (picker) return { ok: false, text: 'الكاشير لسه بيختار مقاس للصنف اللي قبله' };
+    if (modal === 'phone-scanner') setModal(null);
+    const r = lookupCode(index, code);
+    scan(code);
+    if (!r) return { ok: false, text: 'الكود ده مش متسجل على أي صنف' };
+    if (r.ambiguous) return { ok: false, text: 'الكود مكرر على أكتر من صنف، اختار من الكمبيوتر' };
+    const { product, variant } = r.hit;
+    if (!variant && product.variants.length) return { ok: true, text: `${product.name} — اختار المقاس على الكمبيوتر` };
+    return { ok: true, text: `اتضاف: ${product.name}${variant ? ` · ${[variant.color, variant.size].filter(Boolean).join(' ')}` : ''}` };
+  };
+  useEffect(() => {
+    if (!remote?.token || !online || typeof EventSource === 'undefined') return undefined;
+    const base = `/api/pos-remote/${encodeURIComponent(remote.token)}`;
+    const es = new EventSource(`${base}/events`);
+    es.addEventListener('hello', (e) => { try { setPhoneAt(JSON.parse(e.data).phoneSeenAt || null); } catch { /* ignore */ } });
+    es.addEventListener('phone', (e) => { try { setPhoneAt(JSON.parse(e.data).at); } catch { /* ignore */ } });
+    es.addEventListener('scan', (e) => {
+      let d; try { d = JSON.parse(e.data); } catch { return; }
+      setPhoneAt(new Date().toISOString());
+      const answer = remoteScan.current?.(String(d.code || '')) || { ok: false, text: '' };
+      fetch(`${base}/answer`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: d.id, ...answer }) }).catch(() => {});
+    });
+    es.onerror = () => {
+      if (es.readyState !== EventSource.CLOSED) return; // the browser reconnects by itself
+      // closed for good: the pairing was removed or expired → forget it on this computer
+      fetch(base).then((r) => { if (r.status === 404 && remoteKey) { pos.db.current?.set(remoteKey, null); setRemote(null); } }).catch(() => {});
+    };
+    return () => es.close();
+  }, [remote?.token, online, remoteKey, pos.db]);
+  const createRemote = async () => {
+    const r = await api('/pos/remote', { method: 'POST' });
+    const v = { token: r.token, expiresAt: r.expiresAt };
+    await pos.db.current?.set(remoteKey, v); setRemote(v); setPhoneAt(null);
+  };
+  const unpairRemote = async () => {
+    if (remote?.token) await api(`/pos/remote/${encodeURIComponent(remote.token)}`, { method: 'DELETE' }).catch(() => {});
+    await pos.db.current?.set(remoteKey, null); setRemote(null); setPhoneAt(null);
+  };
+  const [, tick] = useState(0);
+  useEffect(() => { if (!remote) return undefined; const id = setInterval(() => tick((n) => n + 1), 20000); return () => clearInterval(id); }, [remote]);
+  const phoneLive = phoneAt && Date.now() - Date.parse(phoneAt) < 40000;
+
   const cameraDetected = useCallback((code) => {
     scan(code); setModal(null); searchRef.current?.focus();
   }, [scan]);
@@ -668,20 +742,24 @@ export default function Pos() {
 
   return (
     <div className="flex h-dvh flex-col bg-canvas text-fg" dir="rtl">
-      <header className="flex items-center gap-2 border-b border-line bg-elevated px-3 py-2.5 sm:px-4">
+      <header className="flex flex-wrap items-center gap-2 border-b border-line bg-elevated px-3 py-2.5 sm:px-4">
         <Link to="/dashboard" aria-label="لوحة التحكم" className="grid h-10 w-10 place-items-center rounded-full hover:bg-fg/[0.07]"><ArrowRight className="h-5 w-5" /></Link>
         <h1 className="min-w-0 flex-1 truncate text-base font-bold sm:text-lg">كاشير · {store?.name}</h1>
+        {/* on a phone the buttons get their own row that scrolls sideways, so the name stays readable and nothing leaves the screen */}
+        <div className="flex items-center gap-2 max-md:order-last max-md:-mx-3 max-md:w-[calc(100%+1.5rem)] max-md:overflow-x-auto max-md:px-3 max-md:pb-1 [&>*]:shrink-0">
         <button type="button" onClick={() => setModal('quick-product')} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-semibold text-white hover:opacity-90"><PackagePlus className="h-4 w-4" /><span className="hidden sm:inline">صنف جديد</span></button>
+        <button type="button" onClick={() => setModal('phone-scanner')} className={cx('inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium hover:bg-fg/[0.05]', phoneLive ? 'border-success text-success' : 'border-line')} aria-label="الموبايل كقارئ باركود"><Smartphone className="h-4 w-4" /><span className="hidden sm:inline">{phoneLive ? 'الموبايل متوصل' : 'موبايل كقارئ'}</span></button>
         <button type="button" onClick={() => setModal('camera-scan')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]" aria-label="مسح باركود بالكاميرا"><Camera className="h-4 w-4" /><span className="hidden sm:inline">مسح بالكاميرا</span></button>
         <button type="button" onClick={() => setModal('receive-stock')} disabled={!online} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05] disabled:opacity-50"><Plus className="h-4 w-4" /><span className="hidden sm:inline">استلام بضاعة</span></button>
         <button type="button" onClick={() => setModal('shift')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]"><CalendarCheck className="h-4 w-4" /><span className="hidden sm:inline">الوردية</span></button>
         <span className={cx('hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold sm:inline-flex', online ? 'bg-success/10 text-success' : 'bg-amber-100 text-amber-900')}>{online ? <Wifi className="h-3.5 w-3.5" /> : <WifiOff className="h-3.5 w-3.5" />}{online ? 'متصل' : 'أوفلاين'}</span>
         {offlineReady && <span className="hidden text-xs text-muted lg:inline">جاهز للأوفلاين</span>}
         {(waiting > 0 || failed > 0) && <button type="button" onClick={() => setModal('queue')} className={cx('inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold', failed ? 'bg-sale/10 text-sale' : 'bg-amber-100 text-amber-900')}><CloudUpload className="h-3.5 w-3.5" />{failed ? `${failed} مرفوضة` : `${waiting} مستنية`}</button>}
-        {pos.reservations.length > 0 && <button type="button" onClick={() => setModal('reservations')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]"><CalendarCheck className="h-4 w-4" /><span className="hidden sm:inline">حجوزات</span><span className="rounded-full bg-btn px-1.5 text-xs font-bold text-on-btn tabular-nums">{pos.reservations.length}</span></button>}
+        {pos.reservations.length > 0 && <button type="button" onClick={() => { pos.refreshReservations(); setModal('reservations'); }} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]"><CalendarCheck className="h-4 w-4" /><span className="hidden sm:inline">حجوزات</span><span className="rounded-full bg-btn px-1.5 text-xs font-bold text-on-btn tabular-nums">{pos.reservations.length}</span></button>}
         <button type="button" onClick={() => setModal('invoice-find')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]"><RotateCcw className="h-4 w-4" /><span className="hidden sm:inline">مرتجع</span></button>
         <button type="button" onClick={() => setModal('day')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]"><CalendarDays className="h-4 w-4" /><span className="hidden sm:inline">اليوم</span></button>
         <label className="hidden cursor-pointer items-center gap-1.5 text-xs text-muted lg:flex"><input type="checkbox" checked={autoPrint} onChange={(e) => { setAutoPrint(e.target.checked); try { localStorage.setItem('twist.pos.autoprint', e.target.checked ? '1' : '0'); } catch { /* ignore */ } }} />طباعة تلقائية</label>
+        </div>
       </header>
 
       {!pos.safeStorage && <div className="bg-sale px-4 py-2 text-center text-sm font-semibold text-white">المتصفح مش سامح بتخزين على الجهاز — متشتغلش أوفلاين، الفواتير ممكن تضيع لو النت قطع.</div>}
@@ -742,6 +820,7 @@ export default function Pos() {
       {!cartOpen && cart.length > 0 && <button type="button" onClick={() => setCartOpen(true)} className="fixed inset-x-3 bottom-3 z-30 flex h-14 items-center justify-between rounded-2xl bg-btn px-5 font-semibold text-on-btn shadow-lift md:hidden"><span className="inline-flex items-center gap-2"><ShoppingCart className="h-5 w-5" />السلة ({t.pieces})</span><span className="tabular-nums">{egp(t.total)}</span></button>}
 
       {picker && <VariantPicker product={picker} onClose={() => setPicker(null)} onPick={(v) => { add(picker, v); setPicker(null); searchRef.current?.focus(); }} />}
+      {modal === 'phone-scanner' && <PhoneScannerModal remote={remote} phoneAt={phoneAt} online={online} onCreate={createRemote} onUnpair={unpairRemote} onClose={() => setModal(null)} />}
       {modal === 'camera-scan' && <CameraScannerModal onClose={() => setModal(null)} onDetected={cameraDetected} />}
       {(modal === 'quick-product' || modal?.newProductBarcode) && <QuickProductModal initialName={modal?.newProductBarcode ? '' : text} initialBarcode={modal?.newProductBarcode || ''} online={online} onClose={() => setModal(null)} onSaved={async (p) => {
         try { await pos.refresh(); } catch { /* The product is already saved; still add it to this register's local catalog. */ }

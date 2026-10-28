@@ -5,11 +5,11 @@
  * أي قيمة مش معروفة بتتشال: صاحب المحل ما يقدرش يكتب CSS ولا HTML، يختار من قوايم بس.
  */
 
-export const CARD_STYLES = ['round', 'flat', 'soft', 'bordered'];
-export const CAT_STYLES = ['tiles', 'circles', 'list'];
+export const CARD_STYLES = ['round', 'flat', 'soft', 'bordered', 'bubble'];
+export const CAT_STYLES = ['tiles', 'circles', 'list', 'bubbles'];
 export const GRID_STYLES = ['cozy', 'dense', 'airy'];
-export const HERO_STYLES = ['auto', 'cover', 'slider', 'split', 'compact'];
-export const TYPE_STYLES = ['normal', 'light', 'bold'];
+export const HERO_STYLES = ['auto', 'cover', 'slider', 'split', 'compact', 'playful'];
+export const TYPE_STYLES = ['normal', 'light', 'bold', 'rounded'];
 export const BADGE_TONES = ['brand', 'sale', 'dark', 'gold', 'green'];
 export const FLASH_TARGETS = ['sale', 'new', 'shop'];
 
@@ -59,6 +59,12 @@ export const TEMPLATES = {
     desc_ar: 'داكن وذهبي، كروت كبيرة ومنتجات قليلة. للفساتين والبدل والمناسبات.', desc_en: 'Dark and gold, large cards, few products.',
     hero: 'cover', card: 'flat', cat: 'tiles', grid: 'airy', type: 'light', preset: 'midnight',
     sections: ['hero', 'new_arrivals', 'story', 'categories', 'best_sellers', 'trust', 'on_sale', 'offers', 'visit', 'free_shipping'],
+  },
+  playground: {
+    ar: 'عالم الأطفال', en: 'Kids playground',
+    desc_ar: 'ألوان مبهجة وأشكال مدورة وخط طفولي، كروت ملونة وتصنيفات فقاعات. لمحلات لبس الأطفال.', desc_en: 'Cheerful colours, bubbly shapes and a playful font. For kidswear.',
+    hero: 'playful', card: 'bubble', cat: 'bubbles', grid: 'cozy', type: 'rounded', preset: 'candy',
+    sections: ['hero', 'categories', 'new_arrivals', 'flash', 'best_sellers', 'offers', 'on_sale', 'trust', 'story', 'visit', 'free_shipping'],
   },
   menswear: {
     ar: 'رجالي كلاسيك', en: 'Classic menswear',
