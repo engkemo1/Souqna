@@ -514,7 +514,7 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
     lqip: `data:image/webp;base64,${lqipBuf.toString('base64')}`,
     alt,
     quality,
-    canvas_v: kind === 'product' ? 2 : null,
+    canvas_v: kind === 'product' ? CANVAS_VERSION : null,
   });
   return getMedia(id);
 }
@@ -525,20 +525,47 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
  * still point to it) but gets a NEW key, so browsers and the CDN cannot show the old cached file.
  * Returns what happened: 'no_source' | 'fine' | 'asis' | 'studio' | 'would' (dry run) | 'done'.
  */
+/** Which plain backdrop a stored photo was put on (corners exactly white or cream), or null. */
+async function plainLook(m) {
+  try {
+    const { data, info } = await sharp(await readMediaFile(m, 'original.jpg')).resize(64, 80, { fit: 'fill' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+    const at = (x, y) => { const i = (y * info.width + x) * 3; return [data[i], data[i + 1], data[i + 2]]; };
+    const corners = [at(1, 1), at(info.width - 2, 1), at(1, info.height - 2), at(info.width - 2, info.height - 2)];
+    for (const [style, rgb] of Object.entries(STYLE_BG)) if (corners.every((c) => c.every((v, k) => Math.abs(v - rgb[k]) <= 4))) return style;
+  } catch { /* unreadable: treat as not plain */ }
+  return null;
+}
+
+/** Bumped whenever the product-photo treatment gets a fix worth re-applying to older photos. 3 = outline repair (no lost hems/cuffs). */
+export const CANVAS_VERSION = 3;
+
+/**
+ * Re-make an older product photo that needs one of the later fixes:
+ *  - the "picture inside a frame" look (a non-4:5 photo shown whole with bars), or
+ *  - a white/cream cut-out made before the outline repair (parts with backdrop-like colours, like a beige turn-up on a
+ *    cream sheet, could be lost).
+ * Works from the untouched source.jpg kept since upload; the row keeps its id (products, search and orders still point to
+ * it) but gets a NEW key, so browsers and the CDN cannot show the old cached file.
+ * Returns what happened: 'no_source' | 'fine' | 'asis' | 'studio' | 'would' (dry run) | 'done'.
+ */
 export async function refreshProductPhoto(m, { dry = false } = {}) {
-  if (m.canvas_v >= 2) return 'fine'; // made (or already re-made) with the new framing
+  if (m.canvas_v >= CANVAS_VERSION) return 'fine';
   let src;
   try { src = await readMediaFile(m, 'source.jpg'); } catch { return 'no_source'; }
   const meta = await sharp(src).metadata();
   const r = CANVAS_W / CANVAS_H;
-  if (Math.abs(meta.width / meta.height - r) / r <= 0.12) return 'fine'; // was already ~4:5: no frame was added
-  if (Math.abs(m.width / m.height - r) / r > 0.03) return 'asis'; // owner chose "exactly as shot": leave it
-  if ((await analyzePhoto(src)).studio) return 'studio'; // plain light backdrop: already a clean studio canvas
+  const near = Math.abs(meta.width / meta.height - r) / r <= 0.12;
+  const canvas = Math.abs(m.width / m.height - r) / r <= 0.03;
+  if (!canvas) return 'asis'; // owner chose "exactly as shot": leave it
+  if ((await analyzePhoto(src)).studio) return 'studio'; // shot on a plain light backdrop: never cut out, already clean
+  const look = await plainLook(m); // white / cream = it was cut out → redo with the repaired outline, same colour
+  const framed = !near && !look && (m.canvas_v ?? 0) < 2; // old bars around a non-4:5 photo
+  if (!look && !framed) return 'fine';
   if (dry) return 'would';
-  const fresh = await processImage(src, { storeId: m.store_id, kind: 'product', style: storePhotoStyle(m.store_id) });
+  const fresh = await processImage(src, { storeId: m.store_id, kind: 'product', style: look || storePhotoStyle(m.store_id) });
   tx(() => {
-    q.run('UPDATE media SET key=?, width=?, height=?, sizes=?, original_ext=?, bytes=?, color=?, lqip=?, remote=?, quality=?, canvas_v=2 WHERE id=?',
-      [fresh.key, fresh.width, fresh.height, fresh.sizes, fresh.original_ext, fresh.bytes, fresh.color, fresh.lqip, fresh.remote, fresh.quality ?? null, m.id]);
+    q.run('UPDATE media SET key=?, width=?, height=?, sizes=?, original_ext=?, bytes=?, color=?, lqip=?, remote=?, quality=?, canvas_v=? WHERE id=?',
+      [fresh.key, fresh.width, fresh.height, fresh.sizes, fresh.original_ext, fresh.bytes, fresh.color, fresh.lqip, fresh.remote, fresh.quality ?? null, CANVAS_VERSION, m.id]);
     q.run('DELETE FROM media WHERE id=?', [fresh.id]);
   });
   await purgeMediaFiles(m); // the old key's files

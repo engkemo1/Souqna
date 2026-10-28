@@ -16,6 +16,7 @@ import { requireOwner } from '../lib/auth.js';
 import { vapidPublicKey, sendTest } from '../lib/push.js';
 import { clampInt, nowIso, slugify } from '../lib/util.js';
 import { notifyBuyer, notifyOrderStatus, notifyPriceDrop, notifyBackInStock, notifyFollowers } from '../lib/buyers.js';
+import { reserveRecord } from '../lib/reserve.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { weeklyReport } from '../lib/report.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled } from '../lib/visual-demand.js';
@@ -110,6 +111,7 @@ const storeSchema = z.object({
   logo_color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   lat: z.coerce.number().min(-90).max(90).nullable().optional(), lng: z.coerce.number().min(-180).max(180).nullable().optional(),
   return_days: z.coerce.number().int().min(0).max(60).optional(),
+  reserve_hours: z.coerce.number().int().min(0).max(72).optional(),
   opens_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   closes_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   day_off: z.union([z.literal(''), z.coerce.number().int().min(0).max(6)]).optional().nullable(),
@@ -414,7 +416,7 @@ function orderCards(rows) {
   return rows.map((o) => {
     const its = items.filter((i) => i.order_id === o.id);
     return {
-      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, customer: o.customer_name, phone: o.phone, city: o.city, governorate: o.governorate,
+      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, reserveUntil: o.reserve_until || null, customer: o.customer_name, phone: o.phone, city: o.city, governorate: o.governorate,
       total: o.delivery_group ? o.subtotal - o.discount : o.total, deliveryGroup: o.delivery_group, shippingFree: !!o.shipping_free, createdAt: o.created_at, itemsCount: its.reduce((s, i) => s + i.qty, 0),
       images: its.slice(0, 3).map((i) => media.get(i.media_id)).filter(Boolean),
     };
@@ -914,7 +916,10 @@ r.get('/orders', h((req, res) => {
 
 /** Orders Twist delivers: the store prepares them (up to "processing" = ready for pickup); pickup and delivery are ours. */
 const PLATFORM_STATUSES = ['shipped', 'delivered'];
-const ownerNext = (o) => (ORDER_FLOW[o.status] || []).filter((s) => !(o.delivery_by === 'platform' && PLATFORM_STATUSES.includes(s)));
+/** "Reserve & try in store": held → ready in the shop → bought (delivered) | not collected (cancelled, stock comes back). */
+export const PICKUP_FLOW = { pending: ['confirmed', 'cancelled'], confirmed: ['delivered', 'cancelled'], delivered: [], cancelled: [] };
+const flowFor = (o) => (o.delivery_by === 'pickup' ? PICKUP_FLOW : ORDER_FLOW);
+const ownerNext = (o) => (flowFor(o)[o.status] || []).filter((s) => !(o.delivery_by === 'platform' && PLATFORM_STATUSES.includes(s)));
 
 r.get('/orders/:id', h((req, res) => {
   const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
@@ -931,7 +936,7 @@ r.get('/orders/:id', h((req, res) => {
   const runShare = runCost == null || runPosition < 0 ? null : Math.floor(runCost / runOrders.length) + (runPosition < runCost % runOrders.length ? 1 : 0);
   res.json({
     order: {
-      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, deliveryGroup: o.delivery_group, handoffAt: o.handoff_at, next: ownerNext(o), createdAt: o.created_at, updatedAt: o.updated_at,
+      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, reserveUntil: o.reserve_until || null, reserveRecord: o.delivery_by === 'pickup' ? reserveRecord(o.phone) : null, deliveryGroup: o.delivery_group, handoffAt: o.handoff_at, next: ownerNext(o), createdAt: o.created_at, updatedAt: o.updated_at,
       customer: { id: customer?.id, name: o.customer_name, phone: o.phone, governorate: o.governorate, city: o.city, address: o.address, ordersCount: customer?.orders_count || 1, totalSpent: customer?.total_spent ?? o.total },
       notes: o.notes, payment: o.payment_method, coupon: o.coupon_code, platformDiscount: o.platform_discount || 0,
       subtotal: o.subtotal, discount: o.discount, shipping: o.delivery_group ? 0 : o.shipping, total: o.delivery_group ? o.subtotal - o.discount : o.total,
@@ -948,11 +953,16 @@ r.patch('/orders/:id/status', h((req, res) => {
   if (!o) throw notFound('Order');
   const { status, note } = z.object({ status: z.enum(['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled']), note: z.string().trim().max(300).optional() }).parse(req.body);
   if (o.delivery_by === 'platform' && PLATFORM_STATUSES.includes(status)) throw badRequest('platform_delivers', 'Twist handles pickup and delivery of this order.');
-  if (!(ORDER_FLOW[o.status] || []).includes(status)) throw badRequest('invalid_transition', 'This status change is not allowed.');
+  if (!(flowFor(o)[o.status] || []).includes(status)) throw badRequest('invalid_transition', 'This status change is not allowed.');
   const feeNeedsRequote = o.delivery_group && (o.delivery_fee_status === 'offered' || o.delivery_fee_status === 'rejected' || (o.delivery_fee_status === 'confirmed' && o.delivery_fee_quote != null));
   tx(() => {
     const now = nowIso();
     q.run('UPDATE orders SET status=?, updated_at=? WHERE id=?', [status, now, o.id]);
+    // reservation confirmed by the shop: the shopper's hold time starts now
+    if (o.delivery_by === 'pickup' && status === 'confirmed') {
+      const hrs = q.val('SELECT reserve_hours FROM stores WHERE id=?', [o.store_id]) || 24;
+      q.run('UPDATE orders SET reserve_until=? WHERE id=?', [new Date(Date.now() + hrs * 3600e3).toISOString(), o.id]);
+    }
     insert('order_events', { order_id: o.id, status, note: note || null, created_at: now });
     if (status === 'cancelled') {
       // Keep the one-trip courier record attached to a live sub-order if the
@@ -1003,7 +1013,7 @@ r.patch('/orders/:id/status', h((req, res) => {
       }
     } else notifyPlatformDelivery(o.id, o.number);
   }
-  res.json({ status, next: ownerNext({ status, delivery_by: o.delivery_by }) });
+  res.json({ status, next: ownerNext({ status, delivery_by: o.delivery_by }), reserveUntil: o.delivery_by === 'pickup' ? q.val('SELECT reserve_until FROM orders WHERE id=?', [o.id]) : undefined });
 }));
 
 /** "No delivery person free right now" → hand this one order over to Twist. */
@@ -1011,6 +1021,7 @@ r.post('/orders/:id/handoff', h((req, res) => {
   const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!o) throw notFound('Order');
   if (o.delivery_by === 'platform') throw badRequest('already_handed_off', 'This order is already delivered by Twist.');
+  if (o.delivery_by === 'pickup') throw badRequest('pickup_order', 'This is an in-store reservation: nothing to deliver.');
   if (!['pending', 'confirmed', 'processing'].includes(o.status)) throw badRequest('invalid_transition', 'This order can no longer be handed over.');
   const now = nowIso();
   tx(() => {

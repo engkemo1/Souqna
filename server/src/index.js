@@ -17,6 +17,7 @@ import { errorHandler } from './lib/errors.js';
 import buyerRoutes from './routes/buyer.js';
 import waRoutes from './routes/wa.js';
 import { prefetchCutoutModel } from './lib/cutout.js';
+import { startReservationSweeper } from './lib/reserve.js';
 import './lib/wa-products.js'; // registers the WhatsApp → product handler (dormant unless WA_ENABLED=1)
 import { startDailySummary } from './lib/daily-summary.js';
 
@@ -95,6 +96,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/cashier/v1', cashierRoutes);
 app.use('/api/pos', posRoutes);
 prefetchCutoutModel(); // background-removal model, fetched once per container
+startReservationSweeper(); // releases in-store reservations nobody collected
 app.use('/api/wa', waRoutes);
 app.use('/api/buyer', buyerRoutes);
 app.use('/api/owner', ownerRoutes);

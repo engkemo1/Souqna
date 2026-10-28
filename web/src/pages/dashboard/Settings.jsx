@@ -22,7 +22,7 @@ import PageTransition from '../../components/PageTransition.jsx';
 import BrandPaletteCard from '../../components/dash/BrandPaletteCard.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'opens_at', 'closes_at', 'day_off', 'return_days', 'instagram', 'facebook', 'tiktok', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'opens_at', 'closes_at', 'day_off', 'return_days', 'reserve_hours', 'instagram', 'facebook', 'tiktok', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
 
 /** Exchange & return policy: one clear period choice (saved with the page) plus a note on pieces excluded one by one. */
 function ReturnsBox({ days, onDays }) {
@@ -60,6 +60,27 @@ function ReturnsBox({ days, onDays }) {
           <Button size="sm" variant="secondary" disabled={busy} onClick={reset}>{t('settings.allowReturnAll')}</Button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** "Reserve & try in store": how long a reserved piece is held for the shopper (0 = feature off). */
+function ReserveBox({ hours, hasPlace, onHours }) {
+  const { lang } = useI18n();
+  const L = (ar, en) => (lang === 'ar' ? ar : en);
+  const cur = String(hours ?? '24');
+  const opts = [['0', L('مقفول', 'Off')], ['6', L('6 ساعات', '6 h')], ['12', L('12 ساعة', '12 h')], ['24', L('يوم', '1 day')], ['48', L('يومين', '2 days')]];
+  return (
+    <div className="sm:col-span-2 rounded-2xl border border-line bg-surface p-4">
+      <p className="text-sm font-semibold">{L('احجزها وجرّبها في المحل', 'Reserve & try in store')}</p>
+      <p className="mt-0.5 text-[12.5px] leading-relaxed text-muted">{L('العميل يحجز القطعة من الموقع، تشيلها له، ييجي يقيسها ويدفع عندك. لو معدّاش، الحجز بيتلغى لوحده والقطعة ترجع للبيع.', 'Shoppers reserve a piece online, you put it aside, they come to try it on and pay in store. If they do not come, it is released automatically.')}</p>
+      <div className="mt-2 flex flex-wrap gap-2" role="radiogroup" aria-label={L('مدة الحجز', 'Hold time')}>
+        {opts.map(([v, label]) => (
+          <button key={v} type="button" role="radio" aria-checked={cur === v} onClick={() => onHours(v)}
+            className={'h-9 rounded-full px-4 text-[13px] font-semibold ring-1 transition active:scale-95 ' + (cur === v ? 'bg-btn text-on-btn ring-transparent' : 'ring-line hover:bg-fg/[0.05]')}>{label}</button>
+        ))}
+      </div>
+      {cur !== '0' && !hasPlace && <p className="mt-2 text-[12.5px] font-medium text-amber-700">{L('عشان الزرار يظهر للعملاء، اكتب عنوان المحل أو حط مكانه على الخريطة.', 'Add your shop address or map pin so shoppers can see this option.')}</p>}
     </div>
   );
 }
@@ -218,7 +239,7 @@ export default function Settings() {
     const x = ({
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
       address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', photo_style: s.photoStyle || 'white', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
-      return_days: String(s.returnDays ?? 3), shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
+      return_days: String(s.returnDays ?? 3), reserve_hours: String(s.reserveHours ?? 24), shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
       logo_initials: s.logoInitials || (s.name.ar || s.name.en || s.code || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: s.logoColor || '#1B1B1B',
     });
     setF(x);
@@ -237,6 +258,7 @@ export default function Settings() {
       body.lat = body.lat === '' || body.lat == null ? null : Number(body.lat);
       body.lng = body.lng === '' || body.lng == null ? null : Number(body.lng);
       body.return_days = Math.min(60, Number(body.return_days || 0));
+      body.reserve_hours = Math.min(72, Number(body.reserve_hours || 0));
       body.shipping_fee = Number(body.shipping_fee || 0);
       body.free_shipping_over = Number(body.free_shipping_over || 0);
       body.offer_badge_ar = body.offer_badge_ar || null;
@@ -357,6 +379,7 @@ export default function Settings() {
                 )}
               </div>
               <ReturnsBox days={f.return_days} onDays={(v) => setF({ ...f, return_days: v })} />
+              <ReserveBox hours={f.reserve_hours} hasPlace={Boolean(f.address_ar || f.map_url || f.lat)} onHours={(v) => setF({ ...f, reserve_hours: v })} />
               <Field label={t('settings.badgeAr')} hint={t('settings.badgeHint')}><Input dir="rtl" value={f.offer_badge_ar} onChange={set('offer_badge_ar')} maxLength={30} /></Field>
               <Field label={t('settings.badgeEn')}><Input dir="ltr" value={f.offer_badge_en} onChange={set('offer_badge_en')} maxLength={30} /></Field>
             </div>

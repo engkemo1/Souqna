@@ -21,7 +21,7 @@ function throttle(key, max = 10) {
   attempts.set(key, [...a, now]);
 }
 const phoneSchema = z.string().trim().transform(normPhone).refine((p) => /^01[0-9]{9}$/.test(p), 'phone_invalid');
-const out = (b) => ({ id: b.id, name: b.name, phone: b.phone });
+const out = (b) => ({ id: b.id, name: b.name, phone: b.phone, phoneVerified: !!b.phone_verified });
 const unread = (id) => q.val('SELECT COUNT(*) FROM buyer_notifications WHERE buyer_id=? AND read=0', [id]);
 
 r.post('/register', h((req, res) => {
@@ -79,6 +79,8 @@ r.post('/otp/verify', h((req, res) => {
     buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
   }
   q.run('DELETE FROM wa_otps WHERE phone=?', [b.phone]);
+  q.run('UPDATE buyers SET phone_verified=1 WHERE id=?', [buyer.id]); // the code proved this number belongs to them
+  buyer = { ...buyer, phone_verified: 1 };
   res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });
 }));
 

@@ -26,6 +26,8 @@ import { quote } from '../lib/cart.js';
 import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, getPlatformFreeShipping } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert, notifyPlatformAlert } from '../lib/whatsapp.js';
+import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
+import { waAuthReady } from '../lib/wa.js';
 import {
   serializeStore, serializeCards, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi,
 } from '../lib/serialize.js';
@@ -828,6 +830,70 @@ r.post('/stores/:slug/orders', h((req, res) => {
   res.status(201).json({ order: result });
 }));
 
+/* ---------------------------------------------------------- "reserve & try in store"
+ * The shopper holds a piece for a few hours (store setting, default 24 h), goes to the shop, tries it on and pays there.
+ * Recorded as a normal order with delivery_by='pickup', no delivery fee, payment in the shop; stock is held like any order
+ * and comes back automatically if the time runs out (lib/reserve.js). */
+const reserveSchema = z.object({
+  name: z.string().trim().min(2, 'name_required').max(80),
+  phone: z.string().trim().regex(/^01[0125][0-9]{8}$/, 'phone_invalid'),
+  notes: z.string().trim().max(300).optional().default(''),
+  items: z.array(z.object({ productId: z.coerce.number().int(), variantId: z.coerce.number().int().nullable().optional(), qty: z.coerce.number().int().min(1).max(3) })).min(1).max(3),
+});
+const reserveHits = new Map();
+
+r.post('/stores/:slug/reserve', h((req, res) => {
+  const s = loadStore(req.params.slug);
+  const hours = s.reserve_hours ?? 24;
+  if (!hours) throw new AppError(409, 'reserve_off', 'This store does not take reservations.');
+  const body = reserveSchema.parse(req.body);
+  const hits = (reserveHits.get(req.ip) || []).filter((t) => Date.now() - t < 3600e3);
+  if (hits.length >= 8) throw new AppError(429, 'rate_limited', 'Too many requests, try again later.');
+  reserveHits.set(req.ip, [...hits, Date.now()]);
+  // once WhatsApp sign-in is live, a reservation needs a number proved by a code (no fake numbers)
+  if (waAuthReady()) {
+    const me = buyerFromReq(req);
+    if (!me || !me.phone_verified || me.phone !== body.phone) throw new AppError(401, 'verify_phone', 'Confirm your number with the WhatsApp code first.');
+  }
+  const record = reserveRecord(body.phone);
+  if (record.blockedUntil) throw new AppError(403, 'reserve_blocked', 'Reservations are paused for this number for a while.', { until: record.blockedUntil });
+  const open = q.val("SELECT COUNT(*) FROM orders WHERE store_id=? AND phone=? AND delivery_by='pickup' AND status IN ('pending','confirmed')", [s.id, body.phone]);
+  if (open >= 3) throw new AppError(409, 'too_many_reservations', 'You already have reservations waiting at this store.');
+  const result = tx(() => {
+    const qt = quote(s, body.items, null, { phone: body.phone });
+    if (qt.hasErrors) throw new AppError(409, 'cart_changed', 'This piece is no longer available.', { lines: qt.lines });
+    const now = nowIso();
+    const until = confirmDeadline(s).toISOString(); // first the shop confirms; the hold time starts then
+    let customer = q.get('SELECT * FROM customers WHERE store_id=? AND phone=?', [s.id, body.phone]);
+    if (!customer) customer = { id: insert('customers', { store_id: s.id, name: body.name, phone: body.phone, created_at: now }) };
+    q.run('UPDATE customers SET name=?, orders_count=orders_count+1, total_spent=total_spent+?, last_order_at=? WHERE id=?', [body.name, qt.subtotal, now, customer.id]);
+    const seq = q.val('SELECT COUNT(*) FROM orders WHERE store_id=?', [s.id]) + 10001;
+    const number = `${s.code}-${seq}`;
+    const trackToken = crypto.randomBytes(12).toString('base64url');
+    const orderId = insert('orders', {
+      store_id: s.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone, notes: body.notes,
+      status: 'pending', delivery_by: 'pickup', payment_method: 'in_store', reserve_until: until,
+      subtotal: qt.subtotal, discount: 0, shipping: 0, total: qt.subtotal, shipping_free: 1,
+      track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
+    });
+    for (const l of qt.lines) {
+      insert('order_items', { order_id: orderId, product_id: l.productId, variant_id: l.variantId, name_ar: l.name.ar, name_en: l.name.en, media_id: l.mediaId, color: l.color, size: l.size, price: l.price, qty: l.qty });
+      if (l.variantId) q.run('UPDATE variants SET stock=MAX(0, stock-?) WHERE id=?', [l.qty, l.variantId]);
+      q.run('UPDATE products SET stock=MAX(0, stock-?), sold_count=sold_count+? WHERE id=?', [l.qty, l.qty, l.productId]);
+    }
+    insert('order_events', { order_id: orderId, status: 'pending', note: 'reserve', created_at: now });
+    return { number, total: qt.subtotal, trackToken, orderId, confirmBy: until, holdHours: hours };
+  });
+  notifyStore(s.id, { title: `طلب حجز للقياس 🛍️ ${result.number}`, body: `${body.name} عايز يقيس. أكّد إن القطعة موجودة خلال ساعتين`, url: `/dashboard/orders/${result.orderId}`, tag: `order-${result.orderId}` });
+  notifyPlatformAlert(`حجز للقياس في ${s.name_ar} 🛍️ ${result.number} للعميل ${body.name}`);
+  delete result.orderId;
+  res.status(201).json({
+    reservation: result,
+    store: { name: bi(s, 'name'), address: bi(s, 'address'), phone: s.phone || null, whatsapp: s.whatsapp || null, mapUrl: s.map_url || null, lat: s.lat ?? null, lng: s.lng ?? null,
+      hours: s.opens_at && s.closes_at ? { open: s.opens_at, close: s.closes_at, dayOff: s.day_off ?? null } : null },
+  });
+}));
+
 const marketplaceOrderSchema = orderSchema.omit({ coupon: true, items: true }).extend({
   stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems, coupon: z.string().trim().max(40).optional().nullable() })).min(1).max(20),
   expectedShipping: z.number().int().min(0).max(5000).optional(),
@@ -932,20 +998,22 @@ const trackMiss = (req, recent) => { trackFails.set(req.ip, [...recent, Date.now
 const normPhone = (v) => { const d = String(v || '').replace(/\D/g, ''); return d.startsWith('20') && d.length === 12 ? `0${d.slice(2)}` : d; };
 
 function trackPayload(o) {
-  const s = q.get('SELECT name_ar, name_en, slug, phone FROM stores WHERE id=?', [o.store_id]);
+  const s = q.get('SELECT name_ar, name_en, slug, phone, address_ar, address_en, map_url, lat, lng, reserve_hours FROM stores WHERE id=?', [o.store_id]);
   const items = q.all('SELECT * FROM order_items WHERE order_id=?', [o.id]);
   const media = mediaMap(items.map((i) => i.media_id));
-  const events = q.all('SELECT status, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]);
+  // only the fixed reservation reasons are shown to the shopper, never a store's free-text note
+  const events = q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id])
+    .map((e) => ({ status: e.status, created_at: e.created_at, ...(['expired', 'unavailable', 'no_show', 'not_confirmed'].includes(e.note) ? { reason: e.note } : {}) }));
   const feeState = o.delivery_group ? q.get("SELECT delivery_fee_status,delivery_fee_quote FROM orders WHERE delivery_group=? AND status<>'cancelled' ORDER BY id LIMIT 1", [o.delivery_group]) : null;
   const basket = o.delivery_group ? q.get("SELECT COUNT(*) AS count, COALESCE(SUM(total),0) AS total, COALESCE(SUM(subtotal-discount),0) AS items_total FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group]) : null;
   return {
     number: o.number, token: o.track_token, status: o.status, createdAt: o.created_at, updatedAt: o.updated_at,
-    deliveryBy: o.delivery_by, firstName: String(o.customer_name || '').split(' ')[0],
+    deliveryBy: o.delivery_by, reserveUntil: o.reserve_until || null, firstName: String(o.customer_name || '').split(' ')[0],
     city: o.city, governorate: o.governorate, phone: o.phone.replace(/^(\d{3})\d{5}/, '$1•••••'),
     subtotal: o.subtotal, discount: o.discount, shipping: o.shipping, shippingFree: !!o.shipping_free, total: o.total, payment: o.payment_method,
     deliveryGroupCount: basket?.count ? basket.count : null, deliveryGroupTotal: basket?.count ? (feeState?.delivery_fee_status === 'rejected' ? basket.items_total : basket.total) : null,
     deliveryFeeStatus: feeState?.delivery_fee_status || o.delivery_fee_status || 'confirmed', deliveryFeeQuote: feeState?.delivery_fee_quote ?? o.delivery_fee_quote ?? null,
-    store: { name: { ar: s?.name_ar, en: s?.name_en }, slug: s?.slug, phone: s?.phone || null },
+    store: { name: { ar: s?.name_ar, en: s?.name_en }, slug: s?.slug, phone: s?.phone || null, ...(o.delivery_by === 'pickup' ? { address: { ar: s?.address_ar || '', en: s?.address_en || '' }, mapUrl: s?.map_url || null, lat: s?.lat ?? null, lng: s?.lng ?? null, reserveHours: s?.reserve_hours || 24 } : {}) },
     items: items.map((i) => ({ productId: i.product_id, reviewed: i.product_id ? !!q.get('SELECT 1 AS x FROM reviews WHERE order_id=? AND product_id=?', [o.id, i.product_id]) : true, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
     events,
   };

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Store as StoreIcon } from 'lucide-react';
 import SmartImage from '../ui/SmartImage.jsx';
 import { StatusBadge } from '../ui/Badge.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -16,21 +16,28 @@ function Thumbs({ images = [], count }) {
   );
 }
 
+
+/** In-store reservations ("reserve & try in store") use their own wording. */
+const PICKUP = { ar: { pending: 'حجز جديد', confirmed: 'جاهزة في المحل', delivered: 'اشتراها', cancelled: 'اتلغى' }, en: { pending: 'New reservation', confirmed: 'Ready in store', delivered: 'Bought', cancelled: 'Cancelled' } };
+const statusLabel = (o, t, lang) => (key, vars) => (o.deliveryBy === 'pickup' && key.startsWith('status.') ? (PICKUP[lang === 'ar' ? 'ar' : 'en'][key.slice(7)] || t(key, vars))
+  : o.deliveryBy === 'platform' && o.status === 'processing' && key === 'status.processing' ? t('orders.markReady') : t(key, vars));
+const PickupTag = ({ lang }) => <span className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-semibold text-brand"><StoreIcon className="h-3 w-3" />{lang === 'ar' ? 'قياس في المحل' : 'Try in store'}</span>;
+
 /** Mobile-first order card. */
 export function OrderCard({ o }) {
   const { t, lang, isRtl } = useI18n();
-  const statusT = (key, vars) => o.deliveryBy === 'platform' && o.status === 'processing' && key === 'status.processing' ? t('orders.markReady') : t(key, vars);
+  const statusT = statusLabel(o, t, lang);
   const Chevron = isRtl ? ChevronLeft : ChevronRight;
   return (
     <Link to={`/dashboard/orders/${o.id}`} className="block rounded-2xl border border-line bg-elevated p-4 transition active:scale-[.99] hover:border-line-strong">
       <div className="flex items-center justify-between gap-3">
         <span className="font-mono text-sm font-semibold" dir="ltr">#{o.number}</span>
-        <span className="flex items-center gap-1.5">{o.deliveryBy === 'platform' && <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-brand">{t('orders.byPlatformShort')}</span>}<StatusBadge status={o.status} t={statusT} /></span>
+        <span className="flex items-center gap-1.5">{o.deliveryBy === 'pickup' && <PickupTag lang={lang} />}{o.deliveryBy === 'platform' && <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-brand">{t('orders.byPlatformShort')}</span>}<StatusBadge status={o.status} t={statusT} /></span>
       </div>
       <div className="mt-3 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate font-semibold">{o.customer}</p>
-          <p className="mt-0.5 flex items-center gap-1 truncate text-[13px] text-muted"><MapPin className="h-3.5 w-3.5 shrink-0" />{o.city} · {relativeTime(o.createdAt, lang)}</p>
+          <p className="mt-0.5 flex items-center gap-1 truncate text-[13px] text-muted">{o.deliveryBy === 'pickup' ? <StoreIcon className="h-3.5 w-3.5 shrink-0" /> : <MapPin className="h-3.5 w-3.5 shrink-0" />}{o.deliveryBy === 'pickup' ? (lang === 'ar' ? 'هيستلم من المحل' : 'Pickup') : o.city} · {relativeTime(o.createdAt, lang)}</p>
         </div>
         <Thumbs images={o.images} count={o.itemsCount} />
       </div>
@@ -45,11 +52,11 @@ export function OrderCard({ o }) {
 /** Desktop table row. */
 export function OrderRow({ o }) {
   const { t, lang } = useI18n();
-  const statusT = (key, vars) => o.deliveryBy === 'platform' && o.status === 'processing' && key === 'status.processing' ? t('orders.markReady') : t(key, vars);
+  const statusT = statusLabel(o, t, lang);
   return (
     <tr className="group cursor-pointer transition hover:bg-fg/[0.025]">
       <td className="py-3.5 ps-5"><Link to={`/dashboard/orders/${o.id}`} className="font-mono text-sm font-semibold after:absolute after:inset-0" dir="ltr">#{o.number}</Link></td>
-      <td className="py-3.5"><p className="font-medium">{o.customer}</p><p className="text-[13px] text-muted">{o.city}</p></td>
+      <td className="py-3.5"><p className="font-medium">{o.customer}</p><p className="text-[13px] text-muted">{o.deliveryBy === 'pickup' ? <PickupTag lang={lang} /> : o.city}</p></td>
       <td className="py-3.5 text-sm text-muted"><p>{formatDate(o.createdAt, lang, { day: 'numeric', month: 'short' })}</p><p className="text-xs">{formatTime(o.createdAt, lang)}</p></td>
       <td className="py-3.5"><Thumbs images={o.images} count={o.itemsCount} /></td>
       <td className="py-3.5 font-semibold tabular">{formatMoney(o.total, lang)}</td>

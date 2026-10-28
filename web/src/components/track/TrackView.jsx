@@ -1,4 +1,6 @@
-import { Check, X, PhoneCall, MessageCircle, Truck, Package, ClipboardCheck, PartyPopper, Clock } from 'lucide-react';
+import { Check, X, PhoneCall, MessageCircle, Truck, Package, ClipboardCheck, PartyPopper, Clock, MapPin, Store as StoreIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { mapsLink } from '../store/ReserveSheet.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
 import SmartImage from '../ui/SmartImage.jsx';
@@ -19,8 +21,72 @@ const stamp = (iso, lang) => {
   try { return new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso.replace(' ', 'T') + 'Z')); } catch { return iso; }
 };
 
+/** "Reserve & try in store": what the shopper needs — is it ready, until when, where is the shop. */
+function ReservationView({ o }) {
+  const { t, tr, lang } = useI18n();
+  const L = (ar, en) => (lang === 'ar' ? ar : en);
+  const storeName = tr(o.store.name);
+  const phone = o.store.phone;
+  const map = mapsLink(o.store);
+  const reason = [...o.events].reverse().find((e) => e.reason)?.reason;
+  const until = o.reserveUntil ? new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { weekday: 'long', hour: 'numeric', minute: '2-digit' }).format(new Date(o.reserveUntil)) : '';
+  const box = {
+    pending: ['bg-amber-50 text-amber-900', Clock, L('مستنيين المحل يأكد إن القطعة موجودة', 'Waiting for the shop to confirm the piece'), L(`أول ما يأكد هيشيلها لك ${o.store.reserveHours || 24} ساعة. متنزلش قبل التأكيد. لو مأكدش لحد ${until} الطلب بيتلغى لوحده.`, `Once confirmed it is held for you ${o.store.reserveHours || 24} h. Don't go before the confirmation. If not confirmed by ${until}, the request is cancelled.`)],
+    confirmed: ['bg-emerald-50 text-emerald-900', Check, L('القطعة جاهزة ومستنياك ✓', 'Your piece is ready ✓'), L(`عدّي قيسها قبل ${until}، ولو عجبتك ادفع في المحل.`, `Try it on before ${until}; pay in the shop if you like it.`)],
+    delivered: ['bg-emerald-50 text-emerald-900', PartyPopper, L('مبروك عليك 🛍️', 'Enjoy it 🛍️'), L(`شكرًا إنك اشتريت من ${storeName}.`, `Thanks for buying from ${storeName}.`)],
+    cancelled: ['bg-red-50 text-red-800', X, L('الحجز اتلغى', 'Reservation cancelled'),
+      reason === 'unavailable' ? L('بنعتذر، القطعة اتباعت في المحل قبل ما تعدّي.', 'Sorry, the piece was sold in the shop before you came.')
+        : reason === 'expired' ? L('وقت الحجز خلص، والقطعة رجعت للبيع.', 'The hold time ran out and the piece is back on sale.')
+          : reason === 'not_confirmed' ? L('المحل مأكدش في الوقت، فالطلب اتلغى. ممكن تجرّب تحجز تاني أو تكلّم المحل.', 'The shop did not confirm in time, so the request was cancelled. Try again or call the shop.')
+          : L('الحجز اتلغى.', 'This reservation was cancelled.')],
+  }[o.status] || ['bg-surface', Clock, '', ''];
+  const [tone, Icon, title, body] = box;
+  return (
+    <div className="space-y-5">
+      <div className="rounded-3xl border border-line bg-elevated p-5 sm:p-6">
+        <p className="flex items-center gap-1.5 text-sm text-muted"><StoreIcon className="h-4 w-4" />{L('حجز للقياس في المحل', 'Reserved to try in store')}</p>
+        <p className="mt-0.5 font-mono text-xl font-bold" dir="ltr">{o.number}</p>
+        <p className="mt-1 text-sm text-muted">{storeName}{o.firstName ? ` · ${o.firstName}` : ''}</p>
+        <div className={cx('mt-4 flex items-start gap-3 rounded-2xl p-4', tone)}>
+          <Icon className="mt-0.5 h-5 w-5 shrink-0" />
+          <div><p className="font-semibold">{title}</p><p className="mt-1 text-sm leading-relaxed">{body}</p></div>
+        </div>
+        {o.status === 'confirmed' && tr(o.store.address || {}) && <p className="mt-4 flex items-start gap-2 text-sm"><MapPin className="mt-0.5 h-4 w-4 shrink-0 text-brand" />{tr(o.store.address)}</p>}
+      </div>
+
+      <div className="rounded-3xl border border-line bg-elevated p-5 sm:p-6">
+        <ul className="space-y-3">
+          {o.items.map((it, i) => (
+            <li key={i} className="flex flex-wrap items-center gap-3">
+              <SmartImage media={it.image} ratio="4 / 5" sizes="56px" className="w-14 shrink-0 rounded-lg" />
+              <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{tr(it.name)}</p><p className="text-xs text-muted">{[it.size, `× ${it.qty}`].filter(Boolean).join(' · ')}</p>
+                {o.status === 'delivered' && o.token && it.productId && <div className="mt-1"><ReviewForm token={o.token} item={it} /></div>}</div>
+              <span className="text-sm font-semibold tabular">{formatMoney(it.price * it.qty, lang)}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-4 rounded-xl bg-surface px-4 py-3 text-sm text-muted">{L('مفيش دفع دلوقتي: بتدفع في المحل بعد ما تقيسها.', 'Nothing to pay now: you pay in the shop after trying it on.')} · {formatMoney(o.total, lang)}</p>
+      </div>
+
+      <div className="grid gap-2">
+        {o.status === 'confirmed' && map && <Button full icon={MapPin} href={map} target="_blank" rel="noreferrer">{L('اتجاهات المحل على الخريطة', 'Directions to the shop')}</Button>}
+        {o.status === 'cancelled' && o.store.slug && <Button full to={`/s/${o.store.slug}`}>{L('شوف قطع تانية في المحل', 'See other pieces in the shop')}</Button>}
+        <div className="flex flex-wrap gap-2">
+          {phone && <Button variant="outline" icon={PhoneCall} href={`tel:${phone}`}>{t('track.callStore')}</Button>}
+          {phone && <Button variant="outline" icon={MessageCircle} href={`https://wa.me/${phone.replace(/^0/, '20')}?text=${encodeURIComponent(L(`أهلاً، بخصوص حجزي رقم ${o.number}`, `Hi, about my reservation ${o.number}`))}`} target="_blank" rel="noreferrer">{t('track.waStore')}</Button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** Read-only order tracking: progress steps + what's in the order. Safe to show to anyone holding the link. */
 export default function TrackView({ order: o }) {
+  if (o.deliveryBy === 'pickup') return <ReservationView o={o} />;
+  return <DeliveryView o={o} />;
+}
+
+function DeliveryView({ o }) {
   const { t, tr, lang } = useI18n();
   const cancelled = o.status === 'cancelled';
   const feeRejected = o.deliveryFeeStatus === 'rejected';

@@ -22,6 +22,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!cols.includes('auto_whatsapp')) db.exec('ALTER TABLE stores ADD COLUMN auto_whatsapp INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('sort_order')) db.exec('ALTER TABLE stores ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('return_days')) db.exec('ALTER TABLE stores ADD COLUMN return_days INTEGER NOT NULL DEFAULT 3');
+  if (!cols.includes('reserve_hours')) db.exec('ALTER TABLE stores ADD COLUMN reserve_hours INTEGER NOT NULL DEFAULT 24'); // "reserve & try in store": hold time, 0 = off
   if (!cols.includes('hidden')) db.exec('ALTER TABLE stores ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('show_when_empty')) {
     db.exec('ALTER TABLE stores ADD COLUMN show_when_empty INTEGER NOT NULL DEFAULT 0');
@@ -36,6 +37,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   { const pc = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
     if (!pc.includes('expires_at')) db.exec('ALTER TABLE products ADD COLUMN expires_at INTEGER'); // ms; set for products added by WhatsApp (auto-hidden after it)
     if (!pc.includes('source')) db.exec('ALTER TABLE products ADD COLUMN source TEXT'); }
+  { const bc = db.prepare('PRAGMA table_info(buyers)').all().map((c) => c.name);
+    if (bc.length && !bc.includes('phone_verified')) db.exec('ALTER TABLE buyers ADD COLUMN phone_verified INTEGER NOT NULL DEFAULT 0'); } // 1 = proved by a WhatsApp code
   db.exec(`CREATE TABLE IF NOT EXISTS wa_otps (phone TEXT PRIMARY KEY, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, tries INTEGER NOT NULL DEFAULT 0, sent_at INTEGER NOT NULL)`);
   db.exec(`CREATE TABLE IF NOT EXISTS wa_inbound (id TEXT PRIMARY KEY, from_wa TEXT NOT NULL, type TEXT NOT NULL, body TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   db.exec(`CREATE TABLE IF NOT EXISTS pickup_zones (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, fee INTEGER NOT NULL DEFAULT 0 CHECK (fee >= 0 AND fee <= 5000), courier_cost INTEGER NOT NULL DEFAULT 0 CHECK (courier_cost >= 0 AND courier_cost <= 5000), created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
@@ -104,6 +107,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   }
   const ocols = db.prepare('PRAGMA table_info(orders)').all().map((c) => c.name);
   if (!ocols.includes('delivery_by')) db.exec("ALTER TABLE orders ADD COLUMN delivery_by TEXT NOT NULL DEFAULT 'store'");
+  if (!ocols.includes('reserve_until')) db.exec('ALTER TABLE orders ADD COLUMN reserve_until TEXT'); // pickup reservations (delivery_by=\'pickup\'): held until
   if (!ocols.includes('delivery_group')) db.exec('ALTER TABLE orders ADD COLUMN delivery_group TEXT');
   if (!ocols.includes('delivery_route_id')) db.exec('ALTER TABLE orders ADD COLUMN delivery_route_id TEXT');
   if (!ocols.includes('delivery_mode')) db.exec("ALTER TABLE orders ADD COLUMN delivery_mode TEXT NOT NULL DEFAULT 'pooled'");

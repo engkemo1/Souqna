@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw, Banknote, PackageX, Ban } from 'lucide-react';
+import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw, Banknote, PackageX, Ban, Store as StoreIcon } from 'lucide-react';
+import ReserveSheet from '../../components/store/ReserveSheet.jsx';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -118,6 +119,7 @@ export default function Product() {
   const [sizeError, setSizeError] = useState(false);
   const [addState, setAddState] = useState('idle');
   const [quick, setQuick] = useState(null);
+  const [reserving, setReserving] = useState(false);
   const galleryRef = useRef(null);
   const ctaRef = useRef(null);
   const [ctaVisible, setCtaVisible] = useState(true);
@@ -166,6 +168,17 @@ export default function Product() {
       setAddState('done');
       setTimeout(() => setAddState('idle'), 1600);
     }, 280);
+  };
+
+  const canReserve = (store.reserveHours ?? 24) > 0 && Boolean(tr(store.address) || store.mapUrl || store.lat != null);
+  const onReserve = () => {
+    if (needsSize) {
+      setSizeError(true);
+      ctaRef.current?.closest('section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (available <= 0) return;
+    setReserving(true);
   };
 
   const share = async () => {
@@ -239,6 +252,15 @@ export default function Product() {
             <QtyStepper value={qty} onChange={setQty} max={Math.max(1, Math.min(20, available || 1))} label={t('product.quantity')} />
             <div className="flex-1"><AddButton state={addState} disabled={ctaDisabled} onClick={onAdd} label={ctaLabel} /></div>
           </div>
+
+          {canReserve && !ctaDisabled && (
+            <button type="button" onClick={onReserve} className="mt-3 flex w-full items-center gap-3 rounded-2xl border border-line-strong bg-elevated px-4 py-3 text-start transition hover:border-fg active:scale-[.99]">
+              <StoreIcon className="h-5 w-5 shrink-0 text-brand" strokeWidth={1.75} />
+              <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{lang === 'ar' ? 'احجزها وجرّبها في المحل' : 'Reserve & try in store'}</span>
+                <span className="block text-[12.5px] text-muted">{lang === 'ar' ? `المحل يأكد ويشيلها لك ${store.reserveHours || 24} ساعة، تقيسها وتدفع هناك` : `The shop confirms and holds it ${store.reserveHours || 24} h — try it on, pay there`}</span></span>
+            </button>
+          )}
+          <ReserveSheet open={reserving} onClose={() => setReserving(false)} store={store} product={p} variant={variant} color={color} size={size} qty={Math.max(1, Math.min(qty, available || 1, 3))} />
 
           <ProductAlerts product={p} store={store} />
 

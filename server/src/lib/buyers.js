@@ -12,7 +12,7 @@ export const signBuyer = (b) => jwt.sign({ sub: b.id, k: 'buyer' }, SECRET, { ex
 export function buyerFromReq(req) {
   const t = req.headers['x-buyer-token'];
   if (!t || typeof t !== 'string') return null;
-  try { const p = jwt.verify(t, SECRET); return p.k === 'buyer' ? q.get('SELECT id, name, phone FROM buyers WHERE id=?', [p.sub]) || null : null; } catch { return null; }
+  try { const p = jwt.verify(t, SECRET); return p.k === 'buyer' ? q.get('SELECT id, name, phone, phone_verified FROM buyers WHERE id=?', [p.sub]) || null : null; } catch { return null; }
 }
 export function requireBuyer(req, _res, next) {
   const b = buyerFromReq(req);
@@ -41,9 +41,16 @@ const STATUS_TEXT = {
   delivered: ['وصل طلبك 🎉', (n) => `طلب ${n} اتسلّم. قيّم مشترياتك وساعد غيرك يختار`],
   cancelled: ['الطلب اتلغى', (n, s) => `طلب ${n} من ${s} اتلغى`],
 };
+/** In-store reservations ("reserve & try in store") read differently from deliveries. */
+const PICKUP_TEXT = {
+  confirmed: ['القطعة جاهزة في المحل ✅', (n, s) => `${s} جهّز حجزك ${n}. عدّي قيسها قبل ما وقت الحجز يخلص.`],
+  delivered: ['مبروك عليك 🛍️', (n, s) => `شكرًا إنك اشتريت من ${s}.`],
+  cancelled: ['الحجز اتلغى', (n, s) => `حجزك ${n} في ${s} اتلغى. افتح الحجز تشوف قطع شبهها.`],
+};
+
 export function notifyOrderStatus(orderId, status) {
-  const t = STATUS_TEXT[status]; if (!t) return;
-  const o = q.get('SELECT o.id, o.number, o.buyer_id, o.track_token, s.name_ar AS sname FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.id=?', [orderId]);
+  const o = q.get('SELECT o.id, o.number, o.buyer_id, o.track_token, o.delivery_by, s.name_ar AS sname FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.id=?', [orderId]);
+  const t = (o?.delivery_by === 'pickup' ? PICKUP_TEXT : STATUS_TEXT)[status]; if (!t) return;
   if (!o?.buyer_id) return;
   notifyBuyer(o.buyer_id, { kind: 'order', title: t[0], body: t[1](o.number, o.sname), url: `/track/${o.track_token}` });
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Phone, MessageCircle, MapPin, StickyNote, Check, Banknote, Printer, User2, X, Package, Truck } from 'lucide-react';
+import { Phone, MessageCircle, MapPin, StickyNote, Check, Banknote, Printer, User2, X, Package, Truck, Store as StoreIcon, Clock } from 'lucide-react';
 import { useApi, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -77,10 +77,10 @@ export default function OrderDetail() {
     setBusy(status);
     try {
       const r = await api(`/owner/orders/${id}/status`, { method: 'PATCH', body: { status, note: n || undefined } });
-      mutate((d) => ({ order: { ...d.order, status, next: r.next, events: [...d.order.events, { status, note: n || null, created_at: new Date().toISOString().slice(0, 19).replace('T', ' ') }] } }));
+      mutate((d) => ({ order: { ...d.order, status, next: r.next, ...(r.reserveUntil ? { reserveUntil: r.reserveUntil } : {}), events: [...d.order.events, { status, note: n || null, created_at: new Date().toISOString().slice(0, 19).replace('T', ' ') }] } }));
       invalidate('/owner/orders?');
       invalidate('/owner/overview');
-      toast({ title: t('orders.statusUpdated', { s: t(`status.${status}`) }) });
+      toast({ title: t('orders.statusUpdated', { s: statusT(`status.${status}`) }) });
       setCancelOpen(false);
       setNote('');
     } catch (e) {
@@ -112,7 +112,17 @@ export default function OrderDetail() {
   };
 
   const byUs = o.deliveryBy === 'platform';
-  const statusT = (key, vars) => byUs && o.status === 'processing' && key === 'status.processing' ? t('orders.markReady') : t(key, vars);
+  const pickup = o.deliveryBy === 'pickup';
+  const L = (ar, en) => (lang === 'ar' ? ar : en);
+  // in-store reservation wording
+  const PK = { pending: L('حجز جديد', 'New reservation'), confirmed: L('جاهزة في المحل', 'Ready in store'), delivered: L('اشتراها', 'Bought'), cancelled: L('اتلغى', 'Cancelled') };
+  const PK_ACTION = { confirmed: L('القطعة جاهزة', 'Piece is ready'), delivered: L('اشتراها', 'Bought it') };
+  const NOTE = { not_confirmed: L('ماتأكدش في الوقت، فاتلغى لوحده', 'Not confirmed in time, cancelled automatically'), reserve: L('حجز للقياس في المحل', 'Reserved to try in store'), expired: L('وقت الحجز خلص والقطعة رجعت للمخزون', 'Hold time ran out, piece back in stock'), unavailable: L('القطعة اتباعت أو مش متاحة', 'Piece sold / not available'), no_show: L('العميل معدّاش', 'Customer did not come') };
+  const statusT = (key, vars) => (pickup && key.startsWith('status.') && PK[key.slice(7)]) ? PK[key.slice(7)] : byUs && o.status === 'processing' && key === 'status.processing' ? t('orders.markReady') : t(key, vars);
+  const lastNote = [...o.events].reverse().find((e) => e.note)?.note;
+  const sorryWa = `https://wa.me/2${o.customer.phone}?text=${encodeURIComponent(L(`أهلاً ${o.customer.name}، بنعتذر جدًا، القطعة اللي حجزتها (رقم ${o.number}) اتباعت قبل ما تعدّي. لو تحب نوريك حاجة شبهها ابعتلنا.`, `Hi ${o.customer.name}, sorry, the piece you reserved (${o.number}) was sold before you came. Want us to show you something similar?`))}`;
+  const left = o.reserveUntil ? Math.max(0, new Date(o.reserveUntil).getTime() - Date.now()) : 0;
+  const leftText = left >= 3600e3 ? L(`فاضل ${Math.floor(left / 3600e3)} ساعة`, `${Math.floor(left / 3600e3)} h left`) : L(`فاضل ${Math.ceil(left / 60e3)} دقيقة`, `${Math.ceil(left / 60e3)} min left`);
   const canHandoff = !byUs && ['pending', 'confirmed', 'processing'].includes(o.status);
   const nextMain = o.next.find((s) => s !== 'cancelled');
   const canCancel = o.next.includes('cancelled');
@@ -120,8 +130,8 @@ export default function OrderDetail() {
 
   const actions = (
     <>
-      {canCancel && <Button variant="danger-ghost" icon={X} onClick={() => setCancelOpen(true)}>{t('status.action.cancelled')}</Button>}
-      {nextMain && <Button variant="brand" icon={Check} loading={busy === nextMain} onClick={() => setStatus(nextMain)}>{byUs && nextMain === 'processing' ? t('orders.markReady') : t(`status.action.${nextMain}`)}</Button>}
+      {canCancel && <Button variant="danger-ghost" icon={X} onClick={() => setCancelOpen(true)}>{pickup ? L('اتباعت / اتلغى', 'Sold / cancel') : t('status.action.cancelled')}</Button>}
+      {nextMain && <Button variant="brand" icon={Check} loading={busy === nextMain} onClick={() => setStatus(nextMain)}>{pickup ? PK_ACTION[nextMain] : byUs && nextMain === 'processing' ? t('orders.markReady') : t(`status.action.${nextMain}`)}</Button>}
     </>
   );
 
@@ -135,10 +145,34 @@ export default function OrderDetail() {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Panel>
-            {o.status === 'cancelled' ? (
+            {pickup ? (
+              <div className="space-y-3">
+                <div className={cx('flex items-start gap-3 rounded-xl p-4', o.status === 'cancelled' ? 'bg-red-50 text-red-800' : o.status === 'delivered' ? 'bg-emerald-50 text-emerald-900' : 'bg-brand/5')}>
+                  <StoreIcon className="mt-0.5 h-5 w-5 shrink-0" />
+                  <div className="min-w-0 text-sm leading-relaxed">
+                    <p className="text-base font-semibold">{L('حجز للقياس في المحل', 'Reserved to try in store')} · {PK[o.status]}</p>
+                    {o.status === 'pending' && <p>{L('العميل هيعدّي يقيسها ويدفع في المحل. اتأكد إن القطعة موجودة، شيلها على جنب، ودوس «القطعة جاهزة» عشان العميل يعرف إنها مستنياه. لو اتباعت، دوس «اتباعت».', 'The customer will come to try it on and pay in store. Check the piece is there, put it aside and tap “Piece is ready”. If it was sold, tap “Sold”.')}</p>}
+                    {o.status === 'confirmed' && <p>{L('القطعة مستنياه. لما ييجي ويشتريها دوس «اشتراها». لو اتباعت لحد تاني أو معدّاش، دوس «اتباعت / اتلغى».', 'Waiting for the customer. Tap “Bought it” when they buy; if it sold to someone else or they did not come, tap “Sold / cancel”.')}</p>}
+                    {o.status === 'cancelled' && lastNote && <p>{NOTE[lastNote] || lastNote}</p>}
+                    {['pending', 'confirmed'].includes(o.status) && o.reserveUntil && <p className={cx('mt-2 flex items-center gap-1.5 font-semibold', o.status === 'pending' && 'text-amber-800')}><Clock className="h-4 w-4" />{o.status === 'pending' ? L('أكّد قبل', 'Confirm before') : L('محجوزة لحد', 'Held until')} {formatDate(o.reserveUntil, lang, { weekday: 'long' })} {formatTime(o.reserveUntil, lang)} · {leftText}</p>}
+                    {o.status === 'pending' && <p className="mt-1 text-[13px]">{L('لو مأكدتش في الوقت ده، الطلب بيتلغى لوحده والقطعة ترجع للبيع.', 'If not confirmed by then, it is cancelled and the piece goes back on sale.')}</p>}
+                  </div>
+                </div>
+                {o.reserveRecord && ['pending', 'confirmed'].includes(o.status) && (
+                  <p className={cx('rounded-xl px-4 py-3 text-sm font-medium', o.reserveRecord.noShows > 0 ? 'bg-amber-50 text-amber-900' : o.reserveRecord.bought > 0 ? 'bg-emerald-50 text-emerald-900' : 'bg-surface text-muted')}>
+                    {o.reserveRecord.noShows > 0
+                      ? L(`⚠️ العميل ده حجز قبل كده ومعدّاش ${o.reserveRecord.noShows} مرة في آخر شهرين. ممكن تكلّمه تتأكد قبل ما تشيل القطعة.`, `⚠️ This customer reserved before and did not come ${o.reserveRecord.noShows} time(s) in the last 2 months. Maybe call before putting it aside.`)
+                      : o.reserveRecord.bought > 0
+                        ? L(`✓ العميل ده حجز واشترى ${o.reserveRecord.bought} مرة قبل كده.`, `✓ This customer reserved and bought ${o.reserveRecord.bought} time(s) before.`)
+                        : L('أول حجز للعميل ده على تويست.', 'First reservation for this customer on Twist.')}
+                  </p>
+                )}
+                {o.status === 'cancelled' && lastNote === 'unavailable' && <Button full variant="outline" icon={MessageCircle} href={sorryWa} target="_blank" rel="noreferrer" className="!text-[#128C7E]">{L('ابعت اعتذار للعميل على واتساب', 'Send the customer an apology on WhatsApp')}</Button>}
+              </div>
+            ) : o.status === 'cancelled' ? (
               <div className="flex items-center gap-3 rounded-xl bg-red-50 p-4 text-red-800"><X className="h-5 w-5" /><p className="font-semibold">{t('status.cancelled')}</p></div>
             ) : <Stepper status={o.status} events={o.events} t={t} lang={lang} byPlatform={byUs} />}
-            {!o.next.length && o.status !== 'cancelled' && <p className="mt-4 text-center text-sm text-muted">{t('orders.final')}</p>}
+            {!pickup && !o.next.length && o.status !== 'cancelled' && <p className="mt-4 text-center text-sm text-muted">{t('orders.final')}</p>}
           </Panel>
 
           <Panel title={`${t('orders.items')} (${o.items.reduce((s, i) => s + i.qty, 0)})`}>
@@ -162,11 +196,11 @@ export default function OrderDetail() {
               <div className="flex justify-between"><dt className="text-muted">{t('cart.subtotal')}</dt><dd className="tabular">{formatMoney(o.subtotal, lang)}</dd></div>
               {o.platformDiscount > 0 && <div className="rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900">{t('order.platformDiscount', { v: formatMoney(o.platformDiscount, lang) })}</div>}
               {o.discount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')} {o.coupon && <span className="rounded bg-success/10 px-1.5 py-0.5 font-mono text-xs" dir="ltr">{o.coupon}</span>}</dt><dd className="tabular">−{formatMoney(o.discount, lang)}</dd></div>}
-              <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{o.shippingFree ? t('common.free') : o.deliveryGroup ? t('cart.sharedDelivery') : o.shipping ? formatMoney(o.shipping, lang) : t('cart.sharedDelivery')}</dd></div>
+              {!pickup && <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{o.shippingFree ? t('common.free') : o.deliveryGroup ? t('cart.sharedDelivery') : o.shipping ? formatMoney(o.shipping, lang) : t('cart.sharedDelivery')}</dd></div>}
               {o.deliveryBy === 'platform' && o.shippingFree ? <p className="rounded-lg bg-brand/5 p-3 text-xs leading-5 text-muted">{o.shippingSponsorDue == null ? t('orders.shippingSponsorPending') : t('orders.shippingSponsorDue', { v: formatMoney(o.shippingSponsorDue, lang) })}</p> : o.deliveryGroup && <p className="rounded-lg bg-brand/5 p-3 text-xs leading-5 text-muted">{t('orders.marketplaceFeeNote')}</p>}
               <div className="flex justify-between pt-1 text-lg font-semibold"><dt>{t('cart.total')}</dt><dd className="tabular">{formatMoney(o.total, lang)}</dd></div>
             </dl>
-            <div className="mt-4 flex items-center gap-3 rounded-xl bg-surface p-3 text-sm"><Banknote className="h-5 w-5 text-brand" /><span className="font-medium">{t('checkout.cod')}</span></div>
+            <div className="mt-4 flex items-center gap-3 rounded-xl bg-surface p-3 text-sm"><Banknote className="h-5 w-5 text-brand" /><span className="font-medium">{pickup ? L('الدفع في المحل', 'Pay in store') : t('checkout.cod')}</span></div>
           </Panel>
 
           <Panel title={t('orders.timeline')}>
@@ -174,9 +208,9 @@ export default function OrderDetail() {
               {[...o.events].reverse().map((e, i) => (
                 <li key={i} className="relative">
                   <span className={cx('absolute -start-6 top-1 h-[15px] w-[15px] rounded-full border-[3px] border-elevated', i === 0 ? 'bg-primary' : 'bg-fg/20')} />
-                  <p className="text-sm font-semibold">{t(`status.${e.status}`)}</p>
+                  <p className="text-sm font-semibold">{statusT(`status.${e.status}`)}</p>
                   <p className="text-xs text-muted">{formatDate(e.created_at, lang, { day: 'numeric', month: 'short' })} · {formatTime(e.created_at, lang)}</p>
-                  {e.note && <p className="mt-1 text-sm text-muted">{e.note === '@handoff' ? t('orders.evHandoff') : e.note}</p>}
+                  {e.note && <p className="mt-1 text-sm text-muted">{e.note === '@handoff' ? t('orders.evHandoff') : NOTE[e.note] || e.note}</p>}
                 </li>
               ))}
             </ol>
@@ -195,6 +229,9 @@ export default function OrderDetail() {
               <Button variant="outline" size="sm" icon={MessageCircle} href={wa} target="_blank" rel="noreferrer" className="!text-[#128C7E]">{t('orders.whatsapp')}</Button>
             </div>
           </Panel>
+          {pickup ? (
+            <Panel title={L('الاستلام', 'Pickup')}><p className="flex gap-2.5 text-base leading-relaxed"><StoreIcon className="mt-1 h-4 w-4 shrink-0 text-muted" />{L('العميل هيستلم ويدفع في المحل. مفيش توصيل.', 'Collected and paid in store. No delivery.')}</p></Panel>
+          ) : (
           <Panel title={t('orders.delivery')}>
             <p className="flex gap-2.5 text-base leading-relaxed"><MapPin className="mt-1 h-4 w-4 shrink-0 text-muted" /><span>{o.customer.address}<br /><span className="text-muted">{o.customer.city} — {t(`gov.${o.customer.governorate}`)}</span></span></p>
             {byUs ? (
@@ -206,6 +243,7 @@ export default function OrderDetail() {
               </div>
             )}
           </Panel>
+          )}
           {o.notes && (
             <Panel title={t('orders.notes')}>
               <p className="flex gap-2.5 rounded-xl bg-amber-50 p-3.5 text-base text-amber-900"><StickyNote className="mt-0.5 h-4 w-4 shrink-0" />{o.notes}</p>
@@ -224,10 +262,21 @@ export default function OrderDetail() {
       <ConfirmDialog open={handoffOpen} onClose={() => setHandoffOpen(false)} title={t('orders.handoff')} body={t('orders.handoffConfirm')}
         confirmLabel={t('orders.handoffYes')} loading={busy === 'handoff'} onConfirm={handoff} />
 
+      {pickup ? (
+        <ConfirmDialog open={cancelOpen} onClose={() => setCancelOpen(false)} danger title={L('إلغاء الحجز', 'Cancel reservation')} body={L('القطعة هترجع للمخزون على الموقع. ليه؟', 'The piece goes back to stock online. Why?')}
+          confirmLabel={L('إلغاء الحجز', 'Cancel reservation')} loading={busy === 'cancelled'} onConfirm={() => setStatus('cancelled', note || 'unavailable')}>
+          <div className="mt-4 grid gap-2">
+            {[['unavailable', L('القطعة اتباعت أو مش متاحة', 'Sold / not available')], ['no_show', L('العميل معدّاش', 'Customer did not come')]].map(([k, label]) => (
+              <button key={k} type="button" onClick={() => setNote(k)} aria-pressed={(note || 'unavailable') === k} className={cx('h-11 rounded-xl border px-4 text-start text-sm font-medium', (note || 'unavailable') === k ? 'border-fg bg-fg/[0.04]' : 'border-line')}>{label}</button>
+            ))}
+          </div>
+        </ConfirmDialog>
+      ) : (
       <ConfirmDialog open={cancelOpen} onClose={() => setCancelOpen(false)} danger title={t('status.action.cancelled')} body={t('orders.confirmCancel')}
         confirmLabel={t('status.action.cancelled')} loading={busy === 'cancelled'} onConfirm={() => setStatus('cancelled', note)}>
         <div className="mt-4"><label className="mb-1.5 block text-sm font-medium text-fg" htmlFor="cancel-note">{t('orders.cancelReason')}</label><Textarea id="cancel-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></div>
       </ConfirmDialog>
+      )}
     </PageTransition>
   );
 }
