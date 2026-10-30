@@ -61,7 +61,7 @@ function ReservationView({ o }) {
               <SmartImage media={it.image} ratio="4 / 5" sizes="56px" className="w-14 shrink-0 rounded-lg" />
               <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{tr(it.name)}</p><p className="text-xs text-muted">{[it.size, `× ${it.qty}`].filter(Boolean).join(' · ')}</p>
                 {o.status === 'delivered' && o.token && it.productId && <div className="mt-1"><ReviewForm token={o.token} item={it} /></div>}</div>
-              <span className="text-sm font-semibold tabular">{formatMoney(it.price * it.qty, lang)}</span>
+              {it.isGift ? <span className="text-sm font-bold text-success">{lang === 'ar' ? 'هدية مجانًا' : 'Free gift'}</span> : it.promoDiscount > 0 ? <span className="flex flex-col items-end leading-tight"><s className="text-xs text-muted tabular">{formatMoney(it.price * it.qty, lang)}</s><span className="text-sm font-semibold text-success tabular">{formatMoney(it.price * it.qty - it.promoDiscount, lang)}</span></span> : <span className="text-sm font-semibold tabular">{formatMoney(it.price * it.qty, lang)}</span>}
             </li>
           ))}
         </ul>
@@ -142,13 +142,14 @@ function DeliveryView({ o }) {
               <SmartImage media={it.image} ratio="4 / 5" sizes="56px" className="w-14 shrink-0 rounded-lg" />
               <div className="min-w-0 flex-1"><p className="truncate text-sm font-medium">{tr(it.name)}</p><p className="text-xs text-muted">{[it.size, `× ${it.qty}`].filter(Boolean).join(' · ')}</p>
                 {o.status === 'delivered' && o.token && it.productId && <div className="mt-1"><ReviewForm token={o.token} item={it} /></div>}</div>
-              <span className="text-sm font-semibold tabular">{formatMoney(it.price * it.qty, lang)}</span>
+              {it.isGift ? <span className="text-sm font-bold text-success">{lang === 'ar' ? 'هدية مجانًا' : 'Free gift'}</span> : it.promoDiscount > 0 ? <span className="flex flex-col items-end leading-tight"><s className="text-xs text-muted tabular">{formatMoney(it.price * it.qty, lang)}</s><span className="text-sm font-semibold text-success tabular">{formatMoney(it.price * it.qty - it.promoDiscount, lang)}</span></span> : <span className="text-sm font-semibold tabular">{formatMoney(it.price * it.qty, lang)}</span>}
             </li>
           ))}
         </ul>
         <dl className="mt-5 space-y-2 border-t border-line pt-4 text-sm">
           <div className="flex justify-between"><dt className="text-muted">{t('cart.subtotal')}</dt><dd className="tabular">{formatMoney(o.subtotal, lang)}</dd></div>
-          {o.discount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')}</dt><dd className="tabular">−{formatMoney(o.discount, lang)}</dd></div>}
+          {o.promoDiscount > 0 && <div className="flex justify-between text-success"><dt>{lang === 'ar' ? 'خصم العروض' : 'Offers discount'}<span className="block text-xs font-normal opacity-80">{(o.promotions || []).map((p) => tr(p.name)).join(' · ')}</span></dt><dd className="tabular">−{formatMoney(o.promoDiscount, lang)}</dd></div>}
+          {o.discount - (o.promoDiscount || 0) > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')}</dt><dd className="tabular">−{formatMoney(o.discount - (o.promoDiscount || 0), lang)}</dd></div>}
           {!feeRejected && <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{o.shippingFree ? t('common.free') : o.shipping ? formatMoney(o.shipping, lang) : t('cart.sharedDelivery')}</dd></div>}
           <div className="flex justify-between text-base font-semibold"><dt>{feeRejected ? (lang === 'ar' ? 'قيمة المنتجات' : 'Items total') : t('cart.total')}</dt><dd className="tabular">{formatMoney(feeRejected ? o.subtotal - o.discount : o.total, lang)}</dd></div>
           {o.deliveryGroupTotal != null && <div className="flex justify-between border-t border-line pt-2 font-semibold text-brand"><dt>{t('cart.marketTotal')} · {o.deliveryGroupCount} {lang === 'ar' ? 'محلات' : 'stores'}</dt><dd className="tabular">{formatMoney(o.deliveryGroupTotal, lang)}</dd></div>}

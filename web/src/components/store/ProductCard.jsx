@@ -12,6 +12,7 @@ import { sp } from '../../lib/store.jsx';
 import { useDesign, GRID_CLASS, kidTint } from '../../lib/design.js';
 import { cx } from '../ui/cx.js';
 import SameDayBadge from './SameDayBadge.jsx';
+import { OfferChip } from '../promo/OfferCards.jsx';
 
 export const CARD_SIZES = '(min-width:1280px) 22vw, (min-width:1024px) 28vw, (min-width:640px) 33vw, 50vw';
 
@@ -72,6 +73,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
         <div className="pointer-events-none absolute start-2.5 top-2.5 flex flex-col items-start gap-1.5 sm:start-3 sm:top-3">
           {p.badge && <span className={cx('rounded-full px-2 py-0.5 text-xs font-bold', tone)}>{p.badge.text}</span>}
           {p.discount > 0 && <span className="rounded-full bg-sale px-2 py-0.5 text-xs font-bold text-white tabular sm:text-xs">-{p.discount}%</span>}
+          {p.offer && !out && <OfferChip offer={p.offer} className="max-w-[9.5rem]" />}
           {p.sameDay && !out && <SameDayBadge />}
           {p.isNew && !out && <span className="rounded-full bg-neutral-900/85 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur sm:text-xs">{t('product.new')}</span>}
         </div>

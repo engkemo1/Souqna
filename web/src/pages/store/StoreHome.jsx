@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Copy, Ticket } from 'lucide-react';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useApi } from '../../lib/hooks.js';
+import { StoreOffersStrip } from '../../components/promo/OfferCards.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
 import HeroSlider from '../../components/store/HeroSlider.jsx';
@@ -202,6 +203,7 @@ export default function StoreHome() {
   const { store, banners } = useStore();
   const { t, tr, lang } = useI18n();
   const { data, error, loading, reload } = useApi(`/stores/${store.slug}/home`);
+  const { data: promos } = useApi(`/stores/${store.slug}/promotions`);
   const [quick, setQuick] = useState(null);
 
   const customization = store?.customization || {};
@@ -210,7 +212,10 @@ export default function StoreHome() {
   const explicitOrder = Array.isArray(customization.sectionsOrder) && customization.sectionsOrder.length > 0 ? customization.sectionsOrder : null;
   const STANDARD = ['hero', 'free_shipping', 'trust', 'new_arrivals', 'categories', 'best_sellers', 'offers', 'on_sale', 'story', 'visit'];
   // الترتيب: اللي صاحب المحل حدده، وإلا ترتيب القالب. ticker/flash اختيارية: بتظهر بس لو موجودة في الترتيب.
-  const allSections = [...new Set([...(explicitOrder || design.sections), ...STANDARD])];
+  const allSections0 = [...new Set([...(explicitOrder || design.sections), ...STANDARD])].filter((k) => k !== 'promos');
+  // the store's live offers sit right under the hero so shoppers see them first
+  const heroAt = allSections0.indexOf('hero');
+  const allSections = [...allSections0.slice(0, heroAt + 1), 'promos', ...allSections0.slice(heroAt + 1)];
 
   const renderSection = (key) => {
     if (hidden.has(key)) return null;
@@ -228,6 +233,9 @@ export default function StoreHome() {
         else node = (store.heroMode === 'cover' ? false : hasBanners) ? sliderHero : <StoreHero />;
         return <div key="hero">{node}</div>;
       }
+
+      case 'promos':
+        return promos?.items?.length ? <StoreOffersStrip key="promos" slug={store.slug} offers={promos.items} title={lang === 'ar' ? 'عروض المحل' : 'Store offers'} linkFor={() => sp(store.slug, 'shop')} /> : null;
 
       case 'ticker':
         return <div key="ticker"><TickerStrip /></div>;

@@ -12,6 +12,8 @@
     "test:media": "node --test test/media-migrate.test.js",
     "test:cashier": "node --test --no-warnings test/cashier-sync.test.js test/product-codes.test.js test/pos.test.js test/pos-fixes.test.js test/pos-remote.test.js",
     "test:buyer-chats": "node --test test/buyer-chats.test.js",
+    "offer-templates": "node --no-warnings --env-file-if-exists=../.env src/scripts/upload-offer-templates.js",
+    "test:promotions": "node --test --no-warnings test/promotions-engine.test.js test/promotions-checkout.test.js",
     "test:market-cart": "node --test test/marketplace-cart.test.js",
     "evaluate:stylist": "node src/scripts/evaluate-stylist.js",
     "evaluate:stylist:external": "node src/scripts/evaluate-external-fashion.js",

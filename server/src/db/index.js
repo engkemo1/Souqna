@@ -253,6 +253,41 @@ export const json = (s, fallback) => {
   try { return s ? JSON.parse(s) : fallback; } catch { return fallback; }
 };
 
+// Promotions: extra columns on existing tables (the new tables themselves come from schema.sql).
+{
+  const add = (table, col, ddl) => { const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name); if (cols.length && !cols.includes(col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`); };
+  add('orders', 'promo_discount', 'INTEGER NOT NULL DEFAULT 0');          // part of `discount` that came from store promotions (the rest is the coupon)
+  add('order_items', 'promo_discount', 'INTEGER NOT NULL DEFAULT 0');     // this line's share of the promotion discount
+  add('order_items', 'is_gift', 'INTEGER NOT NULL DEFAULT 0');            // free gift added by a promotion (price is 0)
+  add('order_items', 'promotion_id', 'INTEGER');
+  add('order_items', 'returned_qty', 'INTEGER NOT NULL DEFAULT 0');
+  add('order_promotions', 'snapshot_json', 'TEXT');   // the definition the order was sold under (re-evaluated for partial returns)
+  add('order_returns', 'calc_json', 'TEXT');          // the refund calculation, kept for transparency
+  add('promotions', 'image_mode', "TEXT NOT NULL DEFAULT 'auto'");       // auto (by product category) | library (owner picked a shared image) | custom (own upload)
+  add('promotions', 'image_category', 'TEXT');                             // library choice: offer_image_categories.key
+  // Twist's nine marketplace image categories (+ a neutral one). Departments are matched most-specific-first.
+  db.exec(`INSERT OR IGNORE INTO offer_image_categories(key, name_ar, name_en, department_slugs_json, sort) VALUES
+    ('general','عام','General','[]',0),
+    ('womens_fashion','أزياء حريمي','Women''s Fashion','["women"]',1),
+    ('mens_fashion','أزياء رجالي','Men''s Fashion','["men"]',2),
+    ('kids_fashion','أزياء أطفال','Kids Fashion','["kids","kids_girls","kids_boys"]',3),
+    ('babywear','ملابس رضع ومواليد','Babywear & Newborn','["kids_baby"]',4),
+    ('sportswear','ملابس رياضية','Sportswear','["women_sports","men_sports"]',5),
+    ('accessories','إكسسوارات','Accessories','["women_accessories","men_accessories","women_bags","men_bags"]',6),
+    ('perfumes','عطور','Perfumes','["perfume_makeup"]',7),
+    ('shoes_sneakers','أحذية وكوتشيات','Shoes & Sneakers','["shoes","shoes_men","shoes_women","shoes_kids"]',8),
+    ('makeup','مكياج','Makeup','[]',9)`);
+  // categories from the first draft of the library: move offers to their new key, drop the old rows only if nothing uses them
+  for (const [oldKey, newKey] of [['kids', 'kids_fashion'], ['men', 'mens_fashion'], ['women', 'womens_fashion'], ['shoes_bags', 'shoes_sneakers']]) {
+    db.prepare('UPDATE promotions SET image_category=? WHERE image_category=?').run(newKey, oldKey);
+    db.prepare('UPDATE offer_templates SET category_key=? WHERE category_key=? AND NOT EXISTS (SELECT 1 FROM offer_templates t2 WHERE t2.offer_type=offer_templates.offer_type AND t2.category_key=?)').run(newKey, oldKey, newKey);
+    db.prepare('DELETE FROM offer_image_categories WHERE key=? AND NOT EXISTS (SELECT 1 FROM offer_templates WHERE category_key=?)').run(oldKey, oldKey);
+  }
+  db.prepare("DELETE FROM offer_image_categories WHERE key='skincare' AND NOT EXISTS (SELECT 1 FROM offer_templates WHERE category_key='skincare')").run();
+  add('products', 'exclude_from_promotions', 'INTEGER NOT NULL DEFAULT 0');
+  add('stores', 'promo_resolution', "TEXT NOT NULL DEFAULT 'best_savings'"); // best_savings | priority
+  add('stores', 'promo_max_per_cart', 'INTEGER');                          // null = no limit
+}
 // Sub-categories (store categories under a top-level one) + department tree (main section > section > type).
 {
   const cc = db.prepare('PRAGMA table_info(categories)').all().map((c) => c.name);

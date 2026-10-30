@@ -11,6 +11,8 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
 import { useStore, sp } from '../../lib/store.jsx';
 import { cx } from '../ui/cx.js';
+import { useStoreQuote, quoteLineFor } from '../../lib/promoClient.js';
+import { LinePrice, LineOfferTag, GiftRows, AppliedOffers, OfferHints } from '../promo/CartOffers.jsx';
 
 export function FreeShippingMeter({ subtotal, threshold }) {
   const { t, lang } = useI18n();
@@ -32,6 +34,7 @@ export function FreeShippingMeter({ subtotal, threshold }) {
 
 export function CartLines({ slug, onNavigate, problems = {} }) {
   const cart = useCart(slug);
+  const { quote, gifts, setGifts } = useStoreQuote(slug, cart.items);
   const { t, tr, lang } = useI18n();
   const toast = useToast();
   const remove = (key) => {
@@ -39,6 +42,7 @@ export function CartLines({ slug, onNavigate, problems = {} }) {
     if (line) toast({ title: t('cart.removed'), tone: 'info', action: { label: t('cart.undo'), onClick: () => cart.restore(line) } });
   };
   return (
+    <>
     <ul className="divide-y divide-line">
       <AnimatePresence initial={false}>
         {cart.items.map((l) => {
@@ -60,10 +64,11 @@ export function CartLines({ slug, onNavigate, problems = {} }) {
                     {l.colorName && <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full ring-1 ring-inset ring-black/10" style={{ background: l.color }} />{tr(l.colorName)}</span>}
                     {l.size && <span>{t('product.size')}: <span className="font-medium text-fg">{l.size}</span></span>}
                   </div>
+                  <LineOfferTag quote={quote} ql={quoteLineFor(quote, l)} />
                   {problem && <p className="mt-1 text-xs font-semibold text-sale">{problem}</p>}
                   <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                     <QtyStepper size="sm" value={l.qty} onChange={(q) => cart.updateQty(l.key, q)} label={t('product.quantity')} />
-                    <span className="font-semibold tabular">{formatMoney(l.price * l.qty, lang)}</span>
+                    <LinePrice ql={quoteLineFor(quote, l)} price={l.price} qty={l.qty} />
                   </div>
                 </div>
               </div>
@@ -72,6 +77,8 @@ export function CartLines({ slug, onNavigate, problems = {} }) {
         })}
       </AnimatePresence>
     </ul>
+    {!!cart.items.length && <div className="space-y-3 pb-3"><GiftRows quote={quote} /><AppliedOffers quote={quote} gifts={gifts} onGift={setGifts} /><OfferHints quote={quote} /></div>}
+    </>
   );
 }
 
@@ -87,9 +94,12 @@ export function CartSummary({ slug, onNavigate, compact }) {
   const cart = useCart(slug);
   const { store } = useStore();
   const { t, lang } = useI18n();
+  const { quote } = useStoreQuote(slug, cart.items);
+  const saved = quote?.promoDiscount || 0;
   return (
     <div className="space-y-3">
       <div className="flex justify-between text-base"><span className="text-muted">{t('cart.subtotal')}</span><span className="font-semibold tabular">{formatMoney(cart.subtotal, lang)}</span></div>
+      {saved > 0 && <div className="flex justify-between text-base text-success"><span>{lang === 'ar' ? 'خصم العروض' : 'Offers discount'}</span><span className="font-semibold tabular">−{formatMoney(saved, lang)}</span></div>}
       {!compact && (
         <div className="flex justify-between text-base"><span className="text-muted">{t('cart.shipping')}</span>
           <span className="tabular">{store.freeShippingOver > 0 && cart.subtotal >= store.freeShippingOver ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(store.shippingFee, lang)}</span>

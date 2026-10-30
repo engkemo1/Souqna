@@ -13,6 +13,9 @@ import { notifyPlatformAlert } from '../lib/whatsapp.js';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { requireOwner } from '../lib/auth.js';
+import promotionsRouter from './owner-promotions.js';
+import { orderPromotions } from '../lib/promotions/orders.js';
+import { computeReturn } from '../lib/promotions/returns.js';
 import { vapidPublicKey, sendTest } from '../lib/push.js';
 import { clampInt, nowIso, slugify } from '../lib/util.js';
 import { notifyBuyer, notifyOrderStatus, notifyPriceDrop, notifyBackInStock, notifyFollowers } from '../lib/buyers.js';
@@ -35,6 +38,7 @@ const r = Router();
 // Store-owner JWT, or — when mounted under /api/admin/stores/:slug/as — the platform admin acting on that store (key-checked upstream).
 r.use((req, res, next) => (req.adminStore ? next() : requireOwner(req, res, next)));
 
+r.use('/promotions', promotionsRouter);
 r.get('/product-types', h((_req, res) => res.json(productTypeTree())));
 r.get('/moda-types', h((_req, res) => {
   const K = loadKnowledge();
@@ -532,7 +536,7 @@ r.get('/analytics', h((req, res) => {
 r.post('/media', upload.array('files', 12), h(async (req, res) => {
   const files = req.files || [];
   if (!files.length) throw badRequest('no_file', 'Please choose at least one image.');
-  const kind = ['product', 'banner', 'category', 'logo', 'cover'].includes(req.query.kind) ? req.query.kind : 'product';
+  const kind = ['product', 'banner', 'category', 'logo', 'cover', 'offer'].includes(req.query.kind) ? req.query.kind : 'product';
   const out = [];
   // the owner is uploading from the dashboard and sees every photo: they are the last check of a cut-out
   for (const f of files) out.push(serializeMedia(await processImage(f.buffer, { storeId: req.store.id, kind, ownerSees: true })));
@@ -986,13 +990,57 @@ r.get('/orders/:id', h((req, res) => {
       id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, reserveUntil: o.reserve_until || null, reserveRecord: o.delivery_by === 'pickup' ? reserveRecord(o.phone) : null, deliveryGroup: o.delivery_group, handoffAt: o.handoff_at, next: ownerNext(o), createdAt: o.created_at, updatedAt: o.updated_at,
       customer: { id: customer?.id, name: o.customer_name, phone: o.phone, governorate: o.governorate, city: o.city, address: o.address, ordersCount: customer?.orders_count || 1, totalSpent: customer?.total_spent ?? o.total },
       notes: o.notes, payment: o.payment_method, coupon: o.coupon_code, platformDiscount: o.platform_discount || 0,
-      subtotal: o.subtotal, discount: o.discount, shipping: o.delivery_group ? 0 : o.shipping, total: o.delivery_group ? o.subtotal - o.discount : o.total,
+      subtotal: o.subtotal, discount: o.discount, promoDiscount: o.promo_discount || 0, promotions: orderPromotions(o.id), refunded: q.val('SELECT COALESCE(SUM(refund),0) FROM order_returns WHERE order_id=?', [o.id]) || 0, shipping: o.delivery_group ? 0 : o.shipping, total: o.delivery_group ? o.subtotal - o.discount : o.total,
       shippingFree: !!o.shipping_free,
       shippingSponsorDue: o.delivery_by === 'platform' && o.shipping_free ? runShare : 0,
-      items: items.map((i) => ({ id: i.id, productId: i.product_id, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
+      items: items.map((i) => ({ id: i.id, productId: i.product_id, name: bi(i, 'name'), price: i.price, qty: i.qty, isGift: !!i.is_gift, promoDiscount: i.promo_discount || 0, returnedQty: i.returned_qty || 0, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
       events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]),
     },
   });
+}));
+
+/**
+ * Return (part of) an online order. Policy:
+ *  - see lib/promotions/returns.js: the offers are re-evaluated on what the customer KEEPS; a benefit no longer earned is deducted from the refund,
+ *    the coupon follows the kept goods, and the refund can never exceed what was paid. The calculation is saved with every return (order_returns.calc_json);
+ *  - a free gift refunds 0 and can be handed back and restocked like anything else;
+ *  - an order that received an offer still counts as one use of it;
+ *  - cancelling the whole order (status change) returns every unit, gifts included, to stock and frees the offer's usage.
+ */
+r.post('/orders/:id/returns', h((req, res) => {
+  const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
+  if (!o) throw notFound('Order');
+  if (o.status === 'cancelled') throw new AppError(409, 'order_cancelled', 'A cancelled order has already been returned to stock.');
+  if (!['shipped', 'delivered'].includes(o.status)) throw new AppError(409, 'order_not_returnable', 'Returns can be recorded once the order is shipped or delivered. Cancel it instead before that.');
+  const body = z.object({ items: z.array(z.object({ itemId: z.coerce.number().int(), qty: z.coerce.number().int().min(1).max(1000) })).min(1).max(100), reason: z.string().trim().max(300).optional().nullable(), restock: z.boolean().default(true), dryRun: z.boolean().default(false) }).parse(req.body);
+  const now = nowIso();
+  const result = tx(() => {
+    const all = q.all('SELECT * FROM order_items WHERE order_id=? ORDER BY id', [o.id]);
+    const request = new Map();
+    for (const it of body.items) {
+      const line = all.find((l) => l.id === it.itemId);
+      if (!line) throw notFound('Order item');
+      const want = (request.get(line.id) || 0) + it.qty;
+      const left = line.qty - (line.returned_qty || 0);
+      if (want > left) throw new AppError(422, 'too_many', `Only ${left} of "${line.name_ar}" can still be returned.`);
+      request.set(line.id, want);
+    }
+    const { refund, lines, calc } = computeReturn(o, all, request, { store: req.store });
+    if (body.dryRun) return { dryRun: true, refund, items: lines, calculation: calc };
+    for (const ln of lines) {
+      const line = all.find((l) => l.id === ln.itemId);
+      q.run('UPDATE order_items SET returned_qty=? WHERE id=?', [(line.returned_qty || 0) + ln.qty, line.id]);
+      if (body.restock && line.product_id) {
+        if (line.variant_id) q.run('UPDATE variants SET stock=stock+? WHERE id=?', [ln.qty, line.variant_id]);
+        q.run('UPDATE products SET stock=stock+?, sold_count=MAX(0,sold_count-?) WHERE id=?', [ln.qty, ln.qty, line.product_id]);
+      }
+      insert('order_returns', { order_id: o.id, store_id: req.store.id, order_item_id: line.id, qty: ln.qty, refund: ln.refund, restocked: body.restock ? 1 : 0, reason: body.reason || null, calc_json: JSON.stringify(calc), created_at: now });
+    }
+    if (o.customer_id && refund) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [refund, o.customer_id]);
+    insert('order_events', { order_id: o.id, status: o.status, note: `return:${refund}`, created_at: now });
+    return { refund, items: lines, calculation: calc };
+  });
+  res.status(result.dryRun ? 200 : 201).json(result);
 }));
 
 r.patch('/orders/:id/status', h((req, res) => {
@@ -1034,9 +1082,9 @@ r.patch('/orders/:id/status', h((req, res) => {
           WHERE o.delivery_group=? AND o.status<>'cancelled' AND o.shipping_free=0 ORDER BY o.id`, [o.delivery_group]);
         const fee = o.shipping || active.reduce((sum, item) => sum + item.shipping, 0);
         const feeOrderId = fee > 0 ? active[0]?.id : undefined;
-        for (const item of q.all("SELECT id, customer_id, subtotal, total FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group])) {
+        for (const item of q.all("SELECT id, customer_id, subtotal, discount, total FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group])) {
           const shipping = item.id === feeOrderId ? fee : 0;
-          const total = item.subtotal + shipping;
+          const total = item.subtotal - (item.discount || 0) + shipping; // keep the offer/coupon discount when the shared fee moves
           if (total !== item.total) {
             q.run('UPDATE orders SET shipping=?, total=? WHERE id=?', [shipping, total, item.id]);
           }

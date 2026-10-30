@@ -52,6 +52,8 @@ const OrderDetail = lazy(() => import('./pages/dashboard/OrderDetail.jsx'));
 const Products = lazy(() => import('./pages/dashboard/Products.jsx'));
 const ProductEditor = lazy(() => import('./pages/dashboard/ProductEditor.jsx'));
 const Offers = lazy(() => import('./pages/dashboard/Offers.jsx'));
+const Promotions = lazy(() => import('./pages/dashboard/Promotions.jsx'));
+const PromotionEditor = lazy(() => import('./pages/dashboard/PromotionEditor.jsx'));
 const Banners = lazy(() => import('./pages/dashboard/Banners.jsx'));
 const DashCategories = lazy(() => import('./pages/dashboard/Categories.jsx'));
 const Customers = lazy(() => import('./pages/dashboard/Customers.jsx'));
@@ -147,6 +149,9 @@ const router = createBrowserRouter([
           { path: 'products/new', element: <ProductEditor /> },
           { path: 'products/:id', element: <ProductEditor /> },
           { path: 'offers', element: <Offers /> },
+          { path: 'promotions', element: <Promotions /> },
+          { path: 'promotions/new', element: <PromotionEditor /> },
+          { path: 'promotions/:id', element: <PromotionEditor /> },
           { path: 'banners', element: <Banners /> },
           { path: 'categories', element: <DashCategories /> },
           { path: 'customers', element: <Customers /> },

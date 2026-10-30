@@ -4,7 +4,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { Link, NavLink, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
-  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Images, FolderTree, Palette, Wand2, Settings, LogOut, ExternalLink, QrCode, Plus, Menu, Camera, Star, ScanBarcode } from 'lucide-react';
+  LayoutDashboard, ShoppingBag, Package, Users, BarChart3, TicketPercent, Percent, Images, FolderTree, Palette, Wand2, Settings, LogOut, ExternalLink, QrCode, Plus, Menu, Camera, Star, ScanBarcode } from 'lucide-react';
 import { useAuth } from '../../lib/auth.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
@@ -30,6 +30,7 @@ export function useNav() {
       { to: '/dashboard/analytics', icon: BarChart3, label: t('dash.analytics') },
     ] },
     { group: t('dash.manage'), items: [
+      { to: '/dashboard/promotions', icon: Percent, label: isRtl ? 'العروض والخصومات' : 'Offers & Discounts' },
       { to: '/dashboard/offers', icon: TicketPercent, label: t('dash.offers') },
       { to: '/dashboard/banners', icon: Images, label: t('dash.banners') },
       { to: '/dashboard/categories', icon: FolderTree, label: t('dash.categories') },

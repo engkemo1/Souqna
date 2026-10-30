@@ -13,6 +13,8 @@ import Button from '../../components/ui/Button.jsx';
 import FinalSaleNote from '../../components/market/FinalSaleNote.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import DeliveryBreakdown from '../../components/market/DeliveryBreakdown.jsx';
+import { loadGifts } from '../../lib/promoClient.js';
+import { GiftRows, AppliedOffers } from '../../components/promo/CartOffers.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import PlaceAutocomplete from '../../components/ui/PlaceAutocomplete.jsx';
 import { CheckoutLocationPicker, reverseGeocode } from '../../components/ui/MapView.jsx';
@@ -60,7 +62,7 @@ export default function MarketCheckout() {
     let alive = true;
     if (!groups.length) { setQuotes(null); return () => { alive = false; }; }
     setQuotes(null);
-    const ask = (group, code) => api(`/stores/${group.slug}/quote`, { method: 'POST', body: { items: group.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), ...(code ? { coupon: code } : {}), ...(phoneForQuote ? { phone: phoneForQuote } : {}) } });
+    const ask = (group, code) => api(`/stores/${group.slug}/quote`, { method: 'POST', body: { items: group.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), gifts: loadGifts(group.slug), ...(code ? { coupon: code } : {}), ...(phoneForQuote ? { phone: phoneForQuote } : {}) } });
     (async () => {
       let rows = await Promise.all(groups.map(async (group) => [group.slug, await ask(group, appliedCode)]));
       let used = Object.fromEntries(groups.map((g) => [g.slug, appliedCode || null]));
@@ -89,7 +91,7 @@ export default function MarketCheckout() {
     if (!groups.length || form.city.trim().length < 2) { setDeliveryQuote(null); return () => { alive = false; }; }
     setDeliveryQuote(null);
     const timer = setTimeout(() => {
-      api('/marketplace/delivery-fee', { method: 'POST', body: { governorate: form.governorate, city: form.city.trim(), ...(phoneForQuote ? { phone: phoneForQuote } : {}), stores: groups.map((g) => ({ slug: g.slug, items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), ...(codes[g.slug] ? { coupon: codes[g.slug] } : {}) })) } })
+      api('/marketplace/delivery-fee', { method: 'POST', body: { governorate: form.governorate, city: form.city.trim(), ...(phoneForQuote ? { phone: phoneForQuote } : {}), stores: groups.map((g) => ({ slug: g.slug, gifts: loadGifts(g.slug), items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), ...(codes[g.slug] ? { coupon: codes[g.slug] } : {}) })) } })
         .then((fee) => { if (alive) setDeliveryQuote(fee); })
         .catch(() => { if (alive) setError(ar ? 'مش قادرين نحدد رسوم التوصيل للمنطقة دي. جرّب تاني.' : 'We could not calculate delivery for this area. Please try again.'); });
     }, 300);
@@ -127,6 +129,8 @@ export default function MarketCheckout() {
   const hasErrors = quoteRows.some(({ quote }) => quote?.hasErrors);
   const subtotal = quoteRows.reduce((sum, row) => sum + (row.quote?.subtotal || 0), 0);
   const discount = quoteRows.reduce((sum, row) => sum + (row.quote?.discount || 0), 0);
+  const promoSaved = quoteRows.reduce((sum, row) => sum + (row.quote?.promoDiscount || 0), 0);
+  const codeSaved = discount - promoSaved;
   const needsDeliveryFee = quoteRows.some(({ quote }) => (quote?.shipping || 0) > 0);
   const feePending = false;
   const shipping = needsDeliveryFee && !feePending ? (deliveryQuote?.fee || 0) : 0;
@@ -153,7 +157,7 @@ export default function MarketCheckout() {
       const result = await api('/marketplace/orders', { method: 'POST', body: {
         name: form.name.trim(), phone: form.phone.trim(), governorate: form.governorate, city: form.city.trim(), address: form.address.trim(), notes: form.notes.trim(),
         ...(feePending ? {} : { expectedShipping: shipping }), expectedTotal: total,
-        stores: groups.map((g) => ({ slug: g.slug, items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), ...(codes[g.slug] ? { coupon: codes[g.slug] } : {}) })),
+        stores: groups.map((g) => ({ slug: g.slug, gifts: loadGifts(g.slug), items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), ...(codes[g.slug] ? { coupon: codes[g.slug] } : {}) })),
       } });
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
       for (const order of result.orders) rememberOrder({ number: order.number, token: order.trackToken, store: order.store?.[lang] || order.store?.ar || order.storeSlug });
@@ -207,9 +211,9 @@ export default function MarketCheckout() {
         <p className="flex items-center justify-center gap-2 text-xs text-muted"><Lock className="h-3.5 w-3.5" />{ar ? 'كل محل هيستلم طلبه ويديره بشكل منفصل.' : 'Each store receives and manages its own order.'}</p>
       </form>
       <aside className="h-fit rounded-3xl border border-line bg-elevated p-5 sm:p-6 lg:sticky lg:top-24 lg:col-span-5"><h2 className="mb-5 flex items-center gap-2 font-semibold"><ShoppingBag className="h-5 w-5" />{ar ? 'ملخص الطلبات' : 'Order summary'}</h2>
-        <div className="space-y-5">{quoteRows.map(({ group, quote }) => <section key={group.slug} className="border-b border-line pb-4 last:border-0"><h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Store className="h-4 w-4" />{group.name?.[lang] || group.name?.ar || group.slug}</h3><div className="flex justify-between text-sm"><span className="text-muted">{ar ? 'المنتجات' : 'Items'}</span><span>{quote ? formatMoney(quote.subtotal, lang) : '…'}</span></div>{quote && <p className="mt-1 text-xs text-muted">{quote.shipping === 0 ? (ar ? 'المحل مؤهل للشحن المجاني؛ قد تظل هناك رسوم واحدة لمحلات أخرى في السلة.' : 'This store qualifies for free shipping; another store may still make one shared basket fee.') : (ar ? 'المحل لم يصل لحد الشحن المجاني؛ رسوم التوصيل تُحسب مرة واحدة للسلة كلها.' : 'This store has not reached its free-shipping threshold; delivery is charged once for the whole basket.')}</p>}{group.items.slice(0, 3).map((line) => { const current = quote?.lines?.find((item) => item.productId === line.productId && (item.variantId || null) === (line.variantId || null)); return <div key={line.key} className="mt-3 flex items-center gap-3"><SmartImage media={line.image} ratio="4 / 5" sizes="40px" className="w-10 rounded-lg" /><span className="min-w-0 flex-1 truncate text-xs">{line.name?.[lang] || line.name?.ar || line.name} × {line.qty}</span><span className="text-xs">{formatMoney((current?.price ?? line.price) * line.qty, lang)}</span></div>;})}{quote?.hasErrors && <p className="mt-2 text-xs font-medium text-sale">{ar ? 'في منتج غير متاح أو كميته أكبر من المخزون.' : 'An item is unavailable or exceeds stock.'}</p>}</section>)}</div>
+        <div className="space-y-5">{quoteRows.map(({ group, quote }) => <section key={group.slug} className="border-b border-line pb-4 last:border-0"><h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Store className="h-4 w-4" />{group.name?.[lang] || group.name?.ar || group.slug}</h3><div className="flex justify-between text-sm"><span className="text-muted">{ar ? 'المنتجات' : 'Items'}</span><span>{quote ? formatMoney(quote.subtotal, lang) : '…'}</span></div>{quote && <p className="mt-1 text-xs text-muted">{quote.shipping === 0 ? (ar ? 'المحل مؤهل للشحن المجاني؛ قد تظل هناك رسوم واحدة لمحلات أخرى في السلة.' : 'This store qualifies for free shipping; another store may still make one shared basket fee.') : (ar ? 'المحل لم يصل لحد الشحن المجاني؛ رسوم التوصيل تُحسب مرة واحدة للسلة كلها.' : 'This store has not reached its free-shipping threshold; delivery is charged once for the whole basket.')}</p>}{group.items.slice(0, 3).map((line) => { const current = quote?.lines?.find((item) => item.productId === line.productId && (item.variantId || null) === (line.variantId || null)); return <div key={line.key} className="mt-3 flex items-center gap-3"><SmartImage media={line.image} ratio="4 / 5" sizes="40px" className="w-10 rounded-lg" /><span className="min-w-0 flex-1 truncate text-xs">{line.name?.[lang] || line.name?.ar || line.name} × {line.qty}</span><span className="text-xs">{current?.promoDiscount ? <><s className="me-1 text-muted">{formatMoney((current.price) * line.qty, lang)}</s><span className="font-semibold text-success">{formatMoney(current.price * line.qty - current.promoDiscount, lang)}</span></> : formatMoney((current?.price ?? line.price) * line.qty, lang)}</span></div>;})}{quote && <div className="mt-3 space-y-2"><GiftRows quote={quote} /><AppliedOffers quote={quote} /></div>}{quote?.hasErrors && <p className="mt-2 text-xs font-medium text-sale">{ar ? 'في منتج غير متاح أو كميته أكبر من المخزون.' : 'An item is unavailable or exceeds stock.'}</p>}</section>)}</div>
         <div className="mt-4 border-t border-line pt-4">
-          {appliedCode && discount > 0 ? (
+          {appliedCode && codeSaved > 0 ? (
             <div className="flex items-center justify-between rounded-xl bg-success/10 px-3 py-2.5 text-sm text-success">
               <span className="inline-flex items-center gap-2 font-semibold"><Tag className="h-4 w-4" />{ar ? `كود ${appliedCode} اتطبّق` : `Code ${appliedCode} applied`}</span>
               <button type="button" onClick={removeCode} aria-label={ar ? 'شيل الكود' : 'Remove code'} className="grid h-8 w-8 place-items-center rounded-full hover:bg-success/10"><X className="h-4 w-4" /></button>
@@ -222,7 +226,7 @@ export default function MarketCheckout() {
           )}
           {couponMsg && <p role="alert" className="mt-2 text-[13px] font-medium text-sale">{couponMsg}</p>}
         </div>
-        <div className="mt-4 space-y-2 border-t border-line pt-4 text-sm"><div className="flex justify-between"><span className="text-muted">{ar ? 'المنتجات' : 'Items'}</span><span>{quotes ? formatMoney(subtotal, lang) : '…'}</span></div>{discount > 0 && <div className="flex justify-between text-success"><span>{ar ? 'خصم الكود' : 'Code discount'}</span><span>- {formatMoney(discount, lang)}</span></div>}<div className="flex justify-between"><span className="text-muted">{ar ? `توصيل Twist إلى ${form.city || 'منطقتك'}` : `Twist delivery to ${form.city || 'your area'}`}</span><span>{quotes && deliveryQuote ? (shipping ? formatMoney(shipping, lang) : (ar ? 'مجاني' : 'Free')) : '…'}</span></div><div className="flex justify-between text-lg font-bold"><span>{ar ? 'الإجمالي' : 'Total'}</span><span>{quotes && deliveryQuote ? formatMoney(total, lang) : '…'}</span></div></div>
+        <div className="mt-4 space-y-2 border-t border-line pt-4 text-sm"><div className="flex justify-between"><span className="text-muted">{ar ? 'المنتجات' : 'Items'}</span><span>{quotes ? formatMoney(subtotal, lang) : '…'}</span></div>{promoSaved > 0 && <div className="flex justify-between text-success"><span>{ar ? 'خصم العروض' : 'Offers discount'}</span><span>- {formatMoney(promoSaved, lang)}</span></div>}{codeSaved > 0 && <div className="flex justify-between text-success"><span>{ar ? 'خصم الكود' : 'Code discount'}</span><span>- {formatMoney(codeSaved, lang)}</span></div>}<div className="flex justify-between"><span className="text-muted">{ar ? `توصيل Twist إلى ${form.city || 'منطقتك'}` : `Twist delivery to ${form.city || 'your area'}`}</span><span>{quotes && deliveryQuote ? (shipping ? formatMoney(shipping, lang) : (ar ? 'مجاني' : 'Free')) : '…'}</span></div><div className="flex justify-between text-lg font-bold"><span>{ar ? 'الإجمالي' : 'Total'}</span><span>{quotes && deliveryQuote ? formatMoney(total, lang) : '…'}</span></div></div>
         {deliveryQuote?.breakdown && <DeliveryBreakdown breakdown={deliveryQuote.breakdown} dest={coords} lang={lang} />}
       </aside>
     </div>

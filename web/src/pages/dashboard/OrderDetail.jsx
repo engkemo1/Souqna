@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Phone, MessageCircle, MapPin, StickyNote, Check, Banknote, Printer, User2, X, Package, Truck, Store as StoreIcon, Clock } from 'lucide-react';
@@ -11,8 +11,8 @@ import { StatusBadge } from '../../components/ui/Badge.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import Button from '../../components/ui/Button.jsx';
-import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
-import { Textarea } from '../../components/ui/Field.jsx';
+import Sheet, { ConfirmDialog } from '../../components/ui/Sheet.jsx';
+import { Textarea, Checkbox } from '../../components/ui/Field.jsx';
 import { ErrorState, EmptyState, errorMessage } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useAuth } from '../../lib/auth.jsx';
@@ -60,7 +60,31 @@ export default function OrderDetail() {
   const [handoffOpen, setHandoffOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
   const [note, setNote] = useState('');
+  const [retOpen, setRetOpen] = useState(false);
+  const [ret, setRet] = useState({});
+  const [restock, setRestock] = useState(true);
+  const [est, setEst] = useState(null);
   const o = data?.order;
+
+  // live estimate of the refund (same calculation the server saves; nothing is written)
+  useEffect(() => {
+    const items = Object.entries(ret).filter(([, n]) => n > 0).map(([itemId, qty]) => ({ itemId: Number(itemId), qty }));
+    if (!retOpen || !items.length) { setEst(null); return undefined; }
+    let live = true;
+    const timer = setTimeout(() => { api(`/owner/orders/${id}/returns`, { method: 'POST', body: { items, dryRun: true } }).then((r) => live && setEst(r)).catch(() => live && setEst(null)); }, 250);
+    return () => { live = false; clearTimeout(timer); };
+  }, [ret, retOpen, id]);
+
+  const doReturn = async () => {
+    const items = Object.entries(ret).filter(([, n]) => n > 0).map(([itemId, qty]) => ({ itemId: Number(itemId), qty }));
+    if (!items.length) return;
+    setBusy('return');
+    try {
+      const r = await api(`/owner/orders/${id}/returns`, { method: 'POST', body: { items, restock } });
+      toast({ title: lang === 'ar' ? `تم تسجيل المرتجع · ${formatMoney(r.refund, lang)}` : `Return recorded · ${formatMoney(r.refund, lang)}` });
+      setRetOpen(false); setRet({}); reload(); invalidate('/owner/orders'); invalidate('/owner/promotions');
+    } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); } finally { setBusy(null); }
+  };
 
   const handoff = async () => {
     setBusy('handoff');
@@ -185,21 +209,27 @@ export default function OrderDetail() {
                     <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
                       {it.color && <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full ring-1 ring-inset ring-black/10" style={{ background: it.color }} /></span>}
                       {it.size && <span>{t('product.size')}: <b className="font-semibold text-fg">{it.size}</b></span>}
-                      <span className="tabular">{formatMoney(it.price, lang)} × {it.qty}</span>
+                      {it.isGift ? <span className="rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-bold text-success">{lang === 'ar' ? 'هدية مجانية' : 'Free gift'}</span> : <span className="tabular">{formatMoney(it.price, lang)} × {it.qty}</span>}
+                      {it.returnedQty > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">{lang === 'ar' ? `مرتجع ${it.returnedQty}` : `Returned ${it.returnedQty}`}</span>}
                     </p>
                   </div>
-                  <span className="font-semibold tabular">{formatMoney(it.price * it.qty, lang)}</span>
+                  {it.isGift ? <span className="font-semibold text-success">{lang === 'ar' ? 'مجانًا' : 'Free'}</span> : it.promoDiscount > 0 ? <span className="flex flex-col items-end leading-tight"><s className="text-xs text-muted tabular">{formatMoney(it.price * it.qty, lang)}</s><span className="font-semibold text-success tabular">{formatMoney(it.price * it.qty - it.promoDiscount, lang)}</span></span> : <span className="font-semibold tabular">{formatMoney(it.price * it.qty, lang)}</span>}
                 </li>
               ))}
             </ul>
             <dl className="mt-5 space-y-2 border-t border-line pt-4 text-base">
               <div className="flex justify-between"><dt className="text-muted">{t('cart.subtotal')}</dt><dd className="tabular">{formatMoney(o.subtotal, lang)}</dd></div>
               {o.platformDiscount > 0 && <div className="rounded-xl bg-amber-50 p-3 text-[13px] text-amber-900">{t('order.platformDiscount', { v: formatMoney(o.platformDiscount, lang) })}</div>}
-              {o.discount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')} {o.coupon && <span className="rounded bg-success/10 px-1.5 py-0.5 font-mono text-xs" dir="ltr">{o.coupon}</span>}</dt><dd className="tabular">−{formatMoney(o.discount, lang)}</dd></div>}
+              {o.promoDiscount > 0 && <div className="flex justify-between text-success"><dt>{lang === 'ar' ? 'خصم العروض' : 'Offers discount'}<span className="block text-xs font-normal opacity-80">{(o.promotions || []).map((p) => tr(p.name)).join(' · ')}</span></dt><dd className="tabular">−{formatMoney(o.promoDiscount, lang)}</dd></div>}
+              {o.discount - (o.promoDiscount || 0) > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')} {o.coupon && <span className="rounded bg-success/10 px-1.5 py-0.5 font-mono text-xs" dir="ltr">{o.coupon}</span>}</dt><dd className="tabular">−{formatMoney(o.discount - (o.promoDiscount || 0), lang)}</dd></div>}
               {!pickup && <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{o.shippingFree ? t('common.free') : o.deliveryGroup ? t('cart.sharedDelivery') : o.shipping ? formatMoney(o.shipping, lang) : t('cart.sharedDelivery')}</dd></div>}
               {o.deliveryBy === 'platform' && o.shippingFree ? <p className="rounded-lg bg-brand/5 p-3 text-xs leading-5 text-muted">{o.shippingSponsorDue == null ? t('orders.shippingSponsorPending') : t('orders.shippingSponsorDue', { v: formatMoney(o.shippingSponsorDue, lang) })}</p> : o.deliveryGroup && <p className="rounded-lg bg-brand/5 p-3 text-xs leading-5 text-muted">{t('orders.marketplaceFeeNote')}</p>}
               <div className="flex justify-between pt-1 text-lg font-semibold"><dt>{t('cart.total')}</dt><dd className="tabular">{formatMoney(o.total, lang)}</dd></div>
+              {o.refunded > 0 && <div className="flex justify-between text-amber-700"><dt>{lang === 'ar' ? 'مرتجعات مستردة' : 'Refunded'}</dt><dd className="tabular">−{formatMoney(o.refunded, lang)}</dd></div>}
             </dl>
+            {['shipped', 'delivered'].includes(o.status) && o.items.some((i) => i.qty - (i.returnedQty || 0) > 0) && (
+              <Button full variant="outline" className="mt-4" onClick={() => setRetOpen(true)}>{lang === 'ar' ? 'تسجيل مرتجع' : 'Record a return'}</Button>
+            )}
             <div className="mt-4 flex items-center gap-3 rounded-xl bg-surface p-3 text-sm"><Banknote className="h-5 w-5 text-brand" /><span className="font-medium">{pickup ? L('الدفع في المحل', 'Pay in store') : t('checkout.cod')}</span></div>
           </Panel>
 
@@ -277,6 +307,34 @@ export default function OrderDetail() {
         <div className="mt-4"><label className="mb-1.5 block text-sm font-medium text-fg" htmlFor="cancel-note">{t('orders.cancelReason')}</label><Textarea id="cancel-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></div>
       </ConfirmDialog>
       )}
+      <Sheet open={retOpen} onClose={() => setRetOpen(false)} title={lang === 'ar' ? 'تسجيل مرتجع' : 'Record a return'} size="md"
+        footer={<Button full disabled={busy === 'return' || !Object.values(ret).some((n) => n > 0)} onClick={doReturn}>{lang === 'ar' ? 'تأكيد المرتجع' : 'Confirm return'}</Button>}>
+        <p className="mb-3 text-sm text-muted">{lang === 'ar' ? 'المبلغ المسترد = ما دفعه العميل عن القطع المرتجعة. لو المرتجع يُسقط عرضًا لم يعد مستحقًا يُخصم فرقه. الهدايا المجانية تُرجَع بدون مبلغ.' : 'Refund = what the customer paid for the returned items. If the return breaks an offer that is no longer earned, the difference is deducted. Free gifts return with no refund.'}</p>
+        <ul className="space-y-3">
+          {o.items.filter((i) => i.qty - (i.returnedQty || 0) > 0).map((it) => {
+            const left = it.qty - (it.returnedQty || 0); const n = ret[it.id] || 0;
+            return (
+              <li key={it.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">
+                <div className="min-w-0 text-sm"><p className="truncate font-medium">{tr(it.name)}{it.isGift ? (lang === 'ar' ? ' (هدية)' : ' (gift)') : ''}</p><p className="text-xs text-muted">{lang === 'ar' ? `متاح للإرجاع ${left}` : `${left} returnable`}</p></div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <button type="button" aria-label="-" className="h-10 w-10 rounded-lg border border-line-strong text-lg" onClick={() => setRet({ ...ret, [it.id]: Math.max(0, n - 1) })}>−</button>
+                  <span className="w-6 text-center tabular">{n}</span>
+                  <button type="button" aria-label="+" className="h-10 w-10 rounded-lg border border-line-strong text-lg" onClick={() => setRet({ ...ret, [it.id]: Math.min(left, n + 1) })}>+</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {est && (
+          <div className="mt-4 space-y-1.5 rounded-xl bg-surface p-3 text-sm">
+            <p className="flex justify-between font-semibold"><span>{lang === 'ar' ? 'المبلغ المسترد' : 'Refund'}</span><span className="tabular">{formatMoney(est.refund, lang)}</span></p>
+            {est.calculation.promoLost > 0 && <p className="flex justify-between text-amber-700"><span>{lang === 'ar' ? 'عرض لم يعد مستحقًا' : 'Offer no longer earned'}</span><span className="tabular">{formatMoney(est.calculation.promoLost, lang)}</span></p>}
+            {est.calculation.giftClawback > 0 && <p className="flex justify-between text-amber-700"><span>{lang === 'ar' ? 'هدية لم تعد مستحقة' : 'Gift no longer earned'}</span><span className="tabular">{formatMoney(est.calculation.giftClawback, lang)}</span></p>}
+            <p className="text-xs text-muted">{lang === 'ar' ? 'يُحسب العرض والكوبون من جديد على القطع التي يحتفظ بها العميل. لا يتغيّر إجمالي الطلب الأصلي.' : 'The offer and coupon are recalculated on what the customer keeps. The original order total never changes.'}</p>
+          </div>
+        )}
+        <Checkbox className="mt-3" checked={restock} onChange={setRestock} label={lang === 'ar' ? 'إرجاع القطع للمخزون' : 'Put items back in stock'} />
+      </Sheet>
     </PageTransition>
   );
 }

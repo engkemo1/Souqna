@@ -13,6 +13,8 @@ import { formatMoney } from '../../lib/format.js';
 import { useLocalState } from '../../lib/hooks.js';
 import { Field, Input, Select, Textarea } from '../../components/ui/Field.jsx';
 import Button from '../../components/ui/Button.jsx';
+import { loadGifts, saveGifts, quoteLineFor } from '../../lib/promoClient.js';
+import { LinePrice, LineOfferTag, GiftRows, AppliedOffers, OfferHints } from '../../components/promo/CartOffers.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { CartEmpty } from '../../components/store/CartContents.jsx';
@@ -24,7 +26,7 @@ import { useBuyer } from '../../lib/buyer.jsx';
 
 const PHONE = /^01[0125][0-9]{8}$/;
 
-function Summary({ quote, items, coupon, onApply, onRemove, couponError, applying }) {
+function Summary({ quote, items, coupon, onApply, onRemove, couponError, applying, gifts, onGift }) {
   const { t, tr, lang } = useI18n();
   const [code, setCode] = useState('');
   const lines = quote?.lines || items.map((l) => ({ ...l, image: l.image }));
@@ -32,7 +34,7 @@ function Summary({ quote, items, coupon, onApply, onRemove, couponError, applyin
     <div>
       <ul className="space-y-4">
         {items.map((l, i) => {
-          const ql = quote?.lines?.[i];
+          const ql = quoteLineFor(quote, l);
           return (
             <li key={l.key} className="flex items-center gap-3.5">
               <div className="relative w-16 shrink-0">
@@ -44,11 +46,14 @@ function Summary({ quote, items, coupon, onApply, onRemove, couponError, applyin
                 <p className="text-xs text-muted">{[l.colorName && tr(l.colorName), l.size].filter(Boolean).join(' · ')}</p>
                 {ql?.error && <p className="text-xs font-semibold text-sale">{ql.error === 'insufficient_stock' ? t('cart.onlyAvailable', { n: ql.available }) : t('cart.unavailable')}</p>}
               </div>
-              <span className="text-sm font-semibold tabular">{formatMoney(l.price * l.qty, lang)}</span>
+              <LinePrice ql={ql} price={l.price} qty={l.qty} className="text-sm" />
             </li>
           );
         })}
       </ul>
+      <GiftRows quote={quote} className="mt-2" />
+      <AppliedOffers quote={quote} gifts={gifts} onGift={onGift} className="mt-4" />
+      <OfferHints quote={quote} className="mt-3" />
 
       <div className="mt-6">
         {coupon ? (
@@ -67,7 +72,8 @@ function Summary({ quote, items, coupon, onApply, onRemove, couponError, applyin
 
       <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-base">
         <div className="flex justify-between"><dt className="text-muted">{t('cart.subtotal')}</dt><dd className="tabular">{quote ? formatMoney(quote.subtotal, lang) : <Skeleton className="h-4 w-16" />}</dd></div>
-        {quote?.discount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')}</dt><dd className="tabular">−{formatMoney(quote.discount, lang)}</dd></div>}
+        {quote?.promoDiscount > 0 && <div className="flex justify-between text-success"><dt>{lang === 'ar' ? 'خصم العروض' : 'Offers discount'}</dt><dd className="tabular">−{formatMoney(quote.promoDiscount, lang)}</dd></div>}
+        {quote?.couponDiscount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')}</dt><dd className="tabular">−{formatMoney(quote.couponDiscount, lang)}</dd></div>}
         <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{!quote ? <Skeleton className="h-4 w-12" /> : quote.shipping === 0 ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(quote.shipping, lang)}</dd></div>
         <div className="flex items-baseline justify-between border-t border-line pt-3 text-lg font-semibold"><dt>{t('cart.total')}</dt><dd className="tabular">{quote ? formatMoney(quote.total, lang) : <Skeleton className="h-5 w-20" />}</dd></div>
       </dl>
@@ -92,12 +98,14 @@ export default function Checkout() {
   const [applying, setApplying] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [gifts, setGiftsState] = useState(() => loadGifts(store.slug));
+  const setGifts = (g) => { saveGifts(store.slug, g); setGiftsState(g); };
   const formRef = useRef(null);
 
   const payload = useMemo(() => cart.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), [cart.items]);
 
   const runQuote = async (code) => {
-    const q = await api(`/stores/${store.slug}/quote`, { method: 'POST', body: { items: payload, coupon: code || null, phone: PHONE.test(form.phone.trim()) ? form.phone.trim() : null } });
+    const q = await api(`/stores/${store.slug}/quote`, { method: 'POST', body: { items: payload, gifts, coupon: code || null, phone: PHONE.test(form.phone.trim()) ? form.phone.trim() : null } });
     setQuote(q);
     return q;
   };
@@ -105,7 +113,7 @@ export default function Checkout() {
   useEffect(() => {
     if (!payload.length) return;
     runQuote(coupon?.code).catch(() => {});
-  }, [payload]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [payload, gifts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const applyCoupon = async (code) => {
     setApplying(true);
@@ -149,7 +157,7 @@ export default function Checkout() {
     if (!validate()) return;
     setPlacing(true);
     try {
-      const { order } = await api(`/stores/${store.slug}/orders`, { method: 'POST', body: { ...form, phone: form.phone.trim(), coupon: coupon?.code || null, items: payload } });
+      const { order } = await api(`/stores/${store.slug}/orders`, { method: 'POST', body: { ...form, phone: form.phone.trim(), coupon: coupon?.code || null, items: payload, gifts, expectedTotal: quote?.total } });
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
       cart.clear();
       rememberOrder({ number: order.number, token: order.trackToken, store: store.name });
@@ -162,7 +170,7 @@ export default function Checkout() {
         toast({ tone: 'error', title: t(`checkout.${err.code}`, { v: '' }) });
         return;
       }
-      if (err.code === 'cart_changed') {
+      if (err.code === 'cart_changed' || err.code === 'price_changed') {
         await runQuote(coupon?.code).catch(() => {});
         setSummaryOpen(true);
       }
@@ -186,7 +194,7 @@ export default function Checkout() {
         <AnimatePresence initial={false}>
           {summaryOpen && (
             <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }} className="overflow-hidden">
-              <div className="container pb-6 pt-2"><Summary quote={quote} items={cart.items} coupon={coupon} onApply={applyCoupon} onRemove={removeCoupon} couponError={couponError} applying={applying} /></div>
+              <div className="container pb-6 pt-2"><Summary quote={quote} items={cart.items} coupon={coupon} onApply={applyCoupon} onRemove={removeCoupon} couponError={couponError} applying={applying} gifts={gifts} onGift={setGifts} /></div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -241,7 +249,7 @@ export default function Checkout() {
 
         <aside className="hidden rounded-3xl border border-line bg-elevated p-6 lg:sticky lg:top-24 lg:col-span-5 lg:block">
           <h2 className="mb-5 text-lg font-semibold">{t('checkout.review')}</h2>
-          <Summary quote={quote} items={cart.items} coupon={coupon} onApply={applyCoupon} onRemove={removeCoupon} couponError={couponError} applying={applying} />
+          <Summary quote={quote} items={cart.items} coupon={coupon} onApply={applyCoupon} onRemove={removeCoupon} couponError={couponError} applying={applying} gifts={gifts} onGift={setGifts} />
         </aside>
       </div>
 

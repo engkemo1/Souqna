@@ -20,6 +20,7 @@ import { useBuyer } from '../../lib/buyer.jsx';
 import { api } from '../../lib/api.js';
 import { Bell } from 'lucide-react';
 import SameDayBadge from '../../components/store/SameDayBadge.jsx';
+import { ProductOffersPanel } from '../../components/promo/OfferCards.jsx';
 import { SectionHeader } from './StoreHome.jsx';
 import { Price, QtyStepper } from '../../components/ui/Commerce.jsx';
 import Skeleton, { SkeletonText } from '../../components/ui/Skeleton.jsx';
@@ -232,6 +233,7 @@ export default function Product() {
           </div>
 
           <Price value={p.price} compareAt={p.compareAt} size="xl" showSave className="mt-5" />
+          <ProductOffersPanel slug={store.slug} offers={data.offers || []} />
 
           <div className="mt-7">
             <VariantPicker product={p} color={color} size={size} onColor={(c) => { setColor(c); setSize(p.sizes.length === 1 ? p.sizes[0] : null); }}

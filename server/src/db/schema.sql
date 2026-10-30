@@ -666,3 +666,114 @@ CREATE TABLE IF NOT EXISTS pos_ai_product_lessons (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_pos_ai_product_lessons_store ON pos_ai_product_lessons(store_id, id DESC);
+
+-- ---------------------------------------------------------------- promotions (العروض والخصومات)
+-- Store-level promotional offers evaluated by lib/promotions/engine.js. The legacy `offers` table above is the coupon-code system and is untouched.
+-- rules_json is the single source of truth for what an offer does; promotion_targets is a derived index (rebuilt on every save) so
+-- "which offers include this product / category" is one indexed lookup.
+CREATE TABLE IF NOT EXISTS promotions (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  name_ar TEXT NOT NULL, name_en TEXT,
+  description_ar TEXT, description_en TEXT,
+  type TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','active','paused')),
+  priority INTEGER NOT NULL DEFAULT 0,
+  stacking TEXT NOT NULL DEFAULT 'per_product' CHECK (stacking IN ('exclusive','per_product','stackable')),
+  stack_with_coupons INTEGER NOT NULL DEFAULT 1,
+  image_media_id INTEGER REFERENCES media(id) ON DELETE SET NULL,
+  template_key TEXT,
+  starts_at TEXT, ends_at TEXT,                         -- Cairo wall-clock 'YYYY-MM-DDTHH:MM'
+  daily_from TEXT, daily_to TEXT,                       -- optional daily window 'HH:MM' (Cairo); from > to wraps past midnight
+  days_mask INTEGER NOT NULL DEFAULT 127,               -- bit 0 = Sunday ... bit 6 = Saturday
+  usage_limit INTEGER,                                  -- total orders that may use it
+  per_customer_limit INTEGER,                           -- per phone number
+  audience TEXT NOT NULL DEFAULT 'all' CHECK (audience IN ('all','new','returning','phones')),
+  audience_phones_json TEXT NOT NULL DEFAULT '[]',
+  rules_json TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_promotions_store ON promotions(store_id, status);
+
+CREATE TABLE IF NOT EXISTS promotion_targets (
+  promotion_id INTEGER NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+  role TEXT NOT NULL CHECK (role IN ('qualify','reward','exclude','gift')),
+  target_type TEXT NOT NULL CHECK (target_type IN ('all','product','category')),
+  target_id INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (promotion_id, role, target_type, target_id)
+);
+CREATE INDEX IF NOT EXISTS idx_promo_targets_lookup ON promotion_targets(target_type, target_id);
+
+-- What each order actually received (a snapshot, so editing or deleting an offer later never rewrites history).
+CREATE TABLE IF NOT EXISTS order_promotions (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  promotion_id INTEGER REFERENCES promotions(id) ON DELETE SET NULL,
+  store_id INTEGER NOT NULL,
+  name_ar TEXT NOT NULL, name_en TEXT,
+  type TEXT NOT NULL,
+  discount INTEGER NOT NULL DEFAULT 0,
+  applications INTEGER NOT NULL DEFAULT 1,
+  detail_json TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_order_promos_promo ON order_promotions(promotion_id);
+CREATE INDEX IF NOT EXISTS idx_order_promos_order ON order_promotions(order_id);
+
+-- Impressions/clicks for offer performance (daily aggregate, no visitor identifiers).
+CREATE TABLE IF NOT EXISTS promotion_views (
+  promotion_id INTEGER NOT NULL REFERENCES promotions(id) ON DELETE CASCADE,
+  day TEXT NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (promotion_id, day)
+);
+
+-- Shared promotional image library: one image per (offer type, product category) pair, stored ONCE in the existing photo storage
+-- (R2 when configured, otherwise the media folder) under offer-templates/ and reused by every store. Only references live here.
+-- category_key 'general' is the neutral fallback; new product categories are just new rows in offer_image_categories (no code change).
+CREATE TABLE IF NOT EXISTS offer_image_categories (
+  key TEXT PRIMARY KEY,
+  name_ar TEXT NOT NULL, name_en TEXT NOT NULL,
+  department_slugs_json TEXT NOT NULL DEFAULT '[]',   -- department slugs (or their parents) whose products use this category's images
+  sort INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS offer_templates (
+  offer_type TEXT NOT NULL,
+  category_key TEXT NOT NULL DEFAULT 'general',
+  file TEXT NOT NULL,                     -- object name under offer-templates/, content-hashed so a new design busts caches
+  sha256 TEXT NOT NULL,
+  remote INTEGER NOT NULL DEFAULT 0,      -- 1 = stored in R2
+  width INTEGER, height INTEGER, bytes INTEGER,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (offer_type, category_key)
+);
+
+-- Who changed which offer and when (kept after the offer is deleted).
+CREATE TABLE IF NOT EXISTS promotion_audit (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL,
+  promotion_id INTEGER,
+  promotion_name TEXT,
+  action TEXT NOT NULL,            -- created | updated | activated | paused | drafted | duplicated | deleted
+  actor_id INTEGER, actor_name TEXT,
+  detail_json TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_promo_audit_store ON promotion_audit(store_id, id DESC);
+CREATE INDEX IF NOT EXISTS idx_promo_audit_promo ON promotion_audit(promotion_id, id DESC);
+
+-- Online-order returns: what was handed back, what was refunded (net of the offer discount) and whether it went back on the shelf.
+CREATE TABLE IF NOT EXISTS order_returns (
+  id INTEGER PRIMARY KEY,
+  order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+  store_id INTEGER NOT NULL,
+  order_item_id INTEGER NOT NULL,
+  qty INTEGER NOT NULL,
+  refund INTEGER NOT NULL DEFAULT 0,
+  restocked INTEGER NOT NULL DEFAULT 1,
+  reason TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_order_returns_order ON order_returns(order_id);

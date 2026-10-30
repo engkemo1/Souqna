@@ -10,6 +10,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { useDashBase } from '../../lib/dashBase.js';
 import { formatMoney } from '../../lib/format.js';
 import { PageHeader } from '../../components/dash/Kit.jsx';
+import ProductOffers from '../../components/promo/ProductOffers.jsx';
 import MediaUploader from '../../components/dash/MediaUploader.jsx';
 import { Field, Input, Textarea, Select, Switch, Segmented } from '../../components/ui/Field.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -367,6 +368,7 @@ export default function ProductEditor() {
   const [suggested, setSuggested] = useState(false);
   const [showEn, setShowEn] = useState(false);
   const [adv, setAdv] = useState(false);
+  const [offerIds, setOfferIds] = useState([]);
   const [published, setPublished] = useState(null);
   const nameRef = useRef(null);
   const [step, setStep] = useState(0);
@@ -459,6 +461,9 @@ export default function ProductEditor() {
       invalidate(`/stores/${store.slug}`);
       setInitial({ ...f, status });
       toast({ title: isNew ? (status === 'draft' ? L('اتحفظ كمسودة', 'Saved as draft') : t('editor.created')) : t('editor.saved'), image: r.product.media?.[0] ? `${r.product.media[0].base}/thumb.webp` : undefined });
+      if (isNew && offerIds.length) {
+        try { await api(`/owner/promotions/for-product/${r.product.id}`, { method: 'PUT', body: { add: offerIds } }); invalidate('/owner/promotions'); } catch { toast({ tone: 'error', title: L('اتحفظ المنتج لكن تعذرت إضافته للعروض', 'Product saved, but adding it to offers failed') }); }
+      }
       if (isNew) {
         if (status === 'draft') {
           navigate(`${base}/products/${r.product.id}`, { replace: true });
@@ -625,6 +630,7 @@ export default function ProductEditor() {
         <Switch label={t('editor.featured')} description={t('editor.featuredHint')} checked={f.featured} onChange={(v) => set({ featured: v })} />
         <Switch label={t('editor.markNew')} description={t('editor.markNewHint')} checked={f.is_new} onChange={(v) => set({ is_new: v })} />
         <Switch label={t('editor.noReturn')} description={t('editor.noReturnHint')} checked={f.no_return} onChange={(v) => set({ no_return: v })} />
+        <ProductOffers productId={isNew ? null : Number(id)} pending={offerIds} onPending={setOfferIds} />
       </div>
     </Card>
   );
