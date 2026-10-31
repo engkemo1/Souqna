@@ -20,7 +20,7 @@ export default function TickerStrip() {
   return (
     <div className="overflow-hidden bg-accent py-2.5 text-on-accent" aria-hidden="true">
       <div className="ticker-track flex w-max gap-10 whitespace-nowrap text-[13px] font-semibold">
-        {row.map((x, i) => <span key={i} className="flex items-center gap-10">{x}<span className="opacity-60">✦</span></span>)}
+        {row.map((x, i) => <span key={i} className="flex items-center gap-10">{x}<span aria-hidden="true" className="">✦</span></span>)}
       </div>
     </div>
   );

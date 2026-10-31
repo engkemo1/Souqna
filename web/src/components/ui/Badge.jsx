@@ -4,7 +4,7 @@ const TONES = {
   neutral: 'bg-fg/[0.07] text-fg',
   brand: 'bg-primary text-on-primary',
   accent: 'bg-accent text-on-accent',
-  sale: 'bg-sale text-white',
+  sale: 'bg-sale text-on-sale',
   success: 'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-600/15',
   warning: 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-600/20',
   danger: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/15',

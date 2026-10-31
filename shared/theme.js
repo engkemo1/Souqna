@@ -181,10 +181,8 @@ export function buildTheme(input = {}) {
 
   // body text on page background
   const text = fix('text', 'text_contrast', raw.text, ensureContrast(raw.text, bg, 7), contrast(raw.text, bg));
-  // muted text — still AA
-  const muted = ensureContrast(mix(text, bg, 0.42), bg, AA);
   // brand colour used as text/link/price on background
-  const primaryInk = ensureContrast(raw.primary, bg, AA);
+  const primaryInk = ensureContrast(raw.primary, bg, AA + 0.4);
   if (primaryInk !== raw.primary) {
     report.push({ field: 'primary', level: 'adjusted', code: 'primary_as_text', from: raw.primary, to: primaryInk, ratio: Math.round(contrast(raw.primary, bg) * 100) / 100 });
   }
@@ -207,6 +205,9 @@ export function buildTheme(input = {}) {
   }
 
   const surface = dark ? mix(bg, '#FFFFFF', 0.05) : mix(bg, '#000000', 0.025);
+  // muted text must stay AA on every surface it sits on (page, soft surface, tinted secondary), not only on the page
+  let muted = ensureContrast(mix(text, bg, 0.42), bg, AA + 0.9);
+  for (const s of [surface, secondary, mix(bg, text, dark ? 0.2 : 0.08)]) muted = ensureContrast(muted, s, AA + 0.9);
   const border = mix(bg, text, dark ? 0.16 : 0.1);
   const borderStrong = mix(bg, text, dark ? 0.3 : 0.22);
 
@@ -234,7 +235,9 @@ export function buildTheme(input = {}) {
     onFooter: onColor(footer),
     footerMuted: ensureContrast(mix(onColor(footer), footer, 0.38), footer, AA),
     sale: ensureContrast(dark ? '#FF6B6B' : '#C62828', bg, AA),
-    success: ensureContrast(dark ? '#4ADE80' : '#15803D', bg, AA),
+    onSale: onColor(ensureContrast(dark ? '#FF6B6B' : '#C62828', bg, AA)),
+    success: ensureContrast(dark ? '#4ADE80' : '#157337', bg, AA),
+    onSuccess: onColor(ensureContrast(dark ? '#4ADE80' : '#157337', bg, AA)),
     ring: ensureContrast(raw.primary, bg, AA_LARGE),
   };
 

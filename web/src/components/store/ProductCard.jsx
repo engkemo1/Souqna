@@ -30,7 +30,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
   const imgR = card === 'flat' ? 'rounded-none' : card === 'bordered' ? 'rounded-md' : bubble ? 'rounded-[22px]' : 'rounded-2xl';
   const wrap = card === 'soft' ? 'rounded-3xl bg-surface p-2.5' : card === 'bordered' ? 'rounded-lg p-2 ring-1 ring-line'
     : bubble ? 'rounded-[28px] p-2 pb-3 transition duration-300 [@media(hover:hover)]:hover:-translate-y-1.5 [@media(hover:hover)]:hover:shadow-[0_18px_40px_-18px_rgba(31,35,64,0.35)]' : '';
-  const tone = { brand: 'bg-primary text-on-primary', sale: 'bg-sale text-white', dark: 'bg-neutral-900 text-white', gold: 'bg-amber-400 text-neutral-900', green: 'bg-emerald-600 text-white' }[p.badge?.tone] || 'bg-primary text-on-primary';
+  const tone = { brand: 'bg-primary text-on-primary', sale: 'bg-sale text-on-sale', dark: 'bg-neutral-900 text-white', gold: 'bg-amber-400 text-neutral-900', green: 'bg-emerald-600 text-white' }[p.badge?.tone] || 'bg-primary text-on-primary';
 
   const toggleFav = (e) => {
     e.preventDefault();
@@ -47,7 +47,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
       viewport={{ once: true, margin: '0px 0px -40px 0px' }}
       transition={{ duration: 0.5, delay: Math.min(index % 4, 3) * 0.06, ease: [0.22, 1, 0.36, 1] }}
       className={cx('group relative flex min-w-0 flex-col', wrap)}
-      style={tint ? { background: tint.bg } : undefined}
+      style={tint ? { background: tint.bg, '--c-text': '31 35 64', '--c-muted': '84 89 112', '--c-sale': '185 28 28', '--c-on-sale': '255 255 255' } : undefined}
     >
       <Link to={href} className={cx('relative block overflow-hidden focus-visible:shadow-ring', bubble ? 'bg-white/70' : 'bg-surface', imgR)} aria-label={tr(p.name)}>
         <SmartImage
@@ -72,7 +72,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
         {/* badges */}
         <div className="pointer-events-none absolute start-2.5 top-2.5 flex flex-col items-start gap-1.5 sm:start-3 sm:top-3">
           {p.badge && <span className={cx('rounded-full px-2 py-0.5 text-xs font-bold', tone)}>{p.badge.text}</span>}
-          {p.discount > 0 && <span className="rounded-full bg-sale px-2 py-0.5 text-xs font-bold text-white tabular sm:text-xs">-{p.discount}%</span>}
+          {p.discount > 0 && <span className="rounded-full bg-sale px-2 py-0.5 text-xs font-bold text-on-sale tabular sm:text-xs">-{p.discount}%</span>}
           {p.offer && !out && <OfferChip offer={p.offer} className="max-w-[9.5rem]" />}
           {p.sameDay && !out && <SameDayBadge />}
           {p.isNew && !out && <span className="rounded-full bg-neutral-900/85 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur sm:text-xs">{t('product.new')}</span>}

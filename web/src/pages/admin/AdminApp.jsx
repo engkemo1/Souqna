@@ -167,7 +167,7 @@ function Bell_({ alerts }) {
     <div className="relative">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-label="التنبيهات" className="relative grid h-10 w-10 place-items-center rounded-full border border-line bg-elevated hover:bg-fg/[0.05]">
         <Bell className="h-[18px] w-[18px]" />
-        {counts.ready > 0 && <span className="absolute -end-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-sale px-1 text-[11px] font-bold text-white">{counts.ready}</span>}
+        {counts.ready > 0 && <span className="absolute -end-1 -top-1 grid h-5 min-w-5 place-items-center rounded-full bg-sale px-1 text-[11px] font-bold text-on-sale">{counts.ready}</span>}
       </button>
       {open && (
         <>
@@ -256,7 +256,7 @@ function MobileDrawer({ open, onClose, alerts, onLogout, location }) {
                   return (
                     <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
                       <n.icon className="h-[18px] w-[18px]" />{n.label}
-                      {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-white">{alerts.counts[n.badge]}</span>}
+                      {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-on-sale">{alerts.counts[n.badge]}</span>}
                     </NavLink>
                   );
                 })}
@@ -298,7 +298,7 @@ function Shell({ onLogout }) {
                   return (
                     <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
                       <n.icon className="h-[18px] w-[18px]" />{n.label}
-                      {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-white">{alerts.counts[n.badge]}</span>}
+                      {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-on-sale">{alerts.counts[n.badge]}</span>}
                     </NavLink>
                   );
                 })}
@@ -346,7 +346,7 @@ function Shell({ onLogout }) {
                 <span className="relative">
                   <n.icon className="h-5 w-5" />
                   {n.badge && alerts.counts[n.badge] > 0 && (
-                    <span className="absolute -end-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-sale px-1 text-[10px] font-bold text-white ring-2 ring-elevated">{alerts.counts[n.badge]}</span>
+                    <span className="absolute -end-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-sale px-1 text-[10px] font-bold text-on-sale ring-2 ring-elevated">{alerts.counts[n.badge]}</span>
                   )}
                 </span>
                 {n.label}

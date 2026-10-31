@@ -14,7 +14,7 @@ let leafletPromise;
 const loadLeaflet = () => leafletPromise || (leafletPromise = Promise.all([import('leaflet'), import('leaflet/dist/leaflet.css')]).then(([m]) => m.default || m));
 const TILES = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const ATTR = '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">OpenStreetMap</a>';
-export const ZONE_COLORS = ['#E8590C', '#1C7ED6', '#2F9E44', '#9C36B5', '#D6336C', '#0C8599'];
+export const ZONE_COLORS = ['#C2410C', '#1864AB', '#237A35', '#862E9C', '#B02A5B', '#0B7285'];
 
 const pinHtml = (color, text) => `<div style="position:relative;width:34px;height:42px"><div style="width:34px;height:34px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:${color};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.35)"></div><span style="position:absolute;inset:0 0 8px 0;display:flex;align-items:center;justify-content:center;color:#fff;font:700 13px system-ui">${text}</span></div>`;
 const makePin = (L, color, text) => L.divIcon({ className: '', html: pinHtml(color, text), iconSize: [34, 42], iconAnchor: [17, 40], popupAnchor: [0, -36] });

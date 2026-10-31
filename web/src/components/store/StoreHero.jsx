@@ -45,7 +45,7 @@ function DoorSign({ store, ar, light }) {
     <div className="relative mt-4 inline-block pt-3">
       <span className={`absolute start-5 top-0 h-3 w-px ${cord}`} />
       <span className={`absolute end-5 top-0 h-3 w-px ${cord}`} />
-      <span className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold shadow-md ring-1 ${open ? 'bg-emerald-500 text-white ring-emerald-300' : 'bg-red-500 text-white ring-red-300'}`}>
+      <span className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold shadow-md ring-1 ${open ? 'bg-emerald-700 text-white ring-emerald-300' : 'bg-red-700 text-white ring-red-300'}`}>
         <span className="relative flex h-2 w-2">
           {open && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/80" />}
           <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
@@ -289,7 +289,7 @@ export function StoreIdentityBar() {
           </div>
         </div>
         <div className="flex shrink-0 gap-2">
-          <Link to={sp(store.slug, 'shop')} className="inline-flex items-center gap-2 rounded-full bg-btn px-5 py-2.5 text-[14px] font-semibold text-white">
+          <Link to={sp(store.slug, 'shop')} className="inline-flex items-center gap-2 rounded-full bg-btn px-5 py-2.5 text-[14px] font-semibold text-on-btn">
             {ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4" />
           </Link>
           {tr(store.address) && (

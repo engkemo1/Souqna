@@ -62,7 +62,7 @@ export default function MarketOrderSuccess() {
           href={l.url}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] font-bold text-white shadow-sm transition hover:bg-[#20ba59] active:scale-[0.99] sm:w-auto sm:px-8"
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] font-bold text-neutral-900 shadow-sm transition hover:bg-[#20ba59] active:scale-[0.99] sm:w-auto sm:px-8"
         >
           <MessageCircle className="h-5 w-5 fill-white text-white" />
           {storeWaLinks.length > 1 ? (ar ? `واتساب ${l.name}` : `WhatsApp ${l.name}`) : (ar ? 'إرسال تفاصيل الطلب لصاحب المحل' : 'Send order to the store owner')}

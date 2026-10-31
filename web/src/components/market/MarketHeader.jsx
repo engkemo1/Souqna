@@ -114,7 +114,7 @@ export default function MarketHeader() {
 
       {mobileMenuOpen && <div className="border-t border-line bg-white shadow-lg md:hidden">
         <div className="container grid gap-2 py-4">
-          <Link to="/stores" onClick={() => setMobileMenuOpen(false)} className="rounded-xl bg-btn px-4 py-3 text-center text-sm font-bold text-white">{t('market.exploreStores')}</Link>
+          <Link to="/stores" onClick={() => setMobileMenuOpen(false)} className="rounded-xl bg-btn px-4 py-3 text-center text-sm font-bold text-on-btn">{t('market.exploreStores')}</Link>
           <a href="/#products" onClick={handleSectionLink('products')} className="rounded-xl border border-line px-4 py-3 text-center text-sm font-bold text-fg">{t('market.browseProducts')}</a>
           <Link to="/track" onClick={() => setMobileMenuOpen(false)} className="rounded-xl border border-line px-4 py-3 text-center text-sm font-bold text-fg">{ar ? 'تتبّع طلبي' : 'Track order'}</Link>
           <Link to="/join" onClick={() => setMobileMenuOpen(false)} className="rounded-xl border border-line px-4 py-3 text-center text-sm font-bold text-fg">{t('market.openStore')}</Link>

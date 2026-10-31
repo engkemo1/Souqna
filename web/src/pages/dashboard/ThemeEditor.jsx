@@ -61,7 +61,7 @@ function LivePreview({ theme, store, products, device, lang }) {
         <div className="bg-secondary px-5 py-6 text-on-secondary">
           <p className="text-[9px] font-semibold tracking-[0.2em] opacity-70">{lang === 'ar' ? 'الموسم الجديد' : 'NEW SEASON'}</p>
           <p className="mt-1 font-display text-xl font-bold leading-tight">{t('theme.previewHero')}</p>
-          <span className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-btn-outline bg-btn px-3 py-1.5 text-xs font-semibold text-white">{t('store.shopAll')}<ArrowRight className="h-3 w-3 rtl:-scale-x-100" /></span>
+          <span className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-btn-outline bg-btn px-3 py-1.5 text-xs font-semibold text-on-btn">{t('store.shopAll')}<ArrowRight className="h-3 w-3 rtl:-scale-x-100" /></span>
           <span className="ms-2 inline-flex rounded-lg border border-line-strong px-3 py-1.5 text-xs font-semibold text-brand">{t('store.newArrivals')}</span>
         </div>
         <div className={cx('grid gap-3 p-3.5', mobile ? 'grid-cols-2' : 'grid-cols-3')}>
@@ -69,7 +69,7 @@ function LivePreview({ theme, store, products, device, lang }) {
             <div key={p?.id ?? i}>
               <div className="relative overflow-hidden rounded-xl bg-surface">
                 {p ? <SmartImage media={p.image} ratio="4 / 5" sizes="160px" /> : <div className="aspect-[4/5]" />}
-                {i === 0 && <span className="absolute start-1.5 top-1.5 rounded-full bg-sale px-1.5 py-0.5 text-[8px] font-bold text-white">-20%</span>}
+                {i === 0 && <span className="absolute start-1.5 top-1.5 rounded-full bg-sale px-1.5 py-0.5 text-[8px] font-bold text-on-sale">-20%</span>}
                 {i === 1 && <span className="absolute start-1.5 top-1.5 rounded-full bg-accent px-1.5 py-0.5 text-[8px] font-bold text-on-accent">{t('product.new')}</span>}
               </div>
               <p className="mt-1.5 truncate text-xs font-medium">{p ? tr(p.name) : t('theme.previewProduct')}</p>
@@ -81,7 +81,7 @@ function LivePreview({ theme, store, products, device, lang }) {
           <div className="flex items-center justify-between rounded-xl border border-line bg-elevated p-2.5">
             <span className="text-xs text-muted">{t('cart.total')}</span><span className="text-xs font-semibold">{money(1598)}</span>
           </div>
-          <span className="mt-2 block rounded-lg border border-btn-outline bg-btn py-2 text-center text-xs font-semibold text-white">{t('cart.checkout')}</span>
+          <span className="mt-2 block rounded-lg border border-btn-outline bg-btn py-2 text-center text-xs font-semibold text-on-btn">{t('cart.checkout')}</span>
         </div>
         <div className="bg-footer px-4 py-4 text-on-footer">
           <p className="font-display text-sm font-bold">{tr(store.name)}</p>
@@ -146,7 +146,7 @@ export default function ThemeEditor() {
                 <span className="block h-3" style={{ background: p.header === p.background ? p.secondary : p.header }} />
                 <span className="flex h-9 items-center justify-center gap-1"><span className="h-3.5 w-3.5 rounded-full" style={{ background: p.primary }} /><span className="h-3.5 w-3.5 rounded-full" style={{ background: p.accent }} /></span>
                 <span className="block h-3" style={{ background: p.footer }} />
-                {activePreset === key && <span className="absolute end-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-primary text-white"><Check className="h-2.5 w-2.5" strokeWidth={3} /></span>}
+                {activePreset === key && <span className="absolute end-1 top-1 grid h-4 w-4 place-items-center rounded-full bg-primary text-on-primary"><Check className="h-2.5 w-2.5" strokeWidth={3} /></span>}
               </span>
               <span className="mt-1.5 block text-xs font-medium">{t(`theme.preset.${key}`)}</span>
             </button>

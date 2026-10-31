@@ -191,7 +191,7 @@ export default function OrderDetail() {
                         : L('أول حجز للعميل ده على تويست.', 'First reservation for this customer on Twist.')}
                   </p>
                 )}
-                {o.status === 'cancelled' && lastNote === 'unavailable' && <Button full variant="outline" icon={MessageCircle} href={sorryWa} target="_blank" rel="noreferrer" className="!text-[#128C7E]">{L('ابعت اعتذار للعميل على واتساب', 'Send the customer an apology on WhatsApp')}</Button>}
+                {o.status === 'cancelled' && lastNote === 'unavailable' && <Button full variant="outline" icon={MessageCircle} href={sorryWa} target="_blank" rel="noreferrer" className="!text-[#0B6B5E]">{L('ابعت اعتذار للعميل على واتساب', 'Send the customer an apology on WhatsApp')}</Button>}
               </div>
             ) : o.status === 'cancelled' ? (
               <div className="flex items-center gap-3 rounded-xl bg-red-50 p-4 text-red-800"><X className="h-5 w-5" /><p className="font-semibold">{t('status.cancelled')}</p></div>
@@ -256,7 +256,7 @@ export default function OrderDetail() {
             <p className="mt-4 font-mono text-base" dir="ltr">{o.customer.phone}</p>
             <div className="mt-3 grid grid-cols-2 gap-2">
               <Button variant="outline" size="sm" icon={Phone} href={`tel:${o.customer.phone}`}>{t('orders.call')}</Button>
-              <Button variant="outline" size="sm" icon={MessageCircle} href={wa} target="_blank" rel="noreferrer" className="!text-[#128C7E]">{t('orders.whatsapp')}</Button>
+              <Button variant="outline" size="sm" icon={MessageCircle} href={wa} target="_blank" rel="noreferrer" className="!text-[#0B6B5E]">{t('orders.whatsapp')}</Button>
             </div>
           </Panel>
           {pickup ? (

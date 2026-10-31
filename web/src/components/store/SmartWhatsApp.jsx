@@ -23,7 +23,7 @@ export default function SmartWhatsApp({ hasBottomNav }) {
     <a href={`https://wa.me/${num}?text=${encodeURIComponent(text)}`} target="_blank" rel="noreferrer"
       aria-label={ar ? 'كلّم المحل على واتساب' : 'Chat with the store on WhatsApp'}
       style={{ bottom: hasBottomNav ? 'calc(var(--bottom-nav-h) + var(--safe-b) + 16px)' : 'calc(var(--safe-b) + 16px)' }}
-      className="fixed end-4 z-40 flex items-center gap-2 rounded-full bg-[#25D366] py-2.5 pe-4 ps-3 text-white shadow-lg transition hover:brightness-95 active:scale-95">
+      className="fixed end-4 z-40 flex items-center gap-2 rounded-full bg-[#25D366] py-2.5 pe-4 ps-3 text-neutral-900 shadow-lg transition hover:brightness-95 active:scale-95">
       <MessageCircle className="h-6 w-6 shrink-0" />
       <span className="flex flex-col text-start leading-tight">
         <span className="text-[13px] font-bold">{ar ? 'واتساب' : 'WhatsApp'}</span>

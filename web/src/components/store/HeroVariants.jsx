@@ -22,7 +22,7 @@ export function HeroSplit({ banners = [] }) {
           <h1 className="mt-4 font-display text-[34px] font-bold leading-tight !text-on-secondary sm:text-5xl">{tr(store.name)}</h1>
           {tr(store.tagline) && <p className="mt-3 max-w-md text-base opacity-80 sm:text-lg">{tr(store.tagline)}</p>}
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link to={sp(store.slug, 'shop')} className="group inline-flex items-center gap-2 rounded-full bg-btn px-6 py-3 text-[15px] font-semibold text-white">
+            <Link to={sp(store.slug, 'shop')} className="group inline-flex items-center gap-2 rounded-full bg-btn px-6 py-3 text-[15px] font-semibold text-on-btn">
               {ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4" />
             </Link>
             {tr(store.address) && (

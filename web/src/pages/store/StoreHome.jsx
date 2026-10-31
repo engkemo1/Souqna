@@ -124,8 +124,8 @@ function CategoryTiles() {
         <SectionHeader title={t('store.shopByCategory')} />
         <div className="flex flex-wrap gap-2.5">
           {categories.map((c) => (
-            <Link key={c.id} to={sp(store.slug, `shop?category=${c.slug}`)} className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-[15px] font-semibold ring-1 ring-line-strong transition hover:bg-btn hover:text-white">
-              {tr(c.name)}<span className="text-xs font-normal opacity-60">{c.count}</span>
+            <Link key={c.id} to={sp(store.slug, `shop?category=${c.slug}`)} className="inline-flex items-center gap-2 rounded-full px-5 py-3 text-[15px] font-semibold ring-1 ring-line-strong transition hover:bg-btn hover:text-on-btn">
+              {tr(c.name)}<span className="text-xs font-normal text-muted">{c.count}</span>
             </Link>
           ))}
         </div>

@@ -60,7 +60,7 @@ export default function StoresDirectory() {
           </div>
 
           <div className="mb-7 flex flex-wrap gap-2" role="tablist" aria-label={t('settings.category')}>
-            {cats.map((item) => <button key={item} type="button" role="tab" aria-selected={category === item} onClick={() => setCategory(item)} className={cx('rounded-full border px-3.5 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm', category === item ? 'border-brand bg-btn text-white shadow-sm' : 'border-line-strong bg-white text-[#43516a] hover:border-fg/30/50 hover:text-brand')}>
+            {cats.map((item) => <button key={item} type="button" role="tab" aria-selected={category === item} onClick={() => setCategory(item)} className={cx('rounded-full border px-3.5 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm', category === item ? 'border-brand bg-btn text-on-btn shadow-sm' : 'border-line-strong bg-white text-[#43516a] hover:border-fg/30/50 hover:text-brand')}>
               {item === 'all' ? t('cat.all') : label(item)}
             </button>)}
           </div>

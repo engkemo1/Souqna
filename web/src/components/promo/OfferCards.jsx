@@ -100,7 +100,7 @@ function ProductOfferRow({ offer, lang, tr }) {
     <div className="flex items-start gap-3 rounded-2xl border border-success/30 bg-success/[0.07] p-3.5">
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-success/15 text-success"><Tag className="h-5 w-5" /></span>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">{tr(offer.name)}{b.big && <span className="ms-2 rounded-full bg-success px-2 py-0.5 text-[11px] font-bold text-white">{b.big}</span>}</p>
+        <p className="font-semibold">{tr(offer.name)}{b.big && <span className="ms-2 rounded-full bg-success px-2 py-0.5 text-[11px] font-bold text-on-success">{b.big}</span>}</p>
         {offer.text && <p className="mt-0.5 text-[13px] text-fg/80">{[tr(offer.text.headline), tr(offer.text.conditions)].filter(Boolean).join(' — ')}</p>}
         {offer.text?.cap && <p className="mt-0.5 text-xs text-muted">{tr(offer.text.cap)}</p>}
         {expiry && <p className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-sale"><Clock className="h-3.5 w-3.5" />{expiry}</p>}
@@ -113,5 +113,5 @@ function ProductOfferRow({ offer, lang, tr }) {
 export function OfferChip({ offer, className }) {
   const { tr } = useI18n();
   if (!offer) return null;
-  return <span className={cx('inline-flex max-w-full items-center gap-1 rounded-full bg-success px-2 py-0.5 text-[11px] font-bold text-white', className)}><Tag className="h-3 w-3 shrink-0" /><span className="truncate">{tr(offer.headline) || tr(offer.name)}</span></span>;
+  return <span className={cx('inline-flex max-w-full items-center gap-1 rounded-full bg-success px-2 py-0.5 text-[11px] font-bold text-on-success', className)}><Tag className="h-3 w-3 shrink-0" /><span className="truncate">{tr(offer.headline) || tr(offer.name)}</span></span>;
 }

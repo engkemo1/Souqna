@@ -73,7 +73,7 @@ function Card({ id, step, title, hint, done, children, className, bare }) {
   return (
     <section id={id} className={cx('scroll-mt-24 rounded-2xl border bg-elevated transition-colors', done ? 'border-line' : 'border-line', className)}>
       {!bare && <header className="flex items-center gap-3 px-5 pt-5 sm:px-6">
-        <span className={cx('grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-bold tabular', done ? 'bg-success text-white' : 'bg-fg/[0.07] text-muted')}>{done ? <Check className="h-4 w-4" strokeWidth={3} /> : step}</span>
+        <span className={cx('grid h-7 w-7 shrink-0 place-items-center rounded-full text-[13px] font-bold tabular', done ? 'bg-success text-on-success' : 'bg-fg/[0.07] text-muted')}>{done ? <Check className="h-4 w-4" strokeWidth={3} /> : step}</span>
         <div className="min-w-0"><h2 className="text-base font-semibold leading-tight">{title}</h2>{hint && <p className="mt-0.5 text-[13px] text-muted">{hint}</p>}</div>
       </header>}
       <div className={cx('px-5 pb-5 sm:px-6 sm:pb-6', bare ? 'pt-5' : 'pt-4')}>{children}</div>
@@ -753,7 +753,7 @@ export default function ProductEditor() {
                 <Input maxLength={24} value={f.badge_text} onChange={(e) => set({ badge_text: e.target.value })} placeholder={L('مثلاً: الأكثر طلبًا', 'e.g. Best seller')} />
                 {f.badge_text.trim() && (
                   <div className="flex flex-wrap items-center gap-2" role="group">
-                    {[['brand', L('لون المحل', 'Store colour'), 'bg-primary text-on-primary'], ['sale', L('أحمر', 'Red'), 'bg-sale text-white'], ['dark', L('أسود', 'Black'), 'bg-neutral-900 text-white'], ['gold', L('ذهبي', 'Gold'), 'bg-amber-400 text-neutral-900'], ['green', L('أخضر', 'Green'), 'bg-emerald-600 text-white']].map(([v, label, cls]) => (
+                    {[['brand', L('لون المحل', 'Store colour'), 'bg-primary text-on-primary'], ['sale', L('أحمر', 'Red'), 'bg-sale text-on-sale'], ['dark', L('أسود', 'Black'), 'bg-neutral-900 text-white'], ['gold', L('ذهبي', 'Gold'), 'bg-amber-400 text-neutral-900'], ['green', L('أخضر', 'Green'), 'bg-emerald-600 text-white']].map(([v, label, cls]) => (
                       <button key={v} type="button" aria-pressed={f.badge_tone === v} onClick={() => set({ badge_tone: v })} className={cx('rounded-full px-3 py-1.5 text-xs font-bold transition active:scale-95', cls, f.badge_tone === v ? 'ring-2 ring-fg ring-offset-2 ring-offset-canvas' : 'opacity-70')}>{label}</button>
                     ))}
                   </div>
@@ -978,7 +978,7 @@ function PublishSuccessSheet({ published, store, onClose, onAddAnother, lang, L,
             href={`https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`}
             target="_blank"
             rel="noreferrer"
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] font-bold text-white shadow-sm transition hover:bg-[#20ba59] active:scale-[0.99]"
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] font-bold text-neutral-900 shadow-sm transition hover:bg-[#20ba59] active:scale-[0.99]"
           >
             <MessageCircle className="h-5 w-5 fill-white text-white" />
             {L('مشاركة فورية على واتساب', 'Share on WhatsApp')}

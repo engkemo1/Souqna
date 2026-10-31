@@ -74,7 +74,7 @@ export function HeroPlayful({ banners = [] }) {
         <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease }} className="order-2 text-center md:order-1 md:text-start">
           <div className="inline-flex items-center gap-3 rounded-full bg-white/80 py-1.5 pe-4 ps-1.5 shadow-sm ring-1 ring-black/5 backdrop-blur">
             <StoreLogo store={store} size={44} className="h-11 w-11" />
-            <span className="text-[13px] font-bold text-fg">{ar ? 'أهلاً بالأبطال الصغيرين' : 'Hello, little heroes'}</span>
+            <span className="text-[13px] font-bold text-neutral-900">{ar ? 'أهلاً بالأبطال الصغيرين' : 'Hello, little heroes'}</span>
             <Sparkles className="h-4 w-4 text-accent" />
           </div>
           <h1 className="kid-title mt-4 text-[40px] leading-[1.05] sm:mt-5 sm:text-6xl lg:text-7xl">
@@ -85,7 +85,7 @@ export function HeroPlayful({ banners = [] }) {
           </h1>
           <p className="mx-auto mt-6 max-w-md text-base font-medium opacity-80 sm:text-lg md:mx-0">{tr(store.tagline) || (ar ? 'لبس مريح وألوان تفرّح، لكل الأعمار' : 'Comfy clothes and happy colours for every age')}</p>
           {sign && (
-            <span className={`mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13.5px] font-bold text-white shadow-md ${open ? 'bg-emerald-500' : 'bg-rose-500'}`}>
+            <span className={`mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13.5px] font-bold text-white shadow-md ${open ? 'bg-emerald-700' : 'bg-rose-700'}`}>
               <span className="relative flex h-2 w-2">{open && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/80" />}<span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
               {sign}
             </span>
@@ -94,8 +94,8 @@ export function HeroPlayful({ banners = [] }) {
             <Link to={sp(store.slug, 'shop')} className={`${pill} kid-pop bg-primary px-7 text-on-primary shadow-[0_6px_0_rgba(0,0,0,0.18)] hover:-translate-y-0.5`}>
               {ar ? 'يلا نتسوّق' : "Let's shop"}<Arrow className="h-4 w-4" />
             </Link>
-            {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className={`${pill} bg-white text-fg shadow-sm ring-1 ring-black/5 hover:-translate-y-0.5`}><MessageCircle className="h-4 w-4 text-emerald-600" />{ar ? 'واتساب' : 'WhatsApp'}</a>}
-            {store.phone && <a href={`tel:${String(store.phone).replace(/\s/g, '')}`} className={`${pill} bg-white text-fg shadow-sm ring-1 ring-black/5 hover:-translate-y-0.5`}><Phone className="h-4 w-4 text-sky-600" />{ar ? 'اتصال' : 'Call'}</a>}
+            {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className={`${pill} bg-white text-neutral-900 shadow-sm ring-1 ring-black/5 hover:-translate-y-0.5`}><MessageCircle className="h-4 w-4 text-emerald-600" />{ar ? 'واتساب' : 'WhatsApp'}</a>}
+            {store.phone && <a href={`tel:${String(store.phone).replace(/\s/g, '')}`} className={`${pill} bg-white text-neutral-900 shadow-sm ring-1 ring-black/5 hover:-translate-y-0.5`}><Phone className="h-4 w-4 text-sky-600" />{ar ? 'اتصال' : 'Call'}</a>}
           </div>
         </motion.div>
 
@@ -108,7 +108,7 @@ export function HeroPlayful({ banners = [] }) {
           <span className="kid-spin absolute -start-3 -top-3 grid h-20 w-20 place-items-center rounded-full text-center text-[12px] font-extrabold leading-tight text-white shadow-lg sm:h-24 sm:w-24 sm:text-[13px]" style={{ background: KID_TINTS[0].ink }}>
             {ar ? <>جديد<br />كل أسبوع</> : <>New<br />every week</>}
           </span>
-          <span className="kid-float absolute -bottom-4 end-2 inline-flex items-center gap-1.5 rounded-2xl bg-white px-3.5 py-2 text-[13px] font-bold shadow-lg" style={{ animationDelay: '0.8s' }}>
+          <span className="kid-float absolute -bottom-4 end-2 inline-flex items-center gap-1.5 rounded-2xl bg-white px-3.5 py-2 text-[13px] font-bold text-neutral-900 shadow-lg" style={{ animationDelay: '0.8s' }}>
             <Heart className="h-4 w-4" style={{ color: KID_TINTS[5].ink, fill: KID_TINTS[5].ink }} />{ar ? 'مقاسات لكل الأعمار' : 'Sizes for every age'}
           </span>
           <span className="kid-float absolute -end-3 top-10 grid h-12 w-12 place-items-center rounded-2xl bg-white shadow-lg" style={{ animationDelay: '1.6s' }}>

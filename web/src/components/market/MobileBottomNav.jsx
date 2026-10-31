@@ -32,7 +32,7 @@ export default function MobileBottomNav() {
           <li key={to} className="flex justify-center">
             <Link to={to} aria-current={on ? 'page' : undefined} className="group flex w-full flex-col items-center gap-1 pb-2 text-[11px] font-semibold">
               {main ? (
-                <span className="-mt-6 grid h-14 w-14 place-items-center rounded-full bg-btn text-white shadow-[0_10px_24px_-6px_rgba(3,36,77,.55)] ring-4 ring-white transition active:scale-95"><Icon className="h-6 w-6" strokeWidth={2} /></span>
+                <span className="-mt-6 grid h-14 w-14 place-items-center rounded-full bg-btn text-on-btn shadow-[0_10px_24px_-6px_rgba(3,36,77,.55)] ring-4 ring-white transition active:scale-95"><Icon className="h-6 w-6" strokeWidth={2} /></span>
               ) : (
                 <span className={cx('grid h-8 w-12 place-items-center rounded-full transition', on ? 'bg-[#EAF0F8] text-brand' : 'text-[#5b6679] group-active:bg-fg/5')}><Icon className="h-[22px] w-[22px]" strokeWidth={on ? 2.25 : 1.75} /></span>
               )}

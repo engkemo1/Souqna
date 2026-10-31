@@ -747,7 +747,7 @@ export default function Pos() {
         <h1 className="min-w-0 flex-1 truncate text-base font-bold sm:text-lg">كاشير · {store?.name}</h1>
         {/* on a phone the buttons get their own row that scrolls sideways, so the name stays readable and nothing leaves the screen */}
         <div className="flex items-center gap-2 max-md:order-last max-md:-mx-3 max-md:w-[calc(100%+1.5rem)] max-md:overflow-x-auto max-md:px-3 max-md:pb-1 [&>*]:shrink-0">
-        <button type="button" onClick={() => setModal('quick-product')} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-semibold text-white hover:opacity-90"><PackagePlus className="h-4 w-4" /><span className="hidden sm:inline">صنف جديد</span></button>
+        <button type="button" onClick={() => setModal('quick-product')} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-primary px-3 text-sm font-semibold text-on-primary hover:opacity-90"><PackagePlus className="h-4 w-4" /><span className="hidden sm:inline">صنف جديد</span></button>
         <button type="button" onClick={() => setModal('phone-scanner')} className={cx('inline-flex h-10 items-center gap-1.5 rounded-xl border px-3 text-sm font-medium hover:bg-fg/[0.05]', phoneLive ? 'border-success text-success' : 'border-line')} aria-label="الموبايل كقارئ باركود"><Smartphone className="h-4 w-4" /><span className="hidden sm:inline">{phoneLive ? 'الموبايل متوصل' : 'موبايل كقارئ'}</span></button>
         <button type="button" onClick={() => setModal('camera-scan')} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05]" aria-label="مسح باركود بالكاميرا"><Camera className="h-4 w-4" /><span className="hidden sm:inline">مسح بالكاميرا</span></button>
         <button type="button" onClick={() => setModal('receive-stock')} disabled={!online} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-line px-3 text-sm font-medium hover:bg-fg/[0.05] disabled:opacity-50"><Plus className="h-4 w-4" /><span className="hidden sm:inline">استلام بضاعة</span></button>
@@ -762,7 +762,7 @@ export default function Pos() {
         </div>
       </header>
 
-      {!pos.safeStorage && <div className="bg-sale px-4 py-2 text-center text-sm font-semibold text-white">المتصفح مش سامح بتخزين على الجهاز — متشتغلش أوفلاين، الفواتير ممكن تضيع لو النت قطع.</div>}
+      {!pos.safeStorage && <div className="bg-sale px-4 py-2 text-center text-sm font-semibold text-on-sale">المتصفح مش سامح بتخزين على الجهاز — متشتغلش أوفلاين، الفواتير ممكن تضيع لو النت قطع.</div>}
       {pos.authExpired && <div className="bg-amber-100 px-4 py-2 text-center text-sm text-amber-900">الجلسة انتهت — الفواتير بتتحفظ على الجهاز. <Link to="/login?next=%2Fpos" className="font-bold underline">سجّل دخول</Link> عشان تتبعت.</div>}
 
       <div className="grid min-h-0 flex-1 md:grid-cols-[1fr_380px]">

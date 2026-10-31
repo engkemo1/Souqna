@@ -73,7 +73,7 @@ function MiniStore({ variant }) {
           <div key={i}>
             <div className="relative aspect-[4/5] rounded-md bg-surface">
               {i === 1 && <span className="absolute start-1 top-1 rounded-full bg-accent px-1 text-[7px] font-bold text-on-accent">NEW</span>}
-              {i === 0 && <span className="absolute start-1 top-1 rounded-full bg-sale px-1 text-[7px] font-bold text-white">-20%</span>}
+              {i === 0 && <span className="absolute start-1 top-1 rounded-full bg-sale px-1 text-[7px] font-bold text-on-sale">-20%</span>}
             </div>
             <span className="mt-1 block h-1 w-8 rounded-full bg-fg/60" />
             <span className={cx('mt-0.5 block h-1 w-5 rounded-full', i === 0 ? 'bg-sale' : 'bg-fg/35')} />

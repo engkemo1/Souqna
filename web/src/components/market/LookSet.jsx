@@ -13,7 +13,7 @@ import { cx } from '../ui/cx.js';
 function StoreCartLink({ slug, name, tr, t }) {
   const c = useCart(slug);
   if (!c.count) return null;
-  return <Link to={sp(slug, 'cart')} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-3.5 py-2 text-[13px] font-bold text-white"><ShoppingBag className="h-4 w-4" />{t('stylist.cartOf', { s: tr(name), n: c.count })}</Link>;
+  return <Link to={sp(slug, 'cart')} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-3.5 py-2 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t('stylist.cartOf', { s: tr(name), n: c.count })}</Link>;
 }
 
 function LookRow({ look, lang, tr, t, added, onAdd }) {
@@ -28,7 +28,7 @@ function LookRow({ look, lang, tr, t, added, onAdd }) {
           <Link key={p.id} to={'/s/' + p.store.slug + '/p/' + p.slug} className={cx('group min-w-0 rounded-2xl border bg-elevated p-2 text-start transition hover:-translate-y-0.5 hover:border-fg hover:shadow-sm', i === look.pick ? 'border-brand ring-1 ring-brand/40' : 'border-line')}>
             <div className="relative">
               <SmartImage media={p.image} ratio="4 / 5" className="overflow-hidden rounded-xl" sizes="(min-width:1280px) 220px, (min-width:640px) 30vw, 44vw" />
-              {i === look.pick && <span className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full bg-btn px-2 py-1 text-[10px] font-bold text-white"><Check className="h-3 w-3" />{t('lod.picked')}</span>}
+              {i === look.pick && <span className="absolute end-2 top-2 inline-flex items-center gap-1 rounded-full bg-btn px-2 py-1 text-[10px] font-bold text-on-btn"><Check className="h-3 w-3" />{t('lod.picked')}</span>}
             </div>
             <p className="mt-2 line-clamp-2 min-h-[2.6em] text-[12px] font-semibold leading-snug sm:text-[13px]">{tr(p.name)}</p>
             <p className="mt-1 text-sm font-bold text-sale">{formatMoney(p.price, lang)}</p>
@@ -123,7 +123,7 @@ function Showcase({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, 
             <p className="text-[12px] font-semibold text-muted">{picks.length === 1 ? (ar ? 'سعر القطعة' : 'Item price') : (ar ? 'إجمالي اللوك' : 'Look total')}</p>
             <p className="text-2xl font-black text-brand">{formatMoney(total, lang)}</p>
           </div>
-          <button type="button" onClick={onAddAll} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-btn text-[15px] font-extrabold text-white shadow-[0_10px_24px_-10px_rgba(3,36,77,.6)] transition hover:brightness-95 active:scale-[.99]"><ShoppingBag className="h-5 w-5" />{picks.length === 1 ? t('stylist.addPick') : (ar ? 'أضف اللوك كامل للسلة' : 'Add the full look to cart')}</button>
+          <button type="button" onClick={onAddAll} className="mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-btn text-[15px] font-extrabold text-on-btn shadow-[0_10px_24px_-10px_rgba(3,36,77,.6)] transition hover:brightness-95 active:scale-[.99]"><ShoppingBag className="h-5 w-5" />{picks.length === 1 ? t('stylist.addPick') : (ar ? 'أضف اللوك كامل للسلة' : 'Add the full look to cart')}</button>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <button type="button" onClick={onShare} className="inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2 text-[12.5px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{picks.length === 1 ? t('stylist.shareItem') : t('stylist.share')}</button>
             {storeLinks}
@@ -172,7 +172,7 @@ function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare
         ))}
       </ul>
       <div className="mt-3 flex flex-wrap items-stretch gap-2">
-        <button type="button" onClick={onAddAll} className="flex h-14 w-full min-w-0 items-center justify-between sm:w-auto sm:flex-1 gap-3 rounded-2xl bg-btn px-4 text-white shadow-[0_12px_26px_-12px_rgba(3,36,77,.65)] transition hover:brightness-95 active:scale-[.99] sm:px-5">
+        <button type="button" onClick={onAddAll} className="flex h-14 w-full min-w-0 items-center justify-between sm:w-auto sm:flex-1 gap-3 rounded-2xl bg-btn px-4 text-on-btn shadow-[0_12px_26px_-12px_rgba(3,36,77,.65)] transition hover:brightness-95 active:scale-[.99] sm:px-5">
           <span className="flex items-center gap-2 text-[14px] font-extrabold sm:text-[15px]"><ShoppingBag className="h-5 w-5" />{picks.length === 1 ? t('stylist.addPick') : (ar ? 'أضف الإطلالة كاملة للسلة' : 'Add the full look to basket')}</span>
           <span className="shrink-0 border-s border-white/40 ps-3 text-[15px] font-black">{formatMoney(total, lang)}</span>
         </button>
@@ -199,7 +199,7 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
   const shownLooks = tabs ? (tabs[Math.min(tab, tabs.length - 1)].items.filter((i) => i.card).map((i) => ({ label: i.label, items: [i.card], pick: 0 }))) : m.looks;
   const orderItems = (m.missingItems || []);
   const missing = orderItems.length > 0 ? (
-    <div className="mt-3 space-y-1.5">{orderItems.slice(0, 4).map((x, i) => <Link key={`${x.key}-${i}`} to={`/request?title=${encodeURIComponent(`${x.label}${x.material ? ' ' + x.material : ''}`)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-line bg-[#F1F4F9] px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" /><span className="flex-1">{x.label}{x.tab && tabs ? ` (${x.tab})` : ''} — {x.hint}</span><span className="rounded-full bg-btn px-3 py-1 text-[12px] text-white">{x.button}</span></Link>)}</div>
+    <div className="mt-3 space-y-1.5">{orderItems.slice(0, 4).map((x, i) => <Link key={`${x.key}-${i}`} to={`/request?title=${encodeURIComponent(`${x.label}${x.material ? ' ' + x.material : ''}`)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-line bg-[#F1F4F9] px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" /><span className="flex-1">{x.label}{x.tab && tabs ? ` (${x.tab})` : ''} — {x.hint}</span><span className="rounded-full bg-btn px-3 py-1 text-[12px] text-on-btn">{x.button}</span></Link>)}</div>
   ) : miss.length > 0 && (
     <div className="mt-3 space-y-1.5">{miss.map((x) => <Link key={x} to={`/request?title=${encodeURIComponent(x)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-line bg-[#F1F4F9] px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" />{t('req.moda', { x })}</Link>)}</div>
   );
@@ -251,7 +251,7 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
           <p className="mt-0.5 text-base font-extrabold sm:text-lg">{totalLabel}{m.overBudget && <span className="ms-2 text-xs font-normal text-sale">{t('stylist.over', { b: formatMoney(m.budget, lang) })}</span>}</p>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
-          <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-white"><ShoppingBag className="h-4 w-4" />{t(picks.length === 1 ? 'stylist.addPick' : m.state === 'partial' ? 'stylist.addAvailable' : 'stylist.addAll')}</button>
+          <button type="button" onClick={() => startAdd(picks)} className="inline-flex items-center justify-center gap-1.5 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t(picks.length === 1 ? 'stylist.addPick' : m.state === 'partial' ? 'stylist.addAvailable' : 'stylist.addAll')}</button>
           {[...new Map(picks.map((p) => [p.store.slug, p.store.name])).entries()].map(([sl, nm]) => <StoreCartLink key={sl} slug={sl} name={nm} tr={tr} t={t} />)}
           <button type="button" onClick={shareLink} className="inline-flex items-center justify-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3.5 py-2.5 text-[13px] font-semibold transition hover:border-fg"><Share2 className="h-4 w-4" />{picks.length === 1 ? t('stylist.shareItem') : t('stylist.share')}</button>
         </div>
@@ -262,7 +262,7 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
       {stickyCTA && <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-canvas/95 px-3 pt-3 shadow-[0_-8px_30px_rgba(0,0,0,.08)] backdrop-blur-md sm:px-6" style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 0.75rem)' }}>
         <div className="mx-auto flex max-w-7xl items-center gap-3">
           <div className="min-w-0 flex-1"><p className="text-[10px] font-semibold text-muted sm:text-xs">{ar ? 'إجمالي اللوك كامل' : 'Full look total'}</p><p className="truncate text-base font-extrabold text-brand sm:text-lg">{money(m.total)}</p></div>
-          <button type="button" onClick={() => startAdd(picks)} className="inline-flex min-h-12 flex-[1.6] items-center justify-center gap-2 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-white sm:flex-none sm:px-8 sm:text-base"><ShoppingBag className="h-4 w-4" />{ar ? 'اشتري اللوك كامل' : 'Buy the full look'}</button>
+          <button type="button" onClick={() => startAdd(picks)} className="inline-flex min-h-12 flex-[1.6] items-center justify-center gap-2 rounded-full bg-btn px-4 py-2.5 text-[13px] font-bold text-on-btn sm:flex-none sm:px-8 sm:text-base"><ShoppingBag className="h-4 w-4" />{ar ? 'اشتري اللوك كامل' : 'Buy the full look'}</button>
         </div>
       </div>}
       {quick && <QuickAddSheet slug={quick.queue[quick.i].store.slug} product={quick.queue[quick.i]} marketplace={marketplace} step={quick.queue.length > 1 ? `${quick.i + 1}/${quick.queue.length}` : ''} onAdded={nextAdd} onClose={() => setQuick(null)} />}

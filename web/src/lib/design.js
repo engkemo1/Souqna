@@ -16,11 +16,11 @@ export const GRID_CLASS = {
 
 /** Pastel card/bubble colours for the kids template ("bg" behind photos, "ink" for stickers and accents). */
 export const KID_TINTS = [
-  { bg: '#FFE4D6', ink: '#FF6B3D' }, // peach
-  { bg: '#DDF0FF', ink: '#2F8EEA' }, // sky
-  { bg: '#E2F7DF', ink: '#2FAE5B' }, // mint
-  { bg: '#FFF3C4', ink: '#F2A500' }, // sun
-  { bg: '#EFE5FF', ink: '#8B5CF6' }, // lilac
-  { bg: '#FFE1EC', ink: '#EC4F86' }, // bubblegum
+  { bg: '#FFE4D6', ink: '#AD4829' }, // peach
+  { bg: '#DDF0FF', ink: '#236BB1' }, // sky
+  { bg: '#E2F7DF', ink: '#20793F' }, // mint
+  { bg: '#FFF3C4', ink: '#916200' }, // sun
+  { bg: '#EFE5FF', ink: '#744DCE' }, // lilac
+  { bg: '#FFE1EC', ink: '#AE3A63' }, // bubblegum
 ];
 export const kidTint = (i = 0) => KID_TINTS[((i % KID_TINTS.length) + KID_TINTS.length) % KID_TINTS.length];

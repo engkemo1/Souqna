@@ -349,7 +349,7 @@ export default function Products() {
                         {weakQ(p) && <p className="mt-1"><WeakTag p={p} t={t} /></p>}
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">{p.status !== 'active' && <StatusPill status={p.status} t={t} />}<StockPill p={p} t={t} lang={lang} /></div>
                       </Link>
-                      <button type="button" onClick={() => setSellP(p)} aria-label={t('products.sell')} className="grid h-11 shrink-0 place-items-center gap-0.5 rounded-xl bg-btn px-3 text-[11px] font-semibold text-white transition active:scale-90"><ShoppingBag className="h-4 w-4" />{t('products.sell')}</button>
+                      <button type="button" onClick={() => setSellP(p)} aria-label={t('products.sell')} className="grid h-11 shrink-0 place-items-center gap-0.5 rounded-xl bg-btn px-3 text-[11px] font-semibold text-on-btn transition active:scale-90"><ShoppingBag className="h-4 w-4" />{t('products.sell')}</button>
                       <button type="button" onClick={() => setQuick(p)} aria-label={t('products.quickEdit')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><Zap className="h-5 w-5" /></button>
                       <button type="button" onClick={() => setQrP(p)} aria-label={t('qr.productTitle')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><QrCode className="h-5 w-5" /></button>
                     </div>

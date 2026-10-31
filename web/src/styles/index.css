@@ -20,13 +20,13 @@
   --c-border: 226 232 240;
   --c-border-strong: 198 208 222;
   --c-primary: 248 98 10;
-  --c-on-primary: 255 255 255;
-  --c-primary-ink: 196 67 0;
+  --c-on-primary: 3 36 77;
+  --c-primary-ink: 176 58 0;
   --c-display: 3 36 77;
   --c-secondary: 236 239 244;
   --c-on-secondary: 3 36 77;
   --c-accent: 248 98 10;
-  --c-on-accent: 255 255 255;
+  --c-on-accent: 3 36 77;
   --c-button: 3 36 77;
   --c-on-button: 255 255 255;
   --c-button-outline: transparent;
@@ -36,7 +36,9 @@
   --c-on-footer: 255 255 255;
   --c-footer-muted: 194 202 214;
   --c-sale: 198 40 40;
-  --c-success: 21 128 61;
+  --c-on-sale: 255 255 255;
+  --c-success: 21 115 55;
+  --c-on-success: 255 255 255;
   --c-ring: 248 98 10;
 
   --header-h: 64px;
@@ -73,7 +75,8 @@
   h2,
   h3,
   h4 {
-    @apply text-fg font-bold leading-snug;
+    @apply font-bold leading-snug;
+    color: inherit; /* a heading takes the colour of the surface it sits on (dark footer cards, coloured banners), never a fixed one */
     text-wrap: balance;
   }
 

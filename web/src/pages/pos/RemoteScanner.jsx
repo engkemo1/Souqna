@@ -102,7 +102,7 @@ export default function RemoteScanner() {
           <ul className="divide-y divide-line rounded-2xl border border-line bg-elevated">
             {log.map((x) => (
               <li key={x.at} className="flex items-start gap-2.5 p-3 text-sm">
-                <span className={'mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full ' + (x.state === 'ok' ? 'bg-success text-white' : x.state === 'bad' ? 'bg-sale text-white' : 'bg-fg/10')}>
+                <span className={'mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full ' + (x.state === 'ok' ? 'bg-success text-on-success' : x.state === 'bad' ? 'bg-sale text-on-sale' : 'bg-fg/10')}>
                   {x.state === 'ok' ? <Check className="h-4 w-4" /> : x.state === 'bad' ? <X className="h-4 w-4" /> : <span className="h-2 w-2 animate-pulse rounded-full bg-fg/40" />}
                 </span>
                 <div className="min-w-0"><p className="font-mono text-xs text-muted" dir="ltr">{x.code}</p><p className="font-medium">{x.text || 'بيتبعت…'}</p></div>

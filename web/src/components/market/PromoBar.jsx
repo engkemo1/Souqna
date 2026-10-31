@@ -12,7 +12,7 @@ export default function PromoBar() {
   const what = p.type === 'percentage' ? t('promo.percent', { v: p.value }) : p.type === 'fixed' ? t('promo.fixed', { v: formatMoney(p.value, lang) }) : t('promo.freeShip');
   const copy = () => { try { navigator.clipboard?.writeText(p.code); } catch { /* ignore */ } };
   return (
-    <div className="bg-btn text-white">
+    <div className="bg-btn text-on-btn">
       <div className="container flex flex-wrap items-center justify-center gap-x-3 gap-y-1 py-2 text-center text-[13px] font-semibold sm:text-sm">
         <Ticket className="h-4 w-4" />
         <span>{tr(p.title)} — {what}{p.firstOrderOnly ? ` (${t('promo.firstOrder')})` : ''}{p.minSubtotal ? ` · ${t('promo.min', { v: formatMoney(p.minSubtotal, lang) })}` : ''}</span>

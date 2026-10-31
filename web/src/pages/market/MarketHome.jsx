@@ -125,11 +125,11 @@ export default function MarketHome() {
             <p className="mt-3 max-w-xl text-sm leading-7 text-[#43516a] sm:mt-4 sm:text-base sm:leading-8 lg:text-[18px]">{t('market.heroBody')}</p>
 
             <div className="mt-5 grid grid-cols-2 gap-2.5 sm:hidden">
-              <Link to="/visual" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-btn px-3 py-3 text-sm font-bold text-white shadow-sm"><Camera className="h-5 w-5" />{t('market.searchByPhoto')}</Link>
+              <Link to="/visual" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-btn px-3 py-3 text-sm font-bold text-on-btn shadow-sm"><Camera className="h-5 w-5" />{t('market.searchByPhoto')}</Link>
               <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: {} }))} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border-[1.5px] border-[#F8620A] bg-white px-3 py-3 text-sm font-bold text-[#03244D]"><ModaAvatar src={base?.features?.stylistAvatar || null} size={28} ring={false} />{t('market.askStylist')}</button>
             </div>
             <div className="mt-5 flex gap-2.5">
-              <Link to="/stores" className="flex flex-1 items-center justify-center rounded-2xl bg-btn px-3 py-3.5 text-sm shadow-[0_10px_24px_-8px_rgba(3,36,77,.55)] font-bold text-white transition hover:brightness-95 sm:flex-none sm:px-7">{t('market.exploreStores')}</Link>
+              <Link to="/stores" className="flex flex-1 items-center justify-center rounded-2xl bg-btn px-3 py-3.5 text-sm shadow-[0_10px_24px_-8px_rgba(3,36,77,.55)] font-bold text-on-btn transition hover:brightness-95 sm:flex-none sm:px-7">{t('market.exploreStores')}</Link>
               <Link to="/join" className="flex flex-1 items-center justify-center rounded-2xl border-[1.5px] border-[#F8620A] bg-white px-3 py-3.5 text-sm font-bold text-[#03244D] transition hover:bg-[#FFF3EB] sm:flex-none sm:px-7">{t('market.openStore')}</Link>
             </div>
 
@@ -147,7 +147,7 @@ export default function MarketHome() {
               <span className="flex min-w-0 items-center gap-3">
                 <span className="flex -space-x-2 rtl:space-x-reverse">
                   {(base?.stores || []).filter((store) => store.cover).slice(0, 3).map((store) => <SmartImage key={store.id} media={store.cover} alt={tr(store.name)} ratio="1 / 1" sizes="36px" className="h-9 w-9 rounded-full border-2 border-white" />)}
-                  <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-btn text-white"><Store className="h-4 w-4" /></span>
+                  <span className="grid h-9 w-9 place-items-center rounded-full border-2 border-white bg-btn text-on-btn"><Store className="h-4 w-4" /></span>
                 </span>
                 <span className="min-w-0"><b className="block truncate text-xs text-[#03244D]">{t('market.allStores')}</b><span className="mt-0.5 block text-[10px] text-muted">{lang === 'ar' ? 'محلات الملابس في بنها كلها في مكان واحد' : 'Banha clothing stores, all in one place'}</span></span>
               </span>
@@ -166,7 +166,7 @@ export default function MarketHome() {
               <form onSubmit={handleHeroSearchSubmit} className="relative mt-3">
                 <input type="search" value={heroSearch} onChange={(e) => setHeroSearch(e.target.value)} placeholder={t('search.placeholder')} aria-label={t('search.placeholder')} className="h-14 w-full rounded-2xl border border-line bg-white ps-12 pe-24 text-sm shadow-xs outline-none transition placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/10 sm:text-base" />
                 <Search className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-muted" />
-                <button type="submit" className="absolute end-2 top-1/2 h-10 -translate-y-1/2 rounded-xl bg-btn px-5 text-sm font-bold text-white transition hover:brightness-95">{t('search.go')}</button>
+                <button type="submit" className="absolute end-2 top-1/2 h-10 -translate-y-1/2 rounded-xl bg-btn px-5 text-sm font-bold text-on-btn transition hover:brightness-95">{t('search.go')}</button>
               </form>
             ) : (
               <Link to="/visual" className="group mt-3 min-h-[148px] flex-col items-center justify-center flex rounded-2xl border border-dashed border-line-strong bg-white/80 px-4 py-5 text-center shadow-[0_8px_24px_rgba(3,36,77,.04)] transition hover:border-fg/30 hover:bg-[#F6F8FB]">
@@ -233,7 +233,7 @@ export default function MarketHome() {
               <h2 className="mt-3 font-display text-2xl font-black text-[#03244D] sm:text-3xl">{t('market.allStores')}</h2>
               <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted sm:text-base">{lang === 'ar' ? 'تصفّح المحلات، ادخل صفحة كل محل، وشوف المنتجات والعروض في مكان واحد.' : 'Browse local shops, open each store page, and see the products and offers in one place.'}</p>
             </div>
-            <Link to="/stores" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-btn px-5 text-sm font-bold text-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">{lang === 'ar' ? 'اكتشف كل المحلات' : 'Discover all stores'}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></Link>
+            <Link to="/stores" className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl bg-btn px-5 text-sm font-bold text-on-btn shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">{lang === 'ar' ? 'اكتشف كل المحلات' : 'Discover all stores'}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></Link>
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {(base?.stores || []).slice(0, 3).map((store, i) => <StoreCard key={store.id} store={store} index={i} />)}

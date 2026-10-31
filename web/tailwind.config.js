@@ -33,7 +33,9 @@ export default {
         'on-footer': v('on-footer'),
         'footer-muted': v('footer-muted'),
         sale: v('sale'),
+        'on-sale': v('on-sale'),
         success: v('success'),
+        'on-success': v('on-success'),
         ring: v('ring'),
       },
       fontFamily: {

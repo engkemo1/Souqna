@@ -37,7 +37,7 @@ function GoldButton({ href, icon: Icon, children, primary }) {
     <motion.a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
       whileHover={{ y: -2, scale: 1.02 }} whileTap={{ scale: 0.97 }}
       className={primary
-        ? 'relative inline-flex items-center gap-2.5 overflow-hidden rounded-full bg-btn px-7 py-4 text-[17px] font-bold text-white shadow-[0_10px_30px_-10px_rgba(3,36,77,.38)]'
+        ? 'relative inline-flex items-center gap-2.5 overflow-hidden rounded-full bg-btn px-7 py-4 text-[17px] font-bold text-on-btn shadow-[0_10px_30px_-10px_rgba(3,36,77,.38)]'
         : 'inline-flex items-center gap-2.5 rounded-full border border-line-strong bg-white px-7 py-4 text-[17px] font-semibold text-brand transition hover:bg-[#EAF0F8]'}>
       {primary && <motion.span aria-hidden className="absolute inset-y-0 -left-1/3 w-1/3 skew-x-[-20deg] bg-white/40" animate={{ x: ['0%', '450%'] }} transition={{ duration: 2.4, repeat: Infinity, repeatDelay: 1.6, ease: 'easeInOut' }} />}
       <Icon className="relative h-5 w-5" /><span className="relative">{children}</span>
@@ -68,7 +68,7 @@ function ModaPitch() {
           </ul>
           <p className="mt-5 text-sm text-muted">كل ما منتجاتك أوصافها وألوانها أوضح، كل ما تويلا تعرضها أكتر. وإحنا بنساعدك في ده.</p>
           <div className="mt-6 flex flex-wrap gap-3">
-            <Link to="/" className="inline-flex items-center gap-2 rounded-full bg-btn px-6 py-3 text-base font-bold text-white hover:brightness-110"><Sparkles className="h-5 w-5" />جرّب تويلا بنفسك</Link>
+            <Link to="/" className="inline-flex items-center gap-2 rounded-full bg-btn px-6 py-3 text-base font-bold text-on-btn hover:brightness-110"><Sparkles className="h-5 w-5" />جرّب تويلا بنفسك</Link>
           </div>
         </div>
       </motion.div>
@@ -203,7 +203,7 @@ export default function Join() {
 
       {/* sticky mobile bar */}
       <div className="fixed inset-x-0 bottom-0 z-20 flex gap-2 border-t border-line bg-white/95 p-3 shadow-[0_-8px_24px_rgba(3,36,77,.08)] backdrop-blur sm:hidden">
-        <a href={wa} target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-2 rounded-full bg-btn py-3 font-bold text-white"><MessageCircle className="h-5 w-5" />واتساب</a>
+        <a href={wa} target="_blank" rel="noreferrer" className="flex flex-1 items-center justify-center gap-2 rounded-full bg-btn py-3 font-bold text-on-btn"><MessageCircle className="h-5 w-5" />واتساب</a>
         <a href={tel} className="flex flex-1 items-center justify-center gap-2 rounded-full border-[1.5px] border-[#F8620A] bg-white py-3 font-semibold text-brand"><Phone className="h-5 w-5" />اتصال</a>
       </div>
       <div className="h-20 sm:hidden" />
