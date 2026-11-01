@@ -12,6 +12,7 @@ import NotFound from './pages/NotFound.jsx';
 const MarketHome = lazy(() => import('./pages/market/MarketHome.jsx'));
 const StoresDirectory = lazy(() => import('./pages/market/StoresDirectory.jsx'));
 const MarketSearch = lazy(() => import('./pages/market/MarketSearch.jsx'));
+const CategoryPage = lazy(() => import('./pages/market/CategoryPage.jsx'));
 const MarketCart = lazy(() => import('./pages/market/MarketCart.jsx'));
 const MarketFavorites = lazy(() => import('./pages/market/MarketFavorites.jsx'));
 const MarketCheckout = lazy(() => import('./pages/market/MarketCheckout.jsx'));
@@ -67,6 +68,7 @@ const AdminApp = lazy(() => import('./pages/admin/AdminApp.jsx'));
 const AdminOverview = lazy(() => import('./pages/admin/Overview.jsx'));
 const AdminStores = lazy(() => import('./pages/admin/Stores.jsx'));
 const AdminDepartments = lazy(() => import('./pages/admin/Departments.jsx'));
+const AdminImageLibrary = lazy(() => import('./pages/admin/ImageLibrary.jsx'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
 const AdminDeliveries = lazy(() => import('./pages/admin/Deliveries.jsx'));
 const AdminDeliveryPeople = lazy(() => import('./pages/admin/DeliveryPeople.jsx'));
@@ -101,6 +103,7 @@ const router = createBrowserRouter([
       { path: '/', element: <MarketHome /> },
       { path: '/stores', element: <StoresDirectory /> },
       { path: '/search', element: <MarketSearch /> },
+      { path: '/c/:slug', element: <CategoryPage /> },
       { path: '/market-cart', element: <MarketCart /> },
       { path: '/market-checkout', element: <MarketCheckout /> },
       { path: '/market-order-success', element: <MarketOrderSuccess /> },
@@ -172,6 +175,7 @@ const router = createBrowserRouter([
           { index: true, element: <AdminOverview /> },
           { path: 'stores', element: <AdminStores /> },
           { path: 'departments', element: <AdminDepartments /> },
+          { path: 'image-library', element: <AdminImageLibrary /> },
           { path: 'orders', element: <AdminOrders /> },
           { path: 'deliveries', element: <AdminDeliveries /> },
           { path: 'delivery-people', element: <AdminDeliveryPeople /> },

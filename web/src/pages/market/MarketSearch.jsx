@@ -28,7 +28,7 @@ export default function MarketSearch() {
   const q = params.get('q') || '';
   const department = params.get('department') || '';
   const sort = params.get('sort') || 'relevance';
-  const { list, label, pathLabel, bySlug, childrenOf } = useDepartments();
+  const { list, label, pathLabel, bySlug, childrenOf } = useDepartments({ all: true });
   const prof = PROFILES[bySlug.get(department)?.profile];
   const density = prof?.grid;
   const cardRatio = (prof?.ratio || '4/5').replace('/', ' / '); // each kind of department gets its own grid rhythm (hijabs dense, fashion airy)

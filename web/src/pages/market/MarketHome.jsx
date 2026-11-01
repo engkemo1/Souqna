@@ -205,7 +205,7 @@ export default function MarketHome() {
       <div className="container mt-6 sm:mt-8"><Why /></div>
 
       {/* shop by department: right under the trust strip (secure payment · easy exchange · local products) */}
-      <div className="mt-8 sm:mt-10"><DeptStrip departments={base?.departments || []} /></div>
+      <div className="mt-8 sm:mt-10"><DeptStrip /></div>
       <StoreStrip stores={base?.stores || []} />
       <LookOfDay />
 

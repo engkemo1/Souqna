@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import { listDepartments, deptSubtree, deptAncestors, deptAttrDefs, deptProfile } from '../lib/departments.js';
+import { listDepartments, customerDepartments, deptSubtree, deptAncestors, deptAttrDefs, deptProfile } from '../lib/departments.js';
 import { z } from 'zod';
 import { q, tx, insert, json } from '../db/index.js';
 import { randomBytes } from 'node:crypto';
@@ -53,7 +53,21 @@ function loadStore(slug) {
 
 /* ---------------------------------------------------------- marketplace */
 
-r.get('/departments', h((_req, res) => res.json({ departments: listDepartments().filter((d) => d.visibility !== 'hidden').map(({ slug, name, sizes, image, parent, profile_effective: profile, attrs_effective: attrs, description, icon }) => ({ slug, name, sizes, image, parent, profile, attrs, description, icon })) })));
+/** Customer-facing tree: hidden sections and sections with nothing in them (no products, no shops) stay out unless the admin set "show when empty". */
+const publicDept = ({ slug, name, sizes, image, images, parent, level, profile_effective: profile, attrs_effective: attrs, description, icon, product_count, stores_count, seo }) => ({ slug, name, sizes, image, images, parent, level, profile, attrs, description, icon, product_count, stores_count, seo });
+// ?all=1: every non-hidden section (store setup, product forms and labels need sections that have no products yet)
+r.get('/departments', h((req, res) => { cache(res, 60); res.json({ departments: (req.query.all ? listDepartments().filter((d) => d.visibility !== 'hidden') : customerDepartments()).map(publicDept) }); }));
+/** One section's landing data: breadcrumb, own details, visible children (with images), SEO. Reads stored rows only — never generates anything. */
+r.get('/departments/:slug', h((req, res) => {
+  const all = listDepartments(); const by = new Map(all.map((d) => [d.slug, d]));
+  const d = by.get(String(req.params.slug));
+  if (!d || d.visibility === 'hidden') throw new AppError(404, 'not_found', 'Section not found.');
+  const visible = new Set(customerDepartments().map((x) => x.slug));
+  if (!visible.has(d.slug)) throw new AppError(404, 'not_found', 'Section not found.');
+  const crumbs = []; for (let c = d, i = 0; c && i < 10; c = by.get(c.parent), i++) crumbs.unshift({ slug: c.slug, name: c.name });
+  cache(res, 60);
+  res.json({ department: publicDept(d), breadcrumb: crumbs, children: all.filter((x) => x.parent === d.slug && visible.has(x.slug)).map(publicDept) });
+}));
 
 r.get('/homepage-ads', h((_req, res) => {
   const today = cairoNow().date;
@@ -839,13 +853,18 @@ r.get('/marketplace/delivery-areas', h((_req, res) => {
   });
 }));
 
+/** Customer instructions: plain text only, max 500 characters. Markup is stripped (and the UI escapes on display anyway). */
+export const cleanComment = (v) => String(v ?? '').replace(/<[^>]*>/g, '').replace(/[<>]/g, '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200E\u200F\u202A-\u202E]/g, '').replace(/\r\n?/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+const commentField = z.string().max(500, 'comment_too_long').optional().default('').transform(cleanComment);
+
 const orderSchema = z.object({
   name: z.string().trim().min(2, 'name_required').max(80),
   phone: z.string().trim().regex(/^01[0125][0-9]{8}$/, 'phone_invalid'),
   governorate: z.string().trim().min(2, 'governorate_required').max(40),
   city: z.string().trim().min(2, 'city_required').max(60),
   address: z.string().trim().min(6, 'address_required').max(240),
-  notes: z.string().trim().max(400).optional().default(''),
+  notes: commentField,                 // general order instructions
+  storeNote: commentField,             // instructions for this store
   coupon: z.string().trim().max(40).optional().nullable(),
   items: cartItems,
   gifts: giftChoices,
@@ -873,7 +892,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
     const trackToken = crypto.randomBytes(12).toString('base64url');
     const orderId = insert('orders', {
       store_id: s.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
-      governorate: body.governorate, city: body.city, address: body.address, notes: body.notes,
+      governorate: body.governorate, city: body.city, address: body.address, notes: body.notes, store_note: body.storeNote || null,
       status: 'pending', delivery_by: 'platform', subtotal: qt.subtotal, discount: qt.discount, promo_discount: qt.promoDiscount || 0, shipping: qt.shipping, total: qt.total,
       shipping_free: qt.shipping === 0 ? 1 : 0,
       coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
@@ -964,8 +983,8 @@ r.post('/stores/:slug/reserve', h((req, res) => {
   });
 }));
 
-const marketplaceOrderSchema = orderSchema.omit({ coupon: true, items: true, gifts: true }).extend({
-  stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems, coupon: z.string().trim().max(40).optional().nullable(), gifts: giftChoices })).min(1).max(20),
+const marketplaceOrderSchema = orderSchema.omit({ coupon: true, items: true, gifts: true, storeNote: true }).extend({
+  stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), storeNote: commentField, items: cartItems, coupon: z.string().trim().max(40).optional().nullable(), gifts: giftChoices })).min(1).max(20),
   expectedShipping: z.number().int().min(0).max(5000).optional(),
   expectedTotal: z.number().int().min(0).max(10000000).optional(),
 });
@@ -975,12 +994,12 @@ r.post('/marketplace/orders', h((req, res) => {
   const body = marketplaceOrderSchema.parse(req.body);
   if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
   const result = tx(() => {
-    const prepared = body.stores.map(({ slug, items, coupon, gifts }) => {
+    const prepared = body.stores.map(({ slug, items, coupon, gifts, storeNote }) => {
       const store = loadStore(slug);
       const qt = quote(store, items, coupon, { phone: body.phone, giftChoices: gifts });
       if (qt.hasErrors) throw new AppError(409, 'cart_changed', 'Some items are no longer available.', { slug, lines: qt.lines });
       if (coupon && qt.couponError) throw new AppError(409, qt.couponError, 'This coupon can no longer be applied.'); // never charge more than the customer was shown
-      return { store, qt };
+      return { store, qt, storeNote };
     });
     // A fixed-amount or free-delivery Twist code is one gift per basket, not one per store.
     if (prepared.filter(({ qt }) => qt.coupon?.source === 'platform' && qt.coupon.type !== 'percentage').length > 1) throw new AppError(409, 'coupon_one_store', 'This code applies to one store in the basket.');
@@ -1000,7 +1019,7 @@ r.post('/marketplace/orders', h((req, res) => {
     }
     const deliveryGroup = crypto.randomUUID();
     const now = nowIso();
-    const orders = prepared.map(({ store, qt }, storeIndex) => {
+    const orders = prepared.map(({ store, qt, storeNote }, storeIndex) => {
       // Keep the one basket fee allocated across the store sub-orders so a
       // split dispatch can see each route's correct cash amount.
       const shipping = pendingFee || split.storeShares[storeIndex]?.freeShipping ? 0 : split.storeShares[storeIndex]?.share || 0;
@@ -1016,7 +1035,7 @@ r.post('/marketplace/orders', h((req, res) => {
       const trackToken = crypto.randomBytes(12).toString('base64url');
       const orderId = insert('orders', {
         store_id: store.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
-        governorate: body.governorate, city: body.city, address: body.address, notes: body.notes,
+        governorate: body.governorate, city: body.city, address: body.address, notes: body.notes, store_note: storeNote || null,
         status: 'pending', delivery_fee_status: pendingFee ? 'pending' : 'confirmed', delivery_fee_quote: null, delivery_by: 'platform', delivery_group: deliveryGroup, delivery_route_id: deliveryGroup, delivery_mode: 'pooled', subtotal: qt.subtotal, discount: qt.discount, promo_discount: qt.promoDiscount || 0, shipping, total: qt.subtotal - qt.discount + shipping,
         shipping_free: qt.shipping === 0 ? 1 : 0,
         coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
@@ -1079,6 +1098,7 @@ function trackPayload(o) {
   const basket = o.delivery_group ? q.get("SELECT COUNT(*) AS count, COALESCE(SUM(total),0) AS total, COALESCE(SUM(subtotal-discount),0) AS items_total FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group]) : null;
   return {
     number: o.number, token: o.track_token, status: o.status, createdAt: o.created_at, updatedAt: o.updated_at,
+    notes: o.notes || null, storeNote: o.store_note || null,
     deliveryBy: o.delivery_by, reserveUntil: o.reserve_until || null, firstName: String(o.customer_name || '').split(' ')[0],
     city: o.city, governorate: o.governorate, phone: o.phone.replace(/^(\d{3})\d{5}/, '$1•••••'),
     subtotal: o.subtotal, discount: o.discount, promoDiscount: o.promo_discount || 0, promotions: orderPromotions(o.id), shipping: o.shipping, shippingFree: !!o.shipping_free, total: o.total, payment: o.payment_method,

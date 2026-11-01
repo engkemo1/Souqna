@@ -166,9 +166,14 @@ test('admin category API: no duplicates, no cycles, safe delete, attributes, reo
     const cyc = await t.admin('PATCH', `/departments/${dept('modest').id}`, { parent: 'niqab' });
     assert.equal(cyc.status, 422);
     assert.equal(dept('modest').parent_slug, null);
-    // depth: a 4th level is refused
-    const deep = await t.admin('POST', '/departments', { name_ar: 'مستوى رابع', name_en: 'Level four', parent: 'modest_open_abayas' });
-    assert.equal(deep.status, 422);
+    // depth is data, not code: a 4th level is allowed; only an absurd depth (> 6 below the main section) is refused
+    let parent = (await t.admin('POST', '/departments', { name_ar: 'سلسلة اختبار', name_en: 'Depth chain', slug: 'depth_chain_0' })).body.departments.find((x) => x.slug === 'depth_chain_0').slug;
+    let refusedAt = 0;
+    for (let i = 1; i <= 8 && !refusedAt; i++) {
+      const r = await t.admin('POST', '/departments', { name_ar: `مستوى ${i}`, name_en: `Level ${i}`, slug: `depth_chain_${i}`, parent });
+      if (r.status === 422) refusedAt = i; else { assert.equal(r.status, 201); parent = `depth_chain_${i}`; }
+    }
+    assert.ok(refusedAt >= 4 && refusedAt <= 8, `deep nesting must be allowed past 3 levels but bounded (refused at ${refusedAt})`);
     // safe delete with products
     prod(t, { name_ar: 'ن', price: 5, department: 'niqab', status: 'active' });
     const refuse = await t.admin('DELETE', `/departments/${created.id}`);

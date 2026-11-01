@@ -3,7 +3,7 @@ import { Check, ChevronDown, ChevronLeft } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatNumber } from '../../lib/format.js';
 import { cx } from '../ui/cx.js';
-import { DEPT_EMOJI } from './DeptStrip.jsx';
+import { emojiFor } from '../../lib/deptIcons.js';
 
 /** مجموعة فلتر قابلة للطي (زي نون/أمازون): العنوان بيقفل ويفتح، وعدد المختار ظاهر جنب العنوان */
 function Group({ title, children, badge = 0, defaultOpen = true }) {
@@ -64,7 +64,7 @@ export default function SearchFilters({ params, set, facets, departments, label,
   const dept = params.get('department') || '';
   const deptBy = new Map(departments.map((d) => [d.slug, d]));
   const deptChain = new Set(); // القسم المختار + كل أجداده: ولادهم بيتفتحوا تحته
-  for (let s = dept, i = 0; s && i < 4; s = deptBy.get(s)?.parent, i++) deptChain.add(s);
+  for (let s = dept, i = 0; s && i < 8; s = deptBy.get(s)?.parent, i++) deptChain.add(s);
   const audTop = { men: 'men', women: 'women', boys: 'kids', girls: 'kids', kids: 'kids' }[params.get('audience') || ''];
   if (audTop) deptChain.add(audTop); // داخل رجالي: أقسام الرجالي كلها ظاهرة (تيشيرتات، بدل، جلاليب…) مش بس الأقسام الرئيسية
   const applyPrice = (e) => { e?.preventDefault(); set({ min: min && Number(min) > 0 ? String(Math.floor(Number(min))) : '', max: max && Number(max) > 0 ? String(Math.floor(Number(max))) : '' }); };
@@ -90,7 +90,7 @@ export default function SearchFilters({ params, set, facets, departments, label,
               <li key={d.slug || 'all'} style={d.parent ? { paddingInlineStart: 14 } : undefined}>
                 <button type="button" onClick={() => set({ department: d.slug })} aria-pressed={on}
                   className={cx('flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-start text-sm transition', on ? 'bg-secondary font-bold' : 'hover:bg-secondary/60', !on && d.slug && n === 0 && 'text-muted')}>
-                  <span className="flex items-center gap-2"><span aria-hidden="true">{d.slug ? DEPT_EMOJI[d.slug] || '🛍️' : '🛒'}</span>{d.slug ? label(d.slug) : t('search.allDepartments')}</span>
+                  <span className="flex items-center gap-2"><span aria-hidden="true">{d.slug ? emojiFor(d) : '🛒'}</span>{d.slug ? label(d.slug) : t('search.allDepartments')}</span>
                   <span className="text-xs text-muted">{formatNumber(n, lang)}</span>
                 </button>
               </li>

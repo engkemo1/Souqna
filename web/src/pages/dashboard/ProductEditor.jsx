@@ -362,7 +362,7 @@ export default function ProductEditor() {
     } catch (x) { toast({ tone: 'error', title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى من الأقسام الخاصة (12)', 'Custom section limit reached (12)') : (errorMessage ? errorMessage(x) : (x.message || 'Error')) }); } finally { setCatBusy(false); }
   };
   const { data: tree } = useApi('/owner/product-types');
-  const { data: pubDepts } = useApi('/departments');
+  const { data: pubDepts } = useApi('/departments?all=1');
   const [f, setF] = useState(EMPTY);
   const deptDefs = (pubDepts?.departments || []).find((d) => d.slug === f.department)?.attrs || [];
   const [initial, setInitial] = useState(EMPTY);

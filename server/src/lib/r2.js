@@ -14,7 +14,7 @@ const sha = (d) => crypto.createHash('sha256').update(d).digest('hex');
 const hmac = (k, d) => crypto.createHmac('sha256', k).update(d).digest();
 const enc = (key) => key.split('/').map(encodeURIComponent).join('/');
 
-async function request(method, key, body, contentType, acct = { bucket: c.bucket, accessKeyId: c.accessKeyId, secretAccessKey: c.secretAccessKey }) {
+async function request(method, key, body, contentType, acct = { bucket: c.bucket, accessKeyId: c.accessKeyId, secretAccessKey: c.secretAccessKey }, extra = {}) {
   const accessKeyId = cleanCredential(acct.accessKeyId);
   const secretAccessKey = cleanCredential(acct.secretAccessKey);
   const payload = body || Buffer.alloc(0);
@@ -25,6 +25,7 @@ async function request(method, key, body, contentType, acct = { bucket: c.bucket
   const payloadHash = sha(payload);
   const headers = { host, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amz };
   if (contentType) headers['content-type'] = contentType;
+  Object.assign(headers, extra);
   const names = Object.keys(headers).sort();
   const canonical = [method, pathName, '', names.map((n) => `${n}:${headers[n]}\n`).join(''), names.join(';'), payloadHash].join('\n');
   const scope = `${day}/auto/s3/aws4_request`;
@@ -40,8 +41,8 @@ async function request(method, key, body, contentType, acct = { bucket: c.bucket
   return res;
 }
 
-const TYPES = { webp: 'image/webp', jpg: 'image/jpeg' };
-export const r2Put = (key, buf) => request('PUT', key, buf, TYPES[key.split('.').pop()] || 'application/octet-stream');
+const TYPES = { webp: 'image/webp', jpg: 'image/jpeg', png: 'image/png', avif: 'image/avif', gif: 'image/gif' };
+export const r2Put = (key, buf, extra) => request('PUT', key, buf, TYPES[key.split('.').pop()] || 'application/octet-stream', undefined, extra);
 export const r2Delete = (key) => request('DELETE', key);
 export async function r2Get(key) { const r = await request('GET', key); return Buffer.from(await r.arrayBuffer()); }
 

@@ -19,6 +19,8 @@ import { testProvider, stylistStatus, saveStylistSettings, providerReady, stylis
 import { llmChain } from '../lib/stylist.js';
 import { geminiUsage, saveGeminiLimit } from '../lib/ai-usage.js';
 import { adminModaPrompts, saveModaPrompts, resetModaPrompts, suggestPrompts } from '../lib/modaPrompts.js';
+import { saveAsset, assignAsset, unassign, deleteAsset, bulkUpload, libraryStatus, listAssets, duplicatesReport, checkLinks, serializeAsset } from '../lib/image-assets.js';
+import { generationStatus, requestCandidate, listCandidates, candidateRow, approveCandidate, rejectCandidate, defaultPrompt, eligibleSections, createBatch, startBatch, pauseBatch, cancelBatch, retryFailed, batchStatus, listBatches } from '../lib/image-gen.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage } from '../lib/deptImage.js';
 import { notifyBuyer, notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
@@ -1073,7 +1075,7 @@ r.get('/orders', h((req, res) => {
   const limit = 25; const pg = Math.max(1, Math.min(1000, parseInt(page, 10) || 1));
   const from = `FROM orders o JOIN stores s ON s.id=o.store_id WHERE ${where.join(' AND ')}`;
   const total = q.val(`SELECT COUNT(*) ${from}`, params);
-  const items = q.all(`SELECT o.id, o.number, o.status, o.total, o.delivery_by, o.customer_name, o.phone, o.governorate, o.city, o.address, o.notes, o.created_at, o.handoff_at, s.name_ar AS store_name, s.slug, s.phone AS store_phone
+  const items = q.all(`SELECT o.id, o.number, o.status, o.total, o.delivery_by, o.customer_name, o.phone, o.governorate, o.city, o.address, o.notes, o.store_note, o.delivery_group, o.created_at, o.handoff_at, s.name_ar AS store_name, s.slug, s.phone AS store_phone
     ${from} ORDER BY o.created_at DESC LIMIT ? OFFSET ?`, [...params, limit, (pg - 1) * limit]);
   const counts = Object.fromEntries(q.all('SELECT status, COUNT(*) AS c FROM orders GROUP BY status').map((x) => [x.status, x.c]));
   counts.all = Object.values(counts).reduce((a, b) => a + b, 0);
@@ -1083,7 +1085,11 @@ r.get('/orders', h((req, res) => {
 r.get('/orders/:id', h((req, res) => {
   const o = q.get('SELECT o.*, s.name_ar AS store_name, s.slug, s.phone AS store_phone, s.address_ar AS store_address, s.map_url AS store_map FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.id=?', [Number(req.params.id)]);
   if (!o) throw new AppError(404, 'not_found', 'Order not found.');
-  res.json({ order: o, items: q.all('SELECT name_ar, color, size, price, qty FROM order_items WHERE order_id=?', [o.id]), events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]) });
+  // every store's instructions for the same checkout (admin only), each tagged with its store
+  const storeNotes = o.delivery_group
+    ? q.all("SELECT o2.number, s2.name_ar AS store_name, o2.store_note AS note FROM orders o2 JOIN stores s2 ON s2.id=o2.store_id WHERE o2.delivery_group=? AND o2.store_note IS NOT NULL AND o2.store_note<>'' ORDER BY o2.id", [o.delivery_group])
+    : (o.store_note ? [{ number: o.number, store_name: o.store_name, note: o.store_note }] : []);
+  res.json({ order: o, storeNotes, items: q.all('SELECT name_ar, color, size, price, qty FROM order_items WHERE order_id=?', [o.id]), events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]) });
 }));
 
 r.patch('/orders/:id/delivery', h((req, res) => {
@@ -1221,6 +1227,7 @@ r.delete('/stores/:slug', h(async (req, res) => {
 }));
 
 /* ------------------------------------------------ departments (managed by the team) */
+const MAX_DEPT_DEPTH = 6; // levels below the main section; the tree is data, this is only a sanity guard
 const deptSchema = z.object({
   name_ar: z.string().trim().min(2).max(40), name_en: z.string().trim().min(2).max(40),
   sizes: z.array(z.string().trim().min(1).max(12)).max(40).default([]),
@@ -1231,12 +1238,15 @@ const deptSchema = z.object({
   description_ar: z.string().trim().max(300).optional(), description_en: z.string().trim().max(300).optional(),
   icon: z.string().trim().max(30).nullable().optional(),
   visibility: z.enum(['visible', 'hidden']).optional(),
+  seo_title_ar: z.string().trim().max(70).optional(), seo_title_en: z.string().trim().max(70).optional(),
+  seo_desc_ar: z.string().trim().max(170).optional(), seo_desc_en: z.string().trim().max(170).optional(),
+  show_empty: z.boolean().optional(),       // show to customers even with no products
 });
 function checkDeptParent(parent, self) {
   if (!parent) return null;
   const p = q.get('SELECT slug FROM departments WHERE slug=?', [parent]);
   if (!p || p.slug === self) throw new AppError(422, 'validation_failed', 'Main section not found.', { parent: 'parent_invalid' });
-  if (deptAncestors(p.slug).length >= 2) throw new AppError(422, 'validation_failed', 'Sections can be nested at most 3 levels deep.', { parent: 'parent_too_deep' });
+  if (deptAncestors(p.slug).length >= MAX_DEPT_DEPTH - 1) throw new AppError(422, 'validation_failed', `Sections can be nested at most ${MAX_DEPT_DEPTH} levels deep.`, { parent: 'parent_too_deep' });
   return p.slug;
 }
 /** Replaces the attribute definitions a section owns (rows with active=0 are the "turn off the inherited one" overrides). */
@@ -1252,7 +1262,9 @@ function assertNoDuplicateName(parent, ar, en, selfSlug) {
   const norm = (x) => String(x || '').trim().toLowerCase();
   if (rows.some((d) => d.slug !== selfSlug && (norm(d.name_ar) === norm(ar) || norm(d.name_en) === norm(en)))) throw new AppError(422, 'validation_failed', 'A section with this name already exists here.', { name_ar: 'duplicate_name' });
 }
-r.get('/departments', h((_req, res) => res.json({ departments: listDepartments({ all: true }).map((d) => ({ ...d, products_count: q.val('SELECT COUNT(*) FROM products WHERE department=?', [d.slug]) })) })));
+/** One shape for every admin response that returns the section list (the UI relies on products_count after each save/upload/delete). */
+const adminDepartments = () => listDepartments({ all: true }).map((d) => ({ ...d, products_count: q.val('SELECT COUNT(*) FROM products WHERE department=?', [d.slug]) }));
+r.get('/departments', h((_req, res) => res.json({ departments: adminDepartments() })));
 r.get('/departments/:id/merchants', h((req, res) => {
   const d = q.get('SELECT slug FROM departments WHERE id=?', [Number(req.params.id)]);
   if (!d) throw new AppError(404, 'not_found', 'Department not found.');
@@ -1270,7 +1282,7 @@ r.post('/departments', h((req, res) => {
     insert('departments', { slug, name_ar: body.name_ar, name_en: body.name_en, sizes_json: JSON.stringify([...new Set(body.sizes)]), sort, active: 1, parent_slug: parent, profile: PROFILES[body.profile] ? body.profile : null, description_ar: body.description_ar || null, description_en: body.description_en || null, icon: body.icon || null, visibility: body.visibility || 'visible' });
     if (body.attrs?.length) saveDeptAttrs(slug, body.attrs);
   });
-  res.status(201).json({ departments: listDepartments({ all: true }) });
+  res.status(201).json({ departments: adminDepartments() });
 }));
 r.patch('/departments/:id', h((req, res) => {
   const body = deptSchema.partial().parse(req.body);
@@ -1282,7 +1294,7 @@ r.patch('/departments/:id', h((req, res) => {
     parent = checkDeptParent(body.parent, d.slug);
     // moving a branch must not push its deepest descendant past 3 levels
     const depthBelow = (slug, n = 0) => Math.max(n, ...q.all('SELECT slug FROM departments WHERE parent_slug=?', [slug]).map((c) => depthBelow(c.slug, n + 1)));
-    if ((parent ? deptAncestors(parent).length + 1 : 0) + depthBelow(d.slug) >= 3) throw new AppError(422, 'validation_failed', 'Sections can be nested at most 3 levels deep.', { parent: 'parent_too_deep' });
+    if ((parent ? deptAncestors(parent).length + 1 : 0) + depthBelow(d.slug) >= MAX_DEPT_DEPTH) throw new AppError(422, 'validation_failed', `Sections can be nested at most ${MAX_DEPT_DEPTH} levels deep.`, { parent: 'parent_too_deep' });
   }
   if (body.name_ar !== undefined || body.name_en !== undefined || body.parent !== undefined) assertNoDuplicateName(body.parent === undefined ? d.parent_slug : parent, body.name_ar ?? d.name_ar, body.name_en ?? d.name_en, d.slug);
   tx(() => {
@@ -1293,17 +1305,19 @@ r.patch('/departments/:id', h((req, res) => {
       profile: body.profile === undefined ? undefined : (PROFILES[body.profile] ? body.profile : null),
       description_ar: body.description_ar, description_en: body.description_en,
       icon: body.icon === undefined ? undefined : (body.icon || null), visibility: body.visibility,
+      seo_title_ar: body.seo_title_ar, seo_title_en: body.seo_title_en, seo_desc_ar: body.seo_desc_ar, seo_desc_en: body.seo_desc_en,
+      show_empty: body.show_empty === undefined ? undefined : body.show_empty ? 1 : 0,
       parent_slug: body.parent === undefined ? undefined : parent,
     });
     if (body.attrs !== undefined) saveDeptAttrs(d.slug, body.attrs);
   });
-  res.json({ departments: listDepartments({ all: true }) });
+  res.json({ departments: adminDepartments() });
 }));
 /** Reorders siblings: body.order = [id, id, ...]. Only the given ids' sort values change. */
 r.post('/departments/reorder', h((req, res) => {
   const { order } = z.object({ order: z.array(z.coerce.number().int()).min(1).max(500) }).parse(req.body);
   tx(() => order.forEach((id, i) => q.run('UPDATE departments SET sort=? WHERE id=?', [i + 1, id])));
-  res.json({ departments: listDepartments({ all: true }) });
+  res.json({ departments: adminDepartments() });
 }));
 /** Safe delete: refused while it has sub-sections; with products it needs `reassign_to` (an active section) and moves them in one transaction. */
 r.delete('/departments/:id', h((req, res) => {
@@ -1324,7 +1338,7 @@ r.delete('/departments/:id', h((req, res) => {
     }
     q.run('DELETE FROM departments WHERE id=?', [d.id]);
   });
-  res.json({ departments: listDepartments({ all: true }), moved: count });
+  res.json({ departments: adminDepartments(), moved: count });
 }));
 
 /* ---- merchant requests for a missing section ---- */
@@ -1379,10 +1393,9 @@ r.post('/departments/:id/image', deptUpload.single('file'), h(async (req, res) =
   const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);
   if (!d) throw new AppError(404, 'not_found', 'Department not found.');
   if (!req.file) throw new AppError(422, 'validation_failed', 'Pick an image.', { file: 'required' });
-  const url = await saveDeptImage(req.file.buffer, d.slug);
-  update('departments', d.id, { image: url });
-  await removeDeptImage(d.image);
-  res.json({ departments: listDepartments({ all: true }) });
+  const { asset, duplicate } = await saveAsset(req.file.buffer, { filename: req.file.originalname, source: 'upload', createdBy: 'admin' });
+  assignAsset(d.slug, asset.id);
+  res.json({ departments: adminDepartments(), asset: serializeAsset(asset), duplicate });
 }));
 r.post('/stylist/avatar', deptUpload.single('file'), h(async (req, res) => {
   if (!req.file) throw new AppError(422, 'validation_failed', 'Pick an image.', { file: 'required' });
@@ -1400,10 +1413,71 @@ r.delete('/stylist/avatar', h(async (_req, res) => {
 r.delete('/departments/:id/image', h(async (req, res) => {
   const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);
   if (!d) throw new AppError(404, 'not_found', 'Department not found.');
-  update('departments', d.id, { image: null });
-  await removeDeptImage(d.image);
-  res.json({ departments: listDepartments({ all: true }) });
+  if (d.image_asset_id) unassign(d.slug);   // the stored asset stays in the library; the original picture (if any) comes back
+  else { update('departments', d.id, { image: null, legacy_image: null }); await removeDeptImage(d.image); }   // an old pre-library file nobody else references
+  res.json({ departments: adminDepartments() });
 }));
+
+/* ---- category image library (central, R2-backed; uploads/generation are explicit admin actions only) ---- */
+const libUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 200 } });
+r.get('/image-library/status', h((_req, res) => res.json({ ...libraryStatus(), generation: generationStatus() })));
+r.get('/image-library/assets', h((req, res) => res.json({ assets: listAssets({ term: String(req.query.q || '') }) })));
+r.get('/image-library/duplicates', h((_req, res) => res.json(duplicatesReport())));
+r.post('/image-library/check-links', h(async (_req, res) => res.json(await checkLinks())));
+r.post('/image-library/upload', libUpload.array('files', 200), h(async (req, res) => {
+  if (!req.files?.length) throw new AppError(422, 'validation_failed', 'Pick at least one image.', { files: 'required' });
+  const overwrite = req.body?.overwrite === 'true' || req.body?.overwrite === '1';
+  res.json(await bulkUpload(req.files, { overwrite, createdBy: 'admin' }));
+}));
+r.post('/image-library/assign', h((req, res) => {
+  const { slug, asset_id } = z.object({ slug: z.string().trim().min(1).max(80), asset_id: z.coerce.number().int().positive() }).parse(req.body);
+  assignAsset(slug, asset_id);
+  res.json(libraryStatus());
+}));
+r.post('/image-library/unassign', h((req, res) => {
+  const { slug } = z.object({ slug: z.string().trim().min(1).max(80) }).parse(req.body);
+  unassign(slug);
+  res.json(libraryStatus());
+}));
+r.delete('/image-library/assets/:id', h(async (req, res) => { await deleteAsset(Number(req.params.id)); res.json({ deleted: true }); }));
+
+r.get('/image-library/generation', h((_req, res) => res.json({ ...generationStatus(), candidates: listCandidates() })));
+/** Pilot readiness: which settings exist (booleans only, never values) — makes no provider or R2 call. */
+r.get('/image-library/readiness', h((_req, res) => {
+  const g = generationStatus(); const has = (k) => !!process.env[k];
+  const checks = [
+    { id: 'cf_token', ok: has('CF_AI_TOKEN'), label: 'CF_AI_TOKEN (Workers AI: Read + Edit)' },
+    { id: 'cf_account', ok: has('CF_ACCOUNT_ID') || has('R2_ACCOUNT_ID'), label: 'CF_ACCOUNT_ID (or R2_ACCOUNT_ID)' },
+    { id: 'provider', ok: g.configured, label: 'Image provider registered' },
+    { id: 'r2', ok: ['R2_ACCOUNT_ID', 'R2_ACCESS_KEY_ID', 'R2_SECRET_ACCESS_KEY', 'R2_BUCKET', 'R2_PUBLIC_URL'].every(has), label: 'R2_* (account, keys, bucket, public URL)' },
+    { id: 'litestream_bucket', ok: has('BACKUP_R2_BUCKET'), label: 'BACKUP_R2_BUCKET (database replication)' },
+  ];
+  res.json({ ready: checks.slice(0, 4).every((c) => c.ok), provider: g.provider, daily_limit: g.daily_limit, used_today: g.used_today, checks });
+}));
+r.get('/image-library/prompt/:slug', h((req, res) => res.json({ prompt: defaultPrompt(String(req.params.slug)) })));
+r.get('/image-library/batches', h((_req, res) => res.json({ batches: listBatches(), eligible: { missing: eligibleSections({ scope: 'missing' }).length, main: eligibleSections({ scope: 'main' }).length, missing_or_legacy: eligibleSections({ scope: 'missing_or_legacy' }).length }, ...generationStatus() })));
+r.post('/image-library/batches', h((req, res) => {
+  const b = z.object({ scope: z.enum(['missing', 'main', 'missing_or_legacy']).default('missing'), size: z.coerce.number().int().min(1).max(30).default(12), slugs: z.array(z.string().max(80)).max(30).optional() }).parse(req.body || {});
+  const id = createBatch({ scope: b.scope, size: b.size, slugs: b.slugs || null, by: 'admin' });
+  startBatch(id, { by: 'admin' });
+  res.status(201).json(batchStatus(id));
+}));
+r.get('/image-library/batches/:id', h((req, res) => res.json(batchStatus(Number(req.params.id)))));
+r.post('/image-library/batches/:id/resume', h((req, res) => { startBatch(Number(req.params.id), { by: 'admin' }); res.json(batchStatus(Number(req.params.id))); }));
+r.post('/image-library/batches/:id/pause', h((req, res) => { pauseBatch(Number(req.params.id)); res.json(batchStatus(Number(req.params.id))); }));
+r.post('/image-library/batches/:id/cancel', h((req, res) => { cancelBatch(Number(req.params.id)); res.json(batchStatus(Number(req.params.id))); }));
+r.post('/image-library/batches/:id/retry-failed', h((req, res) => { retryFailed(Number(req.params.id)); startBatch(Number(req.params.id), { by: 'admin' }); res.json(batchStatus(Number(req.params.id))); }));
+r.post('/image-library/generate', h(async (req, res) => {
+  const body = z.object({ slug: z.string().trim().min(1).max(80), prompt: z.string().trim().max(600).optional(), regenerate: z.boolean().optional() }).parse(req.body);
+  res.status(201).json(await requestCandidate(body.slug, { prompt: body.prompt, regenerate: body.regenerate, by: 'admin' }));
+}));
+r.get('/image-library/candidates/:id/preview', h((req, res) => {
+  const c = candidateRow(Number(req.params.id));
+  if (!c || !c.data) throw new AppError(404, 'not_found', 'No preview.');
+  res.set('Cache-Control', 'private, no-store').type(c.mime || 'image/png').send(Buffer.from(c.data));
+}));
+r.post('/image-library/candidates/:id/approve', h(async (req, res) => { const out = await approveCandidate(Number(req.params.id), { by: 'admin' }); res.json({ asset: serializeAsset(out.asset), duplicate: out.duplicate, ...libraryStatus() }); }));
+r.post('/image-library/candidates/:id/reject', h((req, res) => { rejectCandidate(Number(req.params.id)); res.json({ rejected: true }); }));
 
 /* ---- platform homepage advertisements ---- */
 r.post('/homepage-ads/image', deptUpload.single('file'), h(async (req, res) => {
@@ -1473,7 +1547,7 @@ r.delete('/departments/:id', h((req, res) => {
   if (q.val('SELECT COUNT(*) FROM departments WHERE parent_slug=?', [d.slug])) throw new AppError(409, 'department_has_children', 'Delete or move the sections under it first.');
   if (used) throw new AppError(409, 'department_in_use', `${used} stores use this department — deactivate it instead, or move the stores first.`);
   q.run('DELETE FROM departments WHERE id=?', [d.id]);
-  res.json({ departments: listDepartments({ all: true }) });
+  res.json({ departments: adminDepartments() });
 }));
 
 /** Sections owners asked to publish on the marketplace: accept = it becomes a real department for every store that asked, reject = it stays private to the store. */
@@ -1495,7 +1569,7 @@ r.post('/departments/:id/approve', h((req, res) => {
     }
   });
   for (const sid of stores) notifyStore(sid, { title: 'اتقبل القسم الجديد ✅', body: `قسم «${d.name_ar}» بقى ظاهر في سوق تويست.`, url: '/dashboard/products' });
-  res.json({ departments: listDepartments({ all: true }) });
+  res.json({ departments: adminDepartments() });
 }));
 r.post('/departments/:id/reject', h((req, res) => {
   const d = pendingDept(req.params.id);
@@ -1503,7 +1577,7 @@ r.post('/departments/:id/reject', h((req, res) => {
   if (q.val('SELECT COUNT(*) FROM departments WHERE parent_slug=?', [d.slug])) throw new AppError(409, 'department_has_children', 'Other sections are under it.');
   q.run('DELETE FROM departments WHERE id=?', [d.id]);
   for (const sid of stores) notifyStore(sid, { title: 'القسم الجديد', body: `قسم «${d.name_ar}» هيفضل ظاهر في متجرك بس، مش في سوق تويست.`, url: '/dashboard/products' });
-  res.json({ departments: listDepartments({ all: true }) });
+  res.json({ departments: adminDepartments() });
 }));
 
 r.get('/stores/:slug/products', h((req, res) => {

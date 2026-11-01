@@ -9,7 +9,7 @@ import SuggestInput, { saveRecent } from './SuggestInput.jsx';
 export default function MarketSearchBar({ initial = '', autoFocus, chips = true }) {
   const { t } = useI18n();
   const nav = useNavigate();
-  const { list, label } = useDepartments();
+  const { tops: list, label } = useDepartments();
   const [term, setTerm] = useState(initial);
   const go = (e) => { e.preventDefault(); const q = term.trim(); saveRecent(q); nav(q ? `/search?${new URLSearchParams({ q })}` : '/search'); };
   return (

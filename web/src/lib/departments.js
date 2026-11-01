@@ -3,9 +3,9 @@ import { useApi } from './hooks.js';
 import { useI18n } from './i18n.jsx';
 
 /** Departments are managed by the platform team (admin → الأقسام). Labels come from the API, never hard-coded. */
-export function useDepartments() {
+export function useDepartments({ all = false } = {}) {
   const { lang, t } = useI18n();
-  const { data } = useApi('/departments');
+  const { data } = useApi(all ? '/departments?all=1' : '/departments');
   const list = data?.departments || [];
   const bySlug = useMemo(() => new Map(list.map((d) => [d.slug, d])), [list]);
   const label = useCallback((slug) => {
@@ -19,7 +19,7 @@ export function useDepartments() {
   // "حريمي › فساتين › فساتين أفراح"
   const pathLabel = useCallback((slug) => {
     const parts = [];
-    for (let s = slug, i = 0; s && i < 4; s = bySlug.get(s)?.parent, i++) parts.unshift(label(s));
+    for (let s = slug, i = 0; s && i < 8; s = bySlug.get(s)?.parent, i++) parts.unshift(label(s));
     return parts.join(' › ');
   }, [bySlug, label]);
   return { list, label, bySlug, tops, childrenOf, pathLabel, ready: !!data };

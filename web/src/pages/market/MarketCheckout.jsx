@@ -1,3 +1,4 @@
+import OrderComments from '../../components/OrderComments.jsx';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRight, Banknote, Lock, ShoppingBag, Store, MapPin, Tag, X } from 'lucide-react';
@@ -30,6 +31,7 @@ export default function MarketCheckout() {
   const toast = useToast();
   const [saved, setSaved] = useLocalState('souqna.customer', { name: '', phone: '', governorate: 'Qalyubia', city: ar ? 'بنها' : 'Banha', address: '' });
   const [form, setForm] = useState({ ...saved, notes: '' });
+  const [storeNotes, setStoreNotes] = useState({});   // slug -> this store's instructions
   const [coords, setCoords] = useState(null);
   const [quotes, setQuotes] = useState(null);
   const [deliveryQuote, setDeliveryQuote] = useState(null);
@@ -157,7 +159,7 @@ export default function MarketCheckout() {
       const result = await api('/marketplace/orders', { method: 'POST', body: {
         name: form.name.trim(), phone: form.phone.trim(), governorate: form.governorate, city: form.city.trim(), address: form.address.trim(), notes: form.notes.trim(),
         ...(feePending ? {} : { expectedShipping: shipping }), expectedTotal: total,
-        stores: groups.map((g) => ({ slug: g.slug, gifts: loadGifts(g.slug), items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), ...(codes[g.slug] ? { coupon: codes[g.slug] } : {}) })),
+        stores: groups.map((g) => ({ slug: g.slug, gifts: loadGifts(g.slug), storeNote: (storeNotes[g.slug] || '').trim(), items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), ...(codes[g.slug] ? { coupon: codes[g.slug] } : {}) })),
       } });
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
       for (const order of result.orders) rememberOrder({ number: order.number, token: order.trackToken, store: order.store?.[lang] || order.store?.ar || order.storeSlug });
@@ -184,7 +186,6 @@ export default function MarketCheckout() {
           <Field label={ar ? 'المحافظة' : 'Governorate'}><Select value={form.governorate} onChange={set('governorate')}>{GOVERNORATES.map((g) => <option key={g} value={g}>{t(`gov.${g}`)}</option>)}</Select></Field>
           <Field label={ar ? 'المدينة أو المنطقة' : 'City or area'}><PlaceAutocomplete value={form.city} onChange={(v) => { setError(''); setForm((f) => ({ ...f, city: v })); }} onSelect={(place) => { if (place?.lat && place?.lng) setCoords({ lat: place.lat, lng: place.lng }); }} placeholder={ar ? 'اكتب اسم المدينة أو المنطقة…' : 'Type city or area name…'} /></Field>
           <Field label={ar ? 'العنوان بالتفصيل' : 'Full address'} className="sm:col-span-2"><Textarea rows={2} autoComplete="street-address" value={form.address} onChange={set('address')} required minLength={6} /></Field>
-          <Field label={ar ? 'ملاحظات' : 'Notes'} className="sm:col-span-2"><Textarea rows={2} value={form.notes} onChange={set('notes')} /></Field>
           <div className="sm:col-span-2 pt-1">
             <div className="mb-2 flex items-center justify-between">
               <span className="flex items-center gap-1.5 text-sm font-semibold">
@@ -204,6 +205,9 @@ export default function MarketCheckout() {
             />
           </div>
         </div></section>
+        <OrderComments ar={ar} general={form.notes} onGeneral={(v) => { setError(''); setForm((f) => ({ ...f, notes: v })); }}
+          stores={groups.map((g) => ({ slug: g.slug, name: g.name?.[lang] || g.name?.ar || g.slug, value: storeNotes[g.slug] || '' }))}
+          onStore={(slug, v) => setStoreNotes((m) => ({ ...m, [slug]: v }))} />
         <section className="flex items-center gap-4 rounded-3xl border-2 border-fg bg-elevated p-4"><Banknote className="h-6 w-6 shrink-0" /><span><strong className="block">{ar ? 'الدفع عند الاستلام' : 'Cash on delivery'}</strong><span className="text-sm text-muted">{feePending ? (ar ? 'رسوم التوصيل لسه مش مؤكدة. Twist هتتواصل معاك بالسعر النهائي قبل إرسال المندوب.' : 'Delivery is not priced yet. Twist will contact you with the final fee before dispatch.') : (ar ? 'هتدفعي إجمالي طلبك مرة واحدة لمندوب Twist.' : 'Pay the order total once to the Twist courier.')}</span></span></section>
         <FinalSaleNote items={cart.items} />
         {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}

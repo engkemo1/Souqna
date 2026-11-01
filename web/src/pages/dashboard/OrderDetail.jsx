@@ -1,3 +1,4 @@
+import OrderCommentsView from '../../components/OrderCommentsView.jsx';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -130,7 +131,7 @@ export default function OrderDetail() {
       customer: { name: o.customer.name, phone: o.customer.phone, address: [o.customer.address, o.customer.city, o.customer.governorate].filter(Boolean).join('، ') },
       items: o.items.map((i) => ({ name: tr(i.name), variant: i.size ? `${t('product.size')}: ${i.size}` : '', qty: i.qty, total: fm(i.price * i.qty) })),
       totals: [[t('cart.subtotal'), fm(o.subtotal)], ...(o.discount ? [[t('cart.discount'), `-${fm(o.discount)}`]] : []), [t('cart.shipping'), o.shippingFree ? t('qr.free') : o.deliveryGroup ? t('cart.sharedDelivery') : o.shipping ? fm(o.shipping) : t('cart.sharedDelivery')], [t('qr.total'), fm(o.total), true]],
-      payment: t('checkout.cod'), notes: o.notes, url: orderUrl(o.id),
+      payment: t('checkout.cod'), notes: [o.notes, o.storeNote].filter(Boolean).join(' | '), url: orderUrl(o.id),
       labels: { order: t('qr.order'), items: t('qr.item'), qty: t('qr.qty'), total: t('qr.total'), notes: t('qr.notes'), scan: t('qr.orderScan') },
     }), { page: 'A5', margin: '8mm' });
   };
@@ -274,9 +275,9 @@ export default function OrderDetail() {
             )}
           </Panel>
           )}
-          {o.notes && (
+          {(o.notes || o.storeNote) && (
             <Panel title={t('orders.notes')}>
-              <p className="flex gap-2.5 rounded-xl bg-amber-50 p-3.5 text-base text-amber-900"><StickyNote className="mt-0.5 h-4 w-4 shrink-0" />{o.notes}</p>
+              <OrderCommentsView ar={lang === 'ar'} general={o.notes} stores={[{ name: '', text: o.storeNote }]} />
             </Panel>
           )}
         </div>

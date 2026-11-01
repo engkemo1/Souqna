@@ -11,15 +11,8 @@ import Button from '../ui/Button.jsx';
 import { cx } from '../ui/cx.js';
 import { useMarketCart } from '../../lib/cart.jsx';
 import { useAuth } from '../../lib/auth.jsx';
-
-const TOP_CATEGORIES = [
-  { slug: 'women', label: 'cat.women', href: '/search?audience=women' },
-  { slug: 'men', label: 'cat.men', href: '/search?audience=men' },
-  { slug: 'kids', label: 'cat.kids', href: '/search?audience=kids' },
-  { slug: 'shoes', label: 'cat.shoes', href: '/search?department=shoes' },
-  { slug: 'perfume_makeup', label: 'market.nav.perfume', href: '/search?department=perfume_makeup' },
-  { slug: 'care', label: 'market.nav.care', href: '/search?department=care' },
-];
+import { useDepartments } from '../../lib/departments.js';
+import { deptHref, deptName } from './CategoryCards.jsx';
 
 export default function MarketHeader() {
   const { t, lang, toggle } = useI18n();
@@ -31,6 +24,8 @@ export default function MarketHeader() {
   const cart = useMarketCart();
   const { user: owner } = useAuth() || {};
   const ar = lang === 'ar';
+  const { tops } = useDepartments();
+  const TOP_CATEGORIES = tops.slice(0, 8).map((d) => ({ slug: d.slug, text: deptName(d, lang), href: deptHref(d.slug) })); // from the department tree, never hard-coded
   const handleSectionLink = (id) => (event) => {
     setMobileMenuOpen(false);
     if (window.location.pathname !== '/') return;
@@ -105,7 +100,7 @@ export default function MarketHeader() {
           <Link to="/track" className="shrink-0 font-bold text-fg transition hover:text-brand">{ar ? 'تتبّع طلبي' : 'Track order'}</Link>
           {TOP_CATEGORIES.map((cat) => (
             <Link key={cat.slug} to={cat.href} className="shrink-0 transition hover:text-brand hover:font-semibold">
-              {t(cat.label)}
+              {cat.text}
             </Link>
           ))}
           <Link to="/search?sale=1" className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-[#EAF0F8] px-3 py-1.5 font-bold text-brand transition hover:bg-btn hover:text-white"><Flame className="h-4 w-4" />{lang === 'ar' ? 'عروض بنها' : 'Banha deals'}</Link>
@@ -125,7 +120,7 @@ export default function MarketHeader() {
           </div>
           <button type="button" onClick={() => { toggle(); setMobileMenuOpen(false); }} className="rounded-xl px-3 py-2.5 text-center text-sm font-medium text-muted">{lang === 'ar' ? 'English' : 'العربية'}</button>
           <div className="flex flex-wrap gap-2 border-t border-line pt-3">
-            {TOP_CATEGORIES.map((cat) => <Link key={cat.slug} to={cat.href} onClick={() => setMobileMenuOpen(false)} className="rounded-full border border-line px-3 py-2 text-xs font-medium">{t(cat.label)}</Link>)}
+            {TOP_CATEGORIES.map((cat) => <Link key={cat.slug} to={cat.href} onClick={() => setMobileMenuOpen(false)} className="rounded-full border border-line px-3 py-2 text-xs font-medium">{cat.text}</Link>)}
           </div>
         </div>
       </div>}

@@ -1,3 +1,4 @@
+import OrderComments from '../../components/OrderComments.jsx';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -90,7 +91,7 @@ export default function Checkout() {
   const navigate = useNavigate();
   const [saved, setSaved] = useLocalState('souqna.customer', { name: '', phone: '', governorate: 'Qalyubia', city: lang === 'ar' ? 'بنها' : 'Banha', address: '' });
   const me = useBuyer();
-  const [form, setForm] = useState({ ...saved, ...(me?.buyer ? { name: saved.name || me.buyer.name, phone: saved.phone || me.buyer.phone } : {}), notes: '' });
+  const [form, setForm] = useState({ ...saved, ...(me?.buyer ? { name: saved.name || me.buyer.name, phone: saved.phone || me.buyer.phone } : {}), notes: '', storeNote: '' });
   const [errors, setErrors] = useState({});
   const [quote, setQuote] = useState(null);
   const [coupon, setCoupon] = useState(null);
@@ -226,9 +227,11 @@ export default function Checkout() {
               <Field label={t('checkout.address')} hint={t('checkout.addressHint')} error={errors.address} className="sm:col-span-2">
                 <Textarea name="address" rows={2} autoComplete="street-address" value={form.address} onChange={set('address')} />
               </Field>
-              <Field label={t('checkout.notes')} optional={t('common.optional')} className="sm:col-span-2"><Textarea name="notes" rows={2} value={form.notes} onChange={set('notes')} /></Field>
             </div>
           </section>
+          <OrderComments ar={lang === 'ar'} general={form.notes} onGeneral={(v) => setForm((f) => ({ ...f, notes: v }))}
+            stores={[{ slug: store.slug, name: typeof store.name === 'string' ? store.name : (store.name?.[lang] || store.name?.ar || store.slug), value: form.storeNote }]}
+            onStore={(_slug, v) => setForm((f) => ({ ...f, storeNote: v }))} />
 
           <section className="mt-10">
             <h2 className="mb-4 flex items-center gap-3 text-lg font-semibold"><span className="grid h-7 w-7 place-items-center rounded-full bg-fg text-xs text-canvas">3</span>{t('checkout.payment')}</h2>

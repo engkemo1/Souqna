@@ -16,6 +16,7 @@ const NAV_GROUPS = [
     { to: '/admin/stores', icon: Store, label: 'المحلات' },
     { to: '/admin/subscriptions', icon: CreditCard, label: 'اشتراكات المحلات' },
     { to: '/admin/departments', icon: Tags, label: 'الأقسام', badge: 'depts' },
+    { to: '/admin/image-library', icon: Camera, label: 'مكتبة صور الأقسام' },
     { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
     { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
     { to: '/admin/buyers', icon: Users, label: 'حسابات العملاء' },

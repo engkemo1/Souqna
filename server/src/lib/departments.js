@@ -2,6 +2,7 @@ import { LEGACY_DEPARTMENTS, PROFILES, DEFAULT_PROFILE, ROOT_PROFILES, effective
 import { q, insert } from '../db/index.js';
 import { AppError } from './errors.js';
 import { json } from '../db/index.js';
+import { assetUrls } from './image-assets.js';
 
 export const PENDING_RE = /^c\d+_/;
 const rowToDef = (r) => ({ key: r.key, ar: r.label_ar, en: r.label_en, type: r.type, options: json(r.options_json, []), required: !!r.required, filterable: !!r.filterable, merchant_only: !!r.merchant_only, active: !!r.active, sort: r.sort });
@@ -27,12 +28,21 @@ function inheritance() {
   };
   return { profile, attrs, own: (slug) => own.get(slug) || [] };
 }
-export const listDepartments = ({ all = false } = {}) => { const eff = inheritance(); return (
+/** Active products per department INCLUDING everything below it (a main section counts its sub-sections' products). One query + one pass. */
+export function productCounts() {
+  const own = new Map(q.all("SELECT p.department AS slug, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL GROUP BY p.department").map((r) => [r.slug, r.n]));
+  const parent = new Map(q.all('SELECT slug, parent_slug FROM departments').map((r) => [r.slug, r.parent_slug]));
+  const total = new Map();
+  for (const [slug, n] of own) for (let c = slug, i = 0; c && i < 10; c = parent.get(c), i++) total.set(c, (total.get(c) || 0) + n);
+  return total;
+}
+const levelOf = (by, slug) => { let n = 0; for (let c = by.get(slug)?.parent_slug, i = 0; c && i < 10; c = by.get(c)?.parent_slug, i++) n++; return n; };
+export const listDepartments = ({ all = false } = {}) => { const eff = inheritance(); const counts = productCounts(); const assets = new Map(q.all('SELECT * FROM image_assets').map((a) => [a.id, a])); const byRow = new Map(q.all('SELECT slug, parent_slug FROM departments').map((r) => [r.slug, r])); return (
   q.all(`SELECT d.*, (SELECT COUNT(*) FROM stores s WHERE s.departments LIKE '%,' || d.slug || ',%') AS stores_count
          FROM departments d ${all ? '' : 'WHERE d.active=1'} ORDER BY d.sort, d.id`)
     .map((d) => {
       const pending = !d.active && PENDING_RE.test(d.slug); // a section an owner added; waits for the platform admin to accept it
-      return { id: d.id, slug: d.slug, name: { ar: d.name_ar, en: d.name_en }, name_ar: d.name_ar, name_en: d.name_en, sizes: json(d.sizes_json, []), image: d.image || null, sort: d.sort, active: !!d.active, parent: d.parent_slug || null, profile: d.profile || null, profile_effective: eff.profile(d.slug), description: { ar: d.description_ar || '', en: d.description_en || '' }, icon: d.icon || null, visibility: d.visibility || 'visible', attrs: eff.own(d.slug), attrs_effective: eff.attrs(d.slug), stores_count: d.stores_count,
+      return { id: d.id, slug: d.slug, name: { ar: d.name_ar, en: d.name_en }, name_ar: d.name_ar, name_en: d.name_en, sizes: json(d.sizes_json, []), image: (d.image_asset_id && assetUrls(assets.get(d.image_asset_id))?.card) || d.image || null, images: d.image_asset_id ? assetUrls(assets.get(d.image_asset_id)) : null, image_asset_id: d.image_asset_id || null, level: levelOf(byRow, d.slug), product_count: counts.get(d.slug) || 0, show_empty: !!d.show_empty, seo: { title: { ar: d.seo_title_ar || '', en: d.seo_title_en || '' }, description: { ar: d.seo_desc_ar || '', en: d.seo_desc_en || '' } }, sort: d.sort, active: !!d.active, parent: d.parent_slug || null, profile: d.profile || null, profile_effective: eff.profile(d.slug), description: { ar: d.description_ar || '', en: d.description_en || '' }, icon: d.icon || null, visibility: d.visibility || 'visible', attrs: eff.own(d.slug), attrs_effective: eff.attrs(d.slug), stores_count: d.stores_count,
         ...(pending ? { pending: true, requesters: q.all('SELECT s.name_ar FROM categories c JOIN stores s ON s.id=c.store_id WHERE c.slug=?', [d.slug.replace(/_/g, '-')]).map((x) => x.name_ar) } : {}) };
     })); };
 
@@ -44,7 +54,7 @@ export function deptSubtree(slug) {
   for (const r of rows) if (r.parent_slug) kids.set(r.parent_slug, [...(kids.get(r.parent_slug) || []), r.slug]);
   const roots = !rows.some((r) => r.slug === slug) && LEGACY_DEPARTMENTS[slug] ? LEGACY_DEPARTMENTS[slug] : [slug];
   const out = new Set();
-  const walk = (s, depth = 0) => { if (out.has(s) || depth > 4) return; out.add(s); (kids.get(s) || []).forEach((k) => walk(k, depth + 1)); };
+  const walk = (s, depth = 0) => { if (out.has(s) || depth > 8) return; out.add(s); (kids.get(s) || []).forEach((k) => walk(k, depth + 1)); };
   roots.forEach((r) => walk(r));
   return [...out];
 }
@@ -52,7 +62,7 @@ export function deptSubtree(slug) {
 export function deptAncestors(slug) {
   const by = new Map(deptRows().map((r) => [r.slug, r]));
   const out = [];
-  for (let p = by.get(slug)?.parent_slug, i = 0; p && i < 4; p = by.get(p)?.parent_slug, i++) out.push(p);
+  for (let p = by.get(slug)?.parent_slug, i = 0; p && i < 8; p = by.get(p)?.parent_slug, i++) out.push(p);
   return out;
 }
 /** كل متجر ليه قسم (كاتيجوري) لكل قسم بيبيعه؛ صاحب المحل بيضيف أقسام فرعية جواهم. */
@@ -141,3 +151,6 @@ export async function backfillProductTypes() {
 export const deptProfile = (slug) => inheritance().profile(slug);
 /** Attribute definitions in effect for a department (inherited root -> node, child overrides). */
 export const deptAttrDefs = (slug) => inheritance().attrs(slug);
+
+/** Sections customers may see: not hidden, and either something in them (products / shops) or the admin said "show when empty". */
+export const customerDepartments = () => listDepartments().filter((d) => d.visibility !== 'hidden' && (d.product_count > 0 || d.stores_count > 0 || d.show_empty));

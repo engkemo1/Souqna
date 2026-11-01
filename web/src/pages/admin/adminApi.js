@@ -55,6 +55,24 @@ export async function adminUpload(path, file) {
   return data;
 }
 
+/** multipart upload of many files with extra fields (admin) */
+export async function adminUploadMany(path, files, fields = {}) {
+  const fd = new FormData();
+  for (const f of files) fd.append('files', f, f.name);
+  for (const [k, v] of Object.entries(fields)) fd.append(k, String(v));
+  let res;
+  try { res = await fetch(`/api/admin${path}`, { method: 'POST', headers: { 'x-admin-key': adminKey.get(), 'x-admin-session': adminSession.get() }, body: fd }); } catch { throw new AdminError(0, 'network', 'مفيش اتصال بالسيرفر'); }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) { const err = data?.error || {}; if (res.status === 401) onAuthFail(); throw new AdminError(res.status, err.code || 'error', err.message || 'حصل خطأ', err.fields); }
+  return data;
+}
+/** an admin-only image as a blob URL (generated-image preview) */
+export async function adminBlobUrl(path) {
+  const res = await fetch(`/api/admin${path}`, { headers: { 'x-admin-key': adminKey.get(), 'x-admin-session': adminSession.get() } });
+  if (!res.ok) throw new AdminError(res.status, 'error', 'تعذر تحميل المعاينة');
+  return URL.createObjectURL(await res.blob());
+}
+
 /** GET with loading/error/reload and optional polling. */
 export function useAdminApi(path, { every = 0 } = {}) {
   const [state, setState] = useState({ data: undefined, error: null, loading: true });

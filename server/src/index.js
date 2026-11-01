@@ -1,3 +1,4 @@
+import { customerDepartments } from './lib/departments.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
@@ -21,6 +22,7 @@ import { prefetchCutoutModel } from './lib/cutout.js';
 import { startReservationSweeper } from './lib/reserve.js';
 import './lib/wa-products.js'; // registers the WhatsApp → product handler (dormant unless WA_ENABLED=1)
 import { startDailySummary } from './lib/daily-summary.js';
+import { registerDefaultProviders } from './lib/image-providers.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -62,6 +64,7 @@ app.get('/sitemap.xml', (_req, res) => {
     `${SITE_ORIGIN}/`,
     `${SITE_ORIGIN}/join`,
   ];
+  urls.push(`${SITE_ORIGIN}/stores`, ...customerDepartments().map((d) => `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`)); // category landing pages
   const stores = q.all(`SELECT s.id, s.slug FROM stores s WHERE s.status='active' AND s.hidden=0 AND s.search_indexable=1
     AND EXISTS (SELECT 1 FROM products p WHERE p.store_id=s.id AND p.status='active') ORDER BY s.id LIMIT 49998`);
   urls.push(...stores.map(({ slug }) => `${SITE_ORIGIN}/s/${encodeURIComponent(slug)}`));
@@ -132,6 +135,20 @@ if (fs.existsSync(config.webDist)) {
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url, image }));
   });
+  app.get('/c/:slug', (req, res) => {
+    const all = customerDepartments(); const by = new Map(all.map((d) => [d.slug, d]));
+    const d = by.get(req.params.slug);
+    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    if (!d) return res.status(404).set('X-Robots-Tag', 'noindex').type('html').send(html);
+    const trail = []; for (let c = d, i = 0; c && i < 10; c = by.get(c.parent), i++) trail.unshift(c);
+    const url = `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`;
+    const title = d.seo?.title?.ar || `${d.name.ar} | Twist بنها`;
+    const description = d.seo?.description?.ar || d.description?.ar || `تسوق ${d.name.ar} من محلات بنها على Twist.`;
+    const image = d.images?.hero ? `${d.images.hero.startsWith('http') ? '' : SITE_ORIGIN}${d.images.hero}` : `${SITE_ORIGIN}/brand/twist-share.png`;
+    const ld = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ name: 'الرئيسية', item: `${SITE_ORIGIN}/` }, ...trail.map((c) => ({ name: c.name.ar, item: `${SITE_ORIGIN}/c/${encodeURIComponent(c.slug)}` }))].map((x, i) => ({ '@type': 'ListItem', position: i + 1, name: x.name, item: x.item })) };
+    const out = withSeo(html, { title, description, url, image }).replace('</head>', `<script type="application/ld+json" data-twist-breadcrumb="1">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script></head>`);
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(out);
+  });
   app.get('/s/:slug', (req, res, next) => {
     const store = q.get("SELECT id, name_ar, description_ar, logo_media_id, cover_media_id FROM stores WHERE slug=? AND status='active' AND hidden=0 AND search_indexable=1", [req.params.slug]);
     if (!store) return next();
@@ -200,6 +217,7 @@ export { app };
 // listener stays alive during the slow first-boot DB setup).
 export function startServer(existingServer) {
   startDailySummary();
+  registerDefaultProviders(); // registration only — no provider call is made at startup
   if (existingServer) {
     // Reuse the existing bound socket — no new port needed.
     // the warm-up handler answers {status:'starting'} to every request — drop it, or it would keep answering first

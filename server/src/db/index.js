@@ -256,6 +256,7 @@ export const json = (s, fallback) => {
 // Promotions: extra columns on existing tables (the new tables themselves come from schema.sql).
 {
   const add = (table, col, ddl) => { const cols = db.prepare(`PRAGMA table_info(${table})`).all().map((c) => c.name); if (cols.length && !cols.includes(col)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${ddl}`); };
+  add('orders', 'store_note', 'TEXT');                                    // the customer's instructions for this store (notes = the general instructions, copied to every sub-order)
   add('orders', 'promo_discount', 'INTEGER NOT NULL DEFAULT 0');          // part of `discount` that came from store promotions (the rest is the coupon)
   add('order_items', 'promo_discount', 'INTEGER NOT NULL DEFAULT 0');     // this line's share of the promotion discount
   add('order_items', 'is_gift', 'INTEGER NOT NULL DEFAULT 0');            // free gift added by a promotion (price is 0)
@@ -353,9 +354,11 @@ export const json = (s, fallback) => {
   // Catalog v3 (ADDITIVE schema only; nothing here moves or deletes data). The tree/classification migration is a separate, approved
   // step: `npm run catalog -w server -- plan|test|apply` (see src/lib/catalog-migration.js).
   const dc3 = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);
-  for (const [col, ddl] of [['profile', 'TEXT'], ['description_ar', 'TEXT'], ['description_en', 'TEXT'], ['icon', 'TEXT'], ['visibility', "TEXT NOT NULL DEFAULT 'visible'"]]) {
+  for (const [col, ddl] of [['profile', 'TEXT'], ['description_ar', 'TEXT'], ['description_en', 'TEXT'], ['icon', 'TEXT'], ['visibility', "TEXT NOT NULL DEFAULT 'visible'"], ['image_asset_id', 'INTEGER'], ['legacy_image', 'TEXT'], ['seo_title_ar', 'TEXT'], ['seo_title_en', 'TEXT'], ['seo_desc_ar', 'TEXT'], ['seo_desc_en', 'TEXT'], ['show_empty', 'INTEGER NOT NULL DEFAULT 0']]) {
     if (!dc3.includes(col)) db.exec(`ALTER TABLE departments ADD COLUMN ${col} ${ddl}`);
   }
+  const ic = db.prepare('PRAGMA table_info(image_candidates)').all().map((c) => c.name);
+  for (const [col, ddl] of [['width', 'INTEGER'], ['height', 'INTEGER'], ['phash', 'TEXT'], ['near_json', "TEXT NOT NULL DEFAULT '[]'"]]) if (ic.length && !ic.includes(col)) db.exec(`ALTER TABLE image_candidates ADD COLUMN ${col} ${ddl}`);
   const pc3 = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!pc3.includes('attrs_json')) db.exec('ALTER TABLE products ADD COLUMN attrs_json TEXT');
 }

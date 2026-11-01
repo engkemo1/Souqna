@@ -34,7 +34,7 @@ export default function VisualSearch() {
   const install = useInstall();
   const [sp, setSp] = useSearchParams();
   const { data: visualTypeData } = useApi('/visual-search/types');
-  const { list, label } = useDepartments();
+  const { tops: list, label } = useDepartments();
   const [blob, setBlob] = useState(null);
   const [preview, setPreview] = useState('');
   const [dept, setDept] = useState('');

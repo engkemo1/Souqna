@@ -197,7 +197,7 @@ export default function StoreDesigner() {
   const { store, setStore } = useAuth();
   const toast = useToast();
   const { data, error, reload } = useApi('/owner/store');
-  const { bySlug: deptBy } = useDepartments();
+  const { bySlug: deptBy } = useDepartments({ all: true });
   // the template that fits what the store sells: the profile most of its sections belong to
   const suggestedTemplate = (() => {
     const n = {}; for (const slug of data?.store?.departments || []) { const p = deptBy.get(slug)?.profile; if (p) n[p] = (n[p] || 0) + 1; }

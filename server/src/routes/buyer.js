@@ -178,6 +178,7 @@ const orderRows = (buyerId) => {
   const items = rows.length ? q.all(`SELECT * FROM order_items WHERE order_id IN (${rows.map(() => '?').join(',')})`, rows.map((x) => x.id)) : [];
   const media = mediaMap(items.map((i) => i.media_id));
   return rows.map((o) => ({
+    notes: o.notes || null, storeNote: o.store_note || null,
     number: o.number, token: o.track_token, status: o.status, total: o.delivery_fee_status === 'rejected' ? o.subtotal - o.discount : o.total, createdAt: o.created_at,
     deliveryGroup: o.delivery_group, deliveryGroupCount: o.delivery_group && o.delivery_group_count ? o.delivery_group_count : null, deliveryGroupTotal: o.delivery_group && o.delivery_group_count ? o.delivery_group_total : null,
     deliveryFeeStatus: o.delivery_group_fee_status || o.delivery_fee_status, deliveryFeeQuote: o.delivery_group_fee_quote ?? o.delivery_fee_quote,

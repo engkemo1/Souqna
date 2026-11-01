@@ -1,3 +1,4 @@
+import OrderCommentsView from '../OrderCommentsView.jsx';
 import { Check, X, PhoneCall, MessageCircle, Truck, Package, ClipboardCheck, PartyPopper, Clock, MapPin, Store as StoreIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mapsLink } from '../store/ReserveSheet.jsx';
@@ -156,6 +157,12 @@ function DeliveryView({ o }) {
         </dl>
         <p className="mt-4 rounded-xl bg-surface px-4 py-3 text-sm text-muted">{t('track.payCod')} · {o.city}{o.governorate ? ` — ${t(`gov.${o.governorate}`)}` : ''}</p>
       </div>
+
+      {(o.notes || o.storeNote) && (
+        <div className="rounded-3xl border border-line bg-elevated p-5 sm:p-6">
+          <OrderCommentsView ar={lang === 'ar'} title={lang === 'ar' ? 'ملاحظاتك على الطلب' : 'Your instructions'} general={o.notes} stores={[{ name: tr(o.store?.name), text: o.storeNote }]} />
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-2">
         {phone && <Button variant="outline" icon={PhoneCall} href={`tel:${phone}`}>{t('track.callStore')}</Button>}

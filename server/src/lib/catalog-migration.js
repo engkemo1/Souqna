@@ -111,7 +111,7 @@ export function verify(db, before) {
 export function apply(db, { approved } = {}) {
   if (approved !== true) throw new Error('catalog migration requires explicit approval');
   ensureSchema(db);
-  for (const [col, ddl] of [['profile', 'TEXT'], ['description_ar', 'TEXT'], ['description_en', 'TEXT'], ['icon', 'TEXT'], ['visibility', "TEXT NOT NULL DEFAULT 'visible'"]]) {
+  for (const [col, ddl] of [['profile', 'TEXT'], ['description_ar', 'TEXT'], ['description_en', 'TEXT'], ['icon', 'TEXT'], ['visibility', "TEXT NOT NULL DEFAULT 'visible'"], ['image_asset_id', 'INTEGER'], ['legacy_image', 'TEXT'], ['seo_title_ar', 'TEXT'], ['seo_title_en', 'TEXT'], ['seo_desc_ar', 'TEXT'], ['seo_desc_en', 'TEXT'], ['show_empty', 'INTEGER NOT NULL DEFAULT 0']]) {
     if (!hasCol(db, 'departments', col)) db.exec(`ALTER TABLE departments ADD COLUMN ${col} ${ddl}`);
   }
   const before = snapshot(db);

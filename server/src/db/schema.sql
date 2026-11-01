@@ -182,6 +182,7 @@ CREATE TABLE IF NOT EXISTS orders (
   customer_id INTEGER REFERENCES customers(id) ON DELETE SET NULL,
   customer_name TEXT NOT NULL, phone TEXT NOT NULL,
   governorate TEXT, city TEXT, address TEXT, notes TEXT,
+  store_note TEXT,
   status TEXT NOT NULL DEFAULT 'pending',
   delivery_by TEXT NOT NULL DEFAULT 'store',
   delivery_group TEXT,
@@ -821,3 +822,67 @@ CREATE TABLE IF NOT EXISTS merchant_category_usage (
   last_used_at TEXT NOT NULL DEFAULT (datetime('now')),
   PRIMARY KEY (store_id, department_slug)
 );
+
+-- Image library v1 (additive). One row per STORED image; categories point at it by id. Created once (upload / approved generation), reused everywhere.
+CREATE TABLE IF NOT EXISTS image_assets (
+  id INTEGER PRIMARY KEY,
+  object_key TEXT NOT NULL UNIQUE,             -- key prefix on R2 / media volume, e.g. category-images/ab12cd34ef56
+  original_filename TEXT,
+  mime TEXT NOT NULL,                          -- of the preserved original
+  bytes INTEGER NOT NULL DEFAULT 0,            -- size of the preserved original
+  width INTEGER NOT NULL, height INTEGER NOT NULL,
+  format TEXT NOT NULL,
+  sha256 TEXT NOT NULL UNIQUE,                 -- exact-duplicate guard
+  phash TEXT,                                  -- 64-bit average hash, finds near-duplicates
+  variants_json TEXT NOT NULL DEFAULT '{}',    -- {thumb:{file,w,h,bytes}, card:{...}, hero:{...}}
+  source TEXT NOT NULL DEFAULT 'upload' CHECK (source IN ('upload','bulk','generated','legacy')),
+  status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active','archived')),
+  alt_ar TEXT, alt_en TEXT,
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_image_assets_phash ON image_assets(phash);
+
+-- An AI-generated picture waiting for the admin's decision. Nothing is stored in the library until it is approved.
+CREATE TABLE IF NOT EXISTS image_candidates (
+  id INTEGER PRIMARY KEY,
+  department_slug TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  provider TEXT NOT NULL,
+  data BLOB,
+  mime TEXT,
+  width INTEGER, height INTEGER,
+  phash TEXT,
+  near_json TEXT NOT NULL DEFAULT '[]',        -- ids of library assets / pending candidates that look almost identical
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  requested_by TEXT,
+  asset_id INTEGER REFERENCES image_assets(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  decided_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_image_candidates_dept ON image_candidates(department_slug, status);
+
+-- Controlled generation batches (started only by an admin). One job per section; a section never has two active jobs.
+CREATE TABLE IF NOT EXISTS image_gen_batches (
+  id INTEGER PRIMARY KEY,
+  scope TEXT NOT NULL,
+  size INTEGER NOT NULL,
+  status TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running','paused','done','cancelled')),
+  created_by TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  finished_at TEXT
+);
+CREATE TABLE IF NOT EXISTS image_gen_jobs (
+  id INTEGER PRIMARY KEY,
+  batch_id INTEGER NOT NULL REFERENCES image_gen_batches(id) ON DELETE CASCADE,
+  department_slug TEXT NOT NULL,
+  prompt TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'queued' CHECK (status IN ('queued','running','done','failed','cancelled')),
+  attempts INTEGER NOT NULL DEFAULT 0,
+  error TEXT,
+  candidate_id INTEGER REFERENCES image_candidates(id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_image_gen_jobs_batch ON image_gen_jobs(batch_id, status);
+CREATE INDEX IF NOT EXISTS idx_image_gen_jobs_dept ON image_gen_jobs(department_slug, status);

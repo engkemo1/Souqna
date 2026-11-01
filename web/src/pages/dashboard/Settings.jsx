@@ -224,7 +224,7 @@ export default function Settings() {
   const { t } = useI18n();
   const { setStore } = useAuth();
   const toast = useToast();
-  const depts = useDepartments();
+  const depts = useDepartments({ all: true });
   const { data, error, reload, mutate } = useApi('/owner/store');
   const [f, setF] = useState(null);
   const [errors, setErrors] = useState({});

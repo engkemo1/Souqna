@@ -1,3 +1,4 @@
+import OrderCommentsView from '../../components/OrderCommentsView.jsx';
 import { useState } from 'react';
 import { Truck, Phone, MessageCircle, MapPin, Store as StoreIcon } from 'lucide-react';
 import { PageHeader, FilterTabs, SearchInput, Pagination } from '../../components/dash/Kit.jsx';
@@ -40,7 +41,7 @@ function OrderSheet({ id, onClose, onChanged }) {
             <p className="mb-2 flex items-center gap-2 text-sm font-semibold"><MapPin className="h-4 w-4" />العميل (التسليم)</p>
             <p className="font-medium">{o.customer_name}</p>
             <p className="text-sm text-muted">{[o.address, o.city, o.governorate].filter(Boolean).join('، ')}</p>
-            {o.notes && <p className="mt-2 rounded-lg bg-amber-50 p-2.5 text-sm text-amber-900">ملاحظة: {o.notes}</p>}
+            <div className="mt-2"><OrderCommentsView ar general={o.notes} stores={(data.storeNotes || []).map((n) => ({ name: n.store_name, text: n.note }))} /></div>
             <div className="mt-2 flex gap-2"><Button size="xs" variant="outline" icon={Phone} href={`tel:${o.phone}`}><span dir="ltr">{o.phone}</span></Button><Button size="xs" variant="outline" icon={MessageCircle} href={waLink(o.phone, `أهلاً ${o.customer_name}، بخصوص طلبك ${o.number} من ${o.store_name}`)} target="_blank" rel="noreferrer">واتساب</Button></div>
           </div>
           <div className="rounded-2xl border border-line p-4">

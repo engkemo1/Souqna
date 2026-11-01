@@ -136,14 +136,14 @@ function DeptSheet({ dept, onClose, onSaved, all = [], defaultParent = '' }) {
   const [errs, setErrs] = useState({});
   if (dept && key !== (isNew ? 'new' : dept.id)) {
     setKey(isNew ? 'new' : dept.id); setErrs({});
-    setF(isNew ? { name_ar: '', name_en: '', slug: '', sizes: [], active: true, sort: '', parent: defaultParent || '', profile: '', description_ar: '', description_en: '', icon: '', visibility: 'visible', attrs: [] } : { parent: dept.parent || '', name_ar: dept.name_ar, name_en: dept.name_en, slug: dept.slug, sizes: dept.sizes, active: dept.active, sort: dept.sort, profile: dept.profile || '', description_ar: dept.description?.ar || '', description_en: dept.description?.en || '', icon: dept.icon || '', visibility: dept.visibility || 'visible', attrs: dept.attrs || [] });
+    setF(isNew ? { name_ar: '', name_en: '', slug: '', sizes: [], active: true, sort: '', parent: defaultParent || '', profile: '', description_ar: '', description_en: '', icon: '', visibility: 'visible', attrs: [], seo_title_ar: '', seo_title_en: '', seo_desc_ar: '', seo_desc_en: '', show_empty: false } : { parent: dept.parent || '', name_ar: dept.name_ar, name_en: dept.name_en, slug: dept.slug, sizes: dept.sizes, active: dept.active, sort: dept.sort, profile: dept.profile || '', description_ar: dept.description?.ar || '', description_en: dept.description?.en || '', icon: dept.icon || '', visibility: dept.visibility || 'visible', attrs: dept.attrs || [], seo_title_ar: dept.seo?.title?.ar || '', seo_title_en: dept.seo?.title?.en || '', seo_desc_ar: dept.seo?.description?.ar || '', seo_desc_en: dept.seo?.description?.en || '', show_empty: !!dept.show_empty });
   }
   const open = !!dept && !!f;
   const save = async (e) => {
     e?.preventDefault();
     setBusy(true); setErrs({});
     try {
-      const body = { parent: f.parent || null, name_ar: f.name_ar, name_en: f.name_en, sizes: f.sizes, profile: f.profile || null, description_ar: f.description_ar, description_en: f.description_en, icon: f.icon || null, visibility: f.visibility, attrs: f.attrs.filter((a) => a.active === false || (a.key && (a.ar || a.en))).map(({ _text, ...a }) => a), ...(f.sort !== '' ? { sort: Number(f.sort) } : {}) };
+      const body = { parent: f.parent || null, name_ar: f.name_ar, name_en: f.name_en, sizes: f.sizes, profile: f.profile || null, description_ar: f.description_ar, description_en: f.description_en, seo_title_ar: f.seo_title_ar, seo_title_en: f.seo_title_en, seo_desc_ar: f.seo_desc_ar, seo_desc_en: f.seo_desc_en, show_empty: !!f.show_empty, icon: f.icon || null, visibility: f.visibility, attrs: f.attrs.filter((a) => a.active === false || (a.key && (a.ar || a.en))).map(({ _text, ...a }) => a), ...(f.sort !== '' ? { sort: Number(f.sort) } : {}) };
       const r = isNew ? await adminApi('/departments', { method: 'POST', body: { ...body, slug: f.slug || undefined } }) : await adminApi(`/departments/${dept.id}`, { method: 'PATCH', body: { ...body, active: f.active } });
       onSaved(r.departments); toast({ title: isNew ? 'اتضاف القسم' : 'اتحفظ' }); onClose();
     } catch (x) {
@@ -155,7 +155,7 @@ function DeptSheet({ dept, onClose, onSaved, all = [], defaultParent = '' }) {
   return (
     <Sheet open={open} onClose={onClose} title={isNew ? 'قسم جديد' : `تعديل: ${dept?.name_ar || ''}`} side="end" size="lg"
       footer={<div className="flex gap-2"><Button full loading={busy} onClick={save}>{isNew ? 'إضافة القسم' : 'حفظ'}</Button><Button variant="outline" onClick={onClose}>إلغاء</Button></div>}>
-      {f && (
+      {f && dept && (
         <form onSubmit={save} className="space-y-5 py-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="الاسم (عربي)" error={errs.name_ar}><Input required minLength={2} value={f.name_ar} onChange={(e) => setF({ ...f, name_ar: e.target.value })} placeholder="مثال: عطور" /></Field>
@@ -184,6 +184,13 @@ function DeptSheet({ dept, onClose, onSaved, all = [], defaultParent = '' }) {
             <Field label="أيقونة (اسم أو رمز)"><Input dir="ltr" maxLength={30} value={f.icon} onChange={(e) => setF({ ...f, icon: e.target.value })} className="text-start" placeholder="shirt" /></Field>
           </div>
           <Switch checked={f.visibility !== 'hidden'} onChange={(v) => setF({ ...f, visibility: v ? 'visible' : 'hidden' })} label="ظاهر للتجار والعملاء" description="لو اتقفل القسم بيفضل بمنتجاته بس مش بيظهر في القوائم." />
+          <Switch checked={!!f.show_empty} onChange={(v) => setF({ ...f, show_empty: v })} label="اعرضه للعملاء حتى لو فاضي" description="الأقسام اللي مفيهاش منتجات ولا محلات بتتخفى عن العملاء تلقائيًا." />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="عنوان SEO (عربي)" hint="حتى 70 حرف. فاضي = اسم القسم."><Input maxLength={70} value={f.seo_title_ar} onChange={(e) => setF({ ...f, seo_title_ar: e.target.value })} /></Field>
+            <Field label="SEO title (English)"><Input dir="ltr" maxLength={70} value={f.seo_title_en} onChange={(e) => setF({ ...f, seo_title_en: e.target.value })} className="text-start" /></Field>
+            <Field label="وصف SEO (عربي)" hint="حتى 170 حرف."><textarea rows={2} maxLength={170} className="w-full rounded-xl border border-line-strong bg-elevated p-3 text-sm" value={f.seo_desc_ar} onChange={(e) => setF({ ...f, seo_desc_ar: e.target.value })} /></Field>
+            <Field label="SEO description (English)"><textarea dir="ltr" rows={2} maxLength={170} className="w-full rounded-xl border border-line-strong bg-elevated p-3 text-start text-sm" value={f.seo_desc_en} onChange={(e) => setF({ ...f, seo_desc_en: e.target.value })} /></Field>
+          </div>
           <div><p className="mb-2 text-sm font-medium">الخصائص والفلاتر (التيشيرت غير الجزمة غير العطر)</p>
             <AttrEditor own={f.attrs} inherited={isNew ? [] : (dept.attrs_effective || []).filter((d) => !(dept.attrs || []).some((o) => o.key === d.key && o.active !== false))} onChange={(attrs) => setF({ ...f, attrs })} /></div>
           <div><p className="mb-2 text-sm font-medium">مقاسات احتياطية للقسم (المقاسات الأساسية بتيجي من نوع المنتج)</p><SizesEditor value={f.sizes} onChange={(sizes) => setF({ ...f, sizes })} />

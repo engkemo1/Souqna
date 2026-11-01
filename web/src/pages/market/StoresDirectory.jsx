@@ -7,20 +7,18 @@ import Button from '../../components/ui/Button.jsx';
 import { Select } from '../../components/ui/Field.jsx';
 import { EmptyState, ErrorState } from '../../components/ui/States.jsx';
 import { useApi, useDebounced } from '../../lib/hooks.js';
-import { useDepartments } from '../../lib/departments.js';
+import CategoryBrowser from '../../components/market/CategoryBrowser.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { cx } from '../../components/ui/cx.js';
 
 export default function StoresDirectory() {
   const { t, lang } = useI18n();
-  const { list: departments, label } = useDepartments();
-  const [term, setTerm] = useState('');
+    const [term, setTerm] = useState('');
   const [category, setCategory] = useState('all');
   const [sort, setSort] = useState('featured');
   const q = useDebounced(term.trim(), 250);
   const path = useMemo(() => `/marketplace?${new URLSearchParams({ q, category, sort })}`, [q, category, sort]);
   const { data, error, loading, reload } = useApi(path);
-  const cats = ['all', ...departments.map((d) => d.slug)];
 
   useEffect(() => {
     document.title = `${t('market.allStores')} · ${t('app.name')}`;
@@ -59,11 +57,7 @@ export default function StoresDirectory() {
             </div>
           </div>
 
-          <div className="mb-7 flex flex-wrap gap-2" role="tablist" aria-label={t('settings.category')}>
-            {cats.map((item) => <button key={item} type="button" role="tab" aria-selected={category === item} onClick={() => setCategory(item)} className={cx('rounded-full border px-3.5 py-2 text-xs font-semibold transition sm:px-4 sm:text-sm', category === item ? 'border-brand bg-btn text-on-btn shadow-sm' : 'border-line-strong bg-white text-[#43516a] hover:border-fg/30/50 hover:text-brand')}>
-              {item === 'all' ? t('cat.all') : label(item)}
-            </button>)}
-          </div>
+          <CategoryBrowser value={category} onChange={setCategory} />
 
           {error ? <ErrorState error={error} onRetry={reload} /> : loading && !data ? (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">{Array.from({ length: 6 }, (_, i) => <StoreCardSkeleton key={i} />)}</div>
