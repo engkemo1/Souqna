@@ -60,6 +60,8 @@ test('migration keeps ids/products/stores, moves old sections into the new tree,
     t.insert('departments', { slug: pslug, name_ar: 'قسم المحل', name_en: 'Shop section', sizes_json: '[]', sort: 99, active: 0, parent_slug: 'women' });
     t.insert('categories', { store_id: t.storeId, slug: pslug.replace(/_/g, '-'), name_ar: 'قسم المحل', name_en: 'Shop section', sort: 1 });
     const pp = prod(t, { department: pslug, status: 'active' });
+    // a database the new server code never opened has none of the new tables: the tool must create them itself
+    db.exec('DROP TABLE merchant_category_usage; DROP TABLE category_requests; DROP TABLE category_attributes;');
     const snap = t.mig.snapshot(db);
     t.mig.apply(db, { approved: true });
     assert.equal(mk('women_abaya').id, abayaBefore.id, 'department id preserved');

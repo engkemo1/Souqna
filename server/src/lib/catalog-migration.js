@@ -11,9 +11,19 @@
  *
  * All functions take a node:sqlite handle so the same code runs on a copy of the database (test) and on the real one (apply).
  */
+import fs from 'node:fs';
 import { CATALOG_TREE, OLD_DEFAULT_NAMES, PROFILE_ATTRS } from '@souqna/shared';
 
 const hasCol = (db, table, col) => db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+
+/** Additive DDL only (new tables + new columns), so the tool also works on a database the new server code has never opened. */
+export function ensureSchema(db) {
+  const sql = fs.readFileSync(new URL('../db/schema.sql', import.meta.url), 'utf8');
+  const at = sql.indexOf('-- Catalog v3');
+  if (at < 0) throw new Error('schema.sql has no Catalog v3 section');
+  db.exec(sql.slice(at));
+  if (!hasCol(db, 'products', 'attrs_json')) db.exec('ALTER TABLE products ADD COLUMN attrs_json TEXT');
+}
 
 /** Questions only the owner can answer. Counts are filled from the real database by plan(). */
 export const AMBIGUITIES = [
@@ -100,6 +110,7 @@ export function verify(db, before) {
 /** Applies the mapping inside ONE transaction and verifies it; rolls back on any problem. `approved` must be literally true. */
 export function apply(db, { approved } = {}) {
   if (approved !== true) throw new Error('catalog migration requires explicit approval');
+  ensureSchema(db);
   for (const [col, ddl] of [['profile', 'TEXT'], ['description_ar', 'TEXT'], ['description_en', 'TEXT'], ['icon', 'TEXT'], ['visibility', "TEXT NOT NULL DEFAULT 'visible'"]]) {
     if (!hasCol(db, 'departments', col)) db.exec(`ALTER TABLE departments ADD COLUMN ${col} ${ddl}`);
   }
