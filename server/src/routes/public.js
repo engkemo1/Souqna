@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
-import { listDepartments, deptSubtree, deptAncestors } from '../lib/departments.js';
+import { listDepartments, deptSubtree, deptAncestors, deptAttrDefs, deptProfile } from '../lib/departments.js';
 import { z } from 'zod';
 import { q, tx, insert, json } from '../db/index.js';
 import { randomBytes } from 'node:crypto';
@@ -53,7 +53,7 @@ function loadStore(slug) {
 
 /* ---------------------------------------------------------- marketplace */
 
-r.get('/departments', h((_req, res) => res.json({ departments: listDepartments().map(({ slug, name, sizes, image, parent }) => ({ slug, name, sizes, image, parent })) })));
+r.get('/departments', h((_req, res) => res.json({ departments: listDepartments().filter((d) => d.visibility !== 'hidden').map(({ slug, name, sizes, image, parent, profile_effective: profile, attrs_effective: attrs, description, icon }) => ({ slug, name, sizes, image, parent, profile, attrs, description, icon })) })));
 
 r.get('/homepage-ads', h((_req, res) => {
   const today = cairoNow().date;
@@ -201,6 +201,17 @@ r.get('/search', h((req, res) => {
     const cs = matList.map((k) => matCond(MATERIALS.find((m) => m.key === k)));
     where.push(`(${cs.map((c) => c.sql).join(' OR ')})`); params.push(...cs.flatMap((c) => c.params));
   }
+  // product-type filters (material, fit, fabric, finish...): defined per department, chosen as ?a_<key>=v1,v2
+  const attrDefs = deptSlug ? deptAttrDefs(deptSlug) : [];
+  const attrCond = (d, vals) => ({ sql: `EXISTS (SELECT 1 FROM json_each(p.attrs_json, '$.${d.key}') j WHERE ${d.type === 'text' ? 'LOWER(j.value)' : 'j.value'} IN (${vals.map(() => '?').join(',')}))`, params: d.type === 'text' ? vals.map((v) => v.toLowerCase()) : vals });
+  const attrSel = new Map();
+  for (const d of attrDefs) {
+    const allowed = d.type === 'text' ? null : new Set(d.options.map((x) => x.v));
+    const vals = String(req.query[`a_${d.key}`] || '').split(',').map((x) => x.trim().slice(0, 40)).filter((x) => x && (!allowed || allowed.has(x))).slice(0, 8);
+    if (vals.length) attrSel.set(d.key, vals);
+  }
+  const preAttr = { where: [...where], params: [...params] };
+  for (const d of attrDefs) if (attrSel.has(d.key)) { const c = attrCond(d, attrSel.get(d.key)); where.push(c.sql); params.push(...c.params); }
   const preVariant = { where: [...where], params: [...params] }; // facets for size/colour ignore their own filter
   if (sizes) {
     const list = String(sizes).split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12);
@@ -264,8 +275,18 @@ r.get('/search', h((req, res) => {
   const matSums = MATERIALS.map((m, i) => { const c = matCond(m); return { sql: `SUM(CASE WHEN ${c.sql} THEN 1 ELSE 0 END) AS m${i}`, params: c.params }; });
   const matRow = q.get(`SELECT ${matSums.map((x) => x.sql).join(', ')} FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preMat.where.join(' AND ')}`, [...matSums.flatMap((x) => x.params), ...preMat.params]) || {};
     const materials = MATERIALS.map((m, i) => ({ key: m.key, name: { ar: m.ar, en: m.en }, n: Number(matRow[`m${i}`]) || 0 })).filter((m) => m.n > 0 || matList.includes(m.key)).sort((a, b) => b.n - a.n);
+  // counts per option of every department filter; each one ignores its own selection but respects the others
+  const attrFacets = attrDefs.map((d) => {
+    const w = [...preAttr.where]; const pr = [...preAttr.params];
+    for (const o of attrDefs) if (o.key !== d.key && attrSel.has(o.key)) { const c = attrCond(o, attrSel.get(o.key)); w.push(c.sql); pr.push(...c.params); }
+    const rows = q.all(`SELECT j.value AS v, COUNT(DISTINCT p.id) AS n FROM products p JOIN stores s ON s.id=p.store_id, json_each(p.attrs_json, '$.${d.key}') j WHERE ${w.join(' AND ')} AND p.attrs_json IS NOT NULL GROUP BY j.value ORDER BY n DESC LIMIT 30`, pr);
+    const byV = new Map(rows.map((r) => [String(r.v), r.n]));
+    const options = d.type === 'text' ? rows.map((r) => ({ v: String(r.v), ar: String(r.v), en: String(r.v), n: r.n }))
+      : d.options.map((o) => ({ ...o, n: byV.get(o.v) || 0 })).filter((o) => o.n > 0 || (attrSel.get(d.key) || []).includes(o.v));
+    return { key: d.key, name: { ar: d.ar, en: d.en }, type: d.type, options, selected: attrSel.get(d.key) || [] };
+  }).filter((f) => f.options.length);
   cache(res, 20);
-  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences, materials } });
+  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences, materials, attrs: attrFacets } });
 }));
 
 /* ---------------------------------------------------------- visual search: "snap it, find it in Banha" */
@@ -573,7 +594,7 @@ r.get('/stores/:slug/promotions', h((req, res) => {
 
 r.post('/stores/:slug/promotions/:id/view', h((req, res) => {
   const s = loadStore(req.params.slug);
-  res.json({ ok: countView(s.id, Number(req.params.id) || 0) });
+  res.json({ ok: countView(s.id, Number(req.params.id) || 0, req.ip || 'unknown') });
 }));
 
 r.get('/stores/:slug/home', h((req, res) => {
@@ -624,6 +645,18 @@ r.get('/stores/:slug/products', h((req, res) => {
     where.push(`EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND UPPER(v.color) IN (${list.map(() => '?').join(',')}))`);
     params.push(...list);
   }
+  // department-specific filters (fabric, fit, shade, ...) for what this store sells in the current scope
+  const scopeWhere = [...where]; const scopeParams = [...params];
+  const scopeDepts = q.all(`SELECT p.department AS d, COUNT(*) AS n FROM products p WHERE ${scopeWhere.join(' AND ')} AND p.department IS NOT NULL GROUP BY p.department ORDER BY n DESC`, scopeParams);
+  const sDefs = []; const sSeen = new Set();
+  for (const { d } of scopeDepts.slice(0, 8)) for (const def of deptAttrDefs(d)) if (!sSeen.has(def.key)) { sSeen.add(def.key); sDefs.push(def); }
+  const sCond = (d, vals) => ({ sql: `EXISTS (SELECT 1 FROM json_each(p.attrs_json, '$.${d.key}') j WHERE ${d.type === 'text' ? 'LOWER(j.value)' : 'j.value'} IN (${vals.map(() => '?').join(',')}))`, params: d.type === 'text' ? vals.map((v) => v.toLowerCase()) : vals });
+  const sSel = new Map();
+  for (const d of sDefs) {
+    const allowed = d.type === 'text' ? null : new Set(d.options.map((x) => x.v));
+    const vals = String(req.query[`a_${d.key}`] || '').split(',').map((x) => x.trim().slice(0, 40)).filter((x) => x && (!allowed || allowed.has(x))).slice(0, 8);
+    if (vals.length) { sSel.set(d.key, vals); const c = sCond(d, vals); where.push(c.sql); params.push(...c.params); }
+  }
   const order = {
     featured: `p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC`,
     newest: 'p.created_at DESC',
@@ -655,7 +688,18 @@ r.get('/stores/:slug/products', h((req, res) => {
     total,
     page,
     pages: Math.max(1, Math.ceil(total / limit)),
-    facets: { sizes: facetSizes, colors: [...colorMap.values()], price },
+    profile: scopeDepts.length ? deptProfile(scopeDepts[0].d) : 'women',
+    facets: {
+      sizes: facetSizes, colors: [...colorMap.values()], price,
+      attrs: sDefs.map((d) => {
+        const w = [...scopeWhere]; const pr = [...scopeParams];
+        for (const o of sDefs) if (o.key !== d.key && sSel.has(o.key)) { const c = sCond(o, sSel.get(o.key)); w.push(c.sql); pr.push(...c.params); }
+        const rows = q.all(`SELECT j.value AS v, COUNT(DISTINCT p.id) AS n FROM products p, json_each(p.attrs_json, '$.${d.key}') j WHERE ${w.join(' AND ')} AND p.attrs_json IS NOT NULL GROUP BY j.value ORDER BY n DESC LIMIT 30`, pr);
+        const byV = new Map(rows.map((r) => [String(r.v), r.n]));
+        const options = d.type === 'text' ? rows.map((r) => ({ v: String(r.v), ar: String(r.v), en: String(r.v), n: r.n })) : d.options.map((o) => ({ ...o, n: byV.get(o.v) || 0 })).filter((o) => o.n > 0 || (sSel.get(d.key) || []).includes(o.v));
+        return { key: d.key, name: { ar: d.ar, en: d.en }, type: d.type, options, selected: sSel.get(d.key) || [] };
+      }).filter((f) => f.options.length),
+    },
   });
 }));
 

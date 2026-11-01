@@ -1,3 +1,4 @@
+import { PROFILES } from '@souqna/shared/catalog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { SlidersHorizontal, X, Check, PackageSearch } from 'lucide-react';
@@ -21,7 +22,7 @@ const SORTS = ['featured', 'newest', 'best', 'price_asc', 'price_desc', 'discoun
 const FILTER_KEYS = ['category', 'sizes', 'colors', 'min', 'max', 'sale'];
 
 function FilterPanel({ value, onChange, facets, categories }) {
-  const { t, tr } = useI18n();
+  const { t, tr, lang } = useI18n();
   const set = (k, v) => onChange({ ...value, [k]: v || undefined });
   const toggleList = (k, item) => {
     const list = (value[k] || '').split(',').filter(Boolean);
@@ -80,6 +81,21 @@ function FilterPanel({ value, onChange, facets, categories }) {
         </section>
       )}
 
+      {(facets?.attrs || []).map((f) => (
+        <section key={f.key} className="py-6">
+          <h3 className="mb-3 text-sm font-semibold">{tr(f.name)}</h3>
+          <div className="flex flex-wrap gap-2">
+            {f.options.map((o) => (
+              <button key={o.v} type="button" onClick={() => toggleList(`a_${f.key}`, o.v)} aria-pressed={has(`a_${f.key}`, o.v)}
+                className={cx('inline-flex h-10 items-center gap-2 rounded-xl border px-3.5 text-sm font-medium transition', has(`a_${f.key}`, o.v) ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>
+                {o.hex && <span aria-hidden="true" className="h-4 w-4 rounded-full ring-1 ring-inset ring-black/15" style={{ background: o.hex }} />}{tr(o)}
+                <span className={cx('text-xs', has(`a_${f.key}`, o.v) ? 'opacity-80' : 'text-muted')}>{formatNumber(o.n, lang)}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+
       <section className="py-6">
         <h3 className="mb-3 text-sm font-semibold">{t('shop.filter.price')}</h3>
         <div className="grid grid-cols-2 gap-3">
@@ -136,11 +152,12 @@ export default function Shop() {
     return () => io.disconnect();
   });
 
-  const current = Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || undefined]));
-  const activeCount = FILTER_KEYS.filter((k) => k !== 'category' && params.get(k)).length;
+  const attrKeys = [...params.keys()].filter((k) => /^a_[a-z0-9_]+$/.test(k)); // department-specific filters (fabric, fit, finish...)
+  const current = Object.fromEntries([...FILTER_KEYS, ...attrKeys].map((k) => [k, params.get(k) || undefined]));
+  const activeCount = [...FILTER_KEYS, ...attrKeys].filter((k) => k !== 'category' && params.get(k)).length;
   const apply = (v) => {
     const next = new URLSearchParams(params);
-    for (const k of FILTER_KEYS) { if (v[k]) next.set(k, v[k]); else next.delete(k); }
+    for (const k of new Set([...FILTER_KEYS, ...attrKeys, ...Object.keys(v).filter((x) => /^a_[a-z0-9_]+$/.test(x))])) { if (v[k]) next.set(k, v[k]); else next.delete(k); }
     setParams(next, { replace: true });
   };
   const setSort = (s) => { const next = new URLSearchParams(params); next.set('sort', s); setParams(next, { replace: true }); };
@@ -156,6 +173,12 @@ export default function Shop() {
   for (const c of (current.colors || '').split(',').filter(Boolean)) {
     const col = data?.facets?.colors?.find((x) => x.hex.toUpperCase() === c);
     chips.push({ key: `color-${c}`, label: col ? tr({ ar: col.name_ar, en: col.name_en }) : c, swatch: c, remove: () => apply({ ...current, colors: current.colors.split(',').filter((x) => x !== c).join(',') }) });
+  }
+  for (const f of data?.facets?.attrs || []) {
+    for (const v of (current[`a_${f.key}`] || '').split(',').filter(Boolean)) {
+      const o = f.options.find((x) => x.v === v);
+      chips.push({ key: `a-${f.key}-${v}`, label: `${tr(f.name)}: ${o ? tr(o) : v}`, remove: () => apply({ ...current, [`a_${f.key}`]: current[`a_${f.key}`].split(',').filter((x) => x !== v).join(',') || undefined }) });
+    }
   }
   if (current.min || current.max) chips.push({ key: 'price', label: `${current.min || 0} – ${current.max || '∞'}`, remove: () => apply({ ...current, min: undefined, max: undefined }) });
   if (current.sale) chips.push({ key: 'sale', label: t('shop.filter.onSale'), remove: () => apply({ ...current, sale: undefined }) });
@@ -243,7 +266,7 @@ export default function Shop() {
           ) : (
             <>
               <ProductGrid className={cx('transition-opacity duration-300 xl:grid-cols-3 2xl:grid-cols-4', loading && 'opacity-50')}>
-                {items.map((p, i) => <ProductCard key={p.id} product={p} slug={store.slug} onQuickAdd={setQuick} index={i} priority={i < 2} />)}
+                {items.map((p, i) => <ProductCard key={p.id} product={p} slug={store.slug} onQuickAdd={setQuick} index={i} priority={i < 2} ratio={(PROFILES[data?.profile]?.ratio || '4/5').replace('/', ' / ')} />)}
                 {extra.loading && Array.from({ length: 3 }, (_, i) => <ProductCardSkeleton key={`s${i}`} />)}
               </ProductGrid>
               <div ref={sentinel} className="flex justify-center py-10">

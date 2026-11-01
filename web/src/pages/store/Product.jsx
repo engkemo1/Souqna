@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw, Banknote, PackageX, Ban, Store as StoreIcon } from 'lucide-react';
 import ReserveSheet from '../../components/store/ReserveSheet.jsx';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useApi } from '../../lib/hooks.js';
+import { useDepartments } from '../../lib/departments.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { exchangeLabel, exchangeSentence, returnDaysOf } from '../../lib/returns.js';
 import { useFavorites } from '../../lib/cart.jsx';
@@ -114,6 +115,15 @@ export default function Product() {
   const toast = useToast();
   const add = useAddToCart(store.slug);
   const p = data?.product;
+  const depts = useDepartments();
+  // category-specific details (fabric, fit, finish...) from the product's own attribute values, labelled by its section's definitions; merchant-only fields are never shown
+  const specRows = (() => {
+    const defs = depts.bySlug.get(p?.department)?.attrs || [];
+    return defs.filter((d) => !d.merchant_only && p?.attrs && p.attrs[d.key] != null && p.attrs[d.key] !== '').map((d) => {
+      const v = p.attrs[d.key]; const opt = (x) => { const o = (d.options || []).find((y) => y.v === x); return o ? (lang === 'ar' ? o.ar : o.en || o.ar) : x; };
+      return { key: d.key, label: lang === 'ar' ? d.ar : d.en || d.ar, value: d.type === 'boolean' ? (v ? t('common.yes') : t('common.no')) : Array.isArray(v) ? v.map(opt).join(' · ') : d.type === 'number' ? `${v}${d.unit ? ` ${d.unit}` : ''}` : opt(v) };
+    });
+  })();
   const [color, setColor] = useState(null);
   const [size, setSize] = useState(null);
   const [qty, setQty] = useState(1);
@@ -282,6 +292,7 @@ export default function Product() {
                 <dt>{t('product.sku')}</dt><dd className="font-medium text-fg" dir="ltr">{p.sku}</dd>
                 {p.category && <><dt>{t('editor.category')}</dt><dd className="font-medium text-fg">{tr(p.category.name)}</dd></>}
                 {p.sizes.length > 0 && <><dt>{t('product.size')}</dt><dd className="font-medium text-fg">{p.sizes.join(' · ')}</dd></>}
+                {specRows.map((r) => <Fragment key={r.key}><dt>{r.label}</dt><dd className="font-medium text-fg">{r.value}</dd></Fragment>)}
               </dl>
             </Accordion>
             <Accordion title={t('product.shipping')}><p>{t('product.shippingBody', { ex: exchangeSentence(t, store, p) }).trim()}</p></Accordion>

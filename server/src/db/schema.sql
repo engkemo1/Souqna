@@ -777,3 +777,47 @@ CREATE TABLE IF NOT EXISTS order_returns (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 CREATE INDEX IF NOT EXISTS idx_order_returns_order ON order_returns(order_id);
+
+-- Catalog v3 (additive). Attribute definitions live per department; children inherit from their parents and may override a key.
+CREATE TABLE IF NOT EXISTS category_attributes (
+  id INTEGER PRIMARY KEY,
+  department_slug TEXT NOT NULL REFERENCES departments(slug) ON UPDATE CASCADE ON DELETE CASCADE,
+  key TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'select' CHECK (type IN ('text','select','multi','number','boolean')),
+  label_ar TEXT NOT NULL, label_en TEXT NOT NULL,
+  options_json TEXT NOT NULL DEFAULT '[]',
+  required INTEGER NOT NULL DEFAULT 0,
+  filterable INTEGER NOT NULL DEFAULT 1,       -- shown to customers as a filter
+  merchant_only INTEGER NOT NULL DEFAULT 0,    -- only the merchant sees/fills it (never shown to customers)
+  sort INTEGER NOT NULL DEFAULT 0,
+  active INTEGER NOT NULL DEFAULT 1,           -- active=0 in a child turns an inherited attribute off for that branch
+  UNIQUE(department_slug, key)
+);
+CREATE INDEX IF NOT EXISTS idx_category_attributes_dept ON category_attributes(department_slug);
+
+-- A merchant asks for a missing section; only an administrator can create it. The product it came from stays a draft meanwhile.
+CREATE TABLE IF NOT EXISTS category_requests (
+  id INTEGER PRIMARY KEY,
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  requested_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  name_ar TEXT NOT NULL, name_en TEXT,
+  parent_slug TEXT,                            -- the merchant's suggestion (validated); the admin may choose another
+  note TEXT,
+  status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+  reason TEXT,                                 -- why it was rejected
+  department_slug TEXT,                        -- the section that was created / chosen when approved
+  decided_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+  decided_at TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_category_requests_status ON category_requests(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_category_requests_store ON category_requests(store_id);
+
+-- "Recently / frequently used" sections per store (drives the quick picks in the product form).
+CREATE TABLE IF NOT EXISTS merchant_category_usage (
+  store_id INTEGER NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
+  department_slug TEXT NOT NULL,
+  uses INTEGER NOT NULL DEFAULT 1,
+  last_used_at TEXT NOT NULL DEFAULT (datetime('now')),
+  PRIMARY KEY (store_id, department_slug)
+);

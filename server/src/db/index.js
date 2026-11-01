@@ -350,4 +350,12 @@ export const json = (s, fallback) => {
       console.error('[db] department tree migration failed (will retry on next start):', e.message);
     }
   }
+  // Catalog v3 (ADDITIVE schema only; nothing here moves or deletes data). The tree/classification migration is a separate, approved
+  // step: `npm run catalog -w server -- plan|test|apply` (see src/lib/catalog-migration.js).
+  const dc3 = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);
+  for (const [col, ddl] of [['profile', 'TEXT'], ['description_ar', 'TEXT'], ['description_en', 'TEXT'], ['icon', 'TEXT'], ['visibility', "TEXT NOT NULL DEFAULT 'visible'"]]) {
+    if (!dc3.includes(col)) db.exec(`ALTER TABLE departments ADD COLUMN ${col} ${ddl}`);
+  }
+  const pc3 = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
+  if (!pc3.includes('attrs_json')) db.exec('ALTER TABLE products ADD COLUMN attrs_json TEXT');
 }

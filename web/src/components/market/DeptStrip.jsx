@@ -8,6 +8,7 @@ export const DEPT_EMOJI = {
   women: '👗', men: '👔', kids: '🧒', shoes: '👟', bags: '👜', hijab: '🧕', abaya: '🥻', jalabiya: '👘',
   underwear: '🩲', wedding_dress: '👰', wedding_suit: '🤵', sports: '🏃', denim: '👖', accessories: '💍',
   perfume_makeup: '💄', care: '✨',
+  modest: '🧕', women_hijab: '🧕', beauty: '💄', perfumes: '🌸', sportswear: '🏃', shoes_sneakers: '👟',
 };
 
 export const DEFAULT_DEPTS = [

@@ -16,7 +16,7 @@ import { OfferChip } from '../promo/OfferCards.jsx';
 
 export const CARD_SIZES = '(min-width:1280px) 22vw, (min-width:1024px) 28vw, (min-width:640px) 33vw, 50vw';
 
-function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showStore }) {
+function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showStore, ratio = '4 / 5' }) {
   const { t, tr } = useI18n();
   const favs = useFavorites(slug);
   const toast = useToast();
@@ -53,7 +53,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
         <SmartImage
           media={p.image}
           alt={tr(p.name)}
-          ratio="4 / 5"
+          ratio={ratio}
           sizes={CARD_SIZES}
           priority={priority}
           imgClassName="group-hover:scale-[1.035] [@media(hover:none)]:group-hover:scale-100"
@@ -63,7 +63,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
           <SmartImage
             media={p.hoverImage}
             alt=""
-            ratio="4 / 5"
+            ratio={ratio}
             sizes={CARD_SIZES}
             className="!absolute inset-0 opacity-0 transition-opacity duration-500 ease-out [@media(hover:hover)]:group-hover:opacity-100"
           />
@@ -143,7 +143,7 @@ export function ProductCardSkeleton() {
   );
 }
 
-export function ProductGrid({ children, className }) {
+export function ProductGrid({ children, className, density }) {
   const { grid } = useDesign();
-  return <div className={cx('grid', GRID_CLASS[grid] || GRID_CLASS.cozy, className)}>{children}</div>;
+  return <div className={cx('grid', GRID_CLASS[density] || GRID_CLASS[grid] || GRID_CLASS.cozy, className)}>{children}</div>;
 }

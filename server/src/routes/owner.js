@@ -5,7 +5,8 @@ import { ORDER_FLOW, buildTheme, THEME_FIELDS, encodeDepartments, decodeDepartme
 import { extractSwatches } from '../lib/logo-palette.js';
 import { q, tx, insert, update, json } from '../db/index.js';
 import { config } from '../config.js';
-import { assertDepartments, inferDepartment, ensureDeptCategories, deptSubtree, deptAncestors, listDepartments } from '../lib/departments.js';
+import { assertDepartments, inferDepartment, ensureDeptCategories, deptSubtree, deptAncestors, listDepartments, deptAttrDefs } from '../lib/departments.js';
+import { sanitizeAttrValues } from '@souqna/shared';
 import { productTypeTree, deriveDepartment, audienceOrNull, AUDIENCE_KEYS } from '../lib/product-types.js';
 import { inferGender, inferKey } from '../lib/moda/products.js';
 import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
@@ -698,7 +699,15 @@ const colorSchema = z.object({ name_ar: z.string().trim().min(1).max(30), name_e
 function productDepartment(storeId, wanted, text = '', modaKey = null, audience = null) {
   const mine = decodeDepartments(q.val('SELECT departments FROM stores WHERE id=?', [storeId]));
   if (!wanted && modaKey) wanted = deriveDepartment(modaKey, audienceOrNull(audience), mine) || null; // من النوع والفئة: صاحب المحل مش محتاج يختار القسم
-  if (wanted) { if (!mine.includes(wanted)) throw badRequest('invalid_department', 'Pick one of your store departments.'); return wanted; }
+  if (wanted) {
+    if (!mine.includes(wanted)) {
+      // any active LEAF section of the platform tree may be used; the store then sells in it (unknown / inactive / parent sections stay invalid)
+      const d = q.get('SELECT slug FROM departments WHERE slug=? AND active=1 AND visibility<>\'hidden\'', [wanted]);
+      if (!d || q.get('SELECT 1 FROM departments WHERE parent_slug=? AND active=1', [wanted])) throw badRequest('invalid_department', 'Pick one of your store departments.');
+      q.run('UPDATE stores SET departments=? WHERE id=?', [encodeDepartments([...mine, wanted]), storeId]);
+    }
+    return wanted;
+  }
   if (mine.length === 1) return mine[0];
   return inferDepartment(text, mine); // multi-department store: best guess from the name; the editor asks for it explicitly, this is the safety net
 }
@@ -730,6 +739,7 @@ export const productSchema = z.object({
   department: z.string().max(31).nullable().optional(),
   style_level: z.number().int().min(1).max(5).nullable().optional(),
   moda_key: z.string().max(80).nullable().optional(),
+  attrs: z.record(z.string().max(25), z.union([z.string().max(60), z.array(z.string().max(60)).max(8)])).optional(), // product-type filters (material, fit, ...), validated against the department's definitions
   badge_text: z.string().trim().max(24).nullable().optional(),
   badge_tone: z.string().max(12).nullable().optional(),
   status: z.enum(['active', 'draft', 'archived']).default('active'),
@@ -812,6 +822,10 @@ export function saveProduct(storeId, data, existing) {
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };
+    if (data.attrs !== undefined) { // only when the editor sent them (partial saves from WhatsApp / POS keep the stored values)
+      const clean = sanitizeAttrValues(data.attrs, row.department ? deptAttrDefs(row.department) : []);
+      row.attrs_json = Object.keys(clean).length ? JSON.stringify(clean) : null;
+    }
     let id;
     if (existing) {
       id = existing.id;
@@ -1227,6 +1241,50 @@ function checkCatParent(storeId, parentId, selfId) {
   return p.id;
 }
 const catSchema = z.object({ name_ar: z.string().trim().min(1).max(40), name_en: z.string().trim().min(1).max(40), media_id: z.number().int().nullable().optional(), parent_id: z.number().int().nullable().optional() });
+/* ---- smart section picker (searchable tree, recent / frequent, suggestions needing confirmation) ---- */
+const crNorm = (x) => String(x || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ًٌٍَُِّْ]/g, '').replace(/\s+/g, ' ').trim();
+const SYN = { عباية: 'abayas', عبايه: 'abayas', كريب: '', طرحه: 'hijab', حجاب: 'hijab', اسدال: 'prayer', فستان: 'dresses', جينز: 'jeans', سنيكرز: 'sneakers', كوتشي: 'sneakers', حذاء: 'shoes', جزمه: 'shoes', شنطه: 'bags', عطر: 'perfume', برفان: 'perfume', مكياج: 'makeup', تيشيرت: 'tshirt', بنطلون: 'pants', بلوزه: 'tops' };
+r.get('/category-picker', h((req, res) => {
+  const all = listDepartments().filter((d) => d.visibility !== 'hidden');
+  const by = new Map(all.map((d) => [d.slug, d]));
+  const hasKids = new Set(all.map((d) => d.parent).filter(Boolean));
+  const crumb = (d) => { const out = []; for (let c = d, i = 0; c && i < 6; c = by.get(c.parent), i++) out.unshift(c.name); return out; };
+  const item = (d) => ({ slug: d.slug, name: d.name, parent: d.parent, leaf: !hasKids.has(d.slug), breadcrumb: crumb(d), profile: d.profile_effective });
+  const usage = q.all('SELECT department_slug, uses, last_used_at FROM merchant_category_usage WHERE store_id=?', [req.store.id]).filter((u) => by.has(u.department_slug));
+  const recent = [...usage].sort((a, b) => String(b.last_used_at).localeCompare(String(a.last_used_at))).slice(0, 6).map((u) => item(by.get(u.department_slug)));
+  const frequent = [...usage].sort((a, b) => b.uses - a.uses).slice(0, 6).map((u) => item(by.get(u.department_slug)));
+  const text = crNorm(String(req.query.name || ''));
+  let suggestions = [];
+  if (text) {
+    const toks = text.split(' ').filter((t) => t.length > 1); const hints = toks.map((t) => SYN[t]).filter(Boolean);
+    suggestions = all.filter((d) => !hasKids.has(d.slug)).map((d) => {
+      const hay = crNorm(`${d.name.ar} ${d.name.en} ${d.slug.replace(/_/g, ' ')}`);
+      let score = 0; for (const t of toks) if (hay.includes(t)) score += 2; for (const x of hints) if (d.slug.includes(x)) score += 3;
+      return { d, score };
+    }).filter((x) => x.score > 0).sort((a, b) => b.score - a.score).slice(0, 3).map((x) => ({ ...item(x.d), confirm: true }));
+  }
+  res.json({ departments: all.map(item), recent, frequent, suggestions });
+}));
+r.post('/category-usage', h((req, res) => {
+  const { department } = z.object({ department: z.string().max(31) }).parse(req.body);
+  if (!q.get('SELECT 1 FROM departments WHERE slug=? AND active=1', [department])) throw badRequest('invalid_department', 'Unknown section.');
+  q.run("INSERT INTO merchant_category_usage (store_id, department_slug, uses, last_used_at) VALUES (?,?,1,datetime('now')) ON CONFLICT(store_id, department_slug) DO UPDATE SET uses=uses+1, last_used_at=datetime('now')", [req.store.id, department]);
+  res.status(204).end();
+}));
+const reqSchema = z.object({ name_ar: z.string().trim().min(2).max(40), name_en: z.string().trim().max(40).optional(), parent: z.string().trim().toLowerCase().nullable().optional(), note: z.string().trim().max(300).optional() });
+r.get('/category-requests', h((req, res) => res.json({ requests: q.all('SELECT id, name_ar, name_en, parent_slug, note, status, reason, department_slug, created_at, decided_at FROM category_requests WHERE store_id=? ORDER BY id DESC LIMIT 50', [req.store.id]) })));
+r.post('/category-requests', h((req, res) => {
+  const d = reqSchema.parse(req.body);
+  if (q.val("SELECT COUNT(*) FROM category_requests WHERE store_id=? AND status='pending'", [req.store.id]) >= 10) throw badRequest('too_many_requests', 'You have too many pending requests.');
+  if (d.parent && !q.get('SELECT 1 FROM departments WHERE slug=? AND active=1', [d.parent])) throw badRequest('invalid_parent', 'Unknown parent section.');
+  // duplicate check: an existing section (same parent or anywhere) with the same name means "use it" instead of a new request
+  const dup = q.all('SELECT slug, name_ar, name_en, parent_slug FROM departments WHERE active=1').find((x) => crNorm(x.name_ar) === crNorm(d.name_ar) || (d.name_en && crNorm(x.name_en) === crNorm(d.name_en)));
+  if (dup) throw new AppError(409, 'section_exists', 'This section already exists.', { existing: dup.slug });
+  if (q.get("SELECT 1 FROM category_requests WHERE store_id=? AND status='pending' AND COALESCE(parent_slug,'')=? AND name_ar=?", [req.store.id, d.parent || '', d.name_ar])) throw badRequest('request_exists', 'You already asked for this section.');
+  const id = insert('category_requests', { store_id: req.store.id, requested_by: req.user?.id ?? null, name_ar: d.name_ar, name_en: d.name_en || null, parent_slug: d.parent || null, note: d.note || null });
+  notifyPlatformAlert(`طلب قسم جديد «${d.name_ar}» من محل ${req.store.name_ar || req.store.slug}`);
+  res.status(201).json({ request: q.get('SELECT * FROM category_requests WHERE id=?', [id]) });
+}));
 r.post('/categories', h((req, res) => {
   const d = catSchema.parse(req.body);
   // Owners can add their own sections (top-level or under a main one); platform (system) sections stay admin-managed.

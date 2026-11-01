@@ -15,6 +15,8 @@ import { Select } from '../../components/ui/Field.jsx';
 import { EmptyState, ErrorState } from '../../components/ui/States.jsx';
 import { cx } from '../../components/ui/cx.js';
 import SearchFilters from '../../components/market/SearchFilters.jsx';
+import CategoryHeader from '../../components/market/CategoryHeader.jsx';
+import { PROFILES } from '@souqna/shared/catalog';
 import { api } from '../../lib/api.js';
 import RequestBanner from '../../components/market/RequestBanner.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
@@ -26,9 +28,13 @@ export default function MarketSearch() {
   const q = params.get('q') || '';
   const department = params.get('department') || '';
   const sort = params.get('sort') || 'relevance';
-  const { list, label, pathLabel } = useDepartments();
+  const { list, label, pathLabel, bySlug, childrenOf } = useDepartments();
+  const prof = PROFILES[bySlug.get(department)?.profile];
+  const density = prof?.grid;
+  const cardRatio = (prof?.ratio || '4/5').replace('/', ' / '); // each kind of department gets its own grid rhythm (hijabs dense, fashion airy)
   const dq = useDebounced(q, 150);
-  const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store', 'same_day', 'sizes', 'colors', 'category', 'audience', 'material', 'discount'];
+  const attrKeys = [...params.keys()].filter((k) => /^a_[a-z0-9_]+$/.test(k)); // department-specific filters (fabric, fit, finish...)
+  const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store', 'same_day', 'sizes', 'colors', 'category', 'audience', 'material', 'discount', ...attrKeys];
   const [open, setOpen] = useState(false);
   const key = new URLSearchParams({ q: dq, department, sort, ...Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || '']).filter(([, v]) => v)) }).toString();
   const activeCount = FILTER_KEYS.filter((k) => params.get(k)).length + (department ? 1 : 0);
@@ -52,6 +58,7 @@ export default function MarketSearch() {
   const activeChips = [
     params.get('discount') && { id: 'discount', label: lang === 'ar' ? `خصم ${params.get('discount')}٪+` : `${params.get('discount')}%+ off`, remove: () => set({ discount: '' }) },
     params.get('rating') && { id: 'rating', label: lang === 'ar' ? `${params.get('rating') === '3' ? 3 : 4} نجوم فأكثر` : `${params.get('rating') === '3' ? 3 : 4}★ & up`, remove: () => set({ rating: '' }) },
+    ...(data?.facets?.attrs || []).flatMap((f) => csv(`a_${f.key}`).map((v) => ({ id: `a-${f.key}-${v}`, label: `${f.name[lang] || f.name.ar}: ${(f.options.find((o) => o.v === v) || {})[lang] || v}`, remove: () => without(`a_${f.key}`, v) }))),
     ...csv('material').map((k) => ({ id: `mat-${k}`, label: (data?.facets?.materials || []).find((x) => x.key === k)?.name?.[lang] || k, remove: () => without('material', k) })),
     params.get('category') && { id: 'category', label: (data?.facets?.categories || []).find((c) => c.key === params.get('category'))?.name?.[lang] || params.get('category'), remove: () => set({ category: '' }) },
     params.get('audience') && { id: 'audience', label: ({ men: 'رجالي', women: 'حريمي', boys: 'ولادي', girls: 'بناتي', kids: 'أطفال', unisex: 'للجنسين' })[params.get('audience')] || params.get('audience'), remove: () => set({ audience: '' }) },
@@ -81,6 +88,7 @@ export default function MarketSearch() {
           </Select>
         </div>
 
+        {department && <div className="mt-5"><CategoryHeader department={department} bySlug={bySlug} childrenOf={childrenOf} onPick={(slug) => set({ department: slug, ...Object.fromEntries(attrKeys.map((k) => [k, ''])) })} /></div>}
         <div className="mt-5 lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
           <aside className="hidden lg:block"><div className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto pe-1">{panel}</div></aside>
           <div className="min-w-0">
@@ -121,7 +129,7 @@ export default function MarketSearch() {
           <ProductGrid>{Array.from({ length: 8 }, (_, i) => <ProductCardSkeleton key={i} />)}</ProductGrid>
         ) : items.length ? (
           <>
-            <ProductGrid>{items.map((p, i) => <ProductCard key={`${p.store.slug}-${p.id}`} product={p} slug={p.store.slug} index={i} showStore onQuickAdd={setQuick} />)}</ProductGrid>
+            <ProductGrid density={density}>{items.map((p, i) => <ProductCard key={`${p.store.slug}-${p.id}`} product={p} slug={p.store.slug} index={i} showStore ratio={cardRatio} onQuickAdd={setQuick} />)}</ProductGrid>
             {page < (data.pages || 1) && <div className="mt-10 text-center"><Button variant="outline" size="lg" loading={busy} onClick={loadMore}>{t('common.loadMore')}</Button></div>}
           </>
         ) : (

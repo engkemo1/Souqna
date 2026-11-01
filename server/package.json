@@ -29,7 +29,8 @@
     "train:visual": "node --no-warnings --env-file-if-exists=../.env src/scripts/train-visual.js",
     "testset:visual": "node --no-warnings src/scripts/fetch-test-set.js",
     "compare:visual": "node --no-warnings --env-file-if-exists=../.env src/scripts/compare-visual-models.js",
-    "model:prefetch": "node --no-warnings --env-file-if-exists=../.env src/scripts/download-clip-model.js"
+    "model:prefetch": "node --no-warnings --env-file-if-exists=../.env src/scripts/download-clip-model.js",
+    "catalog": "node --no-warnings --env-file-if-exists=../.env src/scripts/catalog-migrate.js"
   },
   "dependencies": {
     "@souqna/shared": "1.0.0",

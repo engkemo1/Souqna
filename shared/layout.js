@@ -66,6 +66,48 @@ export const TEMPLATES = {
     hero: 'playful', card: 'bubble', cat: 'bubbles', grid: 'cozy', type: 'rounded', preset: 'candy',
     sections: ['hero', 'categories', 'new_arrivals', 'flash', 'best_sellers', 'offers', 'on_sale', 'trust', 'story', 'visit', 'free_shipping'],
   },
+  modest: {
+    ar: 'أزياء محتشمة', en: 'Modest fashion',
+    desc_ar: 'هادي وراقي: صور طويلة، تصنيفات دواير (عبايات، جلاليب، قفاطين) وموسم رمضان والعيد بارز. لمحلات العبايات والمحتشم.', desc_en: 'Calm and elegant: tall imagery, circular categories (abayas, jalabiyas, kaftans), Ramadan and Eid up front.',
+    hero: 'split', card: 'soft', cat: 'circles', grid: 'airy', type: 'light', preset: 'ivory',
+    sections: ['hero', 'categories', 'new_arrivals', 'flash', 'best_sellers', 'offers', 'story', 'trust', 'on_sale', 'visit', 'free_shipping'],
+  },
+  hijab_studio: {
+    ar: 'استوديو الطرح', en: 'Hijab studio',
+    desc_ar: 'شبكة كثيفة وصور مربعة وألوان الطرح تظهر على الكارت، والتصنيفات حسب الخامة. لمحلات الطرح والإيشاربات.', desc_en: 'Dense grid, square photos, colour dots on every card, categories by fabric.',
+    hero: 'compact', card: 'soft', cat: 'circles', grid: 'dense', type: 'rounded', preset: 'rose',
+    sections: ['hero', 'categories', 'new_arrivals', 'best_sellers', 'offers', 'flash', 'on_sale', 'trust', 'story', 'visit', 'free_shipping'],
+  },
+  beauty: {
+    ar: 'مكياج وعناية', en: 'Beauty & care',
+    desc_ar: 'نضيف ومضيء: تصنيفات دواير (شفايف، عيون، بشرة)، كروت من غير حدود وعروض بارزة. لمحلات المكياج والعناية.', desc_en: 'Clean and bright: circular categories (lips, eyes, skin), borderless cards, offers up front.',
+    hero: 'cover', card: 'flat', cat: 'circles', grid: 'cozy', type: 'light', preset: 'rose',
+    sections: ['hero', 'categories', 'offers', 'new_arrivals', 'best_sellers', 'flash', 'on_sale', 'trust', 'story', 'visit', 'free_shipping'],
+  },
+  fragrance: {
+    ar: 'عطور فاخرة', en: 'Fragrance house',
+    desc_ar: 'داكن وهادي، القصة أولًا وكروت قليلة كبيرة، وتصنيفات حسب النوع (حريمي، رجالي، للجنسين). لمحلات العطور.', desc_en: 'Dark and quiet, story first, a few large cards, categories by audience.',
+    hero: 'cover', card: 'flat', cat: 'list', grid: 'airy', type: 'light', preset: 'midnight',
+    sections: ['hero', 'story', 'categories', 'new_arrivals', 'best_sellers', 'offers', 'trust', 'on_sale', 'visit', 'free_shipping'],
+  },
+  footwear: {
+    ar: 'أحذية وسنيكرز', en: 'Footwear & sneakers',
+    desc_ar: 'شبكة كثيفة وكروت بحدود وشريط متحرك ودروب جديدة، وتصنيفات حسب النوع (كوتشيات، بوت، صنادل). لمحلات الأحذية.', desc_en: 'Dense bordered cards, ticker and drops, categories by type.',
+    hero: 'cover', card: 'bordered', cat: 'tiles', grid: 'dense', type: 'bold', preset: 'noir',
+    sections: ['hero', 'ticker', 'flash', 'new_arrivals', 'categories', 'best_sellers', 'on_sale', 'offers', 'trust', 'story', 'visit', 'free_shipping'],
+  },
+  activewear: {
+    ar: 'ملابس رياضية', en: 'Activewear',
+    desc_ar: 'حيوي وجريء: خط تقيل، شبكة كثيفة، عروض وخصومات أولًا. لمحلات الملابس الرياضية والجيم.', desc_en: 'Energetic and bold, dense grid, deals first.',
+    hero: 'compact', card: 'flat', cat: 'tiles', grid: 'dense', type: 'bold', preset: 'indigo',
+    sections: ['hero', 'ticker', 'flash', 'on_sale', 'new_arrivals', 'categories', 'best_sellers', 'offers', 'trust', 'story', 'visit', 'free_shipping'],
+  },
+  accessories: {
+    ar: 'إكسسوارات وشنط', en: 'Accessories & bags',
+    desc_ar: 'مفصّل ونظيف: كروت كبيرة وتصنيفات مربعة (شنط، ساعات، مجوهرات). لمحلات الإكسسوارات والشنط.', desc_en: 'Tailored and clean: large cards, square category tiles (bags, watches, jewelry).',
+    hero: 'split', card: 'round', cat: 'tiles', grid: 'cozy', type: 'normal', preset: 'ivory',
+    sections: ['hero', 'categories', 'new_arrivals', 'best_sellers', 'offers', 'trust', 'on_sale', 'story', 'visit', 'free_shipping', 'flash'],
+  },
   menswear: {
     ar: 'رجالي كلاسيك', en: 'Classic menswear',
     desc_ar: 'زوايا حادة وتصنيفات بدل/قميص/جزمة. للمحلات الرجالي والبدل.', desc_en: 'Sharp corners, structured categories.',

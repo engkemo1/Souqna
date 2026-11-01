@@ -1,4 +1,4 @@
-import { encodeDepartments, DEPT_SLUG_RE, decodeDepartments, ORDER_STATUSES } from '@souqna/shared';
+import { encodeDepartments, DEPT_SLUG_RE, decodeDepartments, ORDER_STATUSES, PROFILES, normalizeAttrDefs } from '@souqna/shared';
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
@@ -1226,6 +1226,11 @@ const deptSchema = z.object({
   sizes: z.array(z.string().trim().min(1).max(12)).max(40).default([]),
   sort: z.coerce.number().int().min(0).max(999).optional(), active: z.boolean().optional(),
   parent: z.string().trim().toLowerCase().nullable().optional(),
+  profile: z.string().max(20).nullable().optional(),               // shopping experience (see shared/catalog.js PROFILES); empty = inherit from the parent
+  attrs: z.array(z.any()).max(20).optional(),                      // this section's own attribute definitions (validated by normalizeAttrDefs); inherited ones are not repeated
+  description_ar: z.string().trim().max(300).optional(), description_en: z.string().trim().max(300).optional(),
+  icon: z.string().trim().max(30).nullable().optional(),
+  visibility: z.enum(['visible', 'hidden']).optional(),
 });
 function checkDeptParent(parent, self) {
   if (!parent) return null;
@@ -1234,27 +1239,136 @@ function checkDeptParent(parent, self) {
   if (deptAncestors(p.slug).length >= 2) throw new AppError(422, 'validation_failed', 'Sections can be nested at most 3 levels deep.', { parent: 'parent_too_deep' });
   return p.slug;
 }
-r.get('/departments', h((_req, res) => res.json({ departments: listDepartments({ all: true }) })));
+/** Replaces the attribute definitions a section owns (rows with active=0 are the "turn off the inherited one" overrides). */
+function saveDeptAttrs(slug, input) {
+  const defs = normalizeAttrDefs(input);
+  const off = (Array.isArray(input) ? input : []).filter((d) => d && d.active === false).map((d) => d.key);
+  q.run('DELETE FROM category_attributes WHERE department_slug=?', [slug]);
+  defs.forEach((d, i) => insert('category_attributes', { department_slug: slug, key: d.key, type: d.type, label_ar: d.ar, label_en: d.en, options_json: JSON.stringify(d.options || []), required: d.required ? 1 : 0, filterable: d.filterable ? 1 : 0, merchant_only: d.merchant_only ? 1 : 0, sort: i, active: off.includes(d.key) ? 0 : 1 }));
+}
+/** Same name under the same parent (either language) is a duplicate. */
+function assertNoDuplicateName(parent, ar, en, selfSlug) {
+  const rows = q.all('SELECT slug, name_ar, name_en FROM departments WHERE COALESCE(parent_slug,\'\')=?', [parent || '']);
+  const norm = (x) => String(x || '').trim().toLowerCase();
+  if (rows.some((d) => d.slug !== selfSlug && (norm(d.name_ar) === norm(ar) || norm(d.name_en) === norm(en)))) throw new AppError(422, 'validation_failed', 'A section with this name already exists here.', { name_ar: 'duplicate_name' });
+}
+r.get('/departments', h((_req, res) => res.json({ departments: listDepartments({ all: true }).map((d) => ({ ...d, products_count: q.val('SELECT COUNT(*) FROM products WHERE department=?', [d.slug]) })) })));
+r.get('/departments/:id/merchants', h((req, res) => {
+  const d = q.get('SELECT slug FROM departments WHERE id=?', [Number(req.params.id)]);
+  if (!d) throw new AppError(404, 'not_found', 'Department not found.');
+  res.json({ merchants: q.all('SELECT s.id, s.slug, s.name_ar, COUNT(*) AS products FROM products p JOIN stores s ON s.id=p.store_id WHERE p.department=? GROUP BY s.id ORDER BY products DESC', [d.slug]) });
+}));
 r.post('/departments', h((req, res) => {
   const body = deptSchema.extend({ slug: z.string().trim().toLowerCase().optional() }).parse(req.body);
   let slug = (body.slug || body.name_en).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 30);
   if (!DEPT_SLUG_RE.test(slug)) throw new AppError(422, 'validation_failed', 'Use an English key like "perfumes".', { slug: 'slug_invalid' });
   if (q.get('SELECT id FROM departments WHERE slug=?', [slug])) throw new AppError(422, 'validation_failed', 'This department already exists.', { slug: 'slug_taken' });
+  const parent = checkDeptParent(body.parent, slug);
+  assertNoDuplicateName(parent, body.name_ar, body.name_en, null);
   const sort = body.sort ?? (q.val('SELECT COALESCE(MAX(sort),0)+1 FROM departments'));
-  insert('departments', { slug, name_ar: body.name_ar, name_en: body.name_en, sizes_json: JSON.stringify([...new Set(body.sizes)]), sort, active: 1, parent_slug: checkDeptParent(body.parent, slug) });
+  tx(() => {
+    insert('departments', { slug, name_ar: body.name_ar, name_en: body.name_en, sizes_json: JSON.stringify([...new Set(body.sizes)]), sort, active: 1, parent_slug: parent, profile: PROFILES[body.profile] ? body.profile : null, description_ar: body.description_ar || null, description_en: body.description_en || null, icon: body.icon || null, visibility: body.visibility || 'visible' });
+    if (body.attrs?.length) saveDeptAttrs(slug, body.attrs);
+  });
   res.status(201).json({ departments: listDepartments({ all: true }) });
 }));
 r.patch('/departments/:id', h((req, res) => {
   const body = deptSchema.partial().parse(req.body);
   const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);
   if (!d) throw new AppError(404, 'not_found', 'Department not found.');
-  update('departments', d.id, {
-    name_ar: body.name_ar, name_en: body.name_en, sort: body.sort,
-    sizes_json: body.sizes ? JSON.stringify([...new Set(body.sizes)]) : undefined,
-    active: body.active === undefined ? undefined : body.active ? 1 : 0,
-    parent_slug: body.parent === undefined ? undefined : (body.parent && deptAncestors(body.parent).includes(d.slug)) ? (() => { throw new AppError(422, 'validation_failed', 'A section cannot sit under its own sub-section.', { parent: 'parent_invalid' }); })() : checkDeptParent(body.parent, d.slug),
+  let parent;
+  if (body.parent !== undefined) {
+    if (body.parent && (body.parent === d.slug || deptAncestors(body.parent).includes(d.slug))) throw new AppError(422, 'validation_failed', 'A section cannot sit under its own sub-section.', { parent: 'parent_invalid' });
+    parent = checkDeptParent(body.parent, d.slug);
+    // moving a branch must not push its deepest descendant past 3 levels
+    const depthBelow = (slug, n = 0) => Math.max(n, ...q.all('SELECT slug FROM departments WHERE parent_slug=?', [slug]).map((c) => depthBelow(c.slug, n + 1)));
+    if ((parent ? deptAncestors(parent).length + 1 : 0) + depthBelow(d.slug) >= 3) throw new AppError(422, 'validation_failed', 'Sections can be nested at most 3 levels deep.', { parent: 'parent_too_deep' });
+  }
+  if (body.name_ar !== undefined || body.name_en !== undefined || body.parent !== undefined) assertNoDuplicateName(body.parent === undefined ? d.parent_slug : parent, body.name_ar ?? d.name_ar, body.name_en ?? d.name_en, d.slug);
+  tx(() => {
+    update('departments', d.id, {
+      name_ar: body.name_ar, name_en: body.name_en, sort: body.sort,
+      sizes_json: body.sizes ? JSON.stringify([...new Set(body.sizes)]) : undefined,
+      active: body.active === undefined ? undefined : body.active ? 1 : 0,
+      profile: body.profile === undefined ? undefined : (PROFILES[body.profile] ? body.profile : null),
+      description_ar: body.description_ar, description_en: body.description_en,
+      icon: body.icon === undefined ? undefined : (body.icon || null), visibility: body.visibility,
+      parent_slug: body.parent === undefined ? undefined : parent,
+    });
+    if (body.attrs !== undefined) saveDeptAttrs(d.slug, body.attrs);
   });
   res.json({ departments: listDepartments({ all: true }) });
+}));
+/** Reorders siblings: body.order = [id, id, ...]. Only the given ids' sort values change. */
+r.post('/departments/reorder', h((req, res) => {
+  const { order } = z.object({ order: z.array(z.coerce.number().int()).min(1).max(500) }).parse(req.body);
+  tx(() => order.forEach((id, i) => q.run('UPDATE departments SET sort=? WHERE id=?', [i + 1, id])));
+  res.json({ departments: listDepartments({ all: true }) });
+}));
+/** Safe delete: refused while it has sub-sections; with products it needs `reassign_to` (an active section) and moves them in one transaction. */
+r.delete('/departments/:id', h((req, res) => {
+  const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);
+  if (!d) throw new AppError(404, 'not_found', 'Department not found.');
+  if (q.get('SELECT 1 FROM departments WHERE parent_slug=?', [d.slug])) throw new AppError(409, 'has_children', 'Move or delete the sub-sections first.');
+  const count = q.val('SELECT COUNT(*) FROM products WHERE department=?', [d.slug]);
+  const target = req.query.reassign_to ? q.get('SELECT slug FROM departments WHERE slug=? AND active=1', [String(req.query.reassign_to)]) : null;
+  if (count && (!target || target.slug === d.slug)) throw new AppError(409, 'has_products', `This section has ${count} products. Choose another section to move them to.`, { count });
+  tx(() => {
+    if (count) {
+      q.run('UPDATE products SET department=? WHERE department=?', [target.slug, d.slug]);
+      for (const s of q.all("SELECT id, departments FROM stores WHERE departments LIKE '%,'||?||',%'", [d.slug])) {
+        q.run('UPDATE stores SET departments=? WHERE id=?', [encodeDepartments([...decodeDepartments(s.departments).filter((x) => x !== d.slug), target.slug]), s.id]);
+      }
+    } else {
+      for (const s of q.all("SELECT id, departments FROM stores WHERE departments LIKE '%,'||?||',%'", [d.slug])) q.run('UPDATE stores SET departments=? WHERE id=?', [encodeDepartments(decodeDepartments(s.departments).filter((x) => x !== d.slug)), s.id]);
+    }
+    q.run('DELETE FROM departments WHERE id=?', [d.id]);
+  });
+  res.json({ departments: listDepartments({ all: true }), moved: count });
+}));
+
+/* ---- merchant requests for a missing section ---- */
+r.get('/category-requests', h((req, res) => {
+  const status = ['pending', 'approved', 'rejected'].includes(req.query.status) ? req.query.status : null;
+  res.json({ requests: q.all(`SELECT cr.*, s.name_ar AS store_name, s.slug AS store_slug FROM category_requests cr JOIN stores s ON s.id=cr.store_id ${status ? 'WHERE cr.status=?' : ''} ORDER BY cr.id DESC LIMIT 200`, status ? [status] : []) });
+}));
+r.post('/category-requests/:id/approve', h((req, res) => {
+  const body = z.object({ name_ar: z.string().trim().min(2).max(40).optional(), name_en: z.string().trim().min(2).max(40).optional(), parent: z.string().trim().toLowerCase().nullable().optional(), existing: z.string().trim().toLowerCase().optional() }).parse(req.body || {});
+  const cr = q.get('SELECT * FROM category_requests WHERE id=?', [Number(req.params.id)]);
+  if (!cr || cr.status !== 'pending') throw new AppError(404, 'not_found', 'Request not found.');
+  let slug;
+  tx(() => {
+    if (body.existing) { // the section already exists: point the merchant to it instead of creating a duplicate
+      if (!q.get('SELECT 1 FROM departments WHERE slug=? AND active=1', [body.existing])) throw new AppError(422, 'validation_failed', 'Section not found.', { existing: 'invalid' });
+      slug = body.existing;
+    } else if (cr.department_slug && q.get('SELECT 1 FROM departments WHERE slug=? AND active=0', [cr.department_slug])) {
+      // a request migrated from the old "owner-created section" flow: activate THAT department so its products and the store's section stay linked
+      const dep = q.get('SELECT * FROM departments WHERE slug=?', [cr.department_slug]);
+      const parent = checkDeptParent(body.parent === undefined ? dep.parent_slug : body.parent, dep.slug);
+      const ar = body.name_ar || dep.name_ar; const en = body.name_en || dep.name_en;
+      assertNoDuplicateName(parent, ar, en, dep.slug);
+      update('departments', dep.id, { name_ar: ar, name_en: en, parent_slug: parent, active: 1, visibility: 'visible' });
+      slug = dep.slug;
+    } else {
+      const ar = body.name_ar || cr.name_ar; const en = body.name_en || cr.name_en || cr.name_ar;
+      const parent = checkDeptParent(body.parent === undefined ? cr.parent_slug : body.parent, null);
+      assertNoDuplicateName(parent, ar, en, null);
+      slug = (latinSlug(en) || `sec_${cr.id}`).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 26) || `sec_${cr.id}`;
+      if (q.get('SELECT 1 FROM departments WHERE slug=?', [slug])) slug = `${slug.slice(0, 20)}_${cr.id}`;
+      insert('departments', { slug, name_ar: ar, name_en: en, sizes_json: '[]', sort: q.val('SELECT COALESCE(MAX(sort),0)+1 FROM departments'), active: 1, parent_slug: parent, visibility: 'visible' });
+    }
+    q.run("UPDATE category_requests SET status='approved', department_slug=?, decided_by=?, decided_at=datetime('now') WHERE id=?", [slug, req.user?.id ?? null, cr.id]);
+  });
+  notifyStore(cr.store_id, { title: 'تمت الموافقة على القسم', body: 'قسم "' + cr.name_ar + '" جاهز. اختاره لمنتجاتك.', url: '/dashboard/products', tag: 'cat-req' });
+  res.json({ approved: true, department: slug });
+}));
+r.post('/category-requests/:id/reject', h((req, res) => {
+  const { reason } = z.object({ reason: z.string().trim().min(2).max(300) }).parse(req.body || {});
+  const cr = q.get('SELECT * FROM category_requests WHERE id=?', [Number(req.params.id)]);
+  if (!cr || cr.status !== 'pending') throw new AppError(404, 'not_found', 'Request not found.');
+  q.run("UPDATE category_requests SET status='rejected', reason=?, decided_by=?, decided_at=datetime('now') WHERE id=?", [reason, req.user?.id ?? null, cr.id]);
+  notifyStore(cr.store_id, { title: 'تم رفض طلب القسم', body: reason, url: '/dashboard/products', tag: 'cat-req' });
+  res.json({ rejected: true });
 }));
 const deptUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
 r.post('/look-of-day/image', deptUpload.single('file'), h(async (req, res) => {

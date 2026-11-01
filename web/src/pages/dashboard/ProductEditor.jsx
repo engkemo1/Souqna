@@ -19,6 +19,7 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import { EmptyState, ErrorState, errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { cx } from '../../components/ui/cx.js';
+import SectionPicker, { AttrFields } from '../../components/dash/SectionPicker.jsx';
 
 const PRESET_COLORS = [
   ['#1C1C1E', 'أسود', 'Black'], ['#F4F3EF', 'أبيض', 'White'], ['#8E9096', 'رمادي', 'Grey'], ['#1F2B4D', 'كحلي', 'Navy'], ['#30558F', 'أزرق', 'Blue'],
@@ -29,7 +30,7 @@ const PRESET_COLORS = [
 
 const EMPTY = {
   name_ar: '', name_en: '', description_ar: '', description_en: '', price: '', compare_at_price: '', cost: '', sku: '', barcode: '', variantCodes: {},
-  category_id: '', audience: '', moda_key: '', style_level: '', badge_text: '', badge_tone: 'brand', status: 'active', featured: false, is_new: false, no_return: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
+  category_id: '', department: '', attrs: {}, audience: '', moda_key: '', style_level: '', badge_text: '', badge_tone: 'brand', status: 'active', featured: false, is_new: false, no_return: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
   media: [], seo_title: '', seo_description: '',
 };
 const STYLE_LEVELS = [['1', 'بيتي'], ['2', 'كاجوال'], ['3', 'شيك'], ['4', 'رسمي'], ['5', 'سواريه']];
@@ -46,7 +47,7 @@ function fromProduct(p) {
     ...EMPTY,
     name_ar: p.name.ar, name_en: p.name.en && p.name.en !== p.name.ar ? p.name.en : '', description_ar: p.description.ar || '', description_en: p.description.en || '',
     price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '', barcode: p.barcode || '', variantCodes: codes,
-    category_id: p.categoryId ? String(p.categoryId) : '', audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', badge_text: p.badgeText || '', badge_tone: p.badgeTone || 'brand', status: p.status, featured: p.featured, is_new: p.isNewFlag, no_return: !!p.noReturn,
+    category_id: p.categoryId ? String(p.categoryId) : '', department: p.department || '', attrs: p.attrs || {}, audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', badge_text: p.badgeText || '', badge_tone: p.badgeTone || 'brand', status: p.status, featured: p.featured, is_new: p.isNewFlag, no_return: !!p.noReturn,
     colors: p.colors, sizes: p.sizes, matrix, variantIds: ids, track_stock: p.trackStock, stock: p.stockCount, low_stock_at: p.lowStockAt,
     media: p.media, seo_title: p.seo.title || '', seo_description: p.seo.description || '',
   };
@@ -61,7 +62,7 @@ function toPayload(f) {
   return {
     name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en,
     price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, cost: f.cost ? Number(f.cost) : null,
-    sku: f.sku || null, barcode: f.barcode || null, category_id: f.category_id ? Number(f.category_id) : null, audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, badge_text: f.badge_text.trim() || null, badge_tone: f.badge_text.trim() ? f.badge_tone : null, status: f.status, featured: f.featured, is_new: f.is_new, no_return: f.no_return,
+    sku: f.sku || null, barcode: f.barcode || null, category_id: f.category_id ? Number(f.category_id) : null, ...(f.department && f.deptTouched ? { department: f.department } : {}), attrs: Object.fromEntries(Object.entries(f.attrs || {}).filter(([, v]) => v !== '' && v != null)), audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, badge_text: f.badge_text.trim() || null, badge_tone: f.badge_text.trim() ? f.badge_tone : null, status: f.status, featured: f.featured, is_new: f.is_new, no_return: f.no_return,
     colors: f.colors, sizes: f.sizes, variants, track_stock: f.track_stock, stock: Number(f.stock || 0), low_stock_at: Number(f.low_stock_at || 0),
     media: f.media.map((m) => m.id), primary_media_id: f.media[0]?.id ?? null, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
   };
@@ -361,7 +362,9 @@ export default function ProductEditor() {
     } catch (x) { toast({ tone: 'error', title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى من الأقسام الخاصة (12)', 'Custom section limit reached (12)') : (errorMessage ? errorMessage(x) : (x.message || 'Error')) }); } finally { setCatBusy(false); }
   };
   const { data: tree } = useApi('/owner/product-types');
+  const { data: pubDepts } = useApi('/departments');
   const [f, setF] = useState(EMPTY);
+  const deptDefs = (pubDepts?.departments || []).find((d) => d.slug === f.department)?.attrs || [];
   const [initial, setInitial] = useState(EMPTY);
   const [errors, setErrors] = useState({});
   const [saving, setSaving] = useState(false);
@@ -648,6 +651,11 @@ export default function ProductEditor() {
 
       {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('إيه المنتج؟', 'What is it?')} hint={L('اختار الفئة والنوع مرة واحدة، وإحنا نظبط القسم والمقاسات.', 'Pick it once — we set the department and sizes.')} done={done.type}>
         <TypePicker tree={tree} audience={f.audience} typeKey={f.moda_key} suggested={suggested} error={errors.type} onChange={(p) => { if (p.moda_key) setCustomType(''); set(p); }} customName={customType && !f.moda_key ? customType : ''} onAddSection={addTypeSection} />
+        <div className="mt-5 space-y-3 border-t border-line pt-4">
+          <p className="text-sm font-medium">{L('القسم الدقيق (اختياري — بيحسّن الظهور في الفلاتر)', 'Exact section (optional — improves filters)')}</p>
+          <SectionPicker value={f.department} productName={f.name_ar} onChange={(slug) => set({ department: slug, deptTouched: true, attrs: {} })} />
+          {deptDefs.filter((d) => d.key).length > 0 && f.department && <AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} />}
+        </div>
       </Card>)}
 
       {(!isNew || step === 2) && (<Card id="name" bare={isNew} step={3} title={L('الاسم والوصف', 'Name & description')} done={done.name}>

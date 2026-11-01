@@ -168,6 +168,21 @@ export default function SearchFilters({ params, set, facets, departments, label,
           )} />
         </Group>
       )}
+      {(facets?.attrs || []).map((f) => {
+        const chosen = list(`a_${f.key}`);
+        return (
+          <Group key={f.key} title={f.name[lang] || f.name.ar} badge={chosen.length}>
+            <ShowMore items={f.options} limit={6} lang={lang} keepOpen={(o) => chosen.includes(o.v)} render={(o) => (
+              <Toggle key={o.v} checked={chosen.includes(o.v)} onChange={() => toggleIn(`a_${f.key}`, o.v)}>
+                <span className="flex flex-1 items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">{o.hex && <span aria-hidden="true" className="h-4 w-4 rounded-full border border-black/15" style={{ background: o.hex }} />}{o[lang] || o.ar}</span>
+                  <span className="text-xs text-muted">{formatNumber(o.n, lang)}</span>
+                </span>
+              </Toggle>
+            )} />
+          </Group>
+        );
+      })}
       <Group title={t('search.price')}>
         <ul className="mb-3 space-y-0.5">
           {PRICE_BANDS.map(([lo, hi]) => {

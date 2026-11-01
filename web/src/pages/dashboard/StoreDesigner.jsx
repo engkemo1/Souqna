@@ -6,6 +6,8 @@ import {
   SECTION_IDS, OPTIONAL_SECTIONS, resolveDesign, completeness,
 } from '@souqna/shared/layout';
 import { useApi, invalidate } from '../../lib/hooks.js';
+import { useDepartments } from '../../lib/departments.js';
+import { TEMPLATE_BY_PROFILE, PROFILES } from '@souqna/shared/catalog';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useAuth } from '../../lib/auth.jsx';
@@ -195,6 +197,13 @@ export default function StoreDesigner() {
   const { store, setStore } = useAuth();
   const toast = useToast();
   const { data, error, reload } = useApi('/owner/store');
+  const { bySlug: deptBy } = useDepartments();
+  // the template that fits what the store sells: the profile most of its sections belong to
+  const suggestedTemplate = (() => {
+    const n = {}; for (const slug of data?.store?.departments || []) { const p = deptBy.get(slug)?.profile; if (p) n[p] = (n[p] || 0) + 1; }
+    const top = Object.entries(n).sort((a, b) => b[1] - a[1])[0]?.[0];
+    return top && TEMPLATE_BY_PROFILE[top] ? { id: TEMPLATE_BY_PROFILE[top], profile: top } : null;
+  })();
   const [design, setDesign] = useState(null);
   const [flash, setFlash] = useState(null);
   const [wa, setWa] = useState(null);
@@ -321,6 +330,12 @@ export default function StoreDesigner() {
         </Panel>
 
         <Panel title={L('اختار قالب', 'Choose a template')} subtitle={L('كل قالب بيغيّر الغلاف وترتيب الأقسام وشكل التصنيفات والكروت والكثافة. ألوانك مش بتتغير إلا لو وافقت.', 'Each template changes hero, section order, categories, cards and density.')}>
+          {suggestedTemplate && design.template !== suggestedTemplate.id && TEMPLATES[suggestedTemplate.id] && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand/40 bg-brand/5 p-3">
+              <p className="text-sm"><Sparkles className="me-1.5 inline h-4 w-4 text-brand" />{L(`مناسب لنشاطك (${PROFILES[suggestedTemplate.profile].ar}): `, `Fits your business (${PROFILES[suggestedTemplate.profile].en}): `)}<b>{L(TEMPLATES[suggestedTemplate.id].ar, TEMPLATES[suggestedTemplate.id].en)}</b></p>
+              <Button size="xs" variant="outline" onClick={() => pickTemplate(suggestedTemplate.id)}>{L('جرّبه', 'Try it')}</Button>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 2xl:grid-cols-4">
             {TEMPLATE_IDS.map((id) => {
               const t = TEMPLATES[id]; const on = design.template === id;

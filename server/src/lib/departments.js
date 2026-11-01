@@ -1,17 +1,40 @@
-import { LEGACY_DEPARTMENTS } from '@souqna/shared';
+import { LEGACY_DEPARTMENTS, PROFILES, DEFAULT_PROFILE, ROOT_PROFILES, effectiveAttrs } from '@souqna/shared';
 import { q, insert } from '../db/index.js';
 import { AppError } from './errors.js';
 import { json } from '../db/index.js';
 
 export const PENDING_RE = /^c\d+_/;
-export const listDepartments = ({ all = false } = {}) =>
+const rowToDef = (r) => ({ key: r.key, ar: r.label_ar, en: r.label_en, type: r.type, options: json(r.options_json, []), required: !!r.required, filterable: !!r.filterable, merchant_only: !!r.merchant_only, active: !!r.active, sort: r.sort });
+
+/** Inherited profile / attribute definitions for every department, computed in memory from two queries. */
+function inheritance() {
+  const rows = q.all('SELECT slug, parent_slug, profile FROM departments');
+  const by = new Map(rows.map((r) => [r.slug, r]));
+  const own = new Map();
+  for (const r of q.all('SELECT * FROM category_attributes ORDER BY sort, id')) own.set(r.department_slug, [...(own.get(r.department_slug) || []), rowToDef(r)]);
+  const chain = (slug) => { const out = []; for (let c = by.get(slug), i = 0; c && i < 8; c = by.get(c.parent_slug), i++) out.push(c); return out; }; // node first, root last
+  const profile = (slug) => {
+    const ch = chain(slug);
+    for (const c of ch) if (c.profile && PROFILES[c.profile]) return c.profile;
+    const root = ch[ch.length - 1]?.slug;
+    return ROOT_PROFILES[root] || DEFAULT_PROFILE; // before the catalog migration has run, the old roots still get a sensible experience
+  };
+  /** root -> node: a child redefining a key replaces it; active=0 in a child switches an inherited attribute off for that branch. */
+  const attrs = (slug) => {
+    const merged = new Map(); let any = false;
+    for (const c of chain(slug).reverse()) for (const d of own.get(c.slug) || []) { any = true; if (d.active) merged.set(d.key, d); else merged.delete(d.key); }
+    return any ? [...merged.values()].sort((a, b) => a.sort - b.sort) : effectiveAttrs(null, profile(slug));
+  };
+  return { profile, attrs, own: (slug) => own.get(slug) || [] };
+}
+export const listDepartments = ({ all = false } = {}) => { const eff = inheritance(); return (
   q.all(`SELECT d.*, (SELECT COUNT(*) FROM stores s WHERE s.departments LIKE '%,' || d.slug || ',%') AS stores_count
          FROM departments d ${all ? '' : 'WHERE d.active=1'} ORDER BY d.sort, d.id`)
     .map((d) => {
       const pending = !d.active && PENDING_RE.test(d.slug); // a section an owner added; waits for the platform admin to accept it
-      return { id: d.id, slug: d.slug, name: { ar: d.name_ar, en: d.name_en }, name_ar: d.name_ar, name_en: d.name_en, sizes: json(d.sizes_json, []), image: d.image || null, sort: d.sort, active: !!d.active, parent: d.parent_slug || null, stores_count: d.stores_count,
+      return { id: d.id, slug: d.slug, name: { ar: d.name_ar, en: d.name_en }, name_ar: d.name_ar, name_en: d.name_en, sizes: json(d.sizes_json, []), image: d.image || null, sort: d.sort, active: !!d.active, parent: d.parent_slug || null, profile: d.profile || null, profile_effective: eff.profile(d.slug), description: { ar: d.description_ar || '', en: d.description_en || '' }, icon: d.icon || null, visibility: d.visibility || 'visible', attrs: eff.own(d.slug), attrs_effective: eff.attrs(d.slug), stores_count: d.stores_count,
         ...(pending ? { pending: true, requesters: q.all('SELECT s.name_ar FROM categories c JOIN stores s ON s.id=c.store_id WHERE c.slug=?', [d.slug.replace(/_/g, '-')]).map((x) => x.name_ar) } : {}) };
-    });
+    })); };
 
 const deptRows = () => q.all('SELECT slug, name_ar, name_en, parent_slug FROM departments');
 /** القسم + كل اللي تحته (قسم رئيسي ← أقسام ← أنواع). الأسماء القديمة بتتحول لمكانها الجديد. */
@@ -113,3 +136,8 @@ export async function backfillProductTypes() {
   }
   return n;
 }
+
+/** Profile of a department: its own, else the nearest ancestor's, else by root section, else the default. */
+export const deptProfile = (slug) => inheritance().profile(slug);
+/** Attribute definitions in effect for a department (inherited root -> node, child overrides). */
+export const deptAttrDefs = (slug) => inheritance().attrs(slug);

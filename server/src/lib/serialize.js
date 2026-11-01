@@ -123,6 +123,7 @@ export function serializeProductDetail(p) {
   const [card] = serializeCards([p]);
   return {
     ...card,
+    attrs: json(p.attrs_json, {}),
     description: bi(p, 'description'),
     sku: p.sku,
     barcode: p.barcode || null,
