@@ -31,20 +31,22 @@ export default function CategoryBrowser({ value, onChange }) {
   const rootOf = (slug) => { let s = slug; for (let i = 0; s && i < 6 && bySlug.get(s)?.parent; i++) s = bySlug.get(s).parent; return s; };
   const root = value === 'all' ? null : rootOf(value);
   const rootDept = root ? bySlug.get(root) : null;
-  const groups = useMemo(() => (root ? childrenOf(root).map((c) => ({ c, kids: childrenOf(c.slug) })) : []), [root, childrenOf]);
-  const flatCount = groups.reduce((n, g) => n + 1 + g.kids.length, 0);
-  const LIMIT = 4;
-  const shown = expanded ? groups : groups.slice(0, LIMIT);
+  const level2 = useMemo(() => (root ? childrenOf(root).map((c) => ({ c, kids: childrenOf(c.slug) })) : []), [root, childrenOf]);
+  // the level-2 section that contains the current choice: its children get their own row (revealed only when you go in)
+  const activeL2 = useMemo(() => { if (!root || value === root) return null; let s = value; for (let i = 0; s && i < 6; i++) { const par = bySlug.get(s)?.parent; if (par === root) return s; s = par; } return null; }, [root, value, bySlug]);
+  const inner = level2.find((g) => g.c.slug === activeL2);
+  const LIMIT = 14;
+  const shown = expanded ? level2 : level2.slice(0, LIMIT);
   const select = (slug) => { setExpanded(false); onChange(slug); };
   const allLabel = lang === 'ar' ? 'الكل' : 'All';
 
-  const Chip = ({ slug, children }) => {
+  const Chip = ({ slug, children, sel = false, more = false }) => {
     const on = value === slug;
     return (
       <button type="button" onClick={() => onChange(slug)} aria-pressed={on}
         className={cx('inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition',
-          on ? 'border-brand bg-btn text-on-btn shadow-sm' : 'border-line-strong bg-white text-[#43516a] hover:border-brand hover:text-brand')}>
-        {on && <Check className="h-3.5 w-3.5" aria-hidden="true" />}{children}
+          on ? 'border-brand bg-btn text-on-btn shadow-sm' : sel ? 'border-brand bg-brand/10 text-brand' : 'border-line-strong bg-white text-[#43516a] hover:border-brand hover:text-brand')}>
+        {on && <Check className="h-3.5 w-3.5" aria-hidden="true" />}{children}{more && !on && <ChevronDown className="h-3 w-3 opacity-60" aria-hidden="true" />}
       </button>
     );
   };
@@ -80,24 +82,26 @@ export default function CategoryBrowser({ value, onChange }) {
             <button type="button" onClick={() => onChange('all')} className="ms-auto text-xs font-bold text-muted hover:text-brand">{lang === 'ar' ? 'مسح الاختيار' : 'Clear'}</button>
           </div>
 
-          {groups.length > 0 && (
+          {level2.length > 0 && (
             <div className="mt-4 space-y-4 border-t border-line pt-4">
-              <div className="flex flex-wrap gap-2"><Chip slug={root}>{allLabel} · {label(root)}</Chip></div>
-              {shown.map(({ c, kids }) => (
-                <div key={c.slug}>
-                  {kids.length > 0 ? (
-                    <>
-                      <button type="button" onClick={() => onChange(c.slug)} className={cx('mb-2 text-sm font-black transition hover:text-brand', value === c.slug ? 'text-brand' : 'text-fg')}>{label(c.slug)}</button>
-                      <div className="flex flex-wrap gap-2">{kids.map((k) => <Chip key={k.slug} slug={k.slug}>{label(k.slug)}</Chip>)}</div>
-                    </>
-                  ) : <div className="flex flex-wrap gap-2"><Chip slug={c.slug}>{label(c.slug)}</Chip></div>}
-                </div>
-              ))}
-              {groups.length > LIMIT && (
+              <div className="flex flex-wrap gap-2">
+                <Chip slug={root}>{allLabel} · {label(root)}</Chip>
+                {shown.map(({ c, kids }) => <Chip key={c.slug} slug={c.slug} sel={value === c.slug || activeL2 === c.slug} more={kids.length > 0}>{label(c.slug)}</Chip>)}
+              </div>
+              {level2.length > LIMIT && (
                 <button type="button" onClick={() => setExpanded((v) => !v)} className="inline-flex items-center gap-1 text-sm font-bold text-brand">
                   {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                  {expanded ? (lang === 'ar' ? 'عرض أقل' : 'Show less') : (lang === 'ar' ? `عرض كل الأقسام (${flatCount})` : `Show all (${flatCount})`)}
+                  {expanded ? (lang === 'ar' ? 'عرض أقل' : 'Show less') : (lang === 'ar' ? `عرض كل الأقسام (${level2.length})` : `Show all (${level2.length})`)}
                 </button>
+              )}
+              {inner && inner.kids.length > 0 && (
+                <div className="rounded-xl bg-secondary/50 p-3">
+                  <p className="mb-2 text-[13px] font-black text-fg">{lang === 'ar' ? `داخل ${label(inner.c.slug)}` : `In ${label(inner.c.slug)}`}</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Chip slug={inner.c.slug}>{allLabel} · {label(inner.c.slug)}</Chip>
+                    {inner.kids.map((k) => <Chip key={k.slug} slug={k.slug}>{label(k.slug)}</Chip>)}
+                  </div>
+                </div>
               )}
             </div>
           )}

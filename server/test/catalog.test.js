@@ -229,3 +229,24 @@ test('merchant section picker, usage tracking and the request → approve / reje
     assert.equal((await t.call('POST', '/owner/products', { name_ar: 'x2', price: 50, department: 'nope_nope', media: [], variants: [], stock: 1 }, t.token)).status, 400);
   } finally { t.server.close(); }
 });
+
+test('old category URLs: public section + product filter resolve through an admin-created alias; admin lists history/aliases', async () => {
+  const t = await setup();
+  try {
+    const mk = await t.admin('POST', '/departments', { name_ar: 'كوت اختبار', name_en: 'Coat test', parent: 'women', slug: 'coat_t1' });
+    assert.ok(mk.status < 300, JSON.stringify(mk.body));
+    t.q.run('UPDATE departments SET visibility=?, show_empty=1 WHERE slug=?', ['public', 'coat_t1']);
+    const bad = await t.admin('POST', '/category-aliases', { alias: 'coat_t1', kind: 'slug_en', to: 'coat_t1' });
+    assert.equal(bad.status, 422); // equals a live slug
+    const ok = await t.admin('POST', '/category-aliases', { alias: 'بالطوهات-قديم', kind: 'slug_ar', to: 'coat_t1', reason: 'audit' });
+    assert.equal(ok.status, 201);
+    const page = await t.call('GET', `/departments/${encodeURIComponent('بالطوهات-قديم')}`);
+    assert.equal(page.status, 200); assert.equal(page.body.canonical, 'coat_t1'); assert.equal(page.body.redirected_from, 'بالطوهات-قديم');
+    assert.equal((await t.call('GET', '/departments/not-there-at-all')).status, 404);
+    const list = await t.admin('GET', '/category-aliases'); assert.equal(list.body.aliases.length >= 1, true);
+    assert.equal((await t.admin('GET', '/category-migrations')).status, 200);
+    assert.equal((await t.admin('GET', '/category-review?slugs=coat_t1')).status, 200);
+    await t.admin('PATCH', `/category-aliases/${list.body.aliases[0].id}`, { status: 'disabled' });
+    assert.equal((await t.call('GET', `/departments/${encodeURIComponent('بالطوهات-قديم')}`)).status, 404);
+  } finally { t.server.close(); }
+});

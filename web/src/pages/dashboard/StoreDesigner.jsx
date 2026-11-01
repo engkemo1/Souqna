@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronUp, ChevronDown, Sparkles, ExternalLink, Wand2, Eye, EyeOff, Shirt, Smartphone } from 'lucide-react';
+import { Check, ChevronUp, ChevronDown, Sparkles, ExternalLink, Wand2, Eye, EyeOff, Shirt, Smartphone, Monitor, Maximize2, RotateCcw } from 'lucide-react';
 import { THEME_PRESETS, mix } from '@souqna/shared/theme';
 import {
   TEMPLATES, TEMPLATE_IDS, SEASONS, SEASON_IDS, CARD_STYLES, CAT_STYLES, GRID_STYLES, HERO_STYLES, TYPE_STYLES,
@@ -14,6 +14,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { PageHeader, Panel } from '../../components/dash/Kit.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
+import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 import { Field, Input, Textarea, Switch } from '../../components/ui/Field.jsx';
 import { ErrorState, errorMessage } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
@@ -141,9 +142,12 @@ function Thumb({ tpl, palette }) {
 }
 
 /** معاينة حية: متجرك الحقيقي جوه إطار موبايل، وبيتحدّث فورًا مع كل اختيار من غير حفظ. بتتبعت الإعدادات للإطار بـ postMessage (StoreLayout بيسمعها). */
-function LivePreview({ slug, payload, L, onClose }) {
+function LivePreview({ slug, payload, L, onClose, onLarge, large = false }) {
   const ref = useRef(null);
+  const wrapRef = useRef(null);
   const [ready, setReady] = useState(0);
+  const [device, setDevice] = useState('mobile'); // 'desktop' is only offered in the large preview, where it fits
+  const [boxW, setBoxW] = useState(900);
   useEffect(() => {
     const on = (e) => { if (e.origin === window.location.origin && e.data?.type === 'souqna-design-ready' && e.source === ref.current?.contentWindow) setReady((n) => n + 1); };
     window.addEventListener('message', on);
@@ -154,23 +158,47 @@ function LivePreview({ slug, payload, L, onClose }) {
     const id = setTimeout(() => ref.current?.contentWindow?.postMessage({ type: 'souqna-design-preview', payload }, window.location.origin), 120);
     return () => clearTimeout(id);
   }, [ready, payload]);
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const ro = new ResizeObserver(([e]) => setBoxW(e.contentRect.width));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [device]);
+  const pick = (d) => { if (d !== device) { setReady(0); setDevice(d); } };
+  const DESK_W = 1280, DESK_H = 800;
+  const scale = Math.min(1, boxW / DESK_W);
+  const frame = <iframe key={device} ref={ref} title="store preview" src={`/s/${slug}?preview=design`} className="h-full w-full border-0" />;
+  const tab = (d, Icon, label) => (
+    <button type="button" onClick={() => pick(d)} aria-pressed={device === d} data-testid={`preview-${d}`}
+      className={cx('inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-xs font-semibold transition', device === d ? 'bg-fg text-canvas' : 'text-muted ring-1 ring-line hover:bg-fg/[0.05]')}><Icon className="h-3.5 w-3.5" />{label}</button>
+  );
   return (
-    <div className="flex flex-col items-center gap-3">
-      <div className="flex w-full items-center justify-between">
+    <div className={cx('flex flex-col items-center gap-3', large && 'mx-auto w-full max-w-[1320px]')}>
+      <div className="flex w-full flex-wrap items-center justify-between gap-2">
         <p className="text-sm font-bold">{L('معاينة حية', 'Live preview')}</p>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {large && <>{tab('mobile', Smartphone, L('موبايل', 'Mobile'))}{tab('desktop', Monitor, L('ديسكتوب', 'Desktop'))}</>}
+          {onLarge && <Button size="sm" variant="outline" onClick={onLarge} data-testid="preview-large"><Maximize2 className="h-3.5 w-3.5" />{L('معاينة كبيرة', 'Large preview')}</Button>}
           <Button size="sm" variant="outline" to={`/s/${slug}`} target="_blank"><ExternalLink className="h-3.5 w-3.5" />{L('فتح المتجر', 'Open store')}</Button>
           {onClose && <Button size="sm" variant="outline" onClick={onClose}>{L('إغلاق', 'Close')}</Button>}
         </div>
       </div>
-      <div className="relative w-[320px] max-w-full rounded-[2.4rem] bg-fg p-[9px] shadow-[0_24px_60px_-24px_rgba(3,36,77,.5)]">
-        <span className="absolute left-1/2 top-[14px] z-10 h-[5px] w-16 -translate-x-1/2 rounded-full bg-canvas/25" />
-        <div className="relative overflow-hidden rounded-[1.9rem] bg-white" style={{ height: 600 }}>
-          {!ready && <div className="absolute inset-0 grid place-items-center bg-white text-xs text-muted">{L('جاري تحميل المعاينة…', 'Loading preview…')}</div>}
-          <iframe ref={ref} title="store preview" src={`/s/${slug}?preview=design`} className="h-full w-full border-0" />
+      {device === 'mobile' ? (
+        <div className="relative w-[320px] max-w-full rounded-[2.4rem] bg-fg p-[9px] shadow-[0_24px_60px_-24px_rgba(3,36,77,.5)]">
+          <span className="absolute left-1/2 top-[14px] z-10 h-[5px] w-16 -translate-x-1/2 rounded-full bg-canvas/25" />
+          <div className="relative overflow-hidden rounded-[1.9rem] bg-white" style={{ height: large ? 720 : 600 }}>
+            {!ready && <div className="absolute inset-0 z-10 grid place-items-center bg-white text-xs text-muted">{L('جاري تحميل المعاينة…', 'Loading preview…')}</div>}
+            {frame}
+          </div>
         </div>
-      </div>
-      <p className="max-w-[320px] text-center text-[12px] leading-relaxed text-muted">{L('بتتغير فورًا وإنت بتختار. مفيش حاجة بتتنشر لحد ما تدوس حفظ.', 'Updates instantly as you choose. Nothing is published until you save.')}</p>
+      ) : (
+        <div ref={wrapRef} dir="ltr" className="relative w-full overflow-hidden rounded-2xl border border-line bg-white shadow-soft" style={{ height: DESK_H * scale }}>
+          {!ready && <div className="absolute inset-0 z-10 grid place-items-center bg-white text-xs text-muted">{L('جاري تحميل المعاينة…', 'Loading preview…')}</div>}
+          <div style={{ width: DESK_W, height: DESK_H, transform: `scale(${scale})`, transformOrigin: 'top left' }}>{frame}</div>
+        </div>
+      )}
+      <p className="max-w-[420px] text-center text-[12px] leading-relaxed text-muted">{L('بتتغير فورًا وإنت بتختار. مفيش حاجة بتتنشر لحد ما تدوس حفظ.', 'Updates instantly as you choose. Nothing is published until you press Save.')}</p>
     </div>
   );
 }
@@ -215,6 +243,8 @@ export default function StoreDesigner() {
   const [busy, setBusy] = useState(false);
   const [ai, setAi] = useState({ kind: '', vibe: '', note: '', busy: false, result: null });
   const [showPreview, setShowPreview] = useState(false);
+  const [bigPreview, setBigPreview] = useState(false);
+  const [confirmReset, setConfirmReset] = useState(false);
 
   useEffect(() => {
     if (!data) return;
@@ -252,6 +282,17 @@ export default function StoreDesigner() {
     setOrder([...full, ...OPTIONAL_SECTIONS.filter((o) => !full.includes(o))]);
     setHidden(new Set(OPTIONAL_SECTIONS.filter((o) => !t.sections.includes(o))));
     setApplyPreset(t.preset);
+  });
+  // Reset to the selected template's own defaults: fine-tune overrides, section order and which optional sections show.
+  // It only edits the draft (see it in the preview, publish with Save). Colours, texts, images, banners, products and store data are never touched.
+  const resetTemplate = () => touch(() => {
+    const t = TEMPLATES[design.template];
+    setDesign((d) => ({ ...d, overrides: {} }));
+    const full = [...new Set([...t.sections, ...STANDARD])];
+    setOrder([...full, ...OPTIONAL_SECTIONS.filter((o) => !full.includes(o))]);
+    setHidden(new Set(OPTIONAL_SECTIONS.filter((o) => !t.sections.includes(o))));
+    setConfirmReset(false);
+    toast({ title: L('رجعنا إعدادات القالب للافتراضي. راجع المعاينة واضغط حفظ.', 'Template defaults restored. Review the preview and press Save.') });
   });
   const setOverride = (k, v) => touch(() => setDesign((d) => {
     const o = { ...d.overrides };
@@ -349,6 +390,10 @@ export default function StoreDesigner() {
               );
             })}
           </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-line p-3">
+            <p className="text-[13px] text-muted">{L('عدّلت في تفاصيل أو ترتيب أقسام قالب؟ تقدر ترجّعه لوضعه الأصلي.', 'Changed details or section order? Restore this template to how it ships.')}</p>
+            <Button size="sm" variant="outline" onClick={() => setConfirmReset(true)} data-testid="reset-template"><RotateCcw className="h-3.5 w-3.5" />{L('رجّع القالب للافتراضي', 'Reset to default')}</Button>
+          </div>
           {cur.preset && (
             <div className="mt-4"><Switch checked={!!applyPreset} onChange={(v) => touch(() => setApplyPreset(v ? cur.preset : null))} label={L('طبّق ألوان القالب كمان', 'Also apply the template colours')} description={L('لو قفلتها، ألوانك الحالية تفضل زي ما هي.', 'Off keeps your current colours.')} /></div>
           )}
@@ -408,8 +453,11 @@ export default function StoreDesigner() {
           </div>
         </Panel>
       </div>
-      <aside className="hidden xl:block"><div className="sticky top-4 rounded-3xl border border-line bg-elevated p-4"><LivePreview slug={store.slug} payload={previewPayload} L={L} /></div></aside>
+      <aside className="hidden xl:block"><div className="sticky top-4 rounded-3xl border border-line bg-elevated p-4"><LivePreview slug={store.slug} payload={previewPayload} L={L} onLarge={() => setBigPreview(true)} /></div></aside>
       </div>
+      {bigPreview && <div className="fixed inset-0 z-50 overflow-y-auto bg-canvas/95 p-4 backdrop-blur"><LivePreview large slug={store.slug} payload={previewPayload} L={L} onClose={() => setBigPreview(false)} /></div>}
+      <ConfirmDialog open={confirmReset} onClose={() => setConfirmReset(false)} onConfirm={resetTemplate} title={L('إعادة ضبط القالب', 'Reset template')} confirmLabel={L('أيوه، رجّعه للافتراضي', 'Yes, reset')}
+        body={L(`هيرجع «${L(cur.ar, cur.en)}» لإعداداته الأصلية: شكل الغلاف والكروت والتصنيفات والكثافة وترتيب الأقسام. ألوانك ونصوصك وصور المتجر والبنرات والمنتجات وبيانات المحل مش هتتأثر. التغيير بيظهر في المعاينة وبيتنشر لما تضغط حفظ.`, `This restores “${cur.en}” to its shipped settings: hero, cards, categories, density and section order. Your colours, texts, images, banners, products and store data are not touched. The change shows in the preview and is published when you press Save.`)} />
       {showPreview && <div className="fixed inset-0 z-50 overflow-y-auto bg-canvas/95 p-4 backdrop-blur xl:hidden"><LivePreview slug={store.slug} payload={previewPayload} L={L} onClose={() => setShowPreview(false)} /></div>}
 
       <div className="fixed inset-x-0 bottom-[calc(64px+var(--safe-b))] z-20 flex gap-3 border-t border-line bg-elevated/95 px-4 py-3 backdrop-blur-md md:hidden">

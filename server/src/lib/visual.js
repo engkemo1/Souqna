@@ -13,6 +13,7 @@ import { q } from '../db/index.js';
 import { readMediaFile } from './media.js';
 import { visualProductFamily, visualTypeOptions } from './visual-taxonomy.js';
 import { clipReady, clipStatus, clipEmbedImage, clipEmbedTexts, CLIP_MODEL_NAME } from './visual-clip.js';
+import { detectPerson } from './visual-person.js';
 import { cropRegions, colorDescriptor, rankConfident, normalize, toBlob, fromBlob, dominantColor, FRIENDLY_AR } from './visual-core.js';
 import { buildTextPrototypes, buildCentroids, detectItems, vectorForFamily } from './visual-classify.js';
 
@@ -277,7 +278,7 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
   if (isClip) {
     try {
       regions = [];
-      for (const crop of await cropRegions(buffer)) regions.push({ key: crop.key, vec: normalize(await clipEmbedImage(crop.buffer)), hist: await colorDescriptor(crop.buffer) });
+      for (const crop of await cropRegions(buffer, { detect: detectPerson })) regions.push({ key: crop.key, vec: normalize(await clipEmbedImage(crop.buffer)), hist: await colorDescriptor(crop.buffer) });
     } catch (e) {
       // CLIP failed on this photo (model error / out of memory): answer with the colour model instead of failing the customer
       if (!_model) { console.error('[visual] CLIP failed, using colour model:', e.message); return searchByImage(buffer, { department, type, limit, _model: 'color-v1' }); }

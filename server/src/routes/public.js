@@ -5,7 +5,8 @@ import multer from 'multer';
 import sharp from 'sharp';
 import { listDepartments, customerDepartments, deptSubtree, deptAncestors, deptAttrDefs, deptProfile } from '../lib/departments.js';
 import { z } from 'zod';
-import { q, tx, insert, json } from '../db/index.js';
+import { q, tx, insert, json, db } from '../db/index.js';
+import { resolveAlias } from '../lib/category-aliases.js';
 import { randomBytes } from 'node:crypto';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { clampInt, nowIso } from '../lib/util.js';
@@ -60,13 +61,14 @@ r.get('/departments', h((req, res) => { cache(res, 60); res.json({ departments: 
 /** One section's landing data: breadcrumb, own details, visible children (with images), SEO. Reads stored rows only — never generates anything. */
 r.get('/departments/:slug', h((req, res) => {
   const all = listDepartments(); const by = new Map(all.map((d) => [d.slug, d]));
-  const d = by.get(String(req.params.slug));
+  let d = by.get(String(req.params.slug)); let redirectedFrom = null;
+  if (!d) { const canon = resolveAlias(db, req.params.slug); if (canon && by.get(canon)) { redirectedFrom = String(req.params.slug); d = by.get(canon); } } // old URL -> canonical section (the page replaces its URL)
   if (!d || d.visibility === 'hidden') throw new AppError(404, 'not_found', 'Section not found.');
   const visible = new Set(customerDepartments().map((x) => x.slug));
   if (!visible.has(d.slug)) throw new AppError(404, 'not_found', 'Section not found.');
   const crumbs = []; for (let c = d, i = 0; c && i < 10; c = by.get(c.parent), i++) crumbs.unshift({ slug: c.slug, name: c.name });
   cache(res, 60);
-  res.json({ department: publicDept(d), breadcrumb: crumbs, children: all.filter((x) => x.parent === d.slug && visible.has(x.slug)).map(publicDept) });
+  res.json({ department: publicDept(d), canonical: d.slug, redirected_from: redirectedFrom, breadcrumb: crumbs, children: all.filter((x) => x.parent === d.slug && visible.has(x.slug)).map(publicDept) });
 }));
 
 r.get('/homepage-ads', h((_req, res) => {
@@ -189,7 +191,7 @@ r.get('/search', h((req, res) => {
   const catClause = catKey ? `EXISTS (SELECT 1 FROM categories c WHERE c.id=p.category_id AND ${NORM('c.name_ar')}=?)` : null;
   const baseWhere = [...where]; const baseParams = [...params];
   if (catClause) { baseWhere.push(catClause); baseParams.push(catKey); } // department / store counts respect the chosen category
-  const deptSlug = String(department).replace(/[^a-z0-9_]/g, '');
+  const deptSlug = (() => { const raw = String(department).replace(/[^a-z0-9_]/g, ''); return department && !(raw && q.get('SELECT 1 FROM departments WHERE slug=?', [raw])) ? (resolveAlias(db, department) || raw) : raw; })();
   const storeSlug = String(store).replace(/[^a-z0-9_-]/gi, '');
   const facetFrom = (extra, extraParams) => ({ sql: `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${[...baseWhere, ...extra].join(' AND ')}`, params: [...baseParams, ...extraParams] });
   const deptList = deptSlug ? deptSubtree(deptSlug) : [];

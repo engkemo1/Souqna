@@ -12,6 +12,7 @@ import ProductCard, { ProductCardSkeleton, ProductGrid } from '../../components/
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
 import { TrustStrip } from '../../components/store/StoreChrome.jsx';
 import VisitCard from '../../components/store/VisitCard.jsx';
+import StoreInfoBar from '../../components/store/StoreInfoBar.jsx';
 import StoreHero, { StoreIdentityBar } from '../../components/store/StoreHero.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import { ErrorState } from '../../components/ui/States.jsx';
@@ -317,6 +318,7 @@ export default function StoreHome() {
 
   return (
     <PageTransition>
+      <StoreInfoBar />
       {error ? (
         <div className="container mt-12"><ErrorState error={error} onRetry={reload} /></div>
       ) : (

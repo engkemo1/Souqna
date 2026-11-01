@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Search, SlidersHorizontal } from 'lucide-react';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import { CategoryImage, SubCard, ThumbChip, deptName } from '../../components/market/CategoryCards.jsx';
@@ -38,6 +38,8 @@ export default function CategoryPage() {
   const { slug } = useParams();
   const { t, lang } = useI18n();
   const { data, error, loading, reload } = useApi(`/departments/${encodeURIComponent(slug)}`);
+  const navigate = useNavigate();
+  useEffect(() => { if (data?.canonical && data.canonical !== slug) navigate(`/c/${data.canonical}`, { replace: true }); }, [data?.canonical, slug, navigate]); // an old link lands on the canonical section
   const dept = data?.department;
   const trail = useMemo(() => data?.breadcrumb || [], [data]);
   const children = data?.children || [];

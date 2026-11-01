@@ -9,6 +9,7 @@ import { Field, Input, Switch } from '../../components/ui/Field.jsx';
 import { ErrorState, EmptyState } from '../../components/ui/States.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
+import TaxonomyTools from './TaxonomyTools.jsx';
 import { adminApi, adminUpload, useAdminApi, fmtNum } from './adminApi.js';
 
 const PRESETS = [
@@ -360,6 +361,7 @@ export default function Departments() {
       )}
       <div className="relative mb-4"><Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ابحث في الأقسام (عربي / English / مفتاح)" className="ps-9" aria-label="بحث" /></div>
       {loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : !roots.length ? <EmptyState title={needle ? 'مفيش نتيجة' : 'مفيش أقسام'} body={needle ? 'جرّب كلمة تانية.' : 'أضف أول قسم.'} /> : <ul className="space-y-1.5">{roots.map((d) => <Row key={d.id} d={d} level={0} />)}</ul>}
+      <TaxonomyTools sections={raw.map((d) => ({ slug: d.slug, active: !!d.active, label: pathOf(d) }))} />
       <DeleteDialog key={del?.id} dept={del} others={all.filter((x) => x.slug !== del?.slug)} onClose={() => setDel(null)} onDone={(l) => { setLocal(l); reload(); }} />
       <DeptSheet all={all} defaultParent={newParent} dept={edit === 'new' || !edit ? edit : raw.find((x) => x.id === edit.id) || edit} onClose={() => { setEdit(null); setNewParent(''); }} onSaved={(l) => { setLocal(l); reload(); }} />
     </div>

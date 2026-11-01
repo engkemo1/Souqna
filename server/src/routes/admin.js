@@ -4,7 +4,8 @@ import multer from 'multer';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
-import { q, tx, insert, update } from '../db/index.js';
+import { q, tx, insert, update, db } from '../db/index.js';
+import { addAlias } from '../lib/category-aliases.js';
 import { signToken } from '../lib/auth.js';
 import { slugify, latinSlug } from '../lib/util.js';
 import { config } from '../config.js';
@@ -1339,6 +1340,27 @@ r.delete('/departments/:id', h((req, res) => {
     q.run('DELETE FROM departments WHERE id=?', [d.id]);
   });
   res.json({ departments: adminDepartments(), moved: count });
+}));
+
+/* ---- category aliases (old URLs), migration history, and products that still need a human decision ---- */
+r.get('/category-aliases', h((_req, res) => res.json({ aliases: q.all('SELECT a.id, a.alias, a.kind, a.status, a.reason, a.created_at, d.slug AS department_slug, d.name_ar, d.name_en, d.active AS department_active FROM category_aliases a JOIN departments d ON d.id=a.department_id ORDER BY a.id DESC') })));
+r.post('/category-aliases', h((req, res) => {
+  const b = z.object({ alias: z.string().trim().min(1).max(120), kind: z.enum(['slug_ar', 'slug_en', 'legacy_id', 'path']), to: z.string().trim().min(1).max(80), reason: z.string().trim().max(200).optional() }).parse(req.body || {});
+  const out = addAlias(db, { alias: b.alias, kind: b.kind, to_slug: b.to, reason: b.reason });
+  if (!out.ok) throw new AppError(422, 'validation_failed', out.error, { alias: 'invalid_alias' });
+  res.status(out.skipped ? 200 : 201).json(out);
+}));
+r.patch('/category-aliases/:id', h((req, res) => {
+  const b = z.object({ status: z.enum(['active', 'disabled']) }).parse(req.body || {});
+  if (!q.run('UPDATE category_aliases SET status=? WHERE id=?', [b.status, Number(req.params.id)]).changes) throw new AppError(404, 'not_found', 'Alias not found.');
+  res.json({ ok: true });
+}));
+r.get('/category-migrations', h((req, res) => res.json({ migrations: q.all('SELECT * FROM category_migrations ORDER BY id DESC LIMIT 500') })));
+/** Read-only: legacy/duplicate sections that still hold products, so an admin can classify each product by hand. */
+r.get('/category-review', h((req, res) => {
+  const slugs = String(req.query.slugs || '').split(',').map((x) => x.trim()).filter((x) => DEPT_SLUG_RE.test(x)).slice(0, 20);
+  const rows = slugs.length ? q.all(`SELECT p.id, p.store_id, s.slug AS store_slug, p.name_ar, p.name_en, p.audience, p.department, p.status FROM products p JOIN stores s ON s.id=p.store_id WHERE p.department IN (${slugs.map(() => '?').join(',')}) ORDER BY p.department, p.id LIMIT 1000`, slugs) : [];
+  res.json({ products: rows, empty_sections: q.all("SELECT d.slug, d.name_ar FROM departments d WHERE d.active=1 AND NOT EXISTS (SELECT 1 FROM products p WHERE p.department=d.slug) AND NOT EXISTS (SELECT 1 FROM departments c WHERE c.parent_slug=d.slug)") });
 }));
 
 /* ---- merchant requests for a missing section ---- */

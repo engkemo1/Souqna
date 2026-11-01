@@ -47,7 +47,7 @@ export default function StoreCard({ store: s, index = 0, large }) {
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-between gap-2">
               <h3 className={cx('truncate font-display font-bold', large ? 'text-xl sm:text-2xl' : 'text-lg')}>{tr(s.name)}</h3>
-              <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold"><Star className="h-4 w-4 fill-amber-400 text-amber-400" />{s.rating}<span className="font-normal text-muted">({s.ratingCount})</span></span>
+              {s.ratingCount > 0 && <span className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold"><Star className="h-4 w-4 fill-amber-400 text-amber-400" />{s.rating}<span className="font-normal text-muted">({s.ratingCount})</span></span>}
             </div>
             <p className="mt-1 line-clamp-1 text-sm text-muted">{tr(s.tagline)}</p>
             <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">

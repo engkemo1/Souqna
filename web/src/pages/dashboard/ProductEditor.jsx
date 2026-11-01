@@ -85,7 +85,7 @@ function Card({ id, step, title, hint, done, children, className, bare }) {
 const chipCls = (on) => cx('inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg');
 
 /** اختيار نوع المنتج على طريقة Amazon: الفئة (لمين؟) ← ابحث أو تصفح الأنواع. من النوع بنحدد القسم والمقاسات تلقائي. */
-function TypePicker({ tree, audience, typeKey, onChange, error, suggested, customName, onAddSection }) {
+function TypePicker({ tree, audience, typeKey, onChange, error, suggested, customName, onAddSection, sections = [], department = '', onPickSection }) {
   const { lang } = useI18n();
   const L = (ar, en) => (lang === 'ar' ? ar : en);
   const [q, setQ] = useState('');
@@ -94,11 +94,13 @@ function TypePicker({ tree, audience, typeKey, onChange, error, suggested, custo
   const [adding, setAdding] = useState(null);
   const [busy, setBusy] = useState(false);
   const submitAdd = async () => { setBusy(true); const ok = await onAddSection(adding); setBusy(false); if (ok) { setAdding(null); setQ(''); } };
-  useEffect(() => { setOpen(!typeKey); }, [typeKey]);
+  useEffect(() => { setOpen(!typeKey && !department); }, [typeKey, department]);
   if (!tree) return <Skeleton className="h-32 rounded-xl" />;
   const found = tree.families.flatMap((f) => f.types.map((t) => ({ ...t, family: f }))).find((t) => t.key === typeKey);
   const aud = tree.audiences.find((a) => a.key === audience);
+  const sec = !found ? sections.find((x) => x.slug === department) : null;
   const term = nz(q);
+  const secHits = term ? sections.filter((x) => nz(`${x.ar} ${x.en} ${x.crumb}`).includes(term)).slice(0, 8) : [];
   const avail = tree.families.map((f) => ({ ...f, types: f.types.filter((t) => !audience || t.audiences.includes(audience)) })).filter((f) => f.types.length);
   const activeFam = avail.some((f) => f.key === fam) ? fam : avail[0]?.key;
   const shown = term ? avail.map((f) => ({ ...f, types: f.types.filter((t) => nz(t.ar).includes(term)) })).filter((f) => f.types.length) : avail.filter((f) => f.key === activeFam);
@@ -111,16 +113,23 @@ function TypePicker({ tree, audience, typeKey, onChange, error, suggested, custo
           {tree.audiences.map((a) => <button key={a.key} type="button" aria-pressed={audience === a.key} onClick={() => pickAudience(a.key)} className={chipCls(audience === a.key)}>{lang === 'ar' ? a.ar : a.en}</button>)}
         </div>
       </div>
-      {found && !open ? (
+      {(found || sec) && !open ? (
         <div className="flex items-center justify-between gap-3 rounded-xl border border-line bg-secondary/40 px-4 py-3">
-          <div className="min-w-0"><p className="text-[13px] text-muted">{[aud?.ar, found.family.ar].filter(Boolean).join(' › ')}</p><p className="truncate text-base font-semibold">{found.ar}</p>{suggested && <p className="mt-0.5 text-[12.5px] text-amber-700">{L('اقتراح من اسم المنتج — راجعه', 'Suggested from the name — please check')}</p>}</div>
+          <div className="min-w-0"><p className="text-[13px] text-muted">{found ? [aud?.ar, found.family.ar].filter(Boolean).join(' › ') : sec.crumb}</p><p className="truncate text-base font-semibold">{found ? found.ar : sec.ar}</p>{suggested && <p className="mt-0.5 text-[12.5px] text-amber-700">{L('اقتراح من اسم المنتج — راجعه', 'Suggested from the name — please check')}</p>}</div>
           <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-brand hover:bg-brand/10"><Pencil className="h-3.5 w-3.5" />{L('تغيير', 'Change')}</button>
         </div>
       ) : !audience ? (
         <p className="rounded-xl bg-secondary/50 px-4 py-3 text-sm text-muted">{L('اختار الفئة الأول وهتظهرلك الأنواع المناسبة.', 'Pick who it is for first and the matching types will show.')}</p>
       ) : (
         <div className="space-y-3">
-          <div className="relative"><Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><Input value={q} onChange={(e) => setQ(e.target.value)} className="ps-10" placeholder={L('ابحث عن النوع: قميص، جزمة، فستان…', 'Search type: shirt, shoes, dress…')} aria-label={L('بحث في الأنواع', 'Search types')} /></div>
+          <div className="relative"><Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><Input value={q} onChange={(e) => setQ(e.target.value)} className="ps-10" placeholder={L('اكتب اسم المنتج أو القسم: هاف بوت، روب، سوت، قميص…', 'Type a product or section: ankle boot, robe, suit…')} aria-label={L('بحث في الأنواع والأقسام', 'Search types and sections')} /></div>
+          {term && secHits.length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-[12.5px] font-semibold text-muted">{L('أقسام السوق', 'Marketplace sections')}</p>
+              {secHits.map((x) => <button key={x.slug} type="button" onClick={() => { onPickSection?.(x.slug); setOpen(false); setQ(''); }} className="flex min-h-[3rem] w-full items-center justify-between gap-2 rounded-xl border border-line-strong px-3.5 py-2 text-start text-sm transition hover:border-fg active:scale-[0.99]"><span className="min-w-0"><span className="block truncate font-semibold">{x.ar}</span><span className="block truncate text-[12px] text-muted">{x.crumb}</span></span><span className="shrink-0 text-xs font-semibold text-brand">{L('اختيار', 'Select')}</span></button>)}
+            </div>
+          )}
+          {!term && <p className="text-[13px] text-muted">{L('اكتب اسم المنتج في الخانة فوق، أو اختار من القايمة تحت: اضغط مجموعة (يمين) وبعدين النوع.', 'Search above, or browse: tap a group, then the type.')}</p>}
           <div className="overflow-hidden rounded-2xl border border-line md:grid md:grid-cols-[12rem_minmax(0,1fr)]">
             {!term && (
               <nav aria-label={L('مجموعات الأنواع', 'Type groups')} className="flex gap-1.5 overflow-x-auto border-b border-line bg-secondary/40 p-2 no-scrollbar md:block md:space-y-1 md:overflow-visible md:border-b-0 md:border-e">
@@ -131,7 +140,7 @@ function TypePicker({ tree, audience, typeKey, onChange, error, suggested, custo
               </nav>
             )}
             <div className={cx('p-3 sm:p-4', term && 'md:col-span-2')}>
-              {shown.length === 0 && <p className="py-8 text-center text-sm text-muted">{L('مفيش نوع بالاسم ده. جرّب كلمة تانية أو اتصفح المجموعات.', 'No type matches. Try another word or browse.')}</p>}
+              {shown.length === 0 && !(term && secHits.length) && <p className="py-8 text-center text-sm text-muted">{L('مفيش نتيجة بالاسم ده. جرّب كلمة تانية، أو اضغط «مش لاقي» تحت وأضف القسم.', 'No match. Try another word, or add a new section below.')}</p>}
               <div className="space-y-5">
                 {shown.map((f) => (
                   <div key={f.key}>
@@ -363,6 +372,8 @@ export default function ProductEditor() {
   };
   const { data: tree } = useApi('/owner/product-types');
   const { data: pubDepts } = useApi('/departments?all=1');
+  const { data: pickerData } = useApi('/owner/category-picker');
+  const sectionOptions = useMemo(() => (pickerData?.departments || []).filter((d) => d.leaf).map((d) => ({ slug: d.slug, ar: d.name?.ar || '', en: d.name?.en || '', crumb: (d.breadcrumb || []).map((n) => n?.ar).filter(Boolean).join(' › ') })), [pickerData]);
   const [f, setF] = useState(EMPTY);
   const deptDefs = (pubDepts?.departments || []).find((d) => d.slug === f.department)?.attrs || [];
   const [initial, setInitial] = useState(EMPTY);
@@ -440,7 +451,7 @@ export default function ProductEditor() {
     if (f.name_ar.trim().length < 2) e.name_ar = t('field.required');
     if (!Number(f.price)) e.price = t('field.price_required');
     if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
-    if (status === 'active' && !(f.audience && (f.moda_key || customType))) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
+    if (status === 'active' && !(f.audience && (f.moda_key || customType || f.department))) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
     if (!f.media.length && status === 'active') e.media = t('editor.needImage');
     setErrors(e);
     return e;
@@ -494,7 +505,7 @@ export default function ProductEditor() {
   }
 
   const margin = f.cost && f.price ? Math.round(((f.price - f.cost) / f.price) * 100) : null;
-  const done = { images: f.media.length > 0, type: !!(f.audience && (f.moda_key || customType)), name: f.name_ar.trim().length >= 2, pricing: Number(f.price) > 0 };
+  const done = { images: f.media.length > 0, type: !!(f.audience && (f.moda_key || customType || f.department)), name: f.name_ar.trim().length >= 2, pricing: Number(f.price) > 0 };
   const steps = [['images', L('الصور', 'Photos')], ['type', L('النوع', 'Type')], ['name', L('الاسم', 'Name')], ['pricing', L('السعر', 'Price')]];
   const doneCount = steps.filter(([k]) => done[k]).length;
   const goTo = (k) => document.getElementById(k)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -511,7 +522,7 @@ export default function ProductEditor() {
   const stepErr = (i) => {
     const e = {};
     if (i === 0 && !f.media.length) e.media = t('editor.needImage');
-    if (i === 1 && !(f.audience && (f.moda_key || customType))) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
+    if (i === 1 && !(f.audience && (f.moda_key || customType || f.department))) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
     if (i === 2 && f.name_ar.trim().length < 2) e.name_ar = t('field.required');
     if (i === 3) {
       if (!Number(f.price)) e.price = t('field.price_required');
@@ -650,12 +661,14 @@ export default function ProductEditor() {
       </Card>)}
 
       {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('إيه المنتج؟', 'What is it?')} hint={L('اختار الفئة والنوع مرة واحدة، وإحنا نظبط القسم والمقاسات.', 'Pick it once — we set the department and sizes.')} done={done.type}>
-        <TypePicker tree={tree} audience={f.audience} typeKey={f.moda_key} suggested={suggested} error={errors.type} onChange={(p) => { if (p.moda_key) setCustomType(''); set(p); }} customName={customType && !f.moda_key ? customType : ''} onAddSection={addTypeSection} />
-        <div className="mt-5 space-y-3 border-t border-line pt-4">
-          <p className="text-sm font-medium">{L('القسم الدقيق (اختياري — بيحسّن الظهور في الفلاتر)', 'Exact section (optional — improves filters)')}</p>
-          <SectionPicker value={f.department} productName={f.name_ar} onChange={(slug) => set({ department: slug, deptTouched: true, attrs: {} })} />
-          {deptDefs.filter((d) => d.key).length > 0 && f.department && <AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} />}
-        </div>
+        <TypePicker tree={tree} audience={f.audience} typeKey={f.moda_key} sections={sectionOptions} department={f.department} onPickSection={(slug) => set({ department: slug, deptTouched: true, attrs: {}, moda_key: '' })} suggested={suggested} error={errors.type} onChange={(p) => { if (p.moda_key) setCustomType(''); set(p); }} customName={customType && !f.moda_key ? customType : ''} onAddSection={addTypeSection} />
+        <details className="mt-4 rounded-xl border border-line bg-secondary/30 px-4 py-3">
+          <summary className="cursor-pointer text-sm font-semibold text-brand">{L('اختيار القسم من شجرة الأقسام بالتفصيل (للمتقدمين)', 'Pick from the full section tree (advanced)')}</summary>
+          <div className="mt-3 space-y-3">
+            <SectionPicker value={f.department} productName={f.name_ar} onChange={(slug) => set({ department: slug, deptTouched: true, attrs: {} })} />
+          </div>
+        </details>
+        {deptDefs.filter((d) => d.key).length > 0 && f.department && <div className="mt-4"><AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} /></div>}
       </Card>)}
 
       {(!isNew || step === 2) && (<Card id="name" bare={isNew} step={3} title={L('الاسم والوصف', 'Name & description')} done={done.name}>

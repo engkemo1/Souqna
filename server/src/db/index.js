@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import { CATEGORY_TABLES_SQL } from '../lib/category-aliases.js';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -24,6 +25,7 @@ db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   ('subscription_reminder_days','5'),
   ('subscription_reminder_template','أهلاً {store}، نذكّرك إن اشتراك متجرك على Twist مستحق بمبلغ {amount} ج.م. موعد التجديد {due_date}. ابعتلنا صورة التحويل أو تواصل معانا لتأكيد الدفع. شكراً لثقتك في Twist.'),
   ('cashier_sync_enabled','0')`);
+db.exec(CATEGORY_TABLES_SQL); // category migration history + URL aliases (additive)
 db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KEY, store_id INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
 {
   const eventCols = db.prepare('PRAGMA table_info(cashier_events)').all().map((c) => c.name);

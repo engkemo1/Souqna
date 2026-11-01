@@ -2,6 +2,7 @@ import { motion } from 'framer-motion';
 import { MapPin, Phone, MessageCircle, Navigation, Clock } from 'lucide-react';
 import { useStore } from '../../lib/store.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { DAYS_AR, DAYS_EN, fmtTime, openNow, waNumber } from '../../lib/storeInfo.js';
 
 /** Where to find the store: address, call, WhatsApp, and one tap to open the location in Google Maps. */
 export function mapsLinks(store, address) {
@@ -12,30 +13,7 @@ export function mapsLinks(store, address) {
     embed: `https://www.google.com/maps?q=${q}&output=embed`,
   };
 }
-const DAYS_AR = ['الأحد', 'الإتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
-const DAYS_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const toMin = (hm) => { const [h, m] = String(hm).split(':').map(Number); return h * 60 + m; };
-function fmtTime(hm, ar) {
-  let [h, m] = String(hm).split(':').map(Number);
-  const pm = h >= 12; h = h % 12 || 12;
-  const mm = m ? `:${String(m).padStart(2, '0')}` : '';
-  return ar ? `${h}${mm} ${pm ? 'م' : 'ص'}` : `${h}${mm} ${pm ? 'PM' : 'AM'}`;
-}
-/** Open right now? Uses Cairo time; handles closing after midnight. */
-export function openNow(hours, at = new Date()) {
-  if (!hours) return null;
-  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-GB', { timeZone: 'Africa/Cairo', weekday: 'short', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
-    .formatToParts(at).map((p) => [p.type, p.value]));
-  const day = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(parts.weekday);
-  const now = Number(parts.hour) * 60 + Number(parts.minute);
-  const o = toMin(hours.open), c = toMin(hours.close);
-  const overnight = c <= o;
-  // after midnight, the shift belongs to the previous day
-  const shiftDay = overnight && now < c ? (day + 6) % 7 : day;
-  if (hours.dayOff !== null && hours.dayOff !== undefined && shiftDay === hours.dayOff) return false;
-  return overnight ? now >= o || now < c : now >= o && now < c;
-}
-const waNumber = (n) => { const d = String(n || '').replace(/\D/g, ''); return d.startsWith('20') ? d : `20${d.replace(/^0/, '')}`; };
+export { openNow };
 
 /** Decorative map: streets, the Nile and a pulsing pin. No third-party iframe, so it always renders. */
 function MapArt() {
@@ -111,7 +89,7 @@ export default function VisitCard() {
                 <Phone className="h-4 w-4" />{ar ? 'اتصل' : 'Call'}
               </a>
             )}
-            {store.whatsapp && (
+            {waNumber(store.whatsapp) && (
               <a href={`https://wa.me/${waNumber(store.whatsapp)}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full border border-on-footer/25 px-5 py-3 text-base font-semibold transition hover:bg-on-footer/10">
                 <MessageCircle className="h-4 w-4" />{ar ? 'واتساب' : 'WhatsApp'}
               </a>

@@ -119,7 +119,7 @@ function Meta({ store, ar, tone }) {
   const sub = tone === 'card' ? 'text-muted' : tone === 'light' ? 'text-neutral-700' : 'text-white/80';
   return (
     <div className={`mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-[13px] lg:justify-start ${sub}`}>
-      {store.rating ? (
+      {store.rating && store.ratingCount > 0 ? (
         <span className="inline-flex items-center gap-1 font-semibold">
           <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />{store.rating}<span className="font-normal">({store.ratingCount})</span>
         </span>
@@ -279,7 +279,7 @@ export function StoreIdentityBar() {
             <h1 className="truncate font-display text-2xl font-bold sm:text-3xl">{tr(store.name)}</h1>
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
               {tr(store.tagline) && <span className="truncate">{tr(store.tagline)}</span>}
-              {store.rating ? <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />{store.rating} ({store.ratingCount})</span> : null}
+              {store.rating && store.ratingCount > 0 ? <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />{store.rating} ({store.ratingCount})</span> : null}
               {open !== null && (
                 <span className={`inline-flex items-center gap-1.5 font-semibold ${open ? 'text-emerald-700' : 'text-red-600'}`}>
                   <span className={`h-1.5 w-1.5 rounded-full ${open ? 'bg-emerald-500' : 'bg-red-500'}`} />{open ? (ar ? 'مفتوح دلوقتي' : 'Open now') : (ar ? 'مقفول دلوقتي' : 'Closed now')}

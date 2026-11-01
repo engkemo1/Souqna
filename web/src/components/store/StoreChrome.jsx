@@ -170,20 +170,22 @@ export function BottomNav() {
     { to: 'favorites', icon: Heart, label: t('store.favorites'), n: favs.count },
     { to: 'cart', abs: '/market-cart', icon: ShoppingBag, label: t('store.cart'), n: cart.count, cart: true },
   ];
+  const cap = (n) => (n > 99 ? '99+' : n);
   return (
-    <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-header/95 text-on-header backdrop-blur-md pb-safe lg:hidden">
-      <ul className="mx-auto grid h-[var(--bottom-nav-h)] max-w-lg grid-cols-5">
+    <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 rounded-t-[22px] border-t border-line bg-header/95 text-on-header shadow-[0_-10px_30px_-14px_rgba(0,0,0,.28)] backdrop-blur-xl pb-safe lg:hidden">
+      <ul className="mx-auto grid h-[var(--bottom-nav-h)] max-w-lg grid-cols-5 px-1">
         {items.map((it) => (
           <li key={it.to}>
-            <NavLink to={it.abs || sp(store.slug, it.to)} end={it.end} className="group relative flex h-full flex-col items-center justify-center gap-1 text-xs font-medium">
+            <NavLink to={it.abs || sp(store.slug, it.to)} end={it.end} aria-label={it.n > 0 ? `${it.label} (${it.n})` : it.label}
+              className="group relative flex h-full flex-col items-center justify-center gap-1 rounded-2xl text-[11px] font-medium leading-none outline-none transition active:scale-[.94] focus-visible:ring-2 focus-visible:ring-ring">
               {({ isActive }) => (
                 <>
-                  {isActive && <motion.span layoutId="bn-pill" className="absolute top-1.5 h-8 w-14 rounded-full bg-fg/[0.08]" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
-                  <span className="relative" {...(it.cart ? { 'data-cart-target': true } : {})}>
-                    <it.icon className={cx('h-[22px] w-[22px] transition', isActive ? 'scale-105' : 'opacity-70')} strokeWidth={isActive ? 2.2 : 1.75} />
-                    {it.n > 0 && <span className="absolute -end-2 -top-1.5 grid h-4 min-w-4 place-items-center rounded-full bg-accent px-1 text-[10px] font-bold text-on-accent ring-2 ring-header tabular"><span key={it.cart ? cart.bump : 0} className={it.cart && cart.bump ? 'animate-bump' : ''}>{it.n}</span></span>}
+                  {isActive && <motion.span layoutId="bn-pill" className="absolute top-1.5 h-8 w-14 rounded-full bg-primary/15" transition={{ type: 'spring', stiffness: 500, damping: 38 }} />}
+                  <span className={cx('relative transition-colors', isActive ? 'text-brand' : 'text-on-header/60 group-hover:text-on-header')} {...(it.cart ? { 'data-cart-target': true } : {})}>
+                    <it.icon className={cx('h-[23px] w-[23px] transition-transform', isActive && 'scale-105')} strokeWidth={isActive ? 2.3 : 1.8} {...(isActive && it.icon === Heart ? { fill: 'currentColor', fillOpacity: 0.18 } : {})} />
+                    {it.n > 0 && <span aria-hidden="true" dir="ltr" className="absolute -end-3.5 -top-2 grid h-[18px] min-w-[18px] place-items-center rounded-full bg-accent px-1 text-[10px] font-bold leading-none text-on-accent ring-2 ring-header tabular"><span key={it.cart ? cart.bump : 0} className={it.cart && cart.bump ? 'animate-bump' : ''}>{cap(it.n)}</span></span>}
                   </span>
-                  <span className={cx('relative', isActive ? 'font-semibold' : 'opacity-70')}>{it.label}</span>
+                  <span className={cx('relative transition-colors', isActive ? 'font-bold text-brand' : 'text-on-header/60 group-hover:text-on-header')}>{it.label}</span>
                 </>
               )}
             </NavLink>
@@ -256,7 +258,7 @@ export function StoreFooter() {
             <p className="font-display text-xl font-bold">{tr(store.name)}</p>
           </div>
           <p className="mt-4 max-w-sm text-sm leading-relaxed text-footer-muted">{tr(store.description)}</p>
-          <div className="mt-4 flex items-center gap-1.5 text-sm"><Star className="h-4 w-4 fill-current text-amber-400" /><span className="font-semibold">{store.rating}</span><span className="text-footer-muted">({store.ratingCount})</span></div>
+          {store.ratingCount > 0 && <div className="mt-4 flex items-center gap-1.5 text-sm"><Star className="h-4 w-4 fill-current text-amber-400" /><span className="font-semibold">{store.rating}</span><span className="text-footer-muted">({store.ratingCount})</span></div>}
         </div>
         <div>
           <h3 className="text-sm font-semibold text-on-footer">{t('store.shop')}</h3>

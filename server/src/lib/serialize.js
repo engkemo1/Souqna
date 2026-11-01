@@ -7,6 +7,12 @@ import { sameDayActive, cairoNow } from './sameDay.js';
 
 export const bi = (row, field) => ({ ar: row[`${field}_ar`] ?? '', en: row[`${field}_en`] ?? '' });
 
+/** Store rating comes only from genuinely published reviews. The stored stores.rating / rating_count columns can hold seed or stale values, so they are never shown. */
+export function realStoreRating(storeId) {
+  const r = q.get("SELECT COUNT(*) AS n, AVG(rating) AS a FROM reviews WHERE store_id=? AND status='published'", [storeId]);
+  return r && r.n > 0 ? { rating: Math.round(r.a * 10) / 10, ratingCount: r.n } : { rating: null, ratingCount: 0 };
+}
+
 export function serializeStore(s, { withTheme = true } = {}) {
   const media = mediaMap([s.logo_media_id, s.cover_media_id]);
   const out = {
@@ -37,8 +43,7 @@ export function serializeStore(s, { withTheme = true } = {}) {
     logoInitials: s.logo_initials || '',
     logoColor: s.logo_color || '#1B1B1B',
     cover: media.get(s.cover_media_id) || null,
-    rating: s.rating,
-    ratingCount: s.rating_count,
+    ...realStoreRating(s.id),
     featured: !!s.featured,
     offerBadge: s.offer_badge_ar || s.offer_badge_en ? bi(s, 'offer_badge') : null,
     shippingFee: s.shipping_fee,

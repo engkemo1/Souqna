@@ -68,13 +68,15 @@ export async function subjectBox(buffer) {
 }
 
 /** Returns [{ key, buffer }] — JPEG buffers, already rotated by EXIF. */
-export async function cropRegions(buffer) {
+/** `detect` (optional): async (jpegBuffer) => [l,t,r,b] | null — a person detector used only when the background heuristic cannot find the subject. It may throw; that falls back to the heuristic result. */
+export async function cropRegions(buffer, { detect } = {}) {
   const rotated = await sharp(buffer).rotate().jpeg({ quality: 90 }).toBuffer();
   let { width, height } = await sharp(rotated).metadata();
   let base = rotated;
   let keys = regionKeysFor(width, height);
   // A standing person inside a wide/roomy frame: work on the person, not on the empty backdrop around them.
-  const box = await subjectBox(rotated).catch(() => null);
+  let box = await subjectBox(rotated).catch(() => null);
+  if (!box && typeof detect === 'function') box = await Promise.resolve().then(() => detect(rotated)).catch(() => null);
   if (box) {
     const left = Math.round(box[0] * width), top = Math.round(box[1] * height);
     const w = Math.min(width - left, Math.round((box[2] - box[0]) * width)), h = Math.min(height - top, Math.round((box[3] - box[1]) * height));
