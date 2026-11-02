@@ -28,9 +28,9 @@ import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
 import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, getPlatformFreeShipping } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
-import { storeHours } from '../lib/hours.js';
 import { sendNewOrderAlert, notifyPlatformAlert } from '../lib/whatsapp.js';
 import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
+import { storeHours } from '../lib/hours.js';
 import { waAuthReady } from '../lib/wa.js';
 import {
   serializeStore, serializeCards, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi,

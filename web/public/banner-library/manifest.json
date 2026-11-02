@@ -101,6 +101,17 @@
     }
    ]
   },
+  "makeup": {
+   "ar": "مكياج",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.74,
+     "tone": "light",
+     "bg": "#F5F5F5"
+    }
+   ]
+  },
   "sport": {
    "ar": "رياضة",
    "files": [

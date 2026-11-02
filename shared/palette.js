@@ -58,7 +58,7 @@ export function classify(swatches = []) {
   // The family's representative is its most "alive" tone: saturated, and light enough to read as the colour
   // (so a gold gradient picks the gold, not the near-black shadow of it).
   const alive = (m) => m.s * (0.5 + Math.min(m.l, 0.7)) * (1 - Math.max(0, m.l - 0.7) * 4); // very pale highlights of a gradient don't count as the colour
-  const rep = (f) => [...f.members].sort((x, y) => alive(y) - alive(x))[0];
+  const rep = (f) => { const top = Math.max(...f.members.map((m) => m.pop)); const w = (m) => alive(m) * (0.25 + 0.75 * (m.pop / top)); return [...f.members].sort((x, y) => w(y) - w(x))[0]; }; // a rare anti-aliasing tint must not beat the colour that fills the logo
   const chromatic = families.map((f) => ({ ...rep(f), pop: f.pop }));
   const score = (c) => Math.sqrt(c.pop) * c.s * (1 - Math.abs(c.l - 0.5) * 0.7);
   chromatic.sort((x, y) => score(y) - score(x));

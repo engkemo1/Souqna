@@ -39,7 +39,7 @@ export default function CategoryPage() {
   const { t, lang } = useI18n();
   const { data, error, loading, reload } = useApi(`/departments/${encodeURIComponent(slug)}`);
   const navigate = useNavigate();
-  useEffect(() => { if (data?.canonical && data.canonical !== slug) navigate(`/c/${data.canonical}`, { replace: true }); }, [data?.canonical, slug, navigate]); // an old link lands on the canonical section
+  useEffect(() => { if (data?.canonical && data.redirected_from === slug && data.canonical !== slug) navigate(`/c/${data.canonical}`, { replace: true }); }, [data?.canonical, data?.redirected_from, slug, navigate]); // an old link lands on the canonical section — only for the answer to THIS url (while the next section loads, the previous answer is still on screen and must not bounce the click back)
   const dept = data?.department;
   const trail = useMemo(() => data?.breadcrumb || [], [data]);
   const children = data?.children || [];
