@@ -170,7 +170,6 @@ function DeptSheet({ dept, onClose, onSaved, all = [], defaultParent = '' }) {
                 {all.filter((x) => !dept?.slug || x.slug !== dept.slug).map((x) => <option key={x.slug} value={x.slug}>{x.path}</option>)}
               </select>
             </Field>
-            <Field label="الترتيب" hint="الأصغر يظهر الأول"><Input type="number" dir="ltr" min={0} value={f.sort} onChange={(e) => setF({ ...f, sort: e.target.value })} /></Field>
           </div>
           {isNew ? <p className="rounded-xl bg-secondary px-3 py-2 text-[13px] text-muted">تقدر ترفع صورة القسم بعد ما تضيفه (تعديل ← صورة القسم).</p> : <DeptPhoto dept={dept} onSaved={onSaved} />}
           <div className="grid gap-4 sm:grid-cols-2">
