@@ -39,6 +39,8 @@ const inputSchema = z.object({
   display: z.object({
     fit: z.enum(['contain', 'cover']).default('cover'), focus: z.enum(['top', 'center', 'bottom']).default('center'),
     ratio: z.enum(['default', 'auto', '16/9', '21/9', '4/3', '1/1']).default('default'),
+    text_position: z.enum(['top-start', 'top-center', 'top-end', 'center-start', 'center-center', 'center-end', 'bottom-start', 'bottom-center', 'bottom-end']).default('bottom-start'),
+    banner_url: z.union([z.literal(''), z.string().trim().max(300).regex(/^\/banner-library\/[a-z0-9_-]+\/[a-z0-9_.-]+$/)]).default(''),
     text_color: z.string().trim().regex(/^(#[0-9a-fA-F]{6})?$/).default(''), font: z.enum(['', 'cairo', 'tajawal', 'almarai', 'el_messiri', 'reem_kufi', 'lalezar']).default(''),
   }).optional().nullable(),
   starts_at: stamp, ends_at: stamp, daily_from: hm, daily_to: hm,

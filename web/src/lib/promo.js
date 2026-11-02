@@ -40,7 +40,7 @@ export const DEFAULT_EFFECT = {
   custom: { kind: 'percent_off', percent: 10, apply_to: 'cheapest', group_size: 3 },
 };
 
-export const DEFAULT_DISPLAY = { fit: 'cover', focus: 'center', ratio: 'default', text_color: '', font: '' };
+export const DEFAULT_DISPLAY = { fit: 'cover', focus: 'center', ratio: 'default', text_position: 'bottom-start', banner_url: '', text_color: '', font: '' };
 export function blankOffer(type = 'buy_x_get_y') {
   const when = type === 'gift' ? { logic: 'and', items: [{ kind: 'min_qty', value: 3, scope: 'qualifying' }] } : null;
   return {

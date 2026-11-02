@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Upload, Sparkles, Library, Check } from 'lucide-react';
 import { upload } from '../../lib/api.js';
 import { useApi } from '../../lib/hooks.js';
@@ -23,11 +23,18 @@ export default function ImageChooser({ form, setForm, resolved, customMedia, onC
   const { data } = useApi(`/owner/promotions/templates?type=${form.template_key || form.type}`);
   const fileRef = useRef(null);
   const [busy, setBusy] = useState(false);
+  const [bannerItems, setBannerItems] = useState([]);
   const mode = form.image_mode;
   const cats = data?.categories || [];
   const typeKey = form.template_key || form.type;
   const have = (cat) => { const c = cats.find((x) => x.key === cat); return c?.image ? { url: c.image } : null; };
   const catName = (c) => (lang === 'ar' ? c.name.ar : c.name.en);
+  useEffect(() => {
+    fetch('/banner-library/manifest.json').then((r) => (r.ok ? r.json() : null)).then((m) => {
+      if (!m?.types) return;
+      setBannerItems(Object.entries(m.types).flatMap(([key, value]) => (value.files || []).map((file) => ({ key, label: value.ar || key, url: `/banner-library/${key}/${file.file}` }))));
+    }).catch(() => {});
+  }, []);
 
   const doUpload = async (file) => {
     if (!file) return; setBusy(true);
@@ -56,7 +63,7 @@ export default function ImageChooser({ form, setForm, resolved, customMedia, onC
             {cats.map((c) => {
               const img = have(c.key); const on = form.image_category === c.key; const [c1, c2] = PALETTE[typeKey] || PALETTE.custom;
               return (
-                <button key={c.key} type="button" onClick={() => setForm({ ...form, image_category: c.key })} aria-pressed={on}
+                <button key={c.key} type="button" onClick={() => setForm({ ...form, image_category: c.key, display: { ...form.display, banner_url: '' } })} aria-pressed={on}
                   className={cx('relative overflow-hidden rounded-xl border-2 text-start transition', on ? 'border-primary shadow-soft' : 'border-line hover:border-line-strong')}>
                   <div className="aspect-[16/10] w-full" style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}>{img && <img src={img.url} alt="" loading="lazy" className="h-full w-full object-cover" />}</div>
                   <span className="flex items-center justify-between gap-2 px-2.5 py-2 text-xs font-semibold"><span className="truncate">{catName(c)}</span>{on && <Check className="h-4 w-4 text-brand" />}</span>
@@ -65,6 +72,22 @@ export default function ImageChooser({ form, setForm, resolved, customMedia, onC
               );
             })}
           </div>
+          {bannerItems.length > 0 && (
+            <div className="mt-5 border-t border-line pt-4">
+              <p className="mb-2 flex items-center gap-2 text-sm font-semibold">{p('مكتبة البانرات', 'Banner library')}</p>
+              <p className="mb-3 text-xs text-muted">{p('اختار أي صورة من البانرات المضافة عندك.', 'Choose any banner image already added to your library.')}</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {bannerItems.map((item) => {
+                  const on = form.display?.banner_url === item.url;
+                  return <button key={item.url} type="button" onClick={() => setForm({ ...form, image_mode: 'library', image_category: form.image_category || 'general', display: { ...form.display, banner_url: item.url } })} aria-pressed={on} className={cx('relative overflow-hidden rounded-xl border-2 text-start transition', on ? 'border-primary shadow-soft' : 'border-line hover:border-line-strong')}>
+                    <div className="aspect-[16/10] w-full bg-surface"><img src={item.url} alt="" loading="lazy" className="h-full w-full object-cover" /></div>
+                    <span className="block truncate px-2.5 py-2 text-xs font-semibold">{item.label}</span>
+                    {on && <Check className="absolute end-2 top-2 rounded-full bg-white p-1 text-brand" />}
+                  </button>;
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
       {mode === 'custom' && (

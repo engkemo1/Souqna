@@ -4,6 +4,11 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { cx } from '../ui/cx.js';
 
 const COLORS = ['#FFFFFF', '#111111', '#F5D77A', '#FF5A5F', '#7FD1AE', '#8EC5FF', '#FFB4D1'];
+const POSITIONS = [
+  ['top-start', 'فوق · يمين', 'Top · Right'], ['top-center', 'فوق · نص', 'Top · Center'], ['top-end', 'فوق · شمال', 'Top · Left'],
+  ['center-start', 'نص · يمين', 'Middle · Right'], ['center-center', 'نص · نص', 'Middle · Center'], ['center-end', 'نص · شمال', 'Middle · Left'],
+  ['bottom-start', 'تحت · يمين', 'Bottom · Right'], ['bottom-center', 'تحت · نص', 'Bottom · Center'], ['bottom-end', 'تحت · شمال', 'Bottom · Left'],
+];
 
 /** How an offer card shows its picture and words: fit / height / focus, text colour, font. value = { fit, focus, ratio, text_color, font }. */
 export default function DisplayControls({ value, onChange }) {
@@ -29,6 +34,16 @@ export default function DisplayControls({ value, onChange }) {
           </Field>
         )}
       </div>
+      <Field label={p('مكان الكلام', 'Text position')} hint={p('اختار مكان الكلام على الصورة بسهولة.', 'Choose where the text sits on the picture.')}>
+        <div className="grid max-w-md grid-cols-3 gap-2" dir="ltr">
+          {POSITIONS.map(([value, ar, en]) => (
+            <button key={value} type="button" aria-label={p(ar, en)} aria-pressed={(v.text_position || 'bottom-start') === value} onClick={() => set({ text_position: value })}
+              className={cx('min-h-11 rounded-xl border px-2 py-2 text-xs font-semibold transition hover:border-fg', (v.text_position || 'bottom-start') === value ? 'border-fg bg-fg text-canvas shadow-sm' : 'border-line-strong bg-elevated text-muted')}>
+              {p(ar, en)}
+            </button>
+          ))}
+        </div>
+      </Field>
       <Field label={p('لون الكلام', 'Text colour')} hint={p('سيبه تلقائي وهنختار الأنسب.', 'Leave on Auto to pick the best.')}>
         <div className="flex flex-wrap items-center gap-2">
           <button type="button" onClick={() => set({ text_color: '' })} aria-pressed={!v.text_color} className={cx('h-9 rounded-full border px-3 text-[13px] font-semibold', !v.text_color ? 'border-fg bg-fg text-canvas' : 'border-line-strong')}>{p('تلقائي', 'Auto')}</button>
