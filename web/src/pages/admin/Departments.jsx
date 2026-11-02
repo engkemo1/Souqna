@@ -149,8 +149,9 @@ function DeptSheet({ dept, onClose, onSaved, all = [], defaultParent = '' }) {
       const r = isNew ? await adminApi('/departments', { method: 'POST', body: { ...body, slug: f.slug || undefined } }) : await adminApi(`/departments/${dept.id}`, { method: 'PATCH', body: { ...body, active: f.active } });
       onSaved(r.departments); toast({ title: isNew ? 'اتضاف القسم' : 'اتحفظ' }); onClose();
     } catch (x) {
-      setErrs(Object.fromEntries(Object.entries(x.fields || {}).map(([k, v]) => [k, v === 'slug_taken' ? 'المفتاح ده مستخدم' : v === 'slug_invalid' ? 'حروف إنجليزي صغيرة وأرقام فقط، مثال: perfumes' : k === 'name_ar' && v === 'duplicate_name' ? 'فيه قسم بنفس الاسم هنا' : 'قيمة غير صحيحة'])));
-      toast({ tone: 'error', title: x.message });
+      const fieldErrors = Object.fromEntries(Object.entries(x.fields || {}).map(([k, v]) => [k, v === 'slug_taken' ? 'المفتاح ده مستخدم' : v === 'slug_invalid' ? 'حروف إنجليزي صغيرة وأرقام فقط، مثال: perfumes' : k === 'name_ar' && v === 'duplicate_name' ? 'فيه قسم بنفس الاسم هنا' : 'قيمة غير صحيحة']));
+      setErrs(fieldErrors);
+      toast({ tone: 'error', title: Object.values(fieldErrors)[0] || x.message });
     }
     setBusy(false);
   };
