@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n.jsx';
 import { emojiFor } from '../../lib/deptIcons.js';
@@ -64,5 +64,33 @@ export function ThumbChip({ dept }) {
       <span className="h-9 w-9 shrink-0 overflow-hidden rounded-full bg-secondary"><CategoryImage dept={dept} sizes="36px" className="text-base" /></span>
       <span className="line-clamp-1">{deptName(dept, lang)}</span>
     </Link>
+  );
+}
+
+/**
+ * Sub-sections as round pictures in ONE horizontal row: swipe on touch, drag with the mouse, arrow-free.
+ * A section nobody sells in yet is left out (opening it would show an empty page) — pass only what has products.
+ */
+export function CircleRail({ items, label }) {
+  const { lang } = useI18n();
+  const box = useRef(null);
+  const drag = useRef({ on: false, x: 0, left: 0, moved: false });
+  if (!items?.length) return null;
+  const down = (e) => { if (e.pointerType !== 'mouse' || !box.current) return; drag.current = { on: true, x: e.clientX, left: box.current.scrollLeft, moved: false }; };
+  const move = (e) => { const d = drag.current; if (!d.on) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 5) d.moved = true; box.current.scrollLeft = d.left - dx; };
+  const up = () => { drag.current.on = false; };
+  const stopClick = (e) => { if (drag.current.moved) { e.preventDefault(); drag.current.moved = false; } };
+  return (
+    <div ref={box} role="list" aria-label={label} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onClickCapture={stopClick}
+      className="-mx-4 flex cursor-grab snap-x gap-4 overflow-x-auto px-4 pb-2 no-scrollbar select-none active:cursor-grabbing sm:mx-0 sm:gap-6 sm:px-0">
+      {items.map((c) => (
+        <Link key={c.slug} role="listitem" to={deptHref(c.slug)} draggable={false} className="group w-[76px] shrink-0 snap-start text-center sm:w-[96px] focus-visible:outline-none">
+          <span className="mx-auto block h-[72px] w-[72px] overflow-hidden rounded-full bg-[#EAF0F8] ring-2 ring-white shadow-[0_6px_16px_-8px_rgba(3,36,77,0.5)] transition duration-300 group-hover:-translate-y-0.5 group-hover:ring-brand group-focus-visible:ring-brand sm:h-[92px] sm:w-[92px]">
+            <CategoryImage dept={c} sizes="92px" className="pointer-events-none text-2xl" />
+          </span>
+          <span className="mt-2 line-clamp-2 block text-[12px] font-bold leading-snug text-[#03244D] sm:text-[13px]">{deptName(c, lang)}</span>
+        </Link>
+      ))}
+    </div>
   );
 }

@@ -227,6 +227,7 @@ export default function StoreHome() {
         const sliderHero = (<><HeroSlider banners={banners} slug={store.slug} /><StoreIdentityBar /></>);
         let node;
         if (design.hero === 'cover') node = <StoreHero />;
+        else if (design.hero === 'full') node = <StoreHero variant="full" />;
         else if (design.hero === 'slider') node = hasBanners ? sliderHero : <StoreHero />;
         else if (design.hero === 'split') node = <HeroSplit banners={banners} />;
         else if (design.hero === 'playful') node = <HeroPlayful banners={banners} />;

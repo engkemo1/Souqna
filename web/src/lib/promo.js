@@ -40,11 +40,12 @@ export const DEFAULT_EFFECT = {
   custom: { kind: 'percent_off', percent: 10, apply_to: 'cheapest', group_size: 3 },
 };
 
+export const DEFAULT_DISPLAY = { fit: 'cover', focus: 'center', ratio: 'default', text_color: '', font: '' };
 export function blankOffer(type = 'buy_x_get_y') {
   const when = type === 'gift' ? { logic: 'and', items: [{ kind: 'min_qty', value: 3, scope: 'qualifying' }] } : null;
   return {
     name_ar: '', name_en: '', description_ar: '', description_en: '', type, status: 'draft', priority: 0, stacking: 'per_product', stack_with_coupons: true,
-    image_media_id: null, template_key: type, image_mode: 'auto', image_category: null, starts_at: '', ends_at: '', daily_from: '', daily_to: '', days_mask: 127,
+    image_media_id: null, template_key: type, image_mode: 'auto', image_category: null, display: { ...DEFAULT_DISPLAY }, starts_at: '', ends_at: '', daily_from: '', daily_to: '', days_mask: 127,
     usage_limit: null, per_customer_limit: null, audience: 'all', audience_phones: [],
     def: { v: 1, qualify: sel(), reward: null, exclude: sel(), when, effect: structuredClone(DEFAULT_EFFECT[type] || DEFAULT_EFFECT.custom), max_applications: null, max_discount: null },
   };
@@ -54,7 +55,7 @@ export function blankOffer(type = 'buy_x_get_y') {
 export function offerToForm(o) {
   return {
     name_ar: o.name?.ar || '', name_en: o.name?.en || '', description_ar: o.description?.ar || '', description_en: o.description?.en || '', type: o.type, status: o.status,
-    priority: o.priority, stacking: o.stacking, stack_with_coupons: o.stackWithCoupons, image_media_id: o.imageMediaId, template_key: o.templateKey || o.type, image_mode: o.imageMode || 'auto', image_category: o.imageCategory || null,
+    priority: o.priority, stacking: o.stacking, stack_with_coupons: o.stackWithCoupons, image_media_id: o.imageMediaId, template_key: o.templateKey || o.type, image_mode: o.imageMode || 'auto', image_category: o.imageCategory || null, display: { ...DEFAULT_DISPLAY, ...(o.display || {}) },
     starts_at: o.startsAt || '', ends_at: o.endsAt || '', daily_from: o.dailyFrom || '', daily_to: o.dailyTo || '', days_mask: o.daysMask,
     usage_limit: o.usageLimit, per_customer_limit: o.perCustomerLimit, audience: o.audience, audience_phones: o.audiencePhones || [], def: structuredClone(o.def),
   };

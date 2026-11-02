@@ -16,6 +16,7 @@ import PageTransition from '../../components/PageTransition.jsx';
 import OfferVisual from '../../components/promo/OfferVisual.jsx';
 import { PromoAnalytics, PromoHistorySheet } from '../../components/promo/PromoInsights.jsx';
 import ImageChooser from '../../components/promo/ImageChooser.jsx';
+import DisplayControls from '../../components/promo/DisplayControls.jsx';
 import { SelectorField } from '../../components/promo/ProductPicker.jsx';
 import { ConditionsBuilder, EffectEditor, ActionsBuilder } from '../../components/promo/RuleBuilder.jsx';
 import { TYPE_LIST, blankOffer, offerToForm, formToBody, emptySel, selEmpty, PALETTE } from '../../lib/promo.js';
@@ -113,7 +114,7 @@ export default function PromotionEditor() {
     setSaving(null);
   };
 
-  const previewOffer = { type, templateKey: f.template_key || type, name: { ar: f.name_ar, en: f.name_en || f.name_ar }, def: f.def, image: f.image_mode === 'custom' ? custom : null, imageResolved: check.imageResolved, text: check.text };
+  const previewOffer = { type, templateKey: f.template_key || type, name: { ar: f.name_ar, en: f.name_en || f.name_ar }, def: f.def, image: f.image_mode === 'custom' ? custom : null, imageResolved: check.imageResolved, text: check.text, display: f.display };
   const toggleDay = (bit) => set({ days_mask: (f.days_mask ^ (1 << bit)) || f.days_mask });
 
   return (
@@ -205,6 +206,10 @@ export default function PromotionEditor() {
 
           <Panel title={p('صورة العرض', 'Offer image')}>
             <ImageChooser form={f} setForm={setF} resolved={check.imageResolved} customMedia={custom} onCustomMedia={setCustom} />
+          </Panel>
+
+          <Panel title={p('شكل الصورة والكلام', 'Picture & text style')}>
+            <DisplayControls value={f.display} onChange={(display) => set({ display })} />
           </Panel>
         </div>
 

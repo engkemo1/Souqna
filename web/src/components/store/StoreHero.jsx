@@ -187,7 +187,7 @@ function FacadeHero() {
 
 /* ── style B: wide banner + identity card (used for real banner covers) ──── */
 function CoverArt({ media, fit }) {
-  const wide = isWide(media, fit);
+  const crop = fit === 'cover'; // only when the owner explicitly asked to fill the frame; otherwise the WHOLE picture is shown
   return (
     <>
       <img src={pickSrc(media, 640)} alt="" aria-hidden="true" decoding="async"
@@ -197,12 +197,75 @@ function CoverArt({ media, fit }) {
         <img
           src={`${media.base}/original.jpg`} srcSet={srcSet(media, 'jpg')} sizes="100vw"
           width={media.w} height={media.h} alt={media.alt || ''} fetchpriority="high" decoding="async"
-          className={wide
-            ? 'absolute inset-0 h-full w-full object-cover object-center'
-            : 'absolute inset-0 h-full w-full object-contain object-center p-3 drop-shadow-[0_10px_40px_rgba(0,0,0,.45)] sm:p-6'}
+          className={`absolute inset-0 h-full w-full object-center ${crop ? 'object-cover' : 'object-contain'}`}
         />
       </picture>
     </>
+  );
+}
+
+/** Phones: slim identity strip laid over the bottom of the cover. */
+function PhoneStrip({ store, ar }) {
+  const { tr } = useI18n();
+  const maps = mapsLinks(store, tr(store.address));
+  const wa = waNumber(store.whatsapp);
+  const open = openNow(store.hours);
+  const h = store.hours;
+  const status = open === null ? null : open ? (ar ? `مفتوح${h?.close ? ` · لحد ${fmtTime(h.close, ar)}` : ''}` : `Open${h?.close ? ` · until ${fmtTime(h.close, ar)}` : ''}`) : (ar ? `مقفول${h?.open ? ` · بنفتح ${fmtTime(h.open, ar)}` : ''}` : `Closed${h?.open ? ` · opens ${fmtTime(h.open, ar)}` : ''}`);
+  const Arrow = ar ? ArrowLeft : ArrowRight;
+  const round = 'grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/30 backdrop-blur transition active:scale-95';
+  return (
+    <div className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-20 lg:hidden" style={{ background: 'linear-gradient(to top, rgba(0,0,0,.78) 0%, rgba(0,0,0,.4) 55%, rgba(0,0,0,0) 100%)' }}>
+      <div className="flex items-center gap-2.5">
+        {store.logo && <span className="shrink-0 rounded-full bg-white p-[2px] shadow-md"><StoreLogo store={store} size={40} className="h-10 w-10" /></span>}
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-display text-[24px] font-bold leading-tight !text-white drop-shadow">{tr(store.name)}</h1>
+          {status && <p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-white/95"><span className={`h-2 w-2 rounded-full ${open ? 'bg-emerald-400' : 'bg-red-400'}`} />{status}</p>}
+        </div>
+      </div>
+      <div className="mt-3 flex items-center gap-2">
+        <Link to={sp(store.slug, 'shop')} className="inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-white px-4 text-[15px] font-bold text-neutral-900 shadow-lg transition active:scale-[.98]">{ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4" /></Link>
+        {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" aria-label={ar ? 'واتساب' : 'WhatsApp'} className={round}><MessageCircle className="h-5 w-5" /></a>}
+        {tr(store.address) && <a href={maps.open} target="_blank" rel="noreferrer" aria-label={ar ? 'اللوكيشن' : 'Location'} className={round}><Navigation className="h-5 w-5" /></a>}
+        {store.phone && <a href={`tel:${String(store.phone).replace(/\s/g, '')}`} aria-label={ar ? 'اتصال' : 'Call'} className={round}><Phone className="h-5 w-5" /></a>}
+      </div>
+    </div>
+  );
+}
+
+/* ── style C: portrait / square cover — the WHOLE picture, no blur and no crop; identity sits beside it (below on phones) ── */
+function PortraitHero() {
+  const { store } = useStore();
+  const { tr, lang } = useI18n();
+  const ar = lang === 'ar';
+  const cover = store.cover;
+  const { hex, light } = brandOf(cover);
+  const tone = light ? 'light' : 'dark';
+  return (
+    <section className="relative isolate overflow-hidden lg:flex lg:items-stretch" style={{ backgroundColor: hex }}>
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_80%_at_70%_0%,rgb(var(--c-accent)/.28),transparent_70%)]" />
+      <div className="relative shrink-0">
+        <picture className="block">
+          <source type="image/webp" srcSet={srcSet(cover, 'webp')} sizes="(min-width:1024px) 50vw, 100vw" />
+          <img src={`${cover.base}/original.jpg`} srcSet={srcSet(cover, 'jpg')} sizes="(min-width:1024px) 50vw, 100vw"
+            width={cover.w} height={cover.h} alt={cover.alt || tr(store.name)} fetchpriority="high" decoding="async"
+            className="mx-auto block h-auto max-h-[88svh] w-full object-contain lg:mx-0 lg:h-[min(80vh,680px)] lg:max-h-none lg:w-auto" />
+        </picture>
+        {/* phones: a compact strip ON the picture (name, open/closed, one big button + three round ones) — the picture stays visible */}
+        <PhoneStrip store={store} ar={ar} />
+      </div>
+      {/* desktop: identity beside the picture */}
+      <motion.div initial={{ y: 18 }} animate={{ y: 0 }} transition={{ duration: 0.7, ease }} className="hidden min-w-0 flex-1 flex-col justify-center px-14 py-10 text-start lg:flex">
+        <div className="flex items-center gap-3">
+          {store.logo && <span className="rounded-full bg-white p-[3px] shadow-md"><StoreLogo store={store} size={52} className="h-[52px] w-[52px]" /></span>}
+          <h1 className={`font-display text-5xl font-bold leading-tight ${light ? '!text-neutral-900' : '!text-white'}`}>{tr(store.name)}</h1>
+        </div>
+        {tr(store.tagline) && <p className={`mt-2 max-w-xl text-lg ${light ? 'text-neutral-700' : 'text-white/80'}`}>{tr(store.tagline)}</p>}
+        <DoorSign store={store} ar={ar} light={light} />
+        <Meta store={store} ar={ar} tone={tone} />
+        <Actions store={store} ar={ar} tone={tone} />
+      </motion.div>
+    </section>
   );
 }
 
@@ -212,9 +275,9 @@ function BannerHero() {
   const ar = lang === 'ar';
   return (
     <section className="bg-canvas">
-      <div className="relative isolate h-[230px] w-full overflow-hidden bg-[#03244D] xs:h-[260px] sm:h-[360px] lg:h-[460px]">
+      <div className="relative isolate max-h-[78vh] min-h-[200px] w-full overflow-hidden bg-[#03244D]" style={{ aspectRatio: store.cover ? Math.min(Math.max(store.cover.w / store.cover.h, 1.2), 3.2) : 2.4 }}>
         {store.cover ? (
-          <motion.div className="absolute inset-0" initial={{ scale: 1.05 }} animate={{ scale: 1 }} transition={{ duration: 5, ease: 'easeOut' }}>
+          <motion.div className="absolute inset-0" initial={{ opacity: 0.6 }} animate={{ opacity: 1 }} transition={{ duration: 0.6, ease: 'easeOut' }}>
             <CoverArt media={store.cover} fit={store.customization?.coverFit} />
           </motion.div>
         ) : (
@@ -249,13 +312,15 @@ function BannerHero() {
  * Store front.  Auto: a real wide banner → banner style; a logo / square / no cover → storefront style.
  * Owner override: store.customization.heroStyle = 'facade' | 'banner'  (and coverFit = 'cover' | 'contain').
  */
-export default function StoreHero() {
+export default function StoreHero({ variant } = {}) {
   const { store } = useStore();
   const style = store.customization?.heroStyle;
-  const banner = style === 'banner' || (style !== 'facade' && store.cover && isWide(store.cover, store.customization?.coverFit));
+  const full = variant === 'full'; // chosen in the store designer: always the whole picture, never the framed facade
+  const portrait = store.cover && store.cover.w / store.cover.h < 1.2 && (full || (style !== 'facade' && style !== 'banner' && store.customization?.coverFit !== 'cover'));
+  const banner = style === 'banner' || ((full || style !== 'facade') && !!store.cover); // any cover fills the page width, uncropped
   return (
     <>
-      {banner ? <BannerHero /> : <FacadeHero />}
+      {portrait ? <PortraitHero /> : banner ? <BannerHero /> : <FacadeHero />}
       <CategoryStories />
     </>
   );

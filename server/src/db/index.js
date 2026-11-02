@@ -38,6 +38,9 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!cols.includes('auto_whatsapp')) db.exec('ALTER TABLE stores ADD COLUMN auto_whatsapp INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('sort_order')) db.exec('ALTER TABLE stores ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('return_days')) db.exec('ALTER TABLE stores ADD COLUMN return_days INTEGER NOT NULL DEFAULT 3');
+  // banner display controls (additive; existing banners keep today's look: whole picture, centred, normal height, default colour/font)
+  const bannerCols = db.prepare('PRAGMA table_info(banners)').all().map((c) => c.name);
+  for (const [name, def] of [['fit', "'contain'"], ['focus', "'center'"], ['height', "'normal'"], ['text_color', "''"], ['font', "''"]]) if (!bannerCols.includes(name)) db.exec(`ALTER TABLE banners ADD COLUMN ${name} TEXT NOT NULL DEFAULT ${def}`);
   if (!cols.includes('reserve_hours')) db.exec('ALTER TABLE stores ADD COLUMN reserve_hours INTEGER NOT NULL DEFAULT 24'); // "reserve & try in store": hold time, 0 = off
   if (!cols.includes('hidden')) db.exec('ALTER TABLE stores ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('show_when_empty')) {
@@ -267,6 +270,7 @@ export const json = (s, fallback) => {
   add('order_promotions', 'snapshot_json', 'TEXT');   // the definition the order was sold under (re-evaluated for partial returns)
   add('order_returns', 'calc_json', 'TEXT');          // the refund calculation, kept for transparency
   add('promotions', 'image_mode', "TEXT NOT NULL DEFAULT 'auto'");       // auto (by product category) | library (owner picked a shared image) | custom (own upload)
+  add('promotions', 'display_json', 'TEXT');                               // how the offer card shows its picture/text: { fit, focus, ratio, text_color, font } (null = defaults)
   add('promotions', 'image_category', 'TEXT');                             // library choice: offer_image_categories.key
   // Twist's nine marketplace image categories (+ a neutral one). Departments are matched most-specific-first.
   db.exec(`INSERT OR IGNORE INTO offer_image_categories(key, name_ar, name_en, department_slugs_json, sort) VALUES

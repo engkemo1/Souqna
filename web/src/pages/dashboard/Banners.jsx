@@ -17,6 +17,15 @@ import { EmptyState, ErrorState, errorMessage, fieldErrors } from '../../compone
 import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
+import { BANNER_FONTS, bannerFontFamily, loadBannerFont, readableOn } from '../../lib/bannerFonts.js';
+
+const FIXED_RATIO = { short: [4 / 3, 3.6], normal: [4 / 5, 2.4], tall: [1, 1.85] };
+const previewRatio = (f, img, device) => {
+  if (f.height === 'auto' && img?.w && img?.h) return Math.min(Math.max(img.w / img.h, 0.6), 4);
+  const [m, d] = FIXED_RATIO[f.height] || FIXED_RATIO.normal;
+  return device === 'mobile' ? m : d;
+};
+const TEXT_COLORS = ['#FFFFFF', '#111111', '#F5D77A', '#FF5A5F', '#7FD1AE', '#8EC5FF', '#FFB4D1'];
 
 function Preview({ f, device, lang }) {
   const img = device === 'mobile' ? f.mobile[0] || f.desktop[0] : f.desktop[0];
@@ -25,14 +34,14 @@ function Preview({ f, device, lang }) {
   const eyebrow = lang === 'ar' ? f.eyebrow_ar : f.eyebrow_en;
   const cta = lang === 'ar' ? f.cta_ar : f.cta_en;
   return (
-    <div className={cx('relative mx-auto overflow-hidden rounded-xl bg-surface', device === 'mobile' ? 'aspect-[4/5] w-48' : 'aspect-[2400/1000] w-full')} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-      {img && <img src={`${img.base}/${img.sizes.find((s) => s.name === 'md')?.name || img.sizes[0].name}.webp`} alt="" className={cx('absolute inset-0 h-full w-full object-contain', f.mirror_rtl && lang === 'ar' && device !== 'mobile' && '-scale-x-100')} />}
+    <div className={cx('relative mx-auto overflow-hidden rounded-xl bg-surface', device === 'mobile' ? 'w-48' : 'w-full')} style={{ aspectRatio: previewRatio(f, img, device) }} dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+      {img && <img src={`${img.base}/${img.sizes.find((s) => s.name === 'md')?.name || img.sizes[0].name}.webp`} alt="" className={cx('absolute inset-0 h-full w-full', f.fit === 'cover' ? 'object-cover' : 'object-contain', f.focus === 'top' ? 'object-top' : f.focus === 'bottom' ? 'object-bottom' : 'object-center', f.mirror_rtl && lang === 'ar' && device !== 'mobile' && '-scale-x-100')} />}
       {!light && <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10" />}
       <div className={cx('absolute inset-0 flex p-4', device === 'mobile' ? (light ? 'items-start justify-center text-center' : 'items-end justify-center text-center') : f.align === 'center' ? 'items-center justify-center text-center' : 'items-center')}>
-        <div className={cx('max-w-[60%]', device === 'mobile' && 'max-w-full', light ? 'text-neutral-900' : 'text-white')}>
+        <div className={cx('max-w-[60%]', device === 'mobile' && 'max-w-full', light ? 'text-neutral-900' : 'text-white')} style={{ color: f.text_color || undefined, fontFamily: bannerFontFamily(f.font) }}>
           {eyebrow && <p className="text-[9px] font-semibold tracking-widest opacity-80">{eyebrow}</p>}
           <p className="font-display text-base font-bold leading-tight sm:text-lg">{title || '—'}</p>
-          {cta && <span className={cx('mt-2 inline-block rounded-full px-3 py-1 text-[10px] font-semibold', light ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900')}>{cta}</span>}
+          {cta && <span className={cx('mt-2 inline-block rounded-full px-3 py-1 text-[10px] font-semibold', !f.text_color && (light ? 'bg-neutral-900 text-white' : 'bg-white text-neutral-900'))} style={f.text_color ? { backgroundColor: f.text_color, color: readableOn(f.text_color) } : undefined}>{cta}</span>}
         </div>
       </div>
     </div>
@@ -42,7 +51,7 @@ function Preview({ f, device, lang }) {
 function BannerForm({ open, banner, onClose, onSaved, categories }) {
   const { t, tr, lang } = useI18n();
   const toast = useToast();
-  const blank = { desktop: [], mobile: [], eyebrow_ar: '', eyebrow_en: '', title_ar: '', title_en: '', subtitle_ar: '', subtitle_en: '', cta_ar: 'تسوّق الآن', cta_en: 'Shop now', link: '/shop', align: 'start', tone: 'dark', mirror_rtl: false, active: true };
+  const blank = { desktop: [], mobile: [], eyebrow_ar: '', eyebrow_en: '', title_ar: '', title_en: '', subtitle_ar: '', subtitle_en: '', cta_ar: 'تسوّق الآن', cta_en: 'Shop now', link: '/shop', align: 'start', tone: 'dark', mirror_rtl: false, fit: 'contain', focus: 'center', height: 'normal', text_color: '', font: '', active: true };
   const [f, setF] = useState(blank);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
@@ -55,7 +64,7 @@ function BannerForm({ open, banner, onClose, onSaved, categories }) {
     setF(banner ? {
       desktop: banner.image ? [banner.image] : [], mobile: banner.mobileImage ? [banner.mobileImage] : [],
       eyebrow_ar: banner.eyebrow.ar, eyebrow_en: banner.eyebrow.en, title_ar: banner.title.ar, title_en: banner.title.en, subtitle_ar: banner.subtitle.ar, subtitle_en: banner.subtitle.en,
-      cta_ar: banner.cta.ar, cta_en: banner.cta.en, link: banner.link || '/shop', align: banner.align, tone: banner.tone, mirror_rtl: banner.mirrorRtl, active: banner.active,
+      cta_ar: banner.cta.ar, cta_en: banner.cta.en, link: banner.link || '/shop', align: banner.align, tone: banner.tone, mirror_rtl: banner.mirrorRtl, fit: banner.fit || 'contain', focus: banner.focus || 'center', height: banner.height || 'normal', text_color: banner.textColor || '', font: banner.font || '', active: banner.active,
     } : blank);
   }, [open, banner]); // eslint-disable-line react-hooks/exhaustive-deps
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -109,6 +118,45 @@ function BannerForm({ open, banner, onClose, onSaved, categories }) {
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('banners.align')}><Segmented value={f.align} onChange={(v) => setF({ ...f, align: v })} className="w-full [&>button]:flex-1" options={['start', 'center'].map((a) => ({ value: a, label: t(`banners.align.${a}`) }))} /></Field>
           <Field label={t('banners.tone')}><Select value={f.tone} onChange={set('tone')}>{['dark', 'light'].map((x) => <option key={x} value={x}>{t(`banners.tone.${x}`)}</option>)}</Select></Field>
+        </div>
+        <div className="space-y-4 rounded-2xl border border-line p-4">
+          <p className="text-sm font-semibold">{lang === 'ar' ? 'شكل الصورة' : 'Picture'}</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label={lang === 'ar' ? 'عرض الصورة' : 'Fit'} hint={lang === 'ar' ? '«كاملة» = الصورة تظهر كلها بدون قص. «تملى الإطار» = تتقص حواف بسيطة.' : '“Whole” shows the entire picture; “Fill” may trim the edges.'}>
+              <Segmented value={f.fit} onChange={(v) => setF({ ...f, fit: v })} className="w-full [&>button]:flex-1" options={[{ value: 'contain', label: lang === 'ar' ? 'كاملة' : 'Whole' }, { value: 'cover', label: lang === 'ar' ? 'تملى الإطار' : 'Fill' }]} />
+            </Field>
+            <Field label={lang === 'ar' ? 'ارتفاع البانر' : 'Height'}>
+              <Select value={f.height} onChange={set('height')}>{[['auto', lang === 'ar' ? 'يتظبط على الصورة (الأفضل)' : 'Match the picture (best)'], ['short', lang === 'ar' ? 'قصير' : 'Short'], ['normal', lang === 'ar' ? 'عادي' : 'Normal'], ['tall', lang === 'ar' ? 'طويل' : 'Tall']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select>
+            </Field>
+            {f.fit === 'cover' && (
+              <Field label={lang === 'ar' ? 'الجزء اللي يفضل ظاهر' : 'Keep visible'}>
+                <Segmented value={f.focus} onChange={(v) => setF({ ...f, focus: v })} className="w-full [&>button]:flex-1" options={[{ value: 'top', label: lang === 'ar' ? 'فوق' : 'Top' }, { value: 'center', label: lang === 'ar' ? 'النص' : 'Middle' }, { value: 'bottom', label: lang === 'ar' ? 'تحت' : 'Bottom' }]} />
+              </Field>
+            )}
+          </div>
+        </div>
+        <div className="space-y-4 rounded-2xl border border-line p-4">
+          <p className="text-sm font-semibold">{lang === 'ar' ? 'شكل الكلام' : 'Text style'}</p>
+          <Field label={lang === 'ar' ? 'لون الكلام' : 'Text colour'} hint={lang === 'ar' ? 'سيبه فاضي وهنختار لون مناسب للصورة تلقائي.' : 'Leave empty to pick automatically.'}>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => setF({ ...f, text_color: '' })} aria-pressed={!f.text_color} className={cx('h-9 rounded-full border px-3 text-[13px] font-semibold', !f.text_color ? 'border-fg bg-fg text-canvas' : 'border-line-strong')}>{lang === 'ar' ? 'تلقائي' : 'Auto'}</button>
+              {TEXT_COLORS.map((c) => <button key={c} type="button" aria-label={c} aria-pressed={f.text_color.toLowerCase() === c.toLowerCase()} onClick={() => setF({ ...f, text_color: c })} className={cx('h-9 w-9 rounded-full ring-2 ring-offset-2 ring-offset-canvas', f.text_color.toLowerCase() === c.toLowerCase() ? 'ring-fg' : 'ring-line-strong')} style={{ backgroundColor: c }} />)}
+              <label className="relative inline-flex h-9 w-9 cursor-pointer overflow-hidden rounded-full ring-2 ring-line-strong ring-offset-2 ring-offset-canvas" title={lang === 'ar' ? 'لون تاني' : 'Custom'}>
+                <span className="absolute inset-0" style={{ background: 'conic-gradient(red, yellow, lime, aqua, blue, magenta, red)' }} />
+                <input type="color" value={/^#[0-9a-f]{6}$/i.test(f.text_color) ? f.text_color : '#ffffff'} onChange={(e) => setF({ ...f, text_color: e.target.value })} className="absolute inset-0 h-full w-full cursor-pointer opacity-0" />
+              </label>
+            </div>
+          </Field>
+          <Field label={lang === 'ar' ? 'نوع الخط' : 'Font'}>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {BANNER_FONTS.map((x) => (
+                <button key={x.key || 'default'} type="button" aria-pressed={f.font === x.key} onMouseEnter={() => loadBannerFont(x.key)} onFocus={() => loadBannerFont(x.key)} onClick={() => { loadBannerFont(x.key); setF({ ...f, font: x.key }); }}
+                  className={cx('flex min-h-[3rem] items-center justify-between gap-2 rounded-xl border px-3.5 py-2 text-start transition', f.font === x.key ? 'border-fg bg-fg/[0.04] ring-1 ring-fg' : 'border-line-strong hover:border-fg')} style={{ fontFamily: bannerFontFamily(x.key) }}>
+                  <span className="text-lg font-bold">{lang === 'ar' ? 'تشكيلة جديدة' : 'New collection'}</span><span className="text-[11px] font-normal text-muted" style={{ fontFamily: 'inherit' }}>{x.ar}</span>
+                </button>
+              ))}
+            </div>
+          </Field>
         </div>
         <Switch label={t('banners.mirror')} checked={f.mirror_rtl} onChange={(v) => setF({ ...f, mirror_rtl: v })} />
         <Switch label={t('offers.active')} checked={f.active} onChange={(v) => setF({ ...f, active: v })} />
@@ -164,7 +212,7 @@ export default function Banners() {
   const toggle = async (b, active) => {
     const { image, mobileImage, ...rest } = b;
     try {
-      const r = await api(`/owner/banners/${b.id}`, { method: 'PUT', body: { media_id: image.id, mobile_media_id: mobileImage?.id ?? null, eyebrow_ar: rest.eyebrow.ar, eyebrow_en: rest.eyebrow.en, title_ar: rest.title.ar, title_en: rest.title.en, subtitle_ar: rest.subtitle.ar, subtitle_en: rest.subtitle.en, cta_ar: rest.cta.ar, cta_en: rest.cta.en, link: rest.link, align: rest.align, tone: rest.tone, mirror_rtl: rest.mirrorRtl, active } });
+      const r = await api(`/owner/banners/${b.id}`, { method: 'PUT', body: { media_id: image.id, mobile_media_id: mobileImage?.id ?? null, eyebrow_ar: rest.eyebrow.ar, eyebrow_en: rest.eyebrow.en, title_ar: rest.title.ar, title_en: rest.title.en, subtitle_ar: rest.subtitle.ar, subtitle_en: rest.subtitle.en, cta_ar: rest.cta.ar, cta_en: rest.cta.en, link: rest.link, align: rest.align, tone: rest.tone, mirror_rtl: rest.mirrorRtl, fit: rest.fit, focus: rest.focus, height: rest.height, text_color: rest.textColor, font: rest.font, active } });
       refresh(r.items);
     } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); }
   };

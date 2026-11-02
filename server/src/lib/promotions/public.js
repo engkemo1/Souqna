@@ -1,14 +1,15 @@
 /** Customer-facing read model for offers: what the storefront may show. Never used for pricing (that is the engine's job). */
 import { q } from '../../db/index.js';
 import { bi } from '../serialize.js';
-import { eligiblePromotions, categoryChains, promotionsForProduct, resolveProductIds, cairoStamp } from './store.js';
+import { eligiblePromotions, categoryChains, promotionsForProduct, resolveProductIds, cairoStamp, isLive } from './store.js';
 import { describePromotion } from './describe.js';
 import { resolveOfferImage } from './templates.js';
 
+export const parseDisplay = (j) => { try { const o = j ? JSON.parse(j) : null; return o && typeof o === 'object' ? o : null; } catch { return null; } };
 const shape = (row, productIds) => ({
   id: row.id, name: bi(row, 'name'), description: bi(row, 'description'), type: row.type, templateKey: row.template_key || row.type,
   imageMode: row.image_mode, imageMediaId: row.image_mode === 'custom' ? row.image_media_id ?? null : null,
-  imageResolved: resolveOfferImage(row, productIds), text: row.def ? describePromotion(row.def) : null, def: row.def,
+  display: parseDisplay(row.display_json), imageResolved: resolveOfferImage(row, productIds), text: row.def ? describePromotion(row.def) : null, def: row.def,
   endsAt: row.ends_at || null, dailyTo: row.daily_to || null, productCount: productIds.length,
 });
 
@@ -50,9 +51,15 @@ export function offerBadges(storeId, productIds) {
 }
 
 /** Daily impression counter (aggregate only, no visitor identifiers). */
-export function countView(storeId, promotionId) {
-  if (!q.get('SELECT id FROM promotions WHERE id=? AND store_id=?', [promotionId, storeId])) return false;
+const seenViews = new Set(); // "promotion:day:visitor" - one visitor counts once per offer per day (kept in memory; resets on restart, which only ever allows one extra count)
+export function countView(storeId, promotionId, visitor = 'unknown') {
+  const row = q.get('SELECT * FROM promotions WHERE id=? AND store_id=?', [promotionId, storeId]);
+  if (!row || !isLive(row)) return false; // only a live offer counts a view
   const day = cairoStamp().stamp.slice(0, 10);
+  const key = `${promotionId}:${day}:${String(visitor).slice(0, 64)}`;
+  if (seenViews.has(key)) return true;
+  if (seenViews.size > 50_000) seenViews.clear();
+  seenViews.add(key);
   q.run('INSERT INTO promotion_views(promotion_id, day, views) VALUES (?,?,1) ON CONFLICT(promotion_id, day) DO UPDATE SET views=views+1', [promotionId, day]);
   return true;
 }

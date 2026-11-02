@@ -18,6 +18,7 @@ import { Field, Input, Textarea, Select, Switch } from '../../components/ui/Fiel
 import { ErrorState, errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useDepartments } from '../../lib/departments.js';
+import StoreSectionsPicker from '../../components/dash/StoreSectionsPicker.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import BrandPaletteCard from '../../components/dash/BrandPaletteCard.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
@@ -307,13 +308,7 @@ export default function Settings() {
               <div className="sm:col-span-2">
                 <p className="mb-1 text-sm font-medium">{t('settings.departments')}</p>
                 <p className="mb-2 text-[13px] text-muted">{t('settings.departmentsHint')}</p>
-                <div className="flex flex-wrap gap-2" role="group" aria-label={t('settings.departments')}>
-                  {[...depts.list.map((x) => x.slug), ...f.departments.filter((x) => !depts.bySlug.has(x))].map((d) => {
-                    const on = f.departments.includes(d);
-                    return <button key={d} type="button" aria-pressed={on} onClick={() => setF({ ...f, departments: on ? f.departments.filter((x) => x !== d) : [...f.departments, d] })}
-                      className={`h-10 rounded-full border px-4 text-sm font-medium transition active:scale-95 ${on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg'}`}>{depts.label(d)}</button>;
-                  })}
-                </div>
+                <StoreSectionsPicker depts={depts} value={f.departments} onChange={(departments) => setF({ ...f, departments })} />
                 {errors.departments && <p className="mt-1 text-sm text-sale">{errors.departments}</p>}
               </div>
             </div>

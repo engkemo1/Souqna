@@ -19,7 +19,8 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import { EmptyState, ErrorState, errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { cx } from '../../components/ui/cx.js';
-import SectionPicker, { AttrFields } from '../../components/dash/SectionPicker.jsx';
+import { AttrFields } from '../../components/dash/SectionPicker.jsx';
+import SectionTreePicker from '../../components/dash/SectionTreePicker.jsx';
 
 const PRESET_COLORS = [
   ['#1C1C1E', 'أسود', 'Black'], ['#F4F3EF', 'أبيض', 'White'], ['#8E9096', 'رمادي', 'Grey'], ['#1F2B4D', 'كحلي', 'Navy'], ['#30558F', 'أزرق', 'Blue'],
@@ -412,7 +413,8 @@ export default function ProductEditor() {
   };
   const types = useMemo(() => (tree ? tree.families.flatMap((fm) => fm.types.map((ty) => ({ ...ty, family: fm }))) : []), [tree]);
   const type = types.find((ty) => ty.key === f.moda_key) || null;
-  const sizeKind = tree && type ? tree.sizeKinds[type.sizeKind[f.audience || 'unisex']] : null;
+  const deptSizes = (pubDepts?.departments || []).find((d) => d.slug === f.department)?.sizes || [];
+  const sizeKind = tree && type ? tree.sizeKinds[type.sizeKind[f.audience || 'unisex']] : (deptSizes.length ? { ar: '', sizes: deptSizes } : null);
   const styleDefault = type?.style ? STYLE_LEVELS.find(([v]) => Number(v) === type.style)?.[1] : null;
   const aud = tree?.audiences?.find((a) => a.key === f.audience);
   const totalStock = useMemo(() => {
@@ -451,7 +453,7 @@ export default function ProductEditor() {
     if (f.name_ar.trim().length < 2) e.name_ar = t('field.required');
     if (!Number(f.price)) e.price = t('field.price_required');
     if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
-    if (status === 'active' && !(f.audience && (f.moda_key || customType || f.department))) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
+    if (status === 'active' && !(f.moda_key || customType || f.department)) e.type = L('اختار قسم المنتج', 'Pick the product section');
     if (!f.media.length && status === 'active') e.media = t('editor.needImage');
     setErrors(e);
     return e;
@@ -505,7 +507,7 @@ export default function ProductEditor() {
   }
 
   const margin = f.cost && f.price ? Math.round(((f.price - f.cost) / f.price) * 100) : null;
-  const done = { images: f.media.length > 0, type: !!(f.audience && (f.moda_key || customType || f.department)), name: f.name_ar.trim().length >= 2, pricing: Number(f.price) > 0 };
+  const done = { images: f.media.length > 0, type: !!(f.moda_key || customType || f.department), name: f.name_ar.trim().length >= 2, pricing: Number(f.price) > 0 };
   const steps = [['images', L('الصور', 'Photos')], ['type', L('النوع', 'Type')], ['name', L('الاسم', 'Name')], ['pricing', L('السعر', 'Price')]];
   const doneCount = steps.filter(([k]) => done[k]).length;
   const goTo = (k) => document.getElementById(k)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -522,7 +524,7 @@ export default function ProductEditor() {
   const stepErr = (i) => {
     const e = {};
     if (i === 0 && !f.media.length) e.media = t('editor.needImage');
-    if (i === 1 && !(f.audience && (f.moda_key || customType || f.department))) e.type = L('اختار لمين المنتج ونوعه', 'Pick who it is for and the type');
+    if (i === 1 && !(f.moda_key || customType || f.department)) e.type = L('اختار قسم المنتج', 'Pick the product section');
     if (i === 2 && f.name_ar.trim().length < 2) e.name_ar = t('field.required');
     if (i === 3) {
       if (!Number(f.price)) e.price = t('field.price_required');
@@ -660,21 +662,16 @@ export default function ProductEditor() {
         )}
       </Card>)}
 
-      {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('إيه المنتج؟', 'What is it?')} hint={L('اختار الفئة والنوع مرة واحدة، وإحنا نظبط القسم والمقاسات.', 'Pick it once — we set the department and sizes.')} done={done.type}>
-        <TypePicker tree={tree} audience={f.audience} typeKey={f.moda_key} sections={sectionOptions} department={f.department} onPickSection={(slug) => set({ department: slug, deptTouched: true, attrs: {}, moda_key: '' })} suggested={suggested} error={errors.type} onChange={(p) => { if (p.moda_key) setCustomType(''); set(p); }} customName={customType && !f.moda_key ? customType : ''} onAddSection={addTypeSection} />
-        <details className="mt-4 rounded-xl border border-line bg-secondary/30 px-4 py-3">
-          <summary className="cursor-pointer text-sm font-semibold text-brand">{L('اختيار القسم من شجرة الأقسام بالتفصيل (للمتقدمين)', 'Pick from the full section tree (advanced)')}</summary>
-          <div className="mt-3 space-y-3">
-            <SectionPicker value={f.department} productName={f.name_ar} onChange={(slug) => set({ department: slug, deptTouched: true, attrs: {} })} />
-          </div>
-        </details>
+      {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('المنتج في أنهي قسم؟', 'Which section is it in?')} hint={L('اختار من أقسام الموقع. مرة واحدة وخلاص.', 'Pick from the site sections — once.')} done={done.type}>
+        <SectionTreePicker items={pickerData?.departments || []} value={f.department} error={errors.type} customName={customType && !f.department ? customType : ''}
+          onPick={(slug, root) => { setCustomType(''); set({ department: slug, deptTouched: true, attrs: {}, moda_key: '', ...(customType ? { category_id: '' } : {}), ...(['women', 'men', 'kids'].includes(root) ? { audience: root } : {}) }); }} onAddSection={addTypeSection} />
         {deptDefs.filter((d) => d.key).length > 0 && f.department && <div className="mt-4"><AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} /></div>}
       </Card>)}
 
       {(!isNew || step === 2) && (<Card id="name" bare={isNew} step={3} title={L('الاسم والوصف', 'Name & description')} done={done.name}>
         <div className="space-y-4">
           <Field label={L('اسم المنتج', 'Product name')} error={errors.name_ar} hint={type ? L(`مثال: ${type.ar} ${f.colors[0] ? f.colors[0].name_ar : 'أسود'} قطن`, undefined) : undefined}>
-            <Input ref={nameRef} dir="rtl" value={f.name_ar} onChange={(e) => set({ name_ar: e.target.value })} maxLength={120} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} />
+            <Input ref={nameRef} dir="auto" value={f.name_ar} onChange={(e) => set({ name_ar: e.target.value })} maxLength={120} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} />
           </Field>
           {!f.name_ar.trim() && (type || aud) && (
             <div className="flex flex-wrap items-center gap-2">
@@ -690,12 +687,12 @@ export default function ProductEditor() {
             </div>
           )}
           <Field label={L('وصف قصير', 'Short description')} optional={t('common.optional')} hint={L('الخامة، الاستخدام، أي تفصيلة مهمة.', 'Fabric, use, any key detail.')}>
-            <Textarea dir="rtl" rows={3} value={f.description_ar} onChange={(e) => set({ description_ar: e.target.value })} />
+            <Textarea dir="auto" rows={3} value={f.description_ar} onChange={(e) => set({ description_ar: e.target.value })} />
           </Field>
           {showEn ? (
             <div className="grid gap-4 rounded-xl border border-line bg-secondary/30 p-4 sm:grid-cols-2">
-              <Field label={t('editor.nameEn')} optional={t('common.optional')} error={errors.name_en}><Input dir="ltr" value={f.name_en} onChange={(e) => set({ name_en: e.target.value })} /></Field>
-              <Field label={t('editor.descEn')} optional={t('common.optional')}><Textarea dir="ltr" rows={2} value={f.description_en} onChange={(e) => set({ description_en: e.target.value })} /></Field>
+              <Field label={t('editor.nameEn')} optional={t('common.optional')} error={errors.name_en}><Input dir="auto" value={f.name_en} onChange={(e) => set({ name_en: e.target.value })} /></Field>
+              <Field label={t('editor.descEn')} optional={t('common.optional')}><Textarea dir="auto" rows={2} value={f.description_en} onChange={(e) => set({ description_en: e.target.value })} /></Field>
             </div>
           ) : <button type="button" onClick={() => setShowEn(true)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"><Plus className="h-4 w-4" />{L('إضافة اسم ووصف بالإنجليزي (اختياري)', 'Add English name & description (optional)')}</button>}
         </div>
@@ -723,7 +720,7 @@ export default function ProductEditor() {
 
       {(!isNew || step === 4) && (<Card id="variants" bare={isNew} step={5} title={L('الألوان والمقاسات والكمية', 'Colours, sizes & stock')} done={f.colors.length > 0 || f.sizes.length > 0 || Number(f.stock) > 0}>
         <div className="space-y-6">
-          <VariantsEditor f={f} set={set} sizeKind={sizeKind} typeChosen={!!type} />
+          <VariantsEditor f={f} set={set} sizeKind={sizeKind} typeChosen={!!type || !!f.department || !!customType} />
           <div className="grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
             <Switch label={t('editor.trackStock')} checked={f.track_stock} onChange={(v) => set({ track_stock: v })} />
             {!f.colors.length && !f.sizes.length && f.track_stock && <Field label={t('editor.stock')}><Input inputMode="numeric" value={f.stock} onChange={(e) => set({ stock: e.target.value.replace(/\D/g, '') })} /></Field>}

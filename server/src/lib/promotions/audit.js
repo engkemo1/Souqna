@@ -2,7 +2,7 @@ import { q, insert } from '../../db/index.js';
 import { nowIso } from '../util.js';
 
 const FIELDS = ['name_ar', 'name_en', 'description_ar', 'description_en', 'type', 'status', 'priority', 'stacking', 'stack_with_coupons', 'starts_at', 'ends_at', 'daily_from', 'daily_to', 'days_mask',
-  'usage_limit', 'per_customer_limit', 'audience', 'audience_phones_json', 'image_mode', 'image_category', 'image_media_id', 'template_key', 'rules_json'];
+  'usage_limit', 'per_customer_limit', 'audience', 'audience_phones_json', 'image_mode', 'image_category', 'image_media_id', 'template_key', 'rules_json', 'display_json'];
 export const snapshot = (row) => Object.fromEntries(FIELDS.map((f) => [f, row?.[f] ?? null]));
 
 /** Names of the fields that differ between two snapshots ('rules_json' is reported as 'rules'). */

@@ -10,6 +10,7 @@ import { evaluateCart } from '../lib/promotions/engine.js';
 import { logAudit, snapshot, changedFields, history } from '../lib/promotions/audit.js';
 import { promotionAnalytics } from '../lib/promotions/analytics.js';
 import { describePromotion } from '../lib/promotions/describe.js';
+import { parseDisplay } from '../lib/promotions/public.js';
 import { imageCategories, libraryItems, resolveOfferImage, resolveTemplate } from '../lib/promotions/templates.js';
 import {
   cairoStamp, promoState, isLive, parseRow, usageCount, savePromotion, setProductInPromotion, promotionsForProduct,
@@ -35,6 +36,11 @@ const inputSchema = z.object({
   template_key: z.enum(TEMPLATE_KEYS).nullable().optional(),
   image_mode: z.enum(['auto', 'library', 'custom']).default('auto'),
   image_category: z.string().regex(/^[a-z0-9_]{1,40}$/).nullable().optional(),
+  display: z.object({
+    fit: z.enum(['contain', 'cover']).default('cover'), focus: z.enum(['top', 'center', 'bottom']).default('center'),
+    ratio: z.enum(['default', 'auto', '16/9', '21/9', '4/3', '1/1']).default('default'),
+    text_color: z.string().trim().regex(/^(#[0-9a-fA-F]{6})?$/).default(''), font: z.enum(['', 'cairo', 'tajawal', 'almarai', 'el_messiri', 'reem_kufi', 'lalezar']).default(''),
+  }).optional().nullable(),
   starts_at: stamp, ends_at: stamp, daily_from: hm, daily_to: hm,
   days_mask: z.coerce.number().int().min(1).max(127).default(127),
   usage_limit: z.coerce.number().int().min(1).max(10_000_000).nullable().optional(),
@@ -53,7 +59,7 @@ function serialize(row, { images, full = false, productIds } = {}) {
     id: row.id, name: bi(row, 'name'), description: bi(row, 'description'), type: row.type, status: row.status, state,
     live: isLive(row, now), priority: row.priority, stacking: row.stacking, stackWithCoupons: !!row.stack_with_coupons,
     image: row.image_mode === 'custom' && row.image_media_id ? (images?.get(row.image_media_id) || null) : null, imageMediaId: row.image_media_id ?? null, templateKey: row.template_key,
-    imageMode: row.image_mode, imageCategory: row.image_category, imageResolved: resolveOfferImage(row, productIds ?? (def ? resolveProductIds(row.store_id, def) : [])),
+    display: parseDisplay(row.display_json), imageMode: row.image_mode, imageCategory: row.image_category, imageResolved: resolveOfferImage(row, productIds ?? (def ? resolveProductIds(row.store_id, def) : [])),
     startsAt: row.starts_at, endsAt: row.ends_at, dailyFrom: row.daily_from, dailyTo: row.daily_to, daysMask: row.days_mask,
     usageLimit: row.usage_limit, usageCount: usageCount(row.id), perCustomerLimit: row.per_customer_limit,
     audience: row.audience, createdAt: row.created_at, updatedAt: row.updated_at, text,

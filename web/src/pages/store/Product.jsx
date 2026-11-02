@@ -286,7 +286,7 @@ export default function Product() {
           </ul>
 
           <div className="mt-6 border-t border-line">
-            <Accordion title={t('product.description')} defaultOpen><p className="whitespace-pre-line">{tr(p.description)}</p></Accordion>
+            <Accordion title={t('product.description')} defaultOpen><p dir="auto" className="whitespace-pre-line text-start">{tr(p.description)}</p></Accordion>
             <Accordion title={t('product.details')}>
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
                 <dt>{t('product.sku')}</dt><dd className="font-medium text-fg" dir="ltr">{p.sku}</dd>

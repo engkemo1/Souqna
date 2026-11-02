@@ -30,7 +30,7 @@ const SECTION_LABEL = {
 const KIND = [['women', 'حريمي'], ['men', 'رجالي'], ['kids', 'أطفال'], ['sport', 'رياضي'], ['wedding', 'فساتين ومناسبات'], ['shoes', 'أحذية'], ['mixed', 'كل حاجة']];
 const VIBE = [['luxury', 'فخم'], ['soft', 'ناعم'], ['street', 'شبابي'], ['simple', 'بسيط'], ['deals', 'عروض'], ['classic', 'كلاسيك']];
 const OPT = {
-  hero: { auto: ['تلقائي', 'Auto'], cover: ['صورة غلاف', 'Cover'], slider: ['بنرات', 'Slider'], split: ['مقسوم', 'Split'], compact: ['مضغوط', 'Compact'], playful: ['مرح للأطفال', 'Playful'] },
+  hero: { auto: ['تلقائي', 'Auto'], cover: ['صورة غلاف', 'Cover'], slider: ['بنرات', 'Slider'], split: ['مقسوم', 'Split'], compact: ['مضغوط', 'Compact'], playful: ['مرح للأطفال', 'Playful'], full: ['صورة كاملة', 'Full picture'] },
   card: { round: ['مدوّر', 'Rounded'], flat: ['حاد/بدون حدود', 'Flat'], soft: ['ناعم بخلفية', 'Soft'], bordered: ['بإطار', 'Bordered'], bubble: ['ملوّن فقاعات', 'Bubbly'] },
   cat: { tiles: ['مربعات كبيرة', 'Tiles'], circles: ['دواير', 'Circles'], list: ['أزرار نصية', 'Pills'], bubbles: ['فقاعات ملونة', 'Bubbles'] },
   grid: { cozy: ['متوازن', 'Balanced'], dense: ['كثيف', 'Dense'], airy: ['واسع', 'Airy'] },

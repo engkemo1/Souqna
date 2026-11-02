@@ -161,6 +161,7 @@ export function serializeBanner(b, media) {
     align: b.align,
     tone: b.tone,
     mirrorRtl: !!b.mirror_rtl,
+    fit: b.fit || 'contain', focus: b.focus || 'center', height: b.height || 'normal', textColor: b.text_color || '', font: b.font || '',
     position: b.position,
     active: !!b.active,
   };

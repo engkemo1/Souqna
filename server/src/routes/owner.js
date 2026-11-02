@@ -1400,6 +1400,8 @@ const bannerSchema = z.object({
   align: z.enum(['start', 'center', 'end']).default('start'),
   tone: z.enum(['dark', 'light']).default('dark'),
   mirror_rtl: z.boolean().default(false).transform(Number),
+  fit: z.enum(['contain', 'cover']).default('contain'), focus: z.enum(['top', 'center', 'bottom']).default('center'), height: z.enum(['auto', 'short', 'normal', 'tall']).default('normal'),
+  text_color: z.string().trim().regex(/^(#[0-9a-fA-F]{6})?$/).default(''), font: z.enum(['', 'cairo', 'tajawal', 'almarai', 'el_messiri', 'reem_kufi', 'lalezar']).default(''),
   active: z.boolean().default(true),
 });
 

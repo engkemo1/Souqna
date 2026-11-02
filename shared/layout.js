@@ -8,7 +8,7 @@
 export const CARD_STYLES = ['round', 'flat', 'soft', 'bordered', 'bubble'];
 export const CAT_STYLES = ['tiles', 'circles', 'list', 'bubbles'];
 export const GRID_STYLES = ['cozy', 'dense', 'airy'];
-export const HERO_STYLES = ['auto', 'cover', 'slider', 'split', 'compact', 'playful'];
+export const HERO_STYLES = ['auto', 'cover', 'slider', 'split', 'compact', 'playful', 'full'];
 export const TYPE_STYLES = ['normal', 'light', 'bold', 'rounded'];
 export const BADGE_TONES = ['brand', 'sale', 'dark', 'gold', 'green'];
 export const FLASH_TARGETS = ['sale', 'new', 'shop'];
@@ -23,6 +23,12 @@ export const TEMPLATES = {
     desc_ar: 'الشكل المعتاد للمتجر: متوازن ومناسب لأي محل.', desc_en: 'The familiar balanced storefront.',
     hero: 'auto', card: 'round', cat: 'tiles', grid: 'cozy', type: 'normal', preset: null,
     sections: ['hero', 'free_shipping', 'trust', 'new_arrivals', 'categories', 'best_sellers', 'offers', 'on_sale', 'story', 'visit'],
+  },
+  storefront: {
+    ar: 'واجهة المحل (صورة كاملة)', en: 'Storefront (full picture)',
+    desc_ar: 'صورة الغلاف كاملة بدون قص، والاسم والأزرار فوقها على الموبايل وجنبها على الكمبيوتر. للمحلات اللي صورتها واجهة المحل أو صورة طولية.', desc_en: 'The whole cover picture, uncropped; name and buttons over it on phones and beside it on desktop.',
+    hero: 'full', card: 'round', cat: 'circles', grid: 'cozy', type: 'normal', preset: 'noir',
+    sections: ['hero', 'categories', 'new_arrivals', 'best_sellers', 'offers', 'on_sale', 'trust', 'story', 'visit', 'free_shipping'],
   },
   editorial: {
     ar: 'تحريري بسيط', en: 'Minimal editorial',

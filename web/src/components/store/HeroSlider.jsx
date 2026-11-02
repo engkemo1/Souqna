@@ -6,8 +6,16 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { srcSet } from '../../lib/image.js';
 import Skeleton from '../ui/Skeleton.jsx';
 import { cx } from '../ui/cx.js';
+import { bannerFontFamily, loadBannerFont, readableOn } from '../../lib/bannerFonts.js';
 
 const DURATION = 6500;
+/** Banner box height. 'auto' follows the picture's own proportions so the WHOLE picture is shown; the others are fixed shapes. */
+const boxClass = (h) => (h === 'auto' ? 'aspect-[var(--ar-m)] sm:aspect-[var(--ar-d)]'
+  : h === 'short' ? 'aspect-[4/3] sm:aspect-[3/1] lg:aspect-[3.6/1]'
+  : h === 'tall' ? 'aspect-[1/1] sm:aspect-[16/8] lg:aspect-[2400/1300]'
+  : 'aspect-[4/5] sm:aspect-[16/9] md:aspect-[21/10] lg:aspect-[2400/1000]');
+const clampAr = (m) => (m?.w && m?.h ? Math.min(Math.max(m.w / m.h, 0.6), 4) : 2.4);
+const autoRatio = (b) => ({ '--ar-m': clampAr(b.mobileImage || b.image), '--ar-d': clampAr(b.image) });
 const ease = [0.22, 1, 0.36, 1];
 
 function BannerPicture({ banner, priority, isRtl }) {
@@ -29,7 +37,7 @@ function BannerPicture({ banner, priority, isRtl }) {
           loading={priority ? 'eager' : 'lazy'}
           fetchpriority={priority ? 'high' : undefined}
           decoding="async"
-          className={cx('absolute inset-0 h-full w-full object-contain object-center', flip && 'sm:-scale-x-100')}
+          className={cx('absolute inset-0 h-full w-full', banner.fit === 'cover' ? 'object-cover' : 'object-contain', banner.focus === 'top' ? 'object-top' : banner.focus === 'bottom' ? 'object-bottom' : 'object-center', flip && 'sm:-scale-x-100')}
         />
       </picture>
     </div>
@@ -60,6 +68,9 @@ export default function HeroSlider({ banners, slug }) {
     return () => document.removeEventListener('visibilitychange', onVis);
   }, []);
 
+  const curFont = banners[index]?.font;
+  useEffect(() => { loadBannerFont(curFont); }, [curFont]);
+
   if (!n) return null;
   const b = banners[index];
   const light = b.tone === 'light'; // light imagery → dark text
@@ -68,6 +79,8 @@ export default function HeroSlider({ banners, slug }) {
   const NextIcon = isRtl ? ChevronLeft : ChevronRight;
   const link = b.link?.startsWith('/') ? `/s/${slug}${b.link}` : b.link || `/s/${slug}/shop`;
   const hasText = Boolean(tr(b.title) || tr(b.subtitle) || tr(b.cta) || tr(b.eyebrow));
+  const tc = b.textColor || '';
+  const textStyle = { color: tc || undefined, fontFamily: bannerFontFamily(b.font) };
 
   return (
     <section
@@ -84,7 +97,8 @@ export default function HeroSlider({ banners, slug }) {
       }}
     >
       <motion.div
-        className="relative aspect-[4/5] w-full touch-pan-y sm:aspect-[16/9] md:aspect-[21/10] lg:aspect-[2400/1000] lg:max-h-[78vh]"
+        className={cx('relative w-full touch-pan-y lg:max-h-[78vh]', boxClass(b.height))}
+        style={b.height === 'auto' ? autoRatio(b) : undefined}
         drag={n > 1 ? 'x' : false}
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.12}
@@ -111,16 +125,17 @@ export default function HeroSlider({ banners, slug }) {
                 <motion.div
                   initial="hidden" animate="show"
                   variants={{ show: { transition: { staggerChildren: 0.09, delayChildren: 0.25 } } }}
+                  style={{ fontFamily: textStyle.fontFamily }}
                   className={cx('mx-auto max-w-[22rem] sm:max-w-[min(42%,34rem)]', center ? 'sm:max-w-2xl' : 'sm:mx-0', light ? 'text-neutral-900' : 'text-white')}
                 >
                   {tr(b.eyebrow) && (
-                    <motion.p variants={item} className={cx('mb-3 text-xs font-semibold tracking-[0.2em] sm:mb-4 sm:text-[13px]', light ? 'text-neutral-600' : 'text-white/85')}>{tr(b.eyebrow)}</motion.p>
+                    <motion.p variants={item} style={{ color: tc || undefined }} className={cx('mb-3 text-xs font-semibold tracking-[0.2em] sm:mb-4 sm:text-[13px]', light ? 'text-neutral-600' : 'text-white/85')}>{tr(b.eyebrow)}</motion.p>
                   )}
-                  <motion.h2 variants={item} className={cx('font-display font-bold', center ? 'text-display-sm lg:text-[3.25rem] lg:leading-[1.05]' : 'text-display', light ? 'text-neutral-900' : 'text-white')}>{tr(b.title)}</motion.h2>
-                  {tr(b.subtitle) && <motion.p variants={item} className={cx('mt-3 text-base leading-relaxed sm:mt-5 sm:text-lg', light ? 'text-neutral-700' : 'text-white/85')}>{tr(b.subtitle)}</motion.p>}
+                  <motion.h2 variants={item} style={{ color: tc || undefined, fontFamily: textStyle.fontFamily }} className={cx('font-display font-bold', center ? 'text-display-sm lg:text-[3.25rem] lg:leading-[1.05]' : 'text-display', light ? 'text-neutral-900' : 'text-white')}>{tr(b.title)}</motion.h2>
+                  {tr(b.subtitle) && <motion.p variants={item} style={{ color: tc || undefined }} className={cx('mt-3 text-base leading-relaxed sm:mt-5 sm:text-lg', light ? 'text-neutral-700' : 'text-white/85')}>{tr(b.subtitle)}</motion.p>}
                   {tr(b.cta) && (
                     <motion.div variants={item} className="mt-6 sm:mt-8">
-                      <Link to={link} className={cx('group/cta inline-flex h-12 items-center gap-2.5 rounded-full px-7 text-base font-semibold shadow-sm transition active:scale-[.97]',
+                      <Link to={link} style={tc ? { backgroundColor: tc, color: readableOn(tc) } : undefined} className={cx('group/cta inline-flex h-12 items-center gap-2.5 rounded-full px-7 text-base font-semibold shadow-sm transition active:scale-[.97]',
                         light ? 'bg-neutral-900 text-white hover:bg-neutral-800' : 'bg-white text-neutral-900 hover:bg-white/90')}>
                         {tr(b.cta)}
                         <ArrowRight className="h-4 w-4 transition-transform group-hover/cta:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover/cta:-translate-x-0.5" />

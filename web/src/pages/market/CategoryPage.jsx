@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { ChevronLeft, Search, SlidersHorizontal } from 'lucide-react';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
-import { CategoryImage, SubCard, ThumbChip, deptName } from '../../components/market/CategoryCards.jsx';
+import { CategoryImage, CircleRail, deptName } from '../../components/market/CategoryCards.jsx';
 import ProductCard, { ProductCardSkeleton, ProductGrid } from '../../components/store/ProductCard.jsx';
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -64,8 +64,7 @@ export default function CategoryPage() {
     try { const r = await api(`/search?${key}&page=${page + 1}`); setMore({ key, items: [...(more.key === key ? more.items : []), ...r.items], page: page + 1 }); } catch { /* ignore */ }
     setBusy(false);
   };
-  const medium = children.filter((c) => c.level === 1);
-  const compact = children.filter((c) => c.level >= 2);
+  const circles = [...children].filter((c) => c.product_count > 0).sort((x, y) => x.level - y.level); // only sections that actually have products
   const desc = dept?.description?.[lang] || dept?.description?.ar || '';
 
   return (
@@ -94,16 +93,7 @@ export default function CategoryPage() {
             </section>
 
             <div className="container py-6 sm:py-8">
-              {medium.length > 0 && (
-                <section aria-label={lang === 'ar' ? 'الأقسام' : 'Sections'} className="mb-8">
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-5">{medium.map((c) => <SubCard key={c.slug} dept={c} />)}</div>
-                </section>
-              )}
-              {compact.length > 0 && (
-                <section aria-label={lang === 'ar' ? 'أنواع' : 'Types'} className="mb-8">
-                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 no-scrollbar sm:mx-0 sm:flex-wrap sm:px-0">{compact.map((c) => <div key={c.slug} className="shrink-0"><ThumbChip dept={c} /></div>)}</div>
-                </section>
-              )}
+              {circles.length > 0 && <section aria-label={lang === 'ar' ? 'الأقسام' : 'Sections'} className="mb-6"><CircleRail items={circles} label={lang === 'ar' ? 'الأقسام' : 'Sections'} /></section>}
 
               <section aria-label={lang === 'ar' ? 'المنتجات' : 'Products'}>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">

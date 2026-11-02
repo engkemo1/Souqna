@@ -139,6 +139,7 @@ export function savePromotion(storeId, input, id = null) {
     days_mask: input.days_mask ?? 127, usage_limit: input.usage_limit ?? null, per_customer_limit: input.per_customer_limit ?? null,
     audience: input.audience ?? 'all', audience_phones_json: JSON.stringify((input.audience_phones || []).map((p) => String(p).replace(/\D/g, '')).filter(Boolean)),
     rules_json: JSON.stringify(def), updated_at: nowIso(),
+    ...(input.display !== undefined ? { display_json: input.display ? JSON.stringify(input.display) : null } : {}),
   };
   return tx(() => {
     let pid = id;
