@@ -9,3 +9,12 @@ souqna.zip
 deploy.bat
 tmp/
 
+
+# secrets / local backups (never commit)
+.env.*
+!.env.example
+*.save
+*.sqlite
+*.sqlite-*
+backups/
+rollback-*.json

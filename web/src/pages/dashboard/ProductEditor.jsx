@@ -663,7 +663,7 @@ export default function ProductEditor() {
       </Card>)}
 
       {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('المنتج في أنهي قسم؟', 'Which section is it in?')} hint={L('اختار من أقسام الموقع. مرة واحدة وخلاص.', 'Pick from the site sections — once.')} done={done.type}>
-        <SectionTreePicker items={pickerData?.departments || []} value={f.department} error={errors.type} customName={customType && !f.department ? customType : ''}
+        <SectionTreePicker items={pickerData?.departments || []} productName={f.name_ar} value={f.department} error={errors.type} customName={customType && !f.department ? customType : ''}
           onPick={(slug, root) => { setCustomType(''); set({ department: slug, deptTouched: true, attrs: {}, moda_key: '', ...(customType ? { category_id: '' } : {}), ...(['women', 'men', 'kids'].includes(root) ? { audience: root } : {}) }); }} onAddSection={addTypeSection} />
         {deptDefs.filter((d) => d.key).length > 0 && f.department && <div className="mt-4"><AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} /></div>}
       </Card>)}
