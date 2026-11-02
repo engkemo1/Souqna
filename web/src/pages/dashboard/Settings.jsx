@@ -19,11 +19,12 @@ import { ErrorState, errorMessage, fieldErrors } from '../../components/ui/State
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useDepartments } from '../../lib/departments.js';
 import StoreSectionsPicker from '../../components/dash/StoreSectionsPicker.jsx';
+import HoursEditor, { scheduleFromStore } from '../../components/dash/HoursEditor.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import BrandPaletteCard from '../../components/dash/BrandPaletteCard.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'opens_at', 'closes_at', 'day_off', 'return_days', 'reserve_hours', 'instagram', 'facebook', 'tiktok', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'hours', 'return_days', 'reserve_hours', 'instagram', 'facebook', 'tiktok', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
 
 /** Exchange & return policy: one clear period choice (saved with the page) plus a note on pieces excluded one by one. */
 function ReturnsBox({ days, onDays }) {
@@ -222,7 +223,7 @@ function ChangePassword() {
 
 export default function Settings() {
   const dashBase = useDashBase();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const { setStore } = useAuth();
   const toast = useToast();
   const depts = useDepartments({ all: true });
@@ -239,7 +240,7 @@ export default function Settings() {
     const s = data.store;
     const x = ({
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
-      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', photo_style: s.photoStyle || 'white', opens_at: s.hours?.open || '', closes_at: s.hours?.close || '', day_off: s.hours?.dayOff ?? '', instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
+      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', photo_style: s.photoStyle || 'white', hours: scheduleFromStore(s.hours), instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
       return_days: String(s.returnDays ?? 3), reserve_hours: String(s.reserveHours ?? 24), shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
       logo_initials: s.logoInitials || (s.name.ar || s.name.en || s.code || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: s.logoColor || '#1B1B1B',
     });
@@ -331,14 +332,6 @@ export default function Settings() {
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('settings.phone')}><Input dir="ltr" inputMode="tel" value={f.phone} onChange={set('phone')} className="text-start" /></Field>
               <Field label={t('settings.whatsapp')}><Input dir="ltr" inputMode="tel" value={f.whatsapp} onChange={set('whatsapp')} className="text-start" /></Field>
-              <Field label={t('settings.opensAt')} error={errors.opens_at}><Input type="time" dir="ltr" value={f.opens_at} onChange={set('opens_at')} /></Field>
-              <Field label={t('settings.closesAt')} error={errors.closes_at}><Input type="time" dir="ltr" value={f.closes_at} onChange={set('closes_at')} /></Field>
-              <Field label={t('settings.dayOff')}>
-                <select className="h-11 w-full rounded-xl border border-line bg-surface px-3" value={f.day_off} onChange={set('day_off')}>
-                  <option value="">{t('settings.noDayOff')}</option>
-                  {t('analytics.weekdays').split(',').map((d, i) => <option key={d} value={i}>{d}</option>)}
-                </select>
-              </Field>
               <Field label={t('settings.instagram')}><Input dir="ltr" prefix="@" value={f.instagram} onChange={set('instagram')} /></Field>
               <Field label={t('settings.facebook')}><Input dir="ltr" value={f.facebook} onChange={set('facebook')} className="text-start" /></Field>
               <Field label={t('settings.tiktok')}><Input dir="ltr" prefix="@" value={f.tiktok} onChange={set('tiktok')} placeholder="username" /></Field>
@@ -362,6 +355,9 @@ export default function Settings() {
               </Field>
               <Field label={t('settings.addressEn')}><Input dir="ltr" value={f.address_en} onChange={set('address_en')} /></Field>
             </div>
+          </Panel>
+          <Panel title={lang === 'ar' ? 'مواعيد العمل والإجازات' : 'Opening hours & holidays'}>
+            <HoursEditor value={f.hours} onChange={(h) => setF((x) => ({ ...x, hours: h }))} />
           </Panel>
           <Panel title={t('settings.shipping')}>
             <div className="grid gap-4 sm:grid-cols-2">

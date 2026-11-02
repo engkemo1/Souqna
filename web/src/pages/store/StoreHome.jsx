@@ -141,21 +141,21 @@ function CategoryTiles() {
       <SectionHeader title={t('store.shopByCategory')} />
       <div className={`scroll-x -mx-4 gap-3 px-4 sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 ${cols}`}>
         {categories.map((c, i) => (
-          <motion.div key={c.id} className="w-[62%] shrink-0 snap-start xs:w-[52%] sm:w-auto"
+          <motion.div key={c.id} className="w-[46%] shrink-0 snap-start xs:w-[42%] sm:w-auto"
             initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06, duration: 0.5 }}>
-            <Link to={sp(store.slug, `shop?category=${c.slug}`)} className="group relative block overflow-hidden rounded-3xl">
+            <Link to={sp(store.slug, `shop?category=${c.slug}`)} className="group relative block overflow-hidden rounded-[22px] bg-surface shadow-[0_12px_30px_-18px_rgb(var(--c-accent)/.55)] ring-1 ring-line transition active:scale-[.98]">
               <div className={`relative ${few ? 'aspect-[4/5] sm:aspect-[4/3]' : 'aspect-[4/5]'}`}>
                 {c.image
-                  ? <SmartImage media={c.image} className="h-full w-full" sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 60vw" imgClassName="group-hover:scale-[1.04] duration-[1.2s]" />
+                  ? <SmartImage media={c.image} className="h-full w-full" sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 46vw" imgClassName="group-hover:scale-[1.05] duration-[1.2s]" />
                   : <CategoryArt name={tr(c.name)} />}
               </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/55 via-black/0 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 flex items-end justify-between p-4 text-white sm:p-5">
-                <div>
-                  <p className="font-display text-xl font-bold sm:text-2xl">{tr(c.name)}</p>
-                  <p className="mt-0.5 text-sm text-white/80">{t('categories.count', { n: c.count })}</p>
+              {/* the name sits on its own frosted bar, so it stays readable on any photo and never fights the picture */}
+              <div className="absolute inset-x-2 bottom-2 flex items-center justify-between gap-2 rounded-2xl bg-canvas/85 px-3 py-2.5 text-fg ring-1 ring-line backdrop-blur-md sm:inset-x-3 sm:bottom-3 sm:px-4 sm:py-3">
+                <div className="min-w-0">
+                  <p className="truncate text-[15px] font-bold leading-tight sm:text-lg">{tr(c.name)}</p>
+                  <p className="mt-0.5 text-[11.5px] text-muted sm:text-[13px]">{t('categories.count', { n: c.count })}</p>
                 </div>
-                <span className="grid h-10 w-10 place-items-center rounded-full bg-white text-neutral-900 transition-transform duration-300 group-hover:scale-110">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-btn text-on-btn transition-transform duration-300 group-hover:-translate-x-0.5 sm:h-9 sm:w-9">
                   <ArrowRight className="h-4 w-4 rtl:-scale-x-100" />
                 </span>
               </div>
@@ -216,7 +216,7 @@ export default function StoreHome() {
   const allSections0 = [...new Set([...(explicitOrder || design.sections), ...STANDARD])].filter((k) => k !== 'promos');
   // the store's live offers sit right under the hero so shoppers see them first
   const heroAt = allSections0.indexOf('hero');
-  const allSections = [...allSections0.slice(0, heroAt + 1), 'promos', ...allSections0.slice(heroAt + 1)];
+  const allSections = [...allSections0.slice(0, heroAt + 1), 'infobar', 'promos', ...allSections0.slice(heroAt + 1)]; // the contact / hours card sits right under the hero
 
   const renderSection = (key) => {
     if (hidden.has(key)) return null;
@@ -309,6 +309,9 @@ export default function StoreHome() {
       case 'story':
         return <StoreStoryCard key="story" />;
 
+      case 'infobar':
+        return <StoreInfoBar key="infobar" />;
+
       case 'visit':
         return <VisitCard key="visit" />;
 
@@ -319,7 +322,6 @@ export default function StoreHome() {
 
   return (
     <PageTransition>
-      <StoreInfoBar />
       {error ? (
         <div className="container mt-12"><ErrorState error={error} onRetry={reload} /></div>
       ) : (

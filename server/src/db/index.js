@@ -77,6 +77,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!cols.includes('opens_at')) db.exec('ALTER TABLE stores ADD COLUMN opens_at TEXT');
   if (!cols.includes('closes_at')) db.exec('ALTER TABLE stores ADD COLUMN closes_at TEXT');
   if (!cols.includes('day_off')) db.exec('ALTER TABLE stores ADD COLUMN day_off INTEGER');
+  if (!cols.includes('hours_json')) db.exec('ALTER TABLE stores ADD COLUMN hours_json TEXT'); // weekly schedule + holidays (additive; legacy opens_at/closes_at/day_off stay)
   if (!cols.includes('departments')) db.exec("ALTER TABLE stores ADD COLUMN departments TEXT NOT NULL DEFAULT ''");
   if (!cols.includes('delivery_mode')) db.exec("ALTER TABLE stores ADD COLUMN delivery_mode TEXT NOT NULL DEFAULT 'store'");
   if (!cols.includes('hero_mode')) db.exec("ALTER TABLE stores ADD COLUMN hero_mode TEXT NOT NULL DEFAULT 'auto'");

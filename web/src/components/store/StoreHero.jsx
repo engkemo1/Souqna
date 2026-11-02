@@ -1,13 +1,12 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Star, Navigation, ArrowLeft, ArrowRight, MapPin, MessageCircle, Phone } from 'lucide-react';
-import { waNumber } from '@souqna/shared/layout';
+import { Star, ArrowLeft, ArrowRight, MapPin } from 'lucide-react';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { srcSet, pickSrc } from '../../lib/image.js';
 import SmartImage from '../ui/SmartImage.jsx';
 import { StoreLogo } from './StoreChrome.jsx';
-import { mapsLinks, openNow } from './VisitCard.jsx';
+import { mapsLinks } from './VisitCard.jsx';
 
 const ease = [0.22, 1, 0.36, 1];
 
@@ -24,37 +23,7 @@ function brandOf(media) {
   const [r, g, b] = hexToRgb(hex);
   return { hex, light: 0.299 * r + 0.587 * g + 0.114 * b > 165 };
 }
-const fmtTime = (hm, ar) => {
-  let [h, m] = String(hm).split(':').map(Number);
-  const pm = h >= 12; h = h % 12 || 12;
-  const mm = m ? `:${String(m).padStart(2, '0')}` : '';
-  return ar ? `${h}${mm} ${pm ? 'م' : 'ص'}` : `${h}${mm} ${pm ? 'PM' : 'AM'}`;
-};
 const isWide = (media, fit) => (fit === 'cover' ? true : fit === 'contain' ? false : (media?.w && media?.h ? media.w / media.h : 1) >= 1.6);
-
-/** Open / closed — styled like the little sign hanging on a shop door. */
-function DoorSign({ store, ar, light }) {
-  const open = openNow(store.hours);
-  if (open === null) return null;
-  const h = store.hours;
-  const text = open
-    ? (ar ? `مفتوح${h?.close ? ` · لحد ${fmtTime(h.close, ar)}` : ''}` : `Open${h?.close ? ` · until ${fmtTime(h.close, ar)}` : ''}`)
-    : (ar ? `مقفول${h?.open ? ` · بنفتح ${fmtTime(h.open, ar)}` : ''}` : `Closed${h?.open ? ` · opens ${fmtTime(h.open, ar)}` : ''}`);
-  const cord = light ? 'bg-black/30' : 'bg-white/45';
-  return (
-    <div className="relative mt-4 inline-block pt-3">
-      <span className={`absolute start-5 top-0 h-3 w-px ${cord}`} />
-      <span className={`absolute end-5 top-0 h-3 w-px ${cord}`} />
-      <span className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[14px] font-bold shadow-md ring-1 ${open ? 'bg-emerald-700 text-white ring-emerald-300' : 'bg-red-700 text-white ring-red-300'}`}>
-        <span className="relative flex h-2 w-2">
-          {open && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/80" />}
-          <span className="relative inline-flex h-2 w-2 rounded-full bg-white" />
-        </span>
-        {text}
-      </span>
-    </div>
-  );
-}
 
 /** Category "stories" — one tap from the storefront to a section. */
 function CategoryStories() {
@@ -93,22 +62,13 @@ function CategoryStories() {
 
 /** Rating + address chips and the action buttons, shared by both hero styles. */
 function Actions({ store, ar, tone }) {
-  const { tr } = useI18n();
-  const maps = mapsLinks(store, tr(store.address));
   const Arrow = ar ? ArrowLeft : ArrowRight;
-  const wa = waNumber(store.whatsapp);
-  const hasAddress = Boolean(tr(store.address));
   const primary = tone === 'card' ? 'bg-btn text-on-btn hover:brightness-110' : tone === 'light' ? 'bg-neutral-900 text-white hover:bg-neutral-800' : 'bg-white text-neutral-900 hover:bg-white/90';
-  const ghost = tone === 'card' ? 'bg-transparent text-fg ring-line-strong hover:bg-fg/[0.04]' : tone === 'light' ? 'bg-black/[0.06] text-neutral-900 ring-black/15 hover:bg-black/10' : 'bg-white/10 text-white ring-white/25 hover:bg-white/20';
-  const ghostCls = `inline-flex h-12 items-center justify-center gap-2 rounded-full px-3 text-[14px] font-semibold ring-1 backdrop-blur transition active:scale-[.97] sm:px-5 ${ghost}`;
   return (
-    <div className="mt-6 grid grid-cols-3 gap-2.5 sm:flex sm:flex-wrap sm:gap-3 lg:justify-start sm:justify-center">
-      <Link to={sp(store.slug, 'shop')} className={`group col-span-3 inline-flex h-12 items-center justify-center gap-2 rounded-full px-8 text-[15px] font-bold shadow-lg transition active:scale-[.98] sm:col-span-1 ${primary}`}>
+    <div className="mt-6 flex justify-center lg:justify-start">
+      <Link to={sp(store.slug, 'shop')} className={`group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full px-8 text-[15px] font-bold shadow-lg transition active:scale-[.98] sm:w-auto ${primary}`}>
         {ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4 transition group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5" />
       </Link>
-      {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className={ghostCls}><MessageCircle className="h-4 w-4" />{ar ? 'واتساب' : 'WhatsApp'}</a>}
-      {hasAddress && <a href={maps.open} target="_blank" rel="noreferrer" className={ghostCls}><Navigation className="h-4 w-4" />{ar ? 'اللوكيشن' : 'Location'}</a>}
-      {store.phone && <a href={`tel:${String(store.phone).replace(/\s/g, '')}`} className={ghostCls}><Phone className="h-4 w-4" />{ar ? 'اتصال' : 'Call'}</a>}
     </div>
   );
 }
@@ -176,7 +136,6 @@ function FacadeHero() {
             <h1 className={`font-display text-[32px] font-bold leading-tight sm:text-5xl lg:text-6xl ${light ? '!text-neutral-900' : '!text-white'}`}>{tr(store.name)}</h1>
           </div>
           {tr(store.tagline) && <p className={`mx-auto mt-2 max-w-xl text-base sm:text-lg lg:mx-0 ${light ? 'text-neutral-700' : 'text-white/80'}`}>{tr(store.tagline)}</p>}
-          <DoorSign store={store} ar={ar} light={light} />
           <Meta store={store} ar={ar} tone={tone} />
           <Actions store={store} ar={ar} tone={tone} />
         </motion.div>
@@ -207,28 +166,14 @@ function CoverArt({ media, fit }) {
 /** Phones: slim identity strip laid over the bottom of the cover. */
 function PhoneStrip({ store, ar }) {
   const { tr } = useI18n();
-  const maps = mapsLinks(store, tr(store.address));
-  const wa = waNumber(store.whatsapp);
-  const open = openNow(store.hours);
-  const h = store.hours;
-  const status = open === null ? null : open ? (ar ? `مفتوح${h?.close ? ` · لحد ${fmtTime(h.close, ar)}` : ''}` : `Open${h?.close ? ` · until ${fmtTime(h.close, ar)}` : ''}`) : (ar ? `مقفول${h?.open ? ` · بنفتح ${fmtTime(h.open, ar)}` : ''}` : `Closed${h?.open ? ` · opens ${fmtTime(h.open, ar)}` : ''}`);
   const Arrow = ar ? ArrowLeft : ArrowRight;
-  const round = 'grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/15 text-white ring-1 ring-white/30 backdrop-blur transition active:scale-95';
   return (
     <div className="absolute inset-x-0 bottom-0 px-4 pb-4 pt-20 lg:hidden" style={{ background: 'linear-gradient(to top, rgba(0,0,0,.78) 0%, rgba(0,0,0,.4) 55%, rgba(0,0,0,0) 100%)' }}>
       <div className="flex items-center gap-2.5">
         {store.logo && <span className="shrink-0 rounded-full bg-white p-[2px] shadow-md"><StoreLogo store={store} size={40} className="h-10 w-10" /></span>}
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate font-display text-[24px] font-bold leading-tight !text-white drop-shadow">{tr(store.name)}</h1>
-          {status && <p className="mt-0.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-white/95"><span className={`h-2 w-2 rounded-full ${open ? 'bg-emerald-400' : 'bg-red-400'}`} />{status}</p>}
-        </div>
+        <h1 className="min-w-0 flex-1 truncate font-display text-[24px] font-bold leading-tight !text-white drop-shadow">{tr(store.name)}</h1>
       </div>
-      <div className="mt-3 flex items-center gap-2">
-        <Link to={sp(store.slug, 'shop')} className="inline-flex h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-full bg-white px-4 text-[15px] font-bold text-neutral-900 shadow-lg transition active:scale-[.98]">{ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4" /></Link>
-        {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" aria-label={ar ? 'واتساب' : 'WhatsApp'} className={round}><MessageCircle className="h-5 w-5" /></a>}
-        {tr(store.address) && <a href={maps.open} target="_blank" rel="noreferrer" aria-label={ar ? 'اللوكيشن' : 'Location'} className={round}><Navigation className="h-5 w-5" /></a>}
-        {store.phone && <a href={`tel:${String(store.phone).replace(/\s/g, '')}`} aria-label={ar ? 'اتصال' : 'Call'} className={round}><Phone className="h-5 w-5" /></a>}
-      </div>
+      <Link to={sp(store.slug, 'shop')} className="mt-3 inline-flex h-11 w-full items-center justify-center gap-2 rounded-full bg-white px-4 text-[15px] font-bold text-neutral-900 shadow-lg transition active:scale-[.98]">{ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4" /></Link>
     </div>
   );
 }
@@ -261,7 +206,6 @@ function PortraitHero() {
           <h1 className={`font-display text-5xl font-bold leading-tight ${light ? '!text-neutral-900' : '!text-white'}`}>{tr(store.name)}</h1>
         </div>
         {tr(store.tagline) && <p className={`mt-2 max-w-xl text-lg ${light ? 'text-neutral-700' : 'text-white/80'}`}>{tr(store.tagline)}</p>}
-        <DoorSign store={store} ar={ar} light={light} />
         <Meta store={store} ar={ar} tone={tone} />
         <Actions store={store} ar={ar} tone={tone} />
       </motion.div>
@@ -298,7 +242,6 @@ function BannerHero() {
             </div>
           </div>
           <div className="text-center lg:text-start">
-            <DoorSign store={store} ar={ar} light />
             <Meta store={store} ar={ar} tone="card" />
             <Actions store={store} ar={ar} tone="card" />
           </div>
@@ -331,8 +274,6 @@ export function StoreIdentityBar() {
   const { store } = useStore();
   const { tr, lang } = useI18n();
   const ar = lang === 'ar';
-  const open = openNow(store.hours);
-  const maps = mapsLinks(store, tr(store.address));
   const Arrow = ar ? ArrowLeft : ArrowRight;
   return (
     <motion.section initial={{ y: 12 }} animate={{ y: 0 }} transition={{ duration: 0.7, delay: 0.2, ease }}
@@ -345,11 +286,6 @@ export function StoreIdentityBar() {
             <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
               {tr(store.tagline) && <span className="truncate">{tr(store.tagline)}</span>}
               {store.rating && store.ratingCount > 0 ? <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />{store.rating} ({store.ratingCount})</span> : null}
-              {open !== null && (
-                <span className={`inline-flex items-center gap-1.5 font-semibold ${open ? 'text-emerald-700' : 'text-red-600'}`}>
-                  <span className={`h-1.5 w-1.5 rounded-full ${open ? 'bg-emerald-500' : 'bg-red-500'}`} />{open ? (ar ? 'مفتوح دلوقتي' : 'Open now') : (ar ? 'مقفول دلوقتي' : 'Closed now')}
-                </span>
-              )}
             </div>
           </div>
         </div>
@@ -357,11 +293,6 @@ export function StoreIdentityBar() {
           <Link to={sp(store.slug, 'shop')} className="inline-flex items-center gap-2 rounded-full bg-btn px-5 py-2.5 text-[14px] font-semibold text-on-btn">
             {ar ? 'تسوّق الكولكشن' : 'Shop the collection'}<Arrow className="h-4 w-4" />
           </Link>
-          {tr(store.address) && (
-            <a href={maps.open} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full px-4 py-2.5 text-[14px] font-semibold ring-1 ring-line hover:bg-fg/[0.04]">
-              <Navigation className="h-4 w-4" />{ar ? 'اللوكيشن' : 'Location'}
-            </a>
-          )}
         </div>
       </div>
     </motion.section>

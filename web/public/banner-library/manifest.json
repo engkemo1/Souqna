@@ -1,0 +1,149 @@
+{
+ "types": {
+  "women": {
+   "ar": "حريمي",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.78,
+     "tone": "light",
+     "bg": "#FFFFFF"
+    },
+    {
+     "file": "2.jpg",
+     "fx": 0.66,
+     "tone": "light",
+     "bg": "#F3F3F1"
+    }
+   ]
+  },
+  "men": {
+   "ar": "رجالي",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.8,
+     "tone": "light",
+     "bg": "#FFFFFF"
+    },
+    {
+     "file": "2.jpg",
+     "fx": 0.69,
+     "tone": "light",
+     "bg": "#F0F0F0"
+    }
+   ]
+  },
+  "kids": {
+   "ar": "أطفال",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.75,
+     "tone": "light",
+     "bg": "#FFFFFF"
+    }
+   ]
+  },
+  "modest": {
+   "ar": "محجبات",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.72,
+     "tone": "light",
+     "bg": "#F4F4F4"
+    },
+    {
+     "file": "2.jpg",
+     "fx": 0.76,
+     "tone": "light",
+     "bg": "#F5F5F5"
+    }
+   ]
+  },
+  "baby": {
+   "ar": "مواليد",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.74,
+     "tone": "light",
+     "bg": "#F7F8FA"
+    }
+   ]
+  },
+  "shoes": {
+   "ar": "أحذية",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.71,
+     "tone": "light",
+     "bg": "#F4F4F4"
+    }
+   ]
+  },
+  "perfume": {
+   "ar": "عطور",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.76,
+     "tone": "light",
+     "bg": "#F3F6F4"
+    },
+    {
+     "file": "2.jpg",
+     "fx": 0.72,
+     "tone": "light",
+     "bg": "#F4F4F4"
+    }
+   ]
+  },
+  "sport": {
+   "ar": "رياضة",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.74,
+     "tone": "light",
+     "bg": "#F4F4F4"
+    }
+   ]
+  },
+  "accessories": {
+   "ar": "إكسسوارات",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.75,
+     "tone": "light",
+     "bg": "#F7F7F9"
+    }
+   ]
+  },
+  "uniforms": {
+   "ar": "يونيفورم",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.71,
+     "tone": "light",
+     "bg": "#FAFAF8"
+    }
+   ]
+  },
+  "general": {
+   "ar": "عام",
+   "files": [
+    {
+     "file": "1.jpg",
+     "fx": 0.55,
+     "tone": "light",
+     "bg": "#FFFFFF"
+    }
+   ]
+  }
+ }
+}

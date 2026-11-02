@@ -2,7 +2,7 @@ import { motion } from 'framer-motion';
 import { MapPin, Phone, MessageCircle, Navigation, Clock } from 'lucide-react';
 import { useStore } from '../../lib/store.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
-import { DAYS_AR, DAYS_EN, fmtTime, openNow, waNumber } from '../../lib/storeInfo.js';
+import { openNow, upcomingHolidays, waNumber, weekRows } from '../../lib/storeInfo.js';
 
 /** Where to find the store: address, call, WhatsApp, and one tap to open the location in Google Maps. */
 export function mapsLinks(store, address) {
@@ -61,13 +61,23 @@ export default function VisitCard() {
             {store.hours && (
               <div className={row}>
                 <Clock className="mt-0.5 h-5 w-5 shrink-0 text-accent" />
-                <span>
-                  <span className="block text-[13px] opacity-60">{ar ? 'المواعيد' : 'Hours'}</span>
-                  <span className="text-[16px]">{ar ? 'من' : ''} {fmtTime(store.hours.open, ar)} {ar ? 'لـ' : '–'} {fmtTime(store.hours.close, ar)}</span>
-                  <span className={`ms-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${open ? 'bg-emerald-400/15 text-emerald-300' : 'bg-red-400/15 text-red-300'}`}>
-                    <span className={`h-1.5 w-1.5 rounded-full ${open ? 'bg-emerald-400' : 'bg-red-400'}`} />{open ? (ar ? 'مفتوح دلوقتي' : 'Open now') : (ar ? 'مقفول دلوقتي' : 'Closed now')}
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[13px] opacity-60">{ar ? 'المواعيد' : 'Hours'}
+                    <span className={`ms-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-bold ${open ? 'bg-emerald-400/15 text-emerald-300' : 'bg-red-400/15 text-red-300'}`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${open ? 'bg-emerald-400' : 'bg-red-400'}`} />{open ? (ar ? 'مفتوح دلوقتي' : 'Open now') : (ar ? 'مقفول دلوقتي' : 'Closed now')}
+                    </span>
                   </span>
-                  {store.hours.dayOff !== null && <span className="mt-1 block text-[13px] opacity-60">{ar ? `إجازة يوم ${DAYS_AR[store.hours.dayOff]}` : `Closed on ${DAYS_EN[store.hours.dayOff]}`}</span>}
+                  <span className="mt-2 block space-y-1" data-testid="visit-week">
+                    {weekRows(store.hours, ar).map((d) => (
+                      <span key={d.day} className={`flex items-baseline justify-between gap-4 text-[15px] ${d.today ? 'font-bold' : 'opacity-80'}`}>
+                        <span>{d.name}{d.today ? ` · ${ar ? 'النهاردة' : 'today'}` : ''}</span>
+                        <span dir="auto" className={d.closed ? 'opacity-70' : ''}>{d.closed ? (ar ? 'إجازة' : 'Closed') : d.text}</span>
+                      </span>
+                    ))}
+                  </span>
+                  {upcomingHolidays(store.hours).map((h) => (
+                    <span key={`${h.from}-${h.to}`} className="mt-1 block text-[13px] text-amber-300/90">{ar ? 'إجازة' : 'Holiday'}: {h.from === h.to ? h.from : `${h.from} → ${h.to}`}{h.note ? ` · ${h.note}` : ''}</span>
+                  ))}
                 </span>
               </div>
             )}

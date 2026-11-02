@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS stores (
   delivery_zone TEXT NOT NULL DEFAULT '',
   search_indexable INTEGER NOT NULL DEFAULT 1,
   map_url TEXT,
-  opens_at TEXT, closes_at TEXT, day_off INTEGER,
+  opens_at TEXT, closes_at TEXT, day_off INTEGER, hours_json TEXT,
   hero_mode TEXT NOT NULL DEFAULT 'auto',
   logo_media_id INTEGER, cover_media_id INTEGER,
   logo_initials TEXT NOT NULL DEFAULT '', logo_color TEXT NOT NULL DEFAULT '#1B1B1B',

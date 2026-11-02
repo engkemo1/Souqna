@@ -242,3 +242,19 @@ export function createScanBuffer({ gapMs = 60, minLength = 4 } = {}) {
     reset() { buf = ''; },
   };
 }
+
+/** A continuous camera scan should add a held barcode once, until the reader has lost it for several frames. */
+export function createCameraScanGate({ missesToRearm = 12 } = {}) {
+  let lastCode = '';
+  let misses = 0;
+  return (code) => {
+    if (!code) {
+      if (lastCode && ++misses >= missesToRearm) { lastCode = ''; misses = 0; }
+      return false;
+    }
+    misses = 0;
+    if (code === lastCode) return false;
+    lastCode = code;
+    return true;
+  };
+}

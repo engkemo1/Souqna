@@ -106,6 +106,8 @@ test('the same cash movement sent twice is recorded once', () => {
   const again = pos.addCashMovement(storeId, shift.id, { kind: 'out', amount: 500, reason: 'مصاريف', uuid: 'mv-1-abcdef' });
   assert.equal(again.duplicate, true);
   assert.equal(pos.readShift(storeId, shift.id).cashOut, 500);
+  assert.throws(() => pos.addCashMovement(storeId, shift.id, { kind: 'out', amount: 50, reason: 'مصاريف', uuid: 'mv-1-abcdef' }), (e) => e.code === 'movement_key_reused');
+  assert.equal(pos.readShift(storeId, shift.id).cashOut, 500);
 });
 
 test('day reports follow Cairo clock changes (23 and 25 hour days)', () => {

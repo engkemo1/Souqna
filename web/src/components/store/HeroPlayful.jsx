@@ -1,21 +1,13 @@
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, MessageCircle, Phone, Sparkles, Star, Heart } from 'lucide-react';
-import { waNumber } from '@souqna/shared/layout';
+import { ArrowLeft, ArrowRight, Sparkles, Star, Heart } from 'lucide-react';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import SmartImage from '../ui/SmartImage.jsx';
 import { StoreLogo } from './StoreChrome.jsx';
-import { openNow } from './VisitCard.jsx';
 import { KID_TINTS } from '../../lib/design.js';
 
 const ease = [0.22, 1, 0.36, 1];
-const fmtTime = (hm, ar) => {
-  let [h, m] = String(hm).split(':').map(Number);
-  const pm = h >= 12; h = h % 12 || 12;
-  const mm = m ? `:${String(m).padStart(2, '0')}` : '';
-  return ar ? `${h}${mm} ${pm ? 'م' : 'ص'}` : `${h}${mm} ${pm ? 'PM' : 'AM'}`;
-};
 
 /** A soft, hand-drawn looking blob (pure SVG, no image files). */
 const Blob = ({ className, color, d }) => (
@@ -57,12 +49,6 @@ export function HeroPlayful({ banners = [] }) {
   const ar = lang === 'ar';
   const Arrow = ar ? ArrowLeft : ArrowRight;
   const image = store.cover || banners[0]?.image || null;
-  const wa = waNumber(store.whatsapp);
-  const open = openNow(store.hours);
-  const h = store.hours;
-  const sign = open === null ? null : open
-    ? (ar ? `مفتوحين دلوقتي${h?.close ? ` · لحد ${fmtTime(h.close, ar)}` : ''}` : `Open now${h?.close ? ` · until ${fmtTime(h.close, ar)}` : ''}`)
-    : (ar ? `مقفولين${h?.open ? ` · بنفتح ${fmtTime(h.open, ar)}` : ''}` : `Closed${h?.open ? ` · opens ${fmtTime(h.open, ar)}` : ''}`);
   const pill = 'inline-flex h-12 items-center justify-center gap-2 rounded-full px-5 text-[15px] font-bold transition active:scale-[.96]';
   return (
     <section className="kid-hero relative isolate overflow-hidden bg-secondary text-fg">
@@ -84,18 +70,10 @@ export function HeroPlayful({ banners = [] }) {
             </span>
           </h1>
           <p className="mx-auto mt-6 max-w-md text-base font-medium opacity-80 sm:text-lg md:mx-0">{tr(store.tagline) || (ar ? 'لبس مريح وألوان تفرّح، لكل الأعمار' : 'Comfy clothes and happy colours for every age')}</p>
-          {sign && (
-            <span className={`mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13.5px] font-bold text-white shadow-md ${open ? 'bg-emerald-700' : 'bg-rose-700'}`}>
-              <span className="relative flex h-2 w-2">{open && <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white/80" />}<span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
-              {sign}
-            </span>
-          )}
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3 md:justify-start">
             <Link to={sp(store.slug, 'shop')} className={`${pill} kid-pop bg-primary px-7 text-on-primary shadow-[0_6px_0_rgba(0,0,0,0.18)] hover:-translate-y-0.5`}>
               {ar ? 'يلا نتسوّق' : "Let's shop"}<Arrow className="h-4 w-4" />
             </Link>
-            {wa && <a href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer" className={`${pill} bg-white text-neutral-900 shadow-sm ring-1 ring-black/5 hover:-translate-y-0.5`}><MessageCircle className="h-4 w-4 text-emerald-600" />{ar ? 'واتساب' : 'WhatsApp'}</a>}
-            {store.phone && <a href={`tel:${String(store.phone).replace(/\s/g, '')}`} className={`${pill} bg-white text-neutral-900 shadow-sm ring-1 ring-black/5 hover:-translate-y-0.5`}><Phone className="h-4 w-4 text-sky-600" />{ar ? 'اتصال' : 'Call'}</a>}
           </div>
         </motion.div>
 

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createCameraScanGate } from '../../lib/pos/engine.js';
 
 /** Stops the camera for sure: the library's controls, and every track on the video element (light goes off). */
 function stopVideo(video) {
@@ -10,9 +11,10 @@ function stopVideo(video) {
 /**
  * Live barcode scanning with the device camera (@zxing/browser, bundled — no CDN).
  * `onCode(text)` is called for each new code; `continuous` keeps scanning (the phone used as a scanner), otherwise the
- * camera stops after the first code. The same code is not reported twice within `repeatMs`.
+ * camera stops after the first code. Continuous scanning requires the previous code to leave the frame before it can
+ * be read again, so holding a product under the camera cannot add it repeatedly by accident.
  */
-export default function CameraScanner({ onCode, continuous = false, repeatMs = 1500, className = '' }) {
+export default function CameraScanner({ onCode, continuous = false, className = '' }) {
   const videoRef = useRef(null);
   const onCodeRef = useRef(onCode);
   onCodeRef.current = onCode; // a new callback (the product list changed) must not restart the camera
@@ -21,7 +23,7 @@ export default function CameraScanner({ onCode, continuous = false, repeatMs = 1
   useEffect(() => {
     let stopped = false;
     let controls = null;
-    const last = { code: '', at: 0 };
+    const gate = createCameraScanGate();
     const stopAll = () => { stopped = true; try { controls?.stop(); } catch { /* already stopped */ } stopVideo(videoRef.current); };
     (async () => {
       try {
@@ -33,11 +35,10 @@ export default function CameraScanner({ onCode, continuous = false, repeatMs = 1
           { audio: false, video: { facingMode: { ideal: 'environment' } } },
           videoRef.current,
           (result) => {
-            if (!result || stopped) return;
+            if (stopped) return;
+            if (!result) { if (continuous) gate(null); return; }
             const code = result.getText();
-            const now = Date.now();
-            if (code === last.code && now - last.at < repeatMs) return;
-            last.code = code; last.at = now;
+            if (!gate(code)) return;
             if (!continuous) stopAll();
             onCodeRef.current?.(code);
           },
@@ -57,7 +58,7 @@ export default function CameraScanner({ onCode, continuous = false, repeatMs = 1
     const onHide = () => { if (document.visibilityState === 'hidden') stopAll(); };
     document.addEventListener('visibilitychange', onHide);
     return () => { document.removeEventListener('visibilitychange', onHide); stopAll(); };
-  }, [continuous, repeatMs]);
+  }, [continuous]);
   return (
     <div className={className}>
       <div className="overflow-hidden rounded-2xl bg-black"><video ref={videoRef} className="aspect-[4/3] w-full object-cover" muted playsInline autoPlay /></div>

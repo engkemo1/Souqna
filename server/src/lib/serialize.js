@@ -4,6 +4,7 @@ import { SEASONS, BADGE_TONES } from '@souqna/shared/layout';
 import { q, json } from '../db/index.js';
 import { mediaMap, getMedia, serializeMedia } from './media.js';
 import { sameDayActive, cairoNow } from './sameDay.js';
+import { storeHours } from './hours.js';
 
 export const bi = (row, field) => ({ ar: row[`${field}_ar`] ?? '', en: row[`${field}_en`] ?? '' });
 
@@ -36,7 +37,7 @@ export function serializeStore(s, { withTheme = true } = {}) {
     lng: s.lng ?? null,
     heroMode: s.hero_mode || 'auto',
     photoStyle: s.photo_style || 'white',
-    hours: s.opens_at && s.closes_at ? { open: s.opens_at, close: s.closes_at, dayOff: s.day_off ?? null } : null,
+    hours: storeHours(s),
     instagram: s.instagram,
     facebook: s.facebook,
     logo: media.get(s.logo_media_id) || null,

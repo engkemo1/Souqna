@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Reorder, useDragControls } from 'framer-motion';
-import { Plus, Images, Pencil, Trash2, GripVertical, Monitor, Smartphone } from 'lucide-react';
+import { Plus, Images, Pencil, Trash2, GripVertical, Monitor, Smartphone, Wand2 } from 'lucide-react';
 import { useApi, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -18,6 +18,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { BANNER_FONTS, bannerFontFamily, loadBannerFont, readableOn } from '../../lib/bannerFonts.js';
+import BannerStudio from './BannerStudio.jsx';
 
 const FIXED_RATIO = { short: [4 / 3, 3.6], normal: [4 / 5, 2.4], tall: [1, 1.85] };
 const previewRatio = (f, img, device) => {
@@ -194,13 +195,14 @@ function Row({ b, onEdit, onDelete, onToggle, onDragEnd, t, tr }) {
 }
 
 export default function Banners() {
-  const { t, tr } = useI18n();
+  const { t, tr, lang } = useI18n();
   const { store } = useAuth();
   const toast = useToast();
   const { data, error, reload, mutate } = useApi('/owner/banners');
   const { data: cats } = useApi('/owner/categories');
   const [form, setForm] = useState({ open: false, banner: null });
   const [del, setDel] = useState(null);
+  const [studio, setStudio] = useState(false);
   const items = data?.items || [];
   const itemsRef = useRef(items);
   itemsRef.current = items;
@@ -223,9 +225,9 @@ export default function Banners() {
 
   return (
     <PageTransition>
-      <PageHeader title={t('banners.title')} subtitle={t('banners.modes')} actions={<Button icon={Plus} onClick={() => setForm({ open: true, banner: null })}>{t('banners.new')}</Button>} />
+      <PageHeader title={t('banners.title')} subtitle={t('banners.modes')} actions={<div className="flex flex-wrap gap-2"><Button variant="secondary" icon={Wand2} onClick={() => setStudio(true)}>{lang === 'ar' ? 'استوديو البانرات' : 'Banner studio'}</Button><Button icon={Plus} onClick={() => setForm({ open: true, banner: null })}>{t('banners.new')}</Button></div>} />
       {error ? <ErrorState error={error} onRetry={reload} /> : !data ? <ListSkeleton rows={3} /> : !items.length ? (
-        <EmptyState icon={Images} title={t('banners.empty')} body={t('banners.emptyBody')} action={<Button icon={Plus} onClick={() => setForm({ open: true, banner: null })}>{t('banners.new')}</Button>} />
+        <EmptyState icon={Images} title={t('banners.empty')} body={t('banners.emptyBody')} action={<div className="flex flex-wrap justify-center gap-2"><Button icon={Wand2} onClick={() => setStudio(true)}>{lang === 'ar' ? 'استوديو البانرات' : 'Banner studio'}</Button><Button variant="secondary" icon={Plus} onClick={() => setForm({ open: true, banner: null })}>{t('banners.new')}</Button></div>} />
       ) : (
         <Reorder.Group axis="y" values={items} onReorder={(list) => mutate({ items: list })} className="space-y-3">
           {items.map((b) => (
@@ -233,6 +235,7 @@ export default function Banners() {
           ))}
         </Reorder.Group>
       )}
+      <BannerStudio open={studio} onClose={() => setStudio(false)} onCreated={refresh} />
       <BannerForm open={form.open} banner={form.banner} categories={cats?.items || []} onClose={() => setForm({ open: false, banner: null })} onSaved={refresh} />
       <ConfirmDialog open={!!del} onClose={() => setDel(null)} onConfirm={remove} danger title={t('common.delete')} body={del ? tr(del.title) : ''} confirmLabel={t('common.delete')} />
     </PageTransition>

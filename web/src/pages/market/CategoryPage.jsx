@@ -64,7 +64,11 @@ export default function CategoryPage() {
     try { const r = await api(`/search?${key}&page=${page + 1}`); setMore({ key, items: [...(more.key === key ? more.items : []), ...r.items], page: page + 1 }); } catch { /* ignore */ }
     setBusy(false);
   };
-  const circles = [...children].filter((c) => c.product_count > 0).sort((x, y) => x.level - y.level); // only sections that actually have products
+  // sections that actually have products; on a leaf page keep showing its siblings (the current one highlighted) so the row works as a filter
+  const own = children.filter((c) => c.product_count > 0);
+  const sibs = (data?.siblings || []).filter((c) => c.product_count > 0);
+  const circles = [...(own.length ? own : sibs)].sort((x, y) => x.level - y.level);
+  const parentSlug = trail.length > 1 ? trail[trail.length - 2].slug : '';
   const desc = dept?.description?.[lang] || dept?.description?.ar || '';
 
   return (
@@ -93,7 +97,7 @@ export default function CategoryPage() {
             </section>
 
             <div className="container py-6 sm:py-8">
-              {circles.length > 0 && <section aria-label={lang === 'ar' ? 'الأقسام' : 'Sections'} className="mb-6"><CircleRail items={circles} label={lang === 'ar' ? 'الأقسام' : 'Sections'} /></section>}
+              {circles.length > 0 && <section aria-label={lang === 'ar' ? 'الأقسام' : 'Sections'} className="mb-6"><CircleRail items={circles} active={own.length ? '' : slug} backTo={parentSlug ? `/c/${parentSlug}` : undefined} label={lang === 'ar' ? 'الأقسام' : 'Sections'} /></section>}
 
               <section aria-label={lang === 'ar' ? 'المنتجات' : 'Products'}>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">

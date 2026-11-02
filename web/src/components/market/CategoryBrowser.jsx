@@ -56,7 +56,7 @@ export default function CategoryBrowser({ value, onChange }) {
       <div className="-mx-4 overflow-x-auto px-4 pb-2 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden" role="tablist" aria-label={t('settings.category')}>
         <div className="flex min-w-max snap-x gap-4 sm:min-w-0 sm:flex-wrap sm:gap-x-6 sm:gap-y-5">
           <button type="button" role="tab" aria-selected={value === 'all'} onClick={() => select('all')} className="group flex w-[78px] shrink-0 snap-start flex-col items-center gap-2 text-center sm:w-[100px]">
-            <span className={cx('grid h-[68px] w-[68px] place-items-center rounded-full bg-btn text-2xl text-on-btn transition sm:h-[84px] sm:w-[84px]', value === 'all' ? 'ring-[3px] ring-brand ring-offset-2' : 'opacity-90 group-hover:-translate-y-1')} aria-hidden="true">🛍️</span>
+            <span className={cx('block h-[68px] w-[68px] overflow-hidden rounded-full bg-white shadow-sm ring-1 ring-black/5 transition sm:h-[84px] sm:w-[84px]', value === 'all' ? 'ring-[3px] ring-brand ring-offset-2' : 'opacity-90 group-hover:-translate-y-1')} aria-hidden="true"><img src="/all-stores.webp" alt="" width="84" height="84" loading="lazy" draggable="false" className="h-full w-full scale-110 object-cover" /></span>
             <span className={cx('text-[13px] font-bold leading-tight', value === 'all' ? 'text-brand' : 'text-fg')}>{t('cat.all')}</span>
           </button>
           {tops.map((d) => {

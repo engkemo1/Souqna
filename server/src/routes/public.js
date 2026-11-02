@@ -28,6 +28,7 @@ import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
 import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, getPlatformFreeShipping } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
+import { storeHours } from '../lib/hours.js';
 import { sendNewOrderAlert, notifyPlatformAlert } from '../lib/whatsapp.js';
 import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
 import { waAuthReady } from '../lib/wa.js';
@@ -68,7 +69,9 @@ r.get('/departments/:slug', h((req, res) => {
   if (!visible.has(d.slug)) throw new AppError(404, 'not_found', 'Section not found.');
   const crumbs = []; for (let c = d, i = 0; c && i < 10; c = by.get(c.parent), i++) crumbs.unshift({ slug: c.slug, name: c.name });
   cache(res, 60);
-  res.json({ department: publicDept(d), canonical: d.slug, redirected_from: redirectedFrom, breadcrumb: crumbs, children: all.filter((x) => x.parent === d.slug && visible.has(x.slug)).map(publicDept) });
+  res.json({ department: publicDept(d), canonical: d.slug, redirected_from: redirectedFrom, breadcrumb: crumbs, children: all.filter((x) => x.parent === d.slug && visible.has(x.slug)).map(publicDept),
+    // the other sections under the same parent, so a leaf page can keep showing its siblings as the filter row
+    siblings: d.parent ? all.filter((x) => x.parent === d.parent && visible.has(x.slug)).map(publicDept) : [] });
 }));
 
 r.get('/homepage-ads', h((_req, res) => {
@@ -988,7 +991,7 @@ r.post('/stores/:slug/reserve', h((req, res) => {
   res.status(201).json({
     reservation: result,
     store: { name: bi(s, 'name'), address: bi(s, 'address'), phone: s.phone || null, whatsapp: s.whatsapp || null, mapUrl: s.map_url || null, lat: s.lat ?? null, lng: s.lng ?? null,
-      hours: s.opens_at && s.closes_at ? { open: s.opens_at, close: s.closes_at, dayOff: s.day_off ?? null } : null },
+      hours: storeHours(s) },
   });
 }));
 

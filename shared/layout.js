@@ -24,6 +24,12 @@ export const TEMPLATES = {
     hero: 'auto', card: 'round', cat: 'tiles', grid: 'cozy', type: 'normal', preset: null,
     sections: ['hero', 'free_shipping', 'trust', 'new_arrivals', 'categories', 'best_sellers', 'offers', 'on_sale', 'story', 'visit'],
   },
+  banner_card: {
+    ar: 'بنر وكارت الهوية', en: 'Banner + identity card',
+    desc_ar: 'بنر عريض بعرض الصفحة وفوقه كارت فيه اللوجو والاسم وزر التسوّق، وتحته دواير التصنيفات. مناسب لأي محل عنده بنر حلو.', desc_en: 'A full-width banner with a floating card (logo, name, shop button) and circular categories underneath.',
+    hero: 'cover', card: 'round', cat: 'circles', grid: 'cozy', type: 'normal', preset: null,
+    sections: ['hero', 'free_shipping', 'trust', 'new_arrivals', 'categories', 'best_sellers', 'offers', 'on_sale', 'story', 'visit'],
+  },
   storefront: {
     ar: 'واجهة المحل (صورة كاملة)', en: 'Storefront (full picture)',
     desc_ar: 'صورة الغلاف كاملة بدون قص، والاسم والأزرار فوقها على الموبايل وجنبها على الكمبيوتر. للمحلات اللي صورتها واجهة المحل أو صورة طولية.', desc_en: 'The whole cover picture, uncropped; name and buttons over it on phones and beside it on desktop.',

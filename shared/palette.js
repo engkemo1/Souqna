@@ -57,7 +57,8 @@ export function classify(swatches = []) {
   }
   // The family's representative is its most "alive" tone: saturated, and light enough to read as the colour
   // (so a gold gradient picks the gold, not the near-black shadow of it).
-  const rep = (f) => [...f.members].sort((x, y) => y.s * (0.5 + Math.min(y.l, 0.7)) - x.s * (0.5 + Math.min(x.l, 0.7)))[0];
+  const alive = (m) => m.s * (0.5 + Math.min(m.l, 0.7)) * (1 - Math.max(0, m.l - 0.7) * 4); // very pale highlights of a gradient don't count as the colour
+  const rep = (f) => [...f.members].sort((x, y) => alive(y) - alive(x))[0];
   const chromatic = families.map((f) => ({ ...rep(f), pop: f.pop }));
   const score = (c) => Math.sqrt(c.pop) * c.s * (1 - Math.abs(c.l - 0.5) * 0.7);
   chromatic.sort((x, y) => score(y) - score(x));
@@ -78,20 +79,23 @@ export function suggestThemes(swatches) {
     const b = chromatic[0];
     brand = { h: b.h, s: b.s, l: b.l };
     const second = chromatic.slice(1).find((s) => hueGap(s.h, b.h) >= 35 && score(s) >= score(b) * 0.2);
-    // single-colour logo: a richer sibling of the brand (same hue, never drifting into olive / lime)
-    accent = second ? { h: second.h, s: second.s, l: second.l } : { h: b.h, s: clamp(b.s + 0.2, 0.55, 0.92), l: 0.5 };
+    // single-colour logo: a deeper shade of the SAME colour (same hue, saturation capped so a pastel never turns into a neon)
+    accent = second ? { h: second.h, s: second.s, l: second.l } : { h: b.h, s: clamp(b.s * (b.l > 0.6 ? 0.7 : 1), 0.4, 0.65), l: 0.5 };
   }
   const brandHex = monochrome ? '#111111' : fromHsl(brand);
 
   // light variant ---------------------------------------------------------------
   const deep = monochrome ? '#111111' : fromHsl({ h: brand.h, s: clamp(brand.s, 0.3, 0.9), l: clamp(brand.l, 0.22, 0.42) });
+  // a mid / pale logo colour (salmon, orange, sky, gold ...) stays itself on the buttons and brand surfaces; the engine picks a readable
+  // text colour on it and darkens only the colour used as TEXT (primaryInk). Dark logo colours keep the deep shade as before.
+  const faithful = monochrome || brand.l <= 0.42 ? deep : fromHsl({ h: brand.h, s: clamp(brand.s, 0.3, 0.95), l: clamp(brand.l, 0.42, 0.8) });
   const lightInput = {
-    primary: deep,
+    primary: faithful,
     secondary: monochrome ? '#F3F1EC' : fromHsl({ h: brand.h, s: clamp(brand.s, 0.2, 0.6), l: 0.95 }),
     accent: accent ? fromHsl({ h: accent.h, s: clamp(accent.s, 0.45, 0.9), l: clamp(accent.l, 0.38, 0.52) }) : '#C2410C',
     background: '#FFFFFF',
     text: monochrome ? '#141414' : fromHsl({ h: brand.h, s: 0.25, l: 0.09 }),
-    button: deep,
+    button: faithful,
     header: '#FFFFFF',
     footer: monochrome ? '#111111' : fromHsl({ h: brand.h, s: clamp(brand.s, 0.25, 0.6), l: 0.11 }),
   };

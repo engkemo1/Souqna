@@ -128,6 +128,17 @@ test('scanner buffer: fast characters + Enter = a scan; slow typing is not', () 
   assert.equal(b.push('Enter', (t += 10)), null);
 });
 
+test('camera scanner adds a barcode once while held in frame, then rearms after it leaves', () => {
+  const gate = E.createCameraScanGate({ missesToRearm: 3 });
+  assert.equal(gate('622300'), true);
+  assert.equal(gate('622300'), false);
+  gate(null); gate(null);
+  assert.equal(gate('622300'), false, 'brief decode misses do not make a held product add twice');
+  gate(null); gate(null); gate(null);
+  assert.equal(gate('622300'), true, 'showing the barcode again after moving it away adds another piece');
+  assert.equal(gate('622301'), true, 'a different product can be scanned immediately');
+});
+
 test('memory db keeps sales per store only', async () => {
   const db = createMemoryDb();
   const snap = { store: { id: 1 }, products: [{ id: 9, stock: 2 }] };

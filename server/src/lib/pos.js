@@ -69,7 +69,11 @@ export function addCashMovement(storeId, shiftId, { kind, amount, reason, uuid =
   // the same request sent again (the answer was lost on a weak connection) must not take the money out twice
   if (uuid) {
     const dup = q.get('SELECT id, kind, amount, reason, created_by AS createdBy, created_at AS createdAt FROM pos_cash_movements WHERE store_id=? AND uuid=?', [storeId, uuid]);
-    if (dup) return { ...dup, createdAt: isoTime(dup.createdAt), duplicate: true };
+    if (dup) {
+      const existingShift = q.val('SELECT shift_id FROM pos_cash_movements WHERE id=?', [dup.id]);
+      if (existingShift !== shiftId || dup.kind !== kind || dup.amount !== amount || dup.reason !== reason) throw new AppError(409, 'movement_key_reused', 'رقم حركة الدرج اتستخدم قبل كده ببيانات مختلفة. ابدأ الحركة من جديد.');
+      return { ...dup, createdAt: isoTime(dup.createdAt), duplicate: true };
+    }
   }
   openShiftRow(storeId, shiftId);
   const id = Number(q.run('INSERT INTO pos_cash_movements(store_id,shift_id,kind,amount,reason,created_by,uuid) VALUES(?,?,?,?,?,?,?)', [storeId, shiftId, kind, amount, reason, cashierName, uuid]).lastInsertRowid);

@@ -21,6 +21,7 @@ import { vapidPublicKey, sendTest } from '../lib/push.js';
 import { clampInt, nowIso, slugify } from '../lib/util.js';
 import { notifyBuyer, notifyOrderStatus, notifyPriceDrop, notifyBackInStock, notifyFollowers } from '../lib/buyers.js';
 import { reserveRecord } from '../lib/reserve.js';
+import { hoursSchema, legacyFromSchedule } from '../lib/hours.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { weeklyReport } from '../lib/report.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled } from '../lib/visual-demand.js';
@@ -120,6 +121,7 @@ const storeSchema = z.object({
   opens_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   closes_at: z.union([z.literal(''), z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'time_invalid')]).optional().nullable(),
   day_off: z.union([z.literal(''), z.coerce.number().int().min(0).max(6)]).optional().nullable(),
+  hours: hoursSchema.nullable().optional(), // weekly schedule + holidays (null clears it)
   map_url: z.union([z.literal(''), z.string().trim().url().max(400).refine((u) => /^https:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u), 'map_url_invalid')]).optional().nullable(),
   instagram: z.string().trim().max(60).optional(), facebook: z.string().trim().max(60).optional(), tiktok: z.string().trim().max(60).optional(),
   shipping_fee: z.coerce.number().int().min(0).max(1000).optional(),
@@ -130,6 +132,11 @@ const storeSchema = z.object({
 r.put('/store', h((req, res) => {
   const body = storeSchema.parse(req.body);
   for (const k of ['opens_at', 'closes_at', 'day_off', 'map_url']) if (body[k] === '') body[k] = null;
+  if (body.hours !== undefined) { // the schedule is the source of truth; keep the legacy columns in step
+    const hv = body.hours; delete body.hours;
+    body.hours_json = hv ? JSON.stringify(hv) : null;
+    Object.assign(body, hv ? legacyFromSchedule(hv) : { opens_at: null, closes_at: null, day_off: null });
+  }
   if (!req.adminStore) delete body.departments; // أقسام المتجر الرئيسية بيحددها الأدمن بس، مش صاحب المحل
   if (body.departments) { assertDepartments(body.departments); const d = body.departments; body.departments = encodeDepartments(d); body.category = d.length === 1 ? d[0] : 'mixed'; }
   update('stores', req.store.id, body);

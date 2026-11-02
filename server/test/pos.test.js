@@ -88,6 +88,21 @@ test('stock receipt adds inventory once and rejects reusing its id with changed 
   assert.equal(stockOf(bag, 'products'), before + 3);
 });
 
+test('cash movement retries are safe and reusing their id with changed details is rejected', async () => {
+  const register = (await call('/api/pos/registers/resolve', { body: { deviceKey: 'movement-device-01' } })).json.register;
+  const shift = (await call('/api/pos/shifts/open', { body: { registerId: register.id, openingCash: 100 } })).json.shift;
+  const body = { uuid: 'movement-uuid-001', kind: 'in', amount: 20, reason: 'فكة للدرج' };
+  const first = await call(`/api/pos/shifts/${shift.id}/movements`, { body });
+  const retry = await call(`/api/pos/shifts/${shift.id}/movements`, { body });
+  assert.equal(first.status, 201);
+  assert.equal(retry.json.movement.duplicate, true);
+  assert.equal(q.val('SELECT COUNT(*) FROM pos_cash_movements WHERE store_id=? AND uuid=?', [storeA, body.uuid]), 1);
+  const conflict = await call(`/api/pos/shifts/${shift.id}/movements`, { body: { ...body, amount: 200 } });
+  assert.equal(conflict.status, 409);
+  assert.equal(conflict.json.error.code, 'movement_key_reused');
+  assert.equal(q.val('SELECT SUM(amount) FROM pos_cash_movements WHERE store_id=?', [storeA]), 20);
+});
+
 test('payments record only what stayed in the drawer (change is taken out of cash)', async () => {
   const sum = q.val('SELECT SUM(amount) FROM pos_payments');
   assert.equal(sum, 270);
@@ -163,6 +178,22 @@ test('return policy is saved on the invoice and defective items bypass it withou
   assert.equal(defective.status, 200);
   assert.equal(stockOf(bag, 'products'), before, 'defective items are never added back to stock');
   assert.equal(defective.json.sale.returns.at(-1).items[0].defective, 1, 'the exception is recorded for audit');
+});
+
+test('a defective exception applies only to its selected line in a mixed return', async () => {
+  q.run('UPDATE stores SET return_days=3 WHERE id=?', [storeA]);
+  q.run('UPDATE products SET no_return=1 WHERE id=?', [bag]);
+  const s = (await call('/api/pos/sales', { body: sale({ items: [{ productId: bag, qty: 1, price: 50 }, { productId: shirt, variantId: l, qty: 1, price: 200 }], payments: [{ method: 'cash', amount: 250 }] }) })).json;
+  q.run('UPDATE products SET no_return=0 WHERE id=?', [bag]);
+  const bagBefore = stockOf(bag, 'products'); const variantBefore = stockOf(l);
+  const ret = await call('/api/pos/returns', { body: { uuid: 'mixed-defect-return-1', saleId: s.id, items: [
+    { saleItemId: s.items[0].id, qty: 1, defective: true }, { saleItemId: s.items[1].id, qty: 1 },
+  ] } });
+  assert.equal(ret.status, 200);
+  assert.equal(stockOf(bag, 'products'), bagBefore);
+  assert.equal(stockOf(l), variantBefore + 1);
+  assert.deepEqual(ret.json.sale.returns.at(-1).items.map((i) => i.defective), [1, 0]);
+  q.run('UPDATE stores SET return_days=3 WHERE id=?', [storeA]);
 });
 
 test('partial returns distribute pound rounding without refunding more than the sale line', async () => {
