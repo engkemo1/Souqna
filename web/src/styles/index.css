@@ -234,6 +234,11 @@
 .ticker-track { animation: ticker-scroll 28s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } }
 
+/* Shared fallback art for categories that do not have a merchant photo yet. */
+.category-placeholder img { transition: transform 700ms cubic-bezier(.22, 1, .36, 1), filter 700ms ease; }
+.group:hover .category-placeholder img { transform: scale(1.07) rotate(-1deg); filter: saturate(1.08) contrast(1.03); }
+.category-placeholder::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(180deg, transparent 42%, rgb(3 36 77 / .3) 100%); }
+
 /* ---- Kids template ("عالم الأطفال"): rounded playful headings and gentle motion ---- */
 [data-type='rounded'] :is(h1, h2, h3, .font-display, .kid-title) { font-family: 'Baloo Bhaijaan 2', 'IBM Plex Sans Arabic', system-ui, sans-serif; font-weight: 800; letter-spacing: 0; }
 .kid-title { font-family: 'Baloo Bhaijaan 2', 'IBM Plex Sans Arabic', system-ui, sans-serif; font-weight: 800; }

@@ -64,11 +64,15 @@ function ProductRail({ items, slug, onQuickAdd, loading }) {
   );
 }
 
-/** Tile art for categories that have no photo yet: brand-coloured, with the category's first letters. */
+/** One branded visual for categories that have no photo yet. */
 function CategoryArt({ name }) {
   return (
-    <div className="absolute inset-0 grid place-items-center bg-gradient-to-br from-primary to-secondary">
-      <span className="font-display text-6xl font-bold text-on-primary sm:text-7xl">{String(name || '').trim().slice(0, 2)}</span>
+    <div className="category-placeholder absolute inset-0 overflow-hidden">
+      <img src="/departments/category-placeholder.png" alt="" className="h-full w-full object-cover" />
+      <div className="absolute inset-x-3 bottom-3 flex items-center justify-between gap-2 rounded-2xl bg-white/88 px-3 py-2 text-[11px] font-bold text-[#03244D] shadow-sm backdrop-blur-md sm:inset-x-4 sm:bottom-4 sm:px-4 sm:py-2.5 sm:text-xs">
+        <span className="truncate">{name || 'Twist Store'}</span>
+        <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-[#F8620A] text-white">↗</span>
+      </div>
     </div>
   );
 }
@@ -92,7 +96,7 @@ function CategoryTiles() {
               <Link key={c.id} to={sp(store.slug, c.slug ? `shop?category=${c.slug}` : 'shop')} className="group flex w-[92px] shrink-0 flex-col items-center gap-2 text-center sm:w-[120px]">
                 <span className="kid-wiggle relative grid aspect-square w-full place-items-center rounded-full p-1.5 shadow-[0_8px_0_-2px_rgba(31,35,64,0.08)] transition group-active:scale-95" style={{ background: tint.bg }}>
                   {c.slug
-                    ? <span className="block h-full w-full overflow-hidden rounded-full bg-white ring-4 ring-white">{c.image ? <SmartImage media={c.image} ratio="1 / 1" sizes="120px" imgClassName="group-hover:scale-[1.08] duration-700" /> : <span className="grid h-full w-full place-items-center text-2xl font-extrabold" style={{ color: tint.ink }}>{String(tr(c.name)).trim().slice(0, 2)}</span>}</span>
+                    ? <span className="block h-full w-full overflow-hidden rounded-full bg-white ring-4 ring-white">{c.image ? <SmartImage media={c.image} ratio="1 / 1" sizes="120px" imgClassName="group-hover:scale-[1.08] duration-700" /> : <CategoryArt name={tr(c.name)} />}</span>
                     : <span className="kid-title text-xl" style={{ color: tint.ink }}>{t('common.all')}</span>}
                   <span className="absolute -end-0.5 -top-0.5 h-4 w-4 rounded-full ring-[3px] ring-canvas" style={{ background: tint.ink }} />
                 </span>
@@ -135,16 +139,16 @@ function CategoryTiles() {
   }
   if (categories.length < 2) return null; // a single category is just "all products" — the storefront already links to it
   const few = categories.length <= 3;
-  const cols = categories.length === 2 ? 'sm:grid-cols-2' : few ? 'sm:grid-cols-3' : 'sm:grid-cols-3 lg:grid-cols-4';
+  const cols = categories.length === 2 ? 'sm:grid-cols-2 lg:grid-cols-2' : few ? 'sm:grid-cols-3' : 'sm:grid-cols-3 lg:grid-cols-4';
   return (
     <section className="container mt-14 sm:mt-20">
       <SectionHeader title={t('store.shopByCategory')} />
-      <div className={`scroll-x -mx-4 gap-3 px-4 sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 ${cols}`}>
+      <div className={`scroll-x -mx-4 gap-3 px-4 sm:mx-0 sm:grid sm:gap-5 sm:overflow-visible sm:px-0 ${cols} ${few ? 'lg:justify-center' : ''}`}>
         {categories.map((c, i) => (
-          <motion.div key={c.id} className="w-[46%] shrink-0 snap-start xs:w-[42%] sm:w-auto"
+          <motion.div key={c.id} className={`w-[46%] shrink-0 snap-start xs:w-[42%] sm:w-auto ${few ? 'lg:max-w-[350px] lg:justify-self-center' : ''}`}
             initial={{ opacity: 0, y: 12 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i * 0.06, duration: 0.5 }}>
-            <Link to={sp(store.slug, `shop?category=${c.slug}`)} className="group relative block overflow-hidden rounded-[22px] bg-surface shadow-[0_12px_30px_-18px_rgb(var(--c-accent)/.55)] ring-1 ring-line transition active:scale-[.98]">
-              <div className={`relative ${few ? 'aspect-[4/5] sm:aspect-[4/3]' : 'aspect-[4/5]'}`}>
+            <Link to={sp(store.slug, `shop?category=${c.slug}`)} className="group relative block overflow-hidden rounded-[20px] bg-surface shadow-[0_14px_30px_-20px_rgb(var(--c-accent)/.7)] ring-1 ring-line transition hover:-translate-y-1 hover:shadow-[0_20px_40px_-22px_rgb(var(--c-accent)/.8)] active:scale-[.98]">
+              <div className={`relative ${few ? 'aspect-[1.35] sm:aspect-[1.45]' : 'aspect-[4/5]'}`}>
                 {c.image
                   ? <SmartImage media={c.image} className="h-full w-full" sizes="(min-width:1024px) 33vw, (min-width:640px) 50vw, 46vw" imgClassName="group-hover:scale-[1.05] duration-[1.2s]" />
                   : <CategoryArt name={tr(c.name)} />}

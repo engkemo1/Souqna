@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" role="img" aria-label="Fashion bags category artwork">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#F7F3EE"/>
+      <stop offset=".58" stop-color="#F0E7DE"/>
+      <stop offset="1" stop-color="#DDE8F2"/>
+    </linearGradient>
+    <linearGradient id="navyBag" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#0B3D72"/>
+      <stop offset="1" stop-color="#03244D"/>
+    </linearGradient>
+    <linearGradient id="orangeBag" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FF9A42"/>
+      <stop offset="1" stop-color="#E94F08"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%"><feGaussianBlur in="SourceAlpha" stdDeviation="18"/><feOffset dy="20"/><feComponentTransfer><feFuncA type="linear" slope=".18"/></feComponentTransfer><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <clipPath id="sideLogo"><circle cx="245" cy="510" r="42"/></clipPath>
+    <clipPath id="rightLogo"><circle cx="577" cy="530" r="36"/></clipPath>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+  <circle cx="130" cy="150" r="105" fill="#fff" opacity=".55"/>
+  <circle cx="690" cy="160" r="120" fill="#F8620A" opacity=".11"/>
+  <ellipse cx="402" cy="680" rx="280" ry="42" fill="#03244D" opacity=".12"/>
+  <g filter="url(#shadow)">
+    <path d="M120 350h250l-23 285H143z" fill="#F6F0E8" stroke="#03244D" stroke-width="6"/>
+    <path d="M205 355c0-116 110-116 110 0" fill="none" stroke="#03244D" stroke-width="16" stroke-linecap="round"/>
+    <path d="M158 420h204" stroke="#D2C5B8" stroke-width="4"/>
+    <circle cx="245" cy="510" r="42" fill="#fff"/>
+    <image href="/brand/twist-touch.png" x="215" y="480" width="60" height="60" preserveAspectRatio="xMidYMid meet" clip-path="url(#sideLogo)"/>
+    <path d="M300 300h270l-25 330H325z" fill="url(#navyBag)" stroke="#03244D" stroke-width="6"/>
+    <path d="M380 305c0-138 110-138 110 0" fill="none" stroke="#F8620A" stroke-width="18" stroke-linecap="round"/>
+    <path d="M327 390h238" stroke="#2D6296" stroke-width="4"/>
+    <text x="415" y="470" text-anchor="middle" fill="#fff" font-family="Arial, sans-serif" font-size="29" font-weight="700" letter-spacing="4">TWIST</text>
+    <path d="M360 490h110" stroke="#F8620A" stroke-width="5" stroke-linecap="round"/>
+    <path d="M490 390h175l-17 230H505z" fill="url(#orangeBag)" stroke="#C94708" stroke-width="6"/>
+    <path d="M525 395c0-92 76-92 76 0" fill="none" stroke="#03244D" stroke-width="13" stroke-linecap="round"/>
+    <path d="M506 460h143" stroke="#FFB36B" stroke-width="4"/>
+    <circle cx="577" cy="530" r="36" fill="#fff"/>
+    <image href="/brand/twist-touch.png" x="553" y="506" width="48" height="48" preserveAspectRatio="xMidYMid meet" clip-path="url(#rightLogo)"/>
+  </g>
+  <text x="400" y="90" text-anchor="middle" fill="#03244D" font-family="Arial, sans-serif" font-size="18" font-weight="700" letter-spacing="4">STYLE STARTS HERE</text>
+</svg>
