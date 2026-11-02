@@ -505,7 +505,8 @@ r.get('/marketplace', h((req, res) => {
   const params = [];
   if (category && category !== 'all') {
     const cl = deptSubtree(String(category).replace(/[^a-z_]/g, ''));
-    where.push(`(${cl.map(() => 's.departments LIKE ?').join(' OR ')})`); params.push(...cl.map((d) => `%,${d},%`));
+    // a store matches when it declared the section OR actually sells an active product filed under it
+    where.push(`(${cl.map(() => 's.departments LIKE ?').join(' OR ')} OR EXISTS (SELECT 1 FROM products pd WHERE pd.store_id=s.id AND pd.status='active' AND pd.department IN (${cl.map(() => '?').join(',')})))`); params.push(...cl.map((d) => `%,${d},%`), ...cl);
   }
   if (term) {
     where.push('(s.name_ar LIKE ? OR s.name_en LIKE ? OR s.tagline_ar LIKE ? OR s.tagline_en LIKE ?)');
@@ -524,6 +525,12 @@ r.get('/marketplace', h((req, res) => {
   for (const row of q.all("SELECT departments FROM stores s WHERE status='active' AND hidden=0 AND (s.show_when_empty=1 OR (SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0)")) {
     const seen = new Set();
     for (const d of decodeDepartments(row.departments)) for (const x of [d, ...deptAncestors(d)]) if (!seen.has(x)) { seen.add(x); deptCount.set(x, (deptCount.get(x) || 0) + 1); }
+  }
+  // sections a store really sells in (by product), even if the owner never ticked them in settings
+  for (const row of q.all("SELECT p.store_id AS sid, p.department AS d FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL GROUP BY p.store_id, p.department")) {
+    const declared = new Set();
+    for (const d of decodeDepartments(q.val('SELECT departments FROM stores WHERE id=?', [row.sid]) || '')) for (const x of [d, ...deptAncestors(d)]) declared.add(x);
+    for (const x of [row.d, ...deptAncestors(row.d)]) if (!declared.has(x)) { declared.add(x); deptCount.set(x, (deptCount.get(x) || 0) + 1); }
   }
   const names = new Map(listDepartments().map((d) => [d.slug, d]));
   const categories = [...deptCount].filter(([id]) => names.has(id)).map(([id, count]) => ({ id, count, name: names.get(id).name })).sort((a, b) => b.count - a.count);
