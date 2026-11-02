@@ -15,6 +15,7 @@ function SmartImage({ media, alt, sizes = '100vw', ratio, fit = 'cover', priorit
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const ref = useRef(null);
+  const isUrl = typeof media === 'string';
 
   useEffect(() => { setLoaded(false); setFailed(false); }, [media?.id]);
   useEffect(() => { if (ref.current?.complete && ref.current.naturalWidth) setLoaded(true); }, [media?.id]);
@@ -27,14 +28,14 @@ function SmartImage({ media, alt, sizes = '100vw', ratio, fit = 'cover', priorit
       )}
       {media && !failed ? (
         <picture>
-          <source type="image/webp" srcSet={srcSet(media, 'webp')} sizes={sizes} />
+          {!isUrl && <source type="image/webp" srcSet={srcSet(media, 'webp')} sizes={sizes} />}
           <img
             ref={ref}
-            src={`${media.base}/original.jpg`}
-            srcSet={srcSet(media, 'jpg')}
+            src={isUrl ? media : `${media.base}/original.jpg`}
+            {...(!isUrl ? { srcSet: srcSet(media, 'jpg') } : {})}
             sizes={sizes}
-            width={media.w}
-            height={media.h}
+            width={!isUrl ? media.w : undefined}
+            height={!isUrl ? media.h : undefined}
             alt={alt ?? media.alt ?? ''}
             loading={priority ? 'eager' : 'lazy'}
             decoding="async"

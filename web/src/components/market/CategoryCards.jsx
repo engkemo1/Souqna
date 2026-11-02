@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n.jsx';
-import { emojiFor } from '../../lib/deptIcons.js';
 import { cx } from '../ui/cx.js';
 
 /** Where a section opens. Section landing pages live at /c/:slug (the old /search?department= URLs keep working). */
@@ -17,7 +16,7 @@ export function CategoryImage({ dept, sizes, priority = false, className }) {
   const im = dept?.images;
   const src = im?.card || dept?.image;
   if (!src || bad) {
-    return <span className={cx('grid h-full w-full place-items-center bg-gradient-to-br from-[#EAF0F8] via-[#F4EEF8] to-[#F8E9DD] text-4xl', className)} aria-hidden="true">{emojiFor(dept)}</span>;
+    return <img src="/departments/category-placeholder.png" alt="" loading={priority ? 'eager' : 'lazy'} decoding="async" className={cx('h-full w-full object-cover', className)} />;
   }
   const srcSet = im ? `${im.thumb} 160w, ${im.card} 480w, ${im.hero} 1200w` : undefined;
   return <img src={src} srcSet={srcSet} sizes={sizes} alt="" loading={priority ? 'eager' : 'lazy'} decoding="async" onError={() => setBad(true)} className={cx('h-full w-full object-cover', className)} />;
@@ -71,7 +70,7 @@ export function ThumbChip({ dept }) {
  * Sub-sections as round pictures in ONE horizontal row: swipe on touch, drag with the mouse, arrow-free.
  * A section nobody sells in yet is left out (opening it would show an empty page) — pass only what has products.
  */
-export function CircleRail({ items, label, active, backTo }) {
+export function CircleRail({ items, label, active, backTo, onPick }) {
   const { lang } = useI18n();
   const box = useRef(null);
   const drag = useRef({ on: false, x: 0, left: 0, moved: false });
@@ -84,7 +83,14 @@ export function CircleRail({ items, label, active, backTo }) {
     <div ref={box} role="list" aria-label={label} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerLeave={up} onClickCapture={stopClick}
       className="-mx-4 flex cursor-grab snap-x gap-4 overflow-x-auto px-4 pb-2 no-scrollbar select-none active:cursor-grabbing sm:mx-0 sm:gap-6 sm:px-0">
       {items.map((c) => (
-        <Link key={c.slug} role="listitem" to={active === c.slug && backTo ? backTo : deptHref(c.slug)} draggable={false} aria-current={active === c.slug ? 'page' : undefined} className="group w-[76px] shrink-0 snap-start text-center sm:w-[96px] focus-visible:outline-none">
+        onPick ? (
+          <button key={c.slug} type="button" role="listitem" onClick={() => onPick(active === c.slug ? '' : c.slug)} aria-pressed={active === c.slug} className="group w-[76px] shrink-0 snap-start text-center sm:w-[96px] focus-visible:outline-none">
+            <span className={`mx-auto block h-[72px] w-[72px] overflow-hidden rounded-full bg-[#EAF0F8] ring-2 shadow-[0_6px_16px_-8px_rgba(3,36,77,0.5)] ${active === c.slug ? 'ring-brand ring-4' : 'ring-white'} transition duration-300 group-hover:-translate-y-0.5 group-hover:ring-brand group-focus-visible:ring-brand sm:h-[92px] sm:w-[92px]`}>
+              <CategoryImage dept={c} sizes="92px" className="pointer-events-none text-2xl" />
+            </span>
+            <span className="mt-2 line-clamp-2 block text-[12px] font-bold leading-snug text-[#03244D] sm:text-[13px]">{deptName(c, lang)}</span>
+          </button>
+        ) : <Link key={c.slug} role="listitem" to={active === c.slug && backTo ? backTo : deptHref(c.slug)} draggable={false} aria-current={active === c.slug ? 'page' : undefined} className="group w-[76px] shrink-0 snap-start text-center sm:w-[96px] focus-visible:outline-none">
           <span className={`mx-auto block h-[72px] w-[72px] overflow-hidden rounded-full bg-[#EAF0F8] ring-2 shadow-[0_6px_16px_-8px_rgba(3,36,77,0.5)] ${active === c.slug ? 'ring-brand ring-4' : 'ring-white'} transition duration-300 group-hover:-translate-y-0.5 group-hover:ring-brand group-focus-visible:ring-brand sm:h-[92px] sm:w-[92px]`}>
             <CategoryImage dept={c} sizes="92px" className="pointer-events-none text-2xl" />
           </span>

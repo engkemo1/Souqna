@@ -45,14 +45,16 @@ export default function CategoryPage() {
   const children = data?.children || [];
   const [term, setTerm] = useState('');
   const [sort, setSort] = useState('relevance');
+  const [selectedChild, setSelectedChild] = useState('');
   const dq = useDebounced(term.trim(), 250);
-  const key = new URLSearchParams({ q: dq, department: slug, sort }).toString();
+  const activeDepartment = selectedChild || slug;
+  const key = new URLSearchParams({ q: dq, department: activeDepartment, sort }).toString();
   const prods = useApi(`/search?${key}`);
   const [more, setMore] = useState({ key: '', items: [], page: 1 });
   const [busy, setBusy] = useState(false);
   const [quick, setQuick] = useState(null);
   useSeo({ dept, trail, lang });
-  useEffect(() => { window.scrollTo(0, 0); setTerm(''); setSort('relevance'); }, [slug]);
+  useEffect(() => { window.scrollTo(0, 0); setTerm(''); setSort('relevance'); setSelectedChild(''); }, [slug]);
 
   if (error?.status === 404) return <NotFound />;
   const prof = PROFILES[dept?.profile];
@@ -64,11 +66,13 @@ export default function CategoryPage() {
     try { const r = await api(`/search?${key}&page=${page + 1}`); setMore({ key, items: [...(more.key === key ? more.items : []), ...r.items], page: page + 1 }); } catch { /* ignore */ }
     setBusy(false);
   };
-  // sections that actually have products; on a leaf page keep showing its siblings (the current one highlighted) so the row works as a filter
-  const own = children.filter((c) => c.product_count > 0);
-  const sibs = (data?.siblings || []).filter((c) => c.product_count > 0);
+  // Show sections that are already used by a store even before their first product is published.
+  // This keeps valid sections such as "فساتين سواريه" discoverable instead of hiding them
+  // just because their products are currently assigned to the parent section.
+  const hasContent = (c) => c.product_count > 0 || c.stores_count > 0 || c.show_empty;
+  const own = children.filter(hasContent);
+  const sibs = (data?.siblings || []).filter(hasContent);
   const circles = [...(own.length ? own : sibs)].sort((x, y) => x.level - y.level);
-  const parentSlug = trail.length > 1 ? trail[trail.length - 2].slug : '';
   const desc = dept?.description?.[lang] || dept?.description?.ar || '';
 
   return (
@@ -97,7 +101,7 @@ export default function CategoryPage() {
             </section>
 
             <div className="container py-6 sm:py-8">
-              {circles.length > 0 && <section aria-label={lang === 'ar' ? 'الأقسام' : 'Sections'} className="mb-6"><CircleRail items={circles} active={own.length ? '' : slug} backTo={parentSlug ? `/c/${parentSlug}` : undefined} label={lang === 'ar' ? 'الأقسام' : 'Sections'} /></section>}
+              {circles.length > 0 && <section aria-label={lang === 'ar' ? 'الأقسام' : 'Sections'} className="mb-6"><CircleRail items={circles} active={selectedChild} onPick={setSelectedChild} label={lang === 'ar' ? 'الأقسام' : 'Sections'} /></section>}
 
               <section aria-label={lang === 'ar' ? 'المنتجات' : 'Products'}>
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
