@@ -144,7 +144,8 @@ function DeptSheet({ dept, onClose, onSaved, all = [], defaultParent = '' }) {
     e?.preventDefault();
     setBusy(true); setErrs({});
     try {
-      const body = { parent: f.parent || null, name_ar: f.name_ar, name_en: f.name_en, sizes: f.sizes, profile: f.profile || null, description_ar: f.description_ar, description_en: f.description_en, seo_title_ar: f.seo_title_ar, seo_title_en: f.seo_title_en, seo_desc_ar: f.seo_desc_ar, seo_desc_en: f.seo_desc_en, show_empty: !!f.show_empty, icon: f.icon || null, visibility: f.visibility, attrs: f.attrs.filter((a) => a.active === false || (a.key && (a.ar || a.en))).map(({ _text, ...a }) => a), ...(f.sort !== '' ? { sort: Number(f.sort) } : {}) };
+      const sortValue = Number(f.sort);
+      const body = { parent: f.parent || null, name_ar: f.name_ar, name_en: f.name_en, sizes: f.sizes, profile: f.profile || null, description_ar: f.description_ar, description_en: f.description_en, seo_title_ar: f.seo_title_ar, seo_title_en: f.seo_title_en, seo_desc_ar: f.seo_desc_ar, seo_desc_en: f.seo_desc_en, show_empty: !!f.show_empty, icon: f.icon || null, visibility: f.visibility, attrs: f.attrs.filter((a) => a.active === false || (a.key && (a.ar || a.en))).map(({ _text, ...a }) => a), ...(Number.isInteger(sortValue) && sortValue >= 0 ? { sort: sortValue } : {}) };
       const r = isNew ? await adminApi('/departments', { method: 'POST', body: { ...body, slug: f.slug || undefined } }) : await adminApi(`/departments/${dept.id}`, { method: 'PATCH', body: { ...body, active: f.active } });
       onSaved(r.departments); toast({ title: isNew ? 'اتضاف القسم' : 'اتحفظ' }); onClose();
     } catch (x) {
