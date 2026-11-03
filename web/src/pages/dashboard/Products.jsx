@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink, ShoppingBag, QrCode, Camera } from 'lucide-react';
+import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink, ShoppingBag, QrCode, Camera, MoreHorizontal } from 'lucide-react';
 import { useApi, useDebounced, useIsDesktop, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -10,7 +10,7 @@ import { formatMoney, formatNumber } from '../../lib/format.js';
 import { PageHeader, FilterTabs, Pagination, SearchInput, ListSkeleton } from '../../components/dash/Kit.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Badge from '../../components/ui/Badge.jsx';
-import Button, { IconButton } from '../../components/ui/Button.jsx';
+import Button from '../../components/ui/Button.jsx';
 import Sheet, { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 import { Field, Input, Select, Segmented } from '../../components/ui/Field.jsx';
 import { QtyStepper } from '../../components/ui/Commerce.jsx';
@@ -195,6 +195,43 @@ function WeakTag({ p, t }) {
   return weakQ(p) ? <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-400/15 dark:text-amber-200"><Camera className="h-3 w-3" />{t('products.weakPhoto')}</span> : null;
 }
 
+function ProductActionsMenu({ product, t, onSell, onQr, onQuick, onDelete }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
+    const escape = (e) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('pointerdown', close);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', escape); };
+  }, [open]);
+  const action = (fn) => { setOpen(false); fn(product); };
+  return (
+    <div ref={ref} className="relative shrink-0">
+      <button type="button" onClick={() => setOpen((v) => !v)} aria-label={t('common.more')} aria-haspopup="menu" aria-expanded={open}
+        className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-fg transition hover:bg-fg/[0.08] active:scale-95">
+        <MoreHorizontal className="h-5 w-5" />
+      </button>
+      {open && (
+        <div role="menu" className="absolute end-0 top-11 z-30 min-w-44 rounded-xl border border-line bg-elevated p-1.5 shadow-lift">
+          <button type="button" role="menuitem" onClick={() => action(onSell)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-start text-sm hover:bg-fg/[0.06]"><ShoppingBag className="h-4 w-4 text-brand" />{t('products.sell')}</button>
+          <button type="button" role="menuitem" onClick={() => action(onQuick)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-start text-sm hover:bg-fg/[0.06]"><Zap className="h-4 w-4" />{t('products.quickEdit')}</button>
+          <button type="button" role="menuitem" onClick={() => action(onQr)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-start text-sm hover:bg-fg/[0.06]"><QrCode className="h-4 w-4" />{t('qr.productTitle')}</button>
+          <button type="button" role="menuitem" onClick={() => action(onDelete)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-start text-sm text-sale hover:bg-sale/10"><Trash2 className="h-4 w-4" />{t('common.delete')}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function sizeLabel(p, lang) {
+  const n = Number(p.variantCount || 0);
+  if (!n) return '';
+  if (lang === 'ar') return n === 1 ? 'مقاس واحد' : `${formatNumber(n, lang)} مقاسات`;
+  return n === 1 ? 'One size' : `${n} sizes`;
+}
+
 export default function Products() {
   const base = useDashBase();
   const { t, tr, lang } = useI18n();
@@ -307,7 +344,7 @@ export default function Products() {
                             <Link to={`${base}/products/${p.id}`} className="flex items-center gap-3.5">
                               <SmartImage media={p.image} ratio="4 / 5" sizes="56px" className="w-12 shrink-0 rounded-lg" />
                               <span className="min-w-0"><span className="block max-w-[320px] truncate font-medium group-hover:text-brand">{tr(p.name)}</span>
-                                <span className="block text-[13px] text-muted">{p.category ? tr(p.category) : '—'}{p.variantCount ? ` · ${t('products.variants', { n: p.variantCount })}` : ''}<WeakTag p={p} t={t} /></span></span>
+                                <span className="block text-[13px] text-muted">{p.category ? tr(p.category) : '—'}{sizeLabel(p, lang) ? ` · ${sizeLabel(p, lang)}` : ''}<WeakTag p={p} t={t} /></span></span>
                             </Link>
                           </td>
                           <td className="py-3"><StatusPill status={p.status} t={t} /></td>
@@ -315,12 +352,9 @@ export default function Products() {
                           <td className="py-3"><span className="font-semibold tabular">{formatMoney(p.price, lang)}</span>{p.compareAt && <span className="ms-2 text-xs text-muted line-through tabular">{formatMoney(p.compareAt, lang)}</span>}</td>
                           <td className="py-3 text-sm tabular text-muted">{formatNumber(p.sold, lang)}</td>
                           <td className="py-3 pe-5">
-                            <div className="flex justify-end gap-1 opacity-60 transition group-hover:opacity-100">
-                              <IconButton size="sm" label={t('products.sell')} icon={ShoppingBag} onClick={() => setSellP(p)} iconClass="h-[18px] w-[18px] text-brand" />
-                              <IconButton size="sm" label={t('qr.productTitle')} icon={QrCode} onClick={() => setQrP(p)} iconClass="h-[18px] w-[18px]" />
-                              <IconButton size="sm" label={t('products.quickEdit')} icon={Zap} onClick={() => setQuick(p)} iconClass="h-[18px] w-[18px]" />
-                              <IconButton size="sm" label={t('common.edit')} icon={Pencil} to={`${base}/products/${p.id}`} iconClass="h-[18px] w-[18px]" />
-                              <IconButton size="sm" label={t('common.delete')} icon={Trash2} onClick={() => setDel(p)} iconClass="h-[18px] w-[18px] text-sale" />
+                            <div className="flex justify-end gap-2">
+                              <Button size="xs" variant="secondary" icon={Pencil} to={`${base}/products/${p.id}`}>{t('common.edit')}</Button>
+                              <ProductActionsMenu product={p} t={t} onSell={setSellP} onQr={setQrP} onQuick={setQuick} onDelete={setDel} />
                             </div>
                           </td>
                         </tr>
@@ -337,7 +371,7 @@ export default function Products() {
                       <div className="p-3.5">
                         <p className="truncate font-medium">{tr(p.name)}</p>
                         <div className="mt-1.5 flex items-center justify-between"><span className="font-semibold tabular">{formatMoney(p.price, lang)}</span><StockPill p={p} t={t} lang={lang} /></div>
-                        <div className="mt-3 flex gap-2"><Button size="xs" full icon={ShoppingBag} onClick={() => setSellP(p)}>{t('products.sell')}</Button><Button size="xs" variant="secondary" full icon={Zap} onClick={() => setQuick(p)}>{t('products.quickEdit')}</Button><Button size="xs" variant="secondary" icon={QrCode} aria-label={t('qr.productTitle')} onClick={() => setQrP(p)} /></div>
+                        <div className="mt-3 flex items-center gap-2"><Button size="xs" full variant="secondary" icon={Pencil} to={`${base}/products/${p.id}`}>{t('common.edit')}</Button><ProductActionsMenu product={p} t={t} onSell={setSellP} onQr={setQrP} onQuick={setQuick} onDelete={setDel} /></div>
                       </div>
                     </div>
                   ) : (
@@ -349,9 +383,8 @@ export default function Products() {
                         {weakQ(p) && <p className="mt-1"><WeakTag p={p} t={t} /></p>}
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">{p.status !== 'active' && <StatusPill status={p.status} t={t} />}<StockPill p={p} t={t} lang={lang} /></div>
                       </Link>
-                      <button type="button" onClick={() => setSellP(p)} aria-label={t('products.sell')} className="grid h-11 shrink-0 place-items-center gap-0.5 rounded-xl bg-btn px-3 text-[11px] font-semibold text-on-btn transition active:scale-90"><ShoppingBag className="h-4 w-4" />{t('products.sell')}</button>
-                      <button type="button" onClick={() => setQuick(p)} aria-label={t('products.quickEdit')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><Zap className="h-5 w-5" /></button>
-                      <button type="button" onClick={() => setQrP(p)} aria-label={t('qr.productTitle')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><QrCode className="h-5 w-5" /></button>
+                      <Button size="sm" variant="secondary" icon={Pencil} to={`${base}/products/${p.id}`}>{t('common.edit')}</Button>
+                      <ProductActionsMenu product={p} t={t} onSell={setSellP} onQr={setQrP} onQuick={setQuick} onDelete={setDel} />
                     </div>
                   ))}
                 </div>

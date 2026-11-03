@@ -22,6 +22,7 @@ import StoreStoryCard from '../../components/store/StoreStoryCard.jsx';
 import FreeShippingBar from '../../components/store/FreeShippingBar.jsx';
 import FlashBanner from '../../components/store/FlashBanner.jsx';
 import TickerStrip from '../../components/store/TickerStrip.jsx';
+import SeasonSpotlight from '../../components/store/SeasonSpotlight.jsx';
 import { HeroSplit, HeroCompact } from '../../components/store/HeroVariants.jsx';
 import { HeroPlayful } from '../../components/store/HeroPlayful.jsx';
 import { useDesign, kidTint } from '../../lib/design.js';
@@ -237,7 +238,7 @@ export default function StoreHome() {
         else if (design.hero === 'playful') node = <HeroPlayful banners={banners} />;
         else if (design.hero === 'compact') node = hasBanners ? (<><HeroCompact /><HeroSlider banners={banners} slug={store.slug} /></>) : <HeroCompact />;
         else node = (store.heroMode === 'cover' ? false : hasBanners) ? sliderHero : <StoreHero />;
-        return <div key="hero">{node}</div>;
+        return <div key="hero">{node}<SeasonSpotlight /></div>;
       }
 
       case 'promos':
@@ -286,11 +287,16 @@ export default function StoreHome() {
         return <CategoryTiles key="categories" />;
 
       case 'best_sellers':
-        if (!loading && (!data?.bestSellers || data.bestSellers.length === 0)) return null;
+        {
+          // the same product must not appear twice on one page: leave out what "وصل حديثاً" already shows, and hide the shelf if too little is left
+          const shownIds = new Set((data?.newArrivals || []).map((p) => p.id));
+          var bestItems = (data?.bestSellers || []).filter((p) => !shownIds.has(p.id));
+        }
+        if (!loading && bestItems.length < 3) return null;
         return (
           <section key="best_sellers" className="container mt-14 sm:mt-20">
             <SectionHeader title={t('store.bestSellers')} to={sp(store.slug, 'shop?sort=best')} />
-            <ProductRail items={data?.bestSellers || []} slug={store.slug} onQuickAdd={setQuick} loading={loading && !data} />
+            <ProductRail items={bestItems} slug={store.slug} onQuickAdd={setQuick} loading={loading && !data} />
           </section>
         );
 

@@ -42,11 +42,10 @@ async function compress(file) {
 
 
 /** Photo guidelines shown with the product uploader so every store ends up with a clean, consistent catalogue. */
-function Tips({ t, empty }) {
+function Tips({ t }) {
   const base = useDashBase();
   return (
-    <details open={empty} className="mb-3 rounded-2xl border border-line bg-secondary/40 p-4 text-sm [&_summary::-webkit-details-marker]:hidden">
-      <summary className="flex cursor-pointer list-none items-center gap-2 font-semibold"><Lightbulb className="h-4 w-4 text-brand" />{t('editor.tipsTitle')}</summary>
+    <div className="rounded-2xl border border-line bg-secondary/40 p-4 text-sm">
       <p className="mt-3 flex items-start gap-2 rounded-xl bg-emerald-50 px-3 py-2 text-[13px] font-medium leading-relaxed text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"><Check className="mt-0.5 h-4 w-4 shrink-0" />{t('editor.tipsLead')}</p>
       <div className="mt-3 grid grid-cols-2 gap-3 text-center text-[12px] font-medium text-muted" aria-hidden="true">
         <div><div className="relative mx-auto grid aspect-[4/5] w-20 place-items-center rounded-xl bg-white ring-2 ring-emerald-500"><span className="h-10 w-9 rounded-md bg-[#1d4e89] shadow-sm" /><span className="absolute -end-1.5 -top-1.5 grid h-5 w-5 place-items-center rounded-full bg-emerald-500 text-white"><Check className="h-3 w-3" /></span></div><p className="mt-1.5">{t('editor.tipGood')}</p></div>
@@ -56,7 +55,7 @@ function Tips({ t, empty }) {
         {[1, 2, 3, 4, 5].map((n) => <li key={n}>{t(`editor.tip${n}`)}</li>)}
       </ul>
       {base === '/dashboard' && <Link to="/dashboard/services" className="mt-3 inline-block text-[13px] font-semibold text-brand hover:underline">{t('editor.tipsPhoto')}</Link>}
-    </details>
+    </div>
   );
 }
 
@@ -234,7 +233,7 @@ function PreviewSheet({ t, files, onConfirm, onCancel }) {
  * `value` is the ordered list of uploaded media objects.
  */
 export default function MediaUploader({ value, onChange, kind = 'product', max = MAX, error }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const toast = useToast();
   const [pending, setPending] = useState([]);
   const [over, setOver] = useState(false);
@@ -314,9 +313,7 @@ export default function MediaUploader({ value, onChange, kind = 'product', max =
   const full = all.length >= max;
   return (
     <div>
-      {kind === 'product' && <PhotoStyleBar key={styleKey} t={t} />}
       {staged && <PreviewSheet t={t} files={staged} onCancel={() => setStaged(null)} onConfirm={() => { const f = staged; setStaged(null); setStyleKey((k) => k + 1); doAdd(f); }} />}
-      {kind === 'product' && <Tips t={t} empty={value.length === 0 && pending.length === 0} />}
       <input ref={galleryRef} type="file" accept="image/*" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
       <input ref={cameraRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
 
@@ -346,6 +343,19 @@ export default function MediaUploader({ value, onChange, kind = 'product', max =
         </>
       )}
       {error && <p className="mt-2 text-[13px] font-medium text-sale" role="alert">{error}</p>}
+
+      {kind === 'product' && (
+        <details className="mt-4 rounded-2xl border border-line bg-secondary/20 p-3 [&_summary::-webkit-details-marker]:hidden">
+          <summary className="flex min-h-10 cursor-pointer list-none items-center gap-2 rounded-xl px-2 text-sm font-semibold">
+            <Lightbulb className="h-4 w-4 text-brand" />
+            {lang === 'ar' ? 'نصائح للصور وخلفيتها' : 'Photo tips and background'}
+          </summary>
+          <div className="mt-2 space-y-3">
+            <PhotoStyleBar key={styleKey} t={t} />
+            <Tips t={t} />
+          </div>
+        </details>
+      )}
 
       {all.length > 0 && (
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>

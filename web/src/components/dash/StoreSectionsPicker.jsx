@@ -3,6 +3,7 @@ import { Check, ChevronDown, Search, X } from 'lucide-react';
 import { Input } from '../ui/Field.jsx';
 import { cx } from '../ui/cx.js';
 import { useI18n } from '../../lib/i18n.jsx';
+import { formatNumber } from '../../lib/format.js';
 
 const nz = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ًٌٍَُِّْ]/g, '').replace(/\s+/g, ' ').trim();
 
@@ -56,7 +57,7 @@ export default function StoreSectionsPicker({ depts, value, onChange }) {
               <div key={r.slug} className="overflow-hidden rounded-xl border border-line">
                 <button type="button" aria-expanded={isOpen} onClick={() => setOpen({ ...open, [r.slug]: !isOpen })} className="flex min-h-[3rem] w-full items-center justify-between gap-3 bg-surface px-4 text-start">
                   <span className="font-semibold">{depts.label(r.slug)}</span>
-                  <span className="flex items-center gap-2">{n > 0 && <span className="rounded-full bg-fg px-2 py-0.5 text-[12px] font-bold text-canvas">{n}</span>}{rows.length > 1 && <span className="text-[12px] text-muted">{rows.length - 1}</span>}<ChevronDown className={cx('h-4 w-4 text-muted transition', isOpen && 'rotate-180')} /></span>
+                  <span className="flex items-center gap-2">{n > 0 && <span className="rounded-full bg-fg px-2 py-0.5 text-[12px] font-bold text-canvas">{formatNumber(n, lang)} {L('مختارة', 'selected')}</span>}<ChevronDown className={cx('h-4 w-4 text-muted transition', isOpen && 'rotate-180')} /></span>
                 </button>
                 {isOpen && <div className="grid gap-0.5 border-t border-line p-1.5 sm:grid-cols-2">{rows.map(({ d, depth }) => <Row key={d.slug} d={d} depth={depth} />)}</div>}
               </div>

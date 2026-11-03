@@ -3,7 +3,6 @@ import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { mapsLinks } from './VisitCard.jsx';
 import { BrandMark } from '../market/Brand.jsx';
 import { motion, AnimatePresence } from 'framer-motion';
-import { SEASONS } from '@souqna/shared/layout';
 import { Search, Heart, ShoppingBag, Home, LayoutGrid, ChevronLeft, ChevronRight, MapPin, Phone, Instagram, Facebook, Star, Truck, RefreshCcw, Banknote, Store, ShieldCheck, Sparkles, Clock, Award } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useFavorites, useMarketCart, useRegisterStore } from '../../lib/cart.jsx';
@@ -69,14 +68,11 @@ export function AnnouncementBar() {
   }
 
   const customText = (lang === 'ar' ? custom?.text_ar : custom?.text_en) || custom?.text_ar || custom?.text_en;
-  const season = SEASONS[store?.customization?.design?.season];
-  const seasonText = season ? (lang === 'ar' ? season.announce_ar : season.announce_en) : '';
   const items = custom?.enabled && customText ? [
     customText,
     ...(store.freeShippingOver > 0 ? [t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) })] : []),
     ...offers.slice(0, 1).map((o) => `${t('store.useCode')} ${o.code} — ${tr(o.title)}`),
   ] : [
-    ...(seasonText ? [seasonText] : []),
     ...(store.freeShippingOver > 0 ? [t('store.freeShippingOver', { v: formatMoney(store.freeShippingOver, lang) })] : []),
     ...offers.slice(0, 2).map((o) => `${t('store.useCode')} ${o.code} — ${tr(o.title)}`),
     t('store.cod'),

@@ -23,6 +23,7 @@ import HoursEditor, { scheduleFromStore } from '../../components/dash/HoursEdito
 import PageTransition from '../../components/PageTransition.jsx';
 import BrandPaletteCard from '../../components/dash/BrandPaletteCard.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
+import { cx } from '../../components/ui/cx.js';
 
 const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'hours', 'return_days', 'reserve_hours', 'instagram', 'facebook', 'tiktok', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
 
@@ -234,12 +235,29 @@ export default function Settings() {
   const [deleteBusy, setDeleteBusy] = useState('');
   const [initial, setInitial] = useState('');
   const [brandKey, setBrandKey] = useState(0);
+  const tabs = [
+    ['info', lang === 'ar' ? 'بيانات المتجر' : 'Store info'],
+    ['look', lang === 'ar' ? 'الشكل' : 'Appearance'],
+    ['sections', lang === 'ar' ? 'الأقسام' : 'Sections'],
+  ];
+  const [activeTab, setActiveTab] = useState(() => {
+    const value = typeof window !== 'undefined' ? window.location.hash.slice(1) : '';
+    return ['info', 'look', 'sections'].includes(value) ? value : 'info';
+  });
+  useEffect(() => {
+    const onHash = () => {
+      const value = window.location.hash.slice(1);
+      if (['info', 'look', 'sections'].includes(value)) setActiveTab(value);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   useEffect(() => {
     if (!data) return;
     const s = data.store;
     const x = ({
-      name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar, tagline_en: s.tagline.en, description_ar: s.description.ar, description_en: s.description.en,
+      name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar === 'أهلاً بيك في متجرنا' ? '' : (s.tagline.ar || ''), tagline_en: s.tagline.en === 'Welcome to our store' ? '' : (s.tagline.en || ''), description_ar: s.description.ar, description_en: s.description.en,
       address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', photo_style: s.photoStyle || 'white', hours: scheduleFromStore(s.hours), instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
       return_days: String(s.returnDays ?? 3), reserve_hours: String(s.reserveHours ?? 24), shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
       logo_initials: s.logoInitials || (s.name.ar || s.name.en || s.code || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: s.logoColor || '#1B1B1B',
@@ -251,6 +269,10 @@ export default function Settings() {
   if (!f) return <div className="space-y-4"><Skeleton className="h-8 w-48" /><Skeleton className="h-64 rounded-2xl" /><Skeleton className="h-64 rounded-2xl" /></div>;
   const dirty = JSON.stringify(f) !== initial;
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const selectTab = (key) => {
+    setActiveTab(key);
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${key}`);
+  };
 
   const save = async () => {
     setBusy(true);
@@ -296,22 +318,20 @@ export default function Settings() {
   return (
     <PageTransition className="pb-24">
       <PageHeader title={t('settings.title')} actions={<Button onClick={save} loading={busy} disabled={!dirty} className="hidden md:inline-flex">{t('common.save')}</Button>} />
-      <div className="grid items-start gap-4 lg:grid-cols-[1fr_360px]">
+      <div role="tablist" aria-label={lang === 'ar' ? 'إعدادات المتجر' : 'Store settings'} className="mb-4 flex min-w-0 gap-2 overflow-x-auto border-b border-line pb-1">
+        {tabs.map(([key, label]) => <button key={key} type="button" role="tab" id={`settings-tab-${key}`} aria-selected={activeTab === key} aria-controls={`settings-panel-${key}`} onClick={() => selectTab(key)} className={cx('min-h-11 shrink-0 rounded-t-xl px-4 text-sm font-semibold transition', activeTab === key ? 'border-b-2 border-brand text-brand' : 'text-muted hover:bg-fg/[0.04] hover:text-fg')}>{label}</button>)}
+      </div>
+      <div role="tabpanel" id="settings-panel-info" aria-labelledby="settings-tab-info" hidden={activeTab !== 'info'}>
+        <div className="grid items-start gap-4 lg:grid-cols-[1fr_360px]">
         <div className="space-y-4">
           <Panel title={t('settings.general')}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('settings.nameAr')} error={errors.name_ar}><Input dir="rtl" value={f.name_ar} onChange={set('name_ar')} /></Field>
               <Field label={t('settings.nameEn')} error={errors.name_en}><Input dir="ltr" value={f.name_en} onChange={set('name_en')} /></Field>
-              <Field label={t('settings.taglineAr')}><Input dir="rtl" value={f.tagline_ar} onChange={set('tagline_ar')} /></Field>
-              <Field label={t('settings.taglineEn')}><Input dir="ltr" value={f.tagline_en} onChange={set('tagline_en')} /></Field>
+              <Field label={t('settings.taglineAr')}><Input dir="rtl" placeholder="أهلاً بيك في متجرنا" value={f.tagline_ar} onChange={set('tagline_ar')} /></Field>
+              <Field label={t('settings.taglineEn')}><Input dir="ltr" placeholder="Welcome to our store" value={f.tagline_en} onChange={set('tagline_en')} /></Field>
               <Field label={t('settings.descAr')}><Textarea dir="rtl" rows={3} value={f.description_ar} onChange={set('description_ar')} /></Field>
               <Field label={t('settings.descEn')}><Textarea dir="ltr" rows={3} value={f.description_en} onChange={set('description_en')} /></Field>
-              <div className="sm:col-span-2">
-                <p className="mb-1 text-sm font-medium">{t('settings.departments')}</p>
-                <p className="mb-2 text-[13px] text-muted">{t('settings.departmentsHint')}</p>
-                <StoreSectionsPicker depts={depts} value={f.departments} onChange={(departments) => setF({ ...f, departments })} />
-                {errors.departments && <p className="mt-1 text-sm text-sale">{errors.departments}</p>}
-              </div>
             </div>
           </Panel>
           <Panel title="موقع المحل على الخريطة">
@@ -376,7 +396,10 @@ export default function Settings() {
             </div>
           </Panel>
         </div>
-        <div className="space-y-4 lg:sticky lg:top-6">
+        </div>
+      </div>
+      <div role="tabpanel" id="settings-panel-look" aria-labelledby="settings-tab-look" hidden={activeTab !== 'look'}>
+        <div className="max-w-2xl space-y-4">
           <Panel title={t('settings.brand')}>
             <div className="space-y-5">
               <ImageSlot label={t('settings.logo')} media={data.store.logo} slot="logo" ratio="1 / 1" round onUploaded={onImage('logo')} onDelete={() => deleteImage('logo')} deleteBusy={deleteBusy === 'logo'} />
@@ -405,6 +428,13 @@ export default function Settings() {
             <ArrowUpRight className="h-5 w-5 text-muted transition group-hover:text-fg rtl:-scale-x-100" />
           </Link>
         </div>
+      </div>
+      <div role="tabpanel" id="settings-panel-sections" aria-labelledby="settings-tab-sections" hidden={activeTab !== 'sections'}>
+        <Panel title={t('settings.departments')}>
+          <p className="mb-2 text-[13px] text-muted">{t('settings.departmentsHint')}</p>
+          <StoreSectionsPicker depts={depts} value={f.departments} onChange={(departments) => setF({ ...f, departments })} />
+          {errors.departments && <p className="mt-1 text-sm text-sale">{errors.departments}</p>}
+        </Panel>
       </div>
       {dashBase === '/dashboard' && <div className="mt-6"><ChangePassword /></div>}
       {dirty && (
