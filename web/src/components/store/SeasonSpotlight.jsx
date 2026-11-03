@@ -1,4 +1,4 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowLeft, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { SEASONS } from '@souqna/shared/layout';
@@ -112,6 +112,7 @@ function SeasonArt({ seasonKey }) {
 export default function SeasonSpotlight() {
   const { store } = useStore();
   const { lang } = useI18n();
+  const reduceMotion = useReducedMotion();
   const seasonKey = store?.customization?.design?.season;
   const season = SEASONS[seasonKey];
   if (!season) return null;
@@ -125,7 +126,7 @@ export default function SeasonSpotlight() {
   return (
     <motion.section
       aria-label={rtl ? `${season.ar} في ${storeName || 'المتجر'}` : `${season.en} at ${storeName || 'the store'}`}
-      initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+      initial={reduceMotion ? false : { opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={reduceMotion ? { duration: 0 } : { duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
       className="container mt-6 sm:mt-8"
       style={{
         '--season-primary': palette.primary,

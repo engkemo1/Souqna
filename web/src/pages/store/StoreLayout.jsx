@@ -38,9 +38,12 @@ export default function StoreLayout() {
     return () => window.removeEventListener('message', on);
   }, [isPreview, !!apiData]); // eslint-disable-line react-hooks/exhaustive-deps
   const data = useMemo(() => {
-    if (!apiData || !preview) return apiData;
+    if (!apiData) return apiData;
     const cz = apiData.store.customization || {};
-    const theme = preview.palette ? buildTheme(preview.palette) : apiData.store.theme;
+    // Keep the merchant's saved/logo-derived brand colours on the live storefront.
+    // A seasonal palette is used only inside the designer preview; the occasion card owns that visual treatment.
+    const theme = preview?.palette ? buildTheme(preview.palette) : apiData.store.theme?.input ? buildTheme(apiData.store.theme.input) : apiData.store.theme;
+    if (!preview) return { ...apiData, store: { ...apiData.store, theme } };
     return { ...apiData, store: { ...apiData.store, theme, customization: { ...cz, design: preview.design || cz.design, sectionsOrder: preview.sectionsOrder || cz.sectionsOrder, hiddenSections: preview.hiddenSections || cz.hiddenSections, flash: preview.flash || cz.flash } } };
   }, [apiData, preview]);
   useTheme(data?.store?.theme?.cssVars);

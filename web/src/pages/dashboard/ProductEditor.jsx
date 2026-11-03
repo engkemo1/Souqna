@@ -345,6 +345,8 @@ export default function ProductEditor() {
     try {
       const r = await api('/owner/categories', { method: 'POST', body: { name_ar: name, name_en: name, parent_id: null } });
       await reloadCats?.();
+      await reloadPicker?.();
+      await reloadPubDepts?.();
       set({ category_id: String(r.category.id), moda_key: '' });
       setCustomType(name);
       toast({ title: r.pending ? L(`اتضاف «${name}» في متجرك. هيظهر في السوق بعد موافقة الإدارة`, `Added “${name}”. It shows on the marketplace once the admin accepts it`) : L(`اتضاف قسم «${name}» في متجرك`, `Added “${name}” to your store`) });
@@ -366,14 +368,15 @@ export default function ProductEditor() {
     try {
       const r = await api('/owner/categories', { method: 'POST', body: { name_ar: name, name_en: name, parent_id: parent ? Number(parent) : null } });
       await reloadCats?.();
+      await reloadPubDepts?.();
       set({ category_id: String(r.category.id) });
       setNewCat(null);
       toast({ title: r.pending ? L(`اتضاف «${name}» في متجرك. هيظهر في السوق بعد موافقة الإدارة`, `Added “${name}” to your store. It shows on the marketplace once the admin accepts it`) : L(`اتضاف قسم «${name}» في متجرك`, `Added “${name}” to your store`) });
     } catch (x) { toast({ tone: 'error', title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى من الأقسام الخاصة (12)', 'Custom section limit reached (12)') : (errorMessage ? errorMessage(x) : (x.message || 'Error')) }); } finally { setCatBusy(false); }
   };
   const { data: tree } = useApi('/owner/product-types');
-  const { data: pubDepts } = useApi('/departments?all=1');
-  const { data: pickerData } = useApi('/owner/category-picker');
+  const { data: pubDepts, reload: reloadPubDepts } = useApi('/departments?all=1');
+  const { data: pickerData, reload: reloadPicker } = useApi('/owner/category-picker');
   const sectionOptions = useMemo(() => (pickerData?.departments || []).filter((d) => d.leaf).map((d) => ({ slug: d.slug, ar: d.name?.ar || '', en: d.name?.en || '', crumb: (d.breadcrumb || []).map((n) => n?.ar).filter(Boolean).join(' › ') })), [pickerData]);
   const [f, setF] = useState(EMPTY);
   const deptDefs = (pubDepts?.departments || []).find((d) => d.slug === f.department)?.attrs || [];
@@ -405,6 +408,13 @@ export default function ProductEditor() {
     }
     if (isNew) { setF(EMPTY); setInitial(EMPTY); setSuggested(false); }
   }, [data, isNew]);
+
+  // A section can be added from the admin or another tab while this editor stays open.
+  // Revalidate the two lists so the new section is available immediately instead of using stale cache data.
+  useEffect(() => {
+    reloadPicker?.();
+    reloadPubDepts?.();
+  }, [reloadPicker, reloadPubDepts]);
 
   const set = (patch) => {
     setF((x) => ({ ...x, ...patch }));

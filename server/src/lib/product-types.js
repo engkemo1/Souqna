@@ -83,7 +83,7 @@ export function deriveDepartment(key, audience, storeDepartments = [], K = loadK
   const byType = {
     dress_bridal: ['women_wedding_dresses', 'women_dresses'], dress_evening: ['women_soiree_dresses', 'women_dresses'], dress_party: ['women_soiree_dresses', 'women_dresses'], dress_casual: ['women_casual_dresses', 'women_dresses'],
     tuxedo: ['men_wedding_suits', 'men_suits'], suit: ['men_formal_suits', 'men_suits'], classic_set: ['men_formal_suits', 'men_suits'], waistcoat: ['men_suits'],
-    jeans: per('pants'), trousers: per('pants'), chinos: per('pants'), skirt: ['women_skirts'],
+    jeans: ['denim', ...per('pants')], trousers: per('pants'), chinos: per('pants'), skirt: ['women_skirts'],
     abaya: ['women_abaya'], jalabiya: ['men_jalabiya'], hijab_set: ['women_hijab'], tarha: ['women_hijab'], sleepwear: per('underwear'),
   }[key] || [];
   const shoesLeaf = { men: ['shoes_men'], women: ['shoes_women'], boys: ['shoes_kids'], girls: ['shoes_kids'], kids: ['shoes_kids'] }[audience] || ['shoes_men', 'shoes_women'];

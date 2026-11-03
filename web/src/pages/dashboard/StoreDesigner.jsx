@@ -219,6 +219,30 @@ function CompletenessMeter({ store, L }) {
   );
 }
 
+function SeasonPicker({ design, setDesign, touch, L }) {
+  return (
+    <Panel title={L('اختار مناسبة متجرك', 'Choose a store occasion')} subtitle={L('اختار مناسبة واحدة، وشكل المتجر والبانر الموسمي يتظبطوا تلقائيًا. تقدر تلغيها في أي وقت.', 'Choose one occasion and your store look updates automatically. You can remove it anytime.')}>
+      <div className="grid gap-3 sm:grid-cols-2" role="group" aria-label={L('اختار مناسبة', 'Choose an occasion')}>
+        <button type="button" aria-pressed={!design.season} onClick={() => touch(() => setDesign((d) => ({ ...d, season: null })))}
+          className={cx('flex min-h-[76px] items-center justify-between rounded-2xl border px-4 text-start transition active:scale-[.98]', !design.season ? 'border-fg bg-fg text-canvas shadow-sm' : 'border-line-strong hover:border-fg')}>
+          <span><span className="block text-sm font-bold">{L('بدون مناسبة', 'No occasion')}</span><span className={cx('mt-1 block text-xs', !design.season ? 'text-canvas/70' : 'text-muted')}>{L('ألوان متجرك العادية', 'Use your store colours')}</span></span>
+          {!design.season && <span className="rounded-full bg-canvas/15 px-2 py-1 text-[11px] font-bold">{L('مختار', 'Selected')}</span>}
+        </button>
+        {SEASON_IDS.map((id) => {
+          const s = SEASONS[id];
+          const selected = design.season === id;
+          return <button key={id} type="button" aria-pressed={selected} onClick={() => touch(() => setDesign((d) => ({ ...d, season: id })))}
+            className={cx('flex min-h-[76px] items-center justify-between gap-3 rounded-2xl border px-4 text-start transition active:scale-[.98]', selected ? 'border-fg shadow-sm ring-2 ring-fg/20' : 'border-line-strong hover:border-fg')}>
+            <span className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 overflow-hidden rounded-xl ring-1 ring-black/10" aria-hidden="true"><span className="flex-1" style={{ background: s.palette.primary }} /><span className="w-1/2" style={{ background: s.palette.accent }} /></span><span className="min-w-0"><span className="block truncate text-sm font-bold">{L(s.ar, s.en)}</span><span className="mt-1 block truncate text-xs text-muted">{L('تصميم جاهز للمناسبة', 'Ready-made seasonal look')}</span></span></span>
+            {selected && <span className="shrink-0 rounded-full bg-fg px-2 py-1 text-[11px] font-bold text-canvas">{L('مختار', 'Selected')}</span>}
+          </button>;
+        })}
+      </div>
+      <p className="mt-3 text-[12.5px] text-muted">{L('التغيير مسودة لحد ما تضغط حفظ.', 'This stays a draft until you press Save.')}</p>
+    </Panel>
+  );
+}
+
 export default function StoreDesigner() {
   const { t, lang } = useI18n();
   const L = (ar, en) => (lang === 'ar' ? ar : en);
@@ -350,6 +374,7 @@ export default function StoreDesigner() {
       <div className="min-w-0 space-y-5">
         <div className="xl:hidden"><Button variant="outline" full onClick={() => setShowPreview(true)}><Smartphone className="h-4 w-4" />{L('معاينة حية للمتجر', 'Live store preview')}</Button></div>
         <CompletenessMeter store={data.store} L={L} />
+        <SeasonPicker design={design} setDesign={setDesign} touch={touch} L={L} />
 
         <Panel title={L('تويلا تصمّم متجرك', 'Twila designs your store')} subtitle={L('احكيلها نوع محلك والإحساس اللي عايزه، وهي تقترح قالب وألوان وجمل جاهزة بالعامية. إنت اللي بتقرر وتعدّل.', 'Tell Twila your store type and vibe; she suggests a template, colours and copy.')}>
           <div className="space-y-4">
@@ -425,13 +450,6 @@ export default function StoreDesigner() {
               </li>
             ))}
           </ul>
-        </Panel>
-
-        <Panel title={L('سكن الموسم', 'Seasonal skin')} subtitle={L('ألوان وجملة إعلان جاهزة للموسم. بتتركّب فوق ألوان متجرك وتتشال بضغطة.', 'Seasonal colours and a ready announcement; removable anytime.')}>
-          <div className="flex flex-wrap gap-2" role="group">
-            <button type="button" aria-pressed={!design.season} onClick={() => touch(() => setDesign((d) => ({ ...d, season: null })))} className={chip(!design.season)}>{L('بدون', 'None')}</button>
-            {SEASON_IDS.map((id) => <button key={id} type="button" aria-pressed={design.season === id} onClick={() => touch(() => setDesign((d) => ({ ...d, season: id })))} className={chip(design.season === id)}>{SEASONS[id].emoji} {L(SEASONS[id].ar, SEASONS[id].en)}</button>)}
-          </div>
         </Panel>
 
         <Panel title={L('عدّاد العرض', 'Offer countdown')} subtitle={L('عدّاد حقيقي بينتهي في الموعد وبعدها بيختفي لوحده. فعّله من قسم "عدّاد العرض" فوق.', 'A real countdown that disappears when it ends.')}>
