@@ -31,7 +31,7 @@ export function MainCard({ dept, feature = false, priority = false }) {
   return (
     <Link to={deptHref(dept.slug)} aria-label={deptName(dept, lang)}
       className={cx('group relative block overflow-hidden rounded-3xl bg-[#EAF0F8] shadow-[0_10px_30px_-18px_rgba(3,36,77,0.45)] ring-1 ring-black/5 transition duration-500 hover:-translate-y-1 hover:shadow-[0_24px_44px_-20px_rgba(3,36,77,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-        feature ? 'aspect-[3/4] lg:aspect-auto lg:h-full lg:min-h-[520px] lg:col-span-2 lg:row-span-2' : 'aspect-[3/4]')}>
+        feature ? 'aspect-[3/4] lg:aspect-auto lg:h-full lg:min-h-[480px] lg:col-span-2 lg:row-span-2' : 'aspect-[4/5] lg:aspect-auto lg:min-h-[190px]')}>
       <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-105"><CategoryImage dept={dept} priority={priority} sizes={feature ? '(min-width:1024px) 50vw, 70vw' : '(min-width:1024px) 25vw, (min-width:640px) 33vw, 70vw'} /></div>
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5">
