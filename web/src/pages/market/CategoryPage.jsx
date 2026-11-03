@@ -74,6 +74,7 @@ export default function CategoryPage() {
   const sibs = (data?.siblings || []).filter(hasContent);
   const circles = [...(own.length ? own : sibs)].sort((x, y) => x.level - y.level);
   const desc = dept?.description?.[lang] || dept?.description?.ar || '';
+  const hasPic = !!(dept?.images?.hero || dept?.images?.card || dept?.image);
 
   return (
     <div className="min-h-dvh bg-[#F6F8FB] text-[#03244D]">
@@ -83,8 +84,9 @@ export default function CategoryPage() {
           <div className="container py-10"><div className="h-56 animate-pulse rounded-3xl bg-fg/5" /></div>
         ) : dept && (
           <>
-            <section className="relative isolate overflow-hidden bg-[#EAF0F8]">
-              <div className="absolute inset-0 -z-10"><CategoryImage dept={dept} priority sizes="100vw" className="opacity-90" /></div>
+            <section className={`relative isolate overflow-hidden ${hasPic ? 'bg-[#EAF0F8]' : 'bg-gradient-to-br from-[#03244D] via-[#0B3A73] to-[#C44300]'}`}>
+              {/* a section with no picture gets a clean brand gradient — the small placeholder tile would look blurry stretched over a full-width banner */}
+              {hasPic && <div className="absolute inset-0 -z-10"><CategoryImage dept={dept} priority sizes="100vw" className="opacity-90" /></div>}
               <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/70 via-black/25 to-black/10" />
               <div className="container flex min-h-[220px] flex-col justify-end py-6 sm:min-h-[300px] sm:py-10">
                 <nav aria-label="breadcrumb" className="mb-3 flex flex-wrap items-center gap-1 text-[13px] text-white/85">

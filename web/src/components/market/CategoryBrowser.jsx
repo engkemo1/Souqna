@@ -3,7 +3,6 @@ import { Check, ChevronDown, ChevronUp } from 'lucide-react';
 import { useDepartments } from '../../lib/departments.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { cx } from '../ui/cx.js';
-import { emojiFor } from '../../lib/deptIcons.js';
 
 /** Visual avatar for a top-level section: photo when there is one, otherwise the section icon on a soft tint. */
 function Avatar({ dept, size = 'lg' }) {
@@ -14,7 +13,7 @@ function Avatar({ dept, size = 'lg' }) {
     <span className={cx('relative block shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-[#EAF0F8] to-[#F8E9DD]', dim)}>
       {url && !err
         ? <img src={url} alt="" loading="lazy" decoding="async" onError={() => setErr(true)} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" />
-        : <span className={cx('grid h-full w-full place-items-center', size === 'lg' ? 'text-3xl' : 'text-lg')} aria-hidden="true">{emojiFor(dept)}</span>}
+        : <img src="/departments/category-placeholder.png" alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" />}
     </span>
   );
 }

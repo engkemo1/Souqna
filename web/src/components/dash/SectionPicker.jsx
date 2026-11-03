@@ -86,14 +86,15 @@ export default function SectionPicker({ value, productName, onChange }) {
 export function AttrFields({ defs, values, onChange, errors = {} }) {
   const { lang } = useI18n();
   const L = (ar, en) => (lang === 'ar' ? ar : en);
-  if (!defs?.length) return null;
+  const usable = (defs || []).filter((d) => !((d.type === 'select' || d.type === 'multi') && !(d.options || []).length && d.type === 'multi'));
+  if (!usable.length) return null;
   const lab = (d) => (lang === 'ar' ? d.ar : d.en || d.ar);
   const set = (k, v) => onChange({ ...values, [k]: v });
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      {defs.map((d) => (
+      {usable.map((d) => (
         <Field key={d.key} label={`${lab(d)}${d.required ? ' *' : ''}${d.merchant_only ? L(' (داخلي)', ' (internal)') : ''}`} error={errors[d.key]}>
-          {d.type === 'select' ? (
+          {d.type === 'select' && (d.options || []).length ? (
             <select className="h-11 w-full rounded-xl border border-line-strong bg-elevated px-3 text-sm" value={values[d.key] || ''} onChange={(e) => set(d.key, e.target.value)}><option value="">—</option>{d.options.map((o) => <option key={o.v} value={o.v}>{lang === 'ar' ? o.ar : o.en || o.ar}</option>)}</select>
           ) : d.type === 'multi' ? (
             <div className="flex flex-wrap gap-2">{d.options.map((o) => { const cur = Array.isArray(values[d.key]) ? values[d.key] : []; const on = cur.includes(o.v); return <button key={o.v} type="button" aria-pressed={on} onClick={() => set(d.key, on ? cur.filter((x) => x !== o.v) : [...cur, o.v])} className={cx('h-9 rounded-full border px-3 text-sm', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong')}>{lang === 'ar' ? o.ar : o.en || o.ar}</button>; })}</div>

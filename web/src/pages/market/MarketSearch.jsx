@@ -55,15 +55,16 @@ export default function MarketSearch() {
   const total = data?.total ?? 0;
   const csv = (k) => (params.get(k) || '').split(',').filter(Boolean);
   const without = (k, v) => set({ [k]: csv(k).filter((x) => x !== v).join(',') });
+  const rootOf = (slug) => { let c = bySlug.get(slug); for (let i = 0; c && c.parent && i < 8; i++) c = bySlug.get(c.parent); return c?.slug; };
   const activeChips = [
     params.get('discount') && { id: 'discount', label: lang === 'ar' ? `خصم ${params.get('discount')}٪+` : `${params.get('discount')}%+ off`, remove: () => set({ discount: '' }) },
     params.get('rating') && { id: 'rating', label: lang === 'ar' ? `${params.get('rating') === '3' ? 3 : 4} نجوم فأكثر` : `${params.get('rating') === '3' ? 3 : 4}★ & up`, remove: () => set({ rating: '' }) },
     ...(data?.facets?.attrs || []).flatMap((f) => csv(`a_${f.key}`).map((v) => ({ id: `a-${f.key}-${v}`, label: `${f.name[lang] || f.name.ar}: ${(f.options.find((o) => o.v === v) || {})[lang] || v}`, remove: () => without(`a_${f.key}`, v) }))),
     ...csv('material').map((k) => ({ id: `mat-${k}`, label: (data?.facets?.materials || []).find((x) => x.key === k)?.name?.[lang] || k, remove: () => without('material', k) })),
     params.get('category') && { id: 'category', label: (data?.facets?.categories || []).find((c) => c.key === params.get('category'))?.name?.[lang] || params.get('category'), remove: () => set({ category: '' }) },
-    params.get('audience') && { id: 'audience', label: ({ men: 'رجالي', women: 'حريمي', boys: 'ولادي', girls: 'بناتي', kids: 'أطفال', unisex: 'للجنسين' })[params.get('audience')] || params.get('audience'), remove: () => set({ audience: '' }) },
-    department && { id: 'department', label: pathLabel(department), remove: () => set({ department: '' }) },
-    (params.get('min') || params.get('max')) && { id: 'price', label: `${params.get('min') || 0} – ${params.get('max') || '∞'} ${t('search.price').includes('EGP') ? 'EGP' : 'ج.م'}`, remove: () => set({ min: '', max: '' }) },
+    params.get('audience') && !(department && rootOf(department) === params.get('audience')) && { id: 'audience', label: ({ men: 'رجالي', women: 'حريمي', boys: 'ولادي', girls: 'بناتي', kids: 'أطفال', unisex: 'للجنسين' })[params.get('audience')] || params.get('audience'), remove: () => set({ audience: '' }) },
+    department && { id: 'department', label: label(department), title: pathLabel(department), remove: () => set({ department: '' }) },
+    (params.get('min') || params.get('max')) && { id: 'price', label: lang === 'ar' ? (params.get('max') ? `من ${params.get('min') || 0} إلى ${params.get('max')} ج.م` : `من ${params.get('min') || 0} ج.م فأكثر`) : `${params.get('min') || 0} – ${params.get('max') || '∞'} EGP`, remove: () => set({ min: '', max: '' }) },
     ...[['sale', 'search.onSale'], ['in_stock', 'search.inStock'], ['same_day', 'sameday.filter']].filter(([k]) => params.get(k) === '1').map(([k, m]) => ({ id: k, label: t(m), remove: () => set({ [k]: '' }) })),
     params.get('new') && { id: 'new', label: t('search.lastDays', { n: formatNumber(Number(params.get('new')) > 1 ? Number(params.get('new')) : 30, lang) }), remove: () => set({ new: '' }) },
     params.get('store') && { id: 'store', label: (data?.facets?.stores || []).find((x) => x.slug === params.get('store'))?.name?.[lang] || params.get('store'), remove: () => set({ store: '' }) },
@@ -111,7 +112,7 @@ export default function MarketSearch() {
         {activeCount > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-2" aria-label={t('search.activeFilters')}>
             {activeChips.map((c) => (
-              <button key={c.id} type="button" onClick={c.remove} className="inline-flex h-9 items-center gap-2 rounded-full border border-line-strong bg-elevated ps-3.5 pe-2.5 text-sm font-medium transition hover:border-fg">
+              <button key={c.id} type="button" onClick={c.remove} title={c.title} className="inline-flex h-9 items-center gap-2 rounded-full border border-line-strong bg-elevated ps-3.5 pe-2.5 text-sm font-medium transition hover:border-fg">
                 {c.swatch && <span className="h-4 w-4 rounded-full border border-black/10" style={{ background: c.swatch }} />}
                 {c.label}<X className="h-3.5 w-3.5 text-muted" aria-label="remove" />
               </button>
@@ -121,7 +122,7 @@ export default function MarketSearch() {
         )}
         <p className="mb-5 text-sm text-muted" aria-live="polite">
           {loading && !data ? t('common.loading') : q || department
-            ? t('search.results', { n: formatNumber(total, lang), range: data?.price?.max ? `${formatMoney(data.price.min, lang)} – ${formatMoney(data.price.max, lang)}` : '' })
+            ? t('search.results', { n: formatNumber(total, lang), range: data?.price?.max ? (lang === 'ar' ? `(الأسعار من ${formatMoney(data.price.min, lang)} إلى ${formatMoney(data.price.max, lang)})` : `${formatMoney(data.price.min, lang)} – ${formatMoney(data.price.max, lang)}`) : '' })
             : t('search.allProducts', { n: formatNumber(total, lang) })}
         </p>
 

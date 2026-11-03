@@ -71,11 +71,14 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
 
         {/* badges */}
         <div className="pointer-events-none absolute start-2.5 top-2.5 flex flex-col items-start gap-1.5 sm:start-3 sm:top-3">
-          {p.badge && <span className={cx('rounded-full px-2 py-0.5 text-xs font-bold', tone)}>{p.badge.text}</span>}
-          {p.discount > 0 && <span className="rounded-full bg-sale px-2 py-0.5 text-xs font-bold text-on-sale tabular sm:text-xs">-{p.discount}%</span>}
-          {p.offer && !out && <OfferChip offer={p.offer} className="max-w-[9.5rem]" />}
-          {p.sameDay && !out && <SameDayBadge />}
-          {p.isNew && !out && <span className="rounded-full bg-neutral-900/85 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur sm:text-xs">{t('product.new')}</span>}
+          {/* One or two badges at most, by priority — a stack of three reads as noise. */}
+          {[
+            p.badge && <span key="b" className={cx('rounded-full px-2 py-0.5 text-xs font-bold', tone)}>{p.badge.text}</span>,
+            p.discount > 0 && <span key="d" className="rounded-full bg-sale px-2 py-0.5 text-xs font-bold text-on-sale tabular sm:text-xs">-{p.discount}%</span>,
+            p.offer && !out && <OfferChip key="o" offer={p.offer} className="max-w-[9.5rem]" />,
+            p.sameDay && !out && <SameDayBadge key="s" />,
+            p.isNew && !out && <span key="n" className="rounded-full bg-neutral-900/85 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur sm:text-xs">{t('product.new')}</span>,
+          ].filter(Boolean).slice(0, 2)}
         </div>
         {out && (
           <span className="absolute inset-x-2.5 bottom-2.5 rounded-xl bg-white/90 py-2 text-center text-xs font-semibold text-neutral-900 backdrop-blur sm:inset-x-3 sm:bottom-3">{t('product.outOfStock')}</span>
@@ -110,7 +113,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
       </button>
 
       <div className={cx('flex flex-1 flex-col pt-3', bubble && 'px-1.5')}>
-        {showStore && p.store && <span className="mb-0.5 truncate text-xs font-medium text-muted">{tr(p.store.name)}</span>}
+        {showStore && p.store && <span className="mb-0.5 truncate text-[13px] font-medium text-fg/70">{tr(p.store.name)}</span>}
         <div className="flex items-start justify-between gap-2">
           <Link to={href} className="line-clamp-2 min-h-[2.5em] text-[13.5px] font-medium leading-snug text-fg hover:text-brand sm:text-base">{tr(p.name)}</Link>
           {/* mobile quick add */}

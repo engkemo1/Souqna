@@ -639,7 +639,7 @@ export default function ProductEditor() {
                 <div className="flex gap-2"><button type="button" disabled={catBusy} onClick={addCat} className="h-10 flex-1 rounded-xl bg-fg text-sm font-semibold text-canvas disabled:opacity-60">{catBusy ? '…' : L('إضافة واختيار', 'Add & select')}</button><button type="button" onClick={() => setNewCat(null)} className="h-10 rounded-xl border border-line-strong px-4 text-sm">{L('إلغاء', 'Cancel')}</button></div>
               </div>
             ) : (
-              <button type="button" onClick={() => setNewCat({ name: '', parent: '' })} className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-brand hover:bg-brand/10"><Plus className="h-3.5 w-3.5" />{L('مش لاقي القسم؟ أضف قسم جديد', 'Add a new section')}</button>
+              <button type="button" onClick={() => setNewCat({ name: '', parent: '' })} className="mt-2 inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-brand hover:bg-brand/10"><Plus className="h-3.5 w-3.5" />{L('إضافة مجموعة جديدة في متجرك', 'Add a new group in your store')}</button>
             )}
           </Field>
         )}

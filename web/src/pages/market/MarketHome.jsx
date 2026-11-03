@@ -9,6 +9,7 @@ import { sp } from '../../lib/store.jsx';
 import Brand from '../../components/market/Brand.jsx';
 import SocialLinks from '../../components/market/SocialLinks.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
+import MobileHomeSearch from '../../components/market/MobileHomeSearch.jsx';
 import StylistChat from '../../components/market/StylistChat.jsx';
 import ModaAvatar from '../../components/market/ModaAvatar.jsx';
 import WearThis from '../../components/market/WearThis.jsx';
@@ -118,22 +119,19 @@ export default function MarketHome() {
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full bg-[#EAF0F8] px-4 py-2 text-[13px] font-bold text-brand">
               <MapPin className="h-4 w-4" /><span>{lang === 'ar' ? 'اكتشف محلات الملابس في بنها' : 'Discover Banha clothing stores'}</span>
             </motion.div>
-            <h1 className="mt-3 font-display text-[clamp(2.25rem,1.4rem+3vw,4.15rem)] font-black leading-[1.18] tracking-tight text-[#101d3a] sm:mt-4">
+            <MobileHomeSearch />
+            <h1 className="mt-3 font-display text-[1.75rem] sm:text-[clamp(2.25rem,1.4rem+3vw,4.15rem)] font-black leading-[1.18] tracking-tight text-[#101d3a] sm:mt-4">
               <span className="block">{t('market.heroTitle').split('\n')[0]}</span>
               <span className="relative mt-1 inline-block pb-2 text-primary">{t('market.heroTitle').split('\n')[1]}<svg aria-hidden="true" viewBox="0 0 180 10" preserveAspectRatio="none" className="absolute bottom-0 end-0 h-2 w-[42%] text-primary"><path d="M2 6 C28 1 46 9 72 5 S124 2 178 5" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" /></svg></span>
             </h1>
-            <p className="mt-3 max-w-xl text-sm leading-7 text-[#43516a] sm:mt-4 sm:text-base sm:leading-8 lg:text-[18px]">{t('market.heroBody')}</p>
+            <p className="mt-3 hidden max-w-xl text-sm leading-7 text-[#43516a] sm:mt-4 sm:text-base sm:leading-8 lg:text-[18px] sm:block">{t('market.heroBody')}</p>
 
-            <div className="mt-5 grid grid-cols-2 gap-2.5 sm:hidden">
-              <Link to="/visual" className="flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-btn px-3 py-3 text-sm font-bold text-on-btn shadow-sm"><Camera className="h-5 w-5" />{t('market.searchByPhoto')}</Link>
-              <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: {} }))} className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border-[1.5px] border-[#F8620A] bg-white px-3 py-3 text-sm font-bold text-[#03244D]"><ModaAvatar src={base?.features?.stylistAvatar || null} size={28} ring={false} />{t('market.askStylist')}</button>
-            </div>
-            <div className="mt-5 flex gap-2.5">
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:gap-2.5">
               <Link to="/stores" className="flex flex-1 items-center justify-center rounded-2xl bg-btn px-3 py-3.5 text-sm shadow-[0_10px_24px_-8px_rgba(3,36,77,.55)] font-bold text-on-btn transition hover:brightness-95 sm:flex-none sm:px-7">{t('market.exploreStores')}</Link>
-              <Link to="/join" className="flex flex-1 items-center justify-center rounded-2xl border-[1.5px] border-[#F8620A] bg-white px-3 py-3.5 text-sm font-bold text-[#03244D] transition hover:bg-[#FFF3EB] sm:flex-none sm:px-7">{t('market.openStore')}</Link>
+              <Link to="/join" className="flex flex-1 items-center justify-center rounded-2xl px-3 py-2 text-sm font-bold text-brand underline-offset-4 transition hover:underline sm:flex-none sm:border-[1.5px] sm:border-[#F8620A] sm:bg-white sm:px-7 sm:py-3.5 sm:text-[#03244D] sm:no-underline sm:hover:bg-[#FFF3EB]">{t('market.openStore')}</Link>
             </div>
 
-            <div className="mt-4 flex gap-2 overflow-x-auto pb-1 scrollbar-none lg:hidden">
+            <div className="mt-4 hidden gap-2 overflow-x-auto pb-1 scrollbar-none sm:flex lg:hidden">
               {[
                 ['women', t('cat.women'), '/search?audience=women'],
                 ['men', t('cat.men'), '/search?audience=men'],
@@ -143,7 +141,7 @@ export default function MarketHome() {
               ].map(([slug, label, href]) => <Link key={slug} to={href} className="shrink-0 rounded-full border-[1.5px] border-[#F8620A] bg-white px-3.5 py-2 text-xs font-semibold text-[#03244D]">{label}</Link>)}
             </div>
 
-            <Link to="/stores" className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-white bg-white/85 px-3.5 py-3 shadow-[0_8px_24px_rgba(3,36,77,.07)] backdrop-blur lg:hidden">
+            <Link to="/stores" className="mt-3 hidden items-center justify-between gap-3 rounded-2xl border border-white bg-white/85 px-3.5 py-3 shadow-[0_8px_24px_rgba(3,36,77,.07)] backdrop-blur sm:flex lg:hidden">
               <span className="flex min-w-0 items-center gap-3">
                 <span className="flex -space-x-2 rtl:space-x-reverse">
                   {(base?.stores || []).filter((store) => store.cover).slice(0, 3).map((store) => <SmartImage key={store.id} media={store.cover} alt={tr(store.name)} ratio="1 / 1" sizes="36px" className="h-9 w-9 rounded-full border-2 border-white" />)}

@@ -111,7 +111,7 @@ export default function SearchFilters({ params, set, facets, departments, label,
         </Group>
       )}
 
-      {facets?.categories?.length > 0 && (
+      {facets?.categories?.length > 0 && (!params.get('department') || params.get('category')) && (
         <Group title={t('search.category')} badge={params.get('category') ? 1 : 0}>
           <ul className="space-y-0.5">
             <ShowMore items={facets.categories} limit={8} lang={lang} keepOpen={(c) => params.get('category') === c.key} render={(c) => {
@@ -187,7 +187,7 @@ export default function SearchFilters({ params, set, facets, departments, label,
         <ul className="mb-3 space-y-0.5">
           {PRICE_BANDS.map(([lo, hi]) => {
             const on = (params.get('min') || '') === (lo ? String(lo) : '') && (params.get('max') || '') === (hi ? String(hi) : '');
-            const text = !lo ? t('search.under', { n: formatNumber(hi, lang) }) : !hi ? t('search.above', { n: formatNumber(lo, lang) }) : `${formatNumber(lo, lang)} – ${formatNumber(hi, lang)}`;
+            const text = !lo ? t('search.under', { n: formatNumber(hi, lang) }) : !hi ? t('search.above', { n: formatNumber(lo, lang) }) : lang === 'ar' ? `من ${formatNumber(lo, lang)} إلى ${formatNumber(hi, lang)}` : `${formatNumber(lo, lang)} – ${formatNumber(hi, lang)}`;
             return (
               <li key={`${lo}-${hi}`}>
                 <button type="button" aria-pressed={on} onClick={() => set({ min: on || !lo ? '' : String(lo), max: on || !hi ? '' : String(hi) })}

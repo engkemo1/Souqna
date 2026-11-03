@@ -25,10 +25,10 @@ export default function CategoryHeader({ department, bySlug, childrenOf, onPick 
       <h1 className="font-display text-2xl font-bold sm:text-3xl">{nm(d)}</h1>
       {desc && <p className="mt-1.5 max-w-2xl text-sm text-muted">{desc}</p>}
       {kids.length > 0 && (
-        <div className="scroll-x -mx-4 mt-4 gap-2.5 px-4 sm:mx-0 sm:flex-wrap sm:px-0" role="list">
+        <div className="lg:hidden scroll-x -mx-4 mt-4 gap-2.5 px-4 sm:mx-0 sm:flex-wrap sm:px-0" role="list">
           {kids.map((k) => (
             <button key={k.slug} role="listitem" type="button" onClick={() => onPick(k.slug)} className="inline-flex shrink-0 items-center gap-2 rounded-full border border-line-strong bg-elevated py-1.5 ps-1.5 pe-4 text-sm font-semibold transition hover:border-fg">
-              <span className="h-8 w-8 overflow-hidden rounded-full bg-secondary">{k.image ? <SmartImage media={k.image} ratio="1 / 1" sizes="32px" className="h-full w-full object-cover" /> : null}</span>{nm(k)}
+              <span className="h-8 w-8 overflow-hidden rounded-full bg-secondary">{k.image ? <SmartImage media={k.image} ratio="1 / 1" sizes="32px" className="h-full w-full object-cover" /> : <img src="/departments/category-placeholder.png" alt="" loading="lazy" className="h-full w-full object-cover" />}</span>{nm(k)}
             </button>
           ))}
         </div>
