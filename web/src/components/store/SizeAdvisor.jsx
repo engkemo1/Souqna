@@ -60,7 +60,7 @@ export default function SizeAdvisor({ product, onPick }) {
   const [weight, setWeight] = useState(init.weight || '');
   const [foot, setFoot] = useState(init.foot || '');
   const [res, setRes] = useState(null);
-  const chart = !kind && product.sizes?.length && !NO_CHART.includes(product.department) ? (product.department === 'kids' ? 'kids' : 'body') : null;
+  const chart = !kind && product.sizes?.length && !NO_CHART.includes(product.department) && !/perfume|fragrance|عطر|برفان/i.test(product.department || '') ? (product.department === 'kids' ? 'kids' : 'body') : null;
   if (!kind && chart) {
     return (
       <>

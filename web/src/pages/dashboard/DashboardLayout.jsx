@@ -99,7 +99,26 @@ function Sidebar({ pending }) {
             <p className="truncate text-xs text-muted">{user.email}</p>
           </div>
           <div className="flex flex-col items-center gap-1 lg:flex-row">
-            <LangToggle stacked />
+            <LangToggle compact />
+            <button type="button" onClick={logout} title={t('auth.logout')} aria-label={t('auth.logout')} className="grid h-11 w-11 place-items-center rounded-full text-muted transition hover:bg-fg/[0.06] hover:text-sale"><LogOut className="h-[18px] w-[18px] rtl:-scale-x-100" /></button>
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+function MobileTop() {
+  const { store } = useAuth();
+  const { t, tr, lang } = useI18n();
+  return (
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-line bg-elevated/90 px-4 backdrop-blur-md md:hidden">
+      <Link to="/dashboard" className="flex min-w-0 items-center gap-2.5">
+        <StoreLogo store={store} size={32} className="h-8 w-8" />
+        <span className="truncate text-base font-semibold">{tr(store.name)}</span>
+      </Link>
+      <div className="flex items-center">
+        <LangToggle stacked />
         <StoreQrButton store={store} className="flex h-12 min-w-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-[10px] font-semibold leading-none text-fg/80 hover:bg-fg/[0.06] active:scale-95"><QrCode className="h-5 w-5" /><span>{lang === 'ar' ? 'كود QR' : 'QR code'}</span></StoreQrButton>
         <a href={`/s/${store.slug}`} target="_blank" rel="noreferrer" aria-label={t('dash.viewStore')} className="flex h-12 min-w-[52px] flex-col items-center justify-center gap-0.5 rounded-xl px-1.5 text-[10px] font-semibold leading-none text-fg/80 hover:bg-fg/[0.06] active:scale-95"><ExternalLink className="h-5 w-5" /><span>{lang === 'ar' ? 'متجرك' : 'My store'}</span></a>
       </div>

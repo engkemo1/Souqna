@@ -36,6 +36,14 @@ const EMPTY = {
 };
 const STYLE_LEVELS = [['1', 'بيتي'], ['2', 'كاجوال'], ['3', 'شيك'], ['4', 'رسمي'], ['5', 'سواريه']];
 
+// one spelling for packs/volumes ("50جم", "50 gm", "٥٠ جرام" → "50 جم") so the same size is never added twice
+const normPack = (raw) => String(raw || '')
+  .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+  .replace(/(\d)\s*(?=[A-Za-z\u0600-\u06FF])/g, '$1 ')
+  .replace(/\b(ml|ML|Ml)\b/g, 'مل')
+  .replace(/\b(g|gm|gr|gram|grams|G|GM)\b/g, 'جم')
+  .replace(/(?<![\u0600-\u06FF])(جرام|غرام|جم|غم)(?![\u0600-\u06FF])/g, 'جم')
+  .replace(/\s+/g, ' ').trim();
 const vkey = (c, s) => `${c || '-'}|${s || '-'}`;
 const nz = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ًٌٍَُِّْ]/g, '').trim();
 
@@ -211,12 +219,15 @@ function ColorPicker({ open, onClose, onAdd, existing }) {
 }
 
 
-function VariantsEditor({ f, set, sizeKind, typeChosen }) {
+function VariantsEditor({ f, set, sizeKind, typeChosen, mode = 'general', hasColors, setHasColors }) {
   const { t, tr, lang } = useI18n();
   const L = (ar, en) => (lang === 'ar' ? ar : en);
   const [picker, setPicker] = useState(false);
   const [customSize, setCustomSize] = useState('');
   const [fill, setFill] = useState('');
+  const [rowFill, setRowFill] = useState({}); // per-colour "same quantity for this whole row"
+  const showRowFill = f.colors.length > 0 && f.sizes.length > 1;
+  const applyRow = (c) => { const v = rowFill[c.hex] ?? ''; if (v === '') return; const m = { ...f.matrix }; cols.forEach((s) => { m[vkey(c.hex, s)] = v; }); set({ matrix: m }); setRowFill((r) => ({ ...r, [c.hex]: '' })); };
   const toggleSize = (s) => set({ sizes: f.sizes.includes(s) ? f.sizes.filter((x) => x !== s) : [...f.sizes, s] });
   const toggleColor = ([hex, ar, en]) => set({ colors: f.colors.some((c) => c.hex.toUpperCase() === hex) ? f.colors.filter((c) => c.hex.toUpperCase() !== hex) : [...f.colors, { hex, name_ar: ar, name_en: en }] });
   const rows = f.colors.length ? f.colors : [null];
@@ -224,16 +235,25 @@ function VariantsEditor({ f, set, sizeKind, typeChosen }) {
   const total = rows.reduce((sum, c) => sum + cols.reduce((s2, s) => s2 + Number(f.matrix[vkey(c?.hex, s)] || 0), 0), 0);
   const setCell = (c, s, v) => set({ matrix: { ...f.matrix, [vkey(c?.hex, s)]: v.replace(/\D/g, '') } });
   const hasMatrix = (f.colors.length || f.sizes.length) && f.track_stock;
-  const kindSizes = sizeKind?.sizes || [];
+  const PERFUME_SIZES = ['30 مل', '50 مل', '100 مل', '10 مل', '20 مل', '75 مل', '125 مل', '150 مل', '200 مل']; // 30/50/100 are the common ones, so they come first
+  const SKIN_SIZES = ['30 مل', '50 مل', '100 مل']; // skincare: common sizes + «حجم تاني»
+  const BEAUTY_SIZES = []; // makeup: shade is the real choice; the pack is typed freely (علبة 50 جم، تيوب 30 مل، 3 قطع)
+  const kindSizes = (sizeKind?.sizes?.length ? sizeKind.sizes : (mode === 'perfume' ? PERFUME_SIZES : mode === 'skincare' ? SKIN_SIZES : mode === 'beauty' ? BEAUTY_SIZES : [])) || [];
+  // "does it come in colours?": off by default for perfumes and accessories; turning it off clears the colours
   const extra = f.sizes.filter((s) => !kindSizes.includes(s));
-  const noSizes = typeChosen && sizeKind && kindSizes.length === 0;
+  const noSizes = typeChosen && mode !== 'beauty' && ((sizeKind && kindSizes.length === 0) || (mode === 'accessories' && kindSizes.length === 0));
   const customColors = f.colors.filter((c) => !PRESET_COLORS.some(([h]) => h === c.hex.toUpperCase()));
 
   return (
     <div className="space-y-6">
       <div>
-        <p className="mb-2.5 text-sm font-medium">{t('editor.colors')} <span className="font-normal text-muted">· {L('اختار كل الألوان المتاحة', 'tick every colour you have')}</span></p>
-        <div className="flex flex-wrap gap-2.5">
+        <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-medium">{mode === 'beauty' ? L('الدرجات', 'Shades') : t('editor.colors')} <span className="font-normal text-muted">· {hasColors ? (mode === 'beauty' ? L('اختار كل الدرجات المتاحة', 'tick every shade you have') : L('اختار كل الألوان المتاحة', 'tick every colour you have')) : (mode === 'perfume' ? L('العطر مالوش ألوان', 'Perfumes have no colours') : mode === 'beauty' ? L('فعّلها لو المنتج ليه درجات (زي أحمر الشفاه والفاونديشن)', 'turn on if it has shades (lipstick, foundation)') : L('اختياري', 'Optional'))}</span></p>
+          <button type="button" role="switch" aria-checked={hasColors} onClick={() => { if (hasColors) { set({ colors: [] }); setHasColors(false); } else setHasColors(true); }} className="inline-flex h-8 items-center gap-2 rounded-full border border-line-strong px-3 text-[12.5px] font-semibold transition hover:border-fg">
+            <span className={cx('h-3.5 w-3.5 rounded-full border', hasColors ? 'border-brand bg-brand' : 'border-line-strong')} aria-hidden="true" />{hasColors ? (mode === 'beauty' ? L('المنتج بدرجات', 'Has shades') : L('المنتج بألوان', 'Has colours')) : (mode === 'beauty' ? L('من غير درجات', 'No shades') : L('من غير ألوان', 'No colours'))}
+          </button>
+        </div>
+        {hasColors && (<div className="flex flex-wrap gap-2.5">
           {PRESET_COLORS.map((p) => {
             const on = f.colors.some((c) => c.hex.toUpperCase() === p[0]);
             return (
@@ -250,21 +270,21 @@ function VariantsEditor({ f, set, sizeKind, typeChosen }) {
             </button>
           ))}
           <button type="button" onClick={() => setPicker(true)} className="flex w-14 flex-col items-center gap-1 text-[11.5px] font-semibold text-brand"><span className="grid h-10 w-10 place-items-center rounded-full border border-dashed border-line-strong"><Plus className="h-4 w-4" /></span>{L('لون تاني', 'Other')}</button>
-        </div>
+        </div>)}
       </div>
 
       {noSizes ? (
-        <p className="rounded-xl bg-secondary/50 px-4 py-3 text-sm text-muted">{L('النوع ده من غير مقاسات — اكتب الكمية بس.', 'This type has no sizes — just enter the quantity.')}</p>
+        <p className="rounded-xl bg-secondary/50 px-4 py-3 text-sm text-muted">{mode === 'accessories' ? L('الإكسسوارات غالبًا من غير مقاسات. اختار الألوان لو المنتج ليه ألوان، واكتب الكمية.', 'Accessories usually have no sizes. Pick colours if it has any, then enter the quantity.') : L('النوع ده من غير مقاسات — اكتب الكمية بس.', 'This type has no sizes — just enter the quantity.')}</p>
       ) : (
         <div>
-          <p className="mb-2.5 text-sm font-medium">{t('editor.sizes')} {sizeKind && <span className="font-normal text-muted">· {sizeKind.ar}</span>}</p>
+          <p className="mb-2.5 text-sm font-medium">{mode === 'perfume' || mode === 'skincare' ? L('الحجم', 'Volume') : mode === 'beauty' ? L('الكمية أو العبوة', 'Quantity or pack') : t('editor.sizes')} {sizeKind?.ar && <span className="font-normal text-muted">· {sizeKind.ar}</span>}{(mode === 'perfume' || mode === 'beauty' || mode === 'skincare') && <span className="font-normal text-muted">· {mode === 'beauty' ? L('اختياري. لو فيه أكتر من عبوة بسعر أو كمية مختلفة، ضيف كل عبوة لوحدها (بتتسجل كاختيار مستقل)', 'optional. If you have several packs with a different price or stock, add each pack separately (each is its own option)') : mode === 'skincare' ? L('اختياري. اختار الأحجام المتاحة، أو اضغط «حجم تاني»', 'optional. Tick the sizes you have, or add another size') : L('اختار الأحجام المتاحة، أو اكتب حجم تاني', 'tick the volumes you have, or add another')}</span>}</p>
           {!typeChosen && <p className="mb-2 text-[13px] text-amber-700">{L('اختار نوع المنتج فوق عشان تظهرلك المقاسات المناسبة له.', 'Pick the product type above to see its sizes.')}</p>}
           <div className="flex flex-wrap gap-2">
             {kindSizes.map((s) => { const on = f.sizes.includes(s); return <button key={s} type="button" onClick={() => toggleSize(s)} aria-pressed={on} className={cx('h-10 min-w-[3rem] rounded-xl border px-3 text-sm font-semibold transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{s}</button>; })}
             {extra.map((s) => <button key={s} type="button" onClick={() => toggleSize(s)} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-fg bg-fg px-3 text-sm font-semibold text-canvas">{s}<X className="h-3.5 w-3.5" /></button>)}
           </div>
-          <form className="mt-2.5 flex max-w-xs gap-2" onSubmit={(e) => { e.preventDefault(); const s = customSize.trim(); if (s && !f.sizes.includes(s)) set({ sizes: [...f.sizes, s] }); setCustomSize(''); }}>
-            <Input size="sm" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder={t('editor.customSize')} maxLength={12} />
+          <form className={cx('mt-2.5 flex gap-2', mode === 'beauty' ? 'max-w-md' : 'max-w-xs')} onSubmit={(e) => { e.preventDefault(); const s = mode === 'general' || mode === 'accessories' ? customSize.trim() : normPack(customSize); if (s && !f.sizes.includes(s)) set({ sizes: [...f.sizes, s] }); setCustomSize(''); }}>
+            <Input size="sm" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder={mode === 'perfume' || mode === 'skincare' ? L('حجم تاني (مثلًا 25 مل)', 'Other volume (e.g. 25 ml)') : mode === 'beauty' ? L('مثال: علبة 50 جم، تيوب 30 مل، زجاجة 100 مل، 3 قطع', 'e.g. box 50 g, tube 30 ml, bottle 100 ml, 3 pieces') : t('editor.customSize')} maxLength={mode === 'beauty' ? 30 : 12} />
             <Button type="submit" size="sm" variant="outline" icon={Plus} aria-label={t('common.add')} />
           </form>
         </div>
@@ -279,10 +299,16 @@ function VariantsEditor({ f, set, sizeKind, typeChosen }) {
               <Button type="submit" size="sm" variant="secondary">{t('editor.fillAll')}</Button>
             </form>
           </div>
+          <p className="mb-2.5 rounded-xl bg-secondary/60 px-3.5 py-2.5 text-[13px] leading-relaxed text-muted">
+            {f.colors.length && f.sizes.length
+              ? L('اكتب عدد القطع المتاحة في كل خانة: الصف هو اللون والعمود هو المقاس. اللي خلص اكتب له 0. ولو الكمية واحدة للكل، اكتب الرقم فوق واضغط «نفس الكمية للكل». ولو كل مقاسات لون واحد كميتها واحدة، اكتبها جنب اسم اللون واضغط «طبّق».', 'Enter how many pieces you have in each cell: the row is the colour and the column is the size. Put 0 for sold out. If every cell is the same, type the number above and press “Same quantity for all”.')
+              : L('اكتب عدد القطع المتاحة من كل اختيار. اللي خلص اكتب له 0.', 'Enter how many pieces you have of each option. Put 0 for sold out.')}
+          </p>
           <div className="-mx-5 overflow-x-auto px-5 sm:mx-0 sm:px-0">
             <table className="min-w-full border-separate border-spacing-0 overflow-hidden rounded-xl border border-line text-sm">
               <thead><tr className="bg-surface">
                 <th className="sticky start-0 z-10 bg-surface px-3 py-2.5 text-start font-medium text-muted" />
+                {showRowFill && <th className="px-2 py-2.5 text-center text-[11.5px] font-medium leading-tight text-muted">{L('نفس الكمية لكل المقاسات', 'Same for all sizes')}</th>}
                 {cols.map((s) => <th key={s ?? '-'} className="px-2 py-2.5 text-center font-semibold">{s ?? t('editor.stock')}</th>)}
               </tr></thead>
               <tbody>
@@ -291,6 +317,14 @@ function VariantsEditor({ f, set, sizeKind, typeChosen }) {
                     <th className="sticky start-0 z-10 whitespace-nowrap border-t border-line bg-elevated px-3 py-2 text-start font-medium">
                       {c ? <span className="inline-flex items-center gap-2"><span className="h-4 w-4 rounded-full ring-1 ring-inset ring-black/10" style={{ background: c.hex }} />{tr({ ar: c.name_ar, en: c.name_en })}</span> : t('editor.stock')}
                     </th>
+                    {showRowFill && (c ? (
+                      <td className="border-t border-line px-1.5 py-1.5">
+                        <form className="flex items-center justify-center gap-1" onSubmit={(e) => { e.preventDefault(); applyRow(c); }}>
+                          <input inputMode="numeric" value={rowFill[c.hex] ?? ''} onChange={(e) => setRowFill((r) => ({ ...r, [c.hex]: e.target.value.replace(/\D/g, '') }))} placeholder="0" aria-label={L('نفس الكمية لكل مقاسات اللون', 'Same quantity for every size of this colour')} className="h-10 w-12 rounded-lg border border-line bg-elevated text-center tabular outline-none transition focus:border-ring focus:shadow-ring" />
+                          <button type="submit" className="h-10 rounded-lg border border-line-strong px-2 text-[12.5px] font-semibold transition hover:border-fg active:scale-95">{L('طبّق', 'Apply')}</button>
+                        </form>
+                      </td>
+                    ) : <td />)}
                     {cols.map((s) => (
                       <td key={s ?? '-'} className="border-t border-line px-1.5 py-1.5 text-center">
                         <input inputMode="numeric" value={f.matrix[vkey(c?.hex, s)] ?? ''} onChange={(e) => setCell(c, s, e.target.value)} placeholder="0" aria-label={`${c?.name_en || ''} ${s || ''}`}
@@ -425,6 +459,27 @@ export default function ProductEditor() {
   const type = types.find((ty) => ty.key === f.moda_key) || null;
   const deptSizes = (pubDepts?.departments || []).find((d) => d.slug === f.department)?.sizes || [];
   const sizeKind = tree && type ? tree.sizeKinds[type.sizeKind[f.audience || 'unisex']] : (deptSizes.length ? { ar: '', sizes: deptSizes } : null);
+  // perfumes have no colours (they come in volumes); accessories rarely have sizes. Detected from the chosen type / department.
+  const variantMode = (() => {
+    const dept = (pubDepts?.departments || []).find((d) => d.slug === f.department);
+    const txt = [f.department, f.moda_key, customType, type?.key, type?.ar, type?.family?.key, type?.family?.ar, dept?.name?.ar, dept?.name?.en].filter((x) => typeof x === 'string').join(' ').toLowerCase();
+    const typeTxt = [f.moda_key, customType, type?.key, type?.ar, type?.family?.key, type?.family?.ar].filter((x) => typeof x === 'string').join(' ').toLowerCase();
+    const SKIN = /skincare|skin care|serum|lotion|moisturi|cleanser|sunscreen|سيروم|لوشن|مرطب|غسول|واقي شمس|بشرة|عناية|كريم/;
+    const MAKEUP = /makeup|make-up|make up|lipstick|foundation|mascara|eyeshadow|cosmetic|مكياج|ميك اب|ميكب|روج|احمر شفاه|أحمر شفاه|فاونديشن|ماسكارا|تجميل/;
+    for (const x of [typeTxt, txt]) {
+      if (/perfume|fragrance|عطر|برفان|بيرفيوم/.test(x)) return 'perfume';
+      if (/accessor|اكسسوار|إكسسوار|أكسسوار/.test(x)) return 'accessories';
+      if (MAKEUP.test(x)) return 'beauty';
+      if (SKIN.test(x)) return 'skincare';
+    }
+    if (/beauty/.test(txt)) return 'beauty';
+    return 'general';
+  })();
+  // "does it come in colours?" lives here so the wizard can remind the owner of anything they forgot
+  const [hasColors, setHasColors] = useState(true);
+  useEffect(() => { if (f.colors.length > 0) setHasColors(true); }, [f.colors.length]);
+  useEffect(() => { if (!f.colors.length) setHasColors(variantMode === 'general' || variantMode === 'beauty'); }, [variantMode]);
+  const [warned, setWarned] = useState(false);
   const styleDefault = type?.style ? STYLE_LEVELS.find(([v]) => Number(v) === type.style)?.[1] : null;
   const aud = tree?.audiences?.find((a) => a.key === f.audience);
   const totalStock = useMemo(() => {
@@ -436,6 +491,18 @@ export default function ProductEditor() {
     }
     return Number(f.stock || 0);
   }, [f.track_stock, f.colors, f.sizes, f.matrix, f.stock]);
+
+  // things an owner commonly forgets: colours, sizes, quantity (each with what to do about it)
+  const missing = [];
+  if (hasColors && !f.colors.length) missing.push({ k: 'colors', text: L('ماختارتش أي لون. لو المنتج بألوان اختارها، ولو من غير ألوان اضغط «من غير ألوان».', 'No colour picked. Pick its colours, or press “No colours” if it has none.') });
+  if (((sizeKind?.sizes?.length || 0) > 0 || variantMode === 'perfume') && variantMode !== 'accessories' && variantMode !== 'beauty' && variantMode !== 'skincare' && !f.sizes.length) missing.push({ k: 'sizes', text: variantMode === 'perfume' ? L('ماختارتش الحجم. العميل لازم يعرف أحجام العطر المتاحة.', 'No volume picked. Shoppers need to know which volumes you have.') : L('ماختارتش أي مقاس. العميل محتاج يعرف المقاسات المتاحة.', 'No size picked. Shoppers need to know which sizes you have.') });
+  if (f.track_stock && totalStock === 0) missing.push({ k: 'qty', text: L('ماكتبتش الكمية المتاحة، فالمنتج هيظهر للعميل «خلص». اكتب الكمية، أو قفّل «قلّل الكمية تلقائيًا مع كل طلب» لو مش عايز تحسبها.', 'No quantity entered, so the product shows as sold out. Enter the quantity, or switch off automatic stock counting.') });
+  const missingBox = (
+    <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-3 text-[13.5px] leading-relaxed text-amber-900">
+      <p className="mb-1 font-bold">{L('لسه ناقص:', 'Still missing:')}</p>
+      <ul className="list-disc space-y-1 ps-5">{missing.map((m) => <li key={m.k}>{m.text}</li>)}</ul>
+    </div>
+  );
 
   const [aiBusy, setAiBusy] = useState(false);
   const aiFill = async () => {
@@ -474,7 +541,7 @@ export default function ProductEditor() {
     const e = validate(status);
     if (Object.keys(e).length) {
       const first = e.media ? 'images' : e.type ? 'type' : e.name_ar ? 'name' : 'pricing';
-      if (isNew) { const k = { images: 0, type: 1, name: 2, pricing: 3 }[first]; dirRef.current = k > step ? 1 : -1; setStep(k); }
+      if (isNew) { const k = { images: 0, name: 1, type: 2, pricing: 3 }[first]; dirRef.current = k > step ? 1 : -1; setStep(k); }
       setTimeout(() => { document.getElementById(first)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (first === 'name') nameRef.current?.focus({ preventScroll: true }); }, 60);
       toast({ tone: 'error', title: Object.values(e)[0] || t('error.validation_failed') });
       return;
@@ -524,28 +591,29 @@ export default function ProductEditor() {
 
 
   const WSTEPS = [
-    { k: 'images', short: L('الصور', 'Photos'), title: L('صوّر المنتج', 'Add photos'), lead: L('ارفع صورة أو أكتر من موبايلك. أول صورة هي اللي هتظهر للعميل الأول. وبعد ما ترفع، تقدر تخلّي الذكاء الاصطناعي يكتب الاسم والوصف عنك.', 'Upload one or more photos. The first one is the cover.') },
-    { k: 'type', short: L('النوع', 'Type'), title: L('إيه المنتج ده؟', 'What is it?'), lead: L('اختار لمين المنتج وإيه نوعه (تيشرت، فستان…). إحنا هنظبط القسم والمقاسات لوحدنا.', 'Pick who it is for and its type.') },
-    { k: 'name', short: L('الاسم', 'Name'), title: L('الاسم والوصف', 'Name & description'), lead: L('اكتب اسم بسيط وواضح يفهمه العميل. الوصف اختياري.', 'A short clear name. Description is optional.') },
-    { k: 'pricing', short: L('السعر', 'Price'), title: L('بكام؟', 'Price'), lead: L('اكتب سعر البيع. لو في خصم اكتب السعر قبل الخصم وهنظهره مشطوب.', 'Selling price. Add the old price to show a discount.') },
-    { k: 'variants', short: L('الكمية', 'Stock'), title: L('الألوان والمقاسات والكمية', 'Colours, sizes & stock'), lead: L('اختياري. لو المنتج له ألوان أو مقاسات حددها، ولو لأ اكتب الكمية بس وكمّل.', 'Optional. Skip if it has no options.') },
-    { k: 'publish', short: L('المراجعة', 'Review'), title: L('راجع وانشر', 'Review & publish'), lead: L('ده شكل المنتج عند العميل. لو تمام اضغط «نشر المنتج»، ولو لسه مش جاهز احفظه كمسودة وكمّله بعدين.', 'Check it, then publish — or save as a draft.') },
+    { k: 'images', short: L('الصور', 'Photos'), title: L('صوّر المنتج', 'Add photos'), lead: L('المطلوب: ارفع صورة واحدة على الأقل من موبايلك. الأفضل 3 صور: من قدّام ومن ورا وتفصيلة. أول صورة هي الغلاف اللي العميل بيشوفه الأول. بعد الرفع تقدر تخلّي الذكاء الاصطناعي يكتب الاسم والوصف عنك.', 'What to do: upload at least one photo from your phone, ideally 3 (front, back, a detail). The first photo is the cover shoppers see first. After uploading, AI can write the name and description for you.') },
+    { k: 'name', short: L('الاسم', 'Name'), title: L('الاسم والوصف', 'Name & description'), lead: L('المطلوب: اكتب اسم واضح من كلمتين أو أكتر فيه النوع واللون أو الخامة، زي «لانجيري شيفون قصير أسود». اسم زي «لانجيري» لوحده بيقلّل المبيعات. الوصف اختياري، لكن سطرين عن الخامة والمقاس بيقلّلوا أسئلة العملاء.', 'What to do: write a clear name of two or more words with the type plus colour or fabric, e.g. “short black chiffon lingerie”. A one-word name sells less. The description is optional, but two lines about fabric and fit save customers questions.') },
+    { k: 'type', short: L('النوع', 'Type'), title: L('إيه المنتج ده؟', 'What is it?'), lead: L('المطلوب: اختار قسم المنتج. هنرشّحلك الأقسام المناسبة من الاسم اللي كتبته. اختار: لمين هو (ستات، رجالي، أطفال…) وإيه نوعه (فستان، تيشيرت، لانجيري…). لو مش لاقي النوع بالظبط اختار أقرب قسم موجود، والمقاسات هتتظبط لوحدها.', 'What to do: pick who it is for (women, men, kids…) and its type (dress, T-shirt, lingerie…). If you cannot find the exact type, pick the closest existing one, and sizes are set up automatically.') },
+    { k: 'pricing', short: L('السعر', 'Price'), title: L('بكام؟', 'Price'), lead: L('المطلوب: اكتب سعر البيع بالجنيه. لو في خصم اكتب السعر القديم (قبل الخصم) في الخانة التانية وهيظهر للعميل مشطوب. السعر القديم لازم يكون أكبر من سعر البيع.', 'What to do: enter the selling price in EGP. For a discount, enter the old (before-discount) price in the second field and shoppers will see it crossed out. The old price must be higher than the selling price.') },
+    { k: 'variants', short: L('الكمية', 'Stock'), title: L('الألوان والمقاسات والكمية', 'Colours, sizes & stock'), lead: L('اختياري: لو المنتج ليه ألوان (أو درجات في المكياج) أو مقاسات (أو أحجام في العطور) اختارهم وحدد الكمية المتاحة. لو مفيش، قفّل الألوان واكتب الكمية بس واضغط «التالي». لو الكمية بقت صفر المنتج بيظهر للعميل إنه خلص.', 'Optional: if the product comes in colours (or shades for makeup) or sizes (or volumes for perfume), pick them and set the available quantity. If not, switch colours off, enter the quantity and press Next. At zero stock the product shows as sold out.') },
+    { k: 'publish', short: L('المراجعة', 'Review'), title: L('راجع وانشر', 'Review & publish'), lead: L('المطلوب: راجع شكل المنتج زي ما العميل هيشوفه. لو تمام اضغط «نشر المنتج» وهيظهر للعملاء. ولو لسه مش جاهز احفظه كمسودة وكمّله بعدين.', 'What to do: check how the product looks to shoppers. If it is right, press “Publish product” and it goes live. If not ready, save it as a draft and finish later.') },
   ];
   const stepErr = (i) => {
     const e = {};
     if (i === 0 && !f.media.length) e.media = t('editor.needImage');
-    if (i === 1 && !(f.moda_key || customType || f.department)) e.type = L('اختار قسم المنتج', 'Pick the product section');
-    if (i === 2 && f.name_ar.trim().length < 2) e.name_ar = t('field.required');
+    if (i === 1 && f.name_ar.trim().length < 2) e.name_ar = t('field.required');
+    if (i === 2 && !(f.moda_key || customType || f.department)) e.type = L('اختار قسم المنتج', 'Pick the product section');
     if (i === 3) {
       if (!Number(f.price)) e.price = t('field.price_required');
       else if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
     }
     return e;
   };
-  const gotoStep = (n) => { dirRef.current = n > step ? 1 : -1; setErrors({}); setStep(n); };
+  const gotoStep = (n) => { dirRef.current = n > step ? 1 : -1; setErrors({}); setWarned(false); setStep(n); };
   const nextStep = () => {
     const e = stepErr(step);
     if (Object.keys(e).length) { setErrors(e); toast({ tone: 'error', title: Object.values(e)[0] }); return; }
+    if (step === 4 && missing.length && !warned) { setWarned(true); toast({ tone: 'error', duration: 8000, title: missing[0].text + ' ' + L('ولو عايز تكمّل كده، اضغط «التالي» تاني.', 'To continue anyway, press Next again.') }); return; }
     const n = Math.min(step + 1, WSTEPS.length - 1);
     setMaxStep((m) => Math.max(m, n));
     gotoStep(n);
@@ -576,7 +644,10 @@ export default function ProductEditor() {
   const wizHead = (
     <div className="mb-4 px-1">
       <h2 className="text-xl font-bold leading-tight">{W.title}</h2>
-      <p className="mt-1 text-[14px] leading-relaxed text-muted">{W.lead}</p>
+      <div role="note" className="mt-2.5 flex items-start gap-2.5 rounded-xl border border-brand/20 bg-brand/[0.06] px-3.5 py-3 text-[14px] leading-relaxed text-fg">
+        <Info className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+        <p>{W.lead}</p>
+      </div>
     </div>
   );
   const wizBar = (
@@ -672,13 +743,13 @@ export default function ProductEditor() {
         )}
       </Card>)}
 
-      {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('المنتج في أنهي قسم؟', 'Which section is it in?')} hint={L('اختار من أقسام الموقع. مرة واحدة وخلاص.', 'Pick from the site sections — once.')} done={done.type}>
+      {(!isNew || step === 2) && (<Card id="type" bare={isNew} step={2} title={L('المنتج في أنهي قسم؟', 'Which section is it in?')} hint={L('اكتب اسم المنتج في خانة البحث (مثلًا: فستان) واختار من اللي يظهر. ولو مش لاقيه اختار أقرب قسم.', 'Type what it is in the search box (e.g. dress) and pick from the results. If you cannot find it, pick the closest section.')} done={done.type}>
         <SectionTreePicker items={pickerData?.departments || []} productName={f.name_ar} value={f.department} error={errors.type} customName={customType && !f.department ? customType : ''}
           onPick={(slug, root) => { setCustomType(''); set({ department: slug, deptTouched: true, attrs: {}, moda_key: '', ...(customType ? { category_id: '' } : {}), ...(['women', 'men', 'kids'].includes(root) ? { audience: root } : {}) }); }} onAddSection={addTypeSection} />
         {deptDefs.filter((d) => d.key).length > 0 && f.department && <div className="mt-4"><AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} /></div>}
       </Card>)}
 
-      {(!isNew || step === 2) && (<Card id="name" bare={isNew} step={3} title={L('الاسم والوصف', 'Name & description')} done={done.name}>
+      {(!isNew || step === 1) && (<Card id="name" bare={isNew} step={3} title={L('الاسم والوصف', 'Name & description')} done={done.name}>
         <div className="space-y-4">
           <Field label={L('اسم المنتج', 'Product name')} error={errors.name_ar} hint={type ? L(`مثال: ${type.ar} ${f.colors[0] ? f.colors[0].name_ar : 'أسود'} قطن`, undefined) : undefined}>
             <Input ref={nameRef} dir="auto" value={f.name_ar} onChange={(e) => set({ name_ar: e.target.value })} maxLength={120} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} />
@@ -733,7 +804,8 @@ export default function ProductEditor() {
 
       {(!isNew || step === 4) && (<Card id="variants" bare={isNew} step={5} title={L('الألوان والمقاسات والكمية', 'Colours, sizes & stock')} done={f.colors.length > 0 || f.sizes.length > 0 || Number(f.stock) > 0}>
         <div className="space-y-6">
-          <VariantsEditor f={f} set={set} sizeKind={sizeKind} typeChosen={!!type || !!f.department || !!customType} />
+          {missing.length > 0 && (warned || !isNew) && missingBox}
+          <VariantsEditor f={f} set={set} sizeKind={sizeKind} mode={variantMode} hasColors={hasColors} setHasColors={setHasColors} typeChosen={!!type || !!f.department || !!customType} />
           <div className="grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
             <Switch label={t('editor.trackStock')} checked={f.track_stock} onChange={(v) => set({ track_stock: v })} />
             {!f.colors.length && !f.sizes.length && f.track_stock && <Field label={t('editor.stock')}><Input inputMode="numeric" value={f.stock} onChange={(e) => set({ stock: e.target.value.replace(/\D/g, '') })} /></Field>}
@@ -743,7 +815,7 @@ export default function ProductEditor() {
 
       {(!isNew) && (<section className="rounded-2xl border border-line bg-elevated">
         <button type="button" onClick={() => setAdv((v) => !v)} aria-expanded={adv} className="flex w-full items-center justify-between gap-3 px-5 py-4 text-start sm:px-6">
-          <span><span className="text-base font-semibold">{L('إعدادات متقدمة', 'Advanced')}</span><span className="ms-2 text-[13px] text-muted">{L('التكلفة، الكود، الاستخدام، محركات البحث', 'Cost, SKU, use, SEO')}</span></span>
+          <span><span className="text-base font-semibold">{L('إعدادات إضافية (اختيارية)', 'Extra settings (optional)')}</span><span className="ms-2 text-[13px] text-muted">{L('مش لازم تلمسها: التكلفة، الباركود، ظهور المنتج في جوجل', 'You can skip these: cost, barcode, Google listing')}</span></span>
           <ChevronDown className={cx('h-5 w-5 text-muted transition-transform', adv && 'rotate-180')} />
         </button>
         {adv && (
@@ -835,7 +907,7 @@ export default function ProductEditor() {
                 {[aud ? (lang === 'ar' ? aud.ar : aud.en) : null, type?.ar].filter(Boolean).join(' · ')}
               </p>
             ) : <span />}
-            <button type="button" onClick={() => gotoStep(2)} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] font-semibold text-muted hover:border-brand hover:text-brand transition">
+            <button type="button" onClick={() => gotoStep(1)} className="inline-flex shrink-0 items-center gap-1 rounded-full border border-line bg-surface px-2.5 py-1 text-[11.5px] font-semibold text-muted hover:border-brand hover:text-brand transition">
               <Pencil className="h-3 w-3" />
               {L('تعديل', 'Edit')}
             </button>
@@ -908,7 +980,7 @@ export default function ProductEditor() {
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={step} initial={{ opacity: 0, x: 28 * dirRef.current * (lang === 'ar' ? -1 : 1) }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -28 * dirRef.current * (lang === 'ar' ? -1 : 1) }} transition={{ duration: 0.18 }}>
               {wizHead}
-              {step === 5 && <div className="mb-4 space-y-4">{previewRow}{publishCard}</div>}
+              {step === 5 && <div className="mb-4 space-y-4">{missing.length > 0 && <div className="space-y-2">{missingBox}<button type="button" onClick={() => gotoStep(4)} className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline"><Pencil className="h-3.5 w-3.5" />{L('ارجع كمّلها', 'Go back and fix')}</button></div>}{previewRow}{publishCard}</div>}
               {step < 5 && main}
             </motion.div>
           </AnimatePresence>

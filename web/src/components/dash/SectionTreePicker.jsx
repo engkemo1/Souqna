@@ -55,6 +55,7 @@ export default function SectionTreePicker({ items = [], value = '', onPick, erro
   }
   return (
     <div className="space-y-3">
+      <p className="text-[13px] font-medium text-fg">{L('أسرع طريقة: اكتب اسم المنتج (فستان، تيشيرت، عطر…) واختار من اللي يظهر.', 'Fastest way: type what it is (dress, T-shirt, perfume…) and pick from the results.')}</p>
       <div className="relative"><Search className="pointer-events-none absolute start-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" /><Input value={q} onChange={(e) => setQ(e.target.value)} className="ps-10" placeholder={L('اكتب القسم: فساتين، مكياج، حذاء…', 'Type a section: dresses, makeup, shoes…')} /></div>
       {!term && suggestions.length > 0 && (
         <div className="flex flex-wrap items-center gap-2">
