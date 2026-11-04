@@ -35,7 +35,7 @@ import { isWhatsAppConfigured, notifyPlatformDelivery } from '../lib/whatsapp.js
 import { mountCashierAdmin } from './admin-cashier.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { CASHIER_SYSTEMS, CASHIER_IDS, CASHIER_LINK_STATUSES } from '../lib/cashier-catalog.js';
-import { getPlatformFreeShipping, savePlatformFreeShipping, deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing, getZonePolicy, saveZonePolicy, zoneKey } from '../lib/deliveryRates.js';
+import { getPlatformFreeShipping, savePlatformFreeShipping, deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing, getMultiStoreRule, saveMultiStoreRule, getZonePolicy, saveZonePolicy, zoneKey } from '../lib/deliveryRates.js';
 
 function makeSetupLink(req, uid) {
   const token = crypto.randomBytes(24).toString('base64url');
@@ -441,6 +441,8 @@ const deliveryRateSchema = z.object({
   city: z.string().trim().max(60).optional().default(''),
   fee: z.coerce.number().int().min(0).max(5000).optional(),
   distanceKm: z.coerce.number().min(0).max(300).optional().nullable(),
+  lat: z.coerce.number().min(-90).max(90).optional().nullable(),
+  lng: z.coerce.number().min(-180).max(180).optional().nullable(),
 }).refine((r) => r.fee != null || r.distanceKm != null, { path: ['fee'], message: 'fee_or_distance_required' });
 const normalizedDeliveryRate = (parsed) => {
   const distanceKm = parsed.distanceKm == null ? null : Math.round(parsed.distanceKm * 10) / 10;
@@ -449,15 +451,16 @@ const normalizedDeliveryRate = (parsed) => {
     city: parsed.governorate === '*' ? '*' : parsed.city,
     distance_km: distanceKm,
     fee: distanceKm == null ? parsed.fee : deliveryFeeForDistance(distanceKm),
+    ...(parsed.lat !== undefined && parsed.lng !== undefined ? { lat: parsed.lat, lng: parsed.lng } : {}),
   };
 };
 r.get('/delivery-rates', h((_req, res) => {
   const pricing = getDeliveryPricing();
-  const items = q.all('SELECT id, governorate, city, fee, distance_km FROM delivery_rates ORDER BY governorate, city').map((item) => ({
+  const items = q.all('SELECT id, governorate, city, fee, distance_km, lat, lng FROM delivery_rates ORDER BY governorate, city').map((item) => ({
     ...item, distanceKm: item.distance_km == null ? null : Number(item.distance_km),
     fee: item.distance_km == null ? item.fee : deliveryFeeForDistance(Number(item.distance_km), pricing),
   }));
-  res.json({ items, pricing });
+  res.json({ items, pricing, multiStore: getMultiStoreRule() });
 }));
 r.get('/free-shipping', h((_req, res) => res.json(getPlatformFreeShipping())));
 /** One tap: switch store-level free shipping off for every store (each owner can switch it on again for their own store). */
@@ -468,6 +471,10 @@ r.post('/free-shipping/close-all', h((_req, res) => {
 r.put('/free-shipping', h((req, res) => {
   const d = z.object({ enabled: z.boolean(), over: z.coerce.number().int().min(0).max(1000000).default(0) }).parse(req.body);
   res.json(savePlatformFreeShipping(d));
+}));
+r.put('/delivery-rates/multi-store', h((req, res) => {
+  const d = z.object({ extraFee: z.coerce.number().int().min(0).max(500), farExtraFee: z.coerce.number().int().min(0).max(500), sameZoneKm: z.coerce.number().min(0).max(20), farKm: z.coerce.number().min(0).max(200) }).parse(req.body);
+  res.json({ multiStore: saveMultiStoreRule(d) });
 }));
 r.put('/delivery-rates/pricing', h((req, res) => {
   const pricing = z.object({ baseFee: z.coerce.number().int().min(0).max(5000), includedKm: z.coerce.number().min(0).max(100), perKm: z.coerce.number().int().min(0).max(1000), extraPickupStopFee: z.coerce.number().int().min(0).max(1000).default(0), extraPickupZoneFee: z.coerce.number().int().min(0).max(2000).default(0) }).parse(req.body);
@@ -494,11 +501,11 @@ r.delete('/delivery-rates/:id', h((req, res) => {
 }));
 /* ---- pickup zones: price per zone + multi-zone discount + profit guard ---- */
 const zoneList = () => {
-  const saved = new Map(q.all('SELECT key, name, fee, courier_cost FROM pickup_zones').map((z) => [z.key, z]));
+  const saved = new Map(q.all('SELECT key, name, fee, courier_cost, extra_fee FROM pickup_zones').map((z) => [z.key, z]));
   const groups = new Map();
   for (const s of q.all("SELECT id, slug, name_ar, delivery_zone, lat, lng FROM stores WHERE status='active' ORDER BY sort_order, id")) {
     const key = zoneKey(s.delivery_zone, s.id);
-    if (!groups.has(key)) { const row = saved.get(key); groups.set(key, { key, name: String(s.delivery_zone || '').trim() || s.name_ar, fee: row?.fee || 0, courierCost: row?.courier_cost || 0, stores: [] }); }
+    if (!groups.has(key)) { const row = saved.get(key); groups.set(key, { key, name: String(s.delivery_zone || '').trim() || s.name_ar, fee: row?.fee || 0, courierCost: row?.courier_cost || 0, extraFee: row?.extra_fee ?? null, stores: [] }); }
     groups.get(key).stores.push({ slug: s.slug, name: s.name_ar, lat: s.lat, lng: s.lng });
   }
   return [...groups.values()];
@@ -508,12 +515,12 @@ r.get('/delivery-zones', h((_req, res) => {
 }));
 r.put('/delivery-zones', h((req, res) => {
   const body = z.object({
-    zones: z.array(z.object({ key: z.string().trim().min(1).max(120), name: z.string().trim().max(80).default(''), fee: z.coerce.number().int().min(0).max(5000), courierCost: z.coerce.number().int().min(0).max(5000).default(0) })).max(200),
+    zones: z.array(z.object({ key: z.string().trim().min(1).max(120), name: z.string().trim().max(80).default(''), fee: z.coerce.number().int().min(0).max(5000), courierCost: z.coerce.number().int().min(0).max(5000).default(0), extraFee: z.coerce.number().int().min(0).max(500).nullable().optional() })).max(200),
     policy: z.object({ tiers: z.array(z.object({ zones: z.coerce.number().int().min(2).max(10), percent: z.coerce.number().min(0).max(90) })).max(9), extraStopCost: z.coerce.number().int().min(0).max(5000).default(0), minMargin: z.coerce.number().int().min(0).max(5000).default(0) }),
   }).parse(req.body);
   tx(() => {
     for (const zn of body.zones) {
-      q.run('INSERT INTO pickup_zones(key,name,fee,courier_cost) VALUES(?,?,?,?) ON CONFLICT(key) DO UPDATE SET name=excluded.name, fee=excluded.fee, courier_cost=excluded.courier_cost', [zn.key, zn.name, zn.fee, zn.courierCost]);
+      q.run('INSERT INTO pickup_zones(key,name,fee,courier_cost,extra_fee) VALUES(?,?,?,?,?) ON CONFLICT(key) DO UPDATE SET name=excluded.name, fee=excluded.fee, courier_cost=excluded.courier_cost, extra_fee=excluded.extra_fee', [zn.key, zn.name, zn.fee, zn.courierCost, zn.extraFee ?? null]);
     }
     saveZonePolicy(body.policy);
   });
@@ -1194,7 +1201,7 @@ r.post('/stores', h((req, res) => {
       phone: d.phone, whatsapp: d.whatsapp || d.phone, city: 'Banha', auto_whatsapp: d.auto_whatsapp ? 1 : 0,
       address_ar: d.address || null, address_en: d.address || null, map_url: d.map_url || null, lat: d.lat ?? null, lng: d.lng ?? null,
       opens_at: d.opens_at || '10:00', closes_at: d.closes_at || '23:00',
-      tagline_ar: 'أهلاً بيك في متجرنا', tagline_en: 'Welcome to our store',
+      tagline_ar: 'أزياء بتوصلك لحد باب البيت في بنها', tagline_en: 'Fashion, delivered across Banha',
       theme_json: JSON.stringify({ primary: '#1B1B1B', secondary: '#F3F0EA', accent: '#B4532A', background: '#FFFFFF', text: '#0F172A', button: '#1B1B1B', header: '#FFFFFF', footer: '#0F172A' }),
     });
     // A category per department the store sells (e.g. "فساتين"); the owner adds sub-categories under them.

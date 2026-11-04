@@ -61,7 +61,7 @@ export function KpiCard({ label, value, format, delta, deltaSuffix, icon: Icon, 
   return (
     <div className="rounded-2xl border border-line bg-elevated p-4 sm:p-5">
       <div className="flex items-center justify-between gap-2">
-        <p className="truncate text-[13px] font-medium text-muted sm:text-sm">{label}</p>
+        <p className="line-clamp-2 text-[13px] font-medium leading-tight text-muted sm:text-sm">{label}</p>
         {Icon && <span className={cx('grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:h-9 sm:w-9 sm:rounded-xl', tones[tone])}><Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" /></span>}
       </div>
       {loading ? <Skeleton className="mt-3 h-7 w-24" /> : (

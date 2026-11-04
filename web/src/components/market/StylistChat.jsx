@@ -275,7 +275,7 @@ export default function StylistChat() {
           onClick={() => setOpen(true)}
           dir="ltr"
           aria-label={lang === 'ar' ? `اسأل ${name}؟` : `Ask ${name}?`}
-          className="fixed bottom-[calc(84px+env(safe-area-inset-bottom))] left-4 z-40 md:bottom-4 inline-flex h-[52px] items-center gap-2.5 rounded-full bg-btn p-1.5 pe-5 text-[15px] font-bold text-white shadow-[0_4px_20px_rgba(234,88,12,0.45)] transition hover:bg-[#d94e08] hover:shadow-[0_6px_26px_rgba(234,88,12,0.55)] active:scale-95 sm:bottom-6 sm:left-6"
+          className="fixed bottom-[calc(84px+env(safe-area-inset-bottom))] left-4 z-40 md:bottom-4 inline-flex h-[52px] items-center gap-2.5 rounded-full bg-btn p-1.5 max-sm:pe-1.5 sm:pe-5 text-[15px] font-bold text-white shadow-[0_4px_20px_rgba(234,88,12,0.45)] transition hover:bg-[#d94e08] hover:shadow-[0_6px_26px_rgba(234,88,12,0.55)] active:scale-95 sm:bottom-6 sm:left-6"
         >
           {/* Always use our moda.webp avatar with clean ring */}
           <span className="flex h-[40px] w-[40px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white/90 shadow-xs">
@@ -286,7 +286,7 @@ export default function StylistChat() {
               style={{ objectPosition: '50% 10%' }}
             />
           </span>
-          <span className="font-display tracking-wide" dir="rtl">{lang === 'ar' ? `اسأل ${name}؟` : `Ask ${name}?`}</span>
+          <span className="font-display tracking-wide max-sm:hidden" dir="rtl">{lang === 'ar' ? `اسأل ${name}؟` : `Ask ${name}?`}</span>
         </button>
       )}
       {open && (

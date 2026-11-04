@@ -8,6 +8,35 @@ import Button from '../ui/Button.jsx';
 import { Field, Input } from '../ui/Field.jsx';
 import { cx } from '../ui/cx.js';
 
+const KIDS = [['1-2', '80-92'], ['2-3', '92-98'], ['3-4', '98-104'], ['4-5', '104-110'], ['5-6', '110-116'], ['7-8', '122-128'], ['9-10', '134-140'], ['11-12', '146-152'], ['13-14', '158-164']];
+const BODY = [['XS', '80-84', '60-64', '86-90'], ['S', '84-88', '64-68', '90-94'], ['M', '88-94', '68-74', '94-100'], ['L', '94-100', '74-80', '100-106'], ['XL', '100-108', '80-88', '106-114'], ['XXL', '108-116', '88-96', '114-122']];
+const NO_CHART = ['bags', 'hijab', 'accessories', 'abaya', 'jalabiya', 'shoes'];
+
+/** Static size table for products the calculator cannot cover (kids, lingerie, sleepwear...). */
+function SizeChart({ kids, lang, open, onClose }) {
+  const ar = lang === 'ar';
+  const th = 'px-2 py-2 text-start font-semibold';
+  return (
+    <Sheet open={open} onClose={onClose} title={ar ? 'دليل المقاسات' : 'Size guide'} description={ar ? (kids ? 'المقاس حسب السن والطول' : 'المقاس حسب القياسات بالسنتيمتر') : (kids ? 'Size by age and height' : 'Size by body measurements in cm')} side="auto" desktop="center">
+      <div className="space-y-3 pb-2">
+        <div className="overflow-hidden rounded-2xl border border-line-strong">
+          <table className="w-full text-sm" dir={ar ? 'rtl' : 'ltr'}>
+            <thead className="bg-secondary text-on-secondary">
+              <tr>{kids
+                ? <><th className={th}>{ar ? 'السن (سنة)' : 'Age (yrs)'}</th><th className={th}>{ar ? 'الطول (سم)' : 'Height (cm)'}</th></>
+                : <><th className={th}>{ar ? 'المقاس' : 'Size'}</th><th className={th}>{ar ? 'الصدر' : 'Bust'}</th><th className={th}>{ar ? 'الوسط' : 'Waist'}</th><th className={th}>{ar ? 'الأرداف' : 'Hips'}</th></>}</tr>
+            </thead>
+            <tbody>
+              {(kids ? KIDS : BODY).map((r) => <tr key={r[0]} className="border-t border-line-strong">{r.map((c, i) => <td key={i} dir="ltr" className={cx('px-2 py-2 text-start', i === 0 && 'font-semibold')}>{c}</td>)}</tr>)}
+            </tbody>
+          </table>
+        </div>
+        <p className="text-[13px] text-muted">{ar ? 'الجدول تقريبي، والمقاسات بتختلف شوية من براند للتاني. لو بين مقاسين خد الأكبر.' : 'Approximate: sizes vary a little between brands. Between two sizes, take the larger.'}</p>
+      </div>
+    </Sheet>
+  );
+}
+
 const KEY = 'moda.body';
 const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}'); } catch { return {}; } };
 const save = (b) => {
@@ -22,7 +51,7 @@ const save = (b) => {
 
 /** "What's my size?" — a small, transparent calculator on the product page; picks only from the sizes this product really has. */
 export default function SizeAdvisor({ product, onPick }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const kind = advisorKind(product.department, product.sizes);
   const [open, setOpen] = useState(false);
   const init = useMemo(() => load(), []);
@@ -31,6 +60,15 @@ export default function SizeAdvisor({ product, onPick }) {
   const [weight, setWeight] = useState(init.weight || '');
   const [foot, setFoot] = useState(init.foot || '');
   const [res, setRes] = useState(null);
+  const chart = !kind && product.sizes?.length && !NO_CHART.includes(product.department) ? (product.department === 'kids' ? 'kids' : 'body') : null;
+  if (!kind && chart) {
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand underline-offset-2 hover:underline"><Ruler className="h-4 w-4" />{lang === 'ar' ? 'دليل المقاسات' : 'Size guide'}</button>
+        <SizeChart kids={chart === 'kids'} lang={lang} open={open} onClose={() => setOpen(false)} />
+      </>
+    );
+  }
   if (!kind) return null;
   const go = (e) => {
     e.preventDefault();

@@ -5,6 +5,7 @@ import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { DEFAULT_DEPARTMENTS, LEGACY_DEPARTMENTS } from '@souqna/shared';
 import { config } from '../config.js';
+import { importPaperRates, importPaperCoords } from '../lib/banhaRates.js';
 
 fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
 
@@ -61,6 +62,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   db.exec(`CREATE TABLE IF NOT EXISTS wa_otps (phone TEXT PRIMARY KEY, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, tries INTEGER NOT NULL DEFAULT 0, sent_at INTEGER NOT NULL)`);
   db.exec(`CREATE TABLE IF NOT EXISTS wa_inbound (id TEXT PRIMARY KEY, from_wa TEXT NOT NULL, type TEXT NOT NULL, body TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   db.exec(`CREATE TABLE IF NOT EXISTS pickup_zones (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, fee INTEGER NOT NULL DEFAULT 0 CHECK (fee >= 0 AND fee <= 5000), courier_cost INTEGER NOT NULL DEFAULT 0 CHECK (courier_cost >= 0 AND courier_cost <= 5000), created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+  { const pz = db.prepare('PRAGMA table_info(pickup_zones)').all().map((c) => c.name); if (!pz.includes('extra_fee')) db.exec('ALTER TABLE pickup_zones ADD COLUMN extra_fee INTEGER CHECK (extra_fee IS NULL OR (extra_fee >= 0 AND extra_fee <= 500))'); } // extra delivery fee when this zone joins a basket (NULL = default 5)
   // every store is shown by default, even before it has products (the admin can switch it off per store)
   // the stylist was renamed from «مودة» to «تويلا»: carry over names the admin saved before (only if still the old default)
   db.prepare("UPDATE app_settings SET value='تويلا' WHERE key='stylist_name_ar' AND value='مودة'").run();
@@ -168,6 +170,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   db.exec('CREATE INDEX IF NOT EXISTS idx_orders_delivery_route ON orders(delivery_route_id)');
   const rateCols = db.prepare('PRAGMA table_info(delivery_rates)').all().map((c) => c.name);
   if (!rateCols.includes('distance_km')) db.exec('ALTER TABLE delivery_rates ADD COLUMN distance_km REAL');
+  if (!rateCols.includes('lat')) db.exec('ALTER TABLE delivery_rates ADD COLUMN lat REAL');
+  if (!rateCols.includes('lng')) db.exec('ALTER TABLE delivery_rates ADD COLUMN lng REAL');
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_delivery_rates_area ON delivery_rates(lower(governorate), lower(city))');
   db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
     ('delivery_base_fee','50'), ('delivery_included_km','2'), ('delivery_per_km','10'),
@@ -178,6 +182,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
     ('Qalyubia','كفر أبو زكري',60,2.3), ('Qalyubia','كفر ابوزكري',60,2.3), ('Qalyubia','كفر ابو ذكري',60,2.3),
     ('Qalyubia','كفر الجزار',60,2.5), ('Qalyubia','كفر سعد',70,3.6), ('Qalyubia','كفر بطا',70,4.0),
     ('Qalyubia','بقيرة',80,5.0), ('Qalyubia','كفر الأربعين',90,5.4), ('Qalyubia','كفر فرسيس',90,5.7)`);
+  importPaperRates(db); // one-time: delivery prices from the printed price sheet (+5 per extra store)
+  importPaperCoords(db); // one-time: map locations for the sheet areas
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_track_token ON orders(track_token) WHERE track_token IS NOT NULL');
   // Backfill tracking links for orders placed before this feature.
   for (const row of db.prepare('SELECT id FROM orders WHERE track_token IS NULL').all()) {

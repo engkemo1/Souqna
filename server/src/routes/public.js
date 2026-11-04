@@ -544,22 +544,26 @@ r.get('/marketplace', h((req, res) => {
   // A few trending products across stores for the marketplace home
   const trendingRows = q.all(
     `SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id
-     WHERE p.status='active' AND s.status='active' ORDER BY p.sold_count DESC LIMIT 12`,
+     WHERE p.status='active' AND s.status='active' AND (p.track_stock=0 OR p.stock>0) ORDER BY p.sold_count DESC LIMIT 18`,
   );
-  const trending = serializeCards(trendingRows).map((c, i) => ({ ...c, store: { slug: trendingRows[i].store_slug, name: bi(trendingRows[i], 'store_name') } }));
-  const railRows = (sql, params = []) => {
-    const rs = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id
-      WHERE p.status='active' AND s.status='active' AND s.hidden=0 ${sql}`, params);
+  // home rails: skip sold-out items and exact repeats (same store + same name + same price), then cap the list
+  const dedupe = (rows, cap) => { const seen = new Set(); const out = []; for (const r0 of rows) { const k = `${r0.store_slug}|${r0.name_ar}|${r0.price}`; if (seen.has(k)) continue; seen.add(k); out.push(r0); if (out.length >= cap) break; } return out; };
+  const trendingDedup = dedupe(trendingRows, 12);
+  const trending = serializeCards(trendingDedup).map((c, i) => ({ ...c, store: { slug: trendingDedup[i].store_slug, name: bi(trendingDedup[i], 'store_name') } }));
+  const railRows = (sql, params = [], cap = 12) => {
+    const rs0 = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id
+      WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (p.track_stock=0 OR p.stock>0) ${sql}`, params);
+    const rs = dedupe(rs0, cap);
     return serializeCards(rs).map((c, i) => ({ ...c, store: { slug: rs[i].store_slug, name: bi(rs[i], 'store_name') } }));
   };
-  const newest = railRows("ORDER BY p.is_new DESC, p.created_at DESC LIMIT 12");
-  const deals = railRows('AND p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price ORDER BY (p.compare_at_price - p.price) * 1.0 / p.compare_at_price DESC LIMIT 12');
+  const newest = railRows("ORDER BY p.is_new DESC, p.created_at DESC LIMIT 30");
+  const deals = railRows('AND p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price ORDER BY (p.compare_at_price - p.price) * 1.0 / p.compare_at_price DESC LIMIT 30');
   const deptCounts = q.all("SELECT p.department AS slug, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL GROUP BY p.department");
   const countBy = new Map();
   for (const d of deptCounts) for (const sl of [d.slug, ...deptAncestors(d.slug)]) countBy.set(sl, (countBy.get(sl) || 0) + d.n);
   const departments = listDepartments().map((d) => ({ slug: d.slug, name: d.name, image: d.image, parent: d.parent, products: countBy.get(d.slug) || 0 }));
   const deptRails = departments.filter((d) => !d.parent && d.products >= 3).sort((a, b) => b.products - a.products).slice(0, 4)
-    .map((d) => { const sub = deptSubtree(d.slug); return { slug: d.slug, name: d.name, items: railRows(`AND p.department IN (${sub.map(() => '?').join(',')}) ORDER BY p.sold_count DESC, p.id DESC LIMIT 10`, sub) }; });
+    .map((d) => { const sub = deptSubtree(d.slug); return { slug: d.slug, name: d.name, items: railRows(`AND p.department IN (${sub.map(() => '?').join(',')}) ORDER BY p.sold_count DESC, p.id DESC LIMIT 24`, sub, 10) }; });
   cache(res, 60);
   res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });
 }));
@@ -844,8 +848,8 @@ r.post('/marketplace/delivery-fee', h((req, res) => {
   const needsFee = storeQuotes.some((qt) => qt.shipping > 0);
   res.json({
     platformFree,
-    fee: needsFee && !platformFree ? split.customerFee : 0, feeStatus: 'confirmed', fullRouteFee: bd.fee, storeShares: split.storeShares,
-    matched: bd.matched || bd.zones.every((z) => z.custom), scope: bd.scope, pickupStops: bd.stopCount, pickupZones: bd.zones.length,
+    fee: needsFee && !platformFree ? split.customerFee : 0, feeStatus: needsFee && !platformFree && !bd.matched ? 'pending' : 'confirmed', fullRouteFee: bd.fee, storeShares: split.storeShares,
+    matched: bd.matched, scope: bd.scope, pickupStops: bd.stopCount, pickupZones: bd.zones.length,
     breakdown: { zones: bd.zones.map(({ courierCost, ...z }) => z), subtotal: bd.subtotal, percent: bd.percent, discount: bd.discount, total: bd.fee },
   });
 }));
@@ -853,7 +857,7 @@ r.post('/marketplace/delivery-fee', h((req, res) => {
 r.get('/marketplace/free-shipping', h((_req, res) => res.json(getPlatformFreeShipping())));
 
 r.get('/marketplace/delivery-areas', h((_req, res) => {
-  const rows = q.all("SELECT id, governorate, city, fee, distance_km FROM delivery_rates WHERE city <> '*' ORDER BY id");
+  const rows = q.all("SELECT id, governorate, city, fee, distance_km, lat, lng FROM delivery_rates WHERE city <> '*' ORDER BY id");
   res.json({
     areas: rows.map((r) => ({
       id: r.id,
@@ -861,6 +865,8 @@ r.get('/marketplace/delivery-areas', h((_req, res) => {
       city: r.city,
       fee: r.fee,
       distanceKm: r.distance_km == null ? null : Number(r.distance_km),
+      lat: r.lat == null ? null : Number(r.lat),
+      lng: r.lng == null ? null : Number(r.lng),
     })),
   });
 }));
@@ -1019,9 +1025,11 @@ r.post('/marketplace/orders', h((req, res) => {
     // still receives and fulfils its own sub-order. Charge one platform fee.
     // Store thresholds decide whether the shared destination-based delivery fee applies.
     const needsFee = prepared.some(({ qt }) => qt.shipping > 0);
-    const pendingFee = false; // the fee is always known up front now (pickup-zone prices)
-    const fullRouteFee = computeBasketDelivery(prepared.map(({ store }) => store.slug), body.governorate, body.city).fee;
+    const basketDelivery = computeBasketDelivery(prepared.map(({ store }) => store.slug), body.governorate, body.city);
+    const fullRouteFee = basketDelivery.fee;
     const platformFree = platformFreeApplies(prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0));
+    // Area not on the delivery price list: place the order without a fee, customer service calls with the shipping cost.
+    const pendingFee = needsFee && !platformFree && !basketDelivery.matched;
     const split = splitSharedDeliveryFee(fullRouteFee, prepared.map(({ qt }) => ({ freeShipping: platformFree || qt.shipping === 0 })));
     const marketplaceShipping = pendingFee ? 0 : split.customerFee;
     const marketplaceTotal = prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0) + marketplaceShipping;
@@ -1069,7 +1077,7 @@ r.post('/marketplace/orders', h((req, res) => {
     // Store notifications are best-effort, after all sub-orders have committed atomically.
     if (store.auto_whatsapp) sendNewOrderAlert(store, order.orderId).catch((e) => console.error(`[whatsapp] ${order.number} failed: ${e.message}`));
     notifyStore(store.id, { title: `طلب جديد 🛍️ ${order.number}`, body: `${body.name} · ${order.total} ج.م`, url: `/dashboard/orders/${order.orderId}`, tag: `order-${order.orderId}` });
-    notifyPlatformAlert(`طلب تويست جديد 🛍️ ${order.number} من ${store.name_ar} بقيمة ${order.total} ج.م للعميل ${body.name}`);
+    notifyPlatformAlert(`طلب تويست جديد 🛍️ ${order.number} من ${store.name_ar} بقيمة ${order.total} ج.م للعميل ${body.name}${order.deliveryFeeStatus === 'pending' ? ` ⚠️ المنطقة (${body.city}) خارج جدول التوصيل: كلّموا العميل ${body.phone} بمصاريف الشحن` : ''}`);
     // Marketplace orders are always delivered by Twist, regardless of the
     // store's default delivery preference. Dispatch is notified when ready.
   }

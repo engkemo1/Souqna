@@ -35,7 +35,7 @@ export default function DeliveryZones() {
 
   useEffect(() => {
     if (!data) return;
-    setZones(data.zones.map((z) => ({ ...z, fee: z.fee ? String(z.fee) : '', courierCost: z.courierCost ? String(z.courierCost) : '' })));
+    setZones(data.zones.map((z) => ({ ...z, fee: z.fee ? String(z.fee) : '', courierCost: z.courierCost ? String(z.courierCost) : '', extraFee: z.extraFee == null ? '' : String(z.extraFee) })));
     const t = { 2: '', 3: '', 4: '' };
     for (const x of data.policy.tiers) t[x.zones] = String(x.percent);
     setTiers(t); setExtra(String(data.policy.extraStopCost)); setMargin(String(data.policy.minMargin));
@@ -56,7 +56,7 @@ export default function DeliveryZones() {
     setBusy(true);
     try {
       await adminApi('/delivery-zones', { method: 'PUT', body: {
-        zones: zones.map((z) => ({ key: z.key, name: z.name, fee: num(z.fee), courierCost: num(z.courierCost) })),
+        zones: zones.map((z) => ({ key: z.key, name: z.name, fee: num(z.fee), courierCost: num(z.courierCost), extraFee: z.extraFee === '' ? null : num(z.extraFee) })),
         policy: { tiers: tierList.filter((t) => t.percent > 0), extraStopCost: num(extra), minMargin: num(margin) },
       } });
       toast({ title: 'تم حفظ أسعار المناطق والخصم' }); reload();
@@ -67,6 +67,7 @@ export default function DeliveryZones() {
 
   return <div>
     <PageHeader title="مناطق الاستلام والخصم" subtitle="سعر الدليفري لكل منطقة استلام، والخصم لما العميل يطلب من أكتر من منطقة، مع حماية بتمنع الخصم من إنه يخسّرك." />
+    <div className="mb-5 rounded-xl bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><b>القاعدة الحالية:</b> سعر التوصيل بيتحسب من جدول المناطق (صفحة "رسوم التوصيل"). المحلات في <b>نفس المنطقة</b> بسعر الجدول من غير زيادة. كل منطقة استلام تانية في نفس الطلب بتضيف الرقم اللي في خانة "إضافة لو طُلب مع محل تاني" (5 ج.م لو سبته فاضي، و10 للمنطقة البعيدة). باقي الخانات (سعر العميل/الخصم/الربح) قديمة ومش بتأثر على سعر الطلب دلوقتي.</div>
     <div className="mb-5 rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">المحلات اللي في نفس المنطقة بتتحسب <b>مرة واحدة</b> (المندوب بيعدّي مكان واحد). المنطقة بتتحدد من خانة "منطقة استلام الطلبات" في تعديل كل محل. لو منطقة سعرها فاضي، بنستخدم سعر منطقة العميل العادي ({fmtMoney(fallback)}).</div>
 
     <Panel title="أسعار مناطق الاستلام" subtitle={`${zones.length} منطقة`} className="mb-5">
@@ -74,11 +75,12 @@ export default function DeliveryZones() {
         <ul className="divide-y divide-line">
           {zones.map((z, i) => {
             const fee = num(z.fee) || fallback; const cost = num(z.courierCost); const profit = cost ? fee - cost : null;
-            return <li key={z.key} className="grid gap-3 py-4 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_150px_150px_110px] sm:items-end">
+            return <li key={z.key} className="grid gap-3 py-4 first:pt-0 last:pb-0 sm:grid-cols-[minmax(0,1fr)_170px_150px_150px_110px] sm:items-end">
               <div className="min-w-0"><p className="flex items-center gap-2 font-semibold"><MapPin className="h-4 w-4 shrink-0 text-brand" />{z.name}</p>
                 <p className="mt-1 text-xs text-muted">{z.stores.map((s) => s.name).join(' · ')}</p>
                 {z.stores.some((s) => s.lat == null) && <p className="mt-1 text-xs text-amber-700">📍 فيه محل بدون موقع على الخريطة</p>}</div>
-              <Field label="سعر العميل"><Input inputMode="numeric" suffix="ج.م" value={z.fee} placeholder={String(fallback)} onChange={patch(i, 'fee')} /></Field>
+              <Field label="إضافة لو طُلب مع محل تاني" hint="فاضي = 5. حط 10 للمنطقة البعيدة"><Input inputMode="numeric" suffix="ج.م" value={z.extraFee} placeholder="5" onChange={patch(i, 'extraFee')} /></Field>
+              <Field label="سعر العميل (قديم)"><Input inputMode="numeric" suffix="ج.م" value={z.fee} placeholder={String(fallback)} onChange={patch(i, 'fee')} /></Field>
               <Field label="تكلفة المندوب علينا"><Input inputMode="numeric" suffix="ج.م" value={z.courierCost} onChange={patch(i, 'courierCost')} /></Field>
               <p className={`pb-2 text-sm font-semibold ${profit == null ? 'text-muted' : profit < 0 ? 'text-sale' : 'text-emerald-700'}`}>{profit == null ? 'الربح: —' : `الربح: ${profit} ج`}</p>
             </li>;

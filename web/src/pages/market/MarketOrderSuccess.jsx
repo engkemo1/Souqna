@@ -46,6 +46,25 @@ export default function MarketOrderSuccess() {
   return <div className="min-h-dvh"><MarketHeader /><main className="container max-w-2xl py-12 sm:py-20">
     <div className="text-center"><span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-success/10 text-success"><Check className="h-8 w-8" /></span><h1 className="mt-5 font-display text-2xl font-bold">{ar ? `طلبك وصل يا ${state.name || ''}` : `Your order is in, ${state.name || ''}`}</h1><p className="mt-2 text-sm leading-6 text-muted">{ar ? 'كل محل هيجهز منتجاته في طلب مستقل، وTwist هتجمع الطلبات بعد ما تبقى جاهزة وتوصلها لك.' : 'Each store prepares a separate order. Twist collects the orders once they are ready and delivers them to you.'}</p>{feePending && <p className="mx-auto mt-4 max-w-lg rounded-xl bg-amber-50 p-4 text-sm leading-6 text-amber-900">{ar ? 'رسوم التوصيل لسه مش مؤكدة. بعد تجهيز الطلبات وتحديد المسار، هنبعتلك السعر النهائي للموافقة قبل إرسال المندوب.' : 'Delivery is not priced yet. After the stores prepare your orders and Twist plans the route, we will send the final fee for approval before dispatch.'}</p>}</div>
 
+    {/* What happens next: three plain steps so the customer knows what to expect */}
+    <section className="mt-6 rounded-2xl border border-line bg-elevated p-4 sm:p-5" aria-label={ar ? 'إيه اللي هيحصل دلوقتي' : 'What happens next'}>
+      <h2 className="text-sm font-bold">{ar ? 'إيه اللي هيحصل دلوقتي؟' : 'What happens next?'}</h2>
+      <ol className="mt-3 space-y-3 text-sm leading-6">
+        {[
+          ar ? 'المحل بيأكد طلبك ويجهّزه.' : 'The store confirms and prepares your order.',
+          feePending
+            ? (ar ? 'خدمة العملاء هتكلمك بمصاريف الشحن قبل ما المندوب يتحرك.' : 'Customer service will call you with the shipping cost before the courier moves.')
+            : (ar ? 'مندوب Twist بيستلم الطلب ويوصّله لحد باب بيتك، وغالبًا بيوصل خلال يوم.' : 'A Twist courier picks it up and brings it to your door, most often within a day.'),
+          ar ? 'بتدفع كاش لما الطلب يوصلك. مفيش دفع مسبق.' : 'You pay cash when it arrives. Nothing is paid in advance.',
+        ].map((text, i) => (
+          <li key={i} className="flex items-start gap-3">
+            <span className="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-brand/10 text-xs font-bold text-brand">{i + 1}</span>
+            <span>{text}</span>
+          </li>
+        ))}
+      </ol>
+    </section>
+
     {/* WhatsApp confirmation banner: one button per store, sent to the store owner */}
     {storeWaLinks.length > 0 && <div className="mt-6 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 p-4 sm:p-5 text-center">
       <p className="text-base font-bold text-fg">

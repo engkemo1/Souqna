@@ -63,10 +63,12 @@ export default function Customers() {
   return (
     <PageTransition>
       <PageHeader title={t('customers.title')} />
-      <div className="mb-6 grid grid-cols-3 gap-3 sm:gap-4">
+      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
         <KpiCard label={t('customers.total')} value={s?.total} format={(n) => formatNumber(n, lang)} icon={Users} tone="brand" loading={!s} />
         <KpiCard label={t('customers.repeat')} value={s?.repeat} format={(n) => formatNumber(n, lang)} icon={Repeat} tone="violet" loading={!s} hint={s ? `${Math.round((s.repeat / Math.max(1, s.total)) * 100)}%` : null} />
-        <KpiCard label={t('customers.avg')} value={s?.avg} format={(n) => formatMoney(n, lang)} icon={Wallet} tone="accent" loading={!s} />
+        <div className="col-span-2 sm:col-span-1">
+          <KpiCard label={t('customers.avg')} value={s?.avg} format={(n) => formatMoney(n, lang)} icon={Wallet} tone="accent" loading={!s} />
+        </div>
       </div>
       <div className="mb-5 flex gap-2">
         <SearchInput value={term} onChange={setTerm} placeholder={t('customers.search')} className="flex-1" />

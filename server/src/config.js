@@ -35,6 +35,7 @@ export const config = {
   backupKeepDays: Number(process.env.BACKUP_KEEP_DAYS || 14),
   // WhatsApp Cloud API (Meta). Used only when a store's auto_whatsapp switch is on.
   // Twist team number that gets a WhatsApp alert whenever an order must be delivered by us.
+  siteUrl: (process.env.PUBLIC_SITE_URL || 'https://twistegy.com').replace(/\/+$/, ''),
   platformWa: process.env.PLATFORM_WA || '201206928670',
   wa: {
     token: process.env.WA_TOKEN || '',
@@ -53,6 +54,9 @@ export const config = {
     appSecret: process.env.WA_APP_SECRET || '',
     // Approved AUTHENTICATION template (copy-code button) used for customer sign-in codes.
     authTemplate: process.env.WA_AUTH_TEMPLATE || '',
+    // Approved UTILITY template for order updates to customers who ordered without an account (push covers signed-in shoppers).
+    // Body (4 variables): أهلاً {{1}}، طلبك رقم {{2}}: {{3}}. تتبّع طلبك من هنا: {{4}}   — empty = feature off.
+    customerTemplate: process.env.WA_CUSTOMER_TEMPLATE || '',
     authLang: process.env.WA_AUTH_LANG || process.env.WA_TEMPLATE_LANG || 'ar',
   },
 };

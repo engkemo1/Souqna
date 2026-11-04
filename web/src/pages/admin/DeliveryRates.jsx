@@ -73,6 +73,8 @@ export default function DeliveryRates() {
   const [pricing, setPricing] = useState({ baseFee: '50', includedKm: '2', perKm: '10', extraPickupStopFee: '0', extraPickupZoneFee: '0' });
   const [editing, setEditing] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [multi, setMulti] = useState({ extraFee: '5', farExtraFee: '10', sameZoneKm: '0.8', farKm: '4' });
+  const [multiBusy, setMultiBusy] = useState(false);
 
   useEffect(() => {
     if (data?.pricing) {
@@ -86,6 +88,19 @@ export default function DeliveryRates() {
     }
   }, [data?.pricing]);
 
+  useEffect(() => {
+    if (data?.multiStore) setMulti({ extraFee: String(data.multiStore.extraFee), farExtraFee: String(data.multiStore.farExtraFee), sameZoneKm: String(data.multiStore.sameZoneKm), farKm: String(data.multiStore.farKm) });
+  }, [data?.multiStore]);
+
+  const saveMulti = async (event) => {
+    event.preventDefault(); setMultiBusy(true);
+    try {
+      await adminApi('/delivery-rates/multi-store', { method: 'PUT', body: { extraFee: Number(multi.extraFee), farExtraFee: Number(multi.farExtraFee), sameZoneKm: Number(multi.sameZoneKm), farKm: Number(multi.farKm) } });
+      toast({ title: 'تم حفظ زيادة الطلب من أكتر من محل' }); reload();
+    } catch (e) { toast({ tone: 'error', title: e.message }); }
+    setMultiBusy(false);
+  };
+
   const reset = () => { setForm(blank); setEditing(null); setCoords(null); };
 
   const save = async (event) => {
@@ -98,6 +113,7 @@ export default function DeliveryRates() {
           city: form.city.trim(),
           fee: form.fee === '' ? undefined : Number(form.fee),
           distanceKm: form.distanceKm === '' ? null : Number(form.distanceKm),
+          ...(coords ? { lat: coords.lat, lng: coords.lng } : {}),
         },
       });
       toast({ title: editing ? 'تم تحديث رسوم المنطقة' : 'تمت إضافة رسوم المنطقة بنجاح' });
@@ -116,6 +132,8 @@ export default function DeliveryRates() {
       fee: item.distanceKm == null ? String(item.fee) : '',
       distanceKm: item.distanceKm == null ? '' : String(item.distanceKm),
     });
+    setCoords(item.lat != null && item.lng != null ? { lat: Number(item.lat), lng: Number(item.lng) } : null);
+    if (item.lat != null && item.lng != null) setShowMap(true);
   };
 
   const applyPreset = (preset) => {
@@ -131,6 +149,7 @@ export default function DeliveryRates() {
   const handleMapPick = (lat, lng, details) => {
     const km = calcDistanceKm(lat, lng, BANHA_COORDS);
     setCoords({ lat, lng });
+    if (editing && form.fee !== '') return; // fixed price from the price sheet: only move the pin, keep the price
     setForm((f) => ({
       ...f,
       city: f.city && f.city !== '*' ? f.city : (details?.primaryName || details?.shortName || details?.name || f.city),
@@ -202,6 +221,20 @@ export default function DeliveryRates() {
       </div>
 
       <PlatformFreeShipping />
+
+      <Panel title="زيادة الطلب من أكتر من محل" className="mb-5">
+        <p className="mb-4 text-sm leading-6 text-muted">
+          سعر المنطقة من الجدول بيتدفع مرة واحدة. المحلات القريبة من بعض (نفس المنطقة) من غير زيادة، وكل منطقة استلام تانية بتضيف مبلغ. المنطقة الأقرب لوسط بنها هي الأساس ومش بتتحسب.
+        </p>
+        <form onSubmit={saveMulti} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:items-end">
+          <Field label="زيادة كل منطقة تانية" hint="المحل في منطقة مختلفة"><Input inputMode="numeric" suffix="ج.م" value={multi.extraFee} onChange={(e) => setMulti({ ...multi, extraFee: e.target.value.replace(/\D/g, '') })} required /></Field>
+          <Field label="زيادة المنطقة البعيدة" hint="بعيدة عن وسط بنها"><Input inputMode="numeric" suffix="ج.م" value={multi.farExtraFee} onChange={(e) => setMulti({ ...multi, farExtraFee: e.target.value.replace(/\D/g, '') })} required /></Field>
+          <Field label="المحلات القريبة = منطقة واحدة" hint="لو المسافة بينهم أقل من"><Input inputMode="decimal" suffix="كم" value={multi.sameZoneKm} onChange={(e) => setMulti({ ...multi, sameZoneKm: e.target.value.replace(/[^\d.]/g, '') })} required /></Field>
+          <Field label="تعتبر بعيدة لو أكتر من" hint="المسافة عن وسط بنها"><Input inputMode="decimal" suffix="كم" value={multi.farKm} onChange={(e) => setMulti({ ...multi, farKm: e.target.value.replace(/[^\d.]/g, '') })} required /></Field>
+          <div className="sm:col-span-2 lg:col-span-4"><Button type="submit" loading={multiBusy}>حفظ</Button></div>
+        </form>
+        <p className="mt-3 text-xs text-muted">المنطقة بتتحدد من خانة "منطقة استلام الطلبات" في تعديل المحل، ولو فاضية بتتحدد من مكان المحل على الخريطة. تقدر تحدد زيادة مختلفة لمنطقة معينة من صفحة "مناطق الاستلام".</p>
+      </Panel>
 
       <Panel title="طريقة حساب رسوم التوصيل" className="mb-5">
         <p className="mb-4 text-sm leading-6 text-muted">
@@ -360,7 +393,7 @@ export default function DeliveryRates() {
             <ul className="divide-y divide-line max-h-[580px] overflow-auto pe-1">
               {filteredItems.map((item) => (
                 <li key={item.id} className="flex items-center gap-3 py-2.5 first:pt-0 last:pb-0">
-                  <MapPin className="h-4 w-4 shrink-0 text-brand" />
+                  <MapPin className={`h-4 w-4 shrink-0 ${item.lat != null && item.lng != null ? 'text-brand' : 'text-muted/40'}`} aria-label={item.lat != null && item.lng != null ? 'ليها موقع على الخريطة' : 'من غير موقع على الخريطة'} />
                   <div className="min-w-0 flex-1">
                     <p className="font-medium text-sm">
                       {item.governorate === '*'
@@ -371,6 +404,7 @@ export default function DeliveryRates() {
                     </p>
                     <p className="text-xs text-muted">
                       {item.distanceKm == null ? '' : `${item.distanceKm} كم من بنها · `}
+                      {item.governorate !== '*' || item.city ? (item.lat != null && item.lng != null ? '' : 'من غير موقع · ') : ''}
                       <span className="font-semibold text-fg">{fmtMoney(item.fee)}</span>
                     </p>
                   </div>

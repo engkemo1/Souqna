@@ -21,13 +21,15 @@ function CatRow({ c, onEdit, onDelete, onDragEnd, onAddSub, canTop, parent, t, t
   const controls = useDragControls();
   return (
     <Reorder.Item value={c} dragListener={false} dragControls={controls} onDragEnd={onDragEnd} className="list-none" whileDrag={{ scale: 1.02, boxShadow: '0 20px 40px -20px rgba(0,0,0,.3)' }}>
-      <div className={`flex items-center gap-3 rounded-2xl border border-line bg-elevated p-3 ${c.parentId ? 'ms-8' : ''}`}>
+      <div className={`flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-line bg-elevated p-3 ${c.parentId ? 'ms-8' : ''}`}>
         <button type="button" onPointerDown={(e) => controls.start(e)} aria-label="Reorder" className="grid h-11 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-lg text-muted hover:bg-fg/[0.05]"><GripVertical className="h-5 w-5" /></button>
         <SmartImage media={c.image} ratio="1 / 1" sizes="64px" className="h-14 w-14 shrink-0 rounded-xl" />
-        <div className="min-w-0 flex-1"><p className="truncate font-semibold">{tr(c.name)}{parent && <span className="ms-2 text-xs font-normal text-muted">تحت: {tr(parent.name)}</span>}</p><p className="text-sm text-muted">{t('categories.count', { n: c.count ?? 0 })}</p></div>
+        <div className="min-w-[7rem] flex-1"><p className="truncate font-semibold">{tr(c.name)}{parent && <span className="ms-2 text-xs font-normal text-muted">تحت: {tr(parent.name)}</span>}</p><p className="text-sm text-muted">{t('categories.count', { n: c.count ?? 0 })}</p></div>
+        <div className="flex shrink-0 items-center gap-1.5 max-sm:w-full max-sm:justify-end">
         {!c.parentId && <Button size="sm" variant="outline" icon={Plus} onClick={() => onAddSub(c)}>قسم فرعي</Button>}
         {!locked && <IconButton size="sm" label={t('common.edit')} icon={Pencil} iconClass="h-4 w-4" onClick={() => onEdit(c)} />}
         {!locked && <IconButton size="sm" label={t('common.delete')} icon={Trash2} iconClass="h-4 w-4 text-sale" onClick={() => onDelete(c)} />}
+        </div>
       </div>
     </Reorder.Item>
   );

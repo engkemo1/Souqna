@@ -322,8 +322,8 @@ export default function Settings() {
         {tabs.map(([key, label]) => <button key={key} type="button" role="tab" id={`settings-tab-${key}`} aria-selected={activeTab === key} aria-controls={`settings-panel-${key}`} onClick={() => selectTab(key)} className={cx('min-h-11 shrink-0 rounded-t-xl px-4 text-sm font-semibold transition', activeTab === key ? 'border-b-2 border-brand text-brand' : 'text-muted hover:bg-fg/[0.04] hover:text-fg')}>{label}</button>)}
       </div>
       <div role="tabpanel" id="settings-panel-info" aria-labelledby="settings-tab-info" hidden={activeTab !== 'info'}>
-        <div className="grid items-start gap-4 lg:grid-cols-[1fr_360px]">
-        <div className="space-y-4">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-4">
           <Panel title={t('settings.general')}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('settings.nameAr')} error={errors.name_ar}><Input dir="rtl" value={f.name_ar} onChange={set('name_ar')} /></Field>

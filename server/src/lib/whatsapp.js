@@ -120,3 +120,22 @@ export async function sendPlatformAlert(text) {
 export function notifyPlatformAlert(text) {
   sendPlatformAlert(text).catch((e) => console.error(`[whatsapp] team alert failed: ${e.message}`));
 }
+
+/**
+ * Order update to a customer who ordered without an account (signed-in shoppers get an in-app/push notice instead).
+ * Needs an approved template named in WA_CUSTOMER_TEMPLATE; does nothing until it is set. Never throws.
+ */
+export function notifyGuestOrderWhatsApp({ phone, name, number, text, token }) {
+  try {
+    if (!isWhatsAppConfigured() || !config.wa.customerTemplate) return;
+    const to = toWaNumber(phone);
+    if (!to) return;
+    const params = [name || 'عميلنا', number, text, `${config.siteUrl}/track/${token}`].map((v) => ({ type: 'text', text: String(v || '-').replace(/\s+/g, ' ').slice(0, 900) }));
+    fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: config.wa.customerTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }] } }),
+    }).then(async (res) => { if (!res.ok) console.error(`[whatsapp] customer update ${number} failed: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`); })
+      .catch((e) => console.error(`[whatsapp] customer update ${number} failed: ${e.message}`));
+  } catch (e) { console.error(`[whatsapp] customer update failed: ${e.message}`); }
+}

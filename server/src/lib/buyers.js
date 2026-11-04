@@ -5,6 +5,7 @@ import { config } from '../config.js';
 import { q } from '../db/index.js';
 import { AppError } from './errors.js';
 import { vapidPublicKey } from './push.js';
+import { notifyGuestOrderWhatsApp } from './whatsapp.js';
 
 const SECRET = `${config.jwtSecret}:buyer`;
 export const signBuyer = (b) => jwt.sign({ sub: b.id, k: 'buyer' }, SECRET, { expiresIn: '90d' });
@@ -49,9 +50,13 @@ const PICKUP_TEXT = {
 };
 
 export function notifyOrderStatus(orderId, status) {
-  const o = q.get('SELECT o.id, o.number, o.buyer_id, o.track_token, o.delivery_by, s.name_ar AS sname FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.id=?', [orderId]);
+  const o = q.get('SELECT o.id, o.number, o.buyer_id, o.track_token, o.delivery_by, o.customer_name, o.phone, s.name_ar AS sname FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.id=?', [orderId]);
   const t = (o?.delivery_by === 'pickup' ? PICKUP_TEXT : STATUS_TEXT)[status]; if (!t) return;
-  if (!o?.buyer_id) return;
+  if (!o) return;
+  if (!o.buyer_id) { // ordered without an account: WhatsApp (when a customer template is configured)
+    notifyGuestOrderWhatsApp({ phone: o.phone, name: o.customer_name, number: o.number, text: `${t[0].replace(/[\u{1F300}-\u{1FAFF}\u2705\u2714]/gu, '').trim()} — ${t[1](o.number, o.sname)}`, token: o.track_token });
+    return;
+  }
   notifyBuyer(o.buyer_id, { kind: 'order', title: t[0], body: t[1](o.number, o.sname), url: `/track/${o.track_token}` });
 }
 

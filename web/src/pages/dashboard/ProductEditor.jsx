@@ -682,6 +682,9 @@ export default function ProductEditor() {
         <div className="space-y-4">
           <Field label={L('اسم المنتج', 'Product name')} error={errors.name_ar} hint={type ? L(`مثال: ${type.ar} ${f.colors[0] ? f.colors[0].name_ar : 'أسود'} قطن`, undefined) : undefined}>
             <Input ref={nameRef} dir="auto" value={f.name_ar} onChange={(e) => set({ name_ar: e.target.value })} maxLength={120} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} />
+            {f.name_ar.trim().length >= 2 && f.name_ar.trim().split(/\s+/).length < 2 && (
+              <p role="status" className="mt-1.5 text-xs font-medium leading-5 text-amber-700">{L('الاسم عام قوي (كلمة واحدة). العميل مش هيفرّق بينه وبين باقي منتجاتك ولا هيلاقيه في البحث. زوّد اللون أو الخامة أو الموديل، زي: لانجيري شيفون قصير أسود.', 'This name is very generic (one word). Customers cannot tell it apart from your other items, and search works better with more detail: add colour, fabric or style.')}</p>
+            )}
           </Field>
           {!f.name_ar.trim() && (type || aud) && (
             <div className="flex flex-wrap items-center gap-2">

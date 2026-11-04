@@ -156,7 +156,7 @@ export default function OrderDetail() {
   const actions = (
     <>
       {canCancel && <Button variant="danger-ghost" icon={X} onClick={() => setCancelOpen(true)}>{pickup ? L('اتباعت / اتلغى', 'Sold / cancel') : t('status.action.cancelled')}</Button>}
-      {nextMain && <Button variant="brand" icon={Check} loading={busy === nextMain} onClick={() => setStatus(nextMain)}>{pickup ? PK_ACTION[nextMain] : byUs && nextMain === 'processing' ? t('orders.markReady') : t(`status.action.${nextMain}`)}</Button>}
+      {nextMain && <Button variant="brand" icon={Check} loading={busy === nextMain} onClick={() => setStatus(nextMain)}>{pickup ? PK_ACTION[nextMain] : byUs && nextMain === 'processing' ? t('orders.readyCta') : t(`status.action.${nextMain}`)}</Button>}
     </>
   );
 

@@ -229,11 +229,11 @@ export default function Product() {
                 {p.category && <Link to={sp(store.slug, `shop?category=${p.category.slug}`)} className="text-xs font-medium text-muted hover:text-fg">{tr(p.category.name)}</Link>}
               </div>
               <h1 className="font-display text-[1.65rem] font-bold leading-tight sm:text-3xl xl:text-[2.1rem]">{tr(p.name)}</h1>
-              <div className="mt-2.5 flex items-center gap-1.5 text-sm">
+              {p.ratingCount > 0 && <div className="mt-2.5 flex items-center gap-1.5 text-sm">
                 <span className="flex">{[1, 2, 3, 4, 5].map((i) => <Star key={i} className={cx('h-4 w-4', i <= Math.round(p.rating) ? 'fill-amber-400 text-amber-400' : 'text-line-strong')} />)}</span>
                 <span className="font-semibold">{p.rating}</span>
                 <span className="text-muted">· {t('product.reviews', { n: formatNumber(p.ratingCount, lang) })}</span>
-              </div>
+              </div>}
             </div>
             <div className="-me-2 flex shrink-0">
               <IconButton label={t('common.share')} icon={Share2} onClick={share} />

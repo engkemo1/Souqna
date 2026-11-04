@@ -86,13 +86,17 @@ export function resolveDeliveryRate(governorate, city, storeSlugs = []) {
   let cityMatch = area ? rows.find((r) => (clean(r.governorate) === gov || clean(r.governorate) === '*') && clean(r.city) === area) : null;
 
   // 2. Try flexible/substring match (e.g. "شبرا" matching "شبرا الخيمة" or vice versa)
+  // (whole words only, longest listed area wins: "الفلل بنها" -> الفلل, but "بنها" alone never matches "كفر الشيخ بنها")
   if (!cityMatch && area && area.length >= 2) {
-    cityMatch = rows.find((r) => {
-      if (clean(r.governorate) !== gov && clean(r.governorate) !== '*') return false;
+    const padded = ` ${area} `;
+    let best = null;
+    for (const r of rows) {
+      if (clean(r.governorate) !== gov && clean(r.governorate) !== '*') continue;
       const rateCity = clean(r.city);
-      if (!rateCity || rateCity === '*') return false;
-      return area.includes(rateCity) || (area.length >= 3 && rateCity.includes(area));
-    });
+      if (!rateCity || rateCity === '*' || rateCity.length < 3) continue;
+      if (padded.includes(` ${rateCity} `) && (!best || rateCity.length > clean(best.city).length)) best = r;
+    }
+    cityMatch = best;
   }
 
   const governorateRate = rows.find((r) => clean(r.governorate) === gov && (!clean(r.city) || clean(r.city) === '*'));
@@ -162,8 +166,83 @@ export function priceZones(zones, policy) {
   return { subtotal, percent: capped ? Math.round(((subtotal - fee) / subtotal) * 100) : percent, discount: subtotal - fee, fee, capped, tripCost };
 }
 
-/** Full basket delivery quote for the checkout (groups shops by pickup zone). */
+const BANHA_CENTER = { lat: 30.4666, lng: 31.1836 }; // downtown Banha: the reference point for "far"
+const kmBetween = (a, b) => {
+  const rad = (d) => (d * Math.PI) / 180;
+  const dLat = rad(b.lat - a.lat); const dLng = rad(b.lng - a.lng);
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * 6371 * Math.asin(Math.sqrt(h));
+};
+const hasCoords = (s) => Number.isFinite(Number(s.lat)) && Number.isFinite(Number(s.lng)) && !(Number(s.lat) === 0 && Number(s.lng) === 0);
+const readNum = (key, fallback) => { const raw = q.val('SELECT value FROM app_settings WHERE key=?', [key]); const v = raw == null || raw === '' ? NaN : Number(raw); return Number.isFinite(v) && v >= 0 ? v : fallback; };
+
+/** Multi-store basket rule (editable in the admin "رسوم التوصيل" page). */
+export function getMultiStoreRule() {
+  return {
+    extraFee: readNum('delivery_extra_pickup_stop_fee', 5),     // +EGP per extra pickup zone
+    farExtraFee: readNum('delivery_far_extra_fee', 10),         // +EGP for a zone far from downtown
+    sameZoneKm: readNum('delivery_same_zone_km', 0.8),          // stores closer than this = one zone
+    farKm: readNum('delivery_far_km', 4),                       // "far" = more than this from downtown Banha
+  };
+}
+export function saveMultiStoreRule(r) {
+  const clamp = (v, max) => Math.max(0, Math.min(max, Number(v) || 0));
+  for (const [k, val] of [['delivery_extra_pickup_stop_fee', Math.round(clamp(r.extraFee, 500))], ['delivery_far_extra_fee', Math.round(clamp(r.farExtraFee, 500))], ['delivery_same_zone_km', clamp(r.sameZoneKm, 20)], ['delivery_far_km', clamp(r.farKm, 200)]]) {
+    q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [k, String(val)]);
+  }
+  return getMultiStoreRule();
+}
+
+/**
+ * Basket delivery quote (price-sheet rule):
+ *  - the price of the destination area, once. Stores in the SAME pickup zone are one stop = no extra.
+ *    A store's zone is the "pickup zone" text the admin set, or, when that is empty, its map location:
+ *    stores within delivery_same_zone_km (0.8 km) of each other are one zone.
+ *  - + an extra for every other pickup zone: the admin's per-zone extra if set, otherwise 5 EGP
+ *    (extraPickupStopFee) or 10 EGP (delivery_far_extra_fee) when the zone is more than delivery_far_km (4 km)
+ *    from downtown Banha. The zone nearest downtown is the base and is never charged.
+ *  - destination not on the price list -> no price (matched=false): customer service quotes it later.
+ */
 export function computeBasketDelivery(storeSlugs, governorate, city) {
+  const slugs = [...new Set(storeSlugs.map((s) => String(s || '').trim()).filter(Boolean))];
+  const stores = slugs.length ? q.all(`SELECT id, slug, name_ar, name_en, delivery_zone, lat, lng FROM stores WHERE slug IN (${slugs.map(() => '?').join(',')})`, slugs) : [];
+  const dest = resolveDeliveryRate(governorate, city, slugs);
+  const matched = dest.matched && dest.scope === 'city';
+  const rule = getMultiStoreRule();
+  const defaultExtra = rule.extraFee; const sameKm = rule.sameZoneKm; const farKm = rule.farKm; const farExtra = rule.farExtraFee;
+  const savedExtra = new Map(q.all('SELECT key, extra_fee FROM pickup_zones').map((z) => [z.key, z.extra_fee]));
+
+  // 1) stores with a named zone first, then the ones without (they can join a group by location)
+  const groups = new Map();
+  const pt = (s) => ({ lat: Number(s.lat), lng: Number(s.lng) });
+  const ordered = [...stores].sort((x, y) => (String(y.delivery_zone || '').trim() ? 1 : 0) - (String(x.delivery_zone || '').trim() ? 1 : 0));
+  for (const s of ordered) {
+    const named = String(s.delivery_zone || '').trim();
+    let key = null;
+    if (named) key = zoneKey(named, s.id);
+    else if (hasCoords(s)) {
+      for (const g of groups.values()) if (g.stores.some((o) => hasCoords(o) && kmBetween(pt(o), pt(s)) <= sameKm)) { key = g.key; break; }
+      if (!key) key = `loc:${s.id}`;
+    } else key = `store:${s.id}`;
+    if (!groups.has(key)) groups.set(key, { key, name: named || s.name_ar, explicit: savedExtra.get(key) ?? null, stores: [] });
+    groups.get(key).stores.push(s);
+  }
+  const list = [...groups.values()].map((g) => {
+    const withPos = g.stores.filter(hasCoords);
+    g.center = withPos.length ? { lat: withPos.reduce((n, x) => n + Number(x.lat), 0) / withPos.length, lng: withPos.reduce((n, x) => n + Number(x.lng), 0) / withPos.length } : null;
+    g.fromCenter = g.center ? kmBetween(g.center, BANHA_CENTER) : null;
+    return g;
+  });
+  // 2) each zone's extra; the cheapest / closest-to-downtown zone is the base and is never charged
+  for (const g of list) g.extra = g.explicit != null ? g.explicit : (g.fromCenter != null && g.fromCenter > farKm ? farExtra : defaultExtra);
+  list.sort((a, b) => a.extra - b.extra || (a.fromCenter ?? 0) - (b.fromCenter ?? 0));
+  const zones = list.map((g, i) => ({ key: g.key, name: g.name, fee: i === 0 ? dest.fee : g.extra, courierCost: 0, custom: false, stores: g.stores.map((s) => ({ slug: s.slug, name_ar: s.name_ar, name_en: s.name_en, lat: s.lat, lng: s.lng })) }));
+  const subtotal = zones.reduce((sum, z) => sum + z.fee, 0);
+  return { zones, subtotal, percent: 0, discount: 0, fee: matched ? Math.min(5000, subtotal) : 0, capped: false, tripCost: null, matched, scope: dest.scope, stopCount: stores.length };
+}
+
+/** @deprecated old pickup-zone pricing (groups shops by pickup zone). */
+export function computeBasketDeliveryByZones(storeSlugs, governorate, city) {
   const slugs = [...new Set(storeSlugs.map((s) => String(s || '').trim()).filter(Boolean))];
   const stores = slugs.length ? q.all(`SELECT id, slug, name_ar, name_en, delivery_zone, lat, lng FROM stores WHERE slug IN (${slugs.map(() => '?').join(',')})`, slugs) : [];
   const dest = resolveDeliveryRate(governorate, city, slugs); // fallback price for a zone that has none

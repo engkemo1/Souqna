@@ -100,10 +100,32 @@ export default function MarketCheckout() {
     return () => { alive = false; clearTimeout(timer); };
   }, [groupKey, ar, form.governorate, form.city, quoteVersion, JSON.stringify(codes), phoneForQuote]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const [areas, setAreas] = useState([]);
+  useEffect(() => { let alive = true; api('/marketplace/delivery-areas').then((d) => { if (alive) setAreas(d?.areas || []); }).catch(() => {}); return () => { alive = false; }; }, []);
+  const sortedAreas = useMemo(() => [...areas].sort((a, b) => a.name.localeCompare(b.name, 'ar')), [areas]);
+  const nearestArea = (lat, lng) => {
+    let best = null; let bestKm = 2.5; // only trust a listed area when the pin is within ~2.5 km of it
+    for (const a of areas) {
+      if (a.lat == null || a.lng == null) continue;
+      const dLat = (a.lat - lat) * 111; const dLng = (a.lng - lng) * 111 * Math.cos((lat * Math.PI) / 180);
+      const km = Math.hypot(dLat, dLng);
+      if (km < bestKm) { bestKm = km; best = a; }
+    }
+    return best;
+  };
+  const [pinnedArea, setPinnedArea] = useState('');
+
   const set = (key) => (event) => { setError(''); setForm((f) => ({ ...f, [key]: event.target.value })); };
 
   const handleLocationChange = async (lat, lng, details) => {
     setCoords({ lat, lng });
+    const near = nearestArea(lat, lng);
+    if (near) {
+      setPinnedArea(near.name);
+      setForm((f) => ({ ...f, city: near.name, address: f.address.trim() ? f.address : (details?.secondaryName || details?.primaryName || f.address) }));
+      return;
+    }
+    setPinnedArea('');
     if (details?.primaryName || details?.name) {
       const cityName = details.city || (details.shortName || details.name?.split(',')[0]);
       setForm((f) => ({
@@ -134,7 +156,7 @@ export default function MarketCheckout() {
   const promoSaved = quoteRows.reduce((sum, row) => sum + (row.quote?.promoDiscount || 0), 0);
   const codeSaved = discount - promoSaved;
   const needsDeliveryFee = quoteRows.some(({ quote }) => (quote?.shipping || 0) > 0);
-  const feePending = false;
+  const feePending = deliveryQuote?.feeStatus === 'pending'; // area not on the price list: customer service quotes the shipping
   const shipping = needsDeliveryFee && !feePending ? (deliveryQuote?.fee || 0) : 0;
   const total = subtotal - discount + shipping;
 
@@ -178,13 +200,25 @@ export default function MarketCheckout() {
   return <div className="min-h-dvh"><MarketHeader /><main className="container max-w-6xl py-7 sm:py-10">
     <Link to="/market-cart" className="mb-5 inline-flex items-center gap-2 text-sm font-medium text-muted hover:text-fg"><ArrowRight className="h-4 w-4 rtl:rotate-0 ltr:rotate-180" />{ar ? 'الرجوع للسلة' : 'Back to basket'}</Link>
     <h1 className="mb-7 font-display text-2xl font-bold sm:text-3xl">{groups.length > 1 ? (ar ? `إتمام الطلب من ${groups.length} محلات` : `Checkout from ${groups.length} stores`) : (ar ? 'إتمام الطلب' : 'Checkout')}</h1>
-    <div className="grid gap-8 lg:grid-cols-12">
-      <form onSubmit={placeOrder} className="space-y-7 lg:col-span-7">
-        <section className="rounded-3xl border border-line bg-elevated p-5 sm:p-6"><h2 className="mb-5 font-semibold">{ar ? 'بيانات التوصيل' : 'Delivery details'}</h2><div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+      <form onSubmit={placeOrder} className="min-w-0 space-y-7 lg:col-span-7">
+        <section className="rounded-3xl border border-line bg-elevated p-5 sm:p-6"><h2 className="mb-5 font-semibold">{ar ? 'بيانات التوصيل' : 'Delivery details'}</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={ar ? 'الاسم بالكامل' : 'Full name'}><Input autoComplete="name" value={form.name} onChange={set('name')} required minLength={2} /></Field>
           <Field label={ar ? 'رقم الموبايل' : 'Mobile number'}><Input dir="ltr" inputMode="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} required placeholder="01xxxxxxxxx" /></Field>
           <Field label={ar ? 'المحافظة' : 'Governorate'}><Select value={form.governorate} onChange={set('governorate')}>{GOVERNORATES.map((g) => <option key={g} value={g}>{t(`gov.${g}`)}</option>)}</Select></Field>
-          <Field label={ar ? 'المدينة أو المنطقة' : 'City or area'}><PlaceAutocomplete value={form.city} onChange={(v) => { setError(''); setForm((f) => ({ ...f, city: v })); }} onSelect={(place) => { if (place?.lat && place?.lng) setCoords({ lat: place.lat, lng: place.lng }); }} placeholder={ar ? 'اكتب اسم المدينة أو المنطقة…' : 'Type city or area name…'} /></Field>
+          {sortedAreas.length > 0 && (
+            <Field label={ar ? 'اختار منطقتك (أسرع)' : 'Pick your area (fastest)'} className="sm:col-span-2" hint={pinnedArea ? (ar ? `حددنا منطقتك من الدبوس: ${pinnedArea}. لو غلط غيّرها من القايمة.` : `Area set from your pin: ${pinnedArea}. Change it here if wrong.`) : (ar ? 'السعر بيظهر جنب كل منطقة. لو منطقتك مش موجودة اكتب اسمها تحت.' : 'The price is shown next to each area. If yours is missing, type it below.')}>
+              <Select value={sortedAreas.some((a) => a.name === form.city) ? form.city : ''} onChange={(e) => { const a = sortedAreas.find((x) => x.name === e.target.value); if (!a) return; setError(''); setPinnedArea(''); setForm((f) => ({ ...f, city: a.name })); if (a.lat != null && a.lng != null) setCoords({ lat: a.lat, lng: a.lng }); }}>
+                <option value="">{ar ? 'اختار من القايمة…' : 'Choose from the list…'}</option>
+                {sortedAreas.map((a) => <option key={a.name} value={a.name}>{a.name} — {formatMoney(a.fee, lang)}</option>)}
+              </Select>
+            </Field>
+          )}
+          <Field label={sortedAreas.length ? (ar ? 'أو اكتب اسم منطقتك' : 'Or type your area') : (ar ? 'المدينة أو المنطقة' : 'City or area')} className="sm:col-span-2"><PlaceAutocomplete value={form.city} onChange={(v) => { setError(''); setForm((f) => ({ ...f, city: v })); }} onSelect={(place) => { if (place?.lat && place?.lng) setCoords({ lat: place.lat, lng: place.lng }); }} placeholder={ar ? 'اكتب اسم المدينة أو المنطقة…' : 'Type city or area name…'} />
+            {deliveryQuote && (feePending
+              ? <p role="status" className="mt-1.5 text-xs font-medium leading-5 text-amber-700">{ar ? 'منطقتك مش في جدول التوصيل. كمّل الطلب وخدمة العملاء هتكلمك بمصاريف الشحن. لو في بنها اكتب اسم منطقتك (زي الفلل أو الموقف أو بطا) وهيتحسب السعر.' : 'Your area is not on our delivery list. Place the order and customer service will call you with the shipping cost.'}</p>
+              : deliveryQuote.fee > 0 && <p role="status" className="mt-1.5 text-xs font-medium text-brand">{ar ? `التوصيل لمنطقتك: ${formatMoney(deliveryQuote.fee, lang)}` : `Delivery to your area: ${formatMoney(deliveryQuote.fee, lang)}`}</p>)}
+          </Field>
           <Field label={ar ? 'العنوان بالتفصيل' : 'Full address'} className="sm:col-span-2"><Textarea rows={2} autoComplete="street-address" value={form.address} onChange={set('address')} required minLength={6} /></Field>
           <div className="sm:col-span-2 pt-1">
             <div className="mb-2 flex items-center justify-between">
@@ -208,13 +242,14 @@ export default function MarketCheckout() {
         <OrderComments ar={ar} general={form.notes} onGeneral={(v) => { setError(''); setForm((f) => ({ ...f, notes: v })); }}
           stores={groups.map((g) => ({ slug: g.slug, name: g.name?.[lang] || g.name?.ar || g.slug, value: storeNotes[g.slug] || '' }))}
           onStore={(slug, v) => setStoreNotes((m) => ({ ...m, [slug]: v }))} />
-        <section className="flex items-center gap-4 rounded-3xl border-2 border-fg bg-elevated p-4"><Banknote className="h-6 w-6 shrink-0" /><span><strong className="block">{ar ? 'الدفع عند الاستلام' : 'Cash on delivery'}</strong><span className="text-sm text-muted">{feePending ? (ar ? 'رسوم التوصيل لسه مش مؤكدة. Twist هتتواصل معاك بالسعر النهائي قبل إرسال المندوب.' : 'Delivery is not priced yet. Twist will contact you with the final fee before dispatch.') : (ar ? 'هتدفعي إجمالي طلبك مرة واحدة لمندوب Twist.' : 'Pay the order total once to the Twist courier.')}</span></span></section>
+        <section className="flex items-center gap-4 rounded-3xl border-2 border-fg bg-elevated p-4"><Banknote className="h-6 w-6 shrink-0" /><span><strong className="block">{ar ? 'الدفع عند الاستلام' : 'Cash on delivery'}</strong><span className="text-sm text-muted">{feePending ? (ar ? 'منطقتك مش في جدول التوصيل. خدمة العملاء هتكلمك بمصاريف الشحن قبل ما المندوب يتحرك.' : 'Delivery is not priced yet. Twist will contact you with the final fee before dispatch.') : (ar ? 'هتدفعي إجمالي طلبك مرة واحدة لمندوب Twist.' : 'Pay the order total once to the Twist courier.')}</span></span></section>
         <FinalSaleNote items={cart.items} />
         {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
         <Button type="submit" size="lg" full loading={busy} disabled={!quotes || !deliveryQuote || hasErrors}>{feePending ? (ar ? `إرسال الطلب · ${formatMoney(subtotal, lang)} منتجات` : `Place order · ${formatMoney(subtotal, lang)} items`) : groups.length > 1 ? (ar ? `تأكيد ${groups.length} طلبات · ${formatMoney(total, lang)}` : `Confirm ${groups.length} orders · ${formatMoney(total, lang)}`) : (ar ? `تأكيد الطلب · ${formatMoney(total, lang)}` : `Place order · ${formatMoney(total, lang)}`)}</Button>
+        {!hasErrors && (!quotes || !deliveryQuote) && <p role="status" className="text-center text-xs font-medium text-brand">{ar ? 'بنحسب رسوم التوصيل… كمّل الاسم والموبايل والعنوان وهيتفعّل الزر تلقائيًا.' : 'Calculating delivery… finish name, phone and address and the button will unlock.'}</p>}
         <p className="flex items-center justify-center gap-2 text-xs text-muted"><Lock className="h-3.5 w-3.5" />{ar ? 'كل محل هيستلم طلبه ويديره بشكل منفصل.' : 'Each store receives and manages its own order.'}</p>
       </form>
-      <aside className="h-fit rounded-3xl border border-line bg-elevated p-5 sm:p-6 lg:sticky lg:top-24 lg:col-span-5"><h2 className="mb-5 flex items-center gap-2 font-semibold"><ShoppingBag className="h-5 w-5" />{ar ? 'ملخص الطلبات' : 'Order summary'}</h2>
+      <aside className="h-fit min-w-0 rounded-3xl border border-line bg-elevated p-5 sm:p-6 lg:sticky lg:top-24 lg:col-span-5"><h2 className="mb-5 flex items-center gap-2 font-semibold"><ShoppingBag className="h-5 w-5" />{ar ? 'ملخص الطلبات' : 'Order summary'}</h2>
         <div className="space-y-5">{quoteRows.map(({ group, quote }) => <section key={group.slug} className="border-b border-line pb-4 last:border-0"><h3 className="mb-2 flex items-center gap-2 text-sm font-semibold"><Store className="h-4 w-4" />{group.name?.[lang] || group.name?.ar || group.slug}</h3><div className="flex justify-between text-sm"><span className="text-muted">{ar ? 'المنتجات' : 'Items'}</span><span>{quote ? formatMoney(quote.subtotal, lang) : '…'}</span></div>{quote && <p className="mt-1 text-xs text-muted">{quote.shipping === 0 ? (ar ? 'المحل مؤهل للشحن المجاني؛ قد تظل هناك رسوم واحدة لمحلات أخرى في السلة.' : 'This store qualifies for free shipping; another store may still make one shared basket fee.') : (ar ? 'المحل لم يصل لحد الشحن المجاني؛ رسوم التوصيل تُحسب مرة واحدة للسلة كلها.' : 'This store has not reached its free-shipping threshold; delivery is charged once for the whole basket.')}</p>}{group.items.slice(0, 3).map((line) => { const current = quote?.lines?.find((item) => item.productId === line.productId && (item.variantId || null) === (line.variantId || null)); return <div key={line.key} className="mt-3 flex items-center gap-3"><SmartImage media={line.image} ratio="4 / 5" sizes="40px" className="w-10 rounded-lg" /><span className="min-w-0 flex-1 truncate text-xs">{line.name?.[lang] || line.name?.ar || line.name} × {line.qty}</span><span className="text-xs">{current?.promoDiscount ? <><s className="me-1 text-muted">{formatMoney((current.price) * line.qty, lang)}</s><span className="font-semibold text-success">{formatMoney(current.price * line.qty - current.promoDiscount, lang)}</span></> : formatMoney((current?.price ?? line.price) * line.qty, lang)}</span></div>;})}{quote && <div className="mt-3 space-y-2"><GiftRows quote={quote} /><AppliedOffers quote={quote} /></div>}{quote?.hasErrors && <p className="mt-2 text-xs font-medium text-sale">{ar ? 'في منتج غير متاح أو كميته أكبر من المخزون.' : 'An item is unavailable or exceeds stock.'}</p>}</section>)}</div>
         <div className="mt-4 border-t border-line pt-4">
           {appliedCode && codeSaved > 0 ? (
@@ -230,8 +265,8 @@ export default function MarketCheckout() {
           )}
           {couponMsg && <p role="alert" className="mt-2 text-[13px] font-medium text-sale">{couponMsg}</p>}
         </div>
-        <div className="mt-4 space-y-2 border-t border-line pt-4 text-sm"><div className="flex justify-between"><span className="text-muted">{ar ? 'المنتجات' : 'Items'}</span><span>{quotes ? formatMoney(subtotal, lang) : '…'}</span></div>{promoSaved > 0 && <div className="flex justify-between text-success"><span>{ar ? 'خصم العروض' : 'Offers discount'}</span><span>- {formatMoney(promoSaved, lang)}</span></div>}{codeSaved > 0 && <div className="flex justify-between text-success"><span>{ar ? 'خصم الكود' : 'Code discount'}</span><span>- {formatMoney(codeSaved, lang)}</span></div>}<div className="flex justify-between"><span className="text-muted">{ar ? `توصيل Twist إلى ${form.city || 'منطقتك'}` : `Twist delivery to ${form.city || 'your area'}`}</span><span>{quotes && deliveryQuote ? (shipping ? formatMoney(shipping, lang) : (ar ? 'مجاني' : 'Free')) : '…'}</span></div><div className="flex justify-between text-lg font-bold"><span>{ar ? 'الإجمالي' : 'Total'}</span><span>{quotes && deliveryQuote ? formatMoney(total, lang) : '…'}</span></div></div>
-        {deliveryQuote?.breakdown && <DeliveryBreakdown breakdown={deliveryQuote.breakdown} dest={coords} lang={lang} />}
+        <div className="mt-4 space-y-2 border-t border-line pt-4 text-sm"><div className="flex justify-between"><span className="text-muted">{ar ? 'المنتجات' : 'Items'}</span><span>{quotes ? formatMoney(subtotal, lang) : '…'}</span></div>{promoSaved > 0 && <div className="flex justify-between text-success"><span>{ar ? 'خصم العروض' : 'Offers discount'}</span><span>- {formatMoney(promoSaved, lang)}</span></div>}{codeSaved > 0 && <div className="flex justify-between text-success"><span>{ar ? 'خصم الكود' : 'Code discount'}</span><span>- {formatMoney(codeSaved, lang)}</span></div>}<div className="flex justify-between"><span className="text-muted">{ar ? `توصيل Twist إلى ${form.city || 'منطقتك'}` : `Twist delivery to ${form.city || 'your area'}`}</span><span className={feePending ? 'text-right text-xs font-semibold text-amber-700' : ''}>{quotes && deliveryQuote ? (feePending ? (ar ? 'خدمة العملاء هتكلمك بالسعر' : 'Customer service will call you') : shipping ? formatMoney(shipping, lang) : (ar ? 'مجاني' : 'Free')) : '…'}</span></div><div className="flex justify-between text-lg font-bold"><span>{ar ? (feePending ? 'الإجمالي (بدون الشحن)' : 'الإجمالي') : (feePending ? 'Total (excl. shipping)' : 'Total')}</span><span>{quotes && deliveryQuote ? formatMoney(total, lang) : '…'}</span></div></div>
+        {deliveryQuote?.breakdown && !feePending && <DeliveryBreakdown breakdown={deliveryQuote.breakdown} dest={coords} lang={lang} />}
       </aside>
     </div>
   </main></div>;
