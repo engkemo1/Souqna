@@ -356,7 +356,7 @@ export default function ProductEditor() {
         const ex = (cats?.items || []).find((c) => nz(tr(c.name)) === nz(name) || nz(c.name?.ar) === nz(name));
         if (ex) { set({ category_id: String(ex.id), moda_key: '' }); setCustomType(name); toast({ title: L(`اخترنا قسم «${name}» الموجود عندك`, `Selected your existing “${name}” section`) }); return true; }
       }
-      toast({ tone: 'error', title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى من الأقسام الخاصة (12)', 'Custom section limit reached (12)') : (errorMessage ? errorMessage(t, x) : (x.message || 'Error')) });
+      toast({ tone: 'error', duration: x.code === 'too_many_sections' ? 10000 : 3200, title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى: 12 قسم خاص في متجرك، فمش هينفع تضيف قسم جديد. اختار قسم من الأقسام الموجودة في القائمة (هتلاقي اللي محتاجه فيها)، أو امسح قسم مش بتستخدمه من صفحة «الأقسام» وجرّب تاني.', 'You have reached the limit of 12 custom sections, so a new one cannot be added. Pick one of your existing sections from the list (you will most likely find what you need there), or delete an unused section from the Sections page and try again.') : (errorMessage ? errorMessage(t, x) : (x.message || 'Error')) });
       return false;
     }
   };
@@ -372,7 +372,7 @@ export default function ProductEditor() {
       set({ category_id: String(r.category.id) });
       setNewCat(null);
       toast({ title: r.pending ? L(`اتضاف «${name}» في متجرك. هيظهر في السوق بعد موافقة الإدارة`, `Added “${name}” to your store. It shows on the marketplace once the admin accepts it`) : L(`اتضاف قسم «${name}» في متجرك`, `Added “${name}” to your store`) });
-    } catch (x) { toast({ tone: 'error', title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى من الأقسام الخاصة (12)', 'Custom section limit reached (12)') : (errorMessage ? errorMessage(x) : (x.message || 'Error')) }); } finally { setCatBusy(false); }
+    } catch (x) { toast({ tone: 'error', duration: x.code === 'too_many_sections' ? 10000 : 3200, title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى: 12 قسم خاص في متجرك، فمش هينفع تضيف قسم جديد. اختار قسم من الأقسام الموجودة في القائمة (هتلاقي اللي محتاجه فيها)، أو امسح قسم مش بتستخدمه من صفحة «الأقسام» وجرّب تاني.', 'You have reached the limit of 12 custom sections, so a new one cannot be added. Pick one of your existing sections from the list (you will most likely find what you need there), or delete an unused section from the Sections page and try again.') : (errorMessage ? errorMessage(x) : (x.message || 'Error')) }); } finally { setCatBusy(false); }
   };
   const { data: tree } = useApi('/owner/product-types');
   const { data: pubDepts, reload: reloadPubDepts } = useApi('/departments?all=1');
