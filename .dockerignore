@@ -2,3 +2,17 @@ node_modules
 */node_modules
 web/dist
 server/data
+.git
+.env
+.env.*
+Claude outputs
+tmp
+outputs
+test-set
+marketing
+new-banners
+docs
+scripts
+*.log
+*.wav
+tall

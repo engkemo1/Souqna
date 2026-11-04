@@ -35,6 +35,7 @@ export const config = {
   backupKeepDays: Number(process.env.BACKUP_KEEP_DAYS || 14),
   // WhatsApp Cloud API (Meta). Used only when a store's auto_whatsapp switch is on.
   // Twist team number that gets a WhatsApp alert whenever an order must be delivered by us.
+  indexNowKey: process.env.INDEXNOW_KEY || '4c71c0c9e5781e1ad172891efd3e6767', // public by design (served at /<key>.txt); INDEXNOW_KEY=off disables
   siteUrl: (process.env.PUBLIC_SITE_URL || 'https://twistegy.com').replace(/\/+$/, ''),
   platformWa: process.env.PLATFORM_WA || '201206928670',
   wa: {

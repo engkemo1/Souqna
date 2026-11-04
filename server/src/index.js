@@ -23,6 +23,7 @@ import { startReservationSweeper } from './lib/reserve.js';
 import './lib/wa-products.js'; // registers the WhatsApp → product handler (dormant unless WA_ENABLED=1)
 import { startDailySummary } from './lib/daily-summary.js';
 import { registerDefaultProviders } from './lib/image-providers.js';
+import { startIndexNow, indexNowKey } from './lib/indexnow.js';
 
 const app = express();
 app.disable('x-powered-by');
@@ -58,6 +59,21 @@ app.get('/robots.txt', (_req, res) => {
     '',
   ].join('\n'));
 });
+
+// IndexNow ownership proof: the key file Bing fetches to confirm this site owns the key
+if (indexNowKey()) app.get(`/${indexNowKey()}.txt`, (_req, res) => res.type('text/plain').send(indexNowKey()));
+
+// pages to announce to search engines: the fixed pages on the first run, then only stores/products created since `since`
+function newUrlsSince(since) {
+  const urls = since ? [] : [`${SITE_ORIGIN}/`, `${SITE_ORIGIN}/join`, `${SITE_ORIGIN}/stores`, ...customerDepartments().map((d) => `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`)];
+  const cond = since ? 'AND s.created_at > ?' : '';
+  urls.push(...q.all(`SELECT s.slug FROM stores s WHERE s.status='active' AND s.hidden=0 AND s.search_indexable=1 ${cond}
+    AND EXISTS (SELECT 1 FROM products p WHERE p.store_id=s.id AND p.status='active') ORDER BY s.id LIMIT 5000`, since ? [since] : []).map(({ slug }) => `${SITE_ORIGIN}/s/${encodeURIComponent(slug)}`));
+  urls.push(...q.all(`SELECT s.slug AS store_slug, p.slug AS product_slug FROM products p JOIN stores s ON s.id=p.store_id
+    WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND s.search_indexable=1 ${since ? 'AND p.created_at > ?' : ''} ORDER BY p.id LIMIT 20000`, since ? [since] : [])
+    .map(({ store_slug, product_slug }) => `${SITE_ORIGIN}/s/${encodeURIComponent(store_slug)}/p/${encodeURIComponent(product_slug)}`));
+  return urls;
+}
 
 app.get('/sitemap.xml', (_req, res) => {
   const urls = [
@@ -217,6 +233,7 @@ export { app };
 // listener stays alive during the slow first-boot DB setup).
 export function startServer(existingServer) {
   startDailySummary();
+  startIndexNow(SITE_ORIGIN, newUrlsSince);
   registerDefaultProviders(); // registration only — no provider call is made at startup
   if (existingServer) {
     // Reuse the existing bound socket — no new port needed.
