@@ -16,8 +16,8 @@ import { Segmented } from '../../components/ui/Field.jsx';
 import { ErrorState, EmptyState } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import WeeklyReportCard from '../../components/dash/WeeklyReportCard.jsx';
+import StoreHealthCard from '../../components/dash/StoreHealthCard.jsx';
 import DemandCard from '../../components/dash/DemandCard.jsx';
-import SameDayCard from '../../components/dash/SameDayCard.jsx';
 import AppAlertsCard from '../../components/dash/AppAlertsCard.jsx';
 import { StoreQrButton } from '../../components/dash/QrShare.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
@@ -134,7 +134,7 @@ export default function Overview() {
 
       {/* secondary cards sit under the numbers an owner opens the dashboard for */}
       <div className="mt-6 space-y-6">
-        <SameDayCard />
+        <StoreHealthCard />
         <WeeklyReportCard />
         <DemandCard />
       </div>

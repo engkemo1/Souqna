@@ -85,7 +85,7 @@ r.put('/store/same-day', h((req, res) => {
   const until = b.until || req.store.same_day_until || '18:00';
   if (b.on && until <= now.hm) throw new AppError(422, 'validation_failed', 'The cut-off time has already passed today.', { until: 'time_passed' });
   update('stores', req.store.id, { same_day_date: b.on ? now.date : null, same_day_until: until });
-  if (b.on && req.store.same_day_date !== now.date) notifyFollowers(req.store.id, { kind: 'sameday', title: `${req.store.name_ar} بيوصّل النهاردة ⚡`, body: `اطلب قبل ${until} وهيوصلك النهاردة` });
+  if (b.on && req.store.same_day_date !== now.date) notifyFollowers(req.store.id, { kind: 'sameday', title: `${req.store.name_ar} بيجهّز طلبات النهاردة ⚡`, body: `اطلب قبل ${until} وطلبك هيتجهّز النهاردة` });
   res.json({ store: serializeStore(q.get('SELECT * FROM stores WHERE id=?', [req.store.id])) });
 }));
 
@@ -434,6 +434,27 @@ function orderCards(rows) {
     };
   });
 }
+
+/* what is missing from the store: active products a shopper would hesitate on (one-word names, one photo, no description) */
+r.get('/store-health', h((req, res) => {
+  const rows = q.all(
+    `SELECT p.id, p.name_ar, p.description_ar, p.description_en,
+       (SELECT COUNT(*) FROM product_media pm WHERE pm.product_id=p.id) AS photos,
+       COALESCE((SELECT m.quality FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.is_primary=1 LIMIT 1), 100) AS quality
+     FROM products p WHERE p.store_id=? AND p.status='active' ORDER BY p.created_at DESC`, [req.store.id],
+  );
+  const checks = {
+    name: (p) => String(p.name_ar || '').trim().split(/\s+/).filter(Boolean).length < 2,
+    photos: (p) => p.photos < 2,
+    weak: (p) => p.photos > 0 && p.quality < 50,
+    desc: (p) => String(p.description_ar || p.description_en || '').trim().length < 15,
+  };
+  const issues = Object.entries(checks).map(([key, fn]) => {
+    const hit = rows.filter(fn);
+    return { key, count: hit.length, items: hit.slice(0, 3).map((p) => ({ id: p.id, name: p.name_ar })) };
+  }).filter((i) => i.count > 0);
+  res.json({ total: rows.length, issues });
+}));
 
 r.get('/overview', h((req, res) => {
   const n = [7, 30, 90].includes(Number(req.query.range)) ? Number(req.query.range) : 7;

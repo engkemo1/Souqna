@@ -57,10 +57,11 @@ function Why() {
   const { t } = useI18n();
   const items = [
     [CreditCard, t('market.why1'), t('market.why1b')],
+    [Truck, t('market.why2'), t('market.why2b')],
     [Store, t('market.why3'), t('market.why3b')],
   ];
   return (
-    <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-3 sm:grid-cols-3">
       {items.map(([Icon, a, b]) => (
         <div key={a} className="flex items-center gap-3.5 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-xs">
           <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#EAF0F8] text-brand">

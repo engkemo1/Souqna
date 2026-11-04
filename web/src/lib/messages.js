@@ -336,6 +336,7 @@ export const messages = {
     'market.ownerCta': 'دخول أصحاب المحلات',
     'market.ownerDemo': 'جرّب لوحة التحكم',
     'market.why1': 'الدفع عند الاستلام', 'market.why1b': 'ادفع كاش لما الطلب يوصلك',
+    'market.why2': 'توصيل خلال يوم', 'market.why2b': 'لحد باب بيتك في بنها',
     'market.why3': 'منتجات محلية', 'market.why3b': 'من محلات حقيقية في بنها',
     'market.footer': 'Twist — أزياء من محلات بنها',
 
@@ -1429,6 +1430,7 @@ export const messages = {
     'market.ownerCta': 'Store owner login',
     'market.ownerDemo': 'Try the dashboard',
     'market.why1': 'Cash on delivery', 'market.why1b': 'Pay when it arrives',
+    'market.why2': 'Delivery within a day', 'market.why2b': 'To your door in Banha',
     'market.why3': 'Local stores', 'market.why3b': 'Real shops from Banha',
     'market.footer': 'Twist — fashion from Banha stores',
 

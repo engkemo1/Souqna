@@ -7,7 +7,6 @@ import Skeleton from '../ui/Skeleton.jsx';
 import { StoreLogo } from '../store/StoreChrome.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { cx } from '../ui/cx.js';
-import SameDayBadge from '../store/SameDayBadge.jsx';
 
 // A store with no cover yet gets a calm coloured tile with its name, picked from its slug so it always looks the same.
 const FALLBACKS = ['linear-gradient(135deg,#0F3D5E,#2F6E94)', 'linear-gradient(135deg,#5B2A5F,#9C5BA0)', 'linear-gradient(135deg,#7A2E2E,#C26A5A)', 'linear-gradient(135deg,#1F5C4A,#4E9A80)', 'linear-gradient(135deg,#4A3A8C,#7C6BD0)', 'linear-gradient(135deg,#8A4B12,#D08A3C)'];
@@ -43,7 +42,6 @@ export default function StoreCard({ store: s, index = 0, large }) {
           <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
           <div className="absolute start-3 top-3 flex flex-wrap gap-1.5">
             {s.featured && <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[11.5px] font-semibold text-neutral-900 shadow-sm backdrop-blur"><BadgeCheck className="h-3.5 w-3.5 text-[#F8620A]" />{t('market.featured')}</span>}
-            {s.sameDay && <SameDayBadge solid />}
             {s.offerBadge && <span className="rounded-full px-2.5 py-1 text-[11.5px] font-bold text-white shadow-sm" style={{ backgroundColor: brand ? `rgb(${brand})` : '#B4532A' }}>{tr(s.offerBadge)}</span>}
           </div>
           <span className="absolute bottom-3 end-3 hidden translate-y-2 items-center gap-1.5 rounded-full bg-white px-3.5 py-2 text-sm font-semibold text-neutral-900 opacity-0 shadow-soft transition duration-300 group-hover:translate-y-0 group-hover:opacity-100 [@media(hover:hover)]:inline-flex">

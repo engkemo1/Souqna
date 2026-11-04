@@ -20,7 +20,6 @@ import ReviewsSection from '../../components/store/ReviewsSection.jsx';
 import { useBuyer } from '../../lib/buyer.jsx';
 import { api } from '../../lib/api.js';
 import { Bell } from 'lucide-react';
-import SameDayBadge from '../../components/store/SameDayBadge.jsx';
 import { ProductOffersPanel } from '../../components/promo/OfferCards.jsx';
 import { SectionHeader } from './StoreHome.jsx';
 import { Price, QtyStepper } from '../../components/ui/Commerce.jsx';
@@ -225,7 +224,6 @@ export default function Product() {
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 {p.discount > 0 && <span className="rounded-full bg-sale px-2.5 py-0.5 text-xs font-bold text-on-sale">-{p.discount}%</span>}
                 {p.isNew && <span className="rounded-full bg-fg px-2.5 py-0.5 text-xs font-semibold text-canvas">{t('product.new')}</span>}
-                {p.sameDay && <SameDayBadge until={store.sameDayUntil} />}
                 {p.category && <Link to={sp(store.slug, `shop?category=${p.category.slug}`)} className="text-xs font-medium text-muted hover:text-fg">{tr(p.category.name)}</Link>}
               </div>
               <h1 className="font-display text-[1.65rem] font-bold leading-tight sm:text-3xl xl:text-[2.1rem]">{tr(p.name)}</h1>
@@ -277,7 +275,6 @@ export default function Product() {
           <ProductAlerts product={p} store={store} />
 
           <ul className="mt-7 grid gap-3 rounded-2xl bg-secondary p-4 text-sm text-on-secondary">
-            {p.sameDay && <li className="flex items-center gap-3 font-semibold text-emerald-800"><Truck className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('sameday.productLine', { time: new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date(`2000-01-01T${store.sameDayUntil || '18:00'}:00`)) })}</li>}
             <li className="flex items-center gap-3"><Truck className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.delivery')}</li>
             <li className="flex items-center gap-3"><Banknote className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{t('store.cod')}</li>
             {p.noReturn || returnDaysOf(store) <= 0

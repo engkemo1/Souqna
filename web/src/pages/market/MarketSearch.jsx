@@ -34,7 +34,7 @@ export default function MarketSearch() {
   const cardRatio = (prof?.ratio || '4/5').replace('/', ' / '); // each kind of department gets its own grid rhythm (hijabs dense, fashion airy)
   const dq = useDebounced(q, 150);
   const attrKeys = [...params.keys()].filter((k) => /^a_[a-z0-9_]+$/.test(k)); // department-specific filters (fabric, fit, finish...)
-  const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store', 'same_day', 'sizes', 'colors', 'category', 'audience', 'material', 'discount', ...attrKeys];
+  const FILTER_KEYS = ['min', 'max', 'sale', 'new', 'in_stock', 'rating', 'store', 'sizes', 'colors', 'category', 'audience', 'material', 'discount', ...attrKeys];
   const [open, setOpen] = useState(false);
   const key = new URLSearchParams({ q: dq, department, sort, ...Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || '']).filter(([, v]) => v)) }).toString();
   const activeCount = FILTER_KEYS.filter((k) => params.get(k)).length + (department ? 1 : 0);
@@ -65,7 +65,7 @@ export default function MarketSearch() {
     params.get('audience') && !(department && rootOf(department) === params.get('audience')) && { id: 'audience', label: ({ men: 'رجالي', women: 'حريمي', boys: 'ولادي', girls: 'بناتي', kids: 'أطفال', unisex: 'للجنسين' })[params.get('audience')] || params.get('audience'), remove: () => set({ audience: '' }) },
     department && { id: 'department', label: label(department), title: pathLabel(department), remove: () => set({ department: '' }) },
     (params.get('min') || params.get('max')) && { id: 'price', label: lang === 'ar' ? (params.get('max') ? `من ${params.get('min') || 0} إلى ${params.get('max')} ج.م` : `من ${params.get('min') || 0} ج.م فأكثر`) : `${params.get('min') || 0} – ${params.get('max') || '∞'} EGP`, remove: () => set({ min: '', max: '' }) },
-    ...[['sale', 'search.onSale'], ['in_stock', 'search.inStock'], ['same_day', 'sameday.filter']].filter(([k]) => params.get(k) === '1').map(([k, m]) => ({ id: k, label: t(m), remove: () => set({ [k]: '' }) })),
+    ...[['sale', 'search.onSale'], ['in_stock', 'search.inStock']].filter(([k]) => params.get(k) === '1').map(([k, m]) => ({ id: k, label: t(m), remove: () => set({ [k]: '' }) })),
     params.get('new') && { id: 'new', label: t('search.lastDays', { n: formatNumber(Number(params.get('new')) > 1 ? Number(params.get('new')) : 30, lang) }), remove: () => set({ new: '' }) },
     params.get('store') && { id: 'store', label: (data?.facets?.stores || []).find((x) => x.slug === params.get('store'))?.name?.[lang] || params.get('store'), remove: () => set({ store: '' }) },
     ...csv('sizes').map((z) => ({ id: `size-${z}`, label: `${t('search.size')}: ${z}`, remove: () => without('sizes', z) })),
