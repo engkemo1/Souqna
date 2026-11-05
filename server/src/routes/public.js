@@ -1000,8 +1000,22 @@ const reserveSchema = z.object({
   name: z.string().trim().min(2, 'name_required').max(80),
   phone: z.string().trim().regex(/^01[0125][0-9]{8}$/, 'phone_invalid'),
   notes: z.string().trim().max(300).optional().default(''),
+  branch: z.string().trim().max(60).optional().default(''), // which branch the shopper will come to (only when the store has branches)
   items: z.array(z.object({ productId: z.coerce.number().int(), variantId: z.coerce.number().int().nullable().optional(), qty: z.coerce.number().int().min(1).max(3) })).min(1).max(3),
 });
+
+/** A named branch of the store (from stores.branches_json), or null. */
+function branchOf(s, name) {
+  if (!name) return null;
+  try { const list = JSON.parse(s.branches_json || '[]'); return (Array.isArray(list) ? list : []).find((b) => b.name === name) || null; } catch { return null; }
+}
+/** Where/how to reach the shop for a pickup: the branch's own address, map link and number when it has them, else the store's. */
+function pickupInfo(s, br) {
+  if (!br) return { address: bi(s, 'address'), phone: s.phone || null, whatsapp: s.whatsapp || null, mapUrl: s.map_url || null, lat: s.lat ?? null, lng: s.lng ?? null };
+  const addr = br.address || '';
+  return { address: addr ? { ar: addr, en: addr } : bi(s, 'address'), phone: br.phone || s.phone || null, whatsapp: br.phone || s.whatsapp || null,
+    mapUrl: br.map_url || (addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(/بنها|banha/i.test(addr) ? addr : `${addr} بنها`)}` : null), lat: null, lng: null };
+}
 const reserveHits = new Map();
 
 r.post('/stores/:slug/reserve', h((req, res) => {
@@ -1009,6 +1023,8 @@ r.post('/stores/:slug/reserve', h((req, res) => {
   const hours = s.reserve_hours ?? 24;
   if (!hours) throw new AppError(409, 'reserve_off', 'This store does not take reservations.');
   const body = reserveSchema.parse(req.body);
+  const branch = branchOf(s, body.branch);
+  if (branch) body.notes = `الفرع: ${branch.name}${body.notes ? ` — ${body.notes}` : ''}`; // the shop sees it in the order note
   const hits = (reserveHits.get(req.ip) || []).filter((t) => Date.now() - t < 3600e3);
   if (hits.length >= 8) throw new AppError(429, 'rate_limited', 'Too many requests, try again later.');
   reserveHits.set(req.ip, [...hits, Date.now()]);
@@ -1052,7 +1068,7 @@ r.post('/stores/:slug/reserve', h((req, res) => {
   delete result.orderId;
   res.status(201).json({
     reservation: result,
-    store: { name: bi(s, 'name'), address: bi(s, 'address'), phone: s.phone || null, whatsapp: s.whatsapp || null, mapUrl: s.map_url || null, lat: s.lat ?? null, lng: s.lng ?? null,
+    store: { name: bi(s, 'name'), ...pickupInfo(s, branch),
       hours: storeHours(s) },
   });
 }));
@@ -1165,6 +1181,7 @@ const normPhone = (v) => { const d = String(v || '').replace(/\D/g, ''); return 
 
 function trackPayload(o) {
   const s = q.get('SELECT name_ar, name_en, slug, phone, address_ar, address_en, map_url, lat, lng, reserve_hours FROM stores WHERE id=?', [o.store_id]);
+  const bsRow = q.get('SELECT branches_json, map_url, lat, lng, phone, whatsapp FROM stores WHERE id=?', [o.store_id]);
   const items = q.all('SELECT * FROM order_items WHERE order_id=?', [o.id]);
   const media = mediaMap(items.map((i) => i.media_id));
   // only the fixed reservation reasons are shown to the shopper, never a store's free-text note
@@ -1180,7 +1197,7 @@ function trackPayload(o) {
     subtotal: o.subtotal, discount: o.discount, promoDiscount: o.promo_discount || 0, promotions: orderPromotions(o.id), shipping: o.shipping, shippingFree: !!o.shipping_free, total: o.total, payment: o.payment_method,
     deliveryGroupCount: basket?.count ? basket.count : null, deliveryGroupTotal: basket?.count ? (feeState?.delivery_fee_status === 'rejected' ? basket.items_total : basket.total) : null,
     deliveryFeeStatus: feeState?.delivery_fee_status || o.delivery_fee_status || 'confirmed', deliveryFeeQuote: feeState?.delivery_fee_quote ?? o.delivery_fee_quote ?? null,
-    store: { name: { ar: s?.name_ar, en: s?.name_en }, slug: s?.slug, phone: s?.phone || null, ...(o.delivery_by === 'pickup' ? { address: { ar: s?.address_ar || '', en: s?.address_en || '' }, mapUrl: s?.map_url || null, lat: s?.lat ?? null, lng: s?.lng ?? null, reserveHours: s?.reserve_hours || 24 } : {}) },
+    store: { name: { ar: s?.name_ar, en: s?.name_en }, slug: s?.slug, phone: s?.phone || null, ...(o.delivery_by === 'pickup' ? (() => { const bn = /^الفرع: (.+?)(?: — |$)/.exec(o.notes || '')?.[1]; const br = bn ? branchOf(bsRow, bn) : null; const p = pickupInfo({ ...(bsRow || {}), address_ar: s?.address_ar, address_en: s?.address_en }, br); return { address: br ? p.address : { ar: s?.address_ar || '', en: s?.address_en || '' }, mapUrl: p.mapUrl, lat: p.lat, lng: p.lng, reserveHours: s?.reserve_hours || 24, ...(br && p.phone ? { phone: p.phone } : {}) }; })() : {}) },
     items: items.map((i) => ({ isGift: !!i.is_gift, promoDiscount: i.promo_discount || 0, productId: i.product_id, reviewed: i.product_id ? !!q.get('SELECT 1 AS x FROM reviews WHERE order_id=? AND product_id=?', [o.id, i.product_id]) : true, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
     events,
   };

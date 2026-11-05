@@ -34,6 +34,8 @@ export default function ReserveSheet({ open, onClose, store, product, variant, c
   const needVerify = Boolean(otp?.whatsapp) && !buyer?.phoneVerified;
   const lockedPhone = otp?.whatsapp && buyer?.phoneVerified ? buyer.phone : null;
   const [f, setF] = useState({ name: '', phone: '' });
+  const [branch, setBranch] = useState(''); // '' = the store's main address
+  const branches = store.branches || [];
   const [errors, setErrors] = useState({});
   const [msg, setMsg] = useState('');
   const [busy, setBusy] = useState(false);
@@ -44,7 +46,7 @@ export default function ReserveSheet({ open, onClose, store, product, variant, c
     if (!open) return;
     const saved = loadContact();
     setF({ name: buyer?.name || saved.name || '', phone: buyer?.phone || saved.phone || '' });
-    setErrors({}); setMsg(''); setDone(null);
+    setErrors({}); setMsg(''); setDone(null); setBranch('');
   }, [open, buyer]);
 
   const until = (iso) => new Intl.DateTimeFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { weekday: 'long', hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
@@ -52,7 +54,7 @@ export default function ReserveSheet({ open, onClose, store, product, variant, c
   const submit = async (e) => {
     e.preventDefault(); setBusy(true); setErrors({}); setMsg('');
     try {
-      const r = await api(`/stores/${store.slug}/reserve`, { method: 'POST', body: { name: f.name, phone: (lockedPhone || f.phone).replace(/\D/g, '').replace(/^20/, '0'), items: [{ productId: product.id, variantId: variant?.id ?? null, qty }] } });
+      const r = await api(`/stores/${store.slug}/reserve`, { method: 'POST', body: { name: f.name, phone: (lockedPhone || f.phone).replace(/\D/g, '').replace(/^20/, '0'), items: [{ productId: product.id, variantId: variant?.id ?? null, qty }], ...(branch ? { branch } : {}) } });
       try { localStorage.setItem(KEY, JSON.stringify({ name: f.name, phone: f.phone })); } catch { /* private mode */ }
       rememberOrder({ number: r.reservation.number, token: r.reservation.trackToken, store: tr(store.name) });
       setDone(r);
@@ -121,6 +123,17 @@ export default function ReserveSheet({ open, onClose, store, product, variant, c
         <Field label={t('acc.phone')} error={errors.phone} hint={L('المحل هيكلمك عليه لو حاجة اتغيّرت.', 'The shop calls you on it if anything changes.')}>
           <Input dir="ltr" inputMode="tel" value={lockedPhone || f.phone} readOnly={!!lockedPhone} onChange={(e) => setF({ ...f, phone: e.target.value })} placeholder="01XXXXXXXXX" className="text-start" required autoComplete="tel" />
         </Field>
+        {branches.length > 0 && (
+          <fieldset className="space-y-2">
+            <legend className="mb-1 text-sm font-semibold">{L('هتعدّي على أنهي فرع؟', 'Which branch will you visit?')}</legend>
+            {[{ name: '', title: L('الفرع الرئيسي', 'Main branch'), address: tr(store.address) }, ...branches.map((b) => ({ name: b.name, title: b.name, address: b.address }))].map((o) => (
+              <label key={o.name || 'main'} className={`flex cursor-pointer items-start gap-3 rounded-2xl border p-3 text-sm transition ${branch === o.name ? 'border-brand bg-brand/5' : 'border-line'}`}>
+                <input type="radio" name="reserve-branch" className="mt-1" checked={branch === o.name} onChange={() => setBranch(o.name)} />
+                <span className="min-w-0"><span className="block font-semibold">{o.title}</span>{o.address && <span className="block text-[13px] text-muted">{o.address}</span>}</span>
+              </label>
+            ))}
+          </fieldset>
+        )}
         {msg && <p role="alert" className="text-[13px] font-medium text-sale">{msg}</p>}
       </form>
       )}

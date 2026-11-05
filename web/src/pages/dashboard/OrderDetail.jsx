@@ -98,6 +98,13 @@ export default function OrderDetail() {
     } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); }
     setBusy('');
   };
+  const setBranch = async (branch) => {
+    try {
+      await api(`/owner/orders/${id}/branch`, { method: 'PATCH', body: { branch } });
+      mutate((d) => ({ order: { ...d.order, pickupBranch: branch } }));
+      toast({ title: lang === 'ar' ? 'تم تحديد الفرع' : 'Branch saved' });
+    } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); }
+  };
   const setStatus = async (status, n) => {
     setBusy(status);
     try {
@@ -249,6 +256,15 @@ export default function OrderDetail() {
         </div>
 
         <div className="space-y-4">
+          {!pickup && (store?.branches?.length > 0) && !['delivered', 'cancelled'].includes(o.status) && (
+            <Panel title={L('هيتجهّز من أنهي فرع؟', 'Prepared at which branch?')}>
+              <select value={o.pickupBranch || ''} onChange={(e) => setBranch(e.target.value)} aria-label={L('الفرع', 'Branch')} className="h-11 w-full rounded-xl border border-line bg-elevated px-3 text-sm">
+                <option value="">{L('الفرع الرئيسي', 'Main branch')}</option>
+                {store.branches.map((b) => <option key={b.name} value={b.name}>{b.name}</option>)}
+              </select>
+              <p className="mt-2 text-xs text-muted">{L('المندوب هيستلم الطلب من الفرع ده.', 'The courier collects the order from this branch.')}</p>
+            </Panel>
+          )}
           <Panel title={t('orders.customerInfo')}>
             <div className="flex items-center gap-3">
               <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-secondary text-brand"><User2 className="h-5 w-5" /></span>

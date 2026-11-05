@@ -25,7 +25,7 @@ import BrandPaletteCard from '../../components/dash/BrandPaletteCard.jsx';
 import { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 import { cx } from '../../components/ui/cx.js';
 
-const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'hours', 'return_days', 'reserve_hours', 'instagram', 'facebook', 'tiktok', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
+const FIELDS = ['name_ar', 'name_en', 'tagline_ar', 'tagline_en', 'description_ar', 'description_en', 'address_ar', 'address_en', 'departments', 'phone', 'whatsapp', 'contacts', 'branches', 'map_url', 'lat', 'lng', 'hero_mode', 'photo_style', 'hours', 'return_days', 'reserve_hours', 'instagram', 'facebook', 'tiktok', 'shipping_fee', 'free_shipping_over', 'offer_badge_ar', 'offer_badge_en', 'logo_initials', 'logo_color'];
 
 /** Exchange & return policy: one clear period choice (saved with the page) plus a note on pieces excluded one by one. */
 function ReturnsBox({ days, onDays }) {
@@ -129,26 +129,6 @@ function PhotoStylePicker({ value, onChange }) {
         ))}
       </div>
     </fieldset>
-  );
-}
-
-function AutoCover({ onDone }) {
-  const toast = useToast();
-  const [busy, setBusy] = useState(false);
-  const run = async () => {
-    setBusy(true);
-    try {
-      const r = await api('/owner/store/cover/auto', { method: 'POST' });
-      onDone(r.media);
-      toast({ title: 'اتعمل غلاف جديد لمتجرك' });
-    } catch (e) { toast({ tone: 'error', title: e.message || 'حصلت مشكلة' }); }
-    setBusy(false);
-  };
-  return (
-    <button type="button" onClick={run} disabled={busy}
-      className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-l from-[#FF966F] via-[#F8620A] to-[#B84421] px-4 py-2.5 text-sm font-bold text-[#111] disabled:opacity-60">
-      {busy ? 'بنصمم الـ cover…' : 'صمّملي غلافًا أنيقًا من منتجاتي'}
-    </button>
   );
 }
 
@@ -258,7 +238,7 @@ export default function Settings() {
     const s = data.store;
     const x = ({
       name_ar: s.name.ar, name_en: s.name.en, tagline_ar: s.tagline.ar === 'أهلاً بيك في متجرنا' ? '' : (s.tagline.ar || ''), tagline_en: s.tagline.en === 'Welcome to our store' ? '' : (s.tagline.en || ''), description_ar: s.description.ar, description_en: s.description.en,
-      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', photo_style: s.photoStyle || 'white', hours: scheduleFromStore(s.hours), instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
+      address_ar: s.address.ar, address_en: s.address.en, departments: s.departments?.length ? s.departments : (s.category && s.category !== 'mixed' ? [s.category] : []), phone: s.phone || '', whatsapp: s.whatsapp || '', contacts: (s.contacts || []).map((c) => ({ label: c.label || '', phone: c.phone || '' })), branches: (s.branches || []).map((b) => ({ name: b.name || '', address: b.address || '', phone: b.phone || '', map_url: b.map_url || '' })), map_url: s.mapUrl || '', lat: s.lat ?? '', lng: s.lng ?? '', hero_mode: s.heroMode || 'auto', photo_style: s.photoStyle || 'white', hours: scheduleFromStore(s.hours), instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
       return_days: String(s.returnDays ?? 3), reserve_hours: String(s.reserveHours ?? 24), shipping_fee: String(s.shippingFee), free_shipping_over: String(s.freeShippingOver), offer_badge_ar: s.offerBadge?.ar || '', offer_badge_en: s.offerBadge?.en || '',
       logo_initials: s.logoInitials || (s.name.ar || s.name.en || s.code || '').trim().replace(/\s+/g, '').slice(0, 2), logo_color: s.logoColor || '#1B1B1B',
     });
@@ -348,6 +328,47 @@ export default function Settings() {
               }))}
             />
           </Panel>
+          <Panel title="أرقام تواصل إضافية للمحل">
+            <p className="mb-3 text-sm text-muted">لو المحل له أكتر من رقم، ضيف الرقم التاني هنا. هيظهر للعميل في صفحة المحل بزرار اتصال وواتساب.</p>
+            <div className="space-y-3">
+              {(f.contacts || []).map((c, i) => {
+                const upd = (k) => (e) => setF({ ...f, contacts: f.contacts.map((x, j) => (j === i ? { ...x, [k]: e.target.value } : x)) });
+                return (
+                  <div key={i} className="grid items-end gap-3 sm:grid-cols-[1fr_1fr_auto]">
+                    <Field label="الرقم"><Input dir="ltr" inputMode="tel" value={c.phone} onChange={upd('phone')} className="text-start" /></Field>
+                    <Field label="اسم الرقم (اختياري، مثلًا: المبيعات)"><Input dir="rtl" value={c.label} onChange={upd('label')} maxLength={40} /></Field>
+                    <button type="button" onClick={() => setF({ ...f, contacts: f.contacts.filter((_, j) => j !== i) })} className="inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium text-sale hover:bg-sale/10"><Trash2 className="h-4 w-4" />{t('common.delete')}</button>
+                  </div>
+                );
+              })}
+              {(f.contacts || []).length < 6 && <Button type="button" size="sm" variant="secondary" onClick={() => setF({ ...f, contacts: [...(f.contacts || []), { label: '', phone: '' }] })}>+ إضافة رقم</Button>}
+            </div>
+          </Panel>
+          <Panel title="فروع المحل">
+            <p className="mb-3 text-sm text-muted">لو المحل له أكتر من فرع، ضيفهم هنا. لو الفرع ملوش رقم خاص، العميل بيتواصل على أرقام المحل.</p>
+            <div className="space-y-3">
+              {(f.branches || []).map((b, i) => {
+                const upd = (k) => (e) => setF({ ...f, branches: f.branches.map((x, j) => (j === i ? { ...x, [k]: e.target.value } : x)) });
+                return (
+                  <div key={i} className="rounded-2xl border border-line p-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="اسم الفرع (مثلًا: فرع المنشية)"><Input dir="rtl" value={b.name} onChange={upd('name')} maxLength={60} /></Field>
+                      <Field label="العنوان"><Input dir="rtl" value={b.address} onChange={upd('address')} maxLength={160} /></Field>
+                    </div>
+                    <details open={Boolean(b.phone || b.map_url)} className="group mt-3">
+                      <summary className="cursor-pointer select-none text-sm font-semibold text-brand marker:content-none">+ رقم خاص بالفرع أو لينك الخريطة (اختياري)</summary>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <Field label="رقم الفرع (اتصال وواتساب)"><Input dir="ltr" inputMode="tel" value={b.phone} onChange={upd('phone')} className="text-start" /></Field>
+                        <Field label="لينك الموقع على الخريطة"><Input dir="ltr" value={b.map_url} onChange={upd('map_url')} className="text-start" placeholder="https://maps.google.com/..." /></Field>
+                      </div>
+                    </details>
+                    <button type="button" onClick={() => setF({ ...f, branches: f.branches.filter((_, j) => j !== i) })} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium text-sale hover:bg-sale/10"><Trash2 className="h-4 w-4" />{t('common.delete')}</button>
+                  </div>
+                );
+              })}
+              {(f.branches || []).length < 12 && <Button type="button" size="sm" variant="secondary" onClick={() => setF({ ...f, branches: [...(f.branches || []), { name: '', address: '', phone: '', map_url: '' }] })}>+ إضافة فرع</Button>}
+            </div>
+          </Panel>
           <Panel title={t('settings.contact')}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label={t('settings.phone')}><Input dir="ltr" inputMode="tel" value={f.phone} onChange={set('phone')} className="text-start" /></Field>
@@ -415,8 +436,6 @@ export default function Settings() {
               </div>
 <div>
                 <ImageSlot label={t('settings.cover')} media={data.store.cover} slot="cover" ratio="natural" onUploaded={onImage('cover')} onDelete={() => deleteImage('cover')} deleteBusy={deleteBusy === 'cover'} />
-                <AutoCover onDone={onImage('cover')} />
-                <DesignHelp what="cover" className="mt-3" />
                 <HeroModePicker value={f.hero_mode} onChange={(v) => setF({ ...f, hero_mode: v })} />
                 <PhotoStylePicker value={f.photo_style} onChange={(v) => setF({ ...f, photo_style: v })} />
               </div>

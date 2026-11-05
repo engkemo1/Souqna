@@ -26,12 +26,16 @@ export default function StoreInfoBar() {
   const { tr, lang } = useI18n();
   const ar = lang === 'ar';
   const [week, setWeek] = useState(false);
+  const [more, setMore] = useState(false);
   const hours = store.hours;
   const st = statusInfo(hours);
   const tel = telHref(store.phone);
   const wa = waNumber(store.whatsapp);
   const map = mapHref(store, tr(store.address));
-  if (!st && !tel && !wa && !map) return null;
+  const contacts = (store.contacts || []).filter((c) => telHref(c.phone));
+  const branches = store.branches || [];
+  const hasMore = contacts.length > 0 || branches.length > 0;
+  if (!st && !tel && !wa && !map && !hasMore) return null;
 
   const names = ar ? DAYS_AR : DAYS_EN;
   const today = todayHours(hours, ar);
@@ -71,6 +75,39 @@ export default function StoreInfoBar() {
             </div>
           )}
         </div>
+        {hasMore && (
+          <div className="border-t border-line">
+            <button type="button" onClick={() => setMore((v) => !v)} aria-expanded={more} aria-controls="store-more" data-testid="store-more-toggle" className="flex w-full items-center justify-between gap-3 px-4 py-2.5 text-start text-[14px] font-bold transition hover:bg-fg/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+              <span>{contacts.length && branches.length ? (ar ? 'أرقامنا وفروعنا' : 'Our numbers & branches') : contacts.length ? (ar ? 'أرقام التواصل' : 'Contact numbers') : (ar ? 'فروعنا' : 'Our branches')}</span>
+              <ChevronDown className={`h-4 w-4 shrink-0 text-muted transition-transform ${more ? 'rotate-180' : ''}`} aria-hidden="true" />
+            </button>
+            {more && (
+              <div id="store-more" className="space-y-2 bg-fg/[0.02] px-4 pb-3 pt-1">
+                {contacts.map((c, i) => {
+                  const cw = waNumber(c.phone);
+                  return (
+                    <div key={`c${i}`} className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 text-[14px]"><span className="block font-semibold">{c.label || (ar ? 'رقم تواصل' : 'Contact')}</span><span dir="ltr" className="block text-[12px] text-muted">{c.phone}</span></span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        {cw && <a href={`https://wa.me/${cw}`} target="_blank" rel="noreferrer" aria-label={ar ? 'واتساب' : 'WhatsApp'} className={`${round} bg-[#25D366] text-white`}><WhatsAppIcon className="h-5 w-5" /></a>}
+                        <a href={telHref(c.phone)} aria-label={ar ? 'اتصال' : 'Call'} className={`${round} bg-fg/[0.07] text-fg hover:bg-fg/[0.12]`}><Phone className="h-5 w-5" /></a>
+                      </span>
+                    </div>
+                  );
+                })}
+                {branches.map((b, i) => {
+                  const bm = mapHref({ mapUrl: b.map_url }, b.address);
+                  return (
+                    <div key={`b${i}`} className="flex items-center justify-between gap-3">
+                      <span className="min-w-0 text-[14px]"><span className="block font-semibold">{b.name}</span>{b.address && <span className="block truncate text-[12px] text-muted" dir="auto">{b.address}</span>}</span>
+                      {bm && <a href={bm} target="_blank" rel="noreferrer" aria-label={ar ? 'الموقع' : 'Directions'} className={`${round} shrink-0 bg-fg/[0.07] text-fg hover:bg-fg/[0.12]`}><Navigation className="h-5 w-5" /></a>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
         {week && (
           <div id="store-week" className="border-t border-line bg-fg/[0.02] px-4 py-3" data-testid="store-week">
             <ul className="space-y-1.5">

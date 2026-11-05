@@ -33,6 +33,8 @@ export function serializeStore(s, { withTheme = true } = {}) {
     phone: s.phone,
     whatsapp: s.whatsapp,
     mapUrl: s.map_url || null,
+    contacts: (() => { try { const c = JSON.parse(s.contacts_json || '[]'); return Array.isArray(c) ? c : []; } catch { return []; } })(),
+    branches: (() => { try { const b = JSON.parse(s.branches_json || '[]'); return Array.isArray(b) ? b : []; } catch { return []; } })(),
     lat: s.lat ?? null,
     lng: s.lng ?? null,
     heroMode: s.hero_mode || 'auto',

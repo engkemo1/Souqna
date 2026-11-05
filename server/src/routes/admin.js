@@ -243,13 +243,26 @@ r.post('/subscriptions/:slug/free-months', h((req, res) => {
   res.status(201).json({ ok: true, ...period });
 }));
 
+/** A store with several branches: the order may be prepared at one of them: show the courier that branch's address, map and number. */
+function applyPickupBranch(row) {
+  let br = null;
+  if (row.pickup_branch) { try { br = JSON.parse(row.branches_json || '[]').find((b) => b.name === row.pickup_branch) || null; } catch { /* ignore */ } }
+  delete row.branches_json;
+  row.store_branch = br ? br.name : null;
+  if (!br) return row;
+  if (br.address) row.store_address = br.address;
+  row.store_map = br.map_url || (br.address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(/بنها|banha/i.test(br.address) ? br.address : `${br.address} بنها`)}` : row.store_map);
+  if (br.phone) { row.store_phone = br.phone; row.store_whatsapp = br.phone; }
+  return row;
+}
+
 /** Orders Twist has to collect from stores and deliver. */
 r.get('/deliveries', h((_req, res) => {
   const rows = q.all(`SELECT o.id,o.number,o.status,o.total,o.subtotal,o.shipping,o.shipping_free,o.delivery_group,o.delivery_fee_status,o.delivery_fee_quote,o.track_token,o.delivery_sponsor_share,o.delivery_sponsor_collected,
-      o.delivery_route_id,o.delivery_mode,o.delivery_person_id,o.courier_cost,o.customer_name,o.phone,o.governorate,o.city,o.address,o.notes,o.created_at,o.handoff_at,
+      o.delivery_route_id,o.delivery_mode,o.delivery_person_id,o.courier_cost,o.customer_name,o.phone,o.governorate,o.city,o.address,o.notes,o.created_at,o.handoff_at,o.pickup_branch,s.branches_json,
       s.id AS store_id,s.slug,s.name_ar AS store_name,s.phone AS store_phone,s.whatsapp AS store_whatsapp,s.address_ar AS store_address,s.map_url AS store_map,s.delivery_zone
     FROM orders o JOIN stores s ON s.id=o.store_id
-    WHERE o.delivery_by='platform' AND o.status NOT IN ('delivered','cancelled') ORDER BY o.created_at ASC,o.id ASC LIMIT 300`);
+    WHERE o.delivery_by='platform' AND o.status NOT IN ('delivered','cancelled') ORDER BY o.created_at ASC,o.id ASC LIMIT 300`).map(applyPickupBranch);
   const deliveryPeople = new Map(q.all('SELECT id,name FROM delivery_people').map((p) => [p.id, p.name]));
   const routeKey = (row) => row.delivery_route_id || row.delivery_group || `order:${row.id}`;
   const grouped = new Map(); const baskets = new Map();
@@ -1103,8 +1116,9 @@ r.get('/orders', h((req, res) => {
 }));
 
 r.get('/orders/:id', h((req, res) => {
-  const o = q.get('SELECT o.*, s.name_ar AS store_name, s.slug, s.phone AS store_phone, s.address_ar AS store_address, s.map_url AS store_map FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.id=?', [Number(req.params.id)]);
+  const o = q.get('SELECT o.*, s.name_ar AS store_name, s.slug, s.phone AS store_phone, s.address_ar AS store_address, s.map_url AS store_map, s.branches_json FROM orders o JOIN stores s ON s.id=o.store_id WHERE o.id=?', [Number(req.params.id)]);
   if (!o) throw new AppError(404, 'not_found', 'Order not found.');
+  applyPickupBranch(o);
   // every store's instructions for the same checkout (admin only), each tagged with its store
   const storeNotes = o.delivery_group
     ? q.all("SELECT o2.number, s2.name_ar AS store_name, o2.store_note AS note FROM orders o2 JOIN stores s2 ON s2.id=o2.store_id WHERE o2.delivery_group=? AND o2.store_note IS NOT NULL AND o2.store_note<>'' ORDER BY o2.id", [o.delivery_group])

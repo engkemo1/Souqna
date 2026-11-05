@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000">
+  <defs>
+    <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#111827"/><stop offset="1" stop-color="#7c3aed"/></linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#0f766e"/><stop offset="1" stop-color="#14b8a6"/></linearGradient>
+    <linearGradient id="g3" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f97316"/><stop offset="1" stop-color="#facc15"/></linearGradient>
+    <linearGradient id="g4" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#be123c"/><stop offset="1" stop-color="#fb7185"/></linearGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#0f172a" flood-opacity=".18"/></filter>
+    <style>
+      .ar{font-family:Tahoma,Arial,sans-serif;direction:rtl;unicode-bidi:bidi-override}
+      .small{font-size:24px;font-weight:600;letter-spacing:.5px}
+      .title{font-size:58px;font-weight:900}
+      .sub{font-size:28px;font-weight:500}
+      .cta{font-size:25px;font-weight:800}
+    </style>
+  </defs>
+  <rect width="1600" height="1000" fill="#f8fafc"/>
+  <text x="800" y="72" text-anchor="middle" class="ar" font-size="38" font-weight="900" fill="#111827">أشكال إعلانات وعروض Twsit</text>
+  <text x="800" y="112" text-anchor="middle" class="ar" font-size="20" fill="#64748b">معاينة أولية لاختيار الشكل المناسب من لوحة الأدمن</text>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="155" rx="34" width="700" height="350" fill="url(#g1)"/>
+    <circle cx="650" cy="230" r="140" fill="#a78bfa" opacity=".18"/><circle cx="720" cy="420" r="180" fill="#22d3ee" opacity=".10"/>
+    <text x="700" y="220" text-anchor="end" class="ar small" fill="#ddd6fe">عرض مميز من Twsit</text>
+    <text x="700" y="315" text-anchor="end" class="ar title" fill="white">خصم 50%</text>
+    <text x="700" y="365" text-anchor="end" class="ar sub" fill="#ede9fe">على التشكيلة المختارة</text>
+    <rect x="470" y="410" rx="18" width="230" height="54" fill="white"/>
+    <text x="585" y="446" text-anchor="middle" class="ar cta" fill="#4c1d95">تسوق الآن</text>
+    <text x="130" y="452" class="ar" font-size="22" fill="#c4b5fd">مميز ★</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="830" y="155" rx="34" width="700" height="350" fill="url(#g2)"/>
+    <path d="M1230 180h230v230h-230z" fill="#ccfbf1" opacity=".14" transform="rotate(15 1345 295)"/>
+    <text x="1460" y="220" text-anchor="end" class="ar small" fill="#ccfbf1">لفترة محدودة</text>
+    <text x="1460" y="315" text-anchor="end" class="ar title" fill="white">شحن مجاني</text>
+    <text x="1460" y="365" text-anchor="end" class="ar sub" fill="#ccfbf1">اطلب الآن واستلم بدون مصاريف</text>
+    <rect x="1230" y="410" rx="18" width="230" height="54" fill="white"/>
+    <text x="1345" y="446" text-anchor="middle" class="ar cta" fill="#115e59">اكتشف العرض</text>
+    <text x="890" y="452" class="ar" font-size="22" fill="#99f6e4">الأكثر طلبًا</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="70" y="585" rx="34" width="700" height="350" fill="url(#g3)"/>
+    <circle cx="170" cy="760" r="170" fill="#fff7ed" opacity=".18"/><circle cx="300" cy="900" r="90" fill="#fff" opacity=".12"/>
+    <text x="700" y="650" text-anchor="end" class="ar small" fill="#7c2d12">عرض المحل</text>
+    <text x="700" y="745" text-anchor="end" class="ar title" fill="#431407">اشترِ 2 وخد 1</text>
+    <text x="700" y="795" text-anchor="end" class="ar sub" fill="#7c2d12">اختار منتجاتك واستفيد بالهدية</text>
+    <rect x="470" y="840" rx="18" width="230" height="54" fill="#431407"/>
+    <text x="585" y="876" text-anchor="middle" class="ar cta" fill="white">شوف التفاصيل</text>
+    <text x="130" y="900" class="ar" font-size="22" fill="#7c2d12">هدية مجانية 🎁</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="830" y="585" rx="34" width="700" height="350" fill="url(#g4)"/>
+    <circle cx="1370" cy="760" r="180" fill="#ffe4e6" opacity=".16"/><circle cx="1220" cy="650" r="90" fill="#fff" opacity=".10"/>
+    <text x="1460" y="650" text-anchor="end" class="ar small" fill="#ffe4e6">لا تفوّت الفرصة</text>
+    <text x="1460" y="745" text-anchor="end" class="ar title" fill="white">عرض اليوم</text>
+    <text x="1460" y="795" text-anchor="end" class="ar sub" fill="#ffe4e6">خصومات قوية حتى نهاية اليوم</text>
+    <rect x="1230" y="840" rx="18" width="230" height="54" fill="white"/>
+    <text x="1345" y="876" text-anchor="middle" class="ar cta" fill="#9f1239">احجز العرض</text>
+    <text x="890" y="900" class="ar" font-size="22" fill="#fecdd3">ينتهي قريبًا ⏱</text>
+  </g>
+</svg>

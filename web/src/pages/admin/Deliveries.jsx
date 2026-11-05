@@ -57,7 +57,7 @@ export default function Deliveries() {
     setBusy(null);
   };
   const courierMessage = (o) => {
-    const stores = orders.filter((x) => x.delivery_route_id === runKey(o)).map((x) => `• ${x.store_name} — ${x.store_address || 'العنوان غير مسجل'}${x.store_map ? ` — ${x.store_map}` : ''}`).join('\n');
+    const stores = orders.filter((x) => x.delivery_route_id === runKey(o)).map((x) => `• ${x.store_name}${x.store_branch ? ` (${x.store_branch})` : ''} — ${x.store_address || 'العنوان غير مسجل'}${x.store_map ? ` — ${x.store_map}` : ''}`).join('\n');
     const collectionLead = !o.delivery_group || o.delivery_mode !== 'split' || runKey(o) === o.delivery_collection_route_id;
     const amount = o.delivery_mode === 'split' ? (collectionLead ? o.delivery_group_total : 0) : (o.delivery_group_total ?? o.total);
     const collectionNote = o.delivery_mode === 'split'
@@ -106,7 +106,7 @@ export default function Deliveries() {
                         {o.delivery_courier_cost != null && <p className="mt-2 text-xs leading-5 text-muted">المندوب: {o.delivery_person_name || 'غير محدد'} · رسوم هذا المسار من العميل: {fmtMoney(o.delivery_route_customer_fee)} · مساهمات المحلات المحصّلة فعلًا: {fmtMoney(o.delivery_sponsored_total)} · الصافي بعد تكلفة المندوب: <strong className={o.delivery_profit < 0 ? 'text-sale' : 'text-success'}>{fmtMoney(o.delivery_profit)}</strong></p>}
                       </div>}
                       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                        <div><p className="text-xs font-semibold text-muted">استلام من</p><p className="font-medium">{o.store_name}</p><p className="text-[13px] text-muted">{o.store_address || '—'}</p>
+                        <div><p className="text-xs font-semibold text-muted">استلام من</p><p className="font-medium">{o.store_name}{o.store_branch ? ` · ${o.store_branch}` : ''}</p><p className="text-[13px] text-muted">{o.store_address || '—'}</p>
                           <div className="mt-1.5 flex flex-wrap gap-1.5">{o.store_phone && <Button size="xs" variant="outline" icon={Phone} href={`tel:${o.store_phone}`}>اتصال</Button>}{o.store_phone && <Button size="xs" variant="outline" icon={MessageCircle} href={waLink(o.store_phone, `أهلاً، بخصوص الطلب ${o.number} — إحنا جايين نستلمه`)} target="_blank" rel="noreferrer">واتساب</Button>}{o.store_map && <Button size="xs" variant="outline" icon={MapPin} href={o.store_map} target="_blank" rel="noreferrer">خريطة</Button>}</div></div>
                         <div><p className="text-xs font-semibold text-muted">تسليم لـ</p><p className="font-medium">{o.customer_name}</p><p className="text-[13px] text-muted">{[o.address, o.city, o.governorate].filter(Boolean).join('، ')}</p>
                           <div className="mt-1.5 flex flex-wrap gap-1.5"><Button size="xs" variant="outline" icon={Phone} href={`tel:${o.phone}`}>اتصال</Button><Button size="xs" variant="outline" icon={MessageCircle} href={waLink(o.phone, `أهلاً ${o.customer_name}، بنتواصل معاك بخصوص طلبك ${o.number} من ${o.store_name}`)} target="_blank" rel="noreferrer">واتساب</Button></div></div>

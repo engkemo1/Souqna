@@ -44,6 +44,9 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   for (const [name, def] of [['fit', "'contain'"], ['focus', "'center'"], ['height', "'normal'"], ['text_color', "''"], ['font', "''"]]) if (!bannerCols.includes(name)) db.exec(`ALTER TABLE banners ADD COLUMN ${name} TEXT NOT NULL DEFAULT ${def}`);
   if (!cols.includes('reserve_hours')) db.exec('ALTER TABLE stores ADD COLUMN reserve_hours INTEGER NOT NULL DEFAULT 24'); // "reserve & try in store": hold time, 0 = off
   if (!cols.includes('hidden')) db.exec('ALTER TABLE stores ADD COLUMN hidden INTEGER NOT NULL DEFAULT 0');
+  // one store page: extra contact numbers of the store, and its extra branches (address only, no numbers per branch)
+  if (!cols.includes('contacts_json')) db.exec('ALTER TABLE stores ADD COLUMN contacts_json TEXT');
+  if (!cols.includes('branches_json')) db.exec('ALTER TABLE stores ADD COLUMN branches_json TEXT');
   if (!cols.includes('show_when_empty')) {
     db.exec('ALTER TABLE stores ADD COLUMN show_when_empty INTEGER NOT NULL DEFAULT 0');
     // one-time: keep the test store(s) visible even while empty
@@ -140,6 +143,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (prcols.length && !prcols.includes('shift_id')) db.exec('ALTER TABLE pos_returns ADD COLUMN shift_id INTEGER');
   if (!ocols.includes('reserve_until')) db.exec('ALTER TABLE orders ADD COLUMN reserve_until TEXT'); // pickup reservations (delivery_by=\'pickup\'): held until
   if (!ocols.includes('delivery_group')) db.exec('ALTER TABLE orders ADD COLUMN delivery_group TEXT');
+  if (!ocols.includes('pickup_branch')) db.exec('ALTER TABLE orders ADD COLUMN pickup_branch TEXT'); // which branch of the store prepares the order (the courier collects there)
   if (!ocols.includes('delivery_route_id')) db.exec('ALTER TABLE orders ADD COLUMN delivery_route_id TEXT');
   if (!ocols.includes('delivery_mode')) db.exec("ALTER TABLE orders ADD COLUMN delivery_mode TEXT NOT NULL DEFAULT 'pooled'");
   if (!ocols.includes('delivery_fee_status')) db.exec("ALTER TABLE orders ADD COLUMN delivery_fee_status TEXT NOT NULL DEFAULT 'confirmed'");
