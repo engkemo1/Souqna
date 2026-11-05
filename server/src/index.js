@@ -22,6 +22,7 @@ import { prefetchCutoutModel } from './lib/cutout.js';
 import { startReservationSweeper } from './lib/reserve.js';
 import './lib/wa-products.js'; // registers the WhatsApp → product handler (dormant unless WA_ENABLED=1)
 import { startDailySummary } from './lib/daily-summary.js';
+import { startLateOrderAlerts } from './lib/insights.js';
 import { registerDefaultProviders } from './lib/image-providers.js';
 import { startIndexNow, indexNowKey } from './lib/indexnow.js';
 
@@ -233,6 +234,7 @@ export { app };
 // listener stays alive during the slow first-boot DB setup).
 export function startServer(existingServer) {
   startDailySummary();
+  startLateOrderAlerts(); // nudges stores (push) and the admin (WhatsApp) about orders nobody answered; LATE_ALERTS=0 turns it off
   startIndexNow(SITE_ORIGIN, newUrlsSince);
   registerDefaultProviders(); // registration only — no provider call is made at startup
   if (existingServer) {

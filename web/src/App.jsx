@@ -1,11 +1,13 @@
-import { lazy, Suspense } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate, useLocation } from 'react-router-dom';
+import { trackSiteVisit, trackPageEvents } from './lib/siteTracker.js';
 import { MotionConfig } from 'framer-motion';
 import { I18nProvider } from './lib/i18n.jsx';
 import { AuthProvider } from './lib/auth.jsx';
 import { CartProvider } from './lib/cart.jsx';
 import { ToastProvider } from './components/ui/Toast.jsx';
 import { BuyerProvider } from './lib/buyer.jsx';
+import CartSync from './components/market/CartSync.jsx';
 import RouteFallback from './components/RouteFallback.jsx';
 import NotFound from './pages/NotFound.jsx';
 
@@ -80,13 +82,23 @@ const AdminSourcing = lazy(() => import('./pages/admin/Sourcing.jsx'));
 const AdminBuyers = lazy(() => import('./pages/admin/Buyers.jsx'));
 const AdminPhotos = lazy(() => import('./pages/admin/Photos.jsx'));
 const AdminReports = lazy(() => import('./pages/admin/Reports.jsx'));
+const AdminTraffic = lazy(() => import('./pages/admin/Traffic.jsx'));
+const AdminCouriers = lazy(() => import('./pages/admin/Couriers.jsx'));
+const AdminAlerts = lazy(() => import('./pages/admin/Alerts.jsx'));
+const AdminGrowth = lazy(() => import('./pages/admin/Growth.jsx'));
+const AdminInsights = lazy(() => import('./pages/admin/Insights.jsx'));
+const AdminAudit = lazy(() => import('./pages/admin/AuditLog.jsx'));
+const AdminCampaigns = lazy(() => import('./pages/admin/Campaigns.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
+const AdminFeatured = lazy(() => import('./pages/admin/FeaturedAds.jsx'));
 const AdminHomepageAds = lazy(() => import('./pages/admin/HomepageAds.jsx'));
 const StoreManage = lazy(() => import('./pages/admin/StoreManage.jsx'));
 const AdminSystem = lazy(() => import('./pages/admin/System.jsx'));
 const More = lazy(() => import('./pages/dashboard/More.jsx'));
 
 function Root() {
+  const { pathname } = useLocation();
+  useEffect(() => { trackSiteVisit(pathname); trackPageEvents(pathname); }, [pathname]);
   return (
     <Suspense fallback={<RouteFallback />}>
       <Outlet />
@@ -188,6 +200,14 @@ const router = createBrowserRouter([
           { path: 'photos', element: <AdminPhotos /> },
           { path: 'coupons', element: <AdminCoupons /> },
           { path: 'ads', element: <AdminHomepageAds /> },
+          { path: 'featured', element: <AdminFeatured /> },
+          { path: 'traffic', element: <AdminTraffic /> },
+          { path: 'couriers', element: <AdminCouriers /> },
+          { path: 'alerts', element: <AdminAlerts /> },
+          { path: 'growth', element: <AdminGrowth /> },
+          { path: 'insights', element: <AdminInsights /> },
+          { path: 'audit', element: <AdminAudit /> },
+          { path: 'campaigns', element: <AdminCampaigns /> },
           { path: 'reports', element: <AdminReports /> },
           { path: 'system', element: <AdminSystem /> },
           {
@@ -215,6 +235,7 @@ export default function App() {
         <AuthProvider>
           <BuyerProvider>
           <CartProvider>
+            <CartSync />
             <ToastProvider>
               <RouterProvider router={router} />
             </ToastProvider>

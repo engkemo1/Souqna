@@ -25,6 +25,10 @@ import { generationStatus, requestCandidate, listCandidates, candidateRow, appro
 import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage } from '../lib/deptImage.js';
 import { notifyBuyer, notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
+import { trafficStats } from '../lib/traffic.js';
+import { auditMiddleware } from '../lib/insights.js';
+import insightsRoutes from './admin-insights.js';
+import featuredRoutes from './admin-featured.js';
 import { verifyTotp } from '../lib/totp.js';
 import { snapshotDb, runBackup, lastBackup, runOffsiteBackup, lastOffsite } from '../lib/backup.js';
 import { offsiteEnabled, r2Enabled } from '../lib/r2.js';
@@ -71,6 +75,11 @@ r.use((req, _res, next) => {
   }
   next();
 });
+
+/* Everything below this line is behind the admin key. Record writes in the audit log, then the insights endpoints. */
+r.use(auditMiddleware);
+r.use(insightsRoutes);
+r.use(featuredRoutes);
 
 /** Step 2 of admin sign-in. The key (checked above) + a 6-digit authenticator code → a 12-hour session proof. */
 let lastStep = 0;
@@ -579,6 +588,9 @@ r.use('/stores/:slug/as', asStore, ownerRoutes);
 
 const ts = (s) => (s ? Date.parse(String(s).replace(' ', 'T') + 'Z') : NaN);
 const avg = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
+
+/** Site traffic: today / yesterday / last 7 days / all time, per-store visits, sources, peak hours. */
+r.get('/traffic', h((_req, res) => { res.json(trafficStats()); }));
 
 r.get('/reports/stores', h((req, res) => {
   const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;

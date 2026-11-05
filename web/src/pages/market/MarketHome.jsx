@@ -9,6 +9,7 @@ import { sp } from '../../lib/store.jsx';
 import Brand from '../../components/market/Brand.jsx';
 import SocialLinks from '../../components/market/SocialLinks.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
+import FeaturedSlot from '../../components/featured/FeaturedSlot.jsx';
 import MobileHomeSearch from '../../components/market/MobileHomeSearch.jsx';
 import StylistChat from '../../components/market/StylistChat.jsx';
 import ModaAvatar from '../../components/market/ModaAvatar.jsx';
@@ -22,6 +23,8 @@ import { useDepartments } from '../../lib/departments.js';
 import DeptStrip from '../../components/market/DeptStrip.jsx';
 import ProductRail from '../../components/market/ProductRail.jsx';
 import RecentlyViewed from '../../components/market/RecentlyViewed.jsx';
+import BuyAgain from '../../components/market/BuyAgain.jsx';
+import SimilarViewed from '../../components/market/SimilarViewed.jsx';
 import StoreStrip from '../../components/market/StoreStrip.jsx';
 import StoreCard from '../../components/market/StoreCard.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
@@ -110,6 +113,7 @@ export default function MarketHome() {
   return (
     <div className="min-h-dvh bg-[#F6F8FB] ">
       <MarketHeader />
+      <FeaturedSlot placement="market_top" />
 
       {/* Hero */}
       <section className="relative isolate overflow-hidden pt-6 sm:pt-10">
@@ -193,6 +197,7 @@ export default function MarketHome() {
         {showWearThis && <WearThis className="h-full" />}
         <RequestBanner compact className={showWearThis ? 'h-full' : 'h-full md:col-span-2'} />
       </div>
+      <FeaturedSlot placement="market_hero" />
 
       <div className="container mt-5 sm:mt-7">
       {/* Stats Row */}
@@ -216,7 +221,9 @@ export default function MarketHome() {
       <div className="border-y border-line bg-secondary/50">
         <ProductRail title={t('market.newArrivals')} items={base?.newest} to="/search?sort=newest" />
       </div>
+      <BuyAgain />
       <RecentlyViewed />
+      <SimilarViewed />
       {(base?.deptRails || []).map((r, i) => (
         <div key={r.slug} className={i % 2 === 0 ? '' : 'border-y border-line bg-secondary/50'}>
           <ProductRail title={t('market.topIn', { d: r.name?.[lang] || r.name?.ar })} items={r.items} to={`/search?department=${r.slug}`} />
@@ -224,6 +231,8 @@ export default function MarketHome() {
       ))}
 
       {/* A small shop preview leads to a dedicated, searchable store directory. */}
+      <FeaturedSlot placement="market_strip" />
+      <FeaturedSlot placement="market_grid" />
       <section id="stores" className="scroll-mt-32 border-y border-line bg-white">
         <div className="container py-10 sm:py-14">
           <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -263,6 +272,7 @@ export default function MarketHome() {
         </div>
       </section>
 
+      <FeaturedSlot placement="market_bottom" />
       <footer className="container mt-16 flex flex-col items-center justify-between gap-4 border-t border-line py-10 text-sm text-muted sm:flex-row">
         <Brand />
         <div className="flex flex-col items-center gap-3 sm:items-end">

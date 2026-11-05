@@ -63,10 +63,13 @@ async function publishToR2(storeId, key, dir) {
   const uploaded = [];
   try {
     const files = await fs.readdir(dir);
-    for (const f of files) {
+    // all renditions go up in parallel (they used to go one by one)
+    const results = await Promise.allSettled(files.map(async (f) => {
       await r2Put(`${storeId}/${key}/${f}`, await fs.readFile(path.join(dir, f)));
       uploaded.push(f);
-    }
+    }));
+    const failed = results.find((r) => r.status === 'rejected');
+    if (failed) throw failed.reason;
   } catch (e) {
     await Promise.all(uploaded.map((f) => r2Delete(`${storeId}/${key}/${f}`).catch(() => {})));
     throw e;

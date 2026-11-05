@@ -11,6 +11,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import sharp from 'sharp';
@@ -21,7 +22,7 @@ const CACHED = path.join(DIR, 'isnet-general-use.onnx');
 const BAKED = process.env.BG_MODEL_FILE || ''; // set by the Dockerfile: the model is already inside the image
 let FILE = CACHED;
 const SIZE = 1024; // the model's fixed input
-const IDLE_MS = 5 * 60e3;
+const IDLE_MS = Math.max(1, Number(process.env.CUTOUT_IDLE_MIN) || 15) * 60e3; // keep the model loaded between uploads (was 5 min)
 
 export const cutoutEnabled = () => process.env.BG_REMOVAL !== '0';
 
@@ -58,6 +59,33 @@ async function getSession() {
   idle = setTimeout(() => { const s = session; session = null; s?.release?.().catch(() => {}); }, IDLE_MS);
   idle.unref?.();
   return session;
+}
+
+// The owner's preview and the real upload run the model on the SAME photo (at different sizes). Remember the mask for a few
+// minutes, keyed by a coarse fingerprint (same idea as cutout-review.js), so the second pass skips the slow model run.
+const maskCache = new Map();
+const MASK_CACHE_MS = 10 * 60e3;
+async function maskFingerprint(img) {
+  const { data } = await sharp(img).resize(24, 30, { fit: 'fill' }).greyscale().raw().toBuffer({ resolveWithObject: true });
+  return crypto.createHash('sha1').update(Buffer.from(data.map((v) => v >> 5))).digest('hex');
+}
+async function foregroundMaskCached(buffer, width, height, { check = true } = {}) {
+  let key = null;
+  try { key = await maskFingerprint(buffer); } catch { /* no cache for this photo */ }
+  const hit = key && maskCache.get(key);
+  if (hit && Date.now() - hit.at < MASK_CACHE_MS && (hit.checked || !check) && Math.abs(hit.width / hit.height - width / height) < 0.02) {
+    let alpha = hit.alpha;
+    if (hit.width !== width || hit.height !== height) {
+      alpha = await sharp(alpha, { raw: { width: hit.width, height: hit.height, channels: 1 } }).resize(width, height, { fit: 'fill' }).raw().toBuffer();
+    }
+    return { alpha, risky: check ? hit.risky : false };
+  }
+  const out = await foregroundMask(buffer, width, height, { check });
+  if (key && !(hit && hit.checked)) {
+    maskCache.set(key, { alpha: out.alpha, risky: out.risky, checked: check, width, height, at: Date.now() });
+    if (maskCache.size > 12) maskCache.delete(maskCache.keys().next().value);
+  }
+  return out;
 }
 
 let queue = Promise.resolve();
@@ -266,7 +294,7 @@ export async function cutoutLayer(buffer) {
     return await serial(async () => {
       const { data: px, info } = await sharp(buffer).removeAlpha().raw().toBuffer({ resolveWithObject: true });
       const { width, height } = info;
-      const { alpha, risky } = await foregroundMask(buffer, width, height);
+      const { alpha, risky } = await foregroundMaskCached(buffer, width, height);
       if (risky) { console.log('[cutout] outline not trustworthy: keeping the real background'); return null; }
       let cover = 0;
       for (let i = 0; i < alpha.length; i++) cover += alpha[i];
@@ -296,7 +324,7 @@ export async function productBox(buffer) {
   try {
     return await serial(async () => {
       const { width, height } = await sharp(buffer).metadata();
-      const { alpha } = await foregroundMask(buffer, width, height, { check: false }); // only where the product is, for framing
+      const { alpha } = await foregroundMaskCached(buffer, width, height, { check: false }); // only where the product is, for framing
       let x0 = width, y0 = height, x1 = -1, y1 = -1, on = 0;
       for (let y = 0, i = 0; y < height; y++) for (let x = 0; x < width; x++, i++) {
         if (alpha[i] < 60) continue; // low threshold: thin straps and soft edges still count as product

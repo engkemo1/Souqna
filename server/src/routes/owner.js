@@ -566,9 +566,17 @@ r.post('/media', upload.array('files', 12), h(async (req, res) => {
   const files = req.files || [];
   if (!files.length) throw badRequest('no_file', 'Please choose at least one image.');
   const kind = ['product', 'banner', 'category', 'logo', 'cover', 'offer'].includes(req.query.kind) ? req.query.kind : 'product';
-  const out = [];
   // the owner is uploading from the dashboard and sees every photo: they are the last check of a cut-out
-  for (const f of files) out.push(serializeMedia(await processImage(f.buffer, { storeId: req.store.id, kind, ownerSees: true })));
+  // two photos at a time (the cut-out model itself still runs one at a time); the order of the result is kept
+  const out = new Array(files.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < files.length) {
+      const i = next++;
+      out[i] = serializeMedia(await processImage(files[i].buffer, { storeId: req.store.id, kind, ownerSees: true }));
+    }
+  };
+  await Promise.all([worker(), worker()]);
   res.status(201).json({ media: out });
 }));
 

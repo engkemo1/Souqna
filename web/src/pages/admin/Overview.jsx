@@ -5,6 +5,7 @@ import { PageHeader, Panel, KpiCard } from '../../components/dash/Kit.jsx';
 import { ErrorState } from '../../components/ui/States.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import { useAdminApi, fmtMoney, fmtNum, fmtDateTime, ORDER_STATUS_AR, useAdminDepartments } from './adminApi.js';
+import TodayGlance from './TodayGlance.jsx';
 
 const STATUS_TONE = { pending: 'warning', confirmed: 'info', processing: 'violet', shipped: 'info', delivered: 'success', cancelled: 'danger' };
 export const StatusPill = ({ s, platform = false }) => <Badge tone={STATUS_TONE[s] || 'neutral'} dot>{platform && s === 'processing' ? 'جاهز للاستلام' : ORDER_STATUS_AR[s] || s}</Badge>;
@@ -19,6 +20,7 @@ export default function Overview() {
   return (
     <div>
       <PageHeader title="نظرة عامة" subtitle="أرقام المنصة كلها في مكان واحد" />
+      <TodayGlance />
       <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
         {k('مبيعات اليوم', t?.revenueToday, Banknote, 'brand', `${fmtNum(t?.ordersToday)} طلب النهاردة`, fmtMoney)}
         {k('إجمالي المبيعات', t?.revenue, Banknote, 'neutral', `${fmtNum(t?.orders)} طلب`, fmtMoney)}

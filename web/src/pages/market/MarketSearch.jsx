@@ -15,6 +15,7 @@ import { Select } from '../../components/ui/Field.jsx';
 import { EmptyState, ErrorState } from '../../components/ui/States.jsx';
 import { cx } from '../../components/ui/cx.js';
 import SearchFilters from '../../components/market/SearchFilters.jsx';
+import FeaturedSlot from '../../components/featured/FeaturedSlot.jsx';
 import CategoryHeader from '../../components/market/CategoryHeader.jsx';
 import { PROFILES } from '@souqna/shared/catalog';
 import { api } from '../../lib/api.js';
@@ -120,6 +121,7 @@ export default function MarketSearch() {
             <button type="button" onClick={clearFilters} className="text-sm font-semibold text-brand hover:underline">{t('search.clearFilters')}</button>
           </div>
         )}
+        <FeaturedSlot placement="search_slot" store={params.get('store') || undefined} category={params.get('store') ? params.get('category') || undefined : undefined} />
         <p className="mb-5 text-sm text-muted" aria-live="polite">
           {loading && !data ? t('common.loading') : q || department
             ? t('search.results', { n: formatNumber(total, lang), range: data?.price?.max ? (lang === 'ar' ? `(الأسعار من ${formatMoney(data.price.min, lang)} إلى ${formatMoney(data.price.max, lang)})` : `${formatMoney(data.price.min, lang)} – ${formatMoney(data.price.max, lang)}`) : '' })

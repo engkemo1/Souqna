@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard } from 'lucide-react';
+import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard, Eye, Wallet, TrendingUp, AlertTriangle, History } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -8,6 +8,7 @@ import { Field, Input } from '../../components/ui/Field.jsx';
 import Brand from '../../components/market/Brand.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { useAppManifest } from '../../lib/pwa.js';
+import PageHelp from './PageHelp.jsx';
 import { adminApi, adminKey, adminSession, setAdminAuthFail, fmtMoney } from './adminApi.js';
 
 const NAV_GROUPS = [
@@ -18,6 +19,7 @@ const NAV_GROUPS = [
     { to: '/admin/departments', icon: Tags, label: 'الأقسام', badge: 'depts' },
     { to: '/admin/image-library', icon: Camera, label: 'مكتبة صور الأقسام' },
     { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
+    { to: '/admin/featured', icon: Sparkles, label: 'الإعلانات والعروض المميزة' },
     { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
     { to: '/admin/buyers', icon: Users, label: 'حسابات العملاء' },
     { to: '/admin/photos', icon: Camera, label: 'أحدث الصور' },
@@ -28,10 +30,19 @@ const NAV_GROUPS = [
     { to: '/admin/delivery-zones', icon: MapPin, label: 'مناطق الاستلام والخصم' },
     { to: '/admin/delivery-rates', icon: MapPin, label: 'رسوم المناطق' },
     { to: '/admin/delivery-people', icon: Users, label: 'أفراد الدليفري' },
+    { to: '/admin/couriers', icon: Wallet, label: 'حساب المندوبين' },
     { to: '/admin/services', icon: Camera, label: 'الخدمات', badge: 'services' },
     { to: '/admin/sourcing', icon: PackagePlus, label: 'طلبات من برّه', badge: 'sourcing' },
   ] },
-  { label: 'التحليلات', items: [{ to: '/admin/reports', icon: BarChart3, label: 'التقارير' }] },
+  { label: 'التحليلات', items: [
+    { to: '/admin/alerts', icon: AlertTriangle, label: 'التنبيهات والمتابعة' },
+    { to: '/admin/growth', icon: TrendingUp, label: 'النمو وصحة الكتالوج' },
+    { to: '/admin/traffic', icon: Eye, label: 'الزيارات' },
+    { to: '/admin/insights', icon: TrendingUp, label: 'تحليلات السوق' },
+    { to: '/admin/campaigns', icon: Megaphone, label: 'الحملات والإعلانات' },
+    { to: '/admin/reports', icon: BarChart3, label: 'التقارير' },
+    { to: '/admin/audit', icon: History, label: 'سجل الحركات' },
+  ] },
   { label: 'الذكاء الاصطناعي والمنصة', items: [
     { to: '/admin/system?section=cashier', icon: DatabaseBackup, label: 'ربط الكاشير' },
     { to: '/admin/system?section=moda', icon: Sparkles, label: 'المساعد الذكي' },
@@ -335,7 +346,7 @@ function Shell({ onLogout }) {
           </div>
         </header>
         {/* pb-28 on mobile for bottom nav; lg:pb-12 for desktop */}
-        <main className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8"><Outlet context={alerts} /></main>
+        <main className="mx-auto w-full max-w-[1400px] px-4 pb-28 pt-6 sm:px-6 lg:px-8 lg:pb-12 lg:pt-8"><PageHelp /><Outlet context={alerts} /></main>
       </div>
 
       {/* ── Mobile Bottom Nav (5 primary items + menu) ── */}

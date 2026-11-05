@@ -17,7 +17,10 @@ import { storeOffers, productOffers, offerBadges, countView } from '../lib/promo
 const WEAK_PHOTO = `(CASE WHEN COALESCE((SELECT m.quality FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.is_primary=1 LIMIT 1), 100) < 50 THEN 1 ELSE 0 END)`;
 import { sameDaySql, cairoNow } from '../lib/sameDay.js';
 import { buyerFromReq } from '../lib/buyers.js';
+import { recordSiteVisit, recordConversion, cairoDay } from '../lib/traffic.js';
+import { logSearch, trackEvent } from '../lib/insights.js';
 import { recomputeRatings } from '../lib/reviews.js';
+import { publicCampaigns, recordEvent, PLACEMENT_KEYS } from '../lib/featured.js';
 import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
 import { logVisualSearch } from '../lib/visual-demand.js';
 import { runStylist, modaBrain, modaCurator, modaUnderstander, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
@@ -85,6 +88,22 @@ r.get('/homepage-ads', h((_req, res) => {
   res.json({ items });
 }));
 
+/* ---------------------------------------------------------- featured ads & offers (platform-admin campaigns) */
+r.get('/featured', h((req, res) => {
+  const placement = String(req.query.placement || '');
+  if (!PLACEMENT_KEYS.includes(placement)) throw new AppError(422, 'validation_failed', 'Unknown placement', { placement: 'bad_value' });
+  const device = ['desktop', 'mobile'].includes(String(req.query.device)) ? String(req.query.device) : null;
+  cache(res, 30);
+  res.json({ items: publicCampaigns({ placement, store: String(req.query.store || '').slice(0, 80) || null, category: String(req.query.category || '').slice(0, 80) || null, device }) });
+}));
+const featuredEvent = (event) => h((req, res) => {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const counted = recordEvent({ id: Number(req.params.id) || 0, placement: String(body.placement || ''), event, ip: req.ip || '', ua: String(req.headers['user-agent'] || '').slice(0, 200) });
+  res.status(202).json({ counted });
+});
+r.post('/featured/:id/impression', featuredEvent('impression'));
+r.post('/featured/:id/click', featuredEvent('click'));
+
 /* ---------------------------------------------------------- global product search */
 
 const NORM = (col) => `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(${col}),'أ','ا'),'إ','ا'),'آ','ا'),'ة','ه'),'ى','ي'),'ـ','')`;
@@ -142,6 +161,9 @@ const MATERIALS = [
 const MATERIAL_KEYS = new Set(MATERIALS.map((m) => m.key));
 const MAT_TEXT = () => `(' ' || ${NORM('COALESCE(p.name_ar,\'\')')} || ' ' || ${NORM('COALESCE(p.name_en,\'\')')} || ' ' || ${NORM('COALESCE(p.description_ar,\'\')')} || ' ' || ${NORM('COALESCE(p.description_en,\'\')')} || ' ' || ${NORM('COALESCE(p.badge_text,\'\')')})`;
 const matCond = (m) => ({ sql: `(${m.words.map(() => `${MAT_TEXT()} LIKE ?`).join(' OR ')})`, params: m.words.map((w) => `%${normText(w)}%`) });
+
+// sold-out products stay visible (own page, SEO) but always sort after the ones that can be bought
+const SOLD_OUT_LAST = '(CASE WHEN p.track_stock=1 AND p.stock<=0 THEN 1 ELSE 0 END) ASC';
 
 const AUD_DEPT = { men: 'men', women: 'women', kids: 'kids', boys: 'kids', girls: 'kids' };
 
@@ -250,7 +272,7 @@ r.get('/search', h((req, res) => {
   const limit = ids ? 100 : 24; const pg = clampInt(page, 1, 1000, 1);
   const from = `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${where.join(' AND ')}`;
   const total = q.val(`SELECT COUNT(*) ${from}`, params);
-  const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en ${from} ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, ...orderParams, limit, (pg - 1) * limit]);
+  const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en ${from} ORDER BY ${SOLD_OUT_LAST}, ${order} LIMIT ? OFFSET ?`, [...params, ...orderParams, limit, (pg - 1) * limit]);
   const items = serializeCards(rows).map((c, i) => ({ ...c, store: { slug: rows[i].store_slug, name: bi(rows[i], 'store_name') } }));
   const price = q.get(`SELECT MIN(p.price) AS min, MAX(p.price) AS max ${from}`, params);
   const fd = facetFrom(storeSlug ? ['s.slug=?'] : [], storeSlug ? [storeSlug] : []);
@@ -304,6 +326,7 @@ r.get('/search', h((req, res) => {
       : d.options.map((o) => ({ ...o, n: byV.get(o.v) || 0 })).filter((o) => o.n > 0 || (attrSel.get(d.key) || []).includes(o.v));
     return { key: d.key, name: { ar: d.ar, en: d.en }, type: d.type, options, selected: attrSel.get(d.key) || [] };
   }).filter((f) => f.options.length);
+  if (term && !ids && pg === 1 && !department && !store && !min && !max && !sale && !isNew && !inStock && !rating && !sizes && !colors) logSearch(term, total > 0); // plain text searches only; feeds admin → تحليلات السوق
   cache(res, 20);
   res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences, materials, attrs: attrFacets } });
 }));
@@ -700,7 +723,7 @@ r.get('/stores/:slug/products', h((req, res) => {
   const page = clampInt(req.query.page, 1, 1000, 1);
   const whereSql = where.join(' AND ');
   const total = q.val(`SELECT COUNT(*) FROM products p WHERE ${whereSql}`, params);
-  const rows = q.all(`SELECT p.* FROM products p WHERE ${whereSql} ORDER BY ${order} LIMIT ? OFFSET ?`, [...params, limit, (page - 1) * limit]);
+  const rows = q.all(`SELECT p.* FROM products p WHERE ${whereSql} ORDER BY ${SOLD_OUT_LAST}, ${order} LIMIT ? OFFSET ?`, [...params, limit, (page - 1) * limit]);
 
   // facets for the filter sheet (store-wide, so options don't vanish as you filter)
   const facetSizes = q.all("SELECT DISTINCT v.size FROM variants v JOIN products p ON p.id=v.product_id WHERE p.store_id=? AND p.status='active' AND v.size IS NOT NULL", [s.id]).map((x) => x.size);
@@ -744,6 +767,20 @@ r.get('/stores/:slug/products/:pslug', h((req, res) => {
   const offers = productOffers(s.id, p.id);
   const media = mediaMap(offers.map((o) => o.imageMediaId));
   res.json({ product: serializeProductDetail(p), related: withBadges(s.id, related), offers: offers.map(({ imageMediaId, ...o }) => ({ ...o, image: media.get(imageMediaId) || null })) });
+}));
+
+/** "Similar to what you looked at": buyable products from the same sections as the given (recently viewed) products, best sellers first. */
+r.get('/similar', h((req, res) => {
+  const ids = [...new Set(String(req.query.ids || '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 10);
+  if (!ids.length) return res.json({ items: [] });
+  const ph = ids.map(() => '?').join(',');
+  const depts = [...new Set(q.all(`SELECT department FROM products WHERE id IN (${ph}) AND department IS NOT NULL`, ids).map((x) => x.department))];
+  if (!depts.length) return res.json({ items: [] });
+  const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id
+    WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (p.track_stock=0 OR p.stock>0) AND p.id NOT IN (${ph}) AND p.department IN (${depts.map(() => '?').join(',')})
+    ORDER BY p.featured DESC, p.sold_count DESC, p.id DESC LIMIT 12`, [...ids, ...depts]);
+  cache(res, 60);
+  res.json({ items: serializeCards(rows).map((c, i) => ({ ...c, store: { slug: rows[i].store_slug, name: bi(rows[i], 'store_name') } })) });
 }));
 
 /* ---------------------------------------------------------- reviews (verified buyers only, photos allowed) */
@@ -794,9 +831,28 @@ r.post('/track/:token/review', reviewPhotos.array('photos', 3), h(async (req, re
   res.status(201).json({ ok: true });
 }));
 
+/* Site-wide visit beacon (one per browser session). Counts unique visitors per Cairo day without storing any IP or raw id. */
+r.post('/site/visit', h((req, res) => {
+  const b = z.object({ vid: z.string().min(12).max(40), src: z.string().max(20).optional(), camp: z.string().max(40).optional() }).safeParse(req.body);
+  if (b.success) recordSiteVisit({ vid: b.data.vid, src: b.data.src, camp: b.data.camp, ua: req.get('user-agent') });
+  res.status(204).end();
+}));
+
+r.post('/site/conversion', h((req, res) => {
+  const b = z.object({ src: z.string().max(20).optional(), camp: z.string().max(40).optional() }).safeParse(req.body);
+  if (b.success) recordConversion({ src: b.data.src, camp: b.data.camp, ua: req.get('user-agent') });
+  res.status(204).end();
+}));
+
+r.post('/site/event', h((req, res) => {
+  const b = z.object({ name: z.string().max(30) }).safeParse(req.body);
+  if (b.success && !/bot|crawl|spider|headless/i.test(req.get('user-agent') || '')) trackEvent(b.data.name);
+  res.status(204).end();
+}));
+
 r.post('/stores/:slug/visit', h((req, res) => {
   const s = loadStore(req.params.slug);
-  const day = new Date().toISOString().slice(0, 10);
+  const day = cairoDay();
   q.run('INSERT INTO store_visits (store_id, day, visits) VALUES (?,?,1) ON CONFLICT(store_id, day) DO UPDATE SET visits=visits+1', [s.id, day]);
   res.status(204).end();
 }));
@@ -809,7 +865,7 @@ r.post('/stores/:slug/page-view', h((req, res) => {
   if ((path !== storePath && !path.startsWith(`${storePath}/`)) || path.includes('..')) throw badRequest('invalid_page', 'Invalid store page.');
   const suffix = path.slice(storePath.length) || '/';
   const pageType = suffix === '/' ? 'store' : suffix.startsWith('/p/') ? 'product' : suffix === '/categories' || suffix.startsWith('/categories/') ? 'category' : suffix === '/shop' ? 'catalog' : 'page';
-  const day = new Date().toISOString().slice(0, 10);
+  const day = cairoDay();
   q.run(`INSERT INTO store_page_views (store_id, day, path, page_type, views) VALUES (?,?,?,?,1)
     ON CONFLICT(store_id, day, path) DO UPDATE SET views=views+1`, [s.id, day, path, pageType]);
   res.status(204).end();

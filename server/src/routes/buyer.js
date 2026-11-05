@@ -6,10 +6,11 @@ import { h, AppError, notFound } from '../lib/errors.js';
 import { signBuyer, requireBuyer } from '../lib/buyers.js';
 import { vapidPublicKey } from '../lib/push.js';
 import { mediaMap } from '../lib/media.js';
-import { bi } from '../lib/serialize.js';
+import { bi, serializeCards } from '../lib/serialize.js';
 import crypto from 'node:crypto';
 import { config } from '../config.js';
 import { waAuthReady, sendAuthCode } from '../lib/wa.js';
+import { saveSnapshot, clearSnapshot } from '../lib/abandoned.js';
 
 const r = Router();
 const normPhone = (v) => { const d = String(v || '').replace(/\D/g, ''); return d.startsWith('20') && d.length === 12 ? `0${d.slice(2)}` : d; };
@@ -262,6 +263,24 @@ r.post('/push/subscribe', h((req, res) => {
 r.post('/push/unsubscribe', h((req, res) => {
   const { endpoint } = z.object({ endpoint: z.string().max(600) }).parse(req.body);
   q.run('DELETE FROM buyer_push WHERE buyer_id=? AND endpoint=?', [req.buyer.id, endpoint]); res.json({ ok: true });
+}));
+
+/* abandoned-cart reminder: the app reports a summary of the cart; an empty cart (or an order) cancels it */
+r.put('/cart-snapshot', requireBuyer, h((req, res) => {
+  throttle(`cart:${req.buyer.id}`, 120);
+  res.json({ ok: true, saved: !!saveSnapshot(req.buyer, req.body?.lines) });
+}));
+r.delete('/cart-snapshot', requireBuyer, h((req, res) => { clearSnapshot(req.buyer.id); res.json({ ok: true }); }));
+
+/* "Buy again": products from this shopper's delivered orders that can still be bought, most recent first */
+r.get('/buy-again', requireBuyer, h((req, res) => {
+  const tail = String(req.buyer.phone || '').replace(/\D/g, '').slice(-10);
+  const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en
+    FROM order_items oi JOIN orders o ON o.id=oi.order_id JOIN products p ON p.id=oi.product_id JOIN stores s ON s.id=p.store_id
+    WHERE o.status='delivered' AND (o.buyer_id=? OR (? <> '' AND substr(o.phone,-10)=?))
+      AND p.status='active' AND s.status='active' AND s.hidden=0 AND (p.track_stock=0 OR p.stock>0)
+    GROUP BY p.id ORDER BY MAX(o.id) DESC LIMIT 12`, [req.buyer.id, tail, tail]);
+  res.json({ items: serializeCards(rows).map((c, i) => ({ ...c, store: { slug: rows[i].store_slug, name: bi(rows[i], 'store_name') } })) });
 }));
 
 export default r;

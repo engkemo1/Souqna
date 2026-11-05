@@ -22,6 +22,7 @@ import StoreStoryCard from '../../components/store/StoreStoryCard.jsx';
 import FreeShippingBar from '../../components/store/FreeShippingBar.jsx';
 import FlashBanner from '../../components/store/FlashBanner.jsx';
 import TickerStrip from '../../components/store/TickerStrip.jsx';
+import FeaturedSlot from '../../components/featured/FeaturedSlot.jsx';
 import SeasonSpotlight from '../../components/store/SeasonSpotlight.jsx';
 import { HeroSplit, HeroCompact } from '../../components/store/HeroVariants.jsx';
 import { HeroPlayful } from '../../components/store/HeroPlayful.jsx';
@@ -238,14 +239,14 @@ export default function StoreHome() {
         else if (design.hero === 'playful') node = <HeroPlayful banners={banners} />;
         else if (design.hero === 'compact') node = hasBanners ? (<><HeroCompact /><HeroSlider banners={banners} slug={store.slug} /></>) : <HeroCompact />;
         else node = (store.heroMode === 'cover' ? false : hasBanners) ? sliderHero : <StoreHero />;
-        return <div key="hero">{node}<SeasonSpotlight /></div>;
+        return <div key="hero">{node}<FeaturedSlot placement="store_hero" store={store.slug} /><SeasonSpotlight /></div>;
       }
 
       case 'promos':
-        return promos?.items?.length ? <StoreOffersStrip key="promos" slug={store.slug} offers={promos.items} title={lang === 'ar' ? 'عروض المحل' : 'Store offers'} linkFor={() => sp(store.slug, 'shop')} /> : null;
+        return promos?.items?.length ? <><FeaturedSlot key="fo" placement="store_offers" store={store.slug} /><StoreOffersStrip key="promos" slug={store.slug} offers={promos.items} title={lang === 'ar' ? 'عروض المحل' : 'Store offers'} linkFor={() => sp(store.slug, 'shop')} /></> : <FeaturedSlot key="fo" placement="store_offers" store={store.slug} />;
 
       case 'ticker':
-        return <div key="ticker"><TickerStrip /></div>;
+        return <div key="ticker"><FeaturedSlot placement="store_ticker" store={store.slug} /><TickerStrip /></div>;
 
       case 'flash':
         return <FlashBanner key="flash" />;

@@ -52,7 +52,7 @@ async function askGemini(original, result) {
   for (const model of [...new Set([goodModel, ...MODELS()].filter(Boolean))]) {
     if (usedUp.get(model) === day) { limited = true; continue; } // already told "limit reached" today: don't ask again until it renews
     const res = await fetch(`${base}/models/${model}:generateContent`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key() }, body: JSON.stringify(body), signal: AbortSignal.timeout(25000),
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key() }, body: JSON.stringify(body), signal: AbortSignal.timeout(Number(process.env.CUTOUT_REVIEW_TIMEOUT_MS) || 15000),
     });
     const j = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -77,7 +77,7 @@ async function askClaude(original, result) {
   const res = await fetch(process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages', {
     method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': anthropicKey(), 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model, max_tokens: 200, temperature: 0, messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT }, await img(original), await img(result)] }] }),
-    signal: AbortSignal.timeout(30000),
+    signal: AbortSignal.timeout(Number(process.env.CUTOUT_REVIEW_TIMEOUT_MS) || 20000),
   });
   if (!res.ok) {
     const msg = `Claude ${res.status}: ${(await res.text()).slice(0, 160)}`;
