@@ -96,7 +96,7 @@ export default function MarketHome() {
   const deptCounts = base ? Object.fromEntries(STREET_DEPTS.map((d) => [d, (STREET_MAP[d] || [d]).reduce((n, sl) => n + (base.departments?.find((x) => x.slug === sl)?.products || 0), 0)])) : {};
   const showWearThis = base?.features?.stylist !== false;
 
-  useEffect(() => { document.title = `${t('app.name')} · ${t('app.tagline')}`; }, [t]);
+  useEffect(() => { document.title = lang === 'ar' ? 'تويست بنها | Twist – تسوق ملابس من محلات بنها أونلاين' : `${t('app.name')} · ${t('app.tagline')}`; }, [t, lang]);
   useEffect(() => {
     const id = location.hash.slice(1);
     if (!['stores', 'products'].includes(id)) return undefined;

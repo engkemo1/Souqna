@@ -91,6 +91,8 @@ const AdminAudit = lazy(() => import('./pages/admin/AuditLog.jsx'));
 const AdminCampaigns = lazy(() => import('./pages/admin/Campaigns.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
 const AdminFeatured = lazy(() => import('./pages/admin/FeaturedAds.jsx'));
+const AdminAdvertisers = lazy(() => import('./pages/admin/Advertisers.jsx'));
+const AdvertiserPage = lazy(() => import('./pages/market/AdvertiserPage.jsx'));
 const AdminHomepageAds = lazy(() => import('./pages/admin/HomepageAds.jsx'));
 const StoreManage = lazy(() => import('./pages/admin/StoreManage.jsx'));
 const AdminSystem = lazy(() => import('./pages/admin/System.jsx'));
@@ -130,6 +132,7 @@ const router = createBrowserRouter([
       { path: '/account', element: <Account /> },
       { path: '/look/:token', element: <LookShare /> },
       { path: '/look-of-day/:index', element: <LookOfDayDetail /> },
+      { path: '/a/:slug', element: <AdvertiserPage /> },
       { path: '/legal', element: <Legal /> },
       { path: '/legal/:doc', element: <Legal /> },
       { path: '/request', element: <Request /> },
@@ -201,6 +204,7 @@ const router = createBrowserRouter([
           { path: 'coupons', element: <AdminCoupons /> },
           { path: 'ads', element: <AdminHomepageAds /> },
           { path: 'featured', element: <AdminFeatured /> },
+          { path: 'advertisers', element: <AdminAdvertisers /> },
           { path: 'traffic', element: <AdminTraffic /> },
           { path: 'couriers', element: <AdminCouriers /> },
           { path: 'alerts', element: <AdminAlerts /> },

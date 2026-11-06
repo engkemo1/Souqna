@@ -2,6 +2,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import { h, AppError } from '../lib/errors.js';
 import { saveAdImage } from '../lib/adImage.js';
+import { listAdvertisers, getAdvertiser, createAdvertiser, updateAdvertiser, deleteAdvertiser, advertiserReport } from '../lib/advertisers.js';
 import {
   PLACEMENTS, PLACEMENT_KEYS, listCampaigns, getCampaign, createCampaign, updateCampaign, setPaused, archiveCampaign, restoreCampaign, deleteCampaign,
   duplicateCampaign, previewCampaign, eligibleOffers, adminStores, storeTargets, allCategories, analytics,
@@ -34,6 +35,12 @@ r.get('/featured/stores/:id/offers', h((req, res) => { res.json(eligibleOffers(i
 r.get('/featured/stores/:id/targets', h((req, res) => { res.json(storeTargets(id(req))); }));
 r.get('/featured/analytics', h((req, res) => { res.json(analytics({ days: days(req.query.days) })); }));
 r.get('/featured/campaigns/:id/analytics', h((req, res) => { const cid = id(req); getCampaign(cid); res.json(analytics({ days: days(req.query.days), id: cid })); }));
+r.get('/featured/advertisers', h((req, res) => { res.json(listAdvertisers({ days: days(req.query.days) })); }));
+r.post('/featured/advertisers', h(async (req, res) => { res.status(201).json({ advertiser: await createAdvertiser(req.body) }); }));
+r.get('/featured/advertisers/:id', h((req, res) => { res.json({ advertiser: getAdvertiser(id(req), days(req.query.days)) }); }));
+r.put('/featured/advertisers/:id', h(async (req, res) => { res.json({ advertiser: await updateAdvertiser(id(req), req.body) }); }));
+r.delete('/featured/advertisers/:id', h((req, res) => { res.json(deleteAdvertiser(id(req))); }));
+r.get('/featured/advertisers/:id/report', h((req, res) => { res.json(advertiserReport(id(req), [7, 14, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 7)); }));
 r.post('/featured/image', upload.single('file'), h(async (req, res) => {
   if (!req.file) throw new AppError(422, 'validation_failed', 'Pick an image — اختر صورة', { file: 'required' });
   res.json(await saveAdImage(req.file.buffer, req.query.kind === 'fg' ? 'fg' : 'bg'));

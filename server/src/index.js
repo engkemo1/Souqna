@@ -66,7 +66,7 @@ if (indexNowKey()) app.get(`/${indexNowKey()}.txt`, (_req, res) => res.type('tex
 
 // pages to announce to search engines: the fixed pages on the first run, then only stores/products created since `since`
 function newUrlsSince(since) {
-  const urls = since ? [] : [`${SITE_ORIGIN}/`, `${SITE_ORIGIN}/join`, `${SITE_ORIGIN}/stores`, ...customerDepartments().map((d) => `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`)];
+  const urls = since ? [] : [`${SITE_ORIGIN}/`, `${SITE_ORIGIN}/join`, `${SITE_ORIGIN}/stores`, ...indexableDepartments().map((d) => `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`)];
   const cond = since ? 'AND s.created_at > ?' : '';
   urls.push(...q.all(`SELECT s.slug FROM stores s WHERE s.status='active' AND s.hidden=0 AND s.search_indexable=1 ${cond}
     AND EXISTS (SELECT 1 FROM products p WHERE p.store_id=s.id AND p.status='active') ORDER BY s.id LIMIT 5000`, since ? [since] : []).map(({ slug }) => `${SITE_ORIGIN}/s/${encodeURIComponent(slug)}`));
@@ -76,28 +76,28 @@ function newUrlsSince(since) {
   return urls;
 }
 
+const isoDate = (d) => (d ? `${String(d).replace(' ', 'T').replace(/Z$/, '')}Z` : null); // sqlite datetime('now') is UTC
+// category pages worth indexing: only sections that really contain products (empty ones stay reachable for shoppers but are noindex + out of the sitemap)
+const indexableDepartments = () => customerDepartments().filter((d) => d.product_count > 0);
 app.get('/sitemap.xml', (_req, res) => {
-  const urls = [
-    `${SITE_ORIGIN}/`,
-    `${SITE_ORIGIN}/join`,
-  ];
-  urls.push(`${SITE_ORIGIN}/stores`, ...customerDepartments().map((d) => `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`)); // category landing pages
-  const stores = q.all(`SELECT s.id, s.slug FROM stores s WHERE s.status='active' AND s.hidden=0 AND s.search_indexable=1
-    AND EXISTS (SELECT 1 FROM products p WHERE p.store_id=s.id AND p.status='active') ORDER BY s.id LIMIT 49998`);
-  urls.push(...stores.map(({ slug }) => `${SITE_ORIGIN}/s/${encodeURIComponent(slug)}`));
-  const remaining = 50000 - urls.length;
-  if (remaining > 0) urls.push(...q.all(`SELECT s.slug AS store_slug, p.slug AS product_slug FROM products p
+  const entries = [{ loc: `${SITE_ORIGIN}/` }, { loc: `${SITE_ORIGIN}/join` }, { loc: `${SITE_ORIGIN}/stores` }];
+  entries.push(...indexableDepartments().map((d) => ({ loc: `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}` })));
+  const stores = q.all(`SELECT s.slug, (SELECT MAX(p.updated_at) FROM products p WHERE p.store_id=s.id AND p.status='active') AS lastmod FROM stores s
+    WHERE s.status='active' AND s.hidden=0 AND s.search_indexable=1
+    AND EXISTS (SELECT 1 FROM products p WHERE p.store_id=s.id AND p.status='active') ORDER BY s.id LIMIT 49990`);
+  entries.push(...stores.map(({ slug, lastmod }) => ({ loc: `${SITE_ORIGIN}/s/${encodeURIComponent(slug)}`, lastmod: isoDate(lastmod) })));
+  const remaining = 50000 - entries.length;
+  if (remaining > 0) entries.push(...q.all(`SELECT s.slug AS store_slug, p.slug AS product_slug, p.updated_at AS lastmod FROM products p
     JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND s.search_indexable=1
-    ORDER BY p.id LIMIT ?`, [remaining]).map(({ store_slug, product_slug }) =>
-    `${SITE_ORIGIN}/s/${encodeURIComponent(store_slug)}/p/${encodeURIComponent(product_slug)}`));
-  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.map((loc) => `  <url><loc>${xml(loc)}</loc></url>`).join('\n')}\n</urlset>`;
+    ORDER BY p.id LIMIT ?`, [remaining]).map(({ store_slug, product_slug, lastmod }) =>
+    ({ loc: `${SITE_ORIGIN}/s/${encodeURIComponent(store_slug)}/p/${encodeURIComponent(product_slug)}`, lastmod: isoDate(lastmod) })));
+  const body = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${entries.map((e) => `  <url><loc>${xml(e.loc)}</loc>${e.lastmod ? `<lastmod>${e.lastmod}</lastmod>` : ''}</url>`).join('\n')}\n</urlset>`;
   res.type('application/xml').set('Cache-Control', 'public, max-age=900, stale-while-revalidate=3600').send(body);
 });
 
 // Do not index the demo catalogue or checkout flows. Real stores become indexable
 // automatically when they are created; only public, active products enter the sitemap.
 app.use((req, res, next) => {
-  if (req.path === '/stores') res.set('X-Robots-Tag', 'noindex, follow');
   if (req.path.startsWith('/s/')) {
     const [, , slug, ...tail] = req.path.split('/');
     let decodedSlug = '';
@@ -138,19 +138,39 @@ if (fs.existsSync(config.webDist)) {
     .replace(/<meta property="og:url" content="[^"]*"\s*\/>/, `<meta property="og:url" content="${esc(url)}" />`)
     .replace(/<meta property="og:image" content="[^"]*"\s*\/>/, `<meta property="og:image" content="${esc(image)}" />`)
     .replace(/<meta name="twitter:image" content="[^"]*"\s*\/>/, `<meta name="twitter:image" content="${esc(image)}" />`);
+  // A URL that does not exist must answer 404 (not 200) so search engines drop it; the page body is still the app so shoppers see the friendly "not found" screen.
+  const notFoundPage = (res) => res.status(404).set('X-Robots-Tag', 'noindex').set('Cache-Control', 'no-cache').type('html').send(fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8'));
+  const ldTag = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
+  const withLd = (html, objs) => html.replace('</head>', `${objs.map(ldTag).join('')}</head>`);
+  const trunc = (x, n = 155) => { const t = String(x || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t; };
   app.get('/s/:slug/p/:pslug', (req, res, next) => {
-    const item = q.get(`SELECT p.id, p.name_ar, p.seo_title, p.seo_description, p.description_ar, s.name_ar AS store_name_ar
+    const item = q.get(`SELECT p.id, p.name_ar, p.seo_title, p.seo_description, p.description_ar, p.price, p.stock, p.track_stock, p.rating, p.rating_count, p.sku, s.name_ar AS store_name_ar
       FROM products p JOIN stores s ON s.id=p.store_id
       WHERE s.slug=? AND s.status='active' AND s.hidden=0 AND s.search_indexable=1 AND p.slug=? AND p.status='active'`, [req.params.slug, req.params.pslug]);
-    if (!item) return next();
+    if (!item) {
+      const exists = q.get("SELECT 1 AS x FROM products p JOIN stores s ON s.id=p.store_id WHERE s.slug=? AND p.slug=? AND s.status='active'", [req.params.slug, req.params.pslug]);
+      return exists ? next() : notFoundPage(res); // exists but private/not indexable: the app still shows it, noindex comes from the middleware
+    }
     const mediaId = q.get('SELECT media_id FROM product_media WHERE product_id=? ORDER BY is_primary DESC, position LIMIT 1', [item.id])?.media_id;
     const imageBase = mediaMap([mediaId]).get(mediaId)?.base;
     const url = `${SITE_ORIGIN}${req.path}`;
     const title = `${item.seo_title || item.name_ar} | ${item.store_name_ar} | Twist بنها`;
-    const description = item.seo_description || item.description_ar || `${item.name_ar} من ${item.store_name_ar} على Twist بنها.`;
+    const description = trunc(item.seo_description || item.description_ar || `${item.name_ar} من ${item.store_name_ar} في بنها بسعر ${item.price} ج.م. اطلب أونلاين من Twist.`);
     const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/twist-share.png`;
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
-    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url, image }));
+    const inStock = !item.track_stock || item.stock > 0;
+    const product = {
+      '@context': 'https://schema.org', '@type': 'Product', name: item.name_ar, image: [image], description,
+      ...(item.sku ? { sku: item.sku } : {}),
+      offers: { '@type': 'Offer', url, priceCurrency: 'EGP', price: item.price, itemCondition: 'https://schema.org/NewCondition',
+        availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', seller: { '@type': 'Organization', name: item.store_name_ar } },
+      ...(item.rating_count > 0 ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: item.rating, reviewCount: item.rating_count } } : {}),
+    };
+    const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: `${SITE_ORIGIN}/` },
+      { '@type': 'ListItem', position: 2, name: item.store_name_ar, item: `${SITE_ORIGIN}/s/${encodeURIComponent(req.params.slug)}` },
+      { '@type': 'ListItem', position: 3, name: item.name_ar, item: url }] };
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withLd(withSeo(html, { title, description, url, image }), [product, crumbs]));
   });
   app.get('/c/:slug', (req, res) => {
     const all = customerDepartments(); const by = new Map(all.map((d) => [d.slug, d]));
@@ -159,24 +179,36 @@ if (fs.existsSync(config.webDist)) {
     if (!d) return res.status(404).set('X-Robots-Tag', 'noindex').type('html').send(html);
     const trail = []; for (let c = d, i = 0; c && i < 10; c = by.get(c.parent), i++) trail.unshift(c);
     const url = `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`;
-    const title = d.seo?.title?.ar || `${d.name.ar} | Twist بنها`;
-    const description = d.seo?.description?.ar || d.description?.ar || `تسوق ${d.name.ar} من محلات بنها على Twist.`;
+    const title = d.seo?.title?.ar || `${d.name.ar} في بنها | Twist`;
+    const description = d.seo?.description?.ar || d.description?.ar || `تسوق ${d.name.ar} من محلات بنها: قارن الأسعار واطلب أونلاين من Twist.`;
     const image = d.images?.hero ? `${d.images.hero.startsWith('http') ? '' : SITE_ORIGIN}${d.images.hero}` : `${SITE_ORIGIN}/brand/twist-share.png`;
     const ld = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ name: 'الرئيسية', item: `${SITE_ORIGIN}/` }, ...trail.map((c) => ({ name: c.name.ar, item: `${SITE_ORIGIN}/c/${encodeURIComponent(c.slug)}` }))].map((x, i) => ({ '@type': 'ListItem', position: i + 1, name: x.name, item: x.item })) };
+    if (!(d.product_count > 0)) res.set('X-Robots-Tag', 'noindex, follow');
     const out = withSeo(html, { title, description, url, image }).replace('</head>', `<script type="application/ld+json" data-twist-breadcrumb="1">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script></head>`);
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(out);
   });
   app.get('/s/:slug', (req, res, next) => {
     const store = q.get("SELECT id, name_ar, description_ar, logo_media_id, cover_media_id FROM stores WHERE slug=? AND status='active' AND hidden=0 AND search_indexable=1", [req.params.slug]);
-    if (!store) return next();
+    if (!store) return q.get("SELECT 1 AS x FROM stores WHERE slug=? AND status='active'", [req.params.slug]) ? next() : notFoundPage(res);
     const images = mediaMap([store.cover_media_id, store.logo_media_id]);
     const imageBase = images.get(store.cover_media_id)?.base || images.get(store.logo_media_id)?.base;
     const url = `${SITE_ORIGIN}${req.path}`;
     const title = `${store.name_ar} | ملابس وأزياء في بنها على Twist`;
-    const description = store.description_ar || `تسوق من ${store.name_ar} في بنها عبر Twist.`;
+    const description = trunc(store.description_ar || `تسوق ملابس وأزياء من ${store.name_ar} في بنها. تصفّح المنتجات واطلب أونلاين عبر Twist.`);
     const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/twist-share.png`;
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
-    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url, image }));
+    const storeLd = { '@context': 'https://schema.org', '@type': 'ClothingStore', name: store.name_ar, url, image, description,
+      address: { '@type': 'PostalAddress', addressLocality: 'Banha', addressRegion: 'Qalyubia', addressCountry: 'EG' } };
+    const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: `${SITE_ORIGIN}/` },
+      { '@type': 'ListItem', position: 2, name: store.name_ar, item: url }] };
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withLd(withSeo(html, { title, description, url, image }), [storeLd, crumbs]));
+  });
+  app.get('/stores', (_req, res) => {
+    const title = 'كل محلات الملابس في بنها | Twist';
+    const description = 'تصفّح كل محلات الملابس والأزياء في بنها على Twist: رجالي وحريمي وأطفال ورياضي. اختار محلك واطلب أونلاين.';
+    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url: `${SITE_ORIGIN}/stores`, image: `${SITE_ORIGIN}/brand/twist-share.png` }));
   });
   app.get('/join', (_req, res) => {
     const title = 'Twist بنها | افتح متجرك الإلكتروني لمحلك';
@@ -212,8 +244,12 @@ if (fs.existsSync(config.webDist)) {
   // A build file that does not exist (an old name after a deploy) is a 404, never the HTML page: otherwise a browser or
   // the offline cache would keep the page as if it were the script and the screen would break until a reload.
   app.get(/^\/assets\//, (_req, res) => res.status(404).type('text/plain').send('Not found'));
+  // first path segment of every page the web app really has (App.jsx); anything else is a 404
+  const KNOWN_APP_ROUTES = /^\/(stores|search|c|market-cart|market-checkout|market-order-success|favorites|visual|login|register|setup|track|join|account|look|look-of-day|a|legal|request|play|pos|scan|s|dashboard|admin)(\/|$)/;
   app.get('*', (req, res) => {
     const hit = APP_SHELLS.find(([re]) => re.test(req.path));
+    if (/\.[a-z0-9]{2,5}$/i.test(req.path) && !/^\/(s|c|a|look|track)\//.test(req.path)) return res.status(404).type('text/plain').send('Not found'); // a missing file (image, script...) is not an HTML page
+    if (!hit && req.path !== '/' && !KNOWN_APP_ROUTES.test(req.path)) return notFoundPage(res); // unknown URL: real 404 + noindex
     if (!hit) return res.sendFile(path.join(config.webDist, 'index.html'));
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8')
       .replace('<link rel="manifest" href="/manifest.webmanifest" />', `<link rel="manifest" href="${hit[1]}" />`)

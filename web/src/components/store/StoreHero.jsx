@@ -184,10 +184,15 @@ function PortraitHero() {
   const { tr, lang } = useI18n();
   const ar = lang === 'ar';
   const cover = store.cover;
-  const { hex, light } = brandOf(cover);
-  const tone = light ? 'light' : 'dark';
+  const { hex } = brandOf(cover);
+  // The area beside a portrait picture used to be a flat brand colour. It is now the SAME photo, blurred and darkened,
+  // so the side is never empty and the text on it is always white-on-dark (readable whatever the photo looks like).
+  const light = false;
+  const tone = 'dark';
   return (
     <section className="relative isolate overflow-hidden lg:flex lg:items-stretch" style={{ backgroundColor: hex }}>
+      <img src={pickSrc(cover, 640)} alt="" aria-hidden="true" decoding="async" className="absolute inset-0 -z-20 h-full w-full scale-125 object-cover blur-3xl brightness-[.72] saturate-150" />
+      <div className="absolute inset-0 -z-10 bg-black/20" />
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(70%_80%_at_70%_0%,rgb(var(--c-accent)/.28),transparent_70%)]" />
       <div className="relative shrink-0">
         <picture className="block">

@@ -202,6 +202,31 @@ function ChangePassword() {
   );
 }
 
+/** Optional pin for one branch: closed by default, opens the same map picker used for the store. Saves a Google Maps link (no backend change). */
+const pinOf = (url) => { const m = /[?&]q=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/.exec(url || ''); return m ? [Number(m[1]), Number(m[2])] : [null, null]; };
+function BranchMap({ url, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [la, ln] = pinOf(url);
+  const has = Boolean(url);
+  return (
+    <div className="mt-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant="secondary" onClick={() => setOpen((v) => !v)}>
+          {open ? 'قفل الخريطة' : has ? 'تعديل موقع الفرع على الخريطة' : '+ حدّد موقع الفرع على الخريطة (اختياري)'}
+        </Button>
+        {has && !open && <span className="text-sm text-brand">تم تحديد الموقع</span>}
+        {has && <button type="button" onClick={() => { onChange(''); setOpen(false); }} className="text-sm font-medium text-sale hover:underline">شيل الموقع</button>}
+      </div>
+      {open && (
+        <div className="mt-3">
+          <p className="mb-2 text-sm text-muted">دوس على الخريطة أو اسحب الدبوس لمكان الفرع. العميل هيشوف زرار "الموقع" يفتحله الخريطة.</p>
+          <LocationPicker lat={la} lng={ln} onChange={(a, o) => onChange(`https://www.google.com/maps?q=${a},${o}`)} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Settings() {
   const dashBase = useDashBase();
   const { t, lang } = useI18n();
@@ -355,13 +380,13 @@ export default function Settings() {
                       <Field label="اسم الفرع (مثلًا: فرع المنشية)"><Input dir="rtl" value={b.name} onChange={upd('name')} maxLength={60} /></Field>
                       <Field label="العنوان"><Input dir="rtl" value={b.address} onChange={upd('address')} maxLength={160} /></Field>
                     </div>
-                    <details open={Boolean(b.phone || b.map_url)} className="group mt-3">
-                      <summary className="cursor-pointer select-none text-sm font-semibold text-brand marker:content-none">+ رقم خاص بالفرع أو لينك الخريطة (اختياري)</summary>
+                    <details open={Boolean(b.phone)} className="group mt-3">
+                      <summary className="cursor-pointer select-none text-sm font-semibold text-brand marker:content-none">+ رقم خاص بالفرع (اختياري)</summary>
                       <div className="mt-3 grid gap-3 sm:grid-cols-2">
                         <Field label="رقم الفرع (اتصال وواتساب)"><Input dir="ltr" inputMode="tel" value={b.phone} onChange={upd('phone')} className="text-start" /></Field>
-                        <Field label="لينك الموقع على الخريطة"><Input dir="ltr" value={b.map_url} onChange={upd('map_url')} className="text-start" placeholder="https://maps.google.com/..." /></Field>
                       </div>
                     </details>
+                    <BranchMap url={b.map_url} onChange={(v) => setF({ ...f, branches: f.branches.map((x, j) => (j === i ? { ...x, map_url: v } : x)) })} />
                     <button type="button" onClick={() => setF({ ...f, branches: f.branches.filter((_, j) => j !== i) })} className="mt-3 inline-flex min-h-10 items-center gap-2 rounded-xl px-3 text-sm font-medium text-sale hover:bg-sale/10"><Trash2 className="h-4 w-4" />{t('common.delete')}</button>
                   </div>
                 );

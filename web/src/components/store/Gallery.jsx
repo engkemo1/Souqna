@@ -55,7 +55,7 @@ export default function Gallery({ media = [], name, galleryRef }) {
         <div ref={trackRef} className="scroll-x sm:rounded-3xl" aria-label={name}>
           {media.map((m, i) => (
             <button key={m.id} type="button" onClick={() => setLightbox(i)} className="w-full shrink-0 snap-center snap-always" aria-label={`${t('product.zoom')} — ${t('product.image', { n: i + 1, total: media.length })}`}>
-              <SmartImage media={m} ratio={ratio} fit="contain" sizes="(min-width:640px) 80vw, 100vw" priority={i === 0} alt={i === 0 ? name : ''} className="bg-white" showPlaceholder={false} />
+              <SmartImage media={m} ratio={ratio} fit="contain" sizes="(min-width:640px) 80vw, 100vw" priority={i === 0} alt={i === 0 ? name : `${name} — ${i + 1}`} className="bg-white" showPlaceholder={false} />
             </button>
           ))}
         </div>

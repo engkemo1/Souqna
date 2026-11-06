@@ -1,5 +1,6 @@
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
+import { motion, useReducedMotion } from 'framer-motion';
 import { ArrowUpRight } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -46,12 +47,14 @@ function MediaInner({ item, ratio, priority, sizes, device }) {
 }
 
 const ALIGN = { start: 'items-start text-start', center: 'items-center text-center', end: 'items-end text-end' };
-function Media(props) {
+function Media({ lively, ...props }) {
   const f = props.item.fit || { zoom: 100, x: 50, y: 50 };
   const moved = f.zoom !== 100 || f.x !== 50 || f.y !== 50;
   return (
     <div className="absolute inset-0 -z-20 overflow-hidden" style={moved ? { transform: `scale(${f.zoom / 100})`, transformOrigin: `${f.x}% ${f.y}%` } : undefined}>
-      <MediaInner {...props} />
+      {lively
+        ? <motion.div className="absolute inset-0" animate={{ scale: [1, 1.12, 1] }} transition={{ duration: 18, repeat: Infinity, ease: 'easeInOut' }}><MediaInner {...props} /></motion.div>
+        : <MediaInner {...props} />}
     </div>
   );
 }
@@ -66,6 +69,10 @@ const CTA = {
 
 export const FeaturedCard = memo(function FeaturedCard({ item, variant, priority, lang, onClick, preview = false, device }) {
   const ref = useImpression(item.id, item.placement, preview);
+  const calm = useReducedMotion();
+  const hero = variant === 'hero';
+  const x0 = lang === 'en' ? -32 : 32;
+  const enter = (d) => (hero && !calm ? { initial: { opacity: 0, x: x0 }, whileInView: { opacity: 1, x: 0 }, viewport: { once: true }, transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: d } } : {});
   const title = pick(item.title, lang);
   const subtitle = pick(item.subtitle, lang);
   const badge = pick(item.badge, lang);
@@ -78,20 +85,24 @@ export const FeaturedCard = memo(function FeaturedCard({ item, variant, priority
   const wrapProps = item.external ? { href: item.href, target: '_blank', rel: 'noopener noreferrer sponsored' } : { to: item.href };
   const lay = item.layout || { width: 'wide', height: 'm' };
   const heights = { s: 'min-h-36 sm:min-h-44', l: 'min-h-72 sm:min-h-[26rem]' };
-  const baseH = { hero: 'min-h-56 sm:min-h-72 lg:min-h-80', grid: 'min-h-48 sm:min-h-56', slot: 'min-h-32', strip: 'min-h-44' }[variant] || 'min-h-48';
+  const baseH = { hero: 'min-h-80 sm:min-h-72 lg:min-h-80', grid: 'min-h-48 sm:min-h-56', slot: 'min-h-32', strip: 'min-h-44' }[variant] || 'min-h-48';
   const radius = lay.width === 'full' && variant !== 'slot' && variant !== 'strip' ? 'rounded-none' : variant === 'slot' || variant === 'strip' ? 'rounded-2xl' : 'rounded-3xl';
   const sizeCls = cx(heights[lay.height] || baseH, radius, variant === 'strip' && 'w-72 shrink-0 snap-start sm:w-80');
   return (
     <Wrap ref={ref} {...wrapProps} onClick={(e) => { if (preview) e.preventDefault(); else onClick?.(item); }} aria-label={title}
       className={cx('group relative isolate flex overflow-hidden text-white shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand', !hasMedia && !item.bg && 'bg-fg', sizeCls)} style={style}>
-      <Media item={item} device={device} priority={priority} sizes={variant === 'hero' ? '100vw' : '(min-width:1024px) 33vw, 80vw'} />
+      <Media lively={hero && !calm} item={item} device={device} priority={priority} sizes={variant === 'hero' ? '100vw' : '(min-width:1024px) 33vw, 80vw'} />
       {item.fg && <img src={item.fg.src} alt="" loading="lazy" decoding="async" className={cx('pointer-events-none absolute bottom-0 z-[1] max-h-[92%] object-contain', FG_SIDE[item.fg.pos] || FG_SIDE.end)} style={{ width: `${item.fg.size}%` }} />}
       {hasMedia && item.overlay > 0 && <div className="absolute inset-0 -z-10" style={{ background: `linear-gradient(to top, rgba(0,0,0,${item.overlay / 100}) 0%, rgba(0,0,0,${(item.overlay / 100) * 0.3}) 60%, rgba(0,0,0,${(item.overlay / 100) * 0.07}) 100%)` }} />}
+      {hero && hasMedia && <div className="pointer-events-none absolute inset-0 -z-10 hidden ltr:bg-gradient-to-r rtl:bg-gradient-to-l from-black/35 via-black/10 to-transparent sm:block" />}
       <span className="absolute start-3 top-3 z-10 flex flex-wrap items-center gap-1.5">
-        <span className="rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">{LABEL[lang] || LABEL.ar}</span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-bold text-white backdrop-blur">
+          {hero && <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-orange-400 opacity-80" /><span className="relative inline-flex h-2 w-2 rounded-full bg-orange-500" /></span>}
+          {LABEL[lang] || LABEL.ar}
+        </span>
         {badge && <span className="rounded-full bg-brand px-2.5 py-1 text-[11px] font-bold text-white">{badge}</span>}
       </span>
-      <div className={cx('relative z-10 mt-auto flex w-full flex-col p-4 pt-12 sm:p-5', ALIGN[item.align] || ALIGN.start)}>
+      <div className={cx('relative z-10 mt-auto flex w-full flex-col p-4 pt-12 sm:p-5', hero && 'sm:my-auto sm:max-w-[60%] sm:p-10', ALIGN[item.align] || ALIGN.start)}>
         {item.store && (
           <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold opacity-90">
             {item.store.logo
@@ -100,12 +111,16 @@ export const FeaturedCard = memo(function FeaturedCard({ item, variant, priority
             <span className="truncate">{storeName}</span>
           </p>
         )}
-        <p className={cx('font-display font-extrabold leading-tight', variant === 'hero' ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-xl')}>{title}</p>
-        {subtitle && <p className="mt-1.5 line-clamp-2 text-sm leading-relaxed opacity-90">{subtitle}</p>}
+        <motion.p {...enter(0.05)} className={cx('font-display font-extrabold leading-[1.1]', hero ? 'text-3xl [text-shadow:0_2px_20px_rgba(0,0,0,.5)] sm:text-6xl' : 'text-lg sm:text-xl')}>{title}</motion.p>
+        {subtitle && <motion.p {...enter(0.18)} className={cx('mt-1.5 line-clamp-2 text-sm leading-relaxed opacity-90', hero && 'sm:mt-3 sm:text-lg')}>{subtitle}</motion.p>}
         {cta && (
-          <span className={cx('mt-3 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-bold transition', CTA[item.ctaStyle] || CTA.solid)}>
-            {cta}<ArrowUpRight className="h-4 w-4 rtl:-scale-x-100" />
-          </span>
+          <motion.span {...enter(0.32)} className={cx('relative mt-3 inline-flex items-center gap-2 overflow-hidden rounded-full px-4 py-2 text-sm font-bold transition', hero && 'sm:mt-6 sm:px-7 sm:py-3.5 sm:text-base', CTA[item.ctaStyle] || CTA.solid)}>
+            {hero && !calm && <motion.span aria-hidden className="pointer-events-none absolute inset-y-0 w-1/3 -skew-x-12 bg-orange-300/50 blur-md" initial={{ x: '-200%' }} animate={{ x: '500%' }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2.6, ease: 'easeInOut' }} />}
+            <span className="relative">{cta}</span>
+            {hero && !calm
+              ? <motion.span className="relative" animate={{ x: [0, 4, 0] }} transition={{ duration: 1.2, repeat: Infinity }}><ArrowUpRight className="h-4 w-4 rtl:-scale-x-100" /></motion.span>
+              : <ArrowUpRight className="h-4 w-4 rtl:-scale-x-100" />}
+          </motion.span>
         )}
       </div>
     </Wrap>

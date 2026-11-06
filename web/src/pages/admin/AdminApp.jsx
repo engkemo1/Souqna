@@ -20,6 +20,7 @@ const NAV_GROUPS = [
     { to: '/admin/image-library', icon: Camera, label: 'مكتبة صور الأقسام' },
     { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
     { to: '/admin/featured', icon: Sparkles, label: 'الإعلانات والعروض المميزة' },
+    { to: '/admin/advertisers', icon: Megaphone, label: 'المعلنون الخارجيون' },
     { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
     { to: '/admin/buyers', icon: Users, label: 'حسابات العملاء' },
     { to: '/admin/photos', icon: Camera, label: 'أحدث الصور' },

@@ -21,8 +21,8 @@ function useSeo({ dept, trail, lang }) {
   useEffect(() => {
     if (!dept) return undefined;
     const name = deptName(dept, lang);
-    const title = dept.seo?.title?.[lang] || dept.seo?.title?.ar || `${name} | Twist`;
-    const desc = dept.seo?.description?.[lang] || dept.seo?.description?.ar || dept.description?.[lang] || dept.description?.ar || `${name}: ${lang === 'ar' ? 'تسوق من محلات بنها على Twist' : 'shop from Banha stores on Twist'}`;
+    const title = dept.seo?.title?.[lang] || dept.seo?.title?.ar || (lang === 'ar' ? `${name} في بنها | Twist` : `${name} in Banha | Twist`);
+    const desc = dept.seo?.description?.[lang] || dept.seo?.description?.ar || dept.description?.[lang] || dept.description?.ar || (lang === 'ar' ? `تسوق ${name} من محلات بنها: قارن الأسعار واطلب أونلاين من Twist.` : `Shop ${name} from Banha stores: compare prices and order online on Twist.`);
     const url = `${SITE}/c/${dept.slug}`;
     document.title = title;
     const meta = (sel, make) => { let el = document.head.querySelector(sel); if (!el) { el = make(); document.head.appendChild(el); } return el; };

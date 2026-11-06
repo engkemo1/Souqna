@@ -81,7 +81,7 @@ export default function StoreLayout() {
     api(`/stores/${slug}/page-view`, { method: 'POST', body: { path } }).catch(() => {});
   }, [data, slug, pathname, isPreview]);
 
-  useEffect(() => { if (data) document.title = `${tr(data.store.name)} · ${t('app.name')}`; }, [data, tr, t]);
+  useEffect(() => { if (data && !/\/p\//.test(pathname)) document.title = `${tr(data.store.name)} | ملابس وأزياء في بنها · ${t('app.name')}`; }, [data, tr, t, pathname]);
 
   const sub = pathname.replace(sp(slug), '');
   const hideBottomNav = /^\/(p\/|checkout|order\/)/.test(sub);

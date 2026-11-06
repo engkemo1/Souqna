@@ -15,10 +15,10 @@ const STATE = {
   draft: ['مسودة', 'neutral'], scheduled: ['مجدولة', 'info'], active: ['شغالة', 'success'],
   paused: ['موقوفة', 'warning'], resting: ['خارج مواعيدها', 'info'], expired: ['منتهية', 'danger'], archived: ['مؤرشفة', 'neutral'],
 };
-const HEALTH = { offer_unavailable: 'العرض المرتبط مش متاح دلوقتي — الحملة مخفية', store_inactive: 'المحل مش نشط — الحملة مخفية' };
+const HEALTH = { advertiser_hidden: 'صفحة المعلن مخفية — الحملة مخفية', offer_unavailable: 'العرض المرتبط مش متاح دلوقتي — الحملة مخفية', store_inactive: 'المحل مش نشط — الحملة مخفية' };
 const STEPS = ['نوع الحملة', 'المحتوى', 'التصميم', 'الأماكن والاستهداف', 'الجدولة', 'المعاينة والنشر'];
 const STEP_FIELDS = [
-  ['type', 'store_id', 'promotion_id'],
+  ['type', 'store_id', 'promotion_id', 'advertiser_id'],
   ['title_ar', 'title_en', 'subtitle_ar', 'subtitle_en', 'cta_ar', 'cta_en', 'badge_ar', 'badge_en', 'destination_url', 'desktop_image', 'mobile_image'],
   ['background_color', 'text_color', 'cta_style', 'text_align', 'overlay', 'image_zoom', 'image_x', 'image_y', 'fg_image', 'fg_size', 'fg_pos', 'layout_width', 'layout_height', 'layout_align'],
   ['placements', 'targeting.audience', 'targeting.stores', 'targeting.categories', 'priority'],
@@ -26,21 +26,22 @@ const STEP_FIELDS = [
   [],
 ];
 const blank = () => ({
-  type: 'custom', store_id: '', promotion_id: '', product_id: '', category_id: '',
+  type: 'custom', mode: 'custom', advertiser_id: '', store_id: '', promotion_id: '', product_id: '', category_id: '',
   title_ar: '', title_en: '', subtitle_ar: '', subtitle_en: '', cta_ar: 'اكتشف الآن', cta_en: 'Explore now', badge_ar: '', badge_en: '',
   destination_url: '', desktop_image: '', mobile_image: '', background_color: '', text_color: '', cta_style: 'solid', text_align: 'start', overlay: 65,
   image_zoom: 100, image_x: 50, image_y: 50, fg_image: '', fg_size: 40, fg_pos: 'end', layout_width: 'wide', layout_height: 'm', layout_align: 'center',
   placements: [], targeting: { audience: 'all', stores: [], categories: [] }, priority: 0, starts_at: '', ends_at: '', repeat: null,
 });
 const fromCampaign = (c) => ({
-  type: c.type, store_id: c.storeId ? String(c.storeId) : '', promotion_id: c.promotionId ? String(c.promotionId) : '', product_id: c.productId ? String(c.productId) : '', category_id: c.categoryId ? String(c.categoryId) : '',
+  type: c.type, mode: c.advertiserId ? 'advertiser' : c.type, advertiser_id: c.advertiserId ? String(c.advertiserId) : '', store_id: c.storeId ? String(c.storeId) : '', promotion_id: c.promotionId ? String(c.promotionId) : '', product_id: c.productId ? String(c.productId) : '', category_id: c.categoryId ? String(c.categoryId) : '',
   title_ar: c.title.ar, title_en: c.title.en, subtitle_ar: c.subtitle.ar, subtitle_en: c.subtitle.en, cta_ar: c.cta.ar, cta_en: c.cta.en, badge_ar: c.badge.ar, badge_en: c.badge.en,
   destination_url: c.destinationUrl || '', desktop_image: c.desktopImage || '', mobile_image: c.mobileImage || '', background_color: c.backgroundColor || '', text_color: c.textColor || '', cta_style: c.ctaStyle || 'solid', text_align: c.textAlign || 'start', overlay: c.overlay ?? 65,
   image_zoom: c.imageZoom ?? 100, image_x: c.imageX ?? 50, image_y: c.imageY ?? 50, fg_image: c.fgImage || '', fg_size: c.fgSize ?? 40, fg_pos: c.fgPos || 'end', layout_width: c.layoutWidth || 'wide', layout_height: c.layoutHeight || 'm', layout_align: c.layoutAlign || 'center',
   placements: c.placements, targeting: { audience: 'all', stores: [], categories: [], ...c.targeting }, priority: c.priority, starts_at: c.startsAt || '', ends_at: c.endsAt || '', repeat: c.repeat || null,
 });
 const toBody = (f) => ({
-  ...f, store_id: f.store_id ? Number(f.store_id) : null, promotion_id: f.type === 'offer' && f.promotion_id ? Number(f.promotion_id) : null,
+  ...f, advertiser_id: f.mode === 'advertiser' && f.advertiser_id ? Number(f.advertiser_id) : null,
+  store_id: f.mode !== 'advertiser' && f.store_id ? Number(f.store_id) : null, promotion_id: f.type === 'offer' && f.promotion_id ? Number(f.promotion_id) : null,
   product_id: f.product_id ? Number(f.product_id) : null, category_id: f.category_id ? Number(f.category_id) : null,
   starts_at: f.starts_at || null, ends_at: f.ends_at || null, repeat: f.repeat || null, priority: Number(f.priority) || 0,
   overlay: Number(f.overlay), image_zoom: Number(f.image_zoom), image_x: Number(f.image_x), image_y: Number(f.image_y), fg_size: Number(f.fg_size),
@@ -107,7 +108,7 @@ function Confirm({ ask, onClose }) {
   );
 }
 
-function ImagePick({ label, hint, value, onChange, error, kind = 'bg' }) {
+export function ImagePick({ label, hint, value, onChange, error, kind = 'bg' }) {
   const toast = useToast();
   const [busy, setBusy] = useState(false);
   const pick = async (e) => {
@@ -213,6 +214,7 @@ function Wizard({ editing, meta, onClose, onSaved }) {
   const patchPlacement = (key, patch) => setF((v) => ({ ...v, placements: v.placements.map((p) => (p.key === key ? { ...p, ...patch } : p)) }));
   const toggleIn = (list, id) => setF((v) => ({ ...v, targeting: { ...v.targeting, [list]: v.targeting[list].includes(id) ? v.targeting[list].filter((x) => x !== id) : [...v.targeting[list], id] } }));
   const stores = meta?.stores || [];
+  const { data: advList } = useAdminApi('/featured/advertisers');
   const livePreview = useMemo(() => ({
     id: 0, placement: 'market_hero', title: { ar: f.title_ar || 'عنوان الإعلان', en: f.title_en || f.title_ar || 'Ad title' }, subtitle: { ar: f.subtitle_ar, en: f.subtitle_en },
     cta: { ar: f.cta_ar, en: f.cta_en }, badge: { ar: f.badge_ar, en: f.badge_en }, href: '/', external: false,
@@ -238,20 +240,31 @@ function Wizard({ editing, meta, onClose, onSaved }) {
 
       {step === 0 && (
         <div className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {[['custom', 'إعلان مخصص', 'صورة وعنوان ورابط من اختيارك — لأي حاجة.'], ['offer', 'ترويج عرض محل', 'بتروّج لعرض شغال فعلاً عند المحل. السعر والأهلية بيفضلوا من نظام العروض.']].map(([v, t, d]) => (
-              <button key={v} type="button" onClick={() => setF((x) => ({ ...x, type: v }))} aria-pressed={f.type === v}
-                className={`rounded-2xl border p-4 text-start transition ${f.type === v ? 'border-fg bg-fg/[0.04]' : 'border-line hover:border-line-strong'}`}>
-                <b className="flex items-center gap-2">{f.type === v && <Check className="h-4 w-4" />}{t}</b><span className="mt-1 block text-sm text-muted">{d}</span>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {[['custom', 'إعلان مخصص', 'صورة وعنوان ورابط من اختيارك — لأي حاجة.'], ['offer', 'ترويج عرض محل', 'بتروّج لعرض شغال فعلاً عند المحل. السعر والأهلية بيفضلوا من نظام العروض.'], ['advertiser', 'معلن خارجي', 'لعميل ما عندوش محل على Twist — الإعلان يفتح صفحة تعريفية خفيفة باسمه (صور، موقع، واتساب).']].map(([v, t, d]) => (
+              <button key={v} type="button" onClick={() => setF((x) => ({ ...x, mode: v, type: v === 'offer' ? 'offer' : 'custom', ...(v === 'advertiser' ? { store_id: '', promotion_id: '', product_id: '', category_id: '' } : { advertiser_id: '' }) }))} aria-pressed={f.mode === v}
+                className={`rounded-2xl border p-4 text-start transition ${f.mode === v ? 'border-fg bg-fg/[0.04]' : 'border-line hover:border-line-strong'}`}>
+                <b className="flex items-center gap-2">{f.mode === v && <Check className="h-4 w-4" />}{t}</b><span className="mt-1 block text-sm text-muted">{d}</span>
               </button>
             ))}
           </div>
-          <Field label={f.type === 'offer' ? 'المحل' : 'المحل (اختياري)'} error={fe.store_id && 'اختار المحل'}>
+          {f.mode === 'advertiser' && (
+            <Field label="المعلن" error={fe.advertiser_id && 'اختار معلن موجود'} hint="لو المعلن مش في القايمة، ضيفه الأول من صفحة «المعلنين الخارجيين»">
+              <Select value={f.advertiser_id} onChange={(e) => {
+                const a = (advList?.items || []).find((x) => String(x.id) === e.target.value);
+                setF((x) => ({ ...x, advertiser_id: e.target.value, title_ar: x.title_ar || a?.nameAr || '', title_en: x.title_en || a?.nameEn || a?.nameAr || '', cta_ar: x.cta_ar && x.cta_ar !== 'اكتشف الآن' ? x.cta_ar : 'اعرف أكتر', cta_en: x.cta_en && x.cta_en !== 'Explore now' ? x.cta_en : 'Learn more' }));
+              }}>
+                <option value="">— اختار المعلن —</option>
+                {(advList?.items || []).filter((a) => a.status === 'active' || String(a.id) === f.advertiser_id).map((a) => <option key={a.id} value={a.id}>{a.nameAr}{a.status === 'hidden' ? ' (مخفي)' : ''}</option>)}
+              </Select>
+            </Field>
+          )}
+          {f.mode !== 'advertiser' && <Field label={f.type === 'offer' ? 'المحل' : 'المحل (اختياري)'} error={fe.store_id && 'اختار المحل'}>
             <Select value={f.store_id} onChange={(e) => setF((x) => ({ ...x, store_id: e.target.value, promotion_id: '', product_id: '', category_id: '' }))}>
               <option value="">— من غير محل —</option>
               {stores.map((s) => <option key={s.id} value={s.id}>{bi(s.name)}</option>)}
             </Select>
-          </Field>
+          </Field>}
           {f.type === 'offer' && f.store_id && (
             <Field label="العرض" error={fe.promotion_id && 'اختار عرض شغال'} hint="بيظهر هنا العروض الشغالة أو المجدولة بس">
               {offers === 'loading' ? <p className="text-sm text-muted">بنحمّل العروض…</p> : !offers?.length ? <p className="rounded-xl bg-fg/[0.04] p-3 text-sm text-muted">المحل ده مفيهوش عروض شغالة دلوقتي.</p> : (
@@ -276,14 +289,14 @@ function Wizard({ editing, meta, onClose, onSaved }) {
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="العنوان (عربي)" error={fe.title_ar && 'مطلوب أو طويل أوي'}><Input value={f.title_ar} onChange={set('title_ar')} maxLength={80} /></Field>
             <Field label="Title (EN)" error={fe.title_en && 'Required or too long'}><Input dir="ltr" value={f.title_en} onChange={set('title_en')} maxLength={80} /></Field>
-            <Field label="العنوان الفرعي (عربي)" optional><Textarea rows={2} value={f.subtitle_ar} onChange={set('subtitle_ar')} maxLength={160} /></Field>
-            <Field label="Subtitle (EN)" optional><Textarea dir="ltr" rows={2} value={f.subtitle_en} onChange={set('subtitle_en')} maxLength={160} /></Field>
-            <Field label="نص الزر (عربي)" optional><Input value={f.cta_ar} onChange={set('cta_ar')} maxLength={30} /></Field>
-            <Field label="Button text (EN)" optional><Input dir="ltr" value={f.cta_en} onChange={set('cta_en')} maxLength={30} /></Field>
-            <Field label="الشارة (عربي)" optional hint="مثال: خصم ٣٠٪"><Input value={f.badge_ar} onChange={set('badge_ar')} maxLength={24} /></Field>
-            <Field label="Badge (EN)" optional><Input dir="ltr" value={f.badge_en} onChange={set('badge_en')} maxLength={24} /></Field>
+            <Field label="العنوان الفرعي (عربي)" optional="اختياري"><Textarea rows={2} value={f.subtitle_ar} onChange={set('subtitle_ar')} maxLength={160} /></Field>
+            <Field label="Subtitle (EN)" optional="اختياري"><Textarea dir="ltr" rows={2} value={f.subtitle_en} onChange={set('subtitle_en')} maxLength={160} /></Field>
+            <Field label="نص الزر (عربي)" optional="اختياري"><Input value={f.cta_ar} onChange={set('cta_ar')} maxLength={30} /></Field>
+            <Field label="Button text (EN)" optional="اختياري"><Input dir="ltr" value={f.cta_en} onChange={set('cta_en')} maxLength={30} /></Field>
+            <Field label="الشارة (عربي)" optional="اختياري" hint="مثال: خصم ٣٠٪"><Input value={f.badge_ar} onChange={set('badge_ar')} maxLength={24} /></Field>
+            <Field label="Badge (EN)" optional="اختياري"><Input dir="ltr" value={f.badge_en} onChange={set('badge_en')} maxLength={24} /></Field>
           </div>
-          <Field label="الرابط" optional={f.type === 'offer' || !!f.store_id} error={fe.destination_url && 'رابط غير آمن — استخدم مسار داخلي (/…) أو https'} hint="مسار داخلي زي /search أو رابط https. لو فاضي بنستخدم صفحة المحل/المنتج/القسم.">
+          <Field label="الرابط" optional={f.type === 'offer' || !!f.store_id || f.mode === 'advertiser'} error={fe.destination_url && 'رابط غير آمن — استخدم مسار داخلي (/…) أو https'} hint={f.mode === 'advertiser' ? 'سيبه فاضي — الإعلان هيفتح صفحة المعلن تلقائي.' : 'مسار داخلي زي /search أو رابط https. لو فاضي بنستخدم صفحة المحل/المنتج/القسم.'}>
             <Input dir="ltr" value={f.destination_url} onChange={set('destination_url')} placeholder="/search" />
           </Field>
           {targets && (
@@ -317,8 +330,8 @@ function Wizard({ editing, meta, onClose, onSaved }) {
             </div>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="لون الخلفية / تدرّج" optional error={fe.background_color && 'لون غير صالح'} hint="اختار لون أو اكتب تدرّج: linear-gradient(135deg,#111,#e11)"><ColorField allowGradient value={f.background_color} onChange={set('background_color')} placeholder="#0b3a73" /></Field>
-            <Field label="لون النص" optional error={fe.text_color && 'لون غير صالح'}><ColorField value={f.text_color} onChange={set('text_color')} placeholder="#ffffff" /></Field>
+            <Field label="لون الخلفية / تدرّج" optional="اختياري" error={fe.background_color && 'لون غير صالح'} hint="اختار لون أو اكتب تدرّج: linear-gradient(135deg,#111,#e11)"><ColorField allowGradient value={f.background_color} onChange={set('background_color')} placeholder="#0b3a73" /></Field>
+            <Field label="لون النص" optional="اختياري" error={fe.text_color && 'لون غير صالح'}><ColorField value={f.text_color} onChange={set('text_color')} placeholder="#ffffff" /></Field>
           </div>
           <div className="space-y-3 rounded-2xl border border-line p-3">
             <p className="text-sm font-semibold">حجم الإعلان على الصفحة</p>
@@ -362,11 +375,11 @@ function Wizard({ editing, meta, onClose, onSaved }) {
           </Field>
           <Field label="أولوية الحملة" hint="الأعلى بتظهر الأول لو الأماكن متساوية"><Input type="number" min="0" max="100" value={f.priority} onChange={set('priority')} /></Field>
           <Field label="الجمهور"><Select value={f.targeting.audience} onChange={(e) => setF((v) => ({ ...v, targeting: { ...v.targeting, audience: e.target.value } }))}><option value="all">الكل</option><option value="marketplace">السوق بس</option><option value="store">صفحات المحلات بس</option></Select></Field>
-          <Field label="محلات مستهدفة (لأماكن صفحة المحل)" optional hint="فاضي = كل المحلات">
+          <Field label="محلات مستهدفة (لأماكن صفحة المحل)" optional="اختياري" hint="فاضي = كل المحلات">
             <div className="flex flex-wrap gap-1.5">{stores.map((s) => <button key={s.id} type="button" onClick={() => toggleIn('stores', s.id)} aria-pressed={f.targeting.stores.includes(s.id)} className={`rounded-full px-3 py-1.5 text-xs font-medium ${f.targeting.stores.includes(s.id) ? 'bg-fg text-canvas' : 'bg-fg/[0.06]'}`}>{bi(s.name)}</button>)}</div>
           </Field>
           {targets?.categories?.length > 0 && (
-            <Field label="أقسام مستهدفة (خانة البحث)" optional hint="فاضي = كل الأقسام">
+            <Field label="أقسام مستهدفة (خانة البحث)" optional="اختياري" hint="فاضي = كل الأقسام">
               <div className="flex flex-wrap gap-1.5">{targets.categories.map((c) => <button key={c.id} type="button" onClick={() => toggleIn('categories', c.id)} aria-pressed={f.targeting.categories.includes(c.id)} className={`rounded-full px-3 py-1.5 text-xs font-medium ${f.targeting.categories.includes(c.id) ? 'bg-fg text-canvas' : 'bg-fg/[0.06]'}`}>{bi(c.name)}</button>)}</div>
             </Field>
           )}
@@ -377,8 +390,8 @@ function Wizard({ editing, meta, onClose, onSaved }) {
         <div className="space-y-4">
           <p className="rounded-xl bg-fg/[0.04] p-3 text-sm text-muted">المواعيد بتوقيت القاهرة. من غير مواعيد = بتشتغل أول ما تتنشر لحد ما توقفها. التفعيل والانتهاء أوتوماتيك.</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="البداية" optional error={fe.starts_at && 'تاريخ غير صالح'}><Input type="datetime-local" dir="ltr" value={f.starts_at} onChange={set('starts_at')} /></Field>
-            <Field label="النهاية" optional error={fe.ends_at && 'لازم تكون بعد البداية'}><Input type="datetime-local" dir="ltr" value={f.ends_at} onChange={set('ends_at')} /></Field>
+            <Field label="البداية" optional="اختياري" error={fe.starts_at && 'تاريخ غير صالح'}><Input type="datetime-local" dir="ltr" value={f.starts_at} onChange={set('starts_at')} /></Field>
+            <Field label="النهاية" optional="اختياري" error={fe.ends_at && 'لازم تكون بعد البداية'}><Input type="datetime-local" dir="ltr" value={f.ends_at} onChange={set('ends_at')} /></Field>
           </div>
           <div>
             <p className="mb-2 text-sm font-medium">مدة الإعلان (اختصار)</p>
@@ -408,7 +421,7 @@ function Wizard({ editing, meta, onClose, onSaved }) {
                 const on = (f.repeat?.days || []).includes(k);
                 return <button key={k} type="button" aria-pressed={on}
                   onClick={() => setF((x) => { const r = x.repeat || { days: [], windows: [] }; const days = on ? r.days.filter((d) => d !== k) : [...r.days, k]; return { ...x, repeat: normRepeat({ ...r, days }) }; })}
-                  className={`h-8 rounded-lg border px-3 text-xs font-medium ${on ? 'border-fg bg-fg text-bg' : 'border-line hover:bg-fg/[0.05]'}`}>{n}</button>;
+                  className={`h-8 rounded-lg border px-3 text-xs font-medium ${on ? 'border-fg bg-fg text-canvas' : 'border-line hover:bg-fg/[0.05]'}`}>{n}</button>;
               })}
             </div>
             <p className="mb-1.5 text-xs font-medium text-muted">الساعات (لحد ٤ فترات)</p>
@@ -491,7 +504,7 @@ function Analytics({ days, setDays }) {
           <div className="grid grid-cols-3 gap-3">
             <KpiCard label="مشاهدات" value={data?.totals.views || 0} icon={Eye} loading={loading} />
             <KpiCard label="نقرات" value={data?.totals.clicks || 0} icon={MousePointerClick} loading={loading} />
-            <KpiCard label="نسبة النقر" value={data?.totals.ctr == null ? '—' : `${data.totals.ctr}%`} icon={Sparkles} loading={loading} />
+            <KpiCard label="نسبة النقر" value={data?.totals.ctr ?? 0} format={(n) => (data?.totals.ctr == null ? '—' : `${Math.round(n * 10) / 10}%`)} icon={Sparkles} loading={loading} />
           </div>
           {data?.hours && data.totals.views > 0 && (() => {
             const max = Math.max(...data.hours.map((h) => h.views), 1);

@@ -101,8 +101,8 @@ export default function MarketCheckout() {
   }, [groupKey, ar, form.governorate, form.city, quoteVersion, JSON.stringify(codes), phoneForQuote]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [areas, setAreas] = useState([]);
-  useEffect(() => { let alive = true; api('/marketplace/delivery-areas').then((d) => { if (alive) setAreas(d?.areas || []); }).catch(() => {}); return () => { alive = false; }; }, []);
-  const sortedAreas = useMemo(() => [...areas].sort((a, b) => a.name.localeCompare(b.name, 'ar')), [areas]);
+  useEffect(() => { let alive = true; api('/marketplace/delivery-areas').then((d) => { if (alive) setAreas((d?.areas || []).map((x) => ({ ...x, name: x?.name || x?.city })).filter((x, i, arr) => x.name && arr.findIndex((y) => y.name === x.name) === i)); }).catch(() => {}); return () => { alive = false; }; }, []);
+  const sortedAreas = useMemo(() => [...areas].sort((a, b) => String(a.name).localeCompare(String(b.name), 'ar')), [areas]);
   const nearestArea = (lat, lng) => {
     let best = null; let bestKm = 2.5; // only trust a listed area when the pin is within ~2.5 km of it
     for (const a of areas) {

@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS featured_hourly (
   PRIMARY KEY (day, hour, campaign_id, event)
 ) WITHOUT ROWID;
 `);
-for (const [col, ddl] of [['text_align', "TEXT NOT NULL DEFAULT 'start'"], ['overlay', 'INTEGER NOT NULL DEFAULT 65'], ['image_zoom', 'INTEGER NOT NULL DEFAULT 100'], ['image_x', 'INTEGER NOT NULL DEFAULT 50'], ['image_y', 'INTEGER NOT NULL DEFAULT 50'], ['fg_image', "TEXT NOT NULL DEFAULT ''"], ['fg_size', 'INTEGER NOT NULL DEFAULT 40'], ['fg_pos', "TEXT NOT NULL DEFAULT 'end'"], ['layout_width', "TEXT NOT NULL DEFAULT 'wide'"], ['layout_height', "TEXT NOT NULL DEFAULT 'm'"], ['layout_align', "TEXT NOT NULL DEFAULT 'center'"], ['repeat_json', "TEXT NOT NULL DEFAULT ''"]]) {
+for (const [col, ddl] of [['text_align', "TEXT NOT NULL DEFAULT 'start'"], ['overlay', 'INTEGER NOT NULL DEFAULT 65'], ['image_zoom', 'INTEGER NOT NULL DEFAULT 100'], ['image_x', 'INTEGER NOT NULL DEFAULT 50'], ['image_y', 'INTEGER NOT NULL DEFAULT 50'], ['fg_image', "TEXT NOT NULL DEFAULT ''"], ['fg_size', 'INTEGER NOT NULL DEFAULT 40'], ['fg_pos', "TEXT NOT NULL DEFAULT 'end'"], ['layout_width', "TEXT NOT NULL DEFAULT 'wide'"], ['layout_height', "TEXT NOT NULL DEFAULT 'm'"], ['layout_align', "TEXT NOT NULL DEFAULT 'center'"], ['repeat_json', "TEXT NOT NULL DEFAULT ''"], ['advertiser_id', 'INTEGER']]) {
   if (!q.all('PRAGMA table_info(featured_campaigns)').some((c) => c.name === col)) db.exec(`ALTER TABLE featured_campaigns ADD COLUMN ${col} ${ddl}`);
 }
 
@@ -228,7 +228,7 @@ export function normalizeCampaign(body, { partial = false } = {}) {
   out.cta_style = CTA_STYLES.includes(b.cta_style) ? b.cta_style : (b.cta_style == null ? 'solid' : (f.cta_style = 'bad_value'));
 
   const id = (k) => { if (b[k] == null || b[k] === '') return null; const n = Number(b[k]); if (!Number.isInteger(n) || n <= 0) { f[k] = 'bad_value'; return null; } return n; };
-  out.store_id = id('store_id'); out.promotion_id = id('promotion_id'); out.product_id = id('product_id'); out.category_id = id('category_id');
+  out.advertiser_id = type === 'custom' ? id('advertiser_id') : null; out.store_id = id('store_id'); out.promotion_id = id('promotion_id'); out.product_id = id('product_id'); out.category_id = id('category_id');
 
   const pr = b.priority == null ? 50 : Number(b.priority);
   if (!Number.isInteger(pr) || pr < 0 || pr > 100) f.priority = 'bad_value'; else out.priority = pr;
@@ -281,6 +281,8 @@ export function verifyReferences(c, { publishing }) {
   } else {
     c.promotion_id = null;
     if (c.store_id && !(store = activeStore(c.store_id))) f.store_id = 'store_missing';
+    if (c.advertiser_id && !q.get('SELECT 1 AS x FROM featured_advertisers WHERE id=?', [c.advertiser_id])) f.advertiser_id = 'target_invalid';
+    if (c.advertiser_id && c.store_id) f.advertiser_id = 'bad_value'; // either a platform shop or an outside advertiser, not both
   }
   if (!f.store_id && c.store_id) {
     if (c.product_id && !q.get('SELECT 1 AS x FROM products WHERE id=? AND store_id=?', [c.product_id, c.store_id])) f.product_id = 'target_invalid';
@@ -292,7 +294,7 @@ export function verifyReferences(c, { publishing }) {
     if (c.type === 'custom') {
       if (!c.title_ar || !c.title_en) f[!c.title_ar ? 'title_ar' : 'title_en'] = 'required';
       if (!c.desktop_image && !c.mobile_image && !c.fg_image && !f.desktop_image) f.desktop_image = 'image_required';
-      if (!c.destination_url && !c.store_id) f.destination_url = 'destination_missing';
+      if (!c.destination_url && !c.store_id && !c.advertiser_id) f.destination_url = 'destination_missing';
     }
   }
   if (Object.keys(f).length) invalid(f);
@@ -316,12 +318,13 @@ const toDb = (c) => ({
   badge_ar: c.badge_ar, badge_en: c.badge_en, destination_url: c.destination_url, store_id: c.store_id, promotion_id: c.promotion_id, product_id: c.product_id, category_id: c.category_id,
   desktop_image: c.desktop_image, mobile_image: c.mobile_image, background_color: c.background_color, text_color: c.text_color, cta_style: c.cta_style, text_align: c.text_align, overlay: c.overlay,
   image_zoom: c.image_zoom, image_x: c.image_x, image_y: c.image_y, fg_image: c.fg_image, fg_size: c.fg_size, fg_pos: c.fg_pos, layout_width: c.layout_width, layout_height: c.layout_height, layout_align: c.layout_align,
-  placements_json: JSON.stringify(c.placements), targeting_json: JSON.stringify(c.targeting), priority: c.priority, starts_at: c.starts_at, ends_at: c.ends_at, repeat_json: c.repeat ? JSON.stringify(c.repeat) : '',
+  placements_json: JSON.stringify(c.placements), targeting_json: JSON.stringify(c.targeting), priority: c.priority, starts_at: c.starts_at, ends_at: c.ends_at, repeat_json: c.repeat ? JSON.stringify(c.repeat) : '', advertiser_id: c.advertiser_id || null,
 });
 
 /** Where the campaign sends the visitor. An explicit destination wins; otherwise it is built from store / product / category. */
 export function destinationOf(c) {
   if (c.destination_url) return c.destination_url;
+  if (c.advertiser_id) { const a = q.get("SELECT slug FROM featured_advertisers WHERE id=? AND status='active' AND consent=1", [c.advertiser_id]); return a ? `/a/${a.slug}` : '/'; }
   if (!c.store_id) return '/';
   const s = q.get('SELECT slug FROM stores WHERE id=?', [c.store_id]);
   if (!s) return '/';
@@ -335,6 +338,7 @@ const biOf = (row, f) => ({ ar: row[`${f}_ar`] || '', en: row[`${f}_en`] || '' }
 /** Customer-facing shape. `live` offers (from the promotion engine) are passed in so a list renders with one engine call per store. */
 function publicShape(row, placement, liveByStore, mediaCache) {
   let offer = null; let store = null;
+  if (row.advertiser_id && !q.get("SELECT 1 AS x FROM featured_advertisers WHERE id=? AND status='active' AND consent=1", [row.advertiser_id])) return null; // advertiser hidden / withdrawn consent
   if (row.store_id) {
     const s = q.get("SELECT id, slug, name_ar, name_en, logo_media_id, logo_initials, logo_color FROM stores WHERE id=? AND status='active'", [row.store_id]);
     if (!s) return null; // targeting an inactive / deleted store
@@ -431,6 +435,7 @@ function adminShape(row, stats = {}, now = cairoStamp()) {
     if (!p || p.status !== 'active' || !['active', 'scheduled'].includes(promoState(p))) health = 'offer_unavailable';
   }
   if (store && !q.get("SELECT 1 AS x FROM stores WHERE id=? AND status='active'", [store.id])) health = 'store_inactive';
+  if (c.advertiser_id && !['draft', 'archived'].includes(state) && !q.get("SELECT 1 AS x FROM featured_advertisers WHERE id=? AND status='active' AND consent=1", [c.advertiser_id])) health = 'advertiser_hidden';
   const views = stats.impression || 0; const clicks = stats.click || 0;
   return {
     id: c.id, type: c.type, status: c.status, state, health,
@@ -439,7 +444,7 @@ function adminShape(row, stats = {}, now = cairoStamp()) {
     store: store ? { id: store.id, slug: store.slug, name: biOf(store, 'name') } : null,
     desktopImage: c.desktop_image, mobileImage: c.mobile_image, backgroundColor: c.background_color, textColor: c.text_color, ctaStyle: c.cta_style, textAlign: c.text_align || 'start', overlay: c.overlay ?? 65,
     imageZoom: c.image_zoom ?? 100, imageX: c.image_x ?? 50, imageY: c.image_y ?? 50, fgImage: c.fg_image || '', fgSize: c.fg_size ?? 40, fgPos: c.fg_pos || 'end', layoutWidth: c.layout_width || 'wide', layoutHeight: c.layout_height || 'm', layoutAlign: c.layout_align || 'center',
-    placements: c.placements, targeting: c.targeting, priority: c.priority, startsAt: c.starts_at, endsAt: c.ends_at, repeat: parseRepeat(c.repeat_json), repeatNextInMin: state === 'resting' ? repeatNextOpen(parseRepeat(c.repeat_json), (c.starts_at && c.starts_at > now.stamp ? c.starts_at : now.stamp)) : null,
+    placements: c.placements, targeting: c.targeting, priority: c.priority, startsAt: c.starts_at, endsAt: c.ends_at, advertiserId: c.advertiser_id || null, advertiser: c.advertiser_id ? q.get('SELECT id, slug, name_ar FROM featured_advertisers WHERE id=?', [c.advertiser_id]) || null : null, repeat: parseRepeat(c.repeat_json), repeatNextInMin: state === 'resting' ? repeatNextOpen(parseRepeat(c.repeat_json), (c.starts_at && c.starts_at > now.stamp ? c.starts_at : now.stamp)) : null,
     createdBy: c.created_by, createdAt: c.created_at, updatedAt: c.updated_at, archivedAt: c.archived_at,
     stats: { views, clicks, ctr: views ? Math.round((clicks / views) * 1000) / 10 : null },
   };
