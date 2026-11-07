@@ -101,6 +101,12 @@ test('validation: unsafe links, colours, dates, placements and missing content a
     assert.equal(img.status, 201);
     assert.deepEqual([img.body.campaign.imageZoom, img.body.campaign.imageX, img.body.campaign.imageY, img.body.campaign.fgImage, img.body.campaign.fgSize, img.body.campaign.fgPos], [150, 20, 80, '/img/product.png', 55, 'start']);
     assert.equal((await post(t.custom())).body.campaign.imageZoom, 100); // defaults
+    // logo/second image styling: circle or rounded, free vertical spot, optionally hanging half outside the banner
+    const lg = await post(t.custom({ fg_image: '/img/logo.png', fg_size: 18, fg_shape: 'circle', fg_y: 100, fg_out: true }));
+    assert.equal(lg.status, 201, JSON.stringify(lg.body));
+    assert.deepEqual([lg.body.campaign.fgShape, lg.body.campaign.fgY, lg.body.campaign.fgOut], ['circle', 100, true]);
+    assert.deepEqual([img.body.campaign.fgShape, img.body.campaign.fgY, img.body.campaign.fgOut], ['none', 100, false]); // old campaigns keep their look
+    for (const bad of [{ fg_shape: 'star' }, { fg_y: 101 }, { fg_y: -1 }]) assert.equal((await post(t.custom({ fg_image: '/img/logo.png', ...bad }))).status, 422, JSON.stringify(bad));
     for (const bad of [{ image_zoom: 50 }, { image_zoom: 500 }, { image_x: 101 }, { image_y: -1 }, { fg_size: 5 }, { fg_pos: 'top' }, { fg_image: 'javascript:alert(1)' }]) assert.equal((await post(t.custom(bad))).status, 422, JSON.stringify(bad));
     // layout: width / height / alignment of the whole banner on the page, plus the two extra homepage positions
     const lay = await post(t.custom({ layout_width: 'narrow', layout_height: 'l', layout_align: 'end', placements: [{ key: 'market_top' }, { key: 'market_bottom' }] }));

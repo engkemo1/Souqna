@@ -125,7 +125,7 @@ export default function StylistChat() {
     const content = String(raw ?? text).trim();
     if ((!content && !photo) || busy || sendingRef.current) return;
     sendingRef.current = true;
-    const image = photo; const image2 = photo2; const shown = content || (image2 ? t('stylist.compareMsg') : similar ? t('stylist.similarMsg') : t('stylist.photoMsg')); setSimilar(false);
+    const image = photo; const image2 = photo2; const shown = content || (image2 ? t('stylist.compareMsg') : similar ? t('stylist.similarMsg') : t('stylist.photoMsg')); const wasSimilar = similar && !!image && !image2; setSimilar(false);
     const next = [...msgs, { role: 'user', content: shown, photo: image, photo2: image2, answered: !!answers }];
     setMsgs(next); setQuestionAnswers({}); setText(''); setPhoto(null); setPhoto2(null); setBusy(true);
     try {
@@ -134,6 +134,7 @@ export default function StylistChat() {
       if (answers) body.answers = answers;
       if (image) body.image = image;
       if (image && image2) body.image2 = image2;
+      if (wasSimilar) body.similar = true; // «لاقيلي زيه»: يدوّر بالصورة على طول من غير أسئلة
       const res = await fetch('/api/stylist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw Object.assign(new Error('x'), { code: data?.error?.code });

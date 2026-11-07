@@ -16,6 +16,7 @@ import { makeCurator } from './moda/curate.js';
 import { makeUnderstander } from './moda/understand.js';
 import { loadKnowledge } from './moda/knowledge.js';
 import { makeLlmExtract } from './moda/llm.js';
+import { searchByImage, visualSettings } from './visual.js';
 import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates, slotOwnerLabel, cleanSay } from './stylist-ranking.js';
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ـ/g, '').replace(/[ًٌٍَُِّْ]/g, '').trim();
@@ -589,7 +590,32 @@ export async function runModaStylist(messages, { profile, session, answers, imag
 }
 
 /** @param messages [{role:'user'|'assistant', content}] (last 8 kept) */
-export async function runStylist(messages, { image, image2, profile, session, answers } = {}) {
+/** «لاقيلي زيه»: صورة + طلب تشابه ⇒ بحث بالصورة على طول (نفس محرك صفحة البحث بالصورة) من غير أي سؤال عن الجنس أو الميزانية. */
+async function similarFromPhoto(image) {
+  if (!visualSettings().enabled) return null;
+  const m = String(image).match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) throw Object.assign(new Error('badimg'), { code: 'stylist_bad_image' });
+  const found = await searchByImage(Buffer.from(m[2], 'base64'), { limit: 12 });
+  const exact = found.groups.flatMap((g) => g.items.map((x) => ({ id: x.id, label: g.label })));
+  const near = found.groups.flatMap((g) => (g.similar || []).map((x) => ({ id: x.id, label: g.label })));
+  const picked = (exact.length ? exact : near).filter((x, i, a) => a.findIndex((y) => y.id === x.id) === i).slice(0, 8);
+  const ids = picked.map((x) => x.id);
+  const rows = ids.length ? q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id WHERE p.id IN (${ids.map(() => '?').join(',')})`, ids) : [];
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const ordered = picked.map((x) => ({ ...x, row: byId.get(x.id) })).filter((x) => x.row);
+  const cards = serializeCards(ordered.map((x) => x.row));
+  const looks = ordered.map((x, i) => ({ label: x.label || 'قطعة', shown: x.label || 'قطعة', palette: [], items: [{ ...cards[i], store: { slug: x.row.store_slug, name: bi(x.row, 'store_name') } }], pick: 0 }));
+  const say = !looks.length ? 'دورت بالصورة في محلات بنها ومالقيتش حاجة قريبة منها دلوقتي. ابعت طلب ونوفرهولك.'
+    : exact.length ? 'دي أقرب القطع لصورتك من محلات بنها.'
+      : 'مفيش نفس القطعة بالظبط دلوقتي، بس دي أقرب بدائل ليها.';
+  return { intent: looks.length ? 'shop' : 'chat', state: looks.length ? 'full' : 'chat', say, remember: {}, palette: [], tips: '', looks, tabs: [], total: 0, budget: null, overBudget: false, missing: [], questions: [] };
+}
+
+export async function runStylist(messages, { image, image2, profile, session, answers, similar } = {}) {
+  if (similar && image && !image2) {
+    try { const r = await similarFromPhoto(image); if (r) return r; }
+    catch (e) { if (e.code === 'stylist_bad_image') throw e; console.error('[stylist] similar-photo failed, using normal flow:', String(e.message).slice(0, 200)); }
+  }
   const { provider, name } = stylistSettings();
   if (modaEngineEnabled() && !image2 && (!image || (image && providerReady.cloudflare()))) {
     try {

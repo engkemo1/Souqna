@@ -20,7 +20,7 @@ const STEPS = ['نوع الحملة', 'المحتوى', 'التصميم', 'ال�
 const STEP_FIELDS = [
   ['type', 'store_id', 'promotion_id', 'advertiser_id'],
   ['title_ar', 'title_en', 'subtitle_ar', 'subtitle_en', 'cta_ar', 'cta_en', 'badge_ar', 'badge_en', 'destination_url', 'desktop_image', 'mobile_image'],
-  ['background_color', 'text_color', 'cta_style', 'text_align', 'overlay', 'image_zoom', 'image_x', 'image_y', 'fg_image', 'fg_size', 'fg_pos', 'layout_width', 'layout_height', 'layout_align'],
+  ['background_color', 'text_color', 'cta_style', 'text_align', 'overlay', 'image_zoom', 'image_x', 'image_y', 'fg_image', 'fg_size', 'fg_pos', 'fg_shape', 'fg_y', 'fg_out', 'layout_width', 'layout_height', 'layout_align'],
   ['placements', 'targeting.audience', 'targeting.stores', 'targeting.categories', 'priority'],
   ['starts_at', 'ends_at', 'repeat'],
   [],
@@ -29,14 +29,14 @@ const blank = () => ({
   type: 'custom', mode: 'custom', advertiser_id: '', store_id: '', promotion_id: '', product_id: '', category_id: '',
   title_ar: '', title_en: '', subtitle_ar: '', subtitle_en: '', cta_ar: 'اكتشف الآن', cta_en: 'Explore now', badge_ar: '', badge_en: '',
   destination_url: '', desktop_image: '', mobile_image: '', background_color: '', text_color: '', cta_style: 'solid', text_align: 'start', overlay: 65,
-  image_zoom: 100, image_x: 50, image_y: 50, fg_image: '', fg_size: 40, fg_pos: 'end', layout_width: 'wide', layout_height: 'm', layout_align: 'center',
+  image_zoom: 100, image_x: 50, image_y: 50, fg_image: '', fg_size: 40, fg_pos: 'end', fg_shape: 'none', fg_y: 100, fg_out: false, layout_width: 'wide', layout_height: 'm', layout_align: 'center',
   placements: [], targeting: { audience: 'all', stores: [], categories: [] }, priority: 0, starts_at: '', ends_at: '', repeat: null,
 });
 const fromCampaign = (c) => ({
   type: c.type, mode: c.advertiserId ? 'advertiser' : c.type, advertiser_id: c.advertiserId ? String(c.advertiserId) : '', store_id: c.storeId ? String(c.storeId) : '', promotion_id: c.promotionId ? String(c.promotionId) : '', product_id: c.productId ? String(c.productId) : '', category_id: c.categoryId ? String(c.categoryId) : '',
   title_ar: c.title.ar, title_en: c.title.en, subtitle_ar: c.subtitle.ar, subtitle_en: c.subtitle.en, cta_ar: c.cta.ar, cta_en: c.cta.en, badge_ar: c.badge.ar, badge_en: c.badge.en,
   destination_url: c.destinationUrl || '', desktop_image: c.desktopImage || '', mobile_image: c.mobileImage || '', background_color: c.backgroundColor || '', text_color: c.textColor || '', cta_style: c.ctaStyle || 'solid', text_align: c.textAlign || 'start', overlay: c.overlay ?? 65,
-  image_zoom: c.imageZoom ?? 100, image_x: c.imageX ?? 50, image_y: c.imageY ?? 50, fg_image: c.fgImage || '', fg_size: c.fgSize ?? 40, fg_pos: c.fgPos || 'end', layout_width: c.layoutWidth || 'wide', layout_height: c.layoutHeight || 'm', layout_align: c.layoutAlign || 'center',
+  image_zoom: c.imageZoom ?? 100, image_x: c.imageX ?? 50, image_y: c.imageY ?? 50, fg_image: c.fgImage || '', fg_size: c.fgSize ?? 40, fg_pos: c.fgPos || 'end', fg_shape: c.fgShape || 'none', fg_y: c.fgY ?? 100, fg_out: !!c.fgOut, layout_width: c.layoutWidth || 'wide', layout_height: c.layoutHeight || 'm', layout_align: c.layoutAlign || 'center',
   placements: c.placements, targeting: { audience: 'all', stores: [], categories: [], ...c.targeting }, priority: c.priority, starts_at: c.startsAt || '', ends_at: c.endsAt || '', repeat: c.repeat || null,
 });
 const toBody = (f) => ({
@@ -221,7 +221,7 @@ function Wizard({ editing, meta, onClose, onSaved }) {
     image: { desktop: f.desktop_image || null, mobile: f.mobile_image || null, offer: null }, bg: f.background_color || '#0f172a', color: f.text_color || '#ffffff', ctaStyle: f.cta_style,
     layout: { width: f.layout_width, height: f.layout_height, align: f.layout_align },
     align: f.text_align, overlay: Number(f.overlay), fit: { zoom: Number(f.image_zoom), x: Number(f.image_x), y: Number(f.image_y) },
-    fg: f.fg_image ? { src: f.fg_image, size: Number(f.fg_size), pos: f.fg_pos } : null, store: null, offer: null,
+    fg: f.fg_image ? { src: f.fg_image, size: Number(f.fg_size), pos: f.fg_pos, shape: f.fg_shape, y: Number(f.fg_y), out: !!f.fg_out } : null, store: null, offer: null,
   }), [f]);
   const contrast = useContrast({ image: f.desktop_image || f.mobile_image, bg: f.background_color, text: f.text_color || '#ffffff', overlay: Number(f.overlay) });
   const [mockDevice, setMockDevice] = useState('desktop');
@@ -335,9 +335,21 @@ function Wizard({ editing, meta, onClose, onSaved }) {
           </div>
           <ImagePick label="صورة إضافية فوق الخلفية (منتج أو لوجو)" hint="يفضل PNG بخلفية شفافة. اختيارية" value={f.fg_image} onChange={set('fg_image')} kind="fg" error={fe.fg_image && 'صورة غير صالحة'} />
           {f.fg_image && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Slider label="حجم الصورة الإضافية" value={f.fg_size} min={10} max={90} unit="%" onChange={set('fg_size')} />
-              <Field label="مكانها"><Select value={f.fg_pos} onChange={set('fg_pos')}><option value="start">البداية</option><option value="center">النص</option><option value="end">النهاية</option></Select></Field>
+            <div className="space-y-4 rounded-2xl border border-line p-4">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Slider label="حجم الصورة الإضافية" value={f.fg_size} min={10} max={90} unit="%" onChange={set('fg_size')} />
+                <Field label="مكانها (يمين / وسط / شمال)"><Select value={f.fg_pos} onChange={set('fg_pos')}><option value="start">البداية</option><option value="center">النص</option><option value="end">النهاية</option></Select></Field>
+              </div>
+              <Field label="شكل الصورة">
+                <div className="flex flex-wrap gap-2">
+                  {[['none', 'زي ما هي'], ['rounded', 'مربع بحواف دايرية'], ['circle', 'دايرة']].map(([k, t]) => (
+                    <button key={k} type="button" aria-pressed={f.fg_shape === k} onClick={() => set('fg_shape')(k)}
+                      className={`h-10 rounded-full border px-4 text-sm font-semibold transition ${f.fg_shape === k ? 'border-fg bg-fg text-canvas' : 'border-line bg-canvas'}`}>{t}</button>
+                  ))}
+                </div>
+              </Field>
+              <Slider label="مكانها رأسياً (٠ فوق ← ١٠٠ تحت)" value={f.fg_y} min={0} max={100} unit="%" onChange={set('fg_y')} />
+              <Switch checked={!!f.fg_out} onChange={() => set('fg_out')(!f.fg_out)} label="تطلع نصها برّه حدود البانر" description="مركز الصورة على الحافة (فوق أو تحت حسب المكان الرأسي) ونصها خارج البانر." />
             </div>
           )}
           <div className="grid gap-4 sm:grid-cols-2">
