@@ -164,7 +164,8 @@ if (fs.existsSync(config.webDist)) {
     // same name AND price in the same store (e.g. 3 listings of one dress): number the 2nd, 3rd... so titles/descriptions stay unique
     const twin = sameName > 1 && !item.seo_title ? (q.get("SELECT COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE s.slug=? AND p.name_ar=? AND p.price=? AND p.status='active' AND p.id<?", [req.params.slug, item.name_ar, item.price, item.id])?.n || 0) : 0;
     const model = twin > 0 ? ` (موديل ${twin + 1})` : '';
-    const title = `${item.seo_title || item.name_ar}${sameName > 1 && !item.seo_title ? ` - ${item.price} ج.م` : ''}${model} | ${item.store_name_ar} | Twist بنها`;
+    const baseTitle = `${item.seo_title || item.name_ar}${sameName > 1 && !item.seo_title ? ` - ${item.price} ج.م` : ''}${model} | ${item.store_name_ar}`;
+    const title = baseTitle.length + 13 > 60 ? baseTitle : `${baseTitle} | Twist بنها`;
     const baseDesc = String(item.seo_description || item.description_ar || '').replace(/\s+/g, ' ').trim();
     const autoDesc = `${item.name_ar}${model} من ${item.store_name_ar} في بنها بسعر ${item.price} ج.م. قارن الأسعار واطلب أونلاين من Twist.`;
     const description = trunc(baseDesc.length >= 70 ? baseDesc : (baseDesc ? `${baseDesc.replace(/[.،]+$/, '')}. ${autoDesc}` : autoDesc));
