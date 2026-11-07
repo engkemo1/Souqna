@@ -98,6 +98,8 @@ app.get('/sitemap.xml', (_req, res) => {
 // Do not index the demo catalogue or checkout flows. Real stores become indexable
 // automatically when they are created; only public, active products enter the sitemap.
 app.use((req, res, next) => {
+  // internal search results, request forms and store "shop" filter/sort pages are for shoppers, not for Google (they were showing up as thin duplicate pages)
+  if (req.path === '/search' || req.path === '/request' || req.path.startsWith('/request/') || /^\/s\/[^/]+\/(shop|search|categories|favorites)\/?$/.test(req.path)) res.set('X-Robots-Tag', 'noindex, follow');
   if (req.path.startsWith('/s/')) {
     const [, , slug, ...tail] = req.path.split('/');
     let decodedSlug = '';
@@ -129,7 +131,8 @@ app.use('/api', (_req, res) => res.status(404).json({ error: { code: 'not_found'
 if (fs.existsSync(config.webDist)) {
   app.use(express.static(config.webDist, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); if (/\/(sw\.js|offline\.html)$|\.webmanifest$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
-  const withSeo = (html, { title, description, url, image }) => html
+  const withSeo = (html, { title, description, url, image, h1, intro }) => html
+    .replace('<div id="root"></div>', h1 ? `<div id="root"><div style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"><h1>${esc(h1)}</h1>${intro ? `<p>${esc(intro)}</p>` : ''}<nav><a href="/">تويست بنها</a> <a href="/stores">محلات الملابس في بنها</a></nav></div></div>` : '<div id="root"></div>')
     .replace(/<title>.*?<\/title>/, `<title>${esc(title)}</title>`)
     .replace(/<meta name="description" content="[^"]*"\s*\/>/, `<meta name="description" content="${esc(description)}" />`)
     .replace(/<link rel="canonical" href="[^"]*"\s*\/>/, `<link rel="canonical" href="${esc(url)}" />`)
@@ -154,8 +157,11 @@ if (fs.existsSync(config.webDist)) {
     const mediaId = q.get('SELECT media_id FROM product_media WHERE product_id=? ORDER BY is_primary DESC, position LIMIT 1', [item.id])?.media_id;
     const imageBase = mediaMap([mediaId]).get(mediaId)?.base;
     const url = `${SITE_ORIGIN}${req.path}`;
-    const title = `${item.seo_title || item.name_ar} | ${item.store_name_ar} | Twist بنها`;
-    const description = trunc(item.seo_description || item.description_ar || `${item.name_ar} من ${item.store_name_ar} في بنها بسعر ${item.price} ج.م. اطلب أونلاين من Twist.`);
+    const sameName = q.get("SELECT COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE s.slug=? AND p.name_ar=? AND p.status='active'", [req.params.slug, item.name_ar])?.n || 1;
+    const title = `${item.seo_title || item.name_ar}${sameName > 1 && !item.seo_title ? ` - ${item.price} ج.م` : ''} | ${item.store_name_ar} | Twist بنها`;
+    const baseDesc = String(item.seo_description || item.description_ar || '').replace(/\s+/g, ' ').trim();
+    const autoDesc = `${item.name_ar} من ${item.store_name_ar} في بنها بسعر ${item.price} ج.م. قارن الأسعار واطلب أونلاين من Twist.`;
+    const description = trunc(baseDesc.length >= 70 ? baseDesc : (baseDesc ? `${baseDesc.replace(/[.،]+$/, '')}. ${autoDesc}` : autoDesc));
     const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/twist-share.png`;
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
     const inStock = !item.track_stock || item.stock > 0;
@@ -170,7 +176,7 @@ if (fs.existsSync(config.webDist)) {
       { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: `${SITE_ORIGIN}/` },
       { '@type': 'ListItem', position: 2, name: item.store_name_ar, item: `${SITE_ORIGIN}/s/${encodeURIComponent(req.params.slug)}` },
       { '@type': 'ListItem', position: 3, name: item.name_ar, item: url }] };
-    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withLd(withSeo(html, { title, description, url, image }), [product, crumbs]));
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withLd(withSeo(html, { title, description, url, image, h1: item.name_ar, intro: description }), [product, crumbs]));
   });
   app.get('/c/:slug', (req, res) => {
     const all = customerDepartments(); const by = new Map(all.map((d) => [d.slug, d]));
@@ -179,12 +185,13 @@ if (fs.existsSync(config.webDist)) {
     if (!d) return res.status(404).set('X-Robots-Tag', 'noindex').type('html').send(html);
     const trail = []; for (let c = d, i = 0; c && i < 10; c = by.get(c.parent), i++) trail.unshift(c);
     const url = `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`;
-    const title = d.seo?.title?.ar || `${d.name.ar} في بنها | Twist`;
-    const description = d.seo?.description?.ar || d.description?.ar || `تسوق ${d.name.ar} من محلات بنها: قارن الأسعار واطلب أونلاين من Twist.`;
+    const par = trail.length >= 2 ? trail[trail.length - 2].name.ar : ''; const dn = par && !d.name.ar.includes(par) ? `${d.name.ar} ${par}` : d.name.ar; // same name under two parents (جاكيتات حريمي / رجالي) must not give two identical titles
+    const title = d.seo?.title?.ar || `${dn} في بنها | أسعار وموديلات | Twist`;
+    const description = d.seo?.description?.ar || d.description?.ar || `تسوق ${dn} من محلات بنها على Twist: قارن الأسعار والموديلات من محلات كتير في مكان واحد واطلب أونلاين بسهولة.`;
     const image = d.images?.hero ? `${d.images.hero.startsWith('http') ? '' : SITE_ORIGIN}${d.images.hero}` : `${SITE_ORIGIN}/brand/twist-share.png`;
     const ld = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ name: 'الرئيسية', item: `${SITE_ORIGIN}/` }, ...trail.map((c) => ({ name: c.name.ar, item: `${SITE_ORIGIN}/c/${encodeURIComponent(c.slug)}` }))].map((x, i) => ({ '@type': 'ListItem', position: i + 1, name: x.name, item: x.item })) };
     if (!(d.product_count > 0)) res.set('X-Robots-Tag', 'noindex, follow');
-    const out = withSeo(html, { title, description, url, image }).replace('</head>', `<script type="application/ld+json" data-twist-breadcrumb="1">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script></head>`);
+    const out = withSeo(html, { title, description, url, image, h1: d.name.ar, intro: description }).replace('</head>', `<script type="application/ld+json" data-twist-breadcrumb="1">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script></head>`);
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(out);
   });
   app.get('/s/:slug', (req, res, next) => {
@@ -202,20 +209,20 @@ if (fs.existsSync(config.webDist)) {
     const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: `${SITE_ORIGIN}/` },
       { '@type': 'ListItem', position: 2, name: store.name_ar, item: url }] };
-    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withLd(withSeo(html, { title, description, url, image }), [storeLd, crumbs]));
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withLd(withSeo(html, { title, description, url, image, h1: store.name_ar, intro: description }), [storeLd, crumbs]));
   });
   app.get('/stores', (_req, res) => {
     const title = 'كل محلات الملابس في بنها | Twist';
     const description = 'تصفّح كل محلات الملابس والأزياء في بنها على Twist: رجالي وحريمي وأطفال ورياضي. اختار محلك واطلب أونلاين.';
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
-    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url: `${SITE_ORIGIN}/stores`, image: `${SITE_ORIGIN}/brand/twist-share.png` }));
+    res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url: `${SITE_ORIGIN}/stores`, image: `${SITE_ORIGIN}/brand/twist-share.png`, h1: 'كل محلات الملابس في بنها', intro: description }));
   });
   app.get('/join', (_req, res) => {
     const title = 'Twist بنها | افتح متجرك الإلكتروني لمحلك';
     const description = 'Twist منصة بنها للتسوق المحلي. نجهز لمحلات الملابس متجرًا إلكترونيًا باسمها، مع متابعة الطلبات واشتراك شهري من غير عمولة على البيع.';
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, {
-      title, description, url: `${SITE_ORIGIN}/join`, image: `${SITE_ORIGIN}/brand/twist-share.png`,
+      title, description, url: `${SITE_ORIGIN}/join`, image: `${SITE_ORIGIN}/brand/twist-share.png`, h1: 'افتح متجرك الإلكتروني لمحلك على Twist', intro: description,
     }));
   });
   // shared looks get their own preview card (WhatsApp / Facebook read the OG tags, not the SPA)
@@ -250,6 +257,10 @@ if (fs.existsSync(config.webDist)) {
     const hit = APP_SHELLS.find(([re]) => re.test(req.path));
     if (/\.[a-z0-9]{2,5}$/i.test(req.path) && !/^\/(s|c|a|look|track)\//.test(req.path)) return res.status(404).type('text/plain').send('Not found'); // a missing file (image, script...) is not an HTML page
     if (!hit && req.path !== '/' && !KNOWN_APP_ROUTES.test(req.path)) return notFoundPage(res); // unknown URL: real 404 + noindex
+    if (!hit && req.path === '/') {
+      const homeHtml = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8').replace('<div id="root"></div>', '<div id="root"><div style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"><h1>كل محلات الملابس في بنها في مكان واحد</h1><p>تويست (Twist) بنها: اكتشف الموضة، قارن الأسعار واطلب أونلاين من محلات الملابس.</p><nav><a href="/stores">محلات الملابس في بنها</a></nav></div></div>');
+      return res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(homeHtml);
+    }
     if (!hit) return res.sendFile(path.join(config.webDist, 'index.html'));
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8')
       .replace('<link rel="manifest" href="/manifest.webmanifest" />', `<link rel="manifest" href="${hit[1]}" />`)

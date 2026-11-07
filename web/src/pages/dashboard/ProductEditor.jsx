@@ -44,6 +44,21 @@ const normPack = (raw) => String(raw || '')
   .replace(/\b(g|gm|gr|gram|grams|G|GM)\b/g, 'جم')
   .replace(/(?<![\u0600-\u06FF])(جرام|غرام|جم|غم)(?![\u0600-\u06FF])/g, 'جم')
   .replace(/\s+/g, ' ').trim();
+// typed colours ("أسود، بيج، فوشيا"): known names reuse the preset swatch, unknown ones get a stable placeholder tint (the owner can fine-tune it with «لون تاني»)
+const splitList = (t) => String(t || '').split(/[,،;\n]/).map((x) => x.trim()).filter(Boolean);
+const EXTRA_COLORS = { 'فوشيا': '#C2185B', fuchsia: '#C2185B', 'تركواز': '#1AA6A6', turquoise: '#1AA6A6', 'سماوي': '#7EC8E3', 'سمائي': '#7EC8E3', 'لبني': '#7EC8E3', 'ذهبي': '#C9A227', gold: '#C9A227', 'فضي': '#B8BCC2', silver: '#B8BCC2', 'وردي': '#F2A6B8', 'لافندر': '#B39DDB', lavender: '#B39DDB', 'موف': '#8E5FB5', 'عنابي': '#7B1E3A', 'خمري': '#7B1E3A', 'كاكي': '#A39A6B', khaki: '#A39A6B', 'جملي': '#B5793D', camel: '#B5793D', 'رصاصي': '#5E636B', 'سمني': '#F1E6C8', cream: '#F1E6C8', 'كريمي': '#F1E6C8', 'ليموني': '#D6E34F', 'نيلي': '#2E3A8C', 'طوبي': '#A8512F', 'نبيذي': '#6E2433', 'أوف وايت': '#F2EFE6', 'اوف وايت': '#F2EFE6', mint: '#A8D8C0', 'نعناعي': '#A8D8C0', 'مشمشي': '#F4B183', 'سلموني': '#F29A8A' };
+function tintFor(name, taken) {
+  const known = EXTRA_COLORS[String(name).trim().toLowerCase()];
+  if (known && !taken.has(known)) return known;
+  let h = 0; for (const ch of name) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  for (let i = 0; i < 360; i++) {
+    const hue = (h + i * 37) % 360, sat = 0.38, lig = 0.55;
+    const a = sat * Math.min(lig, 1 - lig); const f = (n) => { const k = (n + hue / 30) % 12; return Math.round(255 * (lig - a * Math.max(-1, Math.min(k - 3, 9 - k, 1)))); };
+    const hex = `#${[f(0), f(8), f(4)].map((v) => v.toString(16).padStart(2, '0')).join('')}`.toUpperCase();
+    if (!taken.has(hex)) return hex;
+  }
+  return '#888888';
+}
 const vkey = (c, s) => `${c || '-'}|${s || '-'}`;
 const nz = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ًٌٍَُِّْ]/g, '').trim();
 
@@ -222,12 +237,29 @@ function ColorPicker({ open, onClose, onAdd, existing }) {
 function VariantsEditor({ f, set, sizeKind, typeChosen, mode = 'general', hasColors, setHasColors }) {
   const { t, tr, lang } = useI18n();
   const L = (ar, en) => (lang === 'ar' ? ar : en);
+  const toast = useToast();
   const [picker, setPicker] = useState(false);
   const [customSize, setCustomSize] = useState('');
   const [fill, setFill] = useState('');
   const [rowFill, setRowFill] = useState({}); // per-colour "same quantity for this whole row"
   const showRowFill = f.colors.length > 0 && f.sizes.length > 1;
   const applyRow = (c) => { const v = rowFill[c.hex] ?? ''; if (v === '') return; const m = { ...f.matrix }; cols.forEach((s) => { m[vkey(c.hex, s)] = v; }); set({ matrix: m }); setRowFill((r) => ({ ...r, [c.hex]: '' })); };
+  const [typedColors, setTypedColors] = useState('');
+  const addTypedColors = () => {
+    const names = splitList(typedColors);
+    if (!names.length) return;
+    const next = [...f.colors]; const taken = new Set(next.map((c) => c.hex.toUpperCase()));
+    for (const n of names) {
+      if (next.length >= 12) break;
+      const key = nz(n);
+      if (next.some((c) => nz(c.name_ar) === key || nz(c.name_en) === key)) continue;
+      const pr = PRESET_COLORS.find(([hex, ar, en]) => !taken.has(hex) && (nz(ar) === key || nz(en) === key));
+      if (pr) { next.push({ hex: pr[0], name_ar: pr[1], name_en: pr[2] }); taken.add(pr[0]); continue; }
+      const hex = tintFor(n, taken); taken.add(hex);
+      next.push({ hex, name_ar: n.slice(0, 30), name_en: n.slice(0, 30) });
+    }
+    set({ colors: next }); setTypedColors('');
+  };
   const toggleSize = (s) => set({ sizes: f.sizes.includes(s) ? f.sizes.filter((x) => x !== s) : [...f.sizes, s] });
   const toggleColor = ([hex, ar, en]) => set({ colors: f.colors.some((c) => c.hex.toUpperCase() === hex) ? f.colors.filter((c) => c.hex.toUpperCase() !== hex) : [...f.colors, { hex, name_ar: ar, name_en: en }] });
   const rows = f.colors.length ? f.colors : [null];
@@ -271,6 +303,13 @@ function VariantsEditor({ f, set, sizeKind, typeChosen, mode = 'general', hasCol
           ))}
           <button type="button" onClick={() => setPicker(true)} className="flex w-14 flex-col items-center gap-1 text-[11.5px] font-semibold text-brand"><span className="grid h-10 w-10 place-items-center rounded-full border border-dashed border-line-strong"><Plus className="h-4 w-4" /></span>{L('لون تاني', 'Other')}</button>
         </div>)}
+        {hasColors && (
+          <form className="mt-3 flex max-w-md gap-2" onSubmit={(e) => { e.preventDefault(); addTypedColors(); }}>
+            <Input size="sm" value={typedColors} onChange={(e) => setTypedColors(e.target.value)} onBlur={addTypedColors} maxLength={160}
+              placeholder={L('أو اكتب الألوان وافصل بفاصلة: أسود، بيج، فوشيا', 'Or type colours separated by commas: black, beige, fuchsia')} />
+            <Button type="submit" size="sm" variant="outline" icon={Plus} aria-label={t('common.add')} />
+          </form>
+        )}
       </div>
 
       {noSizes ? (
@@ -283,8 +322,8 @@ function VariantsEditor({ f, set, sizeKind, typeChosen, mode = 'general', hasCol
             {kindSizes.map((s) => { const on = f.sizes.includes(s); return <button key={s} type="button" onClick={() => toggleSize(s)} aria-pressed={on} className={cx('h-10 min-w-[3rem] rounded-xl border px-3 text-sm font-semibold transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{s}</button>; })}
             {extra.map((s) => <button key={s} type="button" onClick={() => toggleSize(s)} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-fg bg-fg px-3 text-sm font-semibold text-canvas">{s}<X className="h-3.5 w-3.5" /></button>)}
           </div>
-          <form className={cx('mt-2.5 flex gap-2', mode === 'beauty' ? 'max-w-md' : 'max-w-xs')} onSubmit={(e) => { e.preventDefault(); const s = mode === 'general' || mode === 'accessories' ? customSize.trim() : normPack(customSize); if (s && !f.sizes.includes(s)) set({ sizes: [...f.sizes, s] }); setCustomSize(''); }}>
-            <Input size="sm" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder={mode === 'perfume' || mode === 'skincare' ? L('حجم تاني (مثلًا 25 مل)', 'Other volume (e.g. 25 ml)') : mode === 'beauty' ? L('مثال: علبة 50 جم، تيوب 30 مل، زجاجة 100 مل، 3 قطع', 'e.g. box 50 g, tube 30 ml, bottle 100 ml, 3 pieces') : t('editor.customSize')} maxLength={mode === 'beauty' ? 30 : 12} />
+          <form className={cx('mt-2.5 flex gap-2', mode === 'beauty' ? 'max-w-md' : 'max-w-sm')} onSubmit={(e) => { e.preventDefault(); const fix = (x) => (mode === 'general' || mode === 'accessories' ? x.trim() : normPack(x)); const add = []; const tooLong = []; for (const raw of splitList(customSize)) { const v = fix(raw); if (!v) continue; if (v.length > 12) { tooLong.push(raw); continue; } if (!f.sizes.includes(v) && !add.includes(v)) add.push(v); } if (add.length) set({ sizes: [...f.sizes, ...add] }); setCustomSize(tooLong.join('، ')); if (tooLong.length) toast({ tone: 'error', title: L('المقاس لازم يبقى 12 حرف أو أقل', 'A size can be at most 12 characters') }); }}>
+            <Input size="sm" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder={mode === 'perfume' || mode === 'skincare' ? L('حجم تاني (مثلًا 25 مل)', 'Other volume (e.g. 25 ml)') : mode === 'beauty' ? L('مثال: علبة 50 جم، تيوب 30 مل، زجاجة 100 مل، 3 قطع', 'e.g. box 50 g, tube 30 ml, bottle 100 ml, 3 pieces') : t('editor.customSize')} maxLength={mode === 'beauty' ? 80 : 60} />
             <Button type="submit" size="sm" variant="outline" icon={Plus} aria-label={t('common.add')} />
           </form>
         </div>

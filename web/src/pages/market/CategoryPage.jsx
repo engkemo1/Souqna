@@ -20,9 +20,11 @@ const SITE = typeof window !== 'undefined' ? window.location.origin : '';
 function useSeo({ dept, trail, lang }) {
   useEffect(() => {
     if (!dept) return undefined;
-    const name = deptName(dept, lang);
-    const title = dept.seo?.title?.[lang] || dept.seo?.title?.ar || (lang === 'ar' ? `${name} في بنها | Twist` : `${name} in Banha | Twist`);
-    const desc = dept.seo?.description?.[lang] || dept.seo?.description?.ar || dept.description?.[lang] || dept.description?.ar || (lang === 'ar' ? `تسوق ${name} من محلات بنها: قارن الأسعار واطلب أونلاين من Twist.` : `Shop ${name} from Banha stores: compare prices and order online on Twist.`);
+    const own = deptName(dept, lang);
+    const par = trail.length >= 2 ? deptName(trail[trail.length - 2], lang) : '';
+    const name = par && !own.includes(par) ? `${own} ${par}` : own; // keeps same-named sections under different parents apart
+    const title = dept.seo?.title?.[lang] || dept.seo?.title?.ar || (lang === 'ar' ? `${name} في بنها | أسعار وموديلات | Twist` : `${name} in Banha | Prices & Styles | Twist`);
+    const desc = dept.seo?.description?.[lang] || dept.seo?.description?.ar || dept.description?.[lang] || dept.description?.ar || (lang === 'ar' ? `تسوق ${name} من محلات بنها على Twist: قارن الأسعار والموديلات من محلات كتير في مكان واحد واطلب أونلاين بسهولة.` : `Shop ${name} from many Banha stores on Twist: compare prices and styles in one place and order online.`);
     const url = `${SITE}/c/${dept.slug}`;
     document.title = title;
     const meta = (sel, make) => { let el = document.head.querySelector(sel); if (!el) { el = make(); document.head.appendChild(el); } return el; };

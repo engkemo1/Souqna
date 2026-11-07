@@ -149,3 +149,67 @@ test('shop-through-Twist: a real Twist checkout of an advertiser item creates a 
   });
   assert.equal(refused.status, 409);
 });
+
+test('colours & sizes per photo: normalised, shown publicly, and become variants so the choice reaches the order', async () => {
+  const { call } = await setup();
+  const { q } = await import('../src/db/index.js');
+  const a = await photo(); const b = await photo();
+  const bad = await call('POST', '/admin/featured/advertisers', adv([{ src: a, name: 'تيشيرت', price: '200', colors: ['x'.repeat(21)] }], { slug: 'opt-bad', twist_orders: false }));
+  assert.equal(bad.status, 422); assert.ok(bad.body.error.fields.gallery);
+
+  const r = await call('POST', '/admin/featured/advertisers', adv([
+    { src: a, name: 'تيشيرت', price: '200', colors: 'أسود، بيج,أسود', sizes: ['M', 'L', ' m '] },
+    { src: b, name: 'حزام', price: '90' },
+  ], { slug: 'opt-ok' }));
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const pub = (await call('GET', '/advertiser/opt-ok')).body.advertiser;
+  assert.deepEqual(pub.gallery[0].colors, ['أسود', 'بيج']);
+  assert.deepEqual(pub.gallery[0].sizes, ['M', 'L']);
+  assert.deepEqual(pub.gallery[1].colors, []);
+  const vs = pub.gallery[0].cart.variants;
+  assert.equal(vs.length, 4); // 2 colours x 2 sizes
+  assert.deepEqual(pub.gallery[1].cart.variants, []);
+
+  // the variant carries colour + size into the quote (and so into the order line)
+  const { quote } = await import('../src/lib/cart.js');
+  const store = q.get('SELECT * FROM stores WHERE slug=?', [r.body.advertiser.shopSlug]);
+  const v = vs.find((x) => x.color === 'بيج' && x.size === 'L');
+  const qt = quote(store, [{ productId: pub.gallery[0].cart.productId, variantId: v.id, qty: 1 }]);
+  assert.equal(qt.hasErrors, false);
+  assert.equal(qt.lines[0].color, 'بيج'); assert.equal(qt.lines[0].size, 'L');
+
+  // removing an option drops its variants again
+  const upd = await call('PUT', `/admin/featured/advertisers/${r.body.advertiser.id}`, adv([{ src: a, name: 'تيشيرت', price: '200', colors: ['أسود'] }, { src: b, name: 'حزام', price: '90' }], { slug: 'opt-ok' }));
+  assert.equal(upd.status, 200, JSON.stringify(upd.body));
+  assert.equal(q.val('SELECT COUNT(*) FROM variants WHERE product_id=?', [pub.gallery[0].cart.productId]), 1);
+});
+
+test('map location: saved as coordinates, becomes the directions link, validated', async () => {
+  const { call } = await setup();
+  const bad = await call('POST', '/admin/featured/advertisers', adv([], { slug: 'loc-bad', twist_orders: false, lat: 95, lng: 31 }));
+  assert.equal(bad.status, 422); assert.ok(bad.body.error.fields.lat);
+  const half = await call('POST', '/admin/featured/advertisers', adv([], { slug: 'loc-half', twist_orders: false, lat: 30.46 }));
+  assert.equal(half.status, 422);
+  const ok = await call('POST', '/admin/featured/advertisers', adv([], { slug: 'loc-ok', twist_orders: false, lat: '30.466123', lng: '31.185432' }));
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  const pub = (await call('GET', '/advertiser/loc-ok')).body.advertiser;
+  assert.equal(pub.lat, 30.466123); assert.equal(pub.lng, 31.185432);
+  assert.equal(pub.mapsUrl, 'https://www.google.com/maps/search/?api=1&query=30.466123,31.185432');
+  // an explicit link still wins; clearing the pin clears the derived link
+  const upd = await call('PUT', `/admin/featured/advertisers/${ok.body.advertiser.id}`, adv([], { slug: 'loc-ok', twist_orders: false, lat: '', lng: '' }));
+  assert.equal(upd.status, 200, JSON.stringify(upd.body));
+  assert.equal((await call('GET', '/advertiser/loc-ok')).body.advertiser.mapsUrl, null);
+});
+
+test('public page carries the brand colour computed from the advertiser logo', async () => {
+  const { call } = await setup();
+  const { saveAdImage } = await import('../src/lib/adImage.js');
+  const png = await sharp({ create: { width: 200, height: 200, channels: 3, background: { r: 245, g: 130, b: 20 } } }).png().toBuffer();
+  const logo = (await saveAdImage(png, 'fg')).image;
+  const r = await call('POST', '/admin/featured/advertisers', adv([], { slug: 'brand-ok', twist_orders: false, logo }));
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const b = (await call('GET', '/advertiser/brand-ok')).body.advertiser.brand;
+  assert.ok(b && /^#[0-9a-f]{6}$/.test(b.c), JSON.stringify(b));
+  assert.ok(parseInt(b.c.slice(1, 3), 16) > 200); // orange: strong red channel
+  assert.equal((await call('GET', '/advertiser/shop-a')).body.advertiser.brand ?? null, null); // no logo -> null, page falls back
+});

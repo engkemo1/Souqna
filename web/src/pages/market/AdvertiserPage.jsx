@@ -13,6 +13,39 @@ const track = (slug, event) => {
   try { fetch(`/api/advertiser/${encodeURIComponent(slug)}/event`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ event }), keepalive: true }).catch(() => {}); } catch { /* tracking must never break the page */ }
 };
 
+/** The advertiser's own brand colour, taken from their logo (the most common saturated colour), so every button matches their identity. */
+const FALLBACK_BRAND = { c: '#03244D', d: '#021a38', on: '#ffffff' };
+function brandFromLogo(src) {
+  return new Promise((resolve) => {
+    const im = new Image();
+    im.crossOrigin = 'anonymous';
+    im.onerror = () => resolve(FALLBACK_BRAND);
+    im.onload = () => {
+      try {
+        const N = 48; const cv = document.createElement('canvas'); cv.width = N; cv.height = N;
+        const cx = cv.getContext('2d', { willReadFrequently: true }); cx.drawImage(im, 0, 0, N, N);
+        const px = cx.getImageData(0, 0, N, N).data;
+        const bins = Array.from({ length: 12 }, () => ({ n: 0, r: 0, g: 0, b: 0 }));
+        for (let i = 0; i < px.length; i += 4) {
+          const [r, g, b, al] = [px[i], px[i + 1], px[i + 2], px[i + 3]];
+          if (al < 200) continue;
+          const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 510, d = mx - mn;
+          if (d < 40 || l < 0.18 || l > 0.85) continue; // skip greys, near-black and near-white
+          let h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h = (h * 60 + 360) % 360;
+          const k = bins[Math.floor(h / 30) % 12]; k.n += 1; k.r += r; k.g += g; k.b += b;
+        }
+        const top = bins.sort((x, y) => y.n - x.n)[0];
+        if (!top || top.n < 12) return resolve(FALLBACK_BRAND);
+        const [r, g, b] = [top.r / top.n, top.g / top.n, top.b / top.n].map(Math.round);
+        const hex = (a) => `#${a.map((v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('')}`;
+        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        resolve({ c: hex([r, g, b]), d: '#171717', on: lum > 0.68 ? '#111111' : '#ffffff' });
+      } catch { resolve(FALLBACK_BRAND); }
+    };
+    im.src = src;
+  });
+}
+
 /** Light profile page of an outside advertiser (reached from a featured ad). No products and no cart: name, photos, how to reach the business. */
 export default function AdvertiserPage() {
   const { slug } = useParams();
@@ -24,17 +57,31 @@ export default function AdvertiserPage() {
   const [idx, setIdx] = useState(0);
   const onRail = () => { const el = rail.current; if (!el || !el.firstElementChild) return; const w = el.firstElementChild.getBoundingClientRect().width + 10; setIdx(Math.min(Math.round(Math.abs(el.scrollLeft) / w), el.children.length - 1)); };
   const [picked, setPicked] = useState([]); // photo urls the visitor chose to ask about in ONE WhatsApp message
+  const [opt, setOpt] = useState({}); // src -> { color, size } the visitor chose for each photo
+  const [sheet, setSheet] = useState(null); // { src, mode: 'select' | 'cart' } — the small "choose colour / size" panel
+  const [brand, setBrand] = useState(FALLBACK_BRAND);
   const [wide, setWide] = useState(false); // a very wide banner or a portrait photo is shown whole (never cropped) with the identity underneath
   const cart = useMarketCart();
   const navigate = useNavigate();
   const toast = useToast();
+  const missing = (it) => ((it.colors?.length && !opt[it.src]?.color) ? 'color' : (it.sizes?.length && !opt[it.src]?.size) ? 'size' : null);
+  const setChoice = (it, k, v) => { setOpt((o) => ({ ...o, [it.src]: { ...o[it.src], [k]: o[it.src]?.[k] === v ? undefined : v } })); };
   const addToCart = (it) => {
     const c = it.cart;
-    cart.add({ productId: c.productId, variantId: null, slug: c.slug, name: { ar: it.name, en: it.name }, price: it.price, compareAt: null, image: c.image, color: null, colorName: null, size: null, qty: 1 }, { slug: c.storeSlug, name: c.storeName });
+    if (missing(it)) { setSheet({ src: it.src, mode: 'cart' }); return; }
+    const ch = opt[it.src] || {};
+    const variant = (c.variants || []).find((v) => (v.color || null) === (ch.color || null) && (v.size || null) === (ch.size || null));
+    cart.add({ productId: c.productId, variantId: variant?.id ?? null, slug: c.slug, name: { ar: it.name, en: it.name }, price: it.price, compareAt: null, image: c.image, color: null, colorName: ch.color ? { ar: ch.color, en: ch.color } : null, size: ch.size || null, qty: 1 }, { slug: c.storeSlug, name: c.storeName });
     track(a.slug, 'cart');
     toast({ title: ar ? 'اتضافت للسلة' : 'Added to basket', description: it.name, action: { label: ar ? 'افتح السلة' : 'View basket', onClick: () => navigate('/market-cart') } });
   };
 
+  useEffect(() => {
+    let on = true;
+    if (a?.brand?.c) setBrand({ c: a.brand.c, d: '#171717', on: a.brand.on }); // computed by the server (works for any logo host)
+    else if (a?.logo) brandFromLogo(a.logo).then((b) => on && setBrand(b));
+    return () => { on = false; };
+  }, [a?.logo, a?.brand?.c]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!a?.cover) { setWide(false); return undefined; }
     const im = new Image();
@@ -58,11 +105,13 @@ export default function AdvertiserPage() {
   }
 
   const name = pick(a.name, lang);
+  // no saved map link? open Google Maps on the shop name + address, so there is always a one-tap «الاتجاهات»
+  const mapsHref = a.mapsUrl || (pick(a.address, lang) ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${name} ${pick(a.address, lang)}`)}` : null);
   const waHref = a.whatsapp ? `https://wa.me/${a.whatsapp}?text=${encodeURIComponent(a.whatsappText)}` : null;
 
   const chosen = (a.gallery || []).filter((it) => picked.includes(it.src));
   const chosenTotal = chosen.reduce((n, it) => n + (it.price || 0), 0);
-  const chosenMsg = `السلام عليكم، شفت صفحة ${name} على Twist وعايز أطلب:\n${chosen.map((it, n) => `${n + 1}. ${it.name || 'قطعة'}${it.price ? ` — ${it.price} جنيه` : ''}`).join('\n')}${chosenTotal ? `\nالإجمالي: ${chosenTotal} جنيه` : ''}`;
+  const chosenMsg = `السلام عليكم، شفت صفحة ${name} على Twist وعايز أطلب:\n${chosen.map((it, n) => `${n + 1}. ${it.name || 'قطعة'}${[opt[it.src]?.color, opt[it.src]?.size].filter(Boolean).length ? ` (${[opt[it.src]?.color, opt[it.src]?.size].filter(Boolean).join('، ')})` : ''}${it.price ? ` — ${it.price} جنيه` : ''}`).join('\n')}${chosenTotal ? `\nالإجمالي: ${chosenTotal} جنيه` : ''}`;
   const Arrow = ar ? ChevronLeft : ChevronRight;
   const Row = ({ href, event, icon: Icon, tint, title, sub, external }) => (
     <a href={href} {...(external ? { target: '_blank', rel: 'noreferrer noopener' } : {})} onClick={() => track(a.slug, event)}
@@ -83,7 +132,7 @@ export default function AdvertiserPage() {
   const sellable = items.some((it) => it.cart || it.name || it.price);
 
   return (
-    <div className="min-h-screen bg-bg">
+    <div className="min-h-screen bg-bg" style={{ '--adv': brand.c, '--adv-dark': brand.d, '--adv-on': brand.on }}>
       <MarketHeader />
       <main className="mx-auto max-w-2xl px-4 pb-28 pt-4">
         {/* ── hero: the cover, a readable gradient, identity on top of it ── */}
@@ -137,14 +186,14 @@ export default function AdvertiserPage() {
           {waHref && (
             <motion.a href={waHref} target="_blank" rel="noreferrer noopener" onClick={() => track(a.slug, 'whatsapp')}
               initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15, type: 'spring', stiffness: 260, damping: 22 }} whileTap={{ scale: 0.97 }} whileHover={{ y: -2 }}
-              className="relative col-span-2 inline-flex h-14 items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-gradient-to-l from-[#1ebe5b] to-[#25D366] text-base font-bold text-white shadow-lg shadow-[#25D366]/30">
+              className="relative col-span-2 inline-flex h-14 items-center justify-center gap-2.5 overflow-hidden rounded-2xl bg-[var(--adv)] text-base font-bold text-[var(--adv-on)] shadow-lg shadow-[var(--adv)]/30">
               <motion.span aria-hidden className="pointer-events-none absolute inset-y-0 w-1/3 -skew-x-12 bg-white/25 blur-md" initial={{ x: '-150%' }} animate={{ x: '450%' }} transition={{ duration: 1.6, repeat: Infinity, repeatDelay: 3.2, ease: 'easeInOut' }} />
               <motion.span animate={{ rotate: [0, -12, 10, -6, 0] }} transition={{ duration: 0.9, repeat: Infinity, repeatDelay: 3.5 }} className="relative"><MessageCircle className="h-6 w-6" /></motion.span>
               <span className="relative">{ar ? 'كلّمهم على واتساب' : 'Chat on WhatsApp'}</span>
             </motion.a>
           )}
           {a.phone && <a href={`tel:+${a.phone}`} onClick={() => track(a.slug, 'call')} className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-line-strong bg-elevated text-[15px] font-bold transition hover:bg-fg/[0.04] active:scale-[.985]"><Phone className="h-5 w-5" />{ar ? 'اتصال' : 'Call'}</a>}
-          {a.mapsUrl && <a href={a.mapsUrl} target="_blank" rel="noreferrer noopener" onClick={() => track(a.slug, 'map')} className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-line-strong bg-elevated text-[15px] font-bold transition hover:bg-fg/[0.04] active:scale-[.985]"><MapPin className="h-5 w-5" />{ar ? 'الاتجاهات' : 'Directions'}</a>}
+          {mapsHref && <a href={mapsHref} target="_blank" rel="noreferrer noopener" onClick={() => track(a.slug, 'map')} className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl border border-line-strong bg-elevated text-[15px] font-bold transition hover:bg-fg/[0.04] active:scale-[.985]"><MapPin className="h-5 w-5" />{ar ? 'الاتجاهات' : 'Directions'}</a>}
         </div>
 
         {pick(a.about, lang) && (
@@ -163,7 +212,7 @@ export default function AdvertiserPage() {
                 {items.map((it, i) => {
                   const orderable = !!(it.name || it.price) && !!a.whatsapp;
                   const on = picked.includes(it.src);
-                  const toggle = () => setPicked((p) => (p.includes(it.src) ? p.filter((x) => x !== it.src) : [...p, it.src]));
+                  const toggle = () => { if (!on && missing(it)) { setSheet({ src: it.src, mode: 'select' }); return; } setPicked((p) => (p.includes(it.src) ? p.filter((x) => x !== it.src) : [...p, it.src])); };
                   return (
                     <motion.figure key={it.src} initial={{ opacity: 0, x: 40 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }} transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1], delay: Math.min(i, 3) * 0.08 }}
                       className="group relative aspect-[4/5] w-[80%] shrink-0 snap-center overflow-hidden rounded-[22px] bg-neutral-900 sm:w-[46%]">
@@ -182,6 +231,7 @@ export default function AdvertiserPage() {
                       <figcaption className="absolute inset-x-0 bottom-0 p-4 text-white">
                         {it.name && <p className="line-clamp-2 font-display text-[22px] font-semibold leading-tight">{it.name}</p>}
                         {it.price && <p className="mt-1 text-[15px] font-light tracking-wide text-white/85" dir="ltr">{it.price.toLocaleString(ar ? 'ar-EG' : 'en-US')} {ar ? 'جنيه' : 'EGP'}</p>}
+                        {(it.colors?.length > 0 || it.sizes?.length > 0) && <p className="mt-1.5 text-[12px] text-white/75">{[opt[it.src]?.color, opt[it.src]?.size].filter(Boolean).join(' · ') || [it.colors?.length ? (ar ? `${it.colors.length} ألوان` : `${it.colors.length} colours`) : '', it.sizes?.length ? (ar ? `${it.sizes.length} مقاسات` : `${it.sizes.length} sizes`) : ''].filter(Boolean).join(' · ')}</p>}
                         {(orderable || it.cart) && (
                           <div className="mt-3.5 flex gap-2">
                             {orderable && (
@@ -218,7 +268,7 @@ export default function AdvertiserPage() {
             <SectionTitle>{ar ? 'معلومات' : 'Info'}</SectionTitle>
             <div className="grid gap-2.5 sm:grid-cols-2">
               {pick(a.hours, lang) && <div className="flex items-center gap-3 rounded-2xl border border-line bg-elevated p-3.5"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-fg/[0.06]"><Clock className="h-5 w-5" /></span><div><p className="text-xs text-muted">{ar ? 'مواعيد الشغل' : 'Hours'}</p><p className="text-[15px] font-bold">{pick(a.hours, lang)}</p></div></div>}
-              {pick(a.address, lang) && <div className="flex items-center gap-3 rounded-2xl border border-line bg-elevated p-3.5"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-fg/[0.06]"><MapPin className="h-5 w-5" /></span><div className="min-w-0"><p className="text-xs text-muted">{ar ? 'العنوان' : 'Address'}</p><p className="text-[15px] font-bold leading-snug">{pick(a.address, lang)}</p></div></div>}
+              {pick(a.address, lang) && <a href={mapsHref} target="_blank" rel="noreferrer noopener" onClick={() => track(a.slug, 'map')} className="flex items-center gap-3 rounded-2xl border border-line bg-elevated p-3.5 transition active:scale-[.99]"><span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl text-[var(--adv-on)]" style={{ background: 'var(--adv)' }}><MapPin className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="text-xs text-muted">{ar ? 'العنوان — اضغط للاتجاهات' : 'Address — tap for directions'}</p><p className="text-[15px] font-bold leading-snug">{pick(a.address, lang)}</p></div><Arrow className="h-4 w-4 shrink-0 text-muted" /></a>}
             </div>
           </>
         )}
@@ -241,19 +291,57 @@ export default function AdvertiserPage() {
       </main>
 
       <AnimatePresence>
+        {sheet && (() => {
+          const it = items.find((x) => x.src === sheet.src);
+          if (!it) return null;
+          const ch = opt[it.src] || {};
+          const miss = missing(it);
+          const go = () => { if (miss) return; const m = sheet.mode; setSheet(null); if (m === 'cart') addToCart(it); else setPicked((p) => (p.includes(it.src) ? p : [...p, it.src])); };
+          return (
+            <>
+              <motion.div key="bd" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setSheet(null)} className="fixed inset-0 z-50 bg-black/50" />
+              <motion.div key="sh" role="dialog" aria-label={it.name} initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', stiffness: 320, damping: 34 }}
+                className="fixed inset-x-0 bottom-0 z-50 mx-auto max-h-[85vh] max-w-xl overflow-y-auto rounded-t-[28px] bg-elevated p-5 pb-6 shadow-2xl">
+                <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-fg/20" />
+                <div className="flex items-center gap-3">
+                  <img src={it.src} alt="" className="h-20 w-16 shrink-0 rounded-xl object-cover" />
+                  <div className="min-w-0 flex-1"><p className="line-clamp-2 font-display text-lg font-bold leading-tight">{it.name}</p>{it.price && <p className="mt-1 text-sm text-muted" dir="ltr">{it.price.toLocaleString(ar ? 'ar-EG' : 'en-US')} {ar ? 'جنيه' : 'EGP'}</p>}</div>
+                </div>
+                {[['color', it.colors, ar ? 'اللون' : 'Colour'], ['size', it.sizes, ar ? 'المقاس' : 'Size']].filter(([, l]) => l?.length).map(([k, list, lbl]) => (
+                  <div key={k} className="mt-5">
+                    <p className="mb-2 text-sm font-bold">{lbl}{ch[k] && <span className="ms-2 font-normal text-muted">{ch[k]}</span>}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {list.map((v) => { const sel = ch[k] === v; return (
+                        <button key={v} type="button" aria-pressed={sel} onClick={() => setChoice(it, k, v)}
+                          className={`h-11 min-w-12 rounded-full border px-4 text-sm font-semibold transition active:scale-95 ${sel ? 'border-[var(--adv-dark)] bg-[var(--adv-dark)] text-white' : 'border-line bg-canvas'}`}>{v}</button>
+                      ); })}
+                    </div>
+                  </div>
+                ))}
+                <button type="button" disabled={!!miss} onClick={go}
+                  className="mt-6 h-12 w-full rounded-full bg-[var(--adv)] text-[15px] font-bold text-[var(--adv-on)] transition disabled:opacity-40">
+                  {miss ? (ar ? `اختار ${miss === 'color' ? 'اللون' : 'المقاس'}` : `Choose a ${miss === 'color' ? 'colour' : 'size'}`) : sheet.mode === 'cart' ? (ar ? 'أضف للسلة' : 'Add to basket') : (ar ? 'تمام، أضف للطلب' : 'Add to my order')}
+                </button>
+              </motion.div>
+            </>
+          );
+        })()}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {picked.length > 0 && a.whatsapp && (
           <motion.div key="bar" initial={{ y: 120, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 120, opacity: 0 }} transition={{ type: 'spring', stiffness: 300, damping: 28 }}
             className="fixed inset-x-3 bottom-[88px] z-40 mx-auto max-w-xl sm:bottom-6">
-            <div className="flex items-center gap-3 bg-black p-2.5 ps-4 text-white shadow-2xl">
+            <div className="flex items-center gap-3 bg-[var(--adv-dark)] p-2.5 ps-4 text-white shadow-2xl">
               <div className="flex -space-x-3 rtl:space-x-reverse">
-                {chosen.slice(0, 3).map((it) => <motion.img layout key={it.src} src={it.src} alt="" className="h-10 w-8 object-cover ring-2 ring-black" />)}
+                {chosen.slice(0, 3).map((it) => <motion.img layout key={it.src} src={it.src} alt="" className="h-10 w-8 object-cover ring-2 ring-[var(--adv-dark)]" />)}
               </div>
               <div className="min-w-0 flex-1 leading-tight">
                 <p className="text-[13px] font-bold">{ar ? `${picked.length} قطعة مختارة` : `${picked.length} selected`}</p>
                 {chosenTotal > 0 && <p className="text-xs text-white/70" dir="ltr">{chosenTotal.toLocaleString(ar ? 'ar-EG' : 'en-US')} {ar ? 'جنيه' : 'EGP'}</p>}
               </div>
               <motion.a whileTap={{ scale: 0.95 }} href={`https://wa.me/${a.whatsapp}?text=${encodeURIComponent(chosenMsg)}`} target="_blank" rel="noreferrer noopener" onClick={() => track(a.slug, 'order')}
-                className="inline-flex h-11 items-center gap-2 bg-[#25D366] px-5 text-[12px] font-bold uppercase tracking-[.1em] text-white">
+                className="inline-flex h-11 items-center gap-2 bg-[var(--adv)] px-5 text-[12px] font-bold uppercase tracking-[.1em] text-[var(--adv-on)]">
                 <Send className="h-4 w-4 rtl:-scale-x-100" />{ar ? 'ابعت الطلب' : 'Send'}
               </motion.a>
             </div>

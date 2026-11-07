@@ -48,7 +48,7 @@ export function ensureShadowStore(adv) {
 }
 
 /** Read an image we stored ourselves (local media dir or our own R2 bucket). Never fetches arbitrary URLs. */
-async function ownImageBuffer(url) {
+export async function ownImageBuffer(url) {
   const u = String(url || '');
   const local = `${config.mediaBaseUrl}/`;
   try {
@@ -80,6 +80,27 @@ async function importPhoto(storeId, buffer, alt) {
   await writeMediaFile(m, 'original.jpg', jpg);
   const id = insert('media', { store_id: storeId, kind: 'product', key, width: meta.width || 0, height: meta.height || 0, sizes: JSON.stringify(sizes), original_ext: 'jpg', bytes: jpg.length, alt: String(alt || '').slice(0, 120), attached: 1, remote: m.remote });
   return id;
+}
+
+/** Colour × size combinations of one item (an empty side counts as "no choice"). */
+export function optionCombos(it) {
+  const colors = Array.isArray(it.colors) && it.colors.length ? it.colors : [null];
+  const sizes = Array.isArray(it.sizes) && it.sizes.length ? it.sizes : [null];
+  if (colors[0] === null && sizes[0] === null) return [];
+  return colors.flatMap((color) => sizes.map((size) => ({ color, size })));
+}
+
+/** Variants make the chosen colour/size travel with the basket line into the order. Stock is not tracked for these products. */
+function syncVariants(pid, it) {
+  const want = optionCombos(it);
+  const have = q.all('SELECT id, color, size FROM variants WHERE product_id=?', [pid]);
+  const same = (a, b) => (a || null) === (b || null);
+  for (const w of want) if (!have.some((v) => same(v.color, w.color) && same(v.size, w.size))) insert('variants', { product_id: pid, color: w.color, size: w.size, stock: 0 });
+  for (const v of have) {
+    if (want.some((w) => same(v.color, w.color) && same(v.size, w.size))) continue;
+    // an option the admin removed: drop it unless an old order still points at it
+    if (!q.val('SELECT 1 FROM order_items WHERE variant_id=? LIMIT 1', [v.id])) q.run('DELETE FROM variants WHERE id=?', [v.id]);
+  }
 }
 
 /** Make the shop's products match the advertiser's sellable photos. Idempotent; safe to call after every save. */
@@ -117,6 +138,7 @@ export async function syncAdvertiserShop(advId) {
         try { const mid = await importPhoto(storeId, buf, it.name); q.run('INSERT OR IGNORE INTO product_media (product_id, media_id, position, is_primary) VALUES (?,?,0,1)', [pid, mid]); } catch { /* keep the product without a picture */ }
       }
     }
+    syncVariants(pid, it);
     count += 1;
   }
   for (const p of q.all("SELECT id, slug FROM products WHERE store_id=? AND status='active'", [storeId])) {
@@ -138,7 +160,42 @@ export function cartInfoFor(adv) {
     const p = q.get("SELECT id, slug FROM products WHERE store_id=? AND slug=? AND status='active'", [adv.store_id, itemSlug(it.src)]);
     if (!p) continue;
     const mid = q.val('SELECT media_id FROM product_media WHERE product_id=? ORDER BY is_primary DESC, position LIMIT 1', [p.id]);
-    out.set(it.src, { productId: p.id, slug: p.slug, storeSlug: store.slug, storeName: { ar: store.name_ar, en: store.name_en || store.name_ar }, image: mid ? serializeMedia(getMedia(mid)) : null });
+    const variants = q.all('SELECT id, color, size FROM variants WHERE product_id=? ORDER BY id', [p.id]);
+    out.set(it.src, { variants, productId: p.id, slug: p.slug, storeSlug: store.slug, storeName: { ar: store.name_ar, en: store.name_en || store.name_ar }, image: mid ? serializeMedia(getMedia(mid)) : null });
   }
+  return out;
+}
+
+const brandCache = new Map();
+/** The advertiser's brand colour = the most common saturated colour of their logo (computed here so it works even when the logo lives on another origin). null when there is none. */
+export async function logoBrand(src) {
+  if (!src) return null;
+  if (brandCache.has(src)) return brandCache.get(src);
+  let out = null;
+  try {
+    const buf = await ownImageBuffer(src);
+    if (buf) {
+      const N = 48;
+      const px = await sharp(buf).resize(N, N, { fit: 'fill' }).ensureAlpha().raw().toBuffer();
+      const bins = Array.from({ length: 12 }, () => ({ n: 0, r: 0, g: 0, b: 0 }));
+      for (let i = 0; i + 3 < px.length; i += 4) {
+        const r = px[i], g = px[i + 1], b = px[i + 2], al = px[i + 3];
+        if (al < 200) continue;
+        const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 510, d = mx - mn;
+        if (d < 40 || l < 0.18 || l > 0.85) continue; // greys, near-black and near-white say nothing about the brand
+        let hue = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+        hue = (hue * 60 + 360) % 360;
+        const k = bins[Math.floor(hue / 30) % 12]; k.n += 1; k.r += r; k.g += g; k.b += b;
+      }
+      const top = bins.sort((x, y) => y.n - x.n)[0];
+      if (top && top.n >= 12) {
+        const [r, g, b] = [top.r / top.n, top.g / top.n, top.b / top.n].map(Math.round);
+        const hex = [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+        out = { c: `#${hex}`, on: (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.68 ? '#111111' : '#ffffff' };
+      }
+    }
+  } catch { out = null; }
+  if (brandCache.size > 200) brandCache.clear();
+  brandCache.set(src, out);
   return out;
 }

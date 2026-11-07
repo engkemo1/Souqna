@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS featured_advertiser_stats (
 );
 `);
 
-for (const [col, ddl] of [['tiktok', "TEXT NOT NULL DEFAULT ''"], ['hours_json', "TEXT NOT NULL DEFAULT ''"], ['twist_orders', 'INTEGER NOT NULL DEFAULT 0'], ['store_id', 'INTEGER']]) {
+for (const [col, ddl] of [['lat', 'REAL'], ['lng', 'REAL'], ['tiktok', "TEXT NOT NULL DEFAULT ''"], ['hours_json', "TEXT NOT NULL DEFAULT ''"], ['twist_orders', 'INTEGER NOT NULL DEFAULT 0'], ['store_id', 'INTEGER']]) {
   if (!q.all('PRAGMA table_info(featured_advertisers)').some((c) => c.name === col)) db.exec(`ALTER TABLE featured_advertisers ADD COLUMN ${col} ${ddl}`);
 }
 
@@ -81,6 +81,22 @@ export function normalizeAdvertiser(body, { id = null } = {}) {
   for (const k of ['logo', 'cover']) { const v = safeUrl(b[k]); if (v === null) f[k] = 'bad_url'; out[k] = v || ''; }
   out.maps_url = url('maps_url'); out.instagram = url('instagram'); out.facebook = url('facebook'); out.tiktok = url('tiktok');
   const gal = Array.isArray(b.gallery) ? b.gallery : [];
+  // optional per-photo colours / sizes: an array or free text split on , ، ; and newlines. Max 10 values of 20 characters, duplicates dropped; null = invalid.
+  const opts = (v) => {
+    if (v === undefined || v === null || v === '') return [];
+    const list = Array.isArray(v) ? v : (typeof v === 'string' ? v.split(/[,،;\n]/) : null);
+    if (!list) return null;
+    const seen = new Set(); const res = [];
+    for (const x of list) {
+      if (typeof x !== 'string' && typeof x !== 'number') return null;
+      const t = clean(String(x), 40);
+      if (!t) continue;
+      if (t.length > 20) return null;
+      const k = t.toLowerCase();
+      if (!seen.has(k)) { seen.add(k); res.push(t); }
+    }
+    return res.length > 10 ? null : res;
+  };
   if (gal.length > 6) f.gallery = 'too_many';
   out.gallery = [];
   // each photo may carry an optional name + price (managed by the platform admin, not by the advertiser). Plain strings = photo only.
@@ -93,7 +109,17 @@ export function normalizeAdvertiser(body, { id = null } = {}) {
     if (name.length > 60) { f.gallery = 'too_long'; break; }
     let price = null;
     if (o.price !== undefined && o.price !== null && o.price !== '') { const n = Number(o.price); if (!Number.isInteger(n) || n < 1 || n > 10_000_000) { f.gallery = 'bad_price'; break; } price = n; }
-    out.gallery.push({ src, name, price });
+    const colors = opts(o.colors); const sizes = opts(o.sizes);
+    if (colors === null || sizes === null) { f.gallery = 'bad_options'; break; }
+    out.gallery.push({ src, name, price, ...(colors.length ? { colors } : {}), ...(sizes.length ? { sizes } : {}) });
+  }
+  // shop location picked on the map (optional): both numbers or neither
+  const hasLat = b.lat !== undefined && b.lat !== null && b.lat !== ''; const hasLng = b.lng !== undefined && b.lng !== null && b.lng !== '';
+  out.lat = null; out.lng = null;
+  if (hasLat || hasLng) {
+    const la = Number(b.lat); const ln = Number(b.lng);
+    if (!hasLat || !hasLng || !Number.isFinite(la) || !Number.isFinite(ln) || Math.abs(la) > 90 || Math.abs(ln) > 180) f.lat = 'bad_location';
+    else { out.lat = Math.round(la * 1e6) / 1e6; out.lng = Math.round(ln * 1e6) / 1e6; }
   }
   for (const k of ['whatsapp', 'phone']) { const v = normalizePhone(b[k]); if (v === null) f[k] = 'bad_phone'; out[k] = v || ''; }
   // structured opening hours (optional) → "open now" badge. Same shape as an ad's repeat: open days + one daily window (past midnight allowed).
@@ -108,7 +134,7 @@ export function normalizeAdvertiser(body, { id = null } = {}) {
   out.consent = b.consent === true || b.consent === 1 || b.consent === '1' ? 1 : 0;
   out.status = b.status === 'hidden' ? 'hidden' : 'active';
   if (out.status === 'active' && !out.consent) f.consent = 'consent_required';
-  if (!out.whatsapp && !out.phone && !out.maps_url && !f.whatsapp && !f.phone) f.whatsapp = 'required'; // a profile with no way to reach the business is useless
+  if (!out.whatsapp && !out.phone && !out.maps_url && out.lat === null && !f.whatsapp && !f.phone) f.whatsapp = 'required'; // a profile with no way to reach the business is useless
   let slug = slugify(b.slug) || slugify(out.name_en) || '';
   if (!slug) slug = `a-${crypto.randomBytes(3).toString('hex')}`;
   const clash = q.get('SELECT id FROM featured_advertisers WHERE slug=?', [slug]);
@@ -118,7 +144,7 @@ export function normalizeAdvertiser(body, { id = null } = {}) {
   return out;
 }
 const toDb = (a) => { const { gallery, hours, ...rest } = a; return { ...rest, gallery_json: JSON.stringify(gallery), hours_json: hours ? JSON.stringify(hours) : '' }; };
-const gal = (row) => { try { const g = JSON.parse(row.gallery_json || '[]'); return Array.isArray(g) ? g.map((x) => (typeof x === 'string' ? { src: x, name: '', price: null } : { src: x.src, name: x.name || '', price: x.price ?? null })).filter((x) => x.src) : []; } catch { return []; } };
+const gal = (row) => { try { const g = JSON.parse(row.gallery_json || '[]'); return Array.isArray(g) ? g.map((x) => (typeof x === 'string' ? { src: x, name: '', price: null } : { src: x.src, name: x.name || '', price: x.price ?? null, colors: Array.isArray(x.colors) ? x.colors : [], sizes: Array.isArray(x.sizes) ? x.sizes : [] })).filter((x) => x.src) : []; } catch { return []; } };
 const bi = (row, f) => ({ ar: row[`${f}_ar`] || '', en: row[`${f}_en`] || row[`${f}_ar`] || '' });
 
 export function publicAdvertiser(slug) {
@@ -128,7 +154,7 @@ export function publicAdvertiser(slug) {
   return {
     slug: r.slug, name, tagline: bi(r, 'tagline'), about: bi(r, 'about'), logo: r.logo || null, cover: r.cover || null,
     gallery: (() => { const cart = cartInfoFor(r); return gal(r).map((it) => ({ ...it, cart: cart.get(it.src) || null })); })(),
-    address: bi(r, 'address'), hours: bi(r, 'hours'), openNow: r.hours_json ? repeatMatches(parseRepeat(r.hours_json)) : null, whatsapp: r.whatsapp || null, phone: r.phone || null, mapsUrl: r.maps_url || null,
+    address: bi(r, 'address'), hours: bi(r, 'hours'), openNow: r.hours_json ? repeatMatches(parseRepeat(r.hours_json)) : null, whatsapp: r.whatsapp || null, phone: r.phone || null, mapsUrl: r.maps_url || (r.lat != null && r.lng != null ? `https://www.google.com/maps/search/?api=1&query=${r.lat},${r.lng}` : null), lat: r.lat ?? null, lng: r.lng ?? null,
     instagram: r.instagram || null, facebook: r.facebook || null, tiktok: r.tiktok || null,
     offer: r.offer_text_ar || r.offer_text_en || r.offer_code ? { text: bi(r, 'offer_text'), code: r.offer_code || null } : null,
     whatsappText: `السلام عليكم، شفت إعلان ${name.ar} على Twist${r.offer_code ? ` — كلمة السر: ${r.offer_code}` : ''}`,
@@ -169,7 +195,7 @@ function campaignStats(id, days) {
 
 const adminShape = (r, days = 30) => ({
   id: r.id, slug: r.slug, name: bi(r, 'name'), nameAr: r.name_ar, nameEn: r.name_en, taglineAr: r.tagline_ar, taglineEn: r.tagline_en, aboutAr: r.about_ar, aboutEn: r.about_en,
-  logo: r.logo, cover: r.cover, gallery: gal(r), addressAr: r.address_ar, addressEn: r.address_en, whatsapp: r.whatsapp, phone: r.phone, mapsUrl: r.maps_url,
+  logo: r.logo, cover: r.cover, gallery: gal(r), addressAr: r.address_ar, addressEn: r.address_en, whatsapp: r.whatsapp, phone: r.phone, mapsUrl: r.maps_url, lat: r.lat ?? null, lng: r.lng ?? null,
   hoursAr: r.hours_ar, hoursEn: r.hours_en, openFrom: parseRepeat(r.hours_json)?.windows?.[0]?.from || '', openTo: parseRepeat(r.hours_json)?.windows?.[0]?.to || '', openDays: parseRepeat(r.hours_json)?.days || [], instagram: r.instagram, facebook: r.facebook, tiktok: r.tiktok || '', offerTextAr: r.offer_text_ar, offerTextEn: r.offer_text_en, offerCode: r.offer_code,
   consent: !!r.consent, twistOrders: !!r.twist_orders, shopSlug: r.store_id ? q.val('SELECT slug FROM stores WHERE id=?', [r.store_id]) : null, status: r.status, url: `/a/${r.slug}`, stats: statsFor(r.id, days), ads: campaignStats(r.id, days), createdAt: r.created_at,
 });

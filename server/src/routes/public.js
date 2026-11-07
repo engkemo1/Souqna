@@ -22,6 +22,7 @@ import { logSearch, trackEvent } from '../lib/insights.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { publicCampaigns, recordEvent, PLACEMENT_KEYS } from '../lib/featured.js';
 import { publicAdvertiser, recordAdvertiserEvent } from '../lib/advertisers.js';
+import { logoBrand } from '../lib/advertiser-shop.js';
 import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
 import { logVisualSearch } from '../lib/visual-demand.js';
 import { runStylist, modaBrain, modaCurator, modaUnderstander, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
@@ -105,11 +106,11 @@ const featuredEvent = (event) => h((req, res) => {
 r.post('/featured/:id/impression', featuredEvent('impression'));
 r.post('/featured/:id/click', featuredEvent('click'));
 /* outside advertisers' profile pages (reached from a featured ad) */
-r.get('/advertiser/:slug', h((req, res) => {
+r.get('/advertiser/:slug', h(async (req, res) => {
   const a = publicAdvertiser(req.params.slug);
   if (!a) throw new AppError(404, 'not_found', 'Page not found');
   cache(res, 30);
-  res.json({ advertiser: a });
+  res.json({ advertiser: { ...a, brand: await logoBrand(a.logo) } });
 }));
 r.post('/advertiser/:slug/event', h((req, res) => {
   const body = req.body && typeof req.body === 'object' ? req.body : {};

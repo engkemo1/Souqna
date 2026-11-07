@@ -315,6 +315,17 @@ function Wizard({ editing, meta, onClose, onSaved }) {
             <FeaturedCard preview item={livePreview} variant="hero" lang="ar" />
             <div className="mt-2"><ContrastNote value={contrast} /></div>
           </div>
+          {f.mode === 'advertiser' && (() => {
+            const adv = (advList?.items || []).find((x) => String(x.id) === f.advertiser_id);
+            if (!adv?.cover) return null;
+            return (
+              <div className="flex items-center gap-3 rounded-2xl border border-line bg-fg/[0.03] p-3">
+                <img src={adv.cover} alt="" className="h-14 w-20 rounded-lg object-cover" />
+                <div className="min-w-0 flex-1"><p className="text-sm font-semibold">غلاف المعلن جاهز</p><p className="text-xs text-muted">استخدم نفس الصورة اللي ضفتها للمعلن كصورة الإعلان (كمبيوتر وموبايل).</p></div>
+                <Button type="button" size="sm" variant="outline" onClick={() => setF((x) => ({ ...x, desktop_image: adv.cover, mobile_image: adv.cover }))}>استخدمها</Button>
+              </div>
+            );
+          })()}
           <ImagePick label="الصورة الخلفية — كمبيوتر" hint={f.type === 'offer' ? 'اختيارية — لو فاضية بنستخدم صورة العرض' : 'مطلوبة للنشر (لو مفيش صورة أمامية)'} value={f.desktop_image} onChange={set('desktop_image')} error={fe.desktop_image && 'صورة غير صالحة'} />
           <ImagePick label="الصورة الخلفية — موبايل" hint="اختيارية — لو فاضية بنستخدم صورة الكمبيوتر" value={f.mobile_image} onChange={set('mobile_image')} />
           <div className="grid gap-4 sm:grid-cols-3">

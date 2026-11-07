@@ -145,7 +145,7 @@ test('advertiser: photos can carry a name + price and become orderable on WhatsA
   assert.equal(evil.status, 422);
   const ok = await call('POST', '/admin/featured/advertisers', adv({ slug: 'items', gallery: [{ src: '/img/1.jpg', name: 'جاكيت جلد', price: '1250' }, { src: '/img/2.jpg', name: '', price: '' }, '/img/3.jpg'] }));
   assert.equal(ok.status, 201, JSON.stringify(ok.body));
-  assert.deepEqual(ok.body.advertiser.gallery, [{ src: '/img/1.jpg', name: 'جاكيت جلد', price: 1250 }, { src: '/img/2.jpg', name: '', price: null }, { src: '/img/3.jpg', name: '', price: null }]);
+  assert.deepEqual(ok.body.advertiser.gallery, [{ src: '/img/1.jpg', name: 'جاكيت جلد', price: 1250, colors: [], sizes: [] }, { src: '/img/2.jpg', name: '', price: null, colors: [], sizes: [] }, { src: '/img/3.jpg', name: '', price: null, colors: [], sizes: [] }]);
   const pub = (await call('GET', '/advertiser/items')).body.advertiser;
   assert.equal(pub.gallery[0].price, 1250); assert.equal(pub.gallery[1].name, '');
   await call('POST', '/advertiser/items/event', { event: 'order' });

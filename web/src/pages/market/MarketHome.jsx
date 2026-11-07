@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Store, CreditCard, MapPin, Sparkles, Camera, MessageSquare, Users, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package } from 'lucide-react';
+import { Search, Store, CreditCard, MapPin, Sparkles, Camera, MessageSquare, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
@@ -41,13 +41,12 @@ const HERO_PROMPTS = [
 function HeroStats({ stats = {}, lang }) {
   const { t } = useI18n();
   const items = [
-    [Users, t('market.stat.customersValue'), t('market.stat.customers')],
     [Package, stats.products ? `+${new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US').format(stats.products)}` : '—', t('market.stat.products')],
-    [Store, t('market.stat.storesValue'), t('market.stat.stores')],
+    [Store, stats.stores ? new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US').format(stats.stores) : t('market.stat.storesValue'), t('market.stat.stores')],
     [Truck, t('market.stat.deliveryValue'), t('market.stat.delivery')],
   ];
   return (
-    <div className="grid grid-cols-2 divide-x divide-x-reverse divide-y divide-gray-100 rounded-2xl border border-line bg-white/95 py-3 shadow-[0_12px_35px_rgba(3,36,77,.06)] sm:grid-cols-4 sm:divide-y-0 sm:py-5">
+    <div className="grid grid-cols-3 divide-x divide-x-reverse divide-gray-100 rounded-2xl border border-line bg-white/95 py-3 shadow-[0_12px_35px_rgba(3,36,77,.06)] sm:py-5">
       {items.map(([Icon, value, label]) => <div key={label} className="flex items-center justify-center gap-2.5 px-2 py-3 text-center sm:gap-3.5 sm:px-4 sm:py-1">
         <div className="hidden h-11 w-11 shrink-0 place-items-center rounded-full bg-[#f6f7f9] text-[#03244D] sm:grid"><Icon className="h-5 w-5" strokeWidth={1.75} /></div>
         <div><p className="font-display text-base font-black text-[#03244D] sm:text-2xl" dir="ltr">{value}</p><p className="text-[10px] font-medium text-muted sm:text-xs">{label}</p></div>
@@ -122,7 +121,7 @@ export default function MarketHome() {
         <div className="container relative grid items-center gap-6 lg:grid-cols-2 lg:gap-12">
           <div className="relative z-10 w-full min-w-0 max-w-2xl">
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="inline-flex items-center gap-2 rounded-full bg-[#EAF0F8] px-4 py-2 text-[13px] font-bold text-brand">
-              <MapPin className="h-4 w-4" /><span>{lang === 'ar' ? 'اكتشف محلات الملابس في بنها' : 'Discover Banha clothing stores'}</span>
+              <MapPin className="h-4 w-4" /><span>{lang === 'ar' ? 'تويست (Twist) بنها: اكتشف محلات الملابس' : 'Twist Banha: discover clothing stores'}</span>
             </motion.div>
             <MobileHomeSearch />
             <h1 className="mt-3 font-display text-[1.75rem] sm:text-[clamp(2.25rem,1.4rem+3vw,4.15rem)] font-black leading-[1.18] tracking-tight text-[#101d3a] sm:mt-4">
@@ -273,6 +272,14 @@ export default function MarketHome() {
       </section>
 
       <FeaturedSlot placement="market_bottom" />
+      {lang === 'ar' && (
+        <section className="container mt-14" aria-labelledby="about-twist">
+          <h2 id="about-twist" className="font-display text-xl font-bold text-[#101d3a]">عن تويست (Twist) بنها</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-[#43516a]">
+            تويست (Twist) منصة تسوق محلية في بنها بتجمع <Link to="/stores" className="font-semibold text-brand underline-offset-2 hover:underline">محلات الملابس</Link> في مكان واحد: رجالي وحريمي وأطفال وملابس رياضية. تقدر تتصفح المنتجات وتقارن الأسعار وتطلب أونلاين وتتابع طلبك. ولو عندك محل، <Link to="/join" className="font-semibold text-brand underline-offset-2 hover:underline">افتح متجرك باسمك على تويست</Link> من غير عمولة على البيع.
+          </p>
+        </section>
+      )}
       <footer className="container mt-16 flex flex-col items-center justify-between gap-4 border-t border-line py-10 text-sm text-muted sm:flex-row">
         <Brand />
         <div className="flex flex-col items-center gap-3 sm:items-end">
