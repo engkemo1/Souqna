@@ -100,6 +100,8 @@ app.get('/sitemap.xml', (_req, res) => {
 // automatically when they are created; only public, active products enter the sitemap.
 app.use((req, res, next) => {
   // internal search results, request forms and store "shop" filter/sort pages are for shoppers, not for Google (they were showing up as thin duplicate pages)
+  // private / transactional app screens (also disallowed in robots.txt): never index them if a crawler ignores robots
+  if (/^\/(account|market-cart|favorites|market-checkout|market-order-success|login|register|visual|track|admin|dashboard|pos)(\/|$)/.test(req.path)) res.set('X-Robots-Tag', 'noindex');
   if (req.path === '/search' || req.path === '/request' || req.path.startsWith('/request/') || /^\/s\/[^/]+\/(shop|search|categories|favorites)\/?$/.test(req.path)) res.set('X-Robots-Tag', 'noindex, follow');
   if (req.path.startsWith('/s/')) {
     const [, , slug, ...tail] = req.path.split('/');
@@ -159,9 +161,12 @@ if (fs.existsSync(config.webDist)) {
     const imageBase = mediaMap([mediaId]).get(mediaId)?.base;
     const url = `${SITE_ORIGIN}${req.path}`;
     const sameName = q.get("SELECT COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE s.slug=? AND p.name_ar=? AND p.status='active'", [req.params.slug, item.name_ar])?.n || 1;
-    const title = `${item.seo_title || item.name_ar}${sameName > 1 && !item.seo_title ? ` - ${item.price} ج.م` : ''} | ${item.store_name_ar} | Twist بنها`;
+    // same name AND price in the same store (e.g. 3 listings of one dress): number the 2nd, 3rd... so titles/descriptions stay unique
+    const twin = sameName > 1 && !item.seo_title ? (q.get("SELECT COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE s.slug=? AND p.name_ar=? AND p.price=? AND p.status='active' AND p.id<?", [req.params.slug, item.name_ar, item.price, item.id])?.n || 0) : 0;
+    const model = twin > 0 ? ` (موديل ${twin + 1})` : '';
+    const title = `${item.seo_title || item.name_ar}${sameName > 1 && !item.seo_title ? ` - ${item.price} ج.م` : ''}${model} | ${item.store_name_ar} | Twist بنها`;
     const baseDesc = String(item.seo_description || item.description_ar || '').replace(/\s+/g, ' ').trim();
-    const autoDesc = `${item.name_ar} من ${item.store_name_ar} في بنها بسعر ${item.price} ج.م. قارن الأسعار واطلب أونلاين من Twist.`;
+    const autoDesc = `${item.name_ar}${model} من ${item.store_name_ar} في بنها بسعر ${item.price} ج.م. قارن الأسعار واطلب أونلاين من Twist.`;
     const description = trunc(baseDesc.length >= 70 ? baseDesc : (baseDesc ? `${baseDesc.replace(/[.،]+$/, '')}. ${autoDesc}` : autoDesc));
     const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/twist-share.png`;
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
