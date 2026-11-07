@@ -1203,6 +1203,14 @@ const createSchema = z.object({
   auto_whatsapp: z.boolean().default(false),
 });
 
+// Normalisers used to spot duplicate accounts.
+const normEmail = (e) => {
+  const [local = '', domain = ''] = String(e || '').trim().toLowerCase().split('@');
+  if (!domain) return String(e || '').trim().toLowerCase();
+  const l = local.split('+')[0];
+  return /^(gmail|googlemail)\.com$/.test(domain) ? `${l.replace(/\./g, '')}@gmail.com` : `${l}@${domain}`;
+};
+const normStoreName = (n) => String(n || '').toLowerCase().normalize('NFKC').replace(/[\u064B-\u065F\u0640]/g, '').replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[^\p{L}\p{N}]+/gu, '');
 const PW_CHARS = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const genPassword = (n = 10) => Array.from({ length: n }, () => PW_CHARS[crypto.randomInt(PW_CHARS.length)]).join('');
 const origin = (req) => `${req.protocol}://${req.get('host')}`;
@@ -1211,7 +1219,15 @@ const credentials = (req, slug, email, password) => ({ slug, email, password, st
 r.post('/stores', h((req, res) => {
   const d = createSchema.parse(req.body);
   assertDepartments(d.departments);
-  if (q.get('SELECT id FROM users WHERE email=?', [d.email])) throw new AppError(422, 'validation_failed', 'Email already in use', { email: 'email_taken' });
+  // Reject anything that looks like an account that already exists: same email (ignoring case, gmail dots and +tags), same phone, same store name.
+  const dup = {};
+  const wantEmail = normEmail(d.email);
+  if (q.all('SELECT email FROM users').some((u) => normEmail(u.email) === wantEmail)) dup.email = 'email_taken';
+  if (q.get('SELECT 1 AS x FROM stores WHERE phone=? OR whatsapp=?', [d.phone, d.phone])) dup.phone = 'phone_taken';
+  if (d.whatsapp && q.get('SELECT 1 AS x FROM stores WHERE phone=? OR whatsapp=?', [d.whatsapp, d.whatsapp])) dup.whatsapp = 'phone_taken';
+  const wantName = normStoreName(d.store_name);
+  if (wantName && q.all('SELECT name_ar, name_en FROM stores').some((st) => normStoreName(st.name_ar) === wantName || normStoreName(st.name_en) === wantName)) dup.store_name = 'name_taken';
+  if (Object.keys(dup).length) throw new AppError(422, 'validation_failed', 'This account or store looks like it already exists', dup);
   const password = d.password || genPassword();
   const out = tx(() => {
     const uid = insert('users', { name: d.owner_name, email: d.email, password_hash: bcrypt.hashSync(password, 10) });

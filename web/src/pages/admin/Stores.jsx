@@ -127,7 +127,17 @@ function CreateSheet({ open, onClose, onDone, depts }) {
   const [busy, setBusy] = useState(false);
   const [errs, setErrs] = useState({});
   const [link, setLink] = useState(null);
+  const [emailTouched, setEmailTouched] = useState(false);
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  // The login email follows the store name (name@twist.com) until the admin types their own.
+  const setName = (e) => {
+    const name = e.target.value;
+    const slug = name.normalize('NFKD').toLowerCase().replace(/[^a-z0-9]+/g, '');
+    setF({ ...f, store_name: name, ...(emailTouched ? {} : { email: slug.length >= 2 ? `${slug}@twist.com` : '' }) });
+  };
+  const setEmail = (e) => { setEmailTouched(true); setF({ ...f, email: e.target.value }); };
+  const emailFocus = (e) => { const el = e.target; if (!f.email) { setF({ ...f, email: '@twist.com' }); setTimeout(() => el.setSelectionRange(0, 0), 0); } };
+  const emailBlur = () => { if (f.email === '@twist.com') setF({ ...f, email: '' }); };
   const submit = async (e) => {
     e.preventDefault();
     if (!f.departments.length) { setErrs({ departments: 'اختار قسم واحد على الأقل' }); return; }
@@ -138,12 +148,12 @@ function CreateSheet({ open, onClose, onDone, depts }) {
       setLink({ slug: r.slug, url: r.setup.url, expires: r.setup.expires });
       onDone();
     } catch (x) {
-      setErrs(Object.fromEntries(Object.entries(x.fields || {}).map(([k, v]) => [k, v === 'email_taken' ? 'الإيميل ده مستخدم' : v === 'phone_invalid' ? 'رقم مصري صحيح (01xxxxxxxxx)' : 'قيمة غير صحيحة'])));
+      setErrs(Object.fromEntries(Object.entries(x.fields || {}).map(([k, v]) => [k, v === 'email_taken' ? 'الإيميل ده مستخدم (أو شبيه بإيميل موجود)' : v === 'phone_taken' ? 'الرقم ده مستخدم في محل تاني' : v === 'name_taken' ? 'فيه محل بنفس الاسم ده' : v === 'phone_invalid' ? 'رقم مصري صحيح (01xxxxxxxxx)' : 'قيمة غير صحيحة'])));
       toast({ tone: 'error', title: x.message });
     }
     setBusy(false);
   };
-  const close = () => { setLink(null); setF(empty); setErrs({}); onClose(); };
+  const close = () => { setLink(null); setF(empty); setErrs({}); setEmailTouched(false); onClose(); };
   return (
     <Sheet open={open} onClose={close} title="إضافة محل جديد" side="end" size="lg">
       {link ? (
@@ -158,9 +168,9 @@ function CreateSheet({ open, onClose, onDone, depts }) {
       ) : (
         <form onSubmit={submit} className="space-y-4 py-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="اسم المحل" error={errs.store_name}><Input required minLength={2} value={f.store_name} onChange={set('store_name')} /></Field>
+            <Field label="اسم المحل" error={errs.store_name}><Input required minLength={2} value={f.store_name} onChange={setName} /></Field>
             <Field label="اسم الصاحب" error={errs.owner_name}><Input required minLength={2} value={f.owner_name} onChange={set('owner_name')} /></Field>
-            <Field label="إيميل الدخول" error={errs.email}><Input type="email" dir="ltr" required value={f.email} onChange={set('email')} className="text-start" /></Field>
+            <Field label="إيميل الدخول" error={errs.email}><Input type="email" dir="ltr" required autoComplete="off" placeholder="store-name@twist.com" value={f.email} onChange={setEmail} onFocus={emailFocus} onBlur={emailBlur} className="text-start" /></Field>
             <Field label="رقم التليفون" error={errs.phone}><Input dir="ltr" inputMode="tel" required pattern="01[0125][0-9]{8}" value={f.phone} onChange={set('phone')} className="text-start" /></Field>
             <Field label="واتساب المحل (لو مختلف)" optional error={errs.whatsapp}><Input dir="ltr" inputMode="tel" pattern="01[0125][0-9]{8}" value={f.whatsapp} onChange={set('whatsapp')} className="text-start" /></Field>
             <Field label="العنوان" optional>

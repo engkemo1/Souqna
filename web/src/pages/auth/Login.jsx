@@ -31,7 +31,8 @@ export default function Login() {
     setBusy(true);
     setError(null);
     try {
-      await login(creds.email.trim(), creds.password);
+      const typed = creds.email.trim();
+      await login(typed && !typed.includes('@') ? `${typed}@twist.com` : typed, creds.password);
       navigate(params.get('next') || '/dashboard', { replace: true });
     } catch (err) {
       setError(err);
@@ -71,7 +72,7 @@ export default function Login() {
       <div className="my-7 flex items-center gap-4 text-xs text-muted"><span className="h-px flex-1 bg-line" />{t('common.or')}<span className="h-px flex-1 bg-line" /></div>
 
       <form onSubmit={submit} noValidate className="space-y-4">
-        <Field label={t('auth.email')} error={fe.email}><Input type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} dir="ltr" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="text-start" /></Field>
+        <Field label={t('auth.email')} error={fe.email}><Input type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} dir="ltr" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="store-name@twist.com" onFocus={(e) => { const el = e.target; if (!form.email) { setForm({ ...form, email: '@twist.com' }); setTimeout(() => el.setSelectionRange(0, 0), 0); } }} onBlur={() => { if (form.email === '@twist.com') setForm({ ...form, email: '' }); }} className="text-start" /></Field>
         <Field label={t('auth.password')} error={fe.password}>
           <div className="relative">
             <Input type={show ? 'text' : 'password'} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} dir="ltr" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pe-12 text-start" />
