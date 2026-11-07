@@ -26,7 +26,9 @@ import { publicAdvertiser, recordAdvertiserEvent } from '../lib/advertisers.js';
 import { logoBrand } from '../lib/advertiser-shop.js';
 import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
 import { logVisualSearch } from '../lib/visual-demand.js';
-import { runStylist, modaBrain, modaCurator, modaUnderstander, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds } from '../lib/stylist.js';
+import { runStylist, modaBrain, modaCurator, modaUnderstander, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds, liveOffersForModa, storesForModa } from '../lib/stylist.js';
+import { contactFromEnv } from '../lib/moda/contact.js';
+import { logStylist } from '../lib/stylist-log.js';
 import { runModa } from '../lib/moda/engine.js';
 import { getModaPrompts } from '../lib/modaPrompts.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
@@ -426,7 +428,7 @@ function modaCatalogRows() {
     ORDER BY p.featured DESC, p.sold_count DESC, p.id DESC LIMIT 5000`);
 }
 function modaClientResponse(result) {
-  const base = { intent: result.intent === 'brain' ? 'chat' : result.intent || (result.state === 'chat' ? 'chat' : 'shop'), state: result.state, say: result.say, tips: result.tips || [], styleTips: result.styleTips || [], questions: result.questions || [], session: result.session };
+  const base = { intent: result.intent === 'brain' ? 'chat' : result.intent || (result.state === 'chat' ? 'chat' : 'shop'), state: result.state, say: result.say, tips: result.tips || [], styleTips: result.styleTips || [], questions: result.questions || [], session: result.session, remember: result.remember || {}, storeCard: result.storeCard || null };
   if (!result.blocks) return { ...base, looks: [], total: 0, weatherSource: result.weatherSource || null };
   const cards = new Map(cardsByIds(result.blocks.tabs.flatMap((tab) => tab.items.map((item) => item.id))).map((card) => [card.id, card]));
   const tabs = result.blocks.tabs.map((tab) => ({
@@ -467,7 +469,8 @@ r.post('/stylist', h(async (req, res) => {
   }
   try {
     // Photos still use the vision-capable provider. Text chat uses the local, rule-based Twila engine and live shop inventory.
-    if (body.image || body.image2) return res.json(await runStylist(body.messages, { image: body.image, image2: body.image2, profile, session: body.session, answers: body.answers, similar: body.similar }));
+    const t0 = Date.now(); const lastText = body.messages[body.messages.length - 1]?.content || '';
+    if (body.image || body.image2) { const out = await runStylist(body.messages, { image: body.image, image2: body.image2, profile, session: body.session, answers: body.answers, similar: body.similar }); logStylist(lastText || '[photo]', out, Date.now() - t0, { photo: true }); return res.json(out); }
     const modaProfile = { ...(profile || {}) };
     const rows = modaCatalogRows();
     const messages = body.startLook
@@ -489,7 +492,8 @@ r.post('/stylist', h(async (req, res) => {
       const cap = Number(process.env.MODA_UNDERSTAND_DAILY ?? 150); const inner = understand;
       understand = async (a) => { const k = `${ip}`; const hits = (understandHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; understandHits.set(k, [...hits, Date.now()]); return inner(a); };
     }
-    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand });
+    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv() });
+    logStylist(body.startLook ? '[start look]' : lastText, result, Date.now() - t0);
     return res.json(modaClientResponse(result));
   }
   catch (e) { if (e.code === 'stylist_no_vision') throw new AppError(422, 'stylist_no_vision', 'Photos need the Anthropic provider.'); if (e.code === 'stylist_bad_image') throw new AppError(422, 'stylist_bad_image', 'Unsupported image.'); if (e.code === 'stylist_unavailable') throw new AppError(503, 'stylist_unavailable', 'The stylist is unavailable right now.'); throw e; }

@@ -72,7 +72,7 @@ test('casual wording is understood as an outing occasion', () => {
 
 test('site-help questions (how to order, seller dashboard, joining, about, safety…) get real answers, shopping stays shopping', async () => {
   const cases = { 'ازاي اطلب': 'how_order', 'ازاي استخدم الموقع': 'site_help', 'ازاي ادخل لوحة المحل': 'seller_dashboard', 'عايز افتح محل على الموقع': 'seller_join', 'انتوا مين': 'about', 'فيه محلات ايه': 'stores_list', 'عندكو كل حاجه': 'everything', 'الموقع ده امان؟': 'safety', 'عايز اكلم خدمه العملاء': 'support', 'ازاي ابحث بصوره': 'visual_search', 'مش لاقي حاجه': 'product_request', 'عاوز اسجل': 'account' };
-  for (const [text, faq] of Object.entries(cases)) { const res = await runModa(text, opts); assert.equal(res.faq, faq, text); assert.ok(res.say.length > 40); assert.doesNotMatch(res.say, /\d{8,}/); }
+  for (const [text, faq] of Object.entries(cases)) { const res = await runModa(text, opts); assert.equal(res.faq, faq, text); assert.ok(res.say.length > 40); assert.doesNotMatch(res.say.replace(/01206928670|201206928670/g, ''), /\d{8,}/); }
   for (const t of ['عايز اطلب جاكيت', 'عايز جزمه سودا', 'كوتشي ابيض', 'قميص ازرق', 'بدلة للفرح', 'عايز اشتري شنطه']) assert.equal(matchFaq(t), null, t);
 });
 
@@ -150,4 +150,199 @@ test('لوك مناسبة (خطوبة/فرح) لسه بيخلّص أسئلته �
   const r = await runModa('أنا وخطيبتي رايحين خطوبة عايزين طقم لينا الاتنين', opts);
   assert.equal(r.state, 'clarify');
   assert.equal(r.blocks, null);
+});
+
+test('طلب بحروف لاتينية (shoes / hoodie aswad) بيرد بنص عربي سليم ومعاه النتايج، مش رسالة «مقدرتش أجهز»', async () => {
+  for (const msg of ['shoes', 'hoodie aswad', 'i need a black hoodie', 'white shirt under 500']) {
+    const r = await runModa(msg, opts);
+    assert.ok(r.blocks?.tabs?.some((t) => t.items.length), msg);
+    assert.doesNotMatch(r.say, /مقدرتش أجهز/, msg);
+    assert.equal(r.guard, undefined, msg);
+  }
+});
+
+test('تحيات وأسئلة خدمة عادية: مرحبا / عندكم توصيل / هل في خصم', async () => {
+  assert.equal((await runModa('مرحبا', opts)).intent, 'greeting');
+  assert.equal((await runModa('يا هلا', opts)).intent, 'greeting');
+  assert.equal((await runModa('عندكم توصيل؟', opts)).faq, 'shipping_where');
+  for (const m of ['هل في خصم', 'في عروض', 'عاوز كود خصم']) assert.equal((await runModa(m, opts)).faq, 'discounts', m);
+  // لكن طلب لبس فيه كلمة «عرض» يفضل طلب لبس
+  assert.equal((await runModa('عاوز تيشيرت عليه عرض', opts)).faq, undefined);
+});
+
+test('كلمات ناقصة: شوز/وشاح/سويت شيرت، و«لولد/لبنت» بتبقى لطفل مش رجالي كبير', () => {
+  assert.equal(parseMessage('شوز رجالي').garments[0]?.key, 'shoes_any');
+  assert.equal(parseMessage('وشاح').garments[0]?.key, 'shawl');
+  assert.equal(parseMessage('سويت شيرت').garments[0]?.key, 'sweater');
+  assert.deepEqual(parseMessage('عاوز تيشيرت لولد').persons, ['boys']);
+  assert.deepEqual(parseMessage('فستان لبنت').persons, ['girls']);
+});
+
+test('«فستان» لوحدها بتعرض اختيارات على طول من غير سؤال دريس ولا سواريه', async () => {
+  const r = await runModa('فستان', opts);
+  assert.notEqual(r.state, 'clarify');
+  assert.ok(r.blocks?.tabs?.[0]?.items?.length);
+});
+
+test('«ارخص» ما بتقولش «ميزانيتك» ولا بتحفظ سقف مش بتاع العميل، و«لون تاني» مابتكررش نفس القطعة من غير توضيح', async () => {
+  const a = await runModa('عاوز هودي', opts);
+  const b = await runModa('ارخص', { ...opts, session: a.session });
+  assert.doesNotMatch(b.say, /ميزانيتك/);
+  assert.equal(b.session.parsed.budget ?? null, null);
+  const c = await runModa('لون تاني', { ...opts, session: b.session });
+  assert.match(c.say, /مفيش بدائل|بدائل تانية|لون تاني|أنسب|اخترتلك/);
+});
+
+test('صورة فستان: بنرشح اللي يتماشى معاه (كعب/شنطة…) مش فستان تاني', async () => {
+  const r = await runModa('ده لبسي، رشحلي يتماشى معاه إيه؟', { ...opts, imageText: 'فستان أسود حريمي' });
+  const keys = (r.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.key));
+  assert.ok(keys.length, 'has picks');
+  assert.ok(!keys.some((k) => String(k).startsWith('dress')), `no second dress: ${keys}`);
+});
+
+test('مدخلات غريبة (فاضي/رموز/نص طويل/كود) ما بتكسرش المحرك', async () => {
+  for (const m of ['', ' ', '؟؟؟', '😀', 'x'.repeat(5000), '<script>alert(1)</script>', "'; DROP TABLE products;--", '{}', 'null']) {
+    const r = await runModa(m, opts);
+    assert.ok(typeof r.say === 'string' && r.say.length, JSON.stringify(m.slice(0, 20)));
+  }
+});
+
+test('advice and service questions get a real answer, not a shop/clarify reply', async () => {
+  const cases = [
+    ['البنطلون الجينز يتلبس مع ايه', /الجينز/],
+    ['ينفع البس كوتشي مع بدلة', /كوتشي/],
+    ['القميص بيتحط جوه البنطلون ولا بره', /القميص/],
+    ['ازاي اغير العنوان', /الطلب/],
+    ['عايز استبدل المقاس', /الاستبدال/],
+    ['انتي بنت ولا ولد', /تويلا|Twila/],
+    ['ازاي ابعتلكم صورة', /صورة/],
+  ];
+  for (const [msg, re] of cases) {
+    const r = await runModa(msg, opts);
+    assert.match(r.say, re, msg);
+    assert.ok(!r.products?.length, msg);
+  }
+});
+
+test('care answers always defer to the garment label and never invent temperatures for delicate fabrics', async () => {
+  const care = K.phrases.advice.items.filter((a) => a.care);
+  assert.ok(care.length >= 15);
+  for (const a of care) assert.ok(/لافتة/.test(a.answer_ar), a.id);
+  for (const id of ['care_wool', 'care_silk', 'care_leather', 'care_suede', 'care_velvet', 'care_suit', 'care_stain']) {
+    const a = care.find((x) => x.id === id);
+    assert.ok(a, id);
+    assert.ok(!/\d+\s*(°|درجه|درجة)/.test(a.answer_ar), `${id} must not give a temperature`);
+  }
+  const cases = [
+    ['ازاي اغسل الجينز', 'care_denim'], ['ازاي اغسل الصوف', 'care_wool'], ['ازاي انضف الجاكيت الجلد', 'care_leather'],
+    ['ازاي اغسل القميص', 'care_cotton'], ['ازاي اغسل', 'care_general'], ['طريقة الغسيل', 'care_general'],
+    ['ازاي انضف الكوتشي', 'care_sneakers'], ['القميص بيتقلص بعد الغسيل', 'care_shrink'], ['ازاي اشيل بقعة قهوة', 'care_stain'],
+  ];
+  for (const [msg, id] of cases) {
+    const r = await runModa(msg, opts);
+    assert.equal(r.adviceId, id, msg);
+    assert.ok(!r.products?.length, msg);
+  }
+});
+
+test('care text written by the store is shown verbatim for shown products', async () => {
+  const first = await runModa('عايز هودي', opts);
+  const shown = first.session?.shown || [];
+  assert.ok(shown.length, 'products shown');
+  const withCare = rows.map((p) => (p.id === shown[0] ? { ...p, care_ar: 'غسيل بارد 30 درجة بدون مبيض' } : p));
+  const r = await runModa('ازاي اغسله', { ...opts, products: withCare, session: first.session });
+  assert.match(r.say, /غسيل بارد 30 درجة بدون مبيض/);
+  assert.match(r.say, /لافتة/);
+});
+
+test('offers question lists real offers and discounted items, or says honestly there are none', async () => {
+  const disc = rows.map((p, i) => (i === 0 ? { ...p, compare_at_price: p.price * 2, stock: 5, track_stock: 1, store_name_ar: 'محل تجريبي' } : p));
+  let r = await runModa('في عروض ايه', { ...opts, products: disc, offers: () => [{ store: 'محل الاختبار', name: 'خصم العيد', headline: 'خصم 20%', endsAt: null }] });
+  assert.match(r.say, /محل الاختبار/); assert.match(r.say, /خصم 20%/); assert.match(r.say, /خصم 50%/);
+  r = await runModa('في عروض ايه', { ...opts, products: rows.map((p) => ({ ...p, compare_at_price: null })), offers: () => [] });
+  assert.match(r.say, /مفيش عروض/);
+  r = await runModa('ازاي استخدم كود الخصم', { ...opts, offers: () => [{ store: 'س', name: '', headline: 'خصم 20%' }] });
+  assert.doesNotMatch(r.say, /خصم 20%/);
+});
+
+test('remembers last budget and audience, and reuses the budget for an occasion request without one', async () => {
+  const a = await runModa('عايز لبس للشغل ميزانيتي 2000', opts);
+  assert.equal(a.remember?.lastBudget, '2000');
+  const b = await runModa('عايز لبس للشغل', { ...opts, profile: { lastBudget: '2000' } });
+  assert.ok(b.parsed.budget?.value === 2000 || b.state === 'clarify', 'budget reused or asked');
+  if (b.blocks) assert.match(b.say, /ميزانيتك المعتادة/);
+  const c = await runModa('عايز لبس للشغل ميزانيتي 3000', { ...opts, profile: { lastBudget: '2000' } });
+  assert.equal(c.parsed.budget.value, 3000);
+  assert.ok(!/ميزانيتك المعتادة/.test(c.say || ''));
+});
+
+test('care question uses the material the store wrote for the shown product', async () => {
+  const first = await runModa('عايز هودي', opts);
+  const shown = first.session?.shown || [];
+  assert.ok(shown.length);
+  const withMat = rows.map((p) => (p.id === shown[0] ? { ...p, material_ar: 'جلد طبيعي' } : p));
+  const r = await runModa('ازاي اغسله', { ...opts, products: withMat, session: first.session });
+  assert.match(r.say, /جلد طبيعي/);
+  assert.equal(r.adviceId, 'care_leather');
+  assert.match(r.say, /لافتة/);
+});
+
+test('offers asked about one garment lists only discounted pieces of that type', async () => {
+  const hood = rows.find((p) => p.key === 'hoodie');
+  assert.ok(hood);
+  const disc = rows.map((p) => (p.id === hood.id ? { ...p, compare_at_price: p.price * 2, stock: 5, track_stock: 1 } : p));
+  const r = await runModa('في عروض على الهودي', { ...opts, products: disc });
+  assert.equal(r.intent, 'faq');
+  assert.match(r.say, /خصم 50%/);
+  assert.ok(r.say.includes(hood.name_ar));
+});
+
+const STORES = [
+  { slug: 'town-style', name_ar: 'تاون ستايل', name_en: 'Town Style', tagline_ar: 'تيشيرتات وجينز', description_ar: '', address_ar: 'شارع سعد زغلول', city: 'Banha', phone: '0132222222', whatsapp: '01011112222', map_url: null, lat: 30.466, lng: 31.185, hours: { open: '10:00', close: '22:00', dayOff: 5 }, branches: [{ name: 'فرع المحطة', address: 'قدام المحطة', phone: '', map_url: 'https://maps.app.goo.gl/x' }], instagram: 'townstyle', facebook: '', tiktok: '' },
+  { slug: 'bait-elmoda', name_ar: 'بيت الموضة', name_en: 'Bait El Moda', tagline_ar: '', description_ar: '', address_ar: '', city: 'Banha', phone: '', whatsapp: '', map_url: null, lat: null, lng: null, hours: null, branches: [], instagram: '', facebook: '', tiktok: '' },
+];
+const sopts = { ...opts, stores: () => STORES, offers: () => [{ store: 'تاون ستايل', name: 'خصم العيد', headline: 'خصم 20%', endsAt: null }] };
+
+test('questions about Twist contact details get the real numbers and links', async () => {
+  const cases = [
+    ['رقمكم كام', 'contact_phone', /01206928670/], ['ايه رقم الواتس بتاعكم', 'contact_whatsapp', /wa\.me\/201206928670/], ['لينك الفيسبوك', 'contact_facebook', /facebook\.com/],
+    ['فين صفحتكم على الفيس', 'contact_facebook', /facebook\.com/], ['حسابكم على انستا', 'contact_instagram', /instagram\.com/], ['تيك توك بتاعكم', 'contact_tiktok', /tiktok\.com/],
+    ['ال mail بتاعكم ايه', 'contact_email', /@gmail\.com/], ['ايميلكم', 'contact_email', /@/], ['ازاي اتواصل معاكم', 'contact_all', /01206928670[\s\S]*facebook[\s\S]*instagram/],
+    ['عنوانكم فين', 'contact_address', /بنها/], ['لينك الموقع', 'website', /twistegy\.com/], ['بتشتغلوا من امتى', 'contact_hours', /واتساب/],
+    ['what is your phone number', 'contact_phone', /01206928670/], ['how can i contact you', 'contact_all', /Facebook/],
+  ];
+  for (const [msg, faq, re] of cases) { const r = await runModa(msg, opts); assert.equal(r.faq, faq, msg); assert.match(r.say, re, msg); assert.ok(!/\{[a-z_]+\}/.test(r.say), `${msg}: unfilled placeholder`); }
+  const custom = await runModa('رقمكم كام', { ...opts, contact: { phone: '0100000000', whatsapp: '20100000000' } });
+  assert.match(custom.say, /0100000000/);
+});
+
+test('who we are, services, and store-owner questions never invent prices or promises', async () => {
+  const cases = [
+    ['مين انتوا', 'about_us'], ['ايه هو تويست', 'about_us'], ['ايه الخدمات اللي بتقدموها', 'services'], ['نقدر نساعد في ايه', 'wide_help'], ['انتوا شركة ولا محل', 'about_kind'],
+    ['مين صاحب الموقع', 'about_owner'], ['عندكم فروع', 'about_branches'], ['عايز افتح محل عندكم', 'seller_join'], ['بكام الاشتراك', 'merchant_price'], ['في عمولة', 'merchant_price'],
+    ['ازاي اصور منتجاتي', 'merchant_photo'], ['هعرف الطلبات ازاي', 'merchant_orders'], ['ازاي اضيف منتجات', 'merchant_products'], ['هل منتجاتي هتظهر في تويلا', 'merchant_moda'],
+    ['عايز اعلن عندكم', 'merchant_ads'], ['محتاج سجل تجاري', 'merchant_requirements'], ['محلي في طنطا ينفع', 'merchant_outside'], ['نسيت الباسورد بتاع لوحة المحل', 'merchant_login_help'],
+    ['عايز اشتغل معاكم', 'partnership'], ['ايه مميزات الاشتراك', 'merchant_benefits'], ['عايز اشتكي', 'complaint_contact'],
+  ];
+  for (const [msg, faq] of cases) { const r = await runModa(msg, opts); assert.equal(r.faq, faq, msg); assert.ok(r.say.length > 40, msg); assert.ok(!r.products?.length, msg); }
+  for (const id of ['merchant_price', 'merchant_requirements', 'merchant_ads']) {
+    const r = await runModa(id === 'merchant_price' ? 'بكام الاشتراك' : id === 'merchant_ads' ? 'عايز اعلن عندكم' : 'محتاج سجل تجاري', opts);
+    assert.doesNotMatch(r.say.replace(/01206928670|201206928670/g, ''), /\d+\s*(جنيه|ج\.م|EGP)/, `${id} must not state a price`);
+  }
+});
+
+test('questions about a specific store use that store data: phone, map, address, branches, hours, social, sells, offers', async () => {
+  let r = await runModa('رقم محل تاون ستايل', sopts); assert.equal(r.faq, 'store'); assert.match(r.say, /0132222222/); assert.match(r.say, /wa\.me\/201011112222/); assert.ok(r.storeCard);
+  r = await runModa('لوكيشن تاون ستايل', sopts); assert.match(r.say, /google\.com\/maps/); assert.match(r.say, /سعد زغلول/); assert.equal(r.storeCard.lat, 30.466);
+  r = await runModa('فروع تاون ستايل', sopts); assert.match(r.say, /فرع المحطة/);
+  r = await runModa('تاون ستايل بيفتح امتي', sopts); assert.match(r.say, /من 10 ص لـ 10 م|مقفول/);
+  r = await runModa('انستجرام تاون ستايل', sopts); assert.match(r.say, /instagram\.com\/townstyle/);
+  r = await runModa('عروض تاون ستايل', sopts); assert.match(r.say, /خصم 20%/);
+  r = await runModa('تاون ستايل بيبيع ايه', sopts); assert.match(r.say, /تيشيرتات وجينز/);
+  r = await runModa('رقم بيت الموضة', sopts); assert.match(r.say, /مسجّلش رقم/); assert.ok(!/\d{7,}/.test(r.say.replace(/01206928670|201206928670/g, '')));
+  r = await runModa('عنوان بيت الموضة', sopts); assert.match(r.say, /مش مسجّل/);
+  r = await runModa('كل حاجة عن تاون ستايل', sopts); assert.match(r.say, /0132222222/); assert.match(r.say, /سعد زغلول/);
+  r = await runModa('رقم المحل', sopts); assert.match(r.say, /تاون ستايل/); assert.match(r.say, /بيت الموضة/);
+  r = await runModa('اي محل بيفتح وبيقفل امتى', sopts); assert.match(r.say, /تاون ستايل/);
+  r = await runModa('عايز هودي من تاون ستايل', sopts); assert.notEqual(r.faq, 'store', 'a shopping request stays shopping');
 });

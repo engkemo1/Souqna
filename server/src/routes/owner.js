@@ -781,6 +781,8 @@ export const productSchema = z.object({
   style_level: z.number().int().min(1).max(5).nullable().optional(),
   moda_key: z.string().max(80).nullable().optional(),
   attrs: z.record(z.string().max(25), z.union([z.string().max(60), z.array(z.string().max(60)).max(8)])).optional(), // product-type filters (material, fit, ...), validated against the department's definitions
+  material: z.string().trim().max(80).nullable().optional(), // الخامه (من صاحب المحل)
+  care: z.string().trim().max(300).nullable().optional(), // تعليمات الغسيل والعناية (من صاحب المحل)
   badge_text: z.string().trim().max(24).nullable().optional(),
   badge_tone: z.string().max(12).nullable().optional(),
   status: z.enum(['active', 'draft', 'archived']).default('active'),
@@ -861,7 +863,7 @@ export function saveProduct(storeId, data, existing) {
       price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null, ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
       category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, wantedDept, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
-      stock, low_stock_at: data.low_stock_at, ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
+      stock, low_stock_at: data.low_stock_at, ...(data.material !== undefined ? { material_ar: (data.material || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.care !== undefined ? { care_ar: (data.care || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };
     if (data.attrs !== undefined) { // only when the editor sent them (partial saves from WhatsApp / POS keep the stored values)
       const clean = sanitizeAttrValues(data.attrs, row.department ? deptAttrDefs(row.department) : []);

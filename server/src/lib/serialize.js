@@ -133,6 +133,8 @@ export function serializeProductDetail(p) {
     ...card,
     attrs: json(p.attrs_json, {}),
     description: bi(p, 'description'),
+    care: p.care_ar || null,
+    material: p.material_ar || null,
     sku: p.sku,
     barcode: p.barcode || null,
     department: p.department || null,

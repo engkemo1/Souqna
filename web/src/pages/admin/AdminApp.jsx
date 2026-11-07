@@ -40,6 +40,7 @@ const NAV_GROUPS = [
     { to: '/admin/growth', icon: TrendingUp, label: 'النمو وصحة الكتالوج' },
     { to: '/admin/traffic', icon: Eye, label: 'الزيارات' },
     { to: '/admin/insights', icon: TrendingUp, label: 'تحليلات السوق' },
+    { to: '/admin/stylist-log', icon: Sparkles, label: 'أسئلة تويلا وسرعتها' },
     { to: '/admin/campaigns', icon: Megaphone, label: 'الحملات والإعلانات' },
     { to: '/admin/reports', icon: BarChart3, label: 'التقارير' },
     { to: '/admin/audit', icon: History, label: 'سجل الحركات' },

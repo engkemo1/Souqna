@@ -10,6 +10,7 @@ import ModaAvatar from './ModaAvatar.jsx';
 import LookSet from './LookSet.jsx';
 import { errorMessage } from '../ui/States.jsx';
 import { cx } from '../ui/cx.js';
+import { telHref } from '../../lib/storeInfo.js';
 
 const store = { get: (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } }, set: (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } } };
 const textValue = (value) => {
@@ -56,6 +57,42 @@ function ModaFeedback({ question, reply, items, productIds, t, onRated }) {
 
 /** Floating shopping assistant: chat in text or voice, answers come with real products from Banha stores. */
 /** خطوات التحليل أثناء الانتظار: العميل يشوف تويلا بتعمل إيه بدل ما يستنى قدام "بفكّر…". */
+/** روابط وإيميلات وأرقام تليفون جوه رد تويلا تتحول لروابط قابلة للضغط (الأسطر الجديدة بتتحفظ بـ whitespace-pre-line). */
+function Linkified({ text }) {
+  const parts = String(text || '').split(/(https?:\/\/[^\s)،]+|[\w.+-]+@[\w-]+\.[\w.-]+|\b0\d{9,10}\b)/g);
+  return parts.map((p, i) => {
+    if (i % 2 === 0) return p;
+    const url = /^https?:/.test(p); const mail = p.includes('@');
+    const clean = url ? p.replace(/[.,;:!؟]+$/, '') : p; const tail = url ? p.slice(clean.length) : '';
+    const href = url ? clean : mail ? `mailto:${p}` : `tel:${p}`;
+    return <span key={i}><a href={href} {...(url ? { target: '_blank', rel: 'noopener noreferrer' } : {})} className="break-all font-semibold text-brand underline underline-offset-2" dir="ltr">{clean}</a>{tail}</span>;
+  });
+}
+
+/** كارت المحل في الشات: خريطة (لو متسجل له إحداثيات) وأزرار لوكيشن واتصال وواتساب وفتح المحل. */
+function StoreCardView({ c, lang }) {
+  const ar = lang !== 'en';
+  const embed = c.lat != null && c.lng != null ? `https://www.openstreetmap.org/export/embed.html?bbox=${c.lng - 0.004}%2C${c.lat - 0.003}%2C${c.lng + 0.004}%2C${c.lat + 0.003}&layer=mapnik&marker=${c.lat}%2C${c.lng}` : null;
+  const tel = telHref(c.phone);
+  const btn = 'inline-flex h-9 items-center rounded-full border border-line-strong px-3.5 text-[13px] font-semibold transition hover:bg-fg/[0.06] active:scale-95';
+  return (
+    <div className="mt-2 max-w-[90%] overflow-hidden rounded-2xl border border-line bg-elevated">
+      {embed && <iframe title={c.name} src={embed} loading="lazy" className="h-40 w-full border-0" />}
+      <div className="p-3">
+        <p className="text-sm font-bold">{c.name}</p>
+        {c.address && <p className="mt-0.5 text-[13px] text-muted">{c.address}</p>}
+        {c.hours && <p className="mt-0.5 text-[12px] text-muted">{c.hours}</p>}
+        <div className="mt-2.5 flex flex-wrap gap-2">
+          {c.mapUrl && <a href={c.mapUrl} target="_blank" rel="noopener noreferrer" className={btn}>{ar ? 'افتح الخريطة' : 'Open map'}</a>}
+          {tel && <a href={tel} className={btn}>{ar ? 'اتصل' : 'Call'}</a>}
+          {c.whatsapp && <a href={c.whatsapp} target="_blank" rel="noopener noreferrer" className={btn}>{ar ? 'واتساب' : 'WhatsApp'}</a>}
+          <Link to={`/s/${c.slug}`} className={btn}>{ar ? 'افتح المحل' : 'Open store'}</Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AnalysisSteps({ t }) {
   const steps = ['stylist.step1', 'stylist.step2', 'stylist.step3', 'stylist.step4', 'stylist.step5'];
   const [i, setI] = useState(0);
@@ -196,7 +233,7 @@ export default function StylistChat() {
       role: 'assistant', say: String(m.say || m.content || '').slice(0, 1400), tips: m.tips, styleTips: m.styleTips,
       intent: m.intent, state: m.state, total: m.total, budget: m.budget, overBudget: m.overBudget,
       weatherSource: m.weatherSource, looks: m.looks, questions: m.questions, missingItems: m.missingItems, missing: m.missing, tabs: m.tabs,
-      palette: m.palette, feedbackQuestion: m.feedbackQuestion,
+      palette: m.palette, feedbackQuestion: m.feedbackQuestion, storeCard: m.storeCard,
     };
   }).slice(-40);
   const saveChat = async (items, currentSession) => {
@@ -333,7 +370,8 @@ export default function StylistChat() {
                 <div key={i} className="flex justify-end"><div className="max-w-[85%] rounded-2xl rounded-ee-sm bg-fg px-3.5 py-2.5 text-[14.5px] leading-relaxed text-canvas">{m.photo && <div className="mb-2 flex gap-1.5"><img src={m.photo} alt="" className={m.photo2 ? 'h-36 w-auto max-w-full rounded-lg object-cover' : 'max-h-56 w-full rounded-lg object-cover'} />{m.photo2 && <img src={m.photo2} alt="" className="h-36 w-auto max-w-full rounded-lg object-cover" />}</div>}{m.content}</div></div>
               ) : (
                 <div key={i} className="max-w-full">
-                  {(m.say || m.error) && <div className={cx('max-w-[90%] rounded-2xl rounded-ss-sm px-3.5 py-2.5 text-[14.5px] leading-relaxed', m.error ? 'bg-sale/10 text-sale' : 'bg-secondary')}>{m.error || m.say}</div>}
+                  {(m.say || m.error) && <div className={cx('max-w-[90%] rounded-2xl rounded-ss-sm px-3.5 py-2.5 text-[14.5px] leading-relaxed', m.error ? 'bg-sale/10 text-sale' : 'bg-secondary whitespace-pre-line')}>{m.error || <Linkified text={m.say} />}</div>}
+                  {m.storeCard && <StoreCardView c={m.storeCard} lang={lang} />}
                   {m.weatherSource === 'met_norway' && m.tips?.length > 0 && <p className="mt-1 text-[10px] text-muted"><a href="https://api.met.no/" target="_blank" rel="noreferrer" className="underline">{lang === 'ar' ? 'بيانات الطقس: MET Norway' : 'Weather data: MET Norway'}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer" className="underline">CC BY 4.0</a></p>}
                   <LookSet data={m} name={name} />
                   {i === msgs.length - 1 && m.questions?.length > 0 && !busy && <>
@@ -346,7 +384,7 @@ export default function StylistChat() {
                       </div>
                     ))}
                   </>}
-                  {!m.historyReadOnly && !m.error && m.looks?.length > 0 && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, ...(m.tips || []), ...(m.styleTips || [])].filter(Boolean).join(' — ')} productIds={(m.looks || []).map((look) => look.items?.[look.pick]?.id).filter((id) => id != null)} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason, productIds) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean), productIds)} t={t} />}
+                  {!m.historyReadOnly && !m.error && (m.looks?.length > 0 || m.intent === 'advice' || m.intent === 'faq') && <ModaFeedback question={m.feedbackQuestion || msgs.slice(0, i).reverse().find((x) => x.role === 'user')?.content} reply={[m.say, ...(m.tips || []), ...(m.styleTips || [])].filter(Boolean).join(' — ')} productIds={(m.looks || []).map((look) => look.items?.[look.pick]?.id).filter((id) => id != null)} items={(m.looks || []).map((look) => { const p = look.items?.[look.pick]; const colors = (p?.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/'); return p ? `${look.label}: ${tr(p.name)}${colors ? ` [${colors}]` : ''} (${p.price})` : ''; }).filter(Boolean)} onRated={(rating, reason, productIds) => learnFromRating(rating, reason, m.feedbackQuestion || '', (m.looks || []).map((look) => { const p = look.items?.[look.pick]; return p ? `${tr(p.name)} ${(p.colors || []).map((color) => color.name_ar || color.name_en).filter(Boolean).slice(0, 2).join('/')}` : ''; }).filter(Boolean), productIds)} t={t} />}
                 </div>
               ))}
               {busy && <AnalysisSteps t={t} />}

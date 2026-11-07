@@ -108,6 +108,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!pcols.includes('badge_text')) db.exec('ALTER TABLE products ADD COLUMN badge_text TEXT'); // شارة مخصصة على كارت المنتج (مثلاً: قطن مصري 100%)
   if (!pcols.includes('badge_tone')) db.exec('ALTER TABLE products ADD COLUMN badge_tone TEXT');
   if (!pcols.includes('audience')) db.exec('ALTER TABLE products ADD COLUMN audience TEXT'); // الفئة: men|women|boys|girls|kids|unisex (فاضي = مستنتج من الاسم)
+  if (!pcols.includes('material_ar')) db.exec('ALTER TABLE products ADD COLUMN material_ar TEXT'); // الخامه بالنص زي ما كتبها صاحب المحل (قطن 100%، جلد طبيعي...)
+  if (!pcols.includes('care_ar')) db.exec('ALTER TABLE products ADD COLUMN care_ar TEXT'); // تعليمات الغسيل والعناية اللي كتبها صاحب المحل (اختياري)
   if (!pcols.includes('moda_key')) db.exec('ALTER TABLE products ADD COLUMN moda_key TEXT'); // نوع القطعة الصريح لمحرك تويلا (فاضي = تلقائي)
   // Cashier linking: barcodes (matched together with sku when a cashier file or API call arrives).
   if (!pcols.includes('barcode')) db.exec('ALTER TABLE products ADD COLUMN barcode TEXT');

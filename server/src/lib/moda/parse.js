@@ -77,7 +77,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   /* ---------- نوايا بسيطة ---------- */
   const intents = entriesOf(matches, 'intent').map((e) => e.key);
   const hasShopping = entriesOf(matches, 'advice').some((e) => e.key === 'shopping');
-  const hasQuestion = entriesOf(matches, 'advice').some((e) => e.key === 'question') || /[?؟]/.test(String(raw));
+  const hasQuestion = entriesOf(matches, 'advice').some((e) => e.key === 'question') || /[?؟]/.test(String(raw)) || /(^| )(ايه|اي|ازاي|يعني|مين|امتي|كام|هل|ينفع|احسن|افضل|الفرق|ولا|هلبس|البس|اغسل|اكوي|انضف|اختار|اعرف|مقاسي|وزني|طولي|لبس|هديه|لون|تمشي|يمشي|يتلبس|تتلبس|يتماشى|تتماشى|اكسسوارات|الاكسسوارات|بيتحط|اشتري|طريقه|تعليمات|غسيل|الغسيل|تنضيف|الكي|بيبهت|بتبهت|بتنكمش|ينكمش|بتتغسل|بيتغسل|يتغسل|تتغسل)( |$)/.test(n) || /(^| )(ال)?(بيتقلص|بتتقلص|الكرش|يخليني|يخسسني|يطولني|اوفر سايز|سليم فيت|سمارت كاجوال|سواريه|ترند|الموضه)( |$)/.test(n);
 
   /* ---------- مين بيلبس ---------- */
   const personSet = new Set();
@@ -114,6 +114,11 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   if (kids.includes('kids_plural') && !personSet.has('boys') && !personSet.has('girls')) result.kidsUnspecified = true;
   if (kids.includes('kids_plural') && (girlWeak || boyWeak) ) { if (girlWeak) personSet.add('girls'); if (boyWeak) personSet.add('boys'); result.kidsUnspecified = false; }
   result.ages = nums.ages;
+  // «لولد / لبنت / لولاد / لبنات» (ل + كلمة): الطلب لطفل حتى من غير سن، فمايرجعش تيشيرت رجالي كبير.
+  for (const t of tokens) {
+    if (/^ل(ولد|ولاد)$/.test(t)) personSet.add('boys');
+    else if (/^ل(بنت|بنوته|بنات|طفله)$/.test(t)) personSet.add('girls');
+  }
 
   /* ---------- المناسبة ---------- */
   const ctxEntries = entriesOf(matches, 'context');
@@ -229,14 +234,16 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   result.fullLook = fl;
 
   /* ---------- نصيحة ---------- */
-  if (hasQuestion && !hasShopping) {
+  if (hasQuestion) {
     let best = null;
     for (const item of K.phrases.advice.items) {
+      if (hasShopping && !item.care) continue; // سؤال غسيل/عنايه عن قطعه («ازاي انضف الجاكيت الجلد») مش طلب شراء
       for (const kw of [...(item.keywords_ar || []), ...(item.keywords_en || [])]) {
         const k = norm(kw); if (!k) continue;
         if ((` ${n} `).includes(` ${k} `) && (!best || k.length > best.len)) best = { id: item.id, len: k.length };
       }
     }
+    if (!best) { const cid = careFallback(n, K); if (cid) best = { id: cid }; }
     if (best) result.advice = { id: best.id };
   }
 
@@ -254,6 +261,9 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   else if (!hasContent && has('thanks') && tokens.length <= 5) result.intent = 'thanks';
   else if (!hasContent && has('greeting') && tokens.length <= 5) result.intent = 'greeting';
   else if (hasContent || hasShopping) result.intent = 'shop';
+
+  // رقم لوحده أو رموز من غير أي كلمة (123 / ؟؟؟ / 😀) مش طلب لبس، إلا لو رقم ميزانية.
+  if (result.intent === 'shop' && !/[A-Za-z\u0600-\u06FF]/.test(String(raw || '')) && !result.budget) result.intent = 'unknown';
 
   /* ---------- صورة (وصف مبسط من الرؤية) ---------- */
   if (imageText) {
@@ -273,3 +283,23 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
 }
 
 export { GENDER_BY_KEY, CONTEXT_PRIORITY };
+
+/** سؤال غسيل/كي/تنضيف مفيهوش عباره محفوظه: نختار رد العنايه المناسب للخامه/القطعه المذكوره، أو الرد العام اللي بيرجّع للافتة. */
+const CARE_VERB = /(^| )(اغسل|اغسله|اغسلها|اغسلهم|انضف|انضفه|انضفها|نضف|اكوي|اكويه|اكويها|غسيل|الغسيل|تنضيف|تنظيف|اعتني|العنايه|يتغسل|بيتغسل|بتتغسل|تتغسل|بتبهت|بيبهت)( |$)/;
+const CARE_FABRIC = [
+  [/(^| )(شمواه)( |$)/, 'care_suede'], [/(^| )(جلد|جلدي)( |$)/, 'care_leather'], [/(^| )(قطيفه|مخمل|فيلفت)( |$)/, 'care_velvet'],
+  [/(^| )(حرير|ساتان|شيفون|دانتيل|فستان|طرحه|عبايه|اسدال|بلوزه)( |$)/, 'care_silk'], [/(^| )(صوف|كنزه|كوت|اكريليك)( |$)/, 'care_wool'],
+  [/(^| )(كتان)( |$)/, 'care_linen'], [/(^| )(جينز)( |$)/, 'care_denim'], [/(^| )(بدله|طقم|بليزر)( |$)/, 'care_suit'],
+  [/(^| )(كوتشي|حذاء|جزمه|جزم|صندل)( |$)/, 'care_sneakers'], [/(^| )(مطبوع|مطرز|طباعه|ستيكر)( |$)/, 'care_printed'],
+  [/(^| )(هودي|سويتر|سويت|جاكيت|بلوفر|جيليه|تراينج)( |$)/, 'care_hoodie'], [/(^| )(ابيض|بيضا|بيضاء)( |$)/, 'care_white'],
+  [/(^| )(بوليستر)( |$)/, 'care_polyester'], [/(^| )(قطن|تيشيرت|بولو|قميص|بنطلون|شورت|بيجامه)( |$)/, 'care_cotton'],
+  [/(^| )(اطفال|ولادي|بناتي|بيبي)( |$)/, 'care_kids'],
+];
+export function careFallback(n, K, { allowGeneral = true } = {}) {
+  const s = ` ${String(n).split(' ').map((w) => (w.length > 3 ? w.replace(/^ال/, '') : w)).join(' ')} `;
+  if (allowGeneral && !CARE_VERB.test(s)) return null; // لو بنقرا خامه مكتوبه (مش سؤال) مش لازم فعل غسيل
+  const ids = new Set(K.phrases.advice.items.filter((i) => i.care).map((i) => i.id));
+  if (allowGeneral && /(^| )(اكوي|اكويه|اكويها)( |$)/.test(s)) return ids.has('care_iron') ? 'care_iron' : null;
+  for (const [re, id] of CARE_FABRIC) if (re.test(s) && ids.has(id)) return id;
+  return allowGeneral && ids.has('care_general') ? 'care_general' : null;
+}

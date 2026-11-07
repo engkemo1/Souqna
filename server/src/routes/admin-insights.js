@@ -4,6 +4,7 @@ import { h, AppError } from '../lib/errors.js';
 import { couriersReport, addSettlement, deleteSettlement, alertsReport, marketInsights, auditList, exportCsv, todayGlance } from '../lib/insights.js';
 import { campaignStats } from '../lib/traffic.js';
 import { growthReport } from '../lib/engage.js';
+import { stylistLogReport } from '../lib/stylist-log.js';
 
 /** Extra platform-admin endpoints. Mounted inside the admin router, so the admin key / 2-step check has already run. */
 const r = Router();
@@ -25,6 +26,7 @@ r.delete('/couriers/settlements/:id', h((req, res) => {
 r.get('/growth', h((_req, res) => { res.json(growthReport()); }));
 r.get('/today', h((_req, res) => { res.json(todayGlance()); }));
 r.get('/campaigns', h((req, res) => { res.json(campaignStats(days(req.query.days, 30, [7, 30, 90]))); }));
+r.get('/stylist-log', h((req, res) => { res.json(stylistLogReport(days(req.query.days, 30, [7, 30, 90]))); }));
 r.get('/alerts', h((_req, res) => { res.json(alertsReport()); }));
 r.get('/insights', h((req, res) => { res.json(marketInsights(days(req.query.days, 30, [7, 30, 90]))); }));
 r.get('/audit', h((req, res) => { res.json({ items: auditList(Number(req.query.limit) || 300) }); }));

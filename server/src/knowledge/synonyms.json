@@ -12,7 +12,7 @@
     "polo":     ["بولو", "polo", "بولو شيرت"],
     "shirt":    ["قميص", "قمصان", "قميصه", "شيرت", "shirt", "shirts", "amees", "2ames", "2amees", "3amees"],
     "blouse":   ["بلوزه", "بلوزة", "بلوزات", "blouse", "bluza", "blousa"],
-    "sweater":  ["سويتر", "سويتشيرت", "كنزه", "بلوفر", "تريكو", "sweater", "pullover", "jumper", "knit", "kanza", "swetar"],
+    "sweater":  ["سويتر", "سويتشيرت", "سويت شيرت", "sweatshirt", "sweat shirt", "كنزه", "بلوفر", "تريكو", "sweater", "pullover", "jumper", "knit", "kanza", "swetar"],
     "hoodie":   ["هودي", "هوديز", "hoodie", "hoody", "hodi"],
     "tunic":    ["تونيك", "tunic"],
     "top":      ["توب", "top", "crop top", "كروب"],
@@ -41,10 +41,10 @@
     "tuxedo":      ["تاكسيدو", "توكسيدو", "تكسيدو", "بدله سواريه", "tuxedo", "tux", "smoking", "سموكنج"],
     "womens_suit": ["تايير", "تاييرات", "بدله حريمي", "طقم حريمي رسمي", "tailleur", "pantsuit", "women suit", "tayer", "tayeer"],
 
-    "jacket":   ["جاكيت", "جاكت", "جواكت", "jacket", "bomber", "jakit", "jaket", "جاكيت جلد", "جاكيت كوتش", "جاكت كوتش", "coach jacket"],
+    "jacket":   ["جاكيت", "جاكت", "جواكت", "jacket", "bomber", "jakit", "jaket", "جاكيت جلد", "جاكيت جينز", "جاكت جينز", "denim jacket", "jean jacket", "جاكيت كوتش", "جاكت كوتش", "coach jacket"],
     "coat":     ["بالطو", "معطف", "كوت", "coat", "overcoat", "trench", "balto", "baltoo"],
     "cardigan": ["كارديجان", "كاردجان", "cardigan", "cardigen"],
-    "shawl":    ["شال", "ستول", "شال سواريه", "shawl", "stole", "wrap", "shal"],
+    "shawl":    ["شال", "ستول", "وشاح", "سكارف", "اسكارف", "scarf", "شال سواريه", "shawl", "stole", "wrap", "shal"],
 
     "abaya":     ["عباءه", "عباية", "عبايه", "عبايات", "abaya", "abayas", "3abaya", "3abaia", "3abayah", "abaia"],
     "jalabiya":  ["جلابيه", "جلابية", "جلاليب", "قفطان", "كفتان", "jalabiya", "galabeya", "gallabiya", "kaftan", "caftan", "galabia", "gelabya", "galabiyya"],
@@ -81,7 +81,7 @@
 
     "sport_top":    ["تيشيرت رياضي", "توب رياضي", "sport top", "gym top", "performance tee"],
     "sport_bottom": ["شورت رياضي", "بنطلون رياضي", "بنطلون تراك", "بنطلون جري", "sport shorts", "gym shorts", "yoga pants", "track pants", "track trousers", "track trouser", "running pants", "running trousers", "running trouser", "athletic pants", "workout pants"],
-    "tracksuit":    ["ترينج", "ترنج", "تريننج", "ترينج كامل", "طقم رياضي", "tracksuit", "track suit", "trenj", "trening"],
+    "tracksuit":    ["ترينج", "ترنج", "تريننج", "ترينج كامل", "تراينج", "تراك سوت", "تراكسوت", "طقم ترينج", "طقم رياضي", "tracksuit", "track suit", "trenj", "trening"],
     "sport_shoes":  ["حذاء جري", "كوتشي جري", "running shoes", "training shoes", "gym shoes"],
 
     "sleepwear": ["بيجامه", "بيجامة", "لبس نوم", "قميص نوم", "pajama", "pyjamas", "sleepwear", "nightgown", "bijama", "bejama"]
@@ -149,11 +149,11 @@
   },
 
   "intents": {
-    "greeting":  ["اهلا", "هاي", "هلو", "ازيك", "ازاي", "سلام", "صباح الخير", "مساء الخير", "hi", "hello", "hey", "ahlan", "ezayak", "ezayek", "salam", "good morning", "7ay", "ahlen", "marhaba"],
+    "greeting":  ["اهلا", "مرحبا", "مرحبتين", "هلا", "اهلين", "يا هلا", "صباح النور", "مساء النور", "هاي", "هلو", "ازيك", "سلام", "صباح الخير", "مساء الخير", "hi", "hello", "hey", "ahlan", "ezayak", "ezayek", "salam", "good morning", "7ay", "ahlen", "marhaba"],
     "thanks":    ["شكرا", "تسلم", "تسلمي", "متشكر", "ميرسي", "thanks", "thank you", "thx", "shokran", "teslam", "mersi", "merci", "tesalam"],
     "yes":       ["ايوه", "اه", "اكيد", "تمام", "ماشي", "اوك", "yes", "yeah", "ok", "okay", "sure", "aywa", "aiwa", "tamam", "mashy", "oke", "okey"],
     "no":        ["لا", "لأ", "مش عايز", "مش عاوز", "مش كده", "غيره", "no", "nope", "not that", "la", "la2", "mesh", "ghayyar", "msh"],
-    "show_more": ["كمان", "غيره", "حاجه تانيه", "حاجة تانية", "بدائل", "اختيار تاني", "more", "another", "other options", "different one", "alternatives", "kaman", "7aga tanya", "taneya", "ghayro", "haga tanya"],
+    "show_more": ["لون تاني", "لون مختلف", "الوان تانيه", "لون غيره", "وريني تاني", "اختيارات تانيه", "غير دي", "مش دي", "another color", "another colour", "different color", "كمان", "غيره", "حاجه تانيه", "حاجة تانية", "بدائل", "اختيار تاني", "more", "another", "other options", "different one", "alternatives", "kaman", "7aga tanya", "taneya", "ghayro", "haga tanya"],
     "cheaper":   ["ارخص", "اقل سعر", "اقل في السعر", "اقل", "cheaper", "less expensive", "lower price", "arkhas", "arkhaass", "a2al"],
     "compare":   ["اقارن", "قارنلي", "مين احسن", "ايه احسن", "اختار", "compare", "which is better", "which one", "2aren", "eh a7san", "a7san eh"],
     "reset":     ["ابدا من الاول", "من الاول", "مسح", "start over", "reset", "clear", "ebda2 men el awel", "men el awel", "ebda men el awal"]

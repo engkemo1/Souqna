@@ -30,7 +30,7 @@ const PRESET_COLORS = [
 
 
 const EMPTY = {
-  name_ar: '', name_en: '', description_ar: '', description_en: '', price: '', compare_at_price: '', cost: '', sku: '', barcode: '', variantCodes: {},
+  name_ar: '', name_en: '', description_ar: '', description_en: '', care: '', material: '', price: '', compare_at_price: '', cost: '', sku: '', barcode: '', variantCodes: {},
   category_id: '', department: '', attrs: {}, audience: '', moda_key: '', style_level: '', badge_text: '', badge_tone: 'brand', status: 'active', featured: false, is_new: false, no_return: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
   media: [], seo_title: '', seo_description: '',
 };
@@ -69,7 +69,7 @@ function fromProduct(p) {
   for (const v of p.variants) { matrix[vkey(v.color, v.size)] = v.stock; ids[vkey(v.color, v.size)] = v.id; codes[vkey(v.color, v.size)] = { sku: v.sku || '', barcode: v.barcode || '' }; }
   return {
     ...EMPTY,
-    name_ar: p.name.ar, name_en: p.name.en && p.name.en !== p.name.ar ? p.name.en : '', description_ar: p.description.ar || '', description_en: p.description.en || '',
+    name_ar: p.name.ar, name_en: p.name.en && p.name.en !== p.name.ar ? p.name.en : '', description_ar: p.description.ar || '', description_en: p.description.en || '', care: p.care || '', material: p.material || '',
     price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '', barcode: p.barcode || '', variantCodes: codes,
     category_id: p.categoryId ? String(p.categoryId) : '', department: p.department || '', attrs: p.attrs || {}, audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', badge_text: p.badgeText || '', badge_tone: p.badgeTone || 'brand', status: p.status, featured: p.featured, is_new: p.isNewFlag, no_return: !!p.noReturn,
     colors: p.colors, sizes: p.sizes, matrix, variantIds: ids, track_stock: p.trackStock, stock: p.stockCount, low_stock_at: p.lowStockAt,
@@ -84,7 +84,7 @@ function toPayload(f) {
     ? colors.flatMap((c) => sizes.map((s) => ({ id: f.variantIds?.[vkey(c?.hex, s)] ?? null, color: c?.hex ?? null, size: s, stock: Number(f.matrix[vkey(c?.hex, s)] || 0), ...(f.variantCodes?.[vkey(c?.hex, s)] ? { sku: f.variantCodes[vkey(c?.hex, s)].sku || null, barcode: f.variantCodes[vkey(c?.hex, s)].barcode || null } : {}) })))
     : [];
   return {
-    name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en,
+    name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en, care: f.care.trim() || null, material: f.material.trim() || null,
     price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, cost: f.cost ? Number(f.cost) : null,
     sku: f.sku || null, barcode: f.barcode || null, category_id: f.category_id ? Number(f.category_id) : null, ...(f.department && f.deptTouched ? { department: f.department } : {}), attrs: Object.fromEntries(Object.entries(f.attrs || {}).filter(([, v]) => v !== '' && v != null)), audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, badge_text: f.badge_text.trim() || null, badge_tone: f.badge_text.trim() ? f.badge_tone : null, status: f.status, featured: f.featured, is_new: f.is_new, no_return: f.no_return,
     colors: f.colors, sizes: f.sizes, variants, track_stock: f.track_stock, stock: Number(f.stock || 0), low_stock_at: Number(f.low_stock_at || 0),
@@ -811,6 +811,12 @@ export default function ProductEditor() {
           )}
           <Field label={L('وصف قصير', 'Short description')} optional={t('common.optional')} hint={L('الخامة، الاستخدام، أي تفصيلة مهمة.', 'Fabric, use, any key detail.')}>
             <Textarea dir="auto" rows={3} value={f.description_ar} onChange={(e) => set({ description_ar: e.target.value })} />
+          </Field>
+          <Field label={L('الخامة', 'Material')} optional={t('common.optional')} hint={L('مثلاً: قطن 100%، بوليستر، جلد طبيعي. تويلا بتستخدمها عشان ترد على أسئلة الغسيل صح.', 'e.g. 100% cotton, polyester, genuine leather. Used to answer care questions correctly.')}>
+            <Input dir="auto" maxLength={80} value={f.material} placeholder={L('قطن 100%', '100% cotton')} onChange={(e) => set({ material: e.target.value })} />
+          </Field>
+          <Field label={L('طريقة الغسيل والعناية', 'Care instructions')} optional={t('common.optional')} hint={L('انسخها من لافتة القطعة. تويلا وصفحة المنتج هيعرضوها للعميل زي ما هي.', 'Copy it from the garment label. Shown to customers as written.')}>
+            <Textarea dir="auto" rows={2} maxLength={300} value={f.care} placeholder={L('مثلاً: غسيل بارد 30°، بدون مبيّض، كي على حرارة منخفضة', 'e.g. Cold wash 30°C, no bleach, low iron')} onChange={(e) => set({ care: e.target.value })} />
           </Field>
           {showEn ? (
             <div className="grid gap-4 rounded-xl border border-line bg-secondary/30 p-4 sm:grid-cols-2">

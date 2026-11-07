@@ -13,6 +13,7 @@ const FABRIC_KEYS = new Set(['tops', 'bottoms', 'dresses', 'suiting', 'modest'])
 const LEISURE_CONTEXTS = new Set(['sahel_beach', 'sport', 'home', 'condolence', 'travel']);
 // وصفات مرتبطة بمناسبة موسمية بعينها (عيد/إفطار): ماتتستلفش كبديل لمناسبة تانية (مثلاً الجامعة).
 const EVENT_ONLY_CONTEXTS = new Set(['eid', 'ramadan_iftar']);
+const OWNED_EXPAND = { dress_any: ['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_beach'], shoes_any: ['shoes_any', 'sneakers', 'formal_shoes', 'loafers', 'flats', 'heels_low', 'heels_high', 'sandals', 'boots'] };
 const AUD_WEIGHT = { men: 1, women: 1, women_hijab: 1, boys: 0.6, girls: 0.6 };
 
 const genderOK = (aud, g) => {
@@ -58,7 +59,7 @@ function slotsFor(aud, parsed, look, K, ctxF, adv) {
     };
   }
   if (!look) return { mode: 'none', slots: [] };
-  const owned = new Set((parsed.ownedPieces || []).map((o) => o.key));
+  const owned = new Set((parsed.ownedPieces || []).flatMap((o) => OWNED_EXPAND[o.key] || [o.key]));
   const slots = [];
   look.slots.forEach(([keyStr, req, share], i) => {
     const keys = String(keyStr).split('|');
@@ -226,7 +227,8 @@ function lookCandidates(aud, context, K, parsed, role) {
 
 /** سياق افتراضي لما العميل يطلب قطعة من غير مناسبة ومعاه قطع مملوكة (صورة). */
 function lookForOwned(aud, parsed, K) {
-  const owned = (parsed.ownedPieces || []).map((o) => o.key);
+  // «دريس» عامة من الصورة بتطابق أي لوك فيه فستان (مش بس dress_any اللي مفيش لوك بيستخدمه).
+  const owned = (parsed.ownedPieces || []).flatMap((o) => OWNED_EXPAND[o.key] || [o.key]);
   if (!owned.length) return [];
   return K.outfits.looks.filter((l) => l.status !== 'draft' && l.audience.includes(aud) && l.slots.some(([k]) => String(k).split('|').some((x) => owned.includes(x)))).sort((a, b) => b.formality - a.formality).map((l) => ({ look: l, t: 0 }));
 }
@@ -290,11 +292,10 @@ export function planOutfit(parsed, products, env = {}) {
   // طلب قطعة محددة من غير ما يقول لمين (هودي، كوتشي...): مانسألش — نعرض للرجالي والحريمي في تابين.
   let audienceOpen = false;
   if (!persons.length && (parsed.garments.length || (parsed.ownedPieces || []).length) && !(parsed.persons || []).length) { persons = ['men', 'women']; audienceOpen = true; }
-  if (!persons.length) return { ...base, state: 'clarify', ask: ['audience', ...(parsed.context || parsed.garments.length || (parsed.ownedPieces || []).length ? [] : ['occasion'])], persons: [] };
+  if (!persons.length) return { ...base, state: 'clarify', ask: ['audience', ...(parsed.context || parsed.garments.length || (parsed.ownedPieces || []).length || parsed.flags?.fromImage ? [] : ['occasion'])], persons: [] };
   const context = parsed.contextEffective || null; const role = parsed.role || 'guest';
   const hasGarments = parsed.garments.length > 0; const hasOwned = (parsed.ownedPieces || []).length > 0;
   if (!context && !hasGarments && !hasOwned) return { ...base, state: 'clarify', ask: ['occasion'], persons };
-  if (!context && parsed.garments.length && parsed.garments.every((g) => g.key === 'dress_any')) return { ...base, state: 'clarify', ask: ['dress_kind'], persons };
 
   const userAvoid = [...(parsed.avoidColors || []), ...(profile.avoidColors || [])];
   const productIds = (value) => new Set(String(value || '').split(',').filter((id) => /^\d{1,15}$/.test(id)));

@@ -87,6 +87,7 @@ const AdminCouriers = lazy(() => import('./pages/admin/Couriers.jsx'));
 const AdminAlerts = lazy(() => import('./pages/admin/Alerts.jsx'));
 const AdminGrowth = lazy(() => import('./pages/admin/Growth.jsx'));
 const AdminInsights = lazy(() => import('./pages/admin/Insights.jsx'));
+const AdminStylistLog = lazy(() => import('./pages/admin/StylistLog.jsx'));
 const AdminAudit = lazy(() => import('./pages/admin/AuditLog.jsx'));
 const AdminCampaigns = lazy(() => import('./pages/admin/Campaigns.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
@@ -210,6 +211,7 @@ const router = createBrowserRouter([
           { path: 'alerts', element: <AdminAlerts /> },
           { path: 'growth', element: <AdminGrowth /> },
           { path: 'insights', element: <AdminInsights /> },
+          { path: 'stylist-log', element: <AdminStylistLog /> },
           { path: 'audit', element: <AdminAudit /> },
           { path: 'campaigns', element: <AdminCampaigns /> },
           { path: 'reports', element: <AdminReports /> },

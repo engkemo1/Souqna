@@ -284,6 +284,8 @@ export default function Product() {
 
           <div className="mt-6 border-t border-line">
             <Accordion title={t('product.description')} defaultOpen><p dir="auto" className="whitespace-pre-line text-start">{tr(p.description)}</p></Accordion>
+            {p.material && <p className="mt-3 text-sm text-muted" dir="auto"><span className="font-semibold text-fg">{tr({ ar: 'الخامة: ', en: 'Material: ' })}</span>{p.material}</p>}
+            {p.care && <Accordion title={tr({ ar: 'طريقة الغسيل والعناية', en: 'Care instructions' })}><p dir="auto" className="whitespace-pre-line text-start">{p.care}</p></Accordion>}
             <Accordion title={t('product.details')}>
               <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-2">
                 <dt>{t('product.sku')}</dt><dd className="font-medium text-fg" dir="ltr">{p.sku}</dd>

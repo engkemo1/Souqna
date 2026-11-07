@@ -15,8 +15,11 @@ import { makeBrain } from './moda/brain.js';
 import { makeCurator } from './moda/curate.js';
 import { makeUnderstander } from './moda/understand.js';
 import { loadKnowledge } from './moda/knowledge.js';
+import { contactFromEnv } from './moda/contact.js';
 import { makeLlmExtract } from './moda/llm.js';
 import { searchByImage, visualSettings } from './visual.js';
+import { storeOffers } from './promotions/public.js';
+import { storeHours } from './hours.js';
 import { rankCandidateRows, coordinateLookCandidates, fitBudgetCandidates, slotOwnerLabel, cleanSay } from './stylist-ranking.js';
 
 const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ـ/g, '').replace(/[ًٌٍَُِّْ]/g, '').trim();
@@ -519,6 +522,26 @@ function modaCatalogue() {
   modaRowsCache = { at: Date.now(), rows };
   return rows;
 }
+/** عروض المحلات الشغالة دلوقتي (حقيقيه، من نظام العروض). بتتنده بس لما حد يسأل عن العروض. */
+export function liveOffersForModa() {
+  const stores = q.all("SELECT id, name_ar FROM stores WHERE status='active' AND hidden=0 LIMIT 300");
+  const out = [];
+  for (const s of stores) {
+    let list = [];
+    try { list = storeOffers(s.id); } catch { list = []; }
+    for (const o of list.slice(0, 2)) out.push({ store: s.name_ar, name: o.name?.ar || '', headline: o.text?.headline?.ar || '', endsAt: o.endsAt || null });
+  }
+  return out;
+}
+/** المحلات الشغالة (بياناتها المسجّلة بس) لأسئلة تويلا عن محل: رقم، لوكيشن، عنوان، فروع، مواعيد، سوشيال. */
+export function storesForModa() {
+  const arr = (j) => { try { const v = JSON.parse(j || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+  return q.all("SELECT * FROM stores WHERE status='active' AND hidden=0 ORDER BY sort_order, id LIMIT 300").map((s) => ({
+    id: s.id, slug: s.slug, name_ar: s.name_ar, name_en: s.name_en, tagline_ar: s.tagline_ar || '', description_ar: s.description_ar || '', address_ar: s.address_ar || '', city: s.city || '',
+    phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.map_url || null, lat: s.lat ?? null, lng: s.lng ?? null, hours: storeHours(s), branches: arr(s.branches_json), contacts: arr(s.contacts_json),
+    instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
+  }));
+}
 export const modaEngineEnabled = () => (process.env.STYLIST_ENGINE || 'moda') !== 'legacy';
 
 
@@ -570,7 +593,7 @@ export async function runModaStylist(messages, { profile, session, answers, imag
   const rows = modaCatalogue();
   // احتياطي مجاني: لو القواعد مافهمتش الرسالة، Cloudflare بيستخرج (شخص/مناسبة/قطعة) من قاموس محدد بس
   const llmExtract = providerReady.cloudflare() ? makeLlmExtract(async (system, msgs) => parseJson(await callLlm('cloudflare', system, msgs))) : null;
-  const out = await runModa(history, { products: rows, profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract, assistantName });
+  const out = await runModa(history, { products: rows, profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract, assistantName, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv() });
   const ids = [...new Set((out.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.id)))];
   const byId = new Map(rows.filter((r) => ids.includes(r.id)).map((r) => [r.id, r]));
   const rowList = ids.map((id) => byId.get(id)).filter(Boolean);
