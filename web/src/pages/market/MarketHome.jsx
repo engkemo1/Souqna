@@ -115,7 +115,7 @@ export default function MarketHome() {
       <FeaturedSlot placement="market_top" />
 
       {/* Hero */}
-      <section className="relative isolate overflow-hidden pt-6 sm:pt-10">
+      <section role="main" id="main" className="relative isolate overflow-hidden pt-6 sm:pt-10">
         <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-b from-white via-white to-[#F6F9FD]" />
         <div aria-hidden="true" className="pointer-events-none absolute -start-24 top-10 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
         <div className="container relative grid items-center gap-6 lg:grid-cols-2 lg:gap-12">

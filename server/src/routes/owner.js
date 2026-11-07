@@ -113,7 +113,7 @@ const storeSchema = z.object({
   phone: z.string().trim().max(20).optional(), whatsapp: z.string().trim().max(20).optional(),
   // extra numbers of the SAME store (call + WhatsApp buttons) and extra branches (name + address + map link, no numbers)
   contacts: z.array(z.object({ label: z.string().trim().max(40).optional(), phone: z.string().trim().max(20) })).max(6).optional(),
-  branches: z.array(z.object({ name: z.string().trim().max(60), address: z.string().trim().max(160).optional(), map_url: z.string().trim().max(500).optional() })).max(12).optional(),
+  branches: z.array(z.object({ name: z.string().trim().max(60), address: z.string().trim().max(160).optional(), phone: z.string().trim().max(20).optional(), map_url: z.string().trim().max(500).optional() })).max(12).optional(),
   hero_mode: z.enum(['auto', 'cover', 'slider']).optional(),
   photo_style: z.enum(['white', 'cream', 'original']).optional(),
   logo_initials: z.string().trim().max(2).optional(),
@@ -141,7 +141,7 @@ r.put('/store', h((req, res) => {
     delete body.contacts;
   }
   if (body.branches !== undefined) {
-    const rows = body.branches.filter((b) => b.name && (b.address || b.map_url)).map((b) => ({ name: b.name, address: b.address || '', map_url: /^https?:\/\//i.test(b.map_url || '') ? b.map_url : '' }));
+    const rows = body.branches.filter((b) => b.name && (b.address || b.map_url || (b.phone || '').replace(/\D/g, '').length >= 6)).map((b) => ({ name: b.name, address: b.address || '', phone: (b.phone || '').replace(/\D/g, '').length >= 6 ? b.phone : '', map_url: /^https?:\/\//i.test(b.map_url || '') ? b.map_url : '' }));
     body.branches_json = rows.length ? JSON.stringify(rows) : null;
     delete body.branches;
   }
@@ -1042,7 +1042,7 @@ r.get('/orders/:id', h((req, res) => {
   const runShare = runCost == null || runPosition < 0 ? null : Math.floor(runCost / runOrders.length) + (runPosition < runCost % runOrders.length ? 1 : 0);
   res.json({
     order: {
-      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, reserveUntil: o.reserve_until || null, reserveRecord: o.delivery_by === 'pickup' ? reserveRecord(o.phone) : null, deliveryGroup: o.delivery_group, handoffAt: o.handoff_at, next: ownerNext(o), createdAt: o.created_at, updatedAt: o.updated_at,
+      id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, pickupBranch: o.pickup_branch || '', reserveUntil: o.reserve_until || null, reserveRecord: o.delivery_by === 'pickup' ? reserveRecord(o.phone) : null, deliveryGroup: o.delivery_group, handoffAt: o.handoff_at, next: ownerNext(o), createdAt: o.created_at, updatedAt: o.updated_at,
       customer: { id: customer?.id, name: o.customer_name, phone: o.phone, governorate: o.governorate, city: o.city, address: o.address, ordersCount: customer?.orders_count || 1, totalSpent: customer?.total_spent ?? o.total },
       notes: o.notes, storeNote: o.store_note || null, payment: o.payment_method, coupon: o.coupon_code, platformDiscount: o.platform_discount || 0,
       subtotal: o.subtotal, discount: o.discount, promoDiscount: o.promo_discount || 0, promotions: orderPromotions(o.id), refunded: q.val('SELECT COALESCE(SUM(refund),0) FROM order_returns WHERE order_id=?', [o.id]) || 0, shipping: o.delivery_group ? 0 : o.shipping, total: o.delivery_group ? o.subtotal - o.discount : o.total,
@@ -1180,6 +1180,24 @@ r.post('/orders/:id/handoff', h((req, res) => {
   });
   notifyPlatformDelivery(o.id, o.number);
   res.json({ deliveryBy: 'platform', handoffAt: now, next: ownerNext({ status: o.status, delivery_by: 'platform' }) });
+}));
+
+/** Which branch prepares this order (stores with several branches): the courier collects from that branch. '' = the main address. */
+r.patch('/orders/:id/branch', h((req, res) => {
+  const { branch } = z.object({ branch: z.string().trim().max(60).default('') }).parse(req.body);
+  const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
+  if (!o) throw notFound('Order');
+  if (o.delivery_by === 'pickup') throw badRequest('pickup_order', 'This is an in-store reservation.');
+  if (['delivered', 'cancelled'].includes(o.status)) throw badRequest('invalid_transition', 'This order is closed.');
+  let name = '';
+  if (branch) {
+    let list = [];
+    try { list = JSON.parse(req.store.branches_json || '[]'); } catch { /* none */ }
+    if (!Array.isArray(list) || !list.some((b) => b.name === branch)) throw badRequest('unknown_branch', 'This branch does not exist.');
+    name = branch;
+  }
+  q.run('UPDATE orders SET pickup_branch=?, updated_at=? WHERE id=?', [name || null, nowIso(), o.id]);
+  res.json({ pickupBranch: name });
 }));
 
 /* ---------------------------------------------------------- services (professional photography) */

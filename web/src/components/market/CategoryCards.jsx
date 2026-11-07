@@ -16,10 +16,10 @@ export function CategoryImage({ dept, sizes, priority = false, className }) {
   const im = dept?.images;
   const src = im?.card || dept?.image;
   if (!src || bad) {
-    return <img src="/departments/category-placeholder.png" alt="" loading={priority ? 'eager' : 'lazy'} decoding="async" className={cx('h-full w-full object-cover', className)} />;
+    return <img src="/departments/category-placeholder.png" alt="" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : undefined} decoding="async" className={cx('h-full w-full object-cover', className)} />;
   }
   const srcSet = im ? `${im.thumb} 160w, ${im.card} 480w, ${im.hero} 1200w` : undefined;
-  return <img src={src} srcSet={srcSet} sizes={sizes} alt="" loading={priority ? 'eager' : 'lazy'} decoding="async" onError={() => setBad(true)} className={cx('h-full w-full object-cover', className)} />;
+  return <img src={src} srcSet={srcSet} sizes={sizes} alt="" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : undefined} decoding="async" onError={() => setBad(true)} className={cx('h-full w-full object-cover', className)} />;
 }
 
 const countLabel = (n, lang) => (n > 0 ? (lang === 'ar' ? `${new Intl.NumberFormat('ar-EG').format(n)} منتج` : `${n} items`) : '');
