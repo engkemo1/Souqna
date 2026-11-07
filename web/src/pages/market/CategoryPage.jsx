@@ -17,7 +17,7 @@ import NotFound from '../NotFound.jsx';
 const SITE = typeof window !== 'undefined' ? window.location.origin : '';
 
 /** Title / description / canonical / BreadcrumbList for the current section. Server-rendered too (for crawlers); this keeps client navigation in sync. */
-function useSeo({ dept, trail, lang }) {
+function useSeo({ dept, trail, lang, canonical }) {
   useEffect(() => {
     if (!dept) return undefined;
     const own = deptName(dept, lang);
@@ -25,7 +25,7 @@ function useSeo({ dept, trail, lang }) {
     const name = par && !own.includes(par) ? `${own} ${par}` : own; // keeps same-named sections under different parents apart
     const title = dept.seo?.title?.[lang] || dept.seo?.title?.ar || (lang === 'ar' ? `${name} في بنها | أسعار وموديلات | Twist` : `${name} in Banha | Prices & Styles | Twist`);
     const desc = dept.seo?.description?.[lang] || dept.seo?.description?.ar || dept.description?.[lang] || dept.description?.ar || (lang === 'ar' ? `تسوق ${name} من محلات بنها على Twist: قارن الأسعار والموديلات من محلات كتير في مكان واحد واطلب أونلاين بسهولة.` : `Shop ${name} from many Banha stores on Twist: compare prices and styles in one place and order online.`);
-    const url = `${SITE}/c/${dept.slug}`;
+    const url = `${SITE}/c/${canonical || dept.slug}`;
     document.title = title;
     const meta = (sel, make) => { let el = document.head.querySelector(sel); if (!el) { el = make(); document.head.appendChild(el); } return el; };
     meta('meta[name="description"]', () => Object.assign(document.createElement('meta'), { name: 'description' })).setAttribute('content', desc);
@@ -33,7 +33,7 @@ function useSeo({ dept, trail, lang }) {
     const ld = meta('script[data-twist-breadcrumb]', () => { const s = document.createElement('script'); s.type = 'application/ld+json'; s.dataset.twistBreadcrumb = '1'; return s; });
     ld.textContent = JSON.stringify({ '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ name: lang === 'ar' ? 'الرئيسية' : 'Home', item: `${SITE}/` }, ...trail.map((c) => ({ name: deptName(c, lang), item: `${SITE}/c/${c.slug}` }))].map((x, i) => ({ '@type': 'ListItem', position: i + 1, name: x.name, item: x.item })) });
     return () => { document.head.querySelector('script[data-twist-breadcrumb]')?.remove(); };
-  }, [dept, trail, lang]);
+  }, [dept, trail, lang, canonical]);
 }
 
 export default function CategoryPage() {
@@ -49,13 +49,13 @@ export default function CategoryPage() {
   const [sort, setSort] = useState('relevance');
   const [selectedChild, setSelectedChild] = useState('');
   const dq = useDebounced(term.trim(), 250);
-  const activeDepartment = selectedChild || slug;
+  const activeDepartment = selectedChild || slug; // the search endpoint understands the readable slug too
   const key = new URLSearchParams({ q: dq, department: activeDepartment, sort }).toString();
   const prods = useApi(`/search?${key}`);
   const [more, setMore] = useState({ key: '', items: [], page: 1 });
   const [busy, setBusy] = useState(false);
   const [quick, setQuick] = useState(null);
-  useSeo({ dept, trail, lang });
+  useSeo({ dept, trail, lang, canonical: data?.canonical });
   useEffect(() => { window.scrollTo(0, 0); setTerm(''); setSort('relevance'); setSelectedChild(''); }, [slug]);
 
   if (error?.status === 404) return <NotFound />;

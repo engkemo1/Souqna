@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
 import helmet from 'helmet';
+import { publicSlug, storedSlug } from './lib/seo-slugs.js';
 import compression from 'compression';
 import cors from 'cors';
 import { config } from './config.js';
@@ -66,7 +67,7 @@ if (indexNowKey()) app.get(`/${indexNowKey()}.txt`, (_req, res) => res.type('tex
 
 // pages to announce to search engines: the fixed pages on the first run, then only stores/products created since `since`
 function newUrlsSince(since) {
-  const urls = since ? [] : [`${SITE_ORIGIN}/`, `${SITE_ORIGIN}/join`, `${SITE_ORIGIN}/stores`, ...indexableDepartments().map((d) => `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`)];
+  const urls = since ? [] : [`${SITE_ORIGIN}/`, `${SITE_ORIGIN}/join`, `${SITE_ORIGIN}/stores`, ...indexableDepartments().map((d) => `${SITE_ORIGIN}/c/${encodeURIComponent(publicSlug(d.slug))}`)];
   const cond = since ? 'AND s.created_at > ?' : '';
   urls.push(...q.all(`SELECT s.slug FROM stores s WHERE s.status='active' AND s.hidden=0 AND s.search_indexable=1 ${cond}
     AND EXISTS (SELECT 1 FROM products p WHERE p.store_id=s.id AND p.status='active') ORDER BY s.id LIMIT 5000`, since ? [since] : []).map(({ slug }) => `${SITE_ORIGIN}/s/${encodeURIComponent(slug)}`));
@@ -81,7 +82,7 @@ const isoDate = (d) => (d ? `${String(d).replace(' ', 'T').replace(/Z$/, '')}Z` 
 const indexableDepartments = () => customerDepartments().filter((d) => d.product_count > 0);
 app.get('/sitemap.xml', (_req, res) => {
   const entries = [{ loc: `${SITE_ORIGIN}/` }, { loc: `${SITE_ORIGIN}/join` }, { loc: `${SITE_ORIGIN}/stores` }];
-  entries.push(...indexableDepartments().map((d) => ({ loc: `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}` })));
+  entries.push(...indexableDepartments().map((d) => ({ loc: `${SITE_ORIGIN}/c/${encodeURIComponent(publicSlug(d.slug))}` })));
   const stores = q.all(`SELECT s.slug, (SELECT MAX(p.updated_at) FROM products p WHERE p.store_id=s.id AND p.status='active') AS lastmod FROM stores s
     WHERE s.status='active' AND s.hidden=0 AND s.search_indexable=1
     AND EXISTS (SELECT 1 FROM products p WHERE p.store_id=s.id AND p.status='active') ORDER BY s.id LIMIT 49990`);
@@ -179,17 +180,19 @@ if (fs.existsSync(config.webDist)) {
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withLd(withSeo(html, { title, description, url, image, h1: item.name_ar, intro: description }), [product, crumbs]));
   });
   app.get('/c/:slug', (req, res) => {
+    const pub = publicSlug(req.params.slug);
+    if (pub !== req.params.slug) return res.redirect(301, `/c/${encodeURIComponent(pub)}`); // an old opaque URL (/c/c18_mvtnfs0s) moves permanently to its readable one
     const all = customerDepartments(); const by = new Map(all.map((d) => [d.slug, d]));
-    const d = by.get(req.params.slug);
+    const d = by.get(storedSlug(req.params.slug));
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
     if (!d) return res.status(404).set('X-Robots-Tag', 'noindex').type('html').send(html);
     const trail = []; for (let c = d, i = 0; c && i < 10; c = by.get(c.parent), i++) trail.unshift(c);
-    const url = `${SITE_ORIGIN}/c/${encodeURIComponent(d.slug)}`;
+    const url = `${SITE_ORIGIN}/c/${encodeURIComponent(publicSlug(d.slug))}`;
     const par = trail.length >= 2 ? trail[trail.length - 2].name.ar : ''; const dn = par && !d.name.ar.includes(par) ? `${d.name.ar} ${par}` : d.name.ar; // same name under two parents (جاكيتات حريمي / رجالي) must not give two identical titles
     const title = d.seo?.title?.ar || `${dn} في بنها | أسعار وموديلات | Twist`;
     const description = d.seo?.description?.ar || d.description?.ar || `تسوق ${dn} من محلات بنها على Twist: قارن الأسعار والموديلات من محلات كتير في مكان واحد واطلب أونلاين بسهولة.`;
     const image = d.images?.hero ? `${d.images.hero.startsWith('http') ? '' : SITE_ORIGIN}${d.images.hero}` : `${SITE_ORIGIN}/brand/twist-share.png`;
-    const ld = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ name: 'الرئيسية', item: `${SITE_ORIGIN}/` }, ...trail.map((c) => ({ name: c.name.ar, item: `${SITE_ORIGIN}/c/${encodeURIComponent(c.slug)}` }))].map((x, i) => ({ '@type': 'ListItem', position: i + 1, name: x.name, item: x.item })) };
+    const ld = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [{ name: 'الرئيسية', item: `${SITE_ORIGIN}/` }, ...trail.map((c) => ({ name: c.name.ar, item: `${SITE_ORIGIN}/c/${encodeURIComponent(publicSlug(c.slug))}` }))].map((x, i) => ({ '@type': 'ListItem', position: i + 1, name: x.name, item: x.item })) };
     if (!(d.product_count > 0)) res.set('X-Robots-Tag', 'noindex, follow');
     const out = withSeo(html, { title, description, url, image, h1: d.name.ar, intro: description }).replace('</head>', `<script type="application/ld+json" data-twist-breadcrumb="1">${JSON.stringify(ld).replace(/</g, '\\u003c')}</script></head>`);
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(out);
