@@ -287,6 +287,9 @@ export function planOutfit(parsed, products, env = {}) {
     if (parsed.genderHint === 'female') persons = ['women']; else if (parsed.genderHint === 'male') persons = ['men'];
     else if (profile.audience) persons = [profile.audience];
   }
+  // طلب قطعة محددة من غير ما يقول لمين (هودي، كوتشي...): مانسألش — نعرض للرجالي والحريمي في تابين.
+  let audienceOpen = false;
+  if (!persons.length && (parsed.garments.length || (parsed.ownedPieces || []).length) && !(parsed.persons || []).length) { persons = ['men', 'women']; audienceOpen = true; }
   if (!persons.length) return { ...base, state: 'clarify', ask: ['audience', ...(parsed.context || parsed.garments.length || (parsed.ownedPieces || []).length ? [] : ['occasion'])], persons: [] };
   const context = parsed.contextEffective || null; const role = parsed.role || 'guest';
   const hasGarments = parsed.garments.length > 0; const hasOwned = (parsed.ownedPieces || []).length > 0;
@@ -298,7 +301,7 @@ export function planOutfit(parsed, products, env = {}) {
   const learnedPreferences = { liked: productIds(profile.likedProductIds), disliked: productIds(profile.dislikedProductIds) };
   const envC = { adv, role, context, userAvoid, profileTaste: profile.taste || [], learnedPreferences };
   const wsum = persons.reduce((t, a) => t + (AUD_WEIGHT[a] || 1), 0);
-  const pBudget = (a) => (budget ? (budget * (AUD_WEIGHT[a] || 1)) / wsum : null);
+  const pBudget = (a) => (budget ? (audienceOpen ? budget : (budget * (AUD_WEIGHT[a] || 1)) / wsum) : null);
 
   const cr = K.contexts.get(context)?.formality || null;
   const tgt = cr ? (env.eventTime?.isNight && cr[1] >= 4 ? cr[1] : (cr[0] + cr[1]) / 2) : null;
@@ -340,7 +343,7 @@ export function planOutfit(parsed, products, env = {}) {
     const herHero = herF?.picks[0]?.product?.colorKeys?.slice(0, 2);
     if (herHero?.length) fl = fl.map((f) => ((f.aud === 'men' && f.look) ? { ...fillPerson('men', parsed, f.look, products, K, envC, pBudget('men'), herHero), t: f.t } : f));
     fl = fl.map((f) => ({ ...f, picks: f.picks.map((p) => ({ ...p })) }));
-    const fit = fitBudget(fl, budget);
+    const fit = fitBudget(fl, audienceOpen && budget ? budget * fl.length : budget);
     const heroSwapped = fl.some((f) => f.picks.some((p) => p.slot.hero && p.relaxedKind === 'budget'));
     return { fills: fl, fit, heroSwapped };
   };
@@ -351,7 +354,9 @@ export function planOutfit(parsed, products, env = {}) {
     if (!best || bad < best.bad || (bad === best.bad && bad > 0 && r.fit.over < best.r.fit.over)) best = { r, bad };
     if (bad === 0) break;
   }
-  const fills = best.r.fills; const { total, dropped, over } = best.r.fit;
+  let fills = best.r.fills; const { total, dropped, over } = best.r.fit;
+  // عرض للجنسين: لو جنس منهم ملقاش حاجة وتاني لقى، منعرضش تاب فاضي ولا نقول «لسه مش متاح».
+  if (audienceOpen && fills.some((f) => f.picks.length) && fills.some((f) => !f.picks.length)) fills = fills.filter((f) => f.picks.length);
 
   // ---- الحالة ----
   const anyPicks = fills.some((f) => f.picks.length);
@@ -368,7 +373,7 @@ export function planOutfit(parsed, products, env = {}) {
   const slotTotal = fills.reduce((t, f) => t + f.slotsCount, 0);
   // Gather every recommendation-critical detail in the same clarification turn.
   // Twila must not reveal a provisional look between these answers.
-  if (!budget && !parsed.flags?.budgetFlexible && (persons.length > 1 || slotTotal > 2) && state !== 'none' && state !== 'no_look') asks.push('budget');
+  if (!budget && !parsed.flags?.budgetFlexible && !audienceOpen && (persons.length > 1 || slotTotal > 2) && state !== 'none' && state !== 'no_look') asks.push('budget');
   if (context && !parsed.daypart && (K.contexts.get(context)?.formality?.[1] || 0) >= 4 && state !== 'none' && state !== 'no_look') asks.push('time_if_dressy');
   if (parsed.garments.length === 1 && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && !parsed.flags?.cheapest && state !== 'none' && state !== 'no_look') asks.push('color_preference');
 
@@ -376,7 +381,7 @@ export function planOutfit(parsed, products, env = {}) {
   for (const f of fills) for (const p of f.picks) { const c = primary(p.product); if (c && !palette.includes(c) && !['black', 'white'].includes(c) || (c && palette.length < 1 && !palette.includes(c))) palette.push(c); }
 
   return {
-    ...base, state, persons, context, role, budget, total, over, dropped, missing, relaxed, ask: asks, palette: palette.slice(0, 3),
+    ...base, state, persons, audienceOpen, context, role, budget, total, over, dropped, missing, relaxed, ask: asks, palette: palette.slice(0, 3),
     people: fills.map((f) => ({
       aud: f.aud, mode: f.mode, look: f.look ? { id: f.look.id, name_ar: f.look.name_ar, tip_ar: f.look.tip_ar, formality: f.look.formality } : null,
       picks: f.picks.map((p) => ({ slotKey: p.slot.base, optional: !p.slot.required, hero: p.slot.hero, product: p.product, relaxed: p.relaxedKind })),

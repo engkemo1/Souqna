@@ -330,11 +330,11 @@ export default function StylistChat() {
                 </div>
               )}
               {msgs.map((m, i) => m.role === 'user' ? (
-                <div key={i} className="flex justify-end"><div className="max-w-[85%] rounded-2xl rounded-ee-sm bg-fg px-3.5 py-2.5 text-[14.5px] leading-relaxed text-canvas">{m.photo && <div className="mb-2 flex gap-1.5"><img src={m.photo} alt="" className="h-36 w-auto max-w-full rounded-lg object-cover" />{m.photo2 && <img src={m.photo2} alt="" className="h-36 w-auto max-w-full rounded-lg object-cover" />}</div>}{m.content}</div></div>
+                <div key={i} className="flex justify-end"><div className="max-w-[85%] rounded-2xl rounded-ee-sm bg-fg px-3.5 py-2.5 text-[14.5px] leading-relaxed text-canvas">{m.photo && <div className="mb-2 flex gap-1.5"><img src={m.photo} alt="" className={m.photo2 ? 'h-36 w-auto max-w-full rounded-lg object-cover' : 'max-h-56 w-full rounded-lg object-cover'} />{m.photo2 && <img src={m.photo2} alt="" className="h-36 w-auto max-w-full rounded-lg object-cover" />}</div>}{m.content}</div></div>
               ) : (
                 <div key={i} className="max-w-full">
                   {(m.say || m.error) && <div className={cx('max-w-[90%] rounded-2xl rounded-ss-sm px-3.5 py-2.5 text-[14.5px] leading-relaxed', m.error ? 'bg-sale/10 text-sale' : 'bg-secondary')}>{m.error || m.say}</div>}
-                  {m.weatherSource === 'met_norway' && <p className="mt-1 text-[10px] text-muted"><a href="https://api.met.no/" target="_blank" rel="noreferrer" className="underline">{lang === 'ar' ? 'بيانات الطقس: MET Norway' : 'Weather data: MET Norway'}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer" className="underline">CC BY 4.0</a></p>}
+                  {m.weatherSource === 'met_norway' && m.tips?.length > 0 && <p className="mt-1 text-[10px] text-muted"><a href="https://api.met.no/" target="_blank" rel="noreferrer" className="underline">{lang === 'ar' ? 'بيانات الطقس: MET Norway' : 'Weather data: MET Norway'}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer" className="underline">CC BY 4.0</a></p>}
                   <LookSet data={m} name={name} />
                   {i === msgs.length - 1 && m.questions?.length > 0 && !busy && <>
                     {m.questions.map((qq) => (

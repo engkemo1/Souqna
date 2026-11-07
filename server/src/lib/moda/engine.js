@@ -219,7 +219,8 @@ export async function runModa(messages, opts = {}) {
 
   // Finish every clarification before showing picks. Questions should not be
   // buried after a partial or low-confidence product result.
-  const needsClarificationFirst = Boolean(plan.ask?.length) && plan.state !== 'none';
+  // طلب قطعة/صورة من غير مناسبة: النتايج تظهر على طول والأسئلة (لون/ميزانية) اختيارية تحتها. لوك المناسبة (خطوبة/فرح…) بيفضل يخلّص أسئلته الأول.
+  const needsClarificationFirst = plan.state === 'clarify' || (Boolean(plan.ask?.length) && plan.state !== 'none' && Boolean(plan.context));
   let res = respond(needsClarificationFirst ? { ...plan, state: 'clarify' } : plan, { seed, lang, profile, assistantName });
   if (typeof brain === 'function' && ['none', 'no_look', 'partial'].includes(plan.state) && !needsClarificationFirst) {
     const avail = [...new Set((plan.people || []).flatMap((p) => p.picks.map((x) => x.product.key)).filter(Boolean))];

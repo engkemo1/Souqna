@@ -53,7 +53,7 @@
     "long_cardigan": ["كيمونو", "كارديجان طويل", "kimono", "duster", "long cardigan"],
 
     "sneakers":     ["كوتشي", "كوتش", "كوتشيات", "سنيكرز", "حذاء رياضي", "جزمه رياضه", "كوتشي رياضي", "sneakers", "sneaker", "trainers", "kotshi", "koshi", "kotchi", "kutshi", "koutchi", "cotchi", "رانينج", "حذاء جري", "جزمه جري", "sport shoes", "running shoes", "running"],
-    "shoes_any":    ["حذاء", "احذيه", "جزمه", "جزم", "shoes", "shoe", "footwear", "gazma", "gozma", "gazam"],
+    "shoes_any":    ["حذاء", "احذيه", "جزمه", "جزم", "جزمات", "شوز", "شوزات", "shoes", "shoe", "footwear", "gazma", "gozma", "gazam"],
     "formal_shoes": ["حذاء رسمي", "جزمه رسمي", "جزمه كلاسيك", "جزمه جلد", "حذاء كلاسيك", "اوكسفورد", "اكسفورد", "oxford", "derby", "dress shoes", "formal shoes", "gazma classic", "gazmet", "ديربي", "جزمه ديربي", "حذاء ديربي", "brogue", "brogues", "monk strap", "dress shoe", "lace up leather shoes", "leather lace up shoes", "جزمه سيرون"],
     "loafers":      ["لوفر", "موكاسين", "loafer", "loafers", "moccasin", "lofer", "جزمه بدون رباط", "حذاء بدون رباط", "penny loafer"],
     "heels_low":    ["كعب واطي", "كعب وسط", "كعب متوسط", "mid heel", "low heel", "kitten heel", "block heel"],

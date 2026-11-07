@@ -42,8 +42,12 @@ test('"أقل سعر تيشرت" is a product request (cheapest first), not a "c
 });
 
 test('a single piece does not trigger an "occasion" question and the reply never says "for the occasion"', async () => {
-  const ask = await runModa('رشحلي كوتشي ابيض', opts);
-  assert.deepEqual(ask.questions.map((q) => q.id), ['who_is_it_for']);
+  // مفيش سؤال «لمين؟» لقطعة للجنسين: النتايج بتظهر على طول (رجالي/حريمي) من غير أي سؤال إجباري.
+  const first = await runModa('رشحلي كوتشي ابيض', opts);
+  assert.notEqual(first.state, 'clarify');
+  assert.ok(first.blocks?.tabs?.length, 'results appear immediately');
+  assert.ok(!(first.questions || []).some((q) => q.id === 'who_is_it_for'));
+  assert.doesNotMatch(first.say, /لـالمناسبة|طقم/);
   const res = await runModa('رشحلي كوتشي ابيض', { ...opts, answers: { who_is_it_for: 'men' } });
   assert.doesNotMatch(res.say, /لـالمناسبة|طقم/);
 });
@@ -77,7 +81,7 @@ test('greetings, "are you an AI / Gemini?" and a Latin brand word inside Arabic 
   for (const t of ['انتي GEMINI ؟', 'انت chatgpt', 'انتي بشر', 'موديل ايه انتي']) { const r = await runModa(t, opts); assert.equal(r.faq, 'about_ai', t); assert.match(r.say, /الذكاء الاصطناعي/); assert.doesNotMatch(r.say, /^I /); }
   assert.equal((await runModa('اخبار مصر ايه', opts)).faq, 'offtopic');
   assert.equal(parseMessage('عايز hoodie اسود').lang, 'ar');
-  assert.equal((await runModa('انتي GEMINI ؟ طيب', opts)).say.match(/[a-z]{4,}/i), null, 'reply stays Arabic');
+  assert.equal((await runModa('انتي GEMINI ؟ طيب', opts)).say.replace(/\bTwist\b/g, '').match(/[a-z]{4,}/i), null, 'reply stays Arabic (the Twist brand name is allowed)');
 });
 
 test('مدى الميزانية: "من X ل Y" و"بين X و Y" الحد الأقصى هو الميزانية', () => {
@@ -126,4 +130,24 @@ test('لما كوتشي ساده بيتختار لمناسبة رسمية، ال
   const r = await runModa([{ role: 'user', content: 'أنا رايح خطوبة بالليل، عايز طقم لحد 5000 جنيه' }], { products: [...fx, ...sn], weatherMock: { temp_c: 23, feels_like_c: 23, rain_pct: 2 } });
   assert.match(r.say, /مفيش جزمة رسمية متاحة/);
   assert.match(r.say, /تحب أدورلك جزمة رسمية/);
+});
+
+test('طلب قطعة (شوز/شنطة/كوتشي) بيعرض نتايج على طول: من غير سؤال مناسبة ولا لمين، ومن غير تاب فاضي', async () => {
+  const shoes = await runModa('شوز رجالي', opts);
+  assert.notEqual(shoes.state, 'clarify');
+  assert.ok(shoes.blocks?.tabs?.[0]?.items?.length, 'shoes request shows items');
+  assert.ok(!(shoes.questions || []).some((q) => ['what_occasion', 'who_is_it_for'].includes(q.id)));
+  for (const msg of ['شنطة', 'جزمه', 'رشحلي كوتشي ابيض']) {
+    const r = await runModa(msg, opts);
+    assert.notEqual(r.state, 'clarify', msg);
+    for (const tab of r.blocks?.tabs || []) assert.ok(tab.items.length || tab.missing.length, `${msg}: empty tab ${tab.label}`);
+    // اللون سؤال اختياري تحت النتايج، مش شرط قبلها
+    assert.ok((r.questions || []).every((q) => q.id === 'color_preference'), msg);
+  }
+});
+
+test('لوك مناسبة (خطوبة/فرح) لسه بيخلّص أسئلته قبل ما يعرض ترشيح', async () => {
+  const r = await runModa('أنا وخطيبتي رايحين خطوبة عايزين طقم لينا الاتنين', opts);
+  assert.equal(r.state, 'clarify');
+  assert.equal(r.blocks, null);
 });

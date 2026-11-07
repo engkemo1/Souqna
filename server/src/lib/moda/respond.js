@@ -73,7 +73,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   const occasionForAr = { engagement_guest: 'للخطوبة', engagement_self: 'لخطوبتك', katb_kitab: 'لكتب الكتاب', wedding_guest: 'للفرح', wedding_self: 'لفرحك', graduation: 'للتخرج', family_gathering: 'للمة العيلة', birthday_party: 'لعيد الميلاد', date_night: 'لخروجة أو عشا', work_formal: 'للشغل', work_casual: 'للشغل', university: 'للجامعة', sport: 'للرياضة', casual_outing: 'للخروجة', travel: 'للسفر', eid: 'للعيد', ramadan_iftar: 'لإفطار رمضان', sahel_beach: 'للساحل' };
   const occasionFor = L === 'en' ? occasion : (occasionForAr[plan.context] || `لـ${occasion}`);
   const paletteAr = joinAr((plan.palette || []).map((c) => colorAr(K, c)));
-  const couple = plan.people.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
+  const couple = !plan.audienceOpen && plan.people.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
   const condolence = plan.tone === 'sober';
 
   const parts = [];
@@ -116,7 +116,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
       } else if (!himHasPrice && herHasPrice) parts.push(say('total_line_couple_her_only', { her: nf(her.subtotal) }));
       else if (himHasPrice && !herHasPrice) parts.push(say('total_line_couple_him_only', { him: nf(him.subtotal) }));
       else if (himHasPrice && herHasPrice) parts.push(say('total_line_couple', { him: nf(him.subtotal), her: nf(her.subtotal), total: nf(plan.total) }));
-    } else if (Number(plan.total) > 0) parts.push(say(plan.people.flatMap((p) => p.picks).length === 1 ? 'total_line_item' : 'total_line', { total: nf(plan.total) }));
+    } else if (Number(plan.total) > 0 && !plan.audienceOpen) parts.push(say(plan.people.flatMap((p) => p.picks).length === 1 ? 'total_line_item' : 'total_line', { total: nf(plan.total) }));
     if (plan.budget && plan.total <= plan.budget && Number(plan.total) > 0) {
       // لو في قطع ناقصة، "جوه الميزانية" مضللة: القطع الناقصة هتزود التكلفة.
       if (plan.state === 'partial' && (plan.missing || []).length) {
@@ -156,7 +156,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
 
   // ---------- بلوكات المنتجات ----------
   const tabs = plan.people.map((pe) => ({
-    id: pe.aud, label: tabLabel(pe.aud, plan.persons, { ...P }), look: pe.look?.name_ar || null,
+    id: pe.aud, label: plan.audienceOpen ? (pe.aud === 'men' ? (L === 'en' ? 'Men' : 'رجالي') : (L === 'en' ? 'Women' : 'حريمي')) : tabLabel(pe.aud, plan.persons, { ...P }), look: pe.look?.name_ar || null,
     items: pe.picks.map((pk) => itemCard(K, pk)), subtotal: pe.subtotal,
     missing: pe.missing.map((m) => ({ key: m.base, material: m.material, label: m.title || itemAr(K, m.base), button: P.order_missing_button, hint: pick(P.order_missing_hint, `${seed}:hint`), payload: { type: 'request_item', key: m.base, material: m.material, color: m.color, audience: pe.aud } })),
   }));
