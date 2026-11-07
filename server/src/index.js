@@ -227,7 +227,7 @@ if (fs.existsSync(config.webDist)) {
   });
   app.get('/join', (_req, res) => {
     const title = 'Twist بنها | افتح متجرك الإلكتروني لمحلك';
-    const description = 'Twist منصة بنها للتسوق المحلي. نجهز لمحلات الملابس متجرًا إلكترونيًا باسمها، مع متابعة الطلبات واشتراك شهري من غير عمولة على البيع.';
+    const description = 'Twist منصة بنها للتسوق المحلي. نجهز لمحلات الملابس متجرًا إلكترونيًا باسمها، مع متابعة الطلبات واشتراك شهري بسيط.';
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, {
       title, description, url: `${SITE_ORIGIN}/join`, image: `${SITE_ORIGIN}/brand/twist-share.png`, h1: 'افتح متجرك الإلكتروني لمحلك على Twist', intro: description,

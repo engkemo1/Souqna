@@ -190,7 +190,7 @@ export default function Join() {
           <motion.div aria-hidden className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[#03244D]/5 blur-3xl" animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 6, repeat: Infinity }} />
           <h2 className="relative font-display text-3xl font-bold text-[#03244D] sm:text-4xl">جاهز تفتح متجرك؟</h2>
           <ul className="relative mx-auto mt-6 grid max-w-md gap-2 text-start text-base text-[#43516a]">
-            {['إحنا بنعمل الحساب ونرفع المنتجات معاك', 'تنبيه فوري بكل طلب جديد', 'اشتراك شهري بسيط، من غير عمولة على البيع'].map((x) => (
+            {['إحنا بنعمل الحساب ونرفع المنتجات معاك', 'تنبيه فوري بكل طلب جديد', 'اشتراك شهري بسيط'].map((x) => (
               <li key={x} className="flex items-center gap-2"><Check className="h-4 w-4 shrink-0 text-brand" />{x}</li>
             ))}
           </ul>

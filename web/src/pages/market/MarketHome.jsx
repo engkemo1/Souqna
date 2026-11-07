@@ -276,7 +276,7 @@ export default function MarketHome() {
         <section className="container mt-14" aria-labelledby="about-twist">
           <h2 id="about-twist" className="font-display text-xl font-bold text-[#101d3a]">عن تويست (Twist) بنها</h2>
           <p className="mt-3 max-w-3xl text-sm leading-7 text-[#43516a]">
-            تويست (Twist) منصة تسوق محلية في بنها بتجمع <Link to="/stores" className="font-semibold text-brand underline-offset-2 hover:underline">محلات الملابس</Link> في مكان واحد: رجالي وحريمي وأطفال وملابس رياضية. تقدر تتصفح المنتجات وتقارن الأسعار وتطلب أونلاين وتتابع طلبك. ولو عندك محل، <Link to="/join" className="font-semibold text-brand underline-offset-2 hover:underline">افتح متجرك باسمك على تويست</Link> من غير عمولة على البيع.
+            تويست (Twist) منصة تسوق محلية في بنها بتجمع <Link to="/stores" className="font-semibold text-brand underline-offset-2 hover:underline">محلات الملابس</Link> في مكان واحد: رجالي وحريمي وأطفال وملابس رياضية. تقدر تتصفح المنتجات وتقارن الأسعار وتطلب أونلاين وتتابع طلبك. ولو عندك محل، <Link to="/join" className="font-semibold text-brand underline-offset-2 hover:underline">افتح متجرك باسمك على تويست</Link>.
           </p>
         </section>
       )}
