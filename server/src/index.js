@@ -31,7 +31,28 @@ const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
 // OpenStreetMap tiles are refused without a Referer, so send the origin (helmet's default is no-referrer)
-app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: 'cross-origin' }, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
+// Content-Security-Policy: locks framing, base URI, plugins and form targets; resources stay open to https so maps, fonts and media keep working
+const CSP = {
+  useDefaults: false,
+  directives: {
+    defaultSrc: ["'self'"],
+    scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'blob:', 'https:'],
+    styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
+    imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+    fontSrc: ["'self'", 'data:', 'https:'],
+    mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
+    connectSrc: ["'self'", 'blob:', 'https:', 'wss:'],
+    workerSrc: ["'self'", 'blob:'],
+    manifestSrc: ["'self'"],
+    frameSrc: ["'self'", 'https:'],
+    objectSrc: ["'none'"],
+    baseUri: ["'self'"],
+    formAction: ["'self'", 'https:'],
+    frameAncestors: ["'self'"],
+    upgradeInsecureRequests: [],
+  },
+};
+app.use(helmet({ contentSecurityPolicy: CSP, crossOriginResourcePolicy: { policy: 'cross-origin' }, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
 app.use(compression());
 app.use(cors());
 app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/wa/')) req.rawBody = buf; } }));
