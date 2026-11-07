@@ -453,7 +453,7 @@ r.get('/stylist/prompts', h((_req, res) => { res.set('Cache-Control', 'public, m
 r.post('/stylist', h(async (req, res) => {
   const st = stylistSettings();
   if (!st.enabled) throw new AppError(503, 'stylist_disabled', 'The stylist is switched off.');
-  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(700) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string().max(500)).optional(), session: z.record(z.any()).optional(), answers: z.record(z.any()).optional(), startLook: z.boolean().optional(), similar: z.boolean().optional(), lang: z.enum(['ar', 'en']).optional() }).parse(req.body);
+  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1200) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string().max(500)).optional(), session: z.record(z.any()).optional(), answers: z.record(z.any()).optional(), startLook: z.boolean().optional(), similar: z.boolean().optional(), lang: z.enum(['ar', 'en']).optional() }).parse(req.body);
   if (body.session && JSON.stringify(body.session).length > 8000) throw new AppError(422, 'validation_failed', 'Session too large.');
   if (body.messages[body.messages.length - 1].role !== 'user') throw new AppError(422, 'validation_failed', 'Last message must be from the shopper.');
   const ip = req.ip || 'x'; const now = Date.now();

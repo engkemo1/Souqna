@@ -166,7 +166,7 @@ export default function StylistChat() {
     const next = [...msgs, { role: 'user', content: shown, photo: image, photo2: image2, answered: !!answers }];
     setMsgs(next); setQuestionAnswers({}); setText(''); setPhoto(null); setPhoto2(null); setBusy(true);
     try {
-      const body = { messages: next.map((m, idx) => ({ role: m.role, content: m.role === 'assistant' ? (m.say || m.content || '') : (answers && idx === next.length - 1 ? '' : m.content) })).filter((m, idx) => m.content || (answers && idx === next.length - 1)), profile };
+      const body = { messages: next.map((m, idx) => ({ role: m.role, content: m.role === 'assistant' ? String(m.say || m.content || '').slice(0, 650) : (answers && idx === next.length - 1 ? '' : m.content) })).filter((m, idx) => m.content || (answers && idx === next.length - 1)), profile };
       if (session) body.session = session;
       if (answers) body.answers = answers;
       if (image) body.image = image;
