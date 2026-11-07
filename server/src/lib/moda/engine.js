@@ -19,7 +19,7 @@ import { norm } from './text.js';
 
 /** "طب ممكن ألبس إيه؟ / فيه بديل؟ / حاجة تانية" بعد رد ما لقاش المطلوب: العميل بيطلب بدائل لنفس المناسبة. */
 const ALT_RE = /(البس|ألبس|الاقي|اجيب|اشتري|اختار)( [^ ]+){0,3} (ايه|اي|ايش)( |$)|(^| )(بديل|بدائل|البديل|حاجه تانيه|حاجات تانيه|مفيش غيره|ايه المتاح|ايه الموجود|ايه اللي موجود)( |$)/;
-import { cairoParts, resolveEventTime, getWeather, weatherAdvice } from './time.js';
+import { cairoParts, resolveEventTime } from './time.js';
 
 const enrichedCache = new WeakMap();
 function ensureEnriched(products, K) {
@@ -266,10 +266,10 @@ async function runModaCore(messages, opts = {}) {
     return { ...res, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
   }
 
-  // ---------- وقت وجو ----------
+  // ---------- وقت ----------
   const eventTime = resolveEventTime(parsed, { now });
-  const weather = await getWeather(eventTime, { now, mock: weatherMock, fetcher });
-  const adv = weatherAdvice(weather, eventTime);
+  // Weather API disabled: no external call, no fabric/layer tips shown to the user.
+  const adv = null;
 
   // ---------- تخطيط ----------
   let rows = ensureEnriched(products, K);
@@ -326,5 +326,5 @@ async function runModaCore(messages, opts = {}) {
     turn: (session?.turn || 0) + 1, parsed: { ...parsed, advice: null, ...(derivedBudget ? { budget: session?.parsed?.budget ?? null } : {}) }, pending: plan.state === 'clarify' || Boolean(plan.ask?.length), pendingQuestion: plan.ask?.[0] || null, shown: [...new Set([...(session?.shown || []), ...shown])].slice(-60),
     lastState: plan.state, lastTotal: needsClarificationFirst ? (session?.lastTotal ?? null) : (plan.total ?? null), lastBudgetUsed: needsClarificationFirst ? (session?.lastBudgetUsed ?? null) : (plan.budget ?? plan.total ?? null),
   };
-  return { ...res, session: nextSession, parsed, weatherSource: weather.source === 'met_norway' ? 'met_norway' : null, curated, debug: { eventTime, weather: adv } };
+  return { ...res, session: nextSession, parsed, curated, debug: { eventTime } };
 }
