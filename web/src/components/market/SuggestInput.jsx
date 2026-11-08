@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Search, Store as StoreIcon, Tag, X } from 'lucide-react';
+import { Clock, Search, Store as StoreIcon, Tag, TrendingUp, X } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useDebounced } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -12,7 +12,12 @@ const writeRecent = (list) => { try { localStorage.setItem(KEY, JSON.stringify(l
 /** Remember a submitted search so it can be offered again (device-only, never sent anywhere). */
 export const saveRecent = (term) => { const t = String(term || '').trim().slice(0, 60); if (t) writeRecent([t, ...readRecent().filter((x) => x !== t)].slice(0, 6)); };
 
-const ICONS = { recent: Clock, product: Search, dept: Tag, store: StoreIcon };
+// what other shoppers search most: fetched at most once per 10 minutes per tab, and silently skipped if it fails
+let popularMemo = { at: 0, items: [] };
+const loadPopular = () => (Date.now() - popularMemo.at < 600000 ? Promise.resolve(popularMemo.items)
+  : api('/search/popular').then((r) => { popularMemo = { at: Date.now(), items: Array.isArray(r?.items) ? r.items.slice(0, 6) : [] }; return popularMemo.items; }).catch(() => popularMemo.items));
+
+const ICONS = { popular: TrendingUp, recent: Clock, product: Search, dept: Tag, store: StoreIcon };
 
 /**
  * Search input with an Amazon-style suggestion list: product names as you type, matching departments and stores,
@@ -27,6 +32,7 @@ export default function SuggestInput({ value, onChange, className, inputProps = 
   const [active, setActive] = useState(-1);
   const [data, setData] = useState(null);
   const [recent, setRecent] = useState([]);
+  const [popular, setPopular] = useState(popularMemo.items);
   const term = value.trim();
   const born = useRef(Date.now()); // an autoFocus on page load must not pop the list open over the content
   const dq = useDebounced(term, 180);
@@ -39,7 +45,10 @@ export default function SuggestInput({ value, onChange, className, inputProps = 
   }, [dq]);
 
   const items = useMemo(() => {
-    if (term.length < 2) return recent.map((q) => ({ kind: 'recent', label: q, q }));
+    if (term.length < 2) {
+      const seen = new Set(recent);
+      return [...recent.map((q) => ({ kind: 'recent', label: q, q })), ...popular.filter((q) => !seen.has(q)).map((q) => ({ kind: 'popular', label: q, q, hint: ar ? 'رائج' : 'Trending' }))];
+    }
     if (!data || dq !== term) return [];
     const name = (n) => n?.[lang] || n?.ar || '';
     return [
@@ -47,7 +56,7 @@ export default function SuggestInput({ value, onChange, className, inputProps = 
       ...data.departments.map((d) => ({ kind: 'dept', label: name(d.name), hint: ar ? 'قسم' : 'Department', to: `/search?department=${d.slug}` })),
       ...data.stores.map((s) => ({ kind: 'store', label: name(s.name), hint: ar ? 'محل' : 'Store', to: `/s/${s.slug}` })),
     ];
-  }, [term, dq, data, recent, lang, ar]);
+  }, [term, dq, data, recent, popular, lang, ar]);
 
   useEffect(() => { setActive(-1); }, [items]);
 
@@ -73,7 +82,7 @@ export default function SuggestInput({ value, onChange, className, inputProps = 
         {...inputProps}
         type="search" autoComplete="off" value={value} className={className}
         onChange={(e) => { onChange(e.target.value); setOpen(true); }}
-        onFocus={() => { setRecent(readRecent()); if (Date.now() - born.current > 400) setOpen(true); }}
+        onFocus={() => { setRecent(readRecent()); loadPopular().then(setPopular); if (Date.now() - born.current > 400) setOpen(true); }}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
         role="combobox" aria-expanded={showList} aria-controls={listId} aria-autocomplete="list"
@@ -81,7 +90,10 @@ export default function SuggestInput({ value, onChange, className, inputProps = 
       />
       {showList && (
         <div className="absolute inset-x-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-line bg-elevated text-start shadow-lift" onMouseDown={(e) => e.preventDefault()}>
-          {term.length < 2 && (
+          {term.length < 2 && recent.length === 0 && (
+            <div className="px-4 pb-1 pt-3 text-xs font-semibold text-muted">{ar ? 'الأكتر بحثًا' : 'Most searched'}</div>
+          )}
+          {term.length < 2 && recent.length > 0 && (
             <div className="flex items-center justify-between px-4 pb-1 pt-3 text-xs font-semibold text-muted">
               <span>{ar ? 'عمليات البحث الأخيرة' : 'Recent searches'}</span>
               <button type="button" onClick={clearRecent} className="inline-flex items-center gap-1 hover:text-fg"><X className="h-3 w-3" />{ar ? 'مسح' : 'Clear'}</button>

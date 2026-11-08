@@ -468,13 +468,13 @@ function ModaTrainingPanel() {
 
 const LOOK_OCCASIONS = ['أوتفيت خروجة', 'أوتفيت مقابلة شغل', 'أوتفيت سهرة', 'أوتفيت خطوبة', 'أوتفيت كتب كتاب', 'أوتفيت فرح', 'أوتفيت مناسبة خاصة', 'أوتفيت خروجة أطفال', 'أوتفيت عيد أطفال'];
 const LOOK_PIECE_SUGGESTIONS = ['تيشيرت', 'قميص', 'بنطلون', 'فستان', 'جاكيت', 'حذاء', 'شنطة', 'كاب (إكسسوار)', 'طاقية (إكسسوار)'];
-const blankOutfit = () => ({ audience: 'women', age: '', occasion: '', say: '', tips: '', coverImage: '', images: [], pieces: [] });
+const blankOutfit = () => ({ audience: 'women', age: '', occasion: '', say: '', tips: '', coverImage: '', images: [], backImage: '', pieces: [] });
 function lookOfDayForm(data) {
   const manual = data.manual || {};
   return {
     mode: data.mode || 'ai',
     manual: { showOthers: !!manual.showOthers, coverImage: manual.coverImage || '', title: manual.title || '', description: manual.description || '', badge: manual.badge || '', outfits: (manual.outfits || []).map((outfit) => ({
-      audience: outfit.audience || 'women', age: outfit.age || '', say: outfit.say || '', tips: outfit.tips || '', occasion: outfit.occasion || '', coverImage: '', images: (outfit.images?.length ? outfit.images : [outfit.coverImage]).filter(Boolean),
+      audience: outfit.audience || 'women', age: outfit.age || '', say: outfit.say || '', tips: outfit.tips || '', occasion: outfit.occasion || '', coverImage: '', images: (outfit.images?.length ? outfit.images : [outfit.coverImage]).filter(Boolean), backImage: outfit.backImage || '',
       pieces: (outfit.pieces || []).map((piece) => ({ label: piece.label || '', productId: piece.product ? piece.productId : null, product: piece.product || null })),
     })) },
   };
@@ -559,7 +559,7 @@ function LookOfDayPanel() {
     setBusy(true);
     const manual = { showOthers: !!f.manual.showOthers, coverImage: f.manual.coverImage, title: f.manual.title.trim(), description: f.manual.description.trim(), badge: f.manual.badge.trim(), outfits: manualOutfits.filter((outfit) => outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).length >= 2)
       .map((outfit) => ({
-        audience: outfit.audience, age: outfit.age.trim(), say: outfit.say.trim(), tips: outfit.tips.trim(), occasion: outfit.occasion.trim(), coverImage: (outfit.images || [])[0] || '', images: outfit.images || [],
+        audience: outfit.audience, age: outfit.age.trim(), say: outfit.say.trim(), tips: outfit.tips.trim(), occasion: outfit.occasion.trim(), coverImage: (outfit.images || [])[0] || '', images: outfit.images || [], backImage: outfit.backImage || '',
         pieces: outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).map((piece) => ({ label: piece.label.trim(), productId: Number(piece.productId) })),
       })) };
     try {
@@ -680,7 +680,7 @@ function LookOfDayPanel() {
                   </div>
                   <div className="rounded-xl border border-dashed border-line-strong bg-elevated p-3">
                     <p className="text-sm font-semibold">صور شخص لابس الأوتفيت ({(outfit.images || []).length}/6)</p>
-                    <p className="mt-0.5 text-xs text-muted">ارفع كذا صورة زي ما تحب (زوايا مختلفة مثلًا). الأولى هي الأساسية والباقي بيظهروا كصور مصغّرة في صفحة اللوك. الأفضل صور طولية (٤:٥)، وبيتكتب عليها "صورة توضيحية" تلقائيًا.</p>
+                    <p className="mt-0.5 text-xs text-muted">الصورة الأولى (الأساسية) هي اللي بتظهر في صف الموديلات على الصفحة الرئيسية. الأحسن: الشخص واقف بجسمه كله، على خلفية بيضا صافية، ورجليه قريبة من حافة الصورة من تحت، وكل الأوتفيتات بنفس النسبة (طولية ٢:٣ أو ٣:٤). باقي الصور بتظهر كصور مصغّرة في صفحة اللوك.</p>
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       {(outfit.images || []).map((img, imgIndex) => (
                         <div key={img} className="relative">
@@ -690,6 +690,21 @@ function LookOfDayPanel() {
                         </div>
                       ))}
                       {(outfit.images || []).length < 6 && <label className="grid h-24 w-[72px] cursor-pointer place-items-center rounded-xl border border-line-strong px-1 text-center text-[12px] font-semibold hover:border-fg">{busy ? '…' : '+ صورة'}<input type="file" accept="image/*" multiple hidden disabled={busy} onChange={async (e) => { const files = [...(e.target.files || [])].slice(0, 6 - (outfit.images || []).length); e.target.value = ''; if (!files.length) return; setBusy(true); try { const urls = []; for (const file of files) { const result = await adminUpload('/look-of-day/image', file); urls.push(result.image); } changeOutfit(outfitIndex, (x) => ({ ...x, images: [...(x.images || []), ...urls].slice(0, 6) })); toast({ title: 'اترفعت الصور؛ احفظ الإعداد لنشرها' }); } catch (x) { toast({ tone: 'error', title: x.message }); } setBusy(false); }} /></label>}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-dashed border-line-strong bg-elevated p-3">
+                    <p className="text-sm font-semibold">صورة الأوتفيت من الخلف (اختياري)</p>
+                    <p className="mt-0.5 text-xs text-muted">لو رفعتها، العميل يقدر يلف الموديل ويشوف الأوتفيت من ورا. نفس الشخص ونفس الوقفة وخلفية بيضا. لو مفيش صورة ظهر، خاصية اللف مش بتظهر للعميل.</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {outfit.backImage ? (
+                        <div className="relative">
+                          <img src={outfit.backImage} alt="" className="h-24 w-[72px] rounded-xl bg-secondary object-cover object-top" />
+                          <span className="absolute inset-x-0 bottom-0 rounded-b-xl bg-black/55 text-center text-[10px] font-bold text-white">الظهر</span>
+                          <button type="button" aria-label="حذف صورة الظهر" onClick={() => changeOutfit(outfitIndex, (x) => ({ ...x, backImage: '' }))} className="absolute -end-1.5 -top-1.5 grid h-6 w-6 place-items-center rounded-full border border-line-strong bg-elevated text-xs font-bold shadow-sm">×</button>
+                        </div>
+                      ) : (
+                        <label className="grid h-24 w-[72px] cursor-pointer place-items-center rounded-xl border border-line-strong px-1 text-center text-[12px] font-semibold hover:border-fg">{busy ? '…' : '+ ظهر'}<input type="file" accept="image/*" hidden disabled={busy} onChange={async (e) => { const file = e.target.files?.[0]; e.target.value = ''; if (!file) return; setBusy(true); try { const result = await adminUpload('/look-of-day/image', file); changeOutfit(outfitIndex, (x) => ({ ...x, backImage: result.image })); toast({ title: 'اترفعت صورة الظهر؛ احفظ الإعداد لنشرها' }); } catch (x) { toast({ tone: 'error', title: x.message }); } setBusy(false); }} /></label>
+                      )}
                     </div>
                   </div>
                   <div className="space-y-2">

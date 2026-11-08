@@ -906,6 +906,7 @@ const lookOutfitSchema = z.object({
   tips: z.string().max(300).optional().default(''),
   coverImage: z.string().trim().max(500).optional().default('').refine(lookImageOk, 'Invalid look image.'),
   images: z.array(z.string().trim().max(500).refine(lookImageOk, 'Invalid look image.')).max(6).optional().default([]),
+  backImage: z.string().trim().max(500).optional().default('').refine(lookImageOk, 'Invalid look image.'), // the same outfit seen from behind (optional: without it the shopper cannot turn the model)
   occasion: z.string().trim().min(2).max(80),
   pieces: z.array(lookPieceSchema).min(2).max(8),
 });
@@ -957,7 +958,7 @@ r.put('/look-of-day', h(async (req, res) => {
         AND (p.track_stock=0 OR p.stock>0)`, ids).map((row) => row.id);
     if (valid.length !== ids.length) throw new AppError(422, 'validation_failed', 'One or more selected products are no longer available. Refresh the product list.');
   }
-  const imagesOf = (m) => [m?.coverImage, ...(m?.outfits || []).flatMap((o) => [o.coverImage, ...(o.images || [])])].filter(Boolean);
+  const imagesOf = (m) => [m?.coverImage, ...(m?.outfits || []).flatMap((o) => [o.coverImage, o.backImage, ...(o.images || [])])].filter(Boolean);
   const previousImages = imagesOf(lookOfDayAdminSettings().manual);
   const saved = saveLookOfDayAdminSettings({ mode: body.mode, manual: body.manual });
   if (body.manual) { const keep = new Set(imagesOf(body.manual)); for (const img of new Set(previousImages)) if (!keep.has(img)) await removeDeptImage(img); }

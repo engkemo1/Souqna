@@ -127,6 +127,17 @@ export default function MarketSearch() {
             ? t('search.results', { n: formatNumber(total, lang), range: data?.price?.max ? (lang === 'ar' ? `(الأسعار من ${formatMoney(data.price.min, lang)} إلى ${formatMoney(data.price.max, lang)})` : `${formatMoney(data.price.min, lang)} – ${formatMoney(data.price.max, lang)}`) : '' })
             : t('search.allProducts', { n: formatNumber(total, lang) })}
         </p>
+        {q && data && items.length > 0 && (data.match === 'partial' || data.match === 'wide') && (
+          <p className="-mt-3 mb-5 text-sm text-muted">{lang === 'ar' ? `مفيش حاجة فيها كل كلمات "${q}" بالظبط، دي أقرب النتايج اللي لقيناها.` : `Nothing matches every word of "${q}" exactly - these are the closest results.`}</p>
+        )}
+
+        {q && data?.didYouMean && (
+          <p className="mb-5 text-sm">
+            <span className="text-muted">{lang === 'ar' ? 'تقصد: ' : 'Did you mean: '}</span>
+            <button type="button" className="font-semibold text-brand underline underline-offset-2" onClick={() => set({ q: data.didYouMean, page: '' })}>{data.didYouMean}</button>
+            <span className="text-muted">{lang === 'ar' ? ' ؟' : ' ?'}</span>
+          </p>
+        )}
 
         {error && !data ? <ErrorState error={error} onRetry={reload} /> : !data ? (
           <ProductGrid>{Array.from({ length: 8 }, (_, i) => <ProductCardSkeleton key={i} />)}</ProductGrid>

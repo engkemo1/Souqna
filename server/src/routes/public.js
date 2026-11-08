@@ -20,6 +20,7 @@ import { sameDaySql, cairoNow } from '../lib/sameDay.js';
 import { buyerFromReq } from '../lib/buyers.js';
 import { recordSiteVisit, recordConversion, cairoDay } from '../lib/traffic.js';
 import { logSearch, trackEvent } from '../lib/insights.js';
+import { buildQuery, matchProducts, prepareRow, vocabFrom, suggestCorrection } from '../lib/search-text.js';
 import { recomputeRatings } from '../lib/reviews.js';
 import { publicCampaigns, recordEvent, PLACEMENT_KEYS } from '../lib/featured.js';
 import { publicAdvertiser, recordAdvertiserEvent } from '../lib/advertisers.js';
@@ -126,12 +127,34 @@ r.post('/advertiser/:slug/event', h((req, res) => {
 
 const NORM = (col) => `REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(LOWER(${col}),'أ','ا'),'إ','ا'),'آ','ا'),'ة','ه'),'ى','ي'),'ـ','')`;
 const normText = (s) => String(s).toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/ـ/g, '').trim();
-// Everyday words people type → other spellings / words that should also match.
-const SYNONYMS = {
-  كوتشي: ['كوتش', 'حذاء', 'جزمه', 'shoe', 'sneaker'], كوتش: ['كوتشي', 'حذاء', 'shoe'], حذاء: ['كوتش', 'جزمه', 'shoe'], جزمه: ['حذاء', 'كوتش', 'shoe'], جزمة: ['حذاء', 'كوتش', 'shoe'],
-  شنطه: ['حقيبه', 'bag'], حقيبه: ['شنطه', 'bag'], طرحه: ['حجاب', 'hijab', 'طرح'], طرح: ['حجاب', 'hijab'], حجاب: ['طرح', 'hijab'],
-  فستان: ['dress', 'فساتين'], فساتين: ['فستان', 'dress'], بدله: ['بدل', 'suit'], بدل: ['بدله', 'suit'], عبايه: ['عبايات', 'abaya'], جلابيه: ['جلاليب', 'galabiya', 'jalabiya'], جلاليب: ['جلابيه', 'jalabiya'],
-  تيشيرت: ['tshirt', 'تي شيرت', 't-shirt'], بنطلون: ['بنطال', 'pants', 'jeans', 'جينز'], جينز: ['jeans', 'بنطلون'], اطفال: ['كيدز', 'kids', 'طفل'], طفل: ['اطفال', 'kids'],
+
+// ---- smarter search (see lib/search-text.js): words, spellings, synonyms, typos ----
+let searchCache = { at: 0, vocab: new Map(), rows: [], depts: [], cats: [], stores: [] };
+const searchLookups = () => {
+  if (Date.now() - searchCache.at < 20000) return searchCache;
+  const prods = q.all("SELECT p.id, p.name_ar, p.name_en, p.description_ar, p.description_en, p.badge_text, p.department, p.category_id, p.store_id FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0");
+  const depts = q.all('SELECT slug, name_ar, name_en FROM departments WHERE active=1');
+  const cats = q.all("SELECT c.id, c.name_ar, c.name_en FROM categories c WHERE EXISTS (SELECT 1 FROM products p WHERE p.category_id=c.id AND p.status='active')");
+  const stores = q.all("SELECT id, name_ar, name_en FROM stores WHERE status='active' AND hidden=0");
+  searchCache = {
+    at: Date.now(), rows: prods.map(prepareRow), depts, cats, stores,
+    vocab: vocabFrom([...prods.flatMap((n) => [n.name_ar, n.name_en]), ...depts.flatMap((d) => [d.name_ar, d.name_en]), ...cats.flatMap((c) => [c.name_ar, c.name_en])]),
+  };
+  return searchCache;
+};
+/** Products matching what the customer typed (optionally only one shop's). `ids` is ready to drop into a WHERE, `score` into an ORDER BY. */
+const searchPlan = (term, onlyStore = null, opts = {}) => {
+  const L = searchLookups();
+  const built = buildQuery(term, { vocab: L.vocab, prefix: !!opts.prefix });
+  if (!built.tokens.length) return built.onlyFiller || !built.text ? null : { level: 1, count: 0, where: '0', params: [], score: '(p.id * 0)', scoreParams: [] };
+  const rows = onlyStore ? L.rows.filter((r) => r.store === onlyStore) : L.rows;
+  const m = matchProducts(built.tokens, rows, L);
+  const hits = m.hits.slice(0, 3000);
+  return {
+    level: m.level, count: hits.length,
+    where: 'p.id IN (SELECT value FROM json_each(?))', params: [JSON.stringify(hits.map((x) => x.id))],
+    score: `COALESCE(json_extract(?, '$."' || p.id || '"'), 0)`, scoreParams: [JSON.stringify(Object.fromEntries(hits.map((x) => [x.id, x.score])))],
+  };
 };
 
 /** Autocomplete for the search box: product names (prefix matches first), departments and stores. Cheap, cached, no personal data. */
@@ -139,12 +162,13 @@ r.get('/search/suggest', h((req, res) => {
   const term = normText(String(req.query.q || '').slice(0, 40));
   if (term.length < 2) { cache(res, 60); return res.json({ products: [], departments: [], stores: [] }); }
   const like = `%${term}%`; const starts = `${term}%`;
-  const products = q.all(
+  const plan = searchPlan(term, null, { prefix: true });
+  const products = plan && plan.level <= 2 ? q.all(
     `SELECT p.name_ar, p.name_en, s.slug AS store_slug, s.name_ar AS store_ar, s.name_en AS store_en,
             (CASE WHEN ${NORM('p.name_ar')} LIKE ? OR ${NORM('p.name_en')} LIKE ? THEN 0 ELSE 1 END) AS rank
      FROM products p JOIN stores s ON s.id=p.store_id
-     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (${NORM('p.name_ar')} LIKE ? OR ${NORM('p.name_en')} LIKE ?)
-     ORDER BY rank, p.sold_count DESC LIMIT 40`, [starts, starts, like, like]);
+     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND ${plan.where}
+     ORDER BY rank, ${plan.score} DESC, p.sold_count DESC LIMIT 40`, [starts, starts, ...plan.params, ...plan.scoreParams]) : [];
   const seen = new Set(); const names = [];
   for (const p of products) {
     const key = normText(p.name_ar);
@@ -158,6 +182,24 @@ r.get('/search/suggest', h((req, res) => {
     .map((x) => ({ slug: x.slug, name: { ar: x.name_ar, en: x.name_en } }));
   cache(res, 30);
   res.json({ products: names, departments, stores });
+}));
+
+/** What other shoppers search most (last 2 weeks): only words searched by at least 3 sessions' worth of searches that still find products today. Aggregate only, no personal data. */
+let popularCache = { at: 0, items: [] };
+r.get('/search/popular', h((_req, res) => {
+  if (Date.now() - popularCache.at > 10 * 60 * 1000) {
+    const rows = q.all("SELECT term, SUM(searches) AS n, SUM(misses) AS m FROM search_terms WHERE day >= date('now', '-14 day') GROUP BY term HAVING SUM(searches) >= 3 AND SUM(misses) * 2 < SUM(searches) ORDER BY n DESC LIMIT 30");
+    const items = [];
+    for (const row of rows) {
+      if (/\d{5,}|@|https?:/i.test(row.term)) continue;
+      const plan = searchPlan(row.term);
+      if (plan && plan.level <= 2 && plan.count > 0) items.push(row.term);
+      if (items.length >= 6) break;
+    }
+    popularCache = { at: Date.now(), items };
+  }
+  cache(res, 300);
+  res.json({ items: popularCache.items });
 }));
 
 const AUD_GROUP = { men: ['men', 'unisex'], women: ['women', 'unisex'], kids: ['kids', 'boys', 'girls'], boys: ['boys', 'kids'], girls: ['girls', 'kids'], unisex: ['unisex'] };
@@ -187,7 +229,6 @@ const AUD_DEPT = { men: 'men', women: 'women', kids: 'kids', boys: 'kids', girls
 
 r.get('/search', h((req, res) => {
   const { q: term = '', department = '', store = '', sort = 'relevance', min, max, page = '1', sale, new: isNew, in_stock: inStock, rating, ids, sizes, colors } = req.query;
-  const tokens = normText(String(term).slice(0, 80)).split(/\s+/).filter(Boolean).slice(0, 6);
   const where = ["p.status='active'", "s.status='active'", 's.hidden=0']; const params = [];
   if (ids) {
     const list = String(ids).split(',').map(Number).filter(Boolean).slice(0, 100);
@@ -195,27 +236,11 @@ r.get('/search', h((req, res) => {
     where.push(`p.id IN (${list.map(() => '?').join(',')})`);
     params.push(...list);
   }
-  // relevance: a hit in the product name beats a synonym hit, which beats a description hit; the department/category match adds weight
-  // (so searching "كوتشي" ranks shoes above a "coach jacket").
-  const scoreSql = []; const scoreParams = [];
-  for (const tk of tokens) {
-    const exact = `%${tk}%`;
-    scoreSql.push(`(CASE WHEN ${NORM('p.name_ar')} LIKE ? OR ${NORM('p.name_en')} LIKE ? THEN 10 ELSE 0 END)`, `(CASE WHEN EXISTS (SELECT 1 FROM departments d WHERE p.department=d.slug AND (${NORM('d.name_ar')} LIKE ? OR ${NORM('d.name_en')} LIKE ? OR d.slug LIKE ?)) THEN 8 ELSE 0 END)`,
-      `(CASE WHEN EXISTS (SELECT 1 FROM categories c WHERE c.id=p.category_id AND (${NORM('c.name_ar')} LIKE ? OR ${NORM('c.name_en')} LIKE ?)) THEN 5 ELSE 0 END)`);
-    scoreParams.push(exact, exact, exact, exact, exact, exact, exact);
-  }
-  for (const tk of tokens) {
-    const alts = [...new Set([tk, ...(SYNONYMS[tk] || []).map(normText)])];
-    const ors = [];
-    for (const a of alts) {
-      const like = `%${a}%`;
-      ors.push(`${NORM('p.name_ar')} LIKE ?`, `${NORM('p.name_en')} LIKE ?`, `${NORM('p.description_ar')} LIKE ?`, `${NORM('p.description_en')} LIKE ?`, `${NORM('s.name_ar')} LIKE ?`, `${NORM('s.name_en')} LIKE ?`,
-        `EXISTS (SELECT 1 FROM categories c WHERE c.id=p.category_id AND (${NORM('c.name_ar')} LIKE ? OR ${NORM('c.name_en')} LIKE ?))`,
-        `EXISTS (SELECT 1 FROM departments d WHERE p.department=d.slug AND (${NORM('d.name_ar')} LIKE ? OR ${NORM('d.name_en')} LIKE ? OR d.slug LIKE ?))`);
-      params.push(like, like, like, like, like, like, like, like, like, like, like);
-    }
-    where.push(`(${ors.join(' OR ')})`);
-  }
+  // relevance + matching live in lib/search-text.js: words match at the start of a word, spellings / synonyms / typos are understood,
+  // and if nothing matches strictly the search widens (descriptions, then "at least one word") instead of showing an empty page.
+  const plan = searchPlan(term);
+  const scoreSql = plan ? [plan.score] : []; const scoreParams = plan ? [...plan.scoreParams] : [];
+  if (plan) { where.push(plan.where); params.push(...plan.params); }
   if (min) { where.push('p.price >= ?'); params.push(clampInt(min, 0, 1e7, 0)); }
   if (max) { where.push('p.price <= ?'); params.push(clampInt(max, 0, 1e7, 1e7)); }
   if (sale === '1') where.push('p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price');
@@ -344,9 +369,15 @@ r.get('/search', h((req, res) => {
       : d.options.map((o) => ({ ...o, n: byV.get(o.v) || 0 })).filter((o) => o.n > 0 || (attrSel.get(d.key) || []).includes(o.v));
     return { key: d.key, name: { ar: d.ar, en: d.en }, type: d.type, options, selected: attrSel.get(d.key) || [] };
   }).filter((f) => f.options.length);
-  if (term && !ids && pg === 1 && !department && !store && !min && !max && !sale && !isNew && !inStock && !rating && !sizes && !colors) logSearch(term, total > 0); // plain text searches only; feeds admin → تحليلات السوق
+  if (term && !ids && pg === 1 && !department && !store && !min && !max && !sale && !isNew && !inStock && !rating && !sizes && !colors) logSearch(term, total > 0 && (!plan || plan.level <= 2)); // plain text searches only; feeds admin → تحليلات السوق
+  // "did you mean": when the words didn't match as typed (nothing, or only a loose match) offer the corrected spelling if it really finds products
+  let didYouMean;
+  if (term && !ids && plan && (plan.level >= 3 || total === 0)) {
+    const fixed = suggestCorrection(term, searchLookups().vocab);
+    if (fixed && fixed !== normText(String(term))) { const p2 = searchPlan(fixed); if (p2 && p2.level <= 2 && p2.count > 0) didYouMean = fixed; }
+  }
   cache(res, 20);
-  res.json({ items, total, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences, materials, attrs: attrFacets } });
+  res.json({ items, total, didYouMean, match: plan ? (plan.level === 1 ? 'exact' : plan.level === 2 ? 'wide' : 'partial') : undefined, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences, materials, attrs: attrFacets } });
 }));
 
 /* ---------------------------------------------------------- visual search: "snap it, find it in Banha" */
@@ -699,11 +730,9 @@ r.get('/stores/:slug/products', h((req, res) => {
     if (cur) { const w = catWhere(catScope(allCats, cur)); where.push(w.sql); params.push(...w.params); } else where.push('1=0');
   }
   if (term) {
-    for (const tk of normText(String(term).slice(0, 60)).split(/\s+/).filter(Boolean).slice(0, 5)) {
-      const alts = [...new Set([tk, ...(SYNONYMS[tk] || []).map(normText)])];
-      where.push(`(${alts.map(() => `${NORM('p.name_ar')} LIKE ? OR ${NORM('p.name_en')} LIKE ? OR ${NORM('p.description_ar')} LIKE ? OR ${NORM('p.description_en')} LIKE ?`).join(' OR ')})`);
-      for (const a of alts) { const like = `%${a}%`; params.push(like, like, like, like); }
-    }
+    // same engine as the marketplace search, limited to this shop's products
+    const plan = searchPlan(term, s.id);
+    where.push(plan ? plan.where : '1=0'); if (plan) params.push(...plan.params);
   }
   if (sale === '1') where.push('p.compare_at_price > p.price');
   if (min) { where.push('p.price >= ?'); params.push(clampInt(min, 0, 1e7, 0)); }

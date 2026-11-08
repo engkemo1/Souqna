@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#061a36"/><stop offset="1" stop-color="#111827"/></linearGradient></defs>
+<rect width="1080" height="1920" fill="url(#g)"/><circle cx="890" cy="340" r="300" fill="#ff6b00" opacity=".20"/><circle cx="110" cy="1570" r="330" fill="#1976d2" opacity=".18"/>
+<text x="540" y="700" text-anchor="middle" font-family="Arial" font-size="105" font-weight="900" fill="white">Twist</text>
+<text x="540" y="850" text-anchor="middle" direction="rtl" unicode-bidi="plaintext" font-family="Arial" font-size="64" font-weight="900" fill="white">محلك أقرب للعميل</text>
+<rect x="250" y="1010" width="580" height="104" rx="52" fill="#ff6b00"/><text x="540" y="1078" text-anchor="middle" direction="rtl" unicode-bidi="plaintext" font-family="Arial" font-size="38" font-weight="900" fill="white">سجّل محلك دلوقتي</text>
+<text x="540" y="1250" text-anchor="middle" font-family="Arial" font-size="42" font-weight="700" fill="#ffb37a">twistegy.com</text>
+</svg>

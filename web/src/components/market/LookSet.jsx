@@ -138,6 +138,50 @@ function Showcase({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, 
   );
 }
 
+/** A compact, shoppable fitting-room panel used beside the photo in "Look of the day". */
+function StudioBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare }) {
+  const ar = lang === 'ar';
+  const picks = looks.map((look) => ({ label: look.label, p: look.items[look.pick] })).filter(({ p }) => p);
+  const label = picks.length === 1 ? (ar ? 'القطعة المختارة' : 'Selected piece') : (ar ? `القطع في اللوك · ${picks.length}` : `${picks.length} pieces in this look`);
+  return (
+    <div className="mt-6 border-t border-line pt-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <p className="text-[14px] font-extrabold sm:text-[15px]">{label}</p>
+        <button type="button" onClick={onShare} className="shrink-0 text-[12px] font-bold text-brand underline-offset-4 transition hover:underline">{ar ? 'مشاركة' : 'Share'}</button>
+      </div>
+      <div className="scrollbar-none -mx-1 flex snap-x gap-2.5 overflow-x-auto px-1 pb-2 sm:grid sm:grid-cols-2 sm:overflow-visible sm:pb-0">
+        {picks.map(({ label: pieceLabel, p }) => (
+          <article key={p.id} className="w-[148px] shrink-0 snap-start overflow-hidden rounded-2xl border border-line bg-canvas/60 p-2 sm:w-auto">
+            <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="group block">
+              <div className="relative overflow-hidden rounded-xl bg-white">
+                <SmartImage media={p.image} alt={tr(p.name)} ratio="4 / 4.4" className="w-full transition duration-300 group-hover:scale-[1.03]" sizes="(min-width:640px) 200px, 148px" />
+                <span className="absolute start-1.5 top-1.5 max-w-[calc(100%-0.75rem)] truncate rounded-full bg-elevated/95 px-2 py-1 text-[9px] font-bold text-brand shadow-sm">{pieceLabel}</span>
+              </div>
+              <p className="mt-2 line-clamp-2 min-h-[2.55em] text-[11px] font-bold leading-snug sm:text-[12px]">{tr(p.name)}</p>
+              <p className="mt-0.5 truncate text-[10px] text-muted">{tr(p.store.name)}</p>
+            </Link>
+            <div className="mt-2 flex items-center justify-between gap-1.5">
+              <p className="truncate text-[12px] font-extrabold text-sale">{formatMoney(p.price, lang)}</p>
+              <button type="button" onClick={() => onAdd(p)} aria-label={t('stylist.addPick')} className={cx('grid h-8 min-w-8 place-items-center rounded-full border px-2 text-[10px] font-extrabold transition', added.includes(p.id) ? 'border-brand bg-[#eaf0f8] text-brand' : 'border-line-strong bg-elevated hover:border-fg')}>
+                {added.includes(p.id) ? <Check className="h-3.5 w-3.5" /> : <ShoppingBag className="h-3.5 w-3.5" />}
+              </button>
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="mt-4 rounded-2xl bg-[#08244d] p-3.5 text-white shadow-[0_12px_24px_-16px_rgba(3,36,77,.85)] sm:p-4">
+        <div className="flex items-end justify-between gap-3">
+          <div><p className="text-[11px] font-bold text-white/65">{picks.length === 1 ? (ar ? 'سعر القطعة' : 'Item price') : (ar ? 'إجمالي اللوك' : 'Look total')}</p><p className="mt-0.5 text-xl font-black sm:text-2xl">{formatMoney(total, lang)}</p></div>
+          <span className="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold text-white/80">{picks.length} {ar ? 'قطع' : 'items'}</span>
+        </div>
+        <button type="button" onClick={onAddAll} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-[13px] font-extrabold text-[#08244d] transition hover:bg-[#f3f6fa] active:scale-[.99]">
+          <ShoppingBag className="h-[18px] w-[18px]" />{picks.length === 1 ? t('stylist.addPick') : (ar ? 'أضف اللوك كامل للسلة' : 'Add the full look')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Look-detail page: product cards row, one total + add-everything bar, share and quick "ask Twila" tweaks. */
 function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare, storeLinks }) {
   const ar = lang === 'ar';
@@ -215,7 +259,7 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
   const money = (n) => formatMoney(n, lang);
   const picks = m.looks.map((l) => l.items[l.pick]).filter(Boolean);
   const totalLabel = picks.length === 1 ? t('stylist.totalItem', { p: money(m.total) }) : m.state === 'partial' ? t('stylist.availableTotal', { p: money(m.total) }) : t('stylist.total', { p: money(m.total) });
-  const ShowComp = showcase === 'cards' ? CardsBlock : Showcase;
+  const ShowComp = showcase === 'cards' ? CardsBlock : showcase === 'studio' ? StudioBlock : Showcase;
   const startAdd = (items) => setQuick({ queue: items, i: 0 });
   const nextAdd = () => {
     if (!quick) return;

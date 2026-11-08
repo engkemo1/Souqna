@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920" viewBox="0 0 1080 1920">
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff7ed"/><stop offset="1" stop-color="#fed7aa"/></linearGradient></defs>
+<rect width="1080" height="1920" fill="url(#g)"/><circle cx="960" cy="260" r="390" fill="#ff6b00" opacity=".16"/><circle cx="70" cy="1700" r="300" fill="#0b315f" opacity=".10"/>
+<text x="540" y="760" text-anchor="middle" direction="rtl" unicode-bidi="plaintext" font-family="Arial" font-size="72" font-weight="900" fill="#061a36">اختار</text>
+<text x="540" y="880" text-anchor="middle" direction="rtl" unicode-bidi="plaintext" font-family="Arial" font-size="72" font-weight="900" fill="#ff6b00">قارن</text>
+<text x="540" y="1000" text-anchor="middle" direction="rtl" unicode-bidi="plaintext" font-family="Arial" font-size="72" font-weight="900" fill="#061a36">اطلب</text>
+<text x="540" y="1140" text-anchor="middle" direction="rtl" unicode-bidi="plaintext" font-family="Arial" font-size="32" fill="#475569">كل اللي محتاجه في كام خطوة</text>
+<rect x="390" y="1240" width="300" height="12" rx="6" fill="#ff6b00"/>
+</svg>
