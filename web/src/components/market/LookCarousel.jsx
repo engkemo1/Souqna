@@ -32,7 +32,28 @@ const CSS = `
 `;
 
 const photoOf = (e) => e?.coverImage || e?.images?.[0] || null;
+// the photos a shopper can turn through, in order: front, 3/4 right, back, 3/4 left (a look with no back photo cannot be turned)
+const framesOf = (e) => (e?.backImage && photoOf(e) ? [photoOf(e), e.rightImage, e.backImage, e.leftImage].filter(Boolean) : []);
+const frameAt = (angle, m) => ((Math.round(angle / (360 / m)) % m) + m) % m;
 const two = (n) => String(n).padStart(2, '0');
+
+/** Eases an angle (0 = front, 180 = back) to its target; while the shopper drags it follows the finger exactly. */
+function useAngle(target, follow) {
+  const [a, setA] = useState(target);
+  const from = useRef(target);
+  useEffect(() => {
+    if (follow || typeof window === 'undefined' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setA(target); from.current = target; return undefined; }
+    const a0 = from.current; const t0 = performance.now(); let raf;
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / 700); const e = k < 0.5 ? 2 * k * k : 1 - ((-2 * k + 2) ** 2) / 2;
+      const v = a0 + (target - a0) * e; setA(v); from.current = v;
+      if (k < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [target, follow]);
+  return a;
+}
 
 /** Counts a number up/down to its new value (used for the look total). */
 function useCountUp(value) {
@@ -57,6 +78,9 @@ function useCountUp(value) {
  * Right column: "In this look" (every piece with its price and a +), "Complete the look" with the total, and "Add full look to bag".
  * Changing the model (tap it, arrows, swipe, ← →, or the timeline) changes the list. Slowly moves on by itself until the visitor touches it.
  */
+// photos from an AI tool are rarely pure white: fade everything outside an oval around the person so no gray rectangle shows on the stage
+const SOFT = { WebkitMaskImage: 'radial-gradient(ellipse 50% 66% at 50% 56%, #000 70%, transparent 100%)', maskImage: 'radial-gradient(ellipse 50% 66% at 50% 56%, #000 70%, transparent 100%)' };
+
 export default function LookCarousel({ entries, active, onChange, headingAs: Heading = 'h3', visible = 7 }) {
   const { lang, t, tr } = useI18n();
   const ar = lang === 'ar';
@@ -71,7 +95,8 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   const vWanted = Math.max(3, Math.min(7, Math.round(Number(visible)) || 7)); // how many models are on stage at once (3 – 7)
   const v = mobile ? Math.min(vWanted, 3) : vWanted; // on a phone three models keep the section calm and short
   const lo = -Math.floor((v - 1) / 2); const hi = Math.ceil((v - 1) / 2);
-  const stepD = Math.min(26, 78 / (v - 1)); const stepM = Math.min(30, 64 / (v - 1));
+  const vs = Math.max(3, Math.min(v, entries.length)); // spacing follows the models that really exist, so two looks are not squeezed together
+  const stepD = Math.min(19, 78 / (vs - 1)); const stepM = Math.min(26, 64 / (vs - 1)); // close together, like a crowd, so the ones behind overlap
   const [playing, setPlaying] = useState(true);
   const [hover, setHover] = useState(false);
   const [quick, setQuick] = useState(null); // { queue: [product], i }
@@ -86,6 +111,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   const [turn, setTurn] = useState(0); // 0 = front, 180 = back (only for looks that have a back photo)
   const [dragging, setDragging] = useState(false);
   const drag = useRef(null);
+  const ang = useAngle(turn, dragging);
   useEffect(() => { setTurn(0); }, [active]); // a new model always starts facing front
   const e = entries[shown] || entries[active];
   const go = (to) => onChange(((to % n) + n) % n);
@@ -120,8 +146,9 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   };
   const title = e?.title || e?.occasion || t('lod.title');
   const shownTotal = useCountUp(total);
-  const hasBackNow = !!entries[active]?.backImage;
-  const flip = () => { setPlaying(false); setTurn((d) => (d > 90 ? 0 : 180)); };
+  const framesNow = framesOf(entries[active]); const mNow = framesNow.length; const hasBackNow = mNow > 1; const stepNow = hasBackNow ? 360 / mNow : 360;
+  const viewNow = hasBackNow ? frameAt(turn, mNow) : 0;
+  const flip = () => { setPlaying(false); setTurn((d) => (Math.round(d / stepNow) + 1) * stepNow); };
   const touch = () => setPlaying(false); // the visitor took over: stop moving on by itself
 
   const onKeyDown = (ev) => {
@@ -183,39 +210,37 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
             const a = Math.abs(off); const far = off < lo || off > hi;
             const img = photoOf(x);
             const scale = off === 0 ? 1 : a === 1 ? 0.88 : a === 2 ? 0.78 : 0.68;
-            const hasBack = off === 0 && !!x.backImage; // only a look with a back photo can be turned
+            const fr = framesOf(x); const m = fr.length; const hasBack = off === 0 && m > 1; // only a look with a back photo can be turned
             const turnHandlers = hasBack ? {
-              onPointerDown: (ev) => { ev.stopPropagation(); drag.current = { x: ev.clientX, base: turn > 90 ? 180 : 0 }; ev.currentTarget.setPointerCapture?.(ev.pointerId); setDragging(true); setPlaying(false); },
-              onPointerMove: (ev) => { if (drag.current) setTurn(Math.max(0, Math.min(180, drag.current.base - (ev.clientX - drag.current.x) * 1.3))); },
-              onPointerUp: () => { if (!drag.current) return; drag.current = null; setDragging(false); setTurn((d) => (d > 90 ? 180 : 0)); },
-              onPointerCancel: () => { drag.current = null; setDragging(false); setTurn((d) => (d > 90 ? 180 : 0)); },
+              onPointerDown: (ev) => { ev.stopPropagation(); drag.current = { x: ev.clientX, base: turn }; ev.currentTarget.setPointerCapture?.(ev.pointerId); setDragging(true); setPlaying(false); },
+              onPointerMove: (ev) => { if (drag.current) setTurn(drag.current.base - (ev.clientX - drag.current.x) * (m <= 2 ? 1.3 : 360 / m / 60)); },
+              onPointerUp: () => { if (!drag.current) return; drag.current = null; setDragging(false); setTurn((d) => Math.round(d / (360 / m)) * (360 / m)); },
+              onPointerCancel: () => { drag.current = null; setDragging(false); setTurn((d) => Math.round(d / (360 / m)) * (360 / m)); },
             } : {};
             return (
               <button
                 key={`${x.audience || x.persona || 'look'}-${x.age || ''}-${x.occasion || ''}-${i}`} type="button" tabIndex={-1}
                 onClick={() => { if (off !== 0) { touch(); go(i); } }}
                 aria-label={x.title || x.occasion || t('lod.title')} aria-current={off === 0 ? 'true' : undefined} aria-hidden={far} data-off={off} {...turnHandlers}
-                className={cx('absolute bottom-[17%] h-[64%] w-[var(--w-m)] [--step:var(--step-m)] mix-blend-multiply transition-[transform,filter,opacity,left] duration-[900ms] ease-[cubic-bezier(.22,1.15,.36,1)] motion-reduce:transition-none sm:bottom-[11%] sm:h-[68%] sm:w-[var(--w-d)] sm:[--step:var(--step-d)] lg:h-[70%]', far && 'pointer-events-none', off === 0 ? (hasBack ? 'cursor-grab touch-pan-y active:cursor-grabbing' : 'cursor-default') : 'cursor-pointer')}
-                style={{ left: `calc(50% + ${off} * var(--step))`, transform: `translateX(-50%) scale(${scale})`, transformOrigin: '50% 100%', filter: off === 0 ? 'none' : `blur(${a === 1 ? 0.8 : a === 2 ? 1.8 : 2.8}px)`, opacity: far ? 0 : off === 0 ? 1 : a === 1 ? 0.95 : a === 2 ? 0.8 : 0.6, zIndex: 10 - a }}
+                className={cx('absolute bottom-[17%] h-[64%] aspect-[4/5] [--step:var(--step-m)] mix-blend-multiply transition-[transform,filter,opacity,left] duration-[900ms] ease-[cubic-bezier(.22,1.15,.36,1)] motion-reduce:transition-none sm:bottom-[11%] sm:h-[68%] sm:[--step:var(--step-d)] lg:h-[70%]', far && 'pointer-events-none', off === 0 ? (hasBack ? 'cursor-grab touch-pan-y active:cursor-grabbing' : 'cursor-default') : 'cursor-pointer')}
+                style={{ left: `calc(50% + ${off} * var(--step))`, transform: `translateX(-50%) scale(${scale})`, transformOrigin: '50% 100%', filter: off === 0 ? 'drop-shadow(0 0 2px rgba(20,20,20,.32))' : `blur(${a === 1 ? 0.6 : a === 2 ? 1.3 : 2.1}px)${a >= 2 ? ' drop-shadow(-6px 0 0 rgba(20,20,20,.10)) drop-shadow(6px 0 0 rgba(20,20,20,.10))' : ''}`, opacity: far ? 0 : off === 0 ? 1 : a === 1 ? 0.9 : a === 2 ? 0.55 : 0.32, zIndex: 10 - a }}
               >
                 <span className="block h-full w-full" style={{ transform: `translateX(calc(var(--px, 0) * ${-14 * (1 + a * 0.55)}px))`, transition: 'transform .5s ease-out' }}>
                   <span className={cx('relative block h-full w-full', ready ? 'tlk-enter' : 'opacity-0')} style={{ animationDelay: `${120 + a * 90}ms` }}>
                     <span className={cx('relative block h-full w-full', off === 0 && 'tlk-float')}>
                       {img && hasBack
                         ? (
-                          <span className="block h-full w-full" style={{ perspective: 900 }}>
-                            <span className="relative block h-full w-full" style={{ transformStyle: 'preserve-3d', transform: `rotateY(${turn}deg)`, transition: dragging ? 'none' : 'transform .7s cubic-bezier(.22,1.15,.36,1)' }}>
-                              <img src={img} alt={turn > 90 ? '' : title} draggable={false} className="absolute inset-0 h-full w-full object-contain object-bottom" style={{ backfaceVisibility: 'hidden' }} />
-                              <img src={x.backImage} alt={turn > 90 ? `${title} — ${ar ? 'من الخلف' : 'back view'}` : ''} draggable={false} className="absolute inset-0 h-full w-full object-contain object-bottom" style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }} />
-                            </span>
+                          <span className="relative block h-full w-full" style={{ transformOrigin: '50% 100%', transform: `scaleX(${(0.2 + 0.8 * Math.abs(Math.cos((ang * m * Math.PI) / 360))).toFixed(3)})`, filter: `brightness(${(1 - 0.06 * Math.abs(Math.sin((ang * m * Math.PI) / 360))).toFixed(3)})` }}>
+                            {fr.map((src, k) => <img key={src} src={src} alt={k === frameAt(ang, m) ? (k === 0 ? title : `${title} — ${ar ? 'زاوية' : 'view'} ${k + 1}`) : ''} draggable={false} className="absolute inset-0 h-full w-full object-contain object-bottom" style={{ ...SOFT, opacity: k === frameAt(ang, m) ? 1 : 0 }} />)}
                           </span>
                         )
                         : img
-                        ? <img src={img} alt={off === 0 ? title : ''} draggable={false} loading={a <= 1 ? 'eager' : 'lazy'} className="h-full w-full object-contain object-bottom" />
+                        ? <img src={img} alt={off === 0 ? title : ''} draggable={false} loading={a <= 1 ? 'eager' : 'lazy'} className="h-full w-full object-contain object-bottom" style={SOFT} />
                         : <span className="grid h-full w-full place-items-center text-6xl font-black text-black/10">{(x.title || x.occasion || '').slice(0, 2)}</span>}
                     </span>
-                    {/* soft shadow on the floor, cast to the right like in the reference; drawn over the photo so its white cannot hide it */}
-                    <span className={cx('absolute -bottom-2 left-[8%] h-5 w-[110%] rounded-[50%] bg-black/25 blur-md', off === 0 && 'tlk-breathe')} style={{ transform: 'skewX(-30deg)', opacity: off === 0 ? 0.55 : 0.3 }} aria-hidden="true" />
+                    {/* every model stands on its own soft contact shadow; the one in front also casts a longer one to the right, like the reference */}
+                    <span className="absolute -bottom-1.5 left-1/2 h-4 w-[44%] -translate-x-1/2 rounded-[50%]" style={{ background: 'radial-gradient(closest-side, rgba(20,20,20,.42), rgba(20,20,20,.14) 60%, transparent)', opacity: off === 0 ? 1 : a === 1 ? 0.8 : a === 2 ? 0.55 : 0.35 }} aria-hidden="true" />
+                    {off === 0 && <span className="tlk-breathe absolute -bottom-2 left-[10%] h-5 w-[105%] rounded-[50%] bg-black/20 blur-md" style={{ transform: 'skewX(-30deg)', opacity: 0.5 }} aria-hidden="true" />}
                   </span>
                 </span>
               </button>
@@ -240,9 +265,9 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
             {hasBackNow && (
-              <button type="button" onClick={flip} aria-pressed={turn > 90} className="me-1 inline-flex h-8 items-center gap-1.5 rounded-full border border-black/15 bg-white/80 px-3 text-[12px] font-semibold text-[#141414] shadow-sm backdrop-blur transition hover:bg-white">
-                <RotateCw className={cx('h-3.5 w-3.5 transition-transform duration-500', turn > 90 && 'rotate-180')} aria-hidden="true" />
-                {turn > 90 ? (ar ? 'من قدام' : 'Front') : (ar ? 'شوف من ورا' : 'See the back')}
+              <button type="button" onClick={flip} aria-pressed={viewNow !== 0} className="me-1 inline-flex h-8 items-center gap-1.5 rounded-full border border-black/15 bg-white/80 px-3 text-[12px] font-semibold text-[#141414] shadow-sm backdrop-blur transition hover:bg-white">
+                <RotateCw className={cx('h-3.5 w-3.5 transition-transform duration-500', viewNow !== 0 && 'rotate-180')} aria-hidden="true" />
+                {mNow > 2 ? (ar ? 'لفّ الموديل' : 'Rotate') : viewNow !== 0 ? (ar ? 'من قدام' : 'Front') : (ar ? 'شوف من ورا' : 'See the back')}
               </button>
             )}
             <button type="button" onClick={() => setPlaying((p) => !p)} aria-label={playing ? (ar ? 'وقّف التبديل' : 'Pause') : (ar ? 'شغّل التبديل' : 'Play')} className="grid h-8 w-8 place-items-center text-[#141414] transition hover:opacity-60">{playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button>

@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { knockOutBackground, cutoutEnabled } from './look-cutout.js';
 import sharp from 'sharp';
 import { config } from '../config.js';
 import { badRequest } from './errors.js';
@@ -69,10 +70,12 @@ export async function saveLookOfDayImage(buffer) {
     const meta = await sharp(buffer, { failOn: 'error' }).metadata();
     if (Math.min(meta.width || 0, meta.height || 0) < 200) throw badRequest('image_too_small', 'Image is too small (min 200px).');
     // Rotate EXIF and resize within max 1600x2000, preserving full aspect ratio (NO forced cropping):
-    webp = await sharp(buffer)
+    let source = buffer;
+    if (cutoutEnabled()) { try { const cut = await knockOutBackground(buffer); if (cut.buffer) source = cut.buffer; } catch { /* a failed cut keeps the original photo */ } }
+    webp = await sharp(source)
       .rotate()
       .resize(1600, 2000, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 85 })
+      .webp({ quality: 85, alphaQuality: 90 })
       .toBuffer();
   } catch (e) {
     if (e.code === 'image_too_small') throw e;

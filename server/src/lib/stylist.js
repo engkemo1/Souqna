@@ -839,7 +839,7 @@ export function lookOfDayAdminSettings() {
     showOthers: !!raw.showOthers, coverImage: String(raw.coverImage || ''), title: String(raw.title || ''), description: String(raw.description || ''), badge: String(raw.badge || ''),
     outfits: outfits.map((outfit) => ({
     audience: ['women', 'men', 'kids'].includes(outfit.audience) ? outfit.audience : 'women',
-    age: String(outfit.age || ''), say: String(outfit.say || ''), tips: String(outfit.tips || ''), occasion: String(outfit.occasion || ''), coverImage: String(outfit.coverImage || ''), images: manualImages(outfit), backImage: String(outfit.backImage || ''),
+    age: String(outfit.age || ''), say: String(outfit.say || ''), tips: String(outfit.tips || ''), occasion: String(outfit.occasion || ''), coverImage: String(outfit.coverImage || ''), images: manualImages(outfit), backImage: String(outfit.backImage || ''), rightImage: String(outfit.rightImage || ''), leftImage: String(outfit.leftImage || ''),
     pieces: (Array.isArray(outfit.pieces) ? outfit.pieces : []).map((piece) => {
       const productId = Number(piece.productId);
       return { label: String(piece.label || ''), productId, product: products.get(productId) || null };
@@ -866,13 +866,13 @@ function buildManualLookEntries() {
       const product = products.get(Number(piece.productId));
       return product ? { label: String(piece.label || '').slice(0, 50), items: [product], pick: 0 } : null;
     }).filter((look) => look?.label);
-    if (looks.length < 2) return null;
+    if (looks.length < 1) return null; // one piece is enough: a tracksuit or a dress is a complete look on its own
     const audience = ['women', 'men', 'kids'].includes(outfit.audience) ? outfit.audience : 'women';
     return {
       audience, age: String(outfit.age || '').slice(0, 40), occasion: String(outfit.occasion || '').slice(0, 80),
       say: String(outfit.say || '').slice(0, 700), tips: String(outfit.tips || '').slice(0, 300),
       looks, total: looks.reduce((sum, look) => sum + look.items[0].price, 0), budget: null, overBudget: false, manual: true,
-      images: manualImages(outfit, manual), backImage: String(outfit.backImage || ''), coverImage: manualImages(outfit, manual)[0] || '', title: String(manual.title || ''), description: String(manual.description || ''), badge: String(manual.badge || ''),
+      images: manualImages(outfit, manual), backImage: String(outfit.backImage || ''), rightImage: String(outfit.rightImage || ''), leftImage: String(outfit.leftImage || ''), coverImage: manualImages(outfit, manual)[0] || '', title: String(manual.title || ''), description: String(manual.description || ''), badge: String(manual.badge || ''),
     };
   }).filter(Boolean);
 }
