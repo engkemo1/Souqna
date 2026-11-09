@@ -26,7 +26,7 @@ export default function LookOfDay() {
   const carousel = entries.length > 1 && withPhoto >= 2; // several looks with photos → the "Try the Look" row of models
   const tabName = (entry) => `${t(`lod.audience.${entry.audience || (entry.persona === 'her' ? 'women' : 'men')}`)}${entry.age ? ` · ${entry.age}` : ''}`;
   return (
-    <section className="container mt-6 sm:mt-14">
+    <section className={carousel ? 'mt-6 w-full px-2 sm:mt-14 sm:px-3' : 'container mt-6 sm:mt-14'}>
       {!carousel && <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold sm:text-2xl"><Sparkles className="h-5 w-5 text-brand" />{e.badge || 'Try the Look'}</h2>
         {entries.length > 1 && !carousel && (
