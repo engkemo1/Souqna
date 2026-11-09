@@ -603,6 +603,15 @@ function LookOfDayPanel() {
     catch (x) { toast({ tone: 'error', title: x.message }); }
     setAiBusy('');
   };
+  const cutBackgrounds = async () => {
+    setBusy(true);
+    try {
+      const r = await adminApi('/look-of-day/cut-background', { method: 'POST', body: {} });
+      const fresh = lookOfDayForm(await adminApi('/look-of-day')); setF(fresh); setBaseline(fresh);
+      toast({ title: r.changed ? `اتشالت الخلفية من ${r.changed} صورة` : 'مفيش صور محتاجة إزالة خلفية' });
+    } catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy(false);
+  };
   const modes = [
     ['ai', 'اقتراحات الذكاء الاصطناعي', 'الاقتراحات تفضل خاصة في الأدمن لحد ما تراجعها وتعتمدها. لو مفيش اعتماد، مفيش اقتراح AI جديد هيظهر للزوار.'],
     ['manual', 'اختيار يدوي من الإدارة', 'ضيف كذا أوتفيت في اليوم، وحدد الفئة والعمر والمناسبة وقطع كل طقم. من غير استدعاء AI.'],
@@ -739,6 +748,7 @@ function LookOfDayPanel() {
         )}
         <div className="flex flex-wrap items-center gap-3 border-t border-line pt-4">
           <Button onClick={save} loading={busy} disabled={!dirty || busy || (f.mode === 'manual' && !manualReady)}>حفظ الإعداد</Button>
+          {f.mode === 'manual' && <Button variant="outline" onClick={cutBackgrounds} loading={busy} disabled={dirty || busy} title="بيشيل الخلفية من صور الأوتفيتات المحفوظة (اللي اترفعت قبل كده)">إزالة الخلفية من الصور المحفوظة</Button>}
           {dirty && <span className="text-[13px] text-muted">في تغييرات لسه ما اتحفظتش</span>}
         </div>
       </div>

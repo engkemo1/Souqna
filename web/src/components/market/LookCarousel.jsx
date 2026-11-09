@@ -38,9 +38,10 @@ const frameAt = (angle, m) => ((Math.round(angle / (360 / m)) % m) + m) % m;
 const two = (n) => String(n).padStart(2, '0');
 
 /** Eases an angle (0 = front, 180 = back) to its target; while the shopper drags it follows the finger exactly. */
-function useAngle(target, follow) {
+function useAngle(target, follow, resetKey) {
   const [a, setA] = useState(target);
   const from = useRef(target);
+  useEffect(() => { setA(0); from.current = 0; }, [resetKey]); // a new look starts facing front, without a spin
   useEffect(() => {
     if (follow || typeof window === 'undefined' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { setA(target); from.current = target; return undefined; }
     const a0 = from.current; const t0 = performance.now(); let raf;
@@ -98,6 +99,11 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   const vs = Math.max(3, Math.min(v, entries.length)); // spacing follows the models that really exist, so two looks are not squeezed together
   const stepD = Math.min(19, 78 / (vs - 1)); const stepM = Math.min(26, 64 / (vs - 1)); // close together, like a crowd, so the ones behind overlap
   const [playing, setPlaying] = useState(true);
+  const [tick, setTick] = useState(0); // bumps when the tab comes back to the front, so the row starts moving again
+  const userPaused = useRef(false); // only the pause button stops the row for good; touching it just pauses a few seconds
+  const resumeTimer = useRef(null);
+  const nudge = () => { setPlaying(false); clearTimeout(resumeTimer.current); if (!userPaused.current) resumeTimer.current = setTimeout(() => setPlaying(true), 9000); };
+  useEffect(() => () => clearTimeout(resumeTimer.current), []);
   const [hover, setHover] = useState(false);
   const [quick, setQuick] = useState(null); // { queue: [product], i }
   const [added, setAdded] = useState([]);
@@ -111,8 +117,8 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   const [turn, setTurn] = useState(0); // 0 = front, 180 = back (only for looks that have a back photo)
   const [dragging, setDragging] = useState(false);
   const drag = useRef(null);
-  const ang = useAngle(turn, dragging);
-  useEffect(() => { setTurn(0); }, [active]); // a new model always starts facing front
+  const ang = useAngle(turn, dragging, active);
+  useEffect(() => { setTurn(0); manualTurn.current = false; }, [active]); // a new model always starts facing front
   const e = entries[shown] || entries[active];
   const go = (to) => onChange(((to % n) + n) % n);
   useEffect(() => {
@@ -130,15 +136,29 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   }, []);
   const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
+  const manualTurn = useRef(false); // once the shopper turns the model himself, it stops turning on its own
+  const framesNow = framesOf(entries[active]); const mNow = framesNow.length; const hasBackNow = mNow > 1; const stepNow = hasBackNow ? 360 / mNow : 360;
+  const viewNow = hasBackNow ? frameAt(turn, mNow) : 0;
+  const flip = () => { manualTurn.current = true; nudge(); setTurn((d) => (Math.round(d / stepNow) + 1) * stepNow); };
+  // a look that can be turned turns by itself: through every angle and back to the front, then the row moves on
+  useEffect(() => {
+    if (!hasBackNow || !playing || hover || quick || reduced || !inView || manualTurn.current) return undefined;
+    const ids = []; for (let k = 1; k <= mNow; k += 1) ids.push(setTimeout(() => setTurn(k * stepNow), 1300 * k));
+    return () => ids.forEach(clearTimeout);
+  }, [active, hasBackNow, mNow, stepNow, playing, hover, quick, reduced, inView]);
   useEffect(() => {
     if (!playing || hover || quick || reduced || n < 2 || !inView) return undefined;
-    const id = setTimeout(() => { if (!document.hidden) go(active + 1); else setPlaying(false); }, 4500);
-    return () => clearTimeout(id);
-  }, [playing, hover, quick, reduced, n, active, inView]); // eslint-disable-line react-hooks/exhaustive-deps
+    let onVisible = null;
+    const id = setTimeout(() => {
+      if (!document.hidden) go(active + 1);
+      else { onVisible = () => { if (!document.hidden) setTick((t) => t + 1); }; document.addEventListener('visibilitychange', onVisible); } // a background tab: wait until it is shown, do not give up
+    }, hasBackNow ? (mNow + 1) * 1300 + 500 : 4500);
+    return () => { clearTimeout(id); if (onVisible) document.removeEventListener('visibilitychange', onVisible); };
+  }, [playing, hover, quick, reduced, n, active, inView, hasBackNow, mNow, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const picks = (e?.looks || []).map((l) => l.items?.[l.pick || 0]).filter(Boolean);
   const total = Number.isFinite(e?.total) && e.total > 0 ? e.total : picks.reduce((s, p) => s + (p.price || 0), 0);
-  const startAdd = (items) => { setPlaying(false); setQuick({ queue: items, i: 0 }); };
+  const startAdd = (items) => { nudge(); setQuick({ queue: items, i: 0 }); };
   const nextAdd = () => {
     if (!quick) return;
     setAdded((a) => [...new Set([...a, quick.queue[quick.i].id])]);
@@ -146,10 +166,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   };
   const title = e?.title || e?.occasion || t('lod.title');
   const shownTotal = useCountUp(total);
-  const framesNow = framesOf(entries[active]); const mNow = framesNow.length; const hasBackNow = mNow > 1; const stepNow = hasBackNow ? 360 / mNow : 360;
-  const viewNow = hasBackNow ? frameAt(turn, mNow) : 0;
-  const flip = () => { setPlaying(false); setTurn((d) => (Math.round(d / stepNow) + 1) * stepNow); };
-  const touch = () => setPlaying(false); // the visitor took over: stop moving on by itself
+  const touch = () => nudge(); // the visitor took over: pause moving on by itself for a few seconds
 
   const onKeyDown = (ev) => {
     if (ev.key === 'ArrowLeft') { ev.preventDefault(); touch(); go(active - 1); }
@@ -198,7 +215,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
           onPointerCancel={() => { start.current = null; }}
           ref={stage}
           style={{ '--step-d': `${stepD}%`, '--step-m': `${stepM}%`, '--w-d': `${Math.min(26, stepD * 1.25)}%`, '--w-m': `${Math.min(34, stepM * 1.3)}%` }}
-          className="relative h-[310px] touch-pan-y select-none overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#141414] sm:h-[460px] lg:h-[600px]"
+          className="relative h-[370px] touch-pan-y select-none overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#141414] sm:h-[500px] lg:h-[620px]"
         >
           <span ref={ring} className="pointer-events-none absolute left-0 top-0 z-30 hidden h-11 w-11 rounded-full border border-[#141414]/70 opacity-0 transition-[opacity,background-color] duration-200 sm:block" aria-hidden="true"><span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#141414]" /></span>
           <span className="pointer-events-none absolute bottom-[8%] left-1/2 h-[10%] w-[34%] -translate-x-1/2 rounded-[50%] bg-black/10 blur-2xl" aria-hidden="true" />
@@ -209,10 +226,10 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
             if (off > n / 2) off -= n; else if (off < -n / 2) off += n; // the row loops
             const a = Math.abs(off); const far = off < lo || off > hi;
             const img = photoOf(x);
-            const scale = off === 0 ? 1 : a === 1 ? 0.88 : a === 2 ? 0.78 : 0.68;
+            const scale = off === 0 ? 1 : a === 1 ? 0.84 : a === 2 ? 0.72 : 0.62;
             const fr = framesOf(x); const m = fr.length; const hasBack = off === 0 && m > 1; // only a look with a back photo can be turned
             const turnHandlers = hasBack ? {
-              onPointerDown: (ev) => { ev.stopPropagation(); drag.current = { x: ev.clientX, base: turn }; ev.currentTarget.setPointerCapture?.(ev.pointerId); setDragging(true); setPlaying(false); },
+              onPointerDown: (ev) => { ev.stopPropagation(); manualTurn.current = true; drag.current = { x: ev.clientX, base: turn }; ev.currentTarget.setPointerCapture?.(ev.pointerId); setDragging(true); nudge(); },
               onPointerMove: (ev) => { if (drag.current) setTurn(drag.current.base - (ev.clientX - drag.current.x) * (m <= 2 ? 1.3 : 360 / m / 60)); },
               onPointerUp: () => { if (!drag.current) return; drag.current = null; setDragging(false); setTurn((d) => Math.round(d / (360 / m)) * (360 / m)); },
               onPointerCancel: () => { drag.current = null; setDragging(false); setTurn((d) => Math.round(d / (360 / m)) * (360 / m)); },
@@ -222,7 +239,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
                 key={`${x.audience || x.persona || 'look'}-${x.age || ''}-${x.occasion || ''}-${i}`} type="button" tabIndex={-1}
                 onClick={() => { if (off !== 0) { touch(); go(i); } }}
                 aria-label={x.title || x.occasion || t('lod.title')} aria-current={off === 0 ? 'true' : undefined} aria-hidden={far} data-off={off} {...turnHandlers}
-                className={cx('absolute bottom-[17%] h-[64%] aspect-[4/5] [--step:var(--step-m)] mix-blend-multiply transition-[transform,filter,opacity,left] duration-[900ms] ease-[cubic-bezier(.22,1.15,.36,1)] motion-reduce:transition-none sm:bottom-[11%] sm:h-[68%] sm:[--step:var(--step-d)] lg:h-[70%]', far && 'pointer-events-none', off === 0 ? (hasBack ? 'cursor-grab touch-pan-y active:cursor-grabbing' : 'cursor-default') : 'cursor-pointer')}
+                className={cx('absolute bottom-[12%] h-[76%] aspect-[4/5] outline-none focus:outline-none focus-visible:outline-none [--step:var(--step-m)] mix-blend-multiply transition-[transform,filter,opacity,left] duration-[900ms] ease-[cubic-bezier(.22,1.15,.36,1)] motion-reduce:transition-none sm:bottom-[9%] sm:h-[80%] sm:[--step:var(--step-d)] lg:h-[82%]', far && 'pointer-events-none', off === 0 ? (hasBack ? 'cursor-grab touch-pan-y active:cursor-grabbing' : 'cursor-default') : 'cursor-pointer')}
                 style={{ left: `calc(50% + ${off} * var(--step))`, transform: `translateX(-50%) scale(${scale})`, transformOrigin: '50% 100%', filter: off === 0 ? 'drop-shadow(0 0 2px rgba(20,20,20,.32))' : `blur(${a === 1 ? 0.6 : a === 2 ? 1.3 : 2.1}px)${a >= 2 ? ' drop-shadow(-6px 0 0 rgba(20,20,20,.10)) drop-shadow(6px 0 0 rgba(20,20,20,.10))' : ''}`, opacity: far ? 0 : off === 0 ? 1 : a === 1 ? 0.9 : a === 2 ? 0.55 : 0.32, zIndex: 10 - a }}
               >
                 <span className="block h-full w-full" style={{ transform: `translateX(calc(var(--px, 0) * ${-14 * (1 + a * 0.55)}px))`, transition: 'transform .5s ease-out' }}>
@@ -270,7 +287,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
                 {mNow > 2 ? (ar ? 'لفّ الموديل' : 'Rotate') : viewNow !== 0 ? (ar ? 'من قدام' : 'Front') : (ar ? 'شوف من ورا' : 'See the back')}
               </button>
             )}
-            <button type="button" onClick={() => setPlaying((p) => !p)} aria-label={playing ? (ar ? 'وقّف التبديل' : 'Pause') : (ar ? 'شغّل التبديل' : 'Play')} className="grid h-8 w-8 place-items-center text-[#141414] transition hover:opacity-60">{playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button>
+            <button type="button" onClick={() => { const next = !playing; userPaused.current = !next; clearTimeout(resumeTimer.current); setPlaying(next); }} aria-label={playing ? (ar ? 'وقّف التبديل' : 'Pause') : (ar ? 'شغّل التبديل' : 'Play')} className="grid h-8 w-8 place-items-center text-[#141414] transition hover:opacity-60">{playing ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}</button>
             <button type="button" onClick={() => { touch(); go(active - 1); }} aria-label={ar ? 'اللوك اللي قبله' : 'Previous look'} className="grid h-8 w-8 place-items-center text-[#141414] transition hover:opacity-60"><ArrowLeft className="h-4 w-4" /></button>
             <button type="button" onClick={() => { touch(); go(active + 1); }} aria-label={ar ? 'اللوك اللي بعده' : 'Next look'} className="grid h-8 w-8 place-items-center text-[#141414] transition hover:opacity-60"><ArrowRight className="h-4 w-4" /></button>
           </div>

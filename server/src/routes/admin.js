@@ -22,7 +22,7 @@ import { geminiUsage, saveGeminiLimit } from '../lib/ai-usage.js';
 import { adminModaPrompts, saveModaPrompts, resetModaPrompts, suggestPrompts } from '../lib/modaPrompts.js';
 import { saveAsset, assignAsset, unassign, deleteAsset, bulkUpload, libraryStatus, listAssets, duplicatesReport, checkLinks, serializeAsset } from '../lib/image-assets.js';
 import { generationStatus, requestCandidate, listCandidates, candidateRow, approveCandidate, rejectCandidate, defaultPrompt, eligibleSections, createBatch, startBatch, pauseBatch, cancelBatch, retryFailed, batchStatus, listBatches } from '../lib/image-gen.js';
-import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage } from '../lib/deptImage.js';
+import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage, recutLookImage } from '../lib/deptImage.js';
 import { notifyBuyer, notifyOrderStatus } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
 import { trafficStats } from '../lib/traffic.js';
@@ -950,6 +950,24 @@ r.post('/look-of-day/approve-ai', h((_req, res) => {
   }
 }));
 r.delete('/look-of-day/ai-proposal', h((_req, res) => res.json(discardLookOfDayProposal())));
+// look photos uploaded before background cutting existed: cut them now, in place (the saved settings only)
+r.post('/look-of-day/cut-background', h(async (_req, res) => {
+  const current = lookOfDayAdminSettings();
+  if (!current.manual?.outfits?.length) return res.json({ changed: 0 });
+  const replaced = [];
+  const swap = async (url) => { const next = await recutLookImage(url); if (next && next !== url) replaced.push(url); return next; };
+  const outfits = [];
+  for (const o of current.manual.outfits) {
+    const images = []; for (const img of o.images || []) images.push(await swap(img));
+    outfits.push({ ...o, images, coverImage: o.coverImage ? await swap(o.coverImage) : '', backImage: o.backImage ? await swap(o.backImage) : '', rightImage: o.rightImage ? await swap(o.rightImage) : '', leftImage: o.leftImage ? await swap(o.leftImage) : '',
+      pieces: o.pieces.map((p) => ({ label: p.label, productId: p.productId })) });
+  }
+  if (replaced.length) {
+    saveLookOfDayAdminSettings({ mode: current.mode, manual: { ...current.manual, outfits } });
+    for (const old of new Set(replaced)) await removeDeptImage(old);
+  }
+  res.json({ changed: replaced.length });
+}));
 r.put('/look-of-day', h(async (req, res) => {
   const body = z.object({ mode: z.enum(['ai', 'manual', 'off']), manual: manualLookSchema.optional() }).parse(req.body);
   if (body.mode === 'manual') {

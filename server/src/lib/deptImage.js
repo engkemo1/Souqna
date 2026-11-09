@@ -102,3 +102,18 @@ export async function removeDeptImage(url) {
     else await fs.rm(path.join(config.mediaDir, name), { force: true });
   } catch { /* ignore */ }
 }
+
+/** Cuts the background out of a look photo that was uploaded before cutting existed. Returns the new URL, or the same URL when nothing needed (or could be) cut. */
+export async function recutLookImage(url) {
+  if (!url || !cutoutEnabled()) return url;
+  const m = String(url).match(/(?:^|\/)((?:look-of-day|homepage-ads)\/[a-f0-9]{24}\.webp)(?:[?#]|$)/i);
+  if (!m) return url;
+  try {
+    let buf;
+    if (r2Enabled && String(url).startsWith(config.r2.publicUrl)) { const r = await fetch(url); if (!r.ok) return url; buf = Buffer.from(await r.arrayBuffer()); }
+    else buf = await fs.readFile(path.join(config.mediaDir, m[1]));
+    const cut = await knockOutBackground(buf);
+    if (!cut.buffer) return url;
+    return await saveLookOfDayImage(cut.buffer);
+  } catch { return url; }
+}

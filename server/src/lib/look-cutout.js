@@ -13,7 +13,7 @@ const STEP = 14;    // how much a pixel may differ from the neighbour the fill c
 
 export const cutoutEnabled = () => process.env.LOOK_CUTOUT !== '0';
 
-/** @param {Buffer} input any image sharp can read. @returns {Promise<{buffer: Buffer|null, removed: number}>} buffer is a PNG with alpha, or null when the photo was left alone */
+/** @param {Buffer} input any image sharp can read. @returns {Promise<{buffer: Buffer|null, removed: number, already?: boolean}>} buffer is a PNG with alpha, or null when the photo was left alone */
 export async function knockOutBackground(input) {
   const { data, info } = await sharp(input).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width: w, height: h } = info;
@@ -25,31 +25,53 @@ export async function knockOutBackground(input) {
   for (let y = 0; y < h; y += 3) { border(0, y); border(w - 1, y); }
   const med = (a) => a.sort((p, q) => p - q)[a.length >> 1];
   const bg = [med(rs), med(gs), med(bs)];
+  // a photo whose border is already transparent was cut before
+  let clear = 0; for (let x = 0; x < w; x += 3) { if (data[x * 4 + 3] < 128) clear++; if (data[((h - 1) * w + x) * 4 + 3] < 128) clear++; }
+  if (clear > w * 0.3) return { buffer: null, removed: 0, already: true };
   const lightness = (bg[0] + bg[1] + bg[2]) / 3;
   if (lightness < 150) return { buffer: null, removed: 0 }; // only light studio backgrounds
   const dist2 = (i, r, g, b) => (data[i] - r) ** 2 + (data[i + 1] - g) ** 2 + (data[i + 2] - b) ** 2;
   const farBorder = rs.reduce((c, _, k) => c + ((rs[k] - bg[0]) ** 2 + (gs[k] - bg[1]) ** 2 + (bs[k] - bg[2]) ** 2 > TO_BG * TO_BG ? 1 : 0), 0);
   if (farBorder > rs.length * 0.18) return { buffer: null, removed: 0 }; // the border is busy: not a plain background
 
-  const bgMask = new Uint8Array(n);
-  const queue = new Int32Array(n);
-  let head = 0, tail = 0;
-  const push = (p) => { if (!bgMask[p]) { bgMask[p] = 1; queue[tail++] = p; } };
-  const T2 = TO_BG * TO_BG, S2 = STEP * STEP;
-  const seed = (x, y) => { const p = y * w + x; if (dist2(p * 4, bg[0], bg[1], bg[2]) <= T2) push(p); };
-  for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
-  for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
-  while (head < tail) {
-    const p = queue[head++]; const x = p % w; const y = (p - x) / w; const i = p * 4;
-    const tryN = (q) => {
-      if (bgMask[q]) return;
-      const j = q * 4;
-      if (dist2(j, bg[0], bg[1], bg[2]) <= T2 && dist2(j, data[i], data[i + 1], data[i + 2]) <= S2) push(q);
-    };
-    if (x > 0) tryN(p - 1); if (x < w - 1) tryN(p + 1); if (y > 0) tryN(p - w); if (y < h - 1) tryN(p + w);
-  }
-  const removed = tail / n;
-  if (removed < 0.2 || removed > 0.93) return { buffer: null, removed }; // nothing to cut, or it would eat the person
+  const T_FIRST = TO_BG;
+  // Try the usual tolerance first; if the cut would take pieces of the person with it (white trousers on a light wall), try tighter ones.
+  // A cut is accepted only when the person is still whole: tall enough and with no empty rows between head and feet.
+  const attempt = (toBg, step) => {
+    const mask = new Uint8Array(n);
+    const queue = new Int32Array(n);
+    let head = 0, tail = 0;
+    const push = (p) => { if (!mask[p]) { mask[p] = 1; queue[tail++] = p; } };
+    const T2 = toBg * toBg, S2 = step * step;
+    const seed = (x, y) => { const p = y * w + x; if (dist2(p * 4, bg[0], bg[1], bg[2]) <= T2) push(p); };
+    for (let x = 0; x < w; x++) { seed(x, 0); seed(x, h - 1); }
+    for (let y = 0; y < h; y++) { seed(0, y); seed(w - 1, y); }
+    while (head < tail) {
+      const p = queue[head++]; const x = p % w; const y = (p - x) / w; const i2 = p * 4;
+      const tryN = (q2) => {
+        if (mask[q2]) return;
+        const j2 = q2 * 4;
+        if (dist2(j2, bg[0], bg[1], bg[2]) <= T2 && dist2(j2, data[i2], data[i2 + 1], data[i2 + 2]) <= S2) push(q2);
+      };
+      if (x > 0) tryN(p - 1); if (x < w - 1) tryN(p + 1); if (y > 0) tryN(p - w); if (y < h - 1) tryN(p + w);
+    }
+    const removed = tail / n;
+    if (removed < 0.2 || removed > 0.93) return { ok: false, removed };
+    // the person (what is kept): its height, and rows with nobody in them between the top and the bottom
+    const rowCount = new Int32Array(h);
+    for (let y = 0; y < h; y++) { let c = 0; const base = y * w; for (let x = 0; x < w; x++) if (!mask[base + x]) c++; rowCount[y] = c; }
+    const minRow = Math.max(3, Math.round(w * 0.004));
+    let top = 0; while (top < h && rowCount[top] < minRow) top++;
+    let bottom = h - 1; while (bottom > top && rowCount[bottom] < minRow) bottom--;
+    if (bottom - top < h * 0.7) return { ok: false, removed };
+    let empty = 0; for (let y = top; y <= bottom; y++) if (rowCount[y] < minRow) empty++;
+    if (empty > (bottom - top) * 0.03) return { ok: false, removed };
+    return { ok: true, removed, mask };
+  };
+  let result = null;
+  for (const [toBg, step] of [[T_FIRST, STEP], [30, 9], [20, 6]]) { result = attempt(toBg, step); if (result.ok) break; }
+  if (!result.ok) return { buffer: null, removed: result.removed };
+  const bgMask = result.mask; const removed = result.removed;
 
   // alpha = 0 on the background, 255 on the person; soften the edge by one pixel so the outline is not jagged
   const alpha = Buffer.alloc(n);
