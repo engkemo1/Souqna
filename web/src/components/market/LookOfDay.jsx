@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -18,6 +18,13 @@ export default function LookOfDay() {
   const entries = data?.entries || [];
   const fromUrl = typeof window !== 'undefined' ? Number(new URLSearchParams(window.location.search).get('models')) : 0;
   const modelsOnStage = fromUrl >= 3 && fromUrl <= 7 ? fromUrl : Number(data?.visibleModels) || MODELS_ON_STAGE;
+  const wide = entries.length > 1 && entries.filter((x) => x.coverImage || x.images?.length).length >= 2;
+  // the "Try the Look" band runs edge to edge: 100vw would add a sideways scrollbar, so the page clips it for as long as the band is shown
+  useEffect(() => {
+    if (!wide) return undefined;
+    const el = document.documentElement; const before = el.style.overflowX; el.style.overflowX = 'clip';
+    return () => { el.style.overflowX = before; };
+  }, [wide]);
   if (!entries.length) return null;
   const i = Math.min(tab, entries.length - 1);
   const e = entries[i];
@@ -26,7 +33,7 @@ export default function LookOfDay() {
   const carousel = entries.length > 1 && withPhoto >= 2; // several looks with photos → the "Try the Look" row of models
   const tabName = (entry) => `${t(`lod.audience.${entry.audience || (entry.persona === 'her' ? 'women' : 'men')}`)}${entry.age ? ` · ${entry.age}` : ''}`;
   return (
-    <section className={carousel ? 'mt-6 w-full px-2 sm:mt-14 sm:px-3' : 'container mt-6 sm:mt-14'}>
+    <section className={carousel ? 'mt-6 sm:mt-14' : 'container mt-6 sm:mt-14'} style={carousel ? { width: '100vw', marginInlineStart: 'calc(50% - 50vw)' } : undefined}>
       {!carousel && <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold sm:text-2xl"><Sparkles className="h-5 w-5 text-brand" />{e.badge || 'Try the Look'}</h2>
         {entries.length > 1 && !carousel && (

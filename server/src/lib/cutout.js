@@ -340,6 +340,21 @@ export async function productBox(buffer) {
   }
 }
 
+/** Alpha mask of the person/product in a photo (one byte per pixel, photo size), or null when the model is unavailable/unsure. For look photos. */
+export async function personAlpha(buffer) {
+  if (!cutoutEnabled()) return null;
+  try {
+    return await serial(async () => {
+      const { width, height } = await sharp(buffer).rotate().metadata();
+      const { alpha } = await foregroundMaskCached(buffer, width, height, { check: false });
+      return { alpha, width, height };
+    });
+  } catch (e) {
+    console.error(`[cutout] person mask skipped: ${e.message}`);
+    return null;
+  }
+}
+
 /** Download the model in the background shortly after start-up, so the first photo does not wait for it. */
 export function prefetchCutoutModel(delayMs = 60e3) {
   if (!cutoutEnabled()) return;

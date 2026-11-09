@@ -37,23 +37,6 @@ const framesOf = (e) => (e?.backImage && photoOf(e) ? [photoOf(e), e.rightImage,
 const frameAt = (angle, m) => ((Math.round(angle / (360 / m)) % m) + m) % m;
 const two = (n) => String(n).padStart(2, '0');
 
-/** Groups entries by gender/age audience so we can add a small visual gap between groups on the stage. */
-const groupOf = (x) => {
-  const a = (x?.audience || '').toLowerCase();
-  if (a.startsWith('kid') || a === 'boys' || a === 'girls' || a.includes('child')) return 'kids';
-  if (a.startsWith('men') || a === 'male' || x?.persona === 'him') return 'men';
-  return 'women';
-};
-/** Returns the cumulative extra-step offset for each entry due to group boundaries (0.6 extra step per boundary crossed). */
-const buildGroupOffsets = (entries) => {
-  const GAP = 0.65;
-  const out = [0];
-  for (let i = 1; i < entries.length; i++) {
-    out.push(out[i - 1] + (groupOf(entries[i]) !== groupOf(entries[i - 1]) ? GAP : 0));
-  }
-  return out;
-};
-
 /** Eases an angle (0 = front, 180 = back) to its target; while the shopper drags it follows the finger exactly. */
 function useAngle(target, follow, resetKey) {
   const [a, setA] = useState(target);
@@ -115,7 +98,6 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   const lo = -Math.floor((v - 1) / 2); const hi = Math.ceil((v - 1) / 2);
   const vs = Math.max(3, Math.min(v, entries.length)); // spacing follows the models that really exist, so two looks are not squeezed together
   const stepD = Math.min(19, 78 / (vs - 1)); const stepM = Math.min(26, 64 / (vs - 1)); // close together, like a crowd, so the ones behind overlap
-  const groupOffsets = buildGroupOffsets(entries); // extra positional gap between gender/audience groups
   const [playing, setPlaying] = useState(true);
   const [tick, setTick] = useState(0); // bumps when the tab comes back to the front, so the row starts moving again
   const userPaused = useRef(false); // only the pause button stops the row for good; touching it just pauses a few seconds
@@ -192,15 +174,11 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   };
 
   return (
-    <section ref={root} className="relative isolate overflow-hidden rounded-[28px] border border-line bg-[#f7f6f2] text-[#141414] shadow-[0_18px_55px_-36px_rgba(9,25,20,.35)] lg:grid lg:grid-cols-[minmax(0,1fr)_380px]">
+    <section ref={root} className="relative isolate overflow-hidden text-[#141414]">
+      <div className="mx-auto max-w-[1760px] lg:grid lg:grid-cols-[minmax(0,1fr)_400px]">
       <style>{CSS}</style>
       {/* ───────── the stage ───────── */}
       <div dir="ltr" className="relative min-w-0" onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
-        <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
-          <span className="tlk-blob absolute -left-24 top-8 h-72 w-72 rounded-full bg-[#ffd9c4]/70 blur-3xl" />
-          <span className="tlk-blob absolute -right-12 bottom-0 h-80 w-80 rounded-full bg-[#cfe2ff]/70 blur-3xl" style={{ animationDelay: '-8s' }} />
-          <span className="absolute left-1/2 top-[18%] h-[70%] w-[46%] -translate-x-1/2 rounded-full bg-white/70 blur-3xl" />
-        </div>
         <div className="pointer-events-none absolute end-4 top-4 z-20 sm:end-8 sm:top-7">
           <span className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white/70 px-3 py-1.5 text-[11px] font-semibold tabular-nums text-[#141414] shadow-sm backdrop-blur-md">
             <span className="relative flex h-1.5 w-1.5"><span className="absolute inset-0 animate-ping rounded-full bg-[#141414]/50" /><span className="relative h-1.5 w-1.5 rounded-full bg-[#141414]" /></span>
@@ -238,15 +216,12 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
           <span ref={ring} className="pointer-events-none absolute left-0 top-0 z-30 hidden h-11 w-11 rounded-full border border-[#141414]/70 opacity-0 transition-[opacity,background-color] duration-200 sm:block" aria-hidden="true"><span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#141414]" /></span>
           <span className="pointer-events-none absolute bottom-[8%] left-1/2 h-[10%] w-[34%] -translate-x-1/2 rounded-[50%] bg-black/10 blur-2xl" aria-hidden="true" />
           {/* the floor */}
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[26%] bg-gradient-to-b from-transparent to-[#ecebe6]" aria-hidden="true" />
           {entries.map((x, i) => {
             let off = i - active;
             if (off > n / 2) off -= n; else if (off < -n / 2) off += n; // the row loops
             const a = Math.abs(off); const far = off < lo || off > hi;
             const img = photoOf(x);
-            const scale = off === 0 ? 1 : a === 1 ? 0.84 : a === 2 ? 0.72 : 0.62;
-            // extra horizontal nudge so models from different audience groups have a visible gap between them
-            const posOff = off + (groupOffsets[i] - (groupOffsets[active] ?? 0));
+            const scale = off === 0 ? 1 : a === 1 ? 0.87 : a === 2 ? 0.77 : 0.68;
             const fr = framesOf(x); const m = fr.length; const hasBack = off === 0 && m > 1; // only a look with a back photo can be turned
             const turnHandlers = hasBack ? {
               onPointerDown: (ev) => { ev.stopPropagation(); manualTurn.current = true; drag.current = { x: ev.clientX, base: turn }; ev.currentTarget.setPointerCapture?.(ev.pointerId); setDragging(true); nudge(); },
@@ -260,7 +235,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
                 onClick={() => { if (off !== 0) { touch(); go(i); } }}
                 aria-label={x.title || x.occasion || t('lod.title')} aria-current={off === 0 ? 'true' : undefined} aria-hidden={far} data-off={off} {...turnHandlers}
                 className={cx('absolute bottom-[12%] h-[76%] aspect-[4/5] outline-none focus:outline-none focus-visible:outline-none [--step:var(--step-m)] mix-blend-multiply transition-[transform,filter,opacity,left] duration-[900ms] ease-[cubic-bezier(.22,1.15,.36,1)] motion-reduce:transition-none sm:bottom-[9%] sm:h-[80%] sm:[--step:var(--step-d)] lg:h-[82%]', far && 'pointer-events-none', off === 0 ? (hasBack ? 'cursor-grab touch-pan-y active:cursor-grabbing' : 'cursor-default') : 'cursor-pointer')}
-                style={{ left: `calc(50% + ${posOff} * var(--step))`, transform: `translateX(-50%) scale(${scale})`, transformOrigin: '50% 100%', filter: off === 0 ? 'drop-shadow(0 0 2px rgba(20,20,20,.32))' : `blur(${a === 1 ? 0.6 : a === 2 ? 1.3 : 2.1}px)${a >= 2 ? ' drop-shadow(-6px 0 0 rgba(20,20,20,.10)) drop-shadow(6px 0 0 rgba(20,20,20,.10))' : ''}`, opacity: far ? 0 : off === 0 ? 1 : a === 1 ? 0.9 : a === 2 ? 0.55 : 0.32, zIndex: 10 - a }}
+                style={{ left: `calc(50% + ${off} * var(--step))`, transform: `translateX(-50%) scale(${scale})`, transformOrigin: '50% 100%', filter: off === 0 ? 'drop-shadow(0 0 2px rgba(20,20,20,.28))' : a === 1 ? 'none' : `blur(${a === 2 ? 0.5 : 1.1}px)${a >= 3 ? ' drop-shadow(-5px 0 0 rgba(20,20,20,.06)) drop-shadow(5px 0 0 rgba(20,20,20,.06))' : ''}`, opacity: far ? 0 : off === 0 ? 1 : a === 1 ? 0.95 : a === 2 ? 0.8 : 0.6, zIndex: 10 - a }}
               >
                 <span className="block h-full w-full" style={{ transform: `translateX(calc(var(--px, 0) * ${-14 * (1 + a * 0.55)}px))`, transition: 'transform .5s ease-out' }}>
                   <span className={cx('relative block h-full w-full', ready ? 'tlk-enter' : 'opacity-0')} style={{ animationDelay: `${120 + a * 90}ms` }}>
@@ -315,7 +290,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
       </div>
 
       {/* ───────── In this look ───────── */}
-      <aside style={{ opacity: fade ? 0 : 1, transition: 'opacity .2s' }} className="flex min-w-0 flex-col border-t border-[#f7f6f2]/60 bg-[#f7f6f2] lg:border-s lg:border-t-0" aria-live="polite">
+      <aside style={{ opacity: fade ? 0 : 1, transition: 'opacity .2s' }} className="flex min-w-0 flex-col border-t border-black/[.07] bg-transparent lg:border-s lg:border-t-0" aria-live="polite">
         <div className="flex items-baseline justify-between px-4 pb-0 pt-3 sm:px-6 lg:pb-3 lg:pt-5">
           <h4 className="text-[13px] font-semibold">{ar ? 'في اللوك ده' : 'In this look'}</h4>
           <span className="text-[11px] text-[#8b8b86]">{ar ? `${picks.length} قطع` : `${picks.length} ${picks.length === 1 ? 'item' : 'items'}`}</span>
@@ -324,7 +299,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
           {picks.map((p, idx) => {
             const done = added.includes(p.id);
             return (
-              <li key={p.id} className="tlk-slide group/row relative flex w-[128px] shrink-0 snap-start flex-col gap-2 transition-colors lg:w-auto lg:flex-row lg:items-center lg:gap-3.5 lg:px-6 lg:py-3 lg:hover:bg-[#eeede8]" style={{ animationDelay: `${80 + idx * 90}ms` }}>
+              <li key={p.id} className="tlk-slide group/row relative flex w-[128px] shrink-0 snap-start flex-col gap-2 transition-colors lg:w-auto lg:flex-row lg:items-center lg:gap-3.5 lg:px-6 lg:py-3 lg:hover:bg-[#faf9f6]" style={{ animationDelay: `${80 + idx * 90}ms` }}>
                 <Link to={`/s/${p.store.slug}/p/${p.slug}`} className="block h-[112px] w-full shrink-0 overflow-hidden rounded-xl bg-[#f3f3f0] lg:h-[68px] lg:w-[68px] transition-transform duration-300 group-hover/row:scale-[1.04]"><SmartImage media={p.image} ratio="1 / 1" className="h-full w-full" sizes="(min-width:1024px) 68px, 128px" /></Link>
                 <Link to={`/s/${p.store.slug}/p/${p.slug}`} className="min-w-0 flex-1">
                   <p className="truncate text-[10px] font-medium uppercase tracking-[.12em] text-[#8b8b86] max-lg:hidden">{tr(p.store.name)}</p>
@@ -354,6 +329,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
         </div>
       </aside>
       {quick && <QuickAddSheet slug={quick.queue[quick.i].store.slug} product={quick.queue[quick.i]} marketplace step={quick.queue.length > 1 ? `${quick.i + 1}/${quick.queue.length}` : ''} onAdded={nextAdd} onClose={() => setQuick(null)} />}
+      </div>
     </section>
   );
 }
