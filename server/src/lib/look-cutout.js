@@ -109,6 +109,25 @@ async function floodKnockOut(input) {
 async function polishRgba(data, w, h) {
   const n = w * h;
   const raw1 = { raw: { width: w, height: h, channels: 1 } };
+  // 0. white leftovers of the studio wall that the cut missed (a strip along the trousers, the wedge between the legs, a patch next to a
+  //    hand): near-pure-white pixels that are connected to the transparent area are background too. A white garment would be eaten
+  //    the same way, so when this would remove a big part of the person it is skipped and the photo keeps the cut it came with.
+  {
+    const white = (i) => { const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2]; const lo = Math.min(r, g, b); return lo > 222 && Math.max(r, g, b) - lo < 30; };
+    const seen = new Uint8Array(n); const st = new Int32Array(n); let sp = 0, person = 0, killed = 0;
+    for (let i = 0; i < n; i++) if (data[i * 4 + 3] >= 128) person++;
+    const edge = (j) => { if (!seen[j] && data[j * 4 + 3] >= 128 && white(j)) { seen[j] = 1; st[sp++] = j; } };
+    for (let i = 0; i < n; i++) {
+      if (data[i * 4 + 3] >= 128) continue;
+      const x = i % w; edge(x > 0 ? i - 1 : i); edge(x < w - 1 ? i + 1 : i); edge(i >= w ? i - w : i); edge(i < n - w ? i + w : i);
+    }
+    const hit = [];
+    while (sp) {
+      const i = st[--sp]; hit.push(i); killed++; const x = i % w;
+      if (x > 0) edge(i - 1); if (x < w - 1) edge(i + 1); if (i >= w) edge(i - w); if (i < n - w) edge(i + w);
+    }
+    if (killed <= person * 0.12) for (const i of hit) data[i * 4 + 3] = 0;
+  }
   // 1. keep the large connected shapes only
   const label = new Int32Array(n); const stack = new Int32Array(n); const sizes = [0];
   let next = 0;
