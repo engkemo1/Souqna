@@ -153,10 +153,10 @@ function ImageSlot({ label, media, slot, ratio, onUploaded, onDelete, deleteBusy
   return (
     <div>
       <p className="mb-2 text-sm font-medium">{label}</p>
-      <button type="button" onClick={() => ref.current?.click()} className={`group relative block w-full overflow-hidden bg-surface ring-1 ring-line ${round ? 'h-28 w-28 rounded-full' : 'rounded-2xl'}`}>
+      <button type="button" onClick={() => ref.current?.click()} className={`group relative block w-full overflow-hidden bg-surface ring-1 ring-line ${round ? 'h-28 w-28 rounded-full' : 'rounded-2xl'} ${!media ? 'min-h-[150px]' : ''}`}>
         <SmartImage media={media} ratio={slot === 'cover' ? 'natural' : ratio} fit={slot === 'cover' ? 'contain' : 'cover'} sizes="400px" />
-        <span className="absolute inset-0 grid place-items-center bg-black/0 text-white opacity-0 transition group-hover:bg-black/35 group-hover:opacity-100 [@media(hover:none)]:bg-black/25 [@media(hover:none)]:opacity-100">
-          {busy ? <Spinner size={24} /> : <span className="inline-flex items-center gap-1.5 rounded-full bg-black/50 px-3 py-1.5 text-sm font-semibold"><Camera className="h-4 w-4" />{t('settings.change')}</span>}
+        <span className={`absolute inset-0 grid place-items-center transition ${media ? 'bg-black/0 text-white opacity-0 group-hover:bg-black/35 group-hover:opacity-100 [@media(hover:none)]:bg-black/25 [@media(hover:none)]:opacity-100' : 'bg-fg/[0.03] text-fg opacity-100'}`}>
+          {busy ? <Spinner size={24} /> : <span className="inline-flex items-center gap-1.5 rounded-full bg-black/60 px-3 py-1.5 text-sm font-semibold text-white"><Camera className="h-4 w-4" />{t('settings.change')}</span>}
         </span>
       </button>
       <input ref={ref} type="file" accept="image/*" hidden onChange={(e) => { pick(e.target.files[0]); e.target.value = ''; }} />
