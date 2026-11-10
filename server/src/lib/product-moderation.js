@@ -1,3 +1,4 @@
+import { decodeDepartments } from '@souqna/shared';
 import { q, json } from '../db/index.js';
 import { inferDepartment } from './departments.js';
 import { deriveDepartment, sizeKindFor } from './product-types.js';
@@ -231,12 +232,25 @@ function detectDeptMismatch(p, ctx, inferredKey, inferredGender, suggestedDeptSl
  */
 export function analyzeProduct(p, ctx = buildModerationContext()) {
   const nameText = `${p.name_ar || ''} ${p.name_en || ''}`.trim();
-  const inferredKey = inferKey(nameText, ctx.K);
-  const inferredGender = inferGender({ name_ar: p.name_ar, name_en: p.name_en, department: p.department, audience: p.audience }, inferredKey || p.moda_key, ctx.K);
-  const effectiveKey = inferredKey || p.moda_key || null;
-  const effectiveGender = inferredGender === 'unisex' && p.audience ? p.audience : inferredGender;
+  const storeDepts = Array.isArray(p.store_departments) ? p.store_departments : decodeDepartments(p.store_departments);
+  const storeRoots = new Set(storeDepts.map((s) => ctx.rootOf(s)).filter(Boolean));
+  const storeDefaultGender = storeRoots.has('men') && !storeRoots.has('women')
+    ? 'men'
+    : storeRoots.has('women') && !storeRoots.has('men')
+      ? 'women'
+      : storeRoots.has('kids') && !storeRoots.has('men') && !storeRoots.has('women')
+        ? 'kids'
+        : null;
 
-  const suggestedDeptSlug = (effectiveKey && deriveDepartment(effectiveKey, effectiveGender, ctx.candidateSlugs, ctx.K))
+  const inferredKey = inferKey(nameText, ctx.K);
+  const inferredGender = inferGender({ name_ar: p.name_ar, name_en: p.name_en, department: p.department, audience: p.audience || storeDefaultGender }, inferredKey || p.moda_key, ctx.K);
+  const effectiveKey = inferredKey || p.moda_key || null;
+  const effectiveGender = inferredGender === 'unisex' ? (p.audience || storeDefaultGender || 'unisex') : inferredGender;
+
+  const storeCandidateSlugs = storeDepts.filter((s) => ctx.deptsBySlug.get(s)?.active);
+  const suggestedDeptSlug = (effectiveKey && storeCandidateSlugs.length && deriveDepartment(effectiveKey, effectiveGender, storeCandidateSlugs, ctx.K))
+    || (storeCandidateSlugs.length && inferDepartment(nameText, storeCandidateSlugs))
+    || (effectiveKey && deriveDepartment(effectiveKey, effectiveGender, ctx.candidateSlugs, ctx.K))
     || inferDepartment(nameText, ctx.candidateSlugs)
     || null;
 
@@ -277,9 +291,10 @@ export function analyzeProduct(p, ctx = buildModerationContext()) {
     addIssue('unclear_name', nameProblem, manualFlags.has('unclear_name'));
   }
 
-  // 4. Missing department / category check
+  // 4. Missing department check (platform department is the source of truth)
   const deptObj = p.department ? ctx.deptsBySlug.get(p.department) : null;
-  if (!p.department || !deptObj || !deptObj.active) {
+  const missingDept = !p.department || !deptObj || !deptObj.active;
+  if (missingDept) {
     const sugLabel = suggestedDeptSlug ? ctx.labelOf(suggestedDeptSlug) : null;
     addIssue(
       'no_department',
@@ -288,8 +303,6 @@ export function analyzeProduct(p, ctx = buildModerationContext()) {
         : `القسم الحالي (${p.department}) غير مفعّل أو قديم${sugLabel ? ` (المقترح: ${sugLabel})` : ''}`,
       manualFlags.has('no_department'),
     );
-  } else if (!p.category_id) {
-    addIssue('no_department', 'مش متضاف لقسم فرعي جوه المحل', manualFlags.has('no_department'));
   }
 
   // 5. Department mismatch check
@@ -332,9 +345,14 @@ export function analyzeProduct(p, ctx = buildModerationContext()) {
 
   // Significant issues (everything except info-level missing_details unless manually flagged)
   const majorIssues = issues.filter((i) => i.severity !== 'info' || i.manual);
-  const needsReview = reviewStatus === 'flagged' || (reviewStatus !== 'approved' && (majorIssues.length > 0 || reviewStatus === 'pending'));
+  const needsReview = reviewStatus === 'flagged' || (reviewStatus !== 'approved' && majorIssues.length > 0);
 
-  const suggestedDepartment = suggestedDeptSlug && suggestedDeptSlug !== p.department
+  // Only suggest changing department when the product is missing a valid department or has a detected mismatch
+  const currentChain = p.department ? ctx.chainOf(p.department) : [];
+  const suggestedDepartment = (missingDept || mismatchReason)
+    && suggestedDeptSlug
+    && suggestedDeptSlug !== p.department
+    && !currentChain.includes(suggestedDeptSlug)
     ? { slug: suggestedDeptSlug, label: ctx.labelOf(suggestedDeptSlug) }
     : null;
 

@@ -28,7 +28,7 @@ const normSearch = (s) => String(s || '')
 function loadAllProductsForAdmin() {
   return q.all(`
     SELECT p.*,
-      s.slug AS store_slug, s.name_ar AS store_name, s.phone AS store_phone, s.whatsapp AS store_whatsapp, s.status AS store_status,
+      s.slug AS store_slug, s.name_ar AS store_name, s.phone AS store_phone, s.whatsapp AS store_whatsapp, s.status AS store_status, s.departments AS store_departments,
       u.name AS owner_name,
       c.name_ar AS category_name_ar, c.name_en AS category_name_en,
       (SELECT COUNT(*) FROM product_media pm WHERE pm.product_id = p.id) AS photo_count,
@@ -112,7 +112,7 @@ export function countProductsWithIssues() {
     const ctx = buildModerationContext();
     const rows = q.all(`
       SELECT p.id, p.name_ar, p.name_en, p.description_ar, p.description_en, p.department, p.category_id, p.audience, p.moda_key,
-        p.sizes_json, p.admin_review_status, p.admin_flags_json,
+        p.sizes_json, p.admin_review_status, p.admin_flags_json, s.departments AS store_departments,
         (SELECT COUNT(*) FROM product_media pm WHERE pm.product_id = p.id) AS photo_count,
         (SELECT m.quality FROM product_media pm JOIN media m ON m.id = pm.media_id WHERE pm.product_id = p.id ORDER BY pm.is_primary DESC, pm.position ASC LIMIT 1) AS primary_quality,
         (SELECT MIN(m.quality) FROM product_media pm JOIN media m ON m.id = pm.media_id WHERE pm.product_id = p.id AND m.quality IS NOT NULL) AS min_quality,
@@ -519,7 +519,7 @@ r.patch('/products/:id', h(async (req, res) => {
   const ctx = buildModerationContext();
   const fullRow = q.get(`
     SELECT p.*,
-      s.slug AS store_slug, s.name_ar AS store_name, s.phone AS store_phone, s.whatsapp AS store_whatsapp, s.status AS store_status,
+      s.slug AS store_slug, s.name_ar AS store_name, s.phone AS store_phone, s.whatsapp AS store_whatsapp, s.status AS store_status, s.departments AS store_departments,
       u.name AS owner_name,
       c.name_ar AS category_name_ar, c.name_en AS category_name_en,
       (SELECT COUNT(*) FROM product_media pm WHERE pm.product_id = p.id) AS photo_count,
@@ -559,7 +559,7 @@ r.post('/products/bulk', h((req, res) => {
 
   tx(() => {
     for (const id of body.ids) {
-      const p = q.get('SELECT * FROM products WHERE id = ?', [id]);
+      const p = q.get('SELECT p.*, s.departments AS store_departments FROM products p JOIN stores s ON s.id = p.store_id WHERE p.id = ?', [id]);
       if (!p) continue;
       if (body.action === 'approve') {
         update('products', id, { admin_review_status: 'approved', admin_reviewed_at: now, admin_flags_json: null, updated_at: now });

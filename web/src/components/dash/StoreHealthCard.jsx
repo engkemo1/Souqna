@@ -24,19 +24,19 @@ export default function StoreHealthCard({ className }) {
   return (
     <div className={`space-y-4 ${className || ''}`}>
       {adminNotes.length > 0 && (
-        <div className="rounded-2xl border border-red-300 bg-red-50/80 p-4 sm:p-5 dark:border-red-500/30 dark:bg-red-500/10">
-          <div className="flex items-center gap-2.5 text-red-900 dark:text-red-200">
+        <div className="rounded-2xl border border-red-300 bg-red-50 p-4 sm:p-5">
+          <div className="flex items-center gap-2.5 text-red-950">
             <AlertTriangle className="h-5 w-5 shrink-0 text-red-600" />
             <h2 className="text-base font-bold">
               {ar ? `ملاحظات من إدارة Twist تحتاج تعديل (${n(adminNotes.length)})` : `Notes from Twist team (${n(adminNotes.length)})`}
             </h2>
           </div>
-          <ul className="mt-3 divide-y divide-red-200/70 dark:divide-red-500/20">
+          <ul className="mt-3 divide-y divide-red-200">
             {adminNotes.map((p) => (
               <li key={p.id} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0 space-y-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Link to={`/dashboard/products/${p.id}`} className="font-bold text-red-950 hover:underline dark:text-red-100">
+                    <Link to={`/dashboard/products/${p.id}`} className="font-bold text-red-950 hover:underline">
                       {p.name}
                     </Link>
                     {p.status !== 'active' && (
@@ -45,13 +45,13 @@ export default function StoreHealthCard({ className }) {
                       </span>
                     )}
                     {p.adminFlags?.map((f) => (
-                      <span key={f} className="rounded-full bg-red-200/80 px-2 py-0.5 text-[11px] font-semibold text-red-900 dark:bg-red-500/30 dark:text-red-100">
+                      <span key={f} className="rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[11px] font-bold text-red-950">
                         {f}
                       </span>
                     ))}
                   </div>
                   {p.adminReviewNote && (
-                    <p className="flex items-start gap-1.5 text-sm font-medium text-red-900 dark:text-red-200">
+                    <p className="flex items-start gap-1.5 text-sm font-semibold text-red-950">
                       <MessageCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
                       <span>{p.adminReviewNote}</span>
                     </p>

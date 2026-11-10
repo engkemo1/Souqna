@@ -92,7 +92,7 @@ let queue = Promise.resolve();
 const serial = (fn) => { const run = queue.then(fn, fn); queue = run.catch(() => {}); return run; };
 
 /** Alpha mask (one byte per pixel, same size as the photo), plus `risky` when the outline may have dropped part of the product. */
-async function foregroundMask(buffer, width, height, { check = true } = {}) {
+async function foregroundMask(buffer, width, height, { check = true, rescue = true } = {}) {
   let risky = false;
   const s = await getSession();
   const { data } = await sharp(buffer).removeAlpha().resize(SIZE, SIZE, { fit: 'fill' }).raw().toBuffer({ resolveWithObject: true });
@@ -155,7 +155,7 @@ async function foregroundMask(buffer, width, height, { check = true } = {}) {
   };
   const dbg = process.env.CUTOUT_DEBUG_DIR; const snap = (name) => dbg && sharp(Buffer.from(m), raw1).png().toFile(`${dbg}/${name}.png`);
   await snap('1-model');
-  grow();
+  if (rescue) grow(); // product photos only: on a person it would pull shadows and wall into the cut
   await snap('2-grow');
   // close small bites along the outline (a notch at a hem, a gap in a cuff): dilate then erode the product shape
   {
@@ -165,7 +165,7 @@ async function foregroundMask(buffer, width, height, { check = true } = {}) {
     for (let i = 0; i < n; i++) if (ero[i] > 215 && m[i] < 255) m[i] = 255;
   }
   await snap('3-close');
-  grow();
+  if (rescue) grow(); // product photos only: on a person it would pull shadows and wall into the cut
   await snap('4-grow2');
   // Safety net: if, right outside the final outline, there is still a real share of pixels that do not look like the
   // backdrop, part of the product may have been left out. Then the backdrop is NOT replaced at all (the caller keeps the
@@ -346,7 +346,7 @@ export async function personAlpha(buffer) {
   try {
     return await serial(async () => {
       const { width, height } = await sharp(buffer).rotate().metadata();
-      const { alpha } = await foregroundMaskCached(buffer, width, height, { check: false });
+      const { alpha } = await foregroundMask(buffer, width, height, { check: false, rescue: false }); // a person: no product-colour rescue
       return { alpha, width, height };
     });
   } catch (e) {

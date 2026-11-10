@@ -42,9 +42,9 @@ const QUALITY_BADGE = (q) => {
 };
 
 const ISSUE_TONE = {
-  critical: 'bg-red-50 text-red-800 ring-1 ring-red-200 dark:bg-red-500/15 dark:text-red-200 dark:ring-red-500/30',
-  warning: 'bg-amber-50 text-amber-900 ring-1 ring-amber-200 dark:bg-amber-500/15 dark:text-amber-200 dark:ring-amber-500/30',
-  info: 'bg-sky-50 text-sky-800 ring-1 ring-sky-200 dark:bg-sky-500/15 dark:text-sky-200 dark:ring-sky-500/30',
+  critical: 'bg-red-100/90 text-red-950 ring-1 ring-inset ring-red-300',
+  warning: 'bg-amber-100/90 text-amber-950 ring-1 ring-inset ring-amber-300',
+  info: 'bg-sky-100/80 text-sky-950 ring-1 ring-inset ring-sky-300',
 };
 
 const STATUS_META = {
@@ -165,7 +165,7 @@ function AdminNoteDialog({ product, onClose, onSaved, issueTypes }) {
               icon={MessageCircle}
               onClick={() => submit(true)}
               loading={busy === 'wa'}
-              className="border-emerald-600/40 bg-emerald-50/70 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-200"
+              className="border-emerald-600/50 bg-emerald-50 text-emerald-950 hover:bg-emerald-100"
             >
               حفظ + إرسال واتساب للمحل 💬
             </Button>
@@ -421,7 +421,7 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
             icon={EyeOff}
             onClick={() => save('flag_hide')}
             loading={busy === 'flag_hide'}
-            className="border-red-500/40 text-red-700 hover:bg-red-50 dark:text-red-300"
+            className="border-red-300 bg-red-50 text-red-800 hover:bg-red-100"
           >
             إيقاف الظهور من الموقع
           </Button>
@@ -470,10 +470,10 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
 
           {/* Detected Issues & Suggested Fixes */}
           {(p.moderation.issues.length > 0 || p.moderation.suggestedDepartment) && (
-            <div className="space-y-3 rounded-2xl border border-amber-500/30 bg-amber-50/70 p-4 dark:bg-amber-500/10">
+            <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
               <div className="flex items-center justify-between gap-2">
-                <p className="flex items-center gap-2 text-sm font-bold text-amber-950 dark:text-amber-200">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-600" />
+                <p className="flex items-center gap-2 text-sm font-bold text-amber-950">
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
                   ملاحظات الفحص التلقائي للمنتج ({fmtNum(p.moderation.issues.length)})
                 </p>
                 {(p.moderation.suggestedDepartment || p.moderation.suggestedModa) && (
@@ -489,8 +489,8 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
               </div>
               <ul className="space-y-1.5">
                 {p.moderation.issues.map((iss) => (
-                  <li key={iss.code} className="flex items-start gap-2 text-xs font-medium text-amber-950 dark:text-amber-100">
-                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-600" />
+                  <li key={iss.code} className="flex items-start gap-2 text-xs font-medium text-amber-950">
+                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-700" />
                     <span>
                       <strong className="font-bold">{iss.label}:</strong> {iss.detail}
                     </span>
@@ -498,7 +498,7 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
                 ))}
               </ul>
               {p.moderation.suggestedDepartment && form.department !== p.moderation.suggestedDepartment.slug && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-white/80 p-2.5 text-xs dark:bg-black/20">
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white p-2.5 text-xs text-neutral-900">
                   <span>
                     القسم المقترح من اسم المنتج: <strong className="font-bold">{p.moderation.suggestedDepartment.label}</strong>
                   </span>
@@ -529,7 +529,7 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
             </div>
 
             {!visibleMedia.length ? (
-              <div className="rounded-xl border border-dashed border-red-300 bg-red-50/50 p-6 text-center text-sm text-red-700 dark:bg-red-500/10 dark:text-red-300">
+              <div className="rounded-xl border border-dashed border-red-300 bg-red-50 p-6 text-center text-sm text-red-900">
                 المنتج بدون صور حالياً! يمكنك رفع صور له من <Link to={`/admin/manage/${p.store.slug}/products/${p.id}`} className="font-bold underline">المحرر الكامل</Link>.
               </div>
             ) : (
@@ -784,7 +784,7 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
                       window.open(waUrl, '_blank', 'noopener,noreferrer');
                     }}
                     loading={busy === 'flag'}
-                    className="border-emerald-600/40 bg-emerald-50/70 text-emerald-900 hover:bg-emerald-100 dark:bg-emerald-500/15 dark:text-emerald-200"
+                    className="border-emerald-600/50 bg-emerald-50 text-emerald-950 hover:bg-emerald-100"
                   >
                     حفظ الكومنت + إرسال واتساب للمحل ({p.store.name_ar})
                   </Button>
@@ -1183,7 +1183,7 @@ export default function AdminProducts() {
               )}
             >
               <span>{it.label}</span>
-              <span className={cx('rounded-full px-1.5 py-0.2 text-[11px] tabular', active ? 'bg-white/20 text-white' : cnt > 0 ? 'bg-red-100 text-red-800 dark:bg-red-500/20 dark:text-red-200' : 'bg-fg/[0.06]')}>
+              <span className={cx('rounded-full px-1.5 py-0.2 text-[11px] font-bold tabular', active ? 'bg-white/25 text-white' : cnt > 0 ? 'bg-red-100 text-red-900' : 'bg-fg/[0.08] text-muted')}>
                 {fmtNum(cnt)}
               </span>
             </button>
@@ -1329,7 +1329,7 @@ export default function AdminProducts() {
                         {p.image ? (
                           <SmartImage media={p.image} ratio="4 / 5" sizes="80px" className="h-full w-full" />
                         ) : (
-                          <div className="grid h-full w-full place-items-center bg-red-50 text-red-500 dark:bg-red-500/10">
+                          <div className="grid h-full w-full place-items-center bg-red-50 text-red-600">
                             <Camera className="h-6 w-6" />
                           </div>
                         )}
@@ -1436,9 +1436,9 @@ export default function AdminProducts() {
                       )}
 
                       {p.moderation?.reviewNote && (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50/70 px-3 py-2 text-xs text-red-950 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-100">
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-950">
                           <span className="flex items-start gap-1.5">
-                            <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-600" />
+                            <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-700" />
                             <span>
                               <strong className="font-bold">كومنت ظاهر لصاحب المحل:</strong> {p.moderation.reviewNote}
                             </span>
@@ -1446,7 +1446,7 @@ export default function AdminProducts() {
                           <button
                             type="button"
                             onClick={() => setNoteProduct(p)}
-                            className="font-bold underline hover:text-red-700"
+                            className="font-bold text-red-900 underline hover:text-red-700"
                           >
                             تعديل الكومنت
                           </button>
@@ -1460,9 +1460,9 @@ export default function AdminProducts() {
                             type="button"
                             disabled={busyId === `dept:${p.id}`}
                             onClick={() => quickFixDept(p)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500/15 px-3 py-1.5 text-xs font-bold text-amber-900 ring-1 ring-amber-500/30 transition hover:bg-amber-500/25 dark:text-amber-200"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-950 ring-1 ring-inset ring-amber-300 transition hover:bg-amber-200"
                           >
-                            <Sparkles className="h-3.5 w-3.5 text-amber-600" />
+                            <Sparkles className="h-3.5 w-3.5 text-amber-700" />
                             {busyId === `dept:${p.id}` ? 'جارٍ النقل…' : `تصليح سريع: نقل لقسم «${sugDept.label}» بضغطة واحدة`}
                           </button>
                         </div>
@@ -1489,7 +1489,7 @@ export default function AdminProducts() {
                           icon={EyeOff}
                           loading={busyId === `vis:${p.id}`}
                           onClick={() => quickToggleVisibility(p)}
-                          className="border border-red-200 bg-red-50/60 hover:bg-red-100/80 dark:border-red-500/30 dark:bg-red-500/10"
+                          className="border border-red-300 bg-red-50 !text-red-800 hover:bg-red-100"
                         >
                           إيقاف الظهور
                         </Button>
@@ -1500,7 +1500,7 @@ export default function AdminProducts() {
                           icon={Eye}
                           loading={busyId === `vis:${p.id}`}
                           onClick={() => quickToggleVisibility(p)}
-                          className="border-emerald-300 bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-500/30 dark:bg-emerald-500/15 dark:text-emerald-200"
+                          className="border-emerald-300 bg-emerald-50 !text-emerald-900 hover:bg-emerald-100"
                         >
                           إعادة الإظهار
                         </Button>

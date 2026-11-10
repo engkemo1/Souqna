@@ -253,9 +253,10 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   /* ---------- متابعة وتحية ---------- */
   const has = (k) => intents.includes(k);
   const explicitAudience = aud.length > 0 || result.kidsUnspecified || partnerFemale || partnerMale;
-  const hasExplicitShopping = /(^| )(لبس|هدوم|ملابس|طقم|بدله|فستان|شوز|كوتشي|اشتري|اتسوق|شراء|تسوق|موديلات|ازياء|فاشون|كولكشن)( |$)/.test(n);
+  const hasExplicitShopping = /(^| )(لبس|هدوم|ملابس|طقم|بدله|فستان|شوز|كوتشي|اشتري|اتسوق|شراء|تسوق|موديلات|ازياء|فاشون|كولكشن|حاجه|حاجة|قطعه|قطعة|لوك|ستايل|استايل|اتشيك|انقي|اجيب|شياكه|شياكة|سمبل|روشه|روشة)( |$)/.test(n);
+  const hasEgyptianShopping = hasShopping && (hasExplicitShopping || result.taste.length > 0 || /(على قد|علي قد|حنين|لقطة|لقطه|في المعقول|سمبل|روق عليا|نقيلي|شوفيلي|ظبطني|اتشيك)/.test(n));
   const hasGarmentsOrOccasion = result.garments.length > 0 || Boolean(result.context) || Boolean(result.budget) || result.fullLook;
-  const hasContent = hasGarmentsOrOccasion || explicitAudience || (hasExplicitShopping && (hasShopping || result.persons.length > 0));
+  const hasContent = hasGarmentsOrOccasion || explicitAudience || (hasExplicitShopping && (hasShopping || result.persons.length > 0)) || hasEgyptianShopping;
   if (has('reset')) result.followup = 'reset';
   else if (has('show_more') && !result.garments.length) result.followup = 'show_more';
   else if (has('cheaper') && !result.garments.length && !result.context) result.followup = 'cheaper'; // "أقل سعر تيشيرت" is a product request, not "cheaper than before"

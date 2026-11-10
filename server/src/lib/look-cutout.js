@@ -97,6 +97,71 @@ async function floodKnockOut(input) {
   return { buffer, removed };
 }
 
+
+/**
+ * Polishes the alpha of a cut-out person photo (RGBA, raw). Fixes what the eye catches on the stage:
+ *  1. floating leftovers (a white patch near the feet, a speck of wall) -> only the big shapes are kept;
+ *  2. ragged / blocky outline (the model works at a small size) -> smoothed, pulled in by about a pixel;
+ *  3. white fringe: pixels at the edge still carry the studio's white. Their colour is replaced by the colour of the
+ *     nearest solid clothing, and near-pure-white pixels right on the rim fade out.
+ * Never touches the inside of the person.
+ */
+async function polishRgba(data, w, h) {
+  const n = w * h;
+  const raw1 = { raw: { width: w, height: h, channels: 1 } };
+  // 1. keep the large connected shapes only
+  const label = new Int32Array(n); const stack = new Int32Array(n); const sizes = [0];
+  let next = 0;
+  for (let s0 = 0; s0 < n; s0++) {
+    if (label[s0] || data[s0 * 4 + 3] < 128) continue;
+    next++; let sp = 0, size = 0; stack[sp++] = s0; label[s0] = next;
+    while (sp) {
+      const i = stack[--sp]; size++; const x = i % w;
+      const nb = [x > 0 ? i - 1 : -1, x < w - 1 ? i + 1 : -1, i >= w ? i - w : -1, i < n - w ? i + w : -1];
+      for (const j of nb) if (j >= 0 && !label[j] && data[j * 4 + 3] >= 128) { label[j] = next; stack[sp++] = j; }
+    }
+    sizes.push(size);
+  }
+  if (!next) return null;
+  const biggest = Math.max(...sizes);
+  const bin = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) if (label[i] && sizes[label[i]] >= biggest * 0.03) bin[i] = 255;
+  // 2. smooth the outline and pull it in slightly
+  const sigma = Math.max(1, Math.min(w, h) * 0.0015);
+  const soft = await sharp(bin, raw1).blur(sigma).extractChannel(0).raw().toBuffer();
+  const alpha = Buffer.alloc(n);
+  for (let i = 0; i < n; i++) { const v = (soft[i] - 120) * (255 / 115); alpha[i] = v <= 0 ? 0 : v >= 255 ? 255 : v; }
+  const rimSigma = Math.max(2, Math.min(w, h) * 0.003);
+  const inside = await sharp(bin, raw1).blur(rimSigma).extractChannel(0).raw().toBuffer(); // < 235: within a few pixels of the outline
+  // 3. colour: take the colour of the solid interior for every pixel that is not fully solid
+  const solid = Buffer.alloc(n); const rgbSolid = Buffer.alloc(n * 3);
+  for (let i = 0; i < n; i++) if (alpha[i] === 255 && inside[i] > 250) { solid[i] = 255; rgbSolid[i * 3] = data[i * 4]; rgbSolid[i * 3 + 1] = data[i * 4 + 1]; rgbSolid[i * 3 + 2] = data[i * 4 + 2]; }
+  const rad = Math.max(5, Math.round(Math.min(w, h) * 0.006));
+  const [wMap, cMap] = await Promise.all([
+    sharp(solid, raw1).blur(rad).extractChannel(0).raw().toBuffer(),
+    sharp(rgbSolid, { raw: { width: w, height: h, channels: 3 } }).blur(rad).raw().toBuffer(),
+  ]);
+  const out = Buffer.alloc(n * 4);
+  for (let i = 0; i < n; i++) {
+    let r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2], a = alpha[i];
+    if (a < 255 && wMap[i] > 4) { const k = 255 / wMap[i]; r = Math.min(255, cMap[i * 3] * k); g = Math.min(255, cMap[i * 3 + 1] * k); b = Math.min(255, cMap[i * 3 + 2] * k); }
+    else if (a > 0 && inside[i] < 235) { // the rim just inside the outline: a white-ish pixel there is studio, not clothing
+      const lo = Math.min(r, g, b), spread = Math.max(r, g, b) - lo;
+      if (lo > 222 && spread < 26) { a = Math.max(0, a - (lo - 222) * 14); if (wMap[i] > 4) { const k = 255 / wMap[i]; r = Math.min(255, cMap[i * 3] * k); g = Math.min(255, cMap[i * 3 + 1] * k); b = Math.min(255, cMap[i * 3 + 2] * k); } }
+    }
+    out[i * 4] = r; out[i * 4 + 1] = g; out[i * 4 + 2] = b; out[i * 4 + 3] = a;
+  }
+  return out;
+}
+
+/** Polish an RGBA/PNG/WebP buffer that is already cut (transparent background). Returns a PNG buffer, or null when it has no person in it. */
+export async function polishCutImage(input) {
+  const { data, info } = await sharp(input).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const out = await polishRgba(data, info.width, info.height);
+  if (!out) return null;
+  return sharp(out, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+}
+
 /**
  * Cuts the background of a look photo. First the repo's ISNet model (it understands "a person", so pale clothing stays);
  * if it is off, missing or unsure, the colour fill above is the fallback. Either way the person must still be whole.
@@ -125,11 +190,15 @@ export async function knockOutBackground(input) {
           const { data } = await sharp(input).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
           const out = Buffer.from(data);
           for (let p = 0; p < n; p++) out[p * 4 + 3] = alpha[p];
-          const buffer = await sharp(out, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+          const polished = await polishRgba(out, w, h).catch(() => null);
+          const buffer = await sharp(polished || out, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
           return { buffer, removed: 1 - cover, ml: true };
         }
       }
     } catch (e) { console.error(`[look-cutout] model cut skipped: ${e.message}`); }
   }
-  return floodKnockOut(input);
+  const flood = await floodKnockOut(input);
+  if (!flood.buffer) return flood;
+  try { const polished = await polishCutImage(flood.buffer); if (polished) return { ...flood, buffer: polished }; } catch { /* keep the unpolished cut */ }
+  return flood;
 }

@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { knockOutBackground, cutoutEnabled } from './look-cutout.js';
+import { knockOutBackground, polishCutImage, cutoutEnabled } from './look-cutout.js';
 import sharp from 'sharp';
 import { config } from '../config.js';
 import { badRequest } from './errors.js';
@@ -75,7 +75,7 @@ export async function saveLookOfDayImage(buffer) {
     webp = await sharp(source)
       .rotate()
       .resize(1600, 2000, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 85, alphaQuality: 90 })
+      .webp({ quality: 88, alphaQuality: 100, smartSubsample: true })
       .toBuffer();
   } catch (e) {
     if (e.code === 'image_too_small') throw e;
@@ -113,7 +113,8 @@ export async function recutLookImage(url) {
     if (r2Enabled && String(url).startsWith(config.r2.publicUrl)) { const r = await fetch(url); if (!r.ok) return url; buf = Buffer.from(await r.arrayBuffer()); }
     else buf = await fs.readFile(path.join(config.mediaDir, m[1]));
     const cut = await knockOutBackground(buf);
-    if (!cut.buffer) return url;
-    return await saveLookOfDayImage(cut.buffer);
+    const next = cut.buffer || (cut.already ? await polishCutImage(buf) : null);
+    if (!next) return url;
+    return await saveLookOfDayImage(next);
   } catch { return url; }
 }

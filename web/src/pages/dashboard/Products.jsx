@@ -194,17 +194,17 @@ function AdminNoteBox({ p, lang, compact = false }) {
   if (!hasNote && !hasFlags && p.adminReviewStatus !== 'flagged') return null;
   const ar = lang === 'ar';
   return (
-    <div className={cx('rounded-xl border border-red-300/80 bg-red-50/90 text-start text-red-900 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-100', compact ? 'mt-1.5 px-2.5 py-1.5 text-xs' : 'p-3 text-sm')}>
+    <div className={cx('rounded-xl border border-red-300 bg-red-50 text-start text-red-950', compact ? 'mt-1.5 px-2.5 py-1.5 text-xs' : 'p-3 text-sm')}>
       <div className="flex flex-wrap items-center gap-1.5 font-bold">
         <MessageCircle className="h-3.5 w-3.5 shrink-0 text-red-600" />
         <span>{ar ? 'ملاحظة من إدارة Twist لتعديل المنتج:' : 'Note from Twist team:'}</span>
         {p.adminFlags?.map((f) => (
-          <span key={f} className="rounded-full bg-red-200/80 px-2 py-0.5 text-[10px] font-bold text-red-950 dark:bg-red-500/30 dark:text-red-100">
+          <span key={f} className="rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-950">
             {f}
           </span>
         ))}
       </div>
-      {hasNote && <p className="mt-1 font-medium leading-relaxed">{p.adminReviewNote}</p>}
+      {hasNote && <p className="mt-1 font-semibold leading-relaxed text-red-950">{p.adminReviewNote}</p>}
     </div>
   );
 }
@@ -214,7 +214,7 @@ function WeakDot({ t }) {
   return <span title={t('products.weakPhoto')} className="absolute bottom-2.5 start-2.5 inline-flex items-center gap-1 rounded-full bg-amber-500/95 px-2 py-0.5 text-[11px] font-medium text-white"><Camera className="h-3 w-3" />{t('products.weakPhoto')}</span>;
 }
 function WeakTag({ p, t }) {
-  return weakQ(p) ? <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-400/15 dark:text-amber-200"><Camera className="h-3 w-3" />{t('products.weakPhoto')}</span> : null;
+  return weakQ(p) ? <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-950"><Camera className="h-3 w-3" />{t('products.weakPhoto')}</span> : null;
 }
 
 function ProductActionsMenu({ product, t, onSell, onQr, onQuick, onDelete }) {
@@ -321,7 +321,7 @@ export default function Products() {
             <button
               type="button"
               onClick={() => setAdminOnly((v) => !v)}
-              className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-start text-sm font-medium text-red-900 dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-100"
+              className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-start text-sm font-semibold text-red-950"
             >
               <MessageCircle className="h-4 w-4 shrink-0 text-red-600" />
               <span className="flex-1">
@@ -335,8 +335,8 @@ export default function Products() {
             </button>
           )}
           {(c?.weak > 0 || weakOnly) && (
-            <button type="button" onClick={() => setWeakOnly((v) => !v)} className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-start text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
-              <Camera className="h-4 w-4 shrink-0" />
+            <button type="button" onClick={() => setWeakOnly((v) => !v)} className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-start text-sm font-medium text-amber-950">
+              <Camera className="h-4 w-4 shrink-0 text-amber-700" />
               <span className="flex-1">{weakOnly ? t('products.weakShowAll') : t('products.weakBanner', { n: formatNumber(c?.weak || 0, lang) })}</span>
               <span className="shrink-0 font-semibold underline-offset-2 hover:underline">{weakOnly ? t('common.all') : t('products.weakReview')}</span>
             </button>

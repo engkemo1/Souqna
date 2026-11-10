@@ -317,7 +317,7 @@ function stylistTrainingPrompt(query) {
 /* ---------------- LLM ---------------- */
 /* Gemini (Google AI Studio، مجاني بحدود يومية). جوجل بتسحب الموديلات القديمة (404)، فبنجرّب GEMINI_MODEL ثم آخر موديل اشتغل ثم البدائل، ونتذكر اللي اشتغل. */
 let geminiGoodModel = null;
-const GEMINI_FALLBACKS = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash'];
+const GEMINI_FALLBACKS = ['gemini-3.8-flash', 'gemini-flash-latest', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'];
 async function callGemini(system, messages) {
   const base = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta';
   const models = [...new Set([process.env.GEMINI_MODEL, geminiGoodModel, ...GEMINI_FALLBACKS].filter(Boolean))];
@@ -333,12 +333,15 @@ async function callGemini(system, messages) {
         }), signal: AbortSignal.timeout(25000),
       });
       const j = await res.json().catch(() => ({}));
-      if (res.ok) { geminiGoodModel = model; recordAi('gemini', 'moda', 'ok', '', model); return (j.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join(''); }
+      if (res.ok) { geminiGoodModel = model; lastError = ''; recordAi('gemini', 'moda', 'ok', '', model); return (j.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join(''); }
       lastErr = new Error(`Gemini ${res.status} (${model}): ${JSON.stringify(j.error || j).slice(0, 160)}`);
       if (res.status !== 404 && !(res.status === 400 && thinking)) recordAi('gemini', 'moda', res.status === 429 ? 'limited' : 'failed', lastErr.message, model);
       if (res.status === 400 && thinking && /think/i.test(JSON.stringify(j.error || j))) continue; // الموديل مبيقبلش thinkingBudget → نعيد من غيره
-      if (res.status === 404) break; // الموديل اتسحب → الموديل اللي بعده
-      throw lastErr; // 429/403/5xx: مش مشكلة اسم موديل، السلسلة الأكبر (Claude/Cloudflare) هتتصرف
+      if (res.status === 404 || res.status === 429 || res.status >= 500) {
+        if (geminiGoodModel === model) geminiGoodModel = null;
+        break; // الموديل اتسحب أو عليه ضغط مؤقت (503/429) → نجرّب موديل Gemini اللي بعده
+      }
+      throw lastErr; // 401/403: مشكلة مفتاح API، السلسلة الأكبر (Claude/Cloudflare) هتتصرف
     }
   }
   throw lastErr || new Error('Gemini: no model available');
@@ -552,7 +555,7 @@ function modaChainCall() {
   if (!chain.length) return null;
   return async (system, msgs) => {
     let last;
-    for (const k of chain) { try { return await callLlm(k, system, msgs); } catch (e) { last = e; lastError = String(e.message || e).slice(0, 200); } }
+    for (const k of chain) { try { const out = await callLlm(k, system, msgs); lastError = ''; return out; } catch (e) { last = e; lastError = String(e.message || e).slice(0, 200); } }
     throw last;
   };
 }
@@ -581,7 +584,7 @@ export function modaBrain() {
   if (!chain.length) return null;
   const callFn = async (system, msgs) => {
     let last;
-    for (const k of chain) { try { return await callLlm(k, system, msgs); } catch (e) { last = e; lastError = String(e.message || e).slice(0, 200); } }
+    for (const k of chain) { try { const out = await callLlm(k, system, msgs); lastError = ''; return out; } catch (e) { last = e; lastError = String(e.message || e).slice(0, 200); } }
     throw last;
   };
   return makeBrain(callFn, { training: (text) => stylistTrainingPrompt(text) });
@@ -873,7 +876,7 @@ function buildManualLookEntries() {
       audience, age: String(outfit.age || '').slice(0, 40), occasion: String(outfit.occasion || '').slice(0, 80),
       say: String(outfit.say || '').slice(0, 700), tips: String(outfit.tips || '').slice(0, 300),
       looks, total: looks.reduce((sum, look) => sum + look.items[0].price, 0), budget: null, overBudget: false, manual: true,
-      images: manualImages(outfit, manual), backImage: String(outfit.backImage || ''), rightImage: String(outfit.rightImage || ''), leftImage: String(outfit.leftImage || ''), coverImage: manualImages(outfit, manual)[0] || '', title: String(manual.title || ''), description: String(manual.description || ''), badge: String(manual.badge || ''),
+      images: manualImages(outfit, manual), backImage: String(outfit.backImage || ''), rightImage: String(outfit.rightImage || ''), leftImage: String(outfit.leftImage || ''), coverImage: manualImages(outfit, manual)[0] || '', title: outfits.length === 1 ? String(manual.title || '') : '', description: outfits.length === 1 ? String(manual.description || '') : '', badge: String(manual.badge || ''),
     };
   }).filter(Boolean);
 }

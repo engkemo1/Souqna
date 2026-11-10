@@ -28,7 +28,7 @@ export function recordAi(provider, kind, outcome, message = '', model = '') {
     const col = outcome === 'ok' ? 'ok' : outcome === 'limited' ? 'limited' : 'failed';
     q.run(`INSERT INTO ai_usage(day, provider, kind, ${col}) VALUES(?,?,?,1) ON CONFLICT(day, provider, kind) DO UPDATE SET ${col}=${col}+1`, [usageDay(), provider, KINDS.includes(kind) ? kind : 'moda']);
     if (outcome === 'limited') setting(`${provider}_limited_at`, new Date().toISOString());
-    if (outcome === 'ok') setting(`${provider}_ok_at`, new Date().toISOString());
+    if (outcome === 'ok') { setting(`${provider}_ok_at`, new Date().toISOString()); setting(`${provider}_last_error`, ''); }
     if (model) setting(`${provider}_model_${kind}`, model);
     if (outcome !== 'ok' && message) setting(`${provider}_last_error`, String(message).slice(0, 300));
   } catch { /* counting must never break the real work */ }
