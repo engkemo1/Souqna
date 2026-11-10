@@ -25,6 +25,14 @@ export default function LookOfDay() {
     const el = document.documentElement; const before = el.style.overflowX; el.style.overflowX = 'clip';
     return () => { el.style.overflowX = before; };
   }, [wide]);
+  // a shared link (?look=3) opens the page on that look and scrolls to the stage
+  const [linked, setLinked] = useState(false);
+  useEffect(() => {
+    if (linked || !entries.length) return;
+    setLinked(true);
+    const n = Number(new URLSearchParams(window.location.search).get('look'));
+    if (n >= 1 && n <= entries.length) { setTab(n - 1); window.setTimeout(() => document.getElementById('try-the-look')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 600); }
+  }, [entries.length]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!entries.length) return null;
   const i = Math.min(tab, entries.length - 1);
   const e = entries[i];
@@ -33,7 +41,7 @@ export default function LookOfDay() {
   const carousel = entries.length > 1 && withPhoto >= 2; // several looks with photos → the "Try the Look" row of models
   const tabName = (entry) => `${t(`lod.audience.${entry.audience || (entry.persona === 'her' ? 'women' : 'men')}`)}${entry.age ? ` · ${entry.age}` : ''}`;
   return (
-    <section className={carousel ? 'mt-6 sm:mt-14' : 'container mt-6 sm:mt-14'} style={carousel ? { width: '100vw', marginInlineStart: 'calc(50% - 50vw)' } : undefined}>
+    <section id="try-the-look" className={carousel ? 'mt-6 sm:mt-14' : 'container mt-6 sm:mt-14'} style={carousel ? { width: '100vw', marginInlineStart: 'calc(50% - 50vw)' } : undefined}>
       {!carousel && <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <h2 className="inline-flex items-center gap-2 font-display text-xl font-bold sm:text-2xl"><Sparkles className="h-5 w-5 text-brand" />{e.badge || 'Try the Look'}</h2>
         {entries.length > 1 && !carousel && (

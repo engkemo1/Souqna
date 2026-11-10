@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Pause, Play, Plus, RotateCw } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Pause, Play, Plus, RotateCw, Share2, X } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
 import QuickAddSheet from '../store/QuickAddSheet.jsx';
@@ -82,6 +82,90 @@ function useCountUp(value) {
 // photos from an AI tool are rarely pure white: fade everything outside an oval around the person so no gray rectangle shows on the stage
 const SOFT = { WebkitMaskImage: 'radial-gradient(ellipse 50% 66% at 50% 56%, #000 70%, transparent 100%)', maskImage: 'radial-gradient(ellipse 50% 66% at 50% 56%, #000 70%, transparent 100%)' };
 
+/** The look in front grows right where it stands: the page dims behind it, the model flies up to a big, sharp size and the pieces slide in beside it. */
+function LookModal({ entry, picks, total, added, ar, from, onClose, onAddOne, onAddAll, onPrev, onNext, many }) {
+  const [k, setK] = useState(0);
+  const [open, setOpen] = useState(false); // false = still at its place on the row, true = grown
+  const stage = useRef(null);
+  const frames = framesOf(entry);
+  useEffect(() => { setK(0); }, [entry]); // a new look starts facing front
+  const src = frames[k] || photoOf(entry);
+  const title = entry.title || entry.occasion || (ar ? 'اللوك' : 'The look');
+  const { lang, tr } = useI18n();
+  const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  // fly from where the model stands to its big place (position + size measured, then eased)
+  useLayoutEffect(() => {
+    const el = stage.current; if (!el) return;
+    if (!from?.height || reduced) { el.style.transform = 'none'; setOpen(true); return; }
+    const to = el.getBoundingClientRect();
+    const sc = from.height / to.height;
+    const dx = from.left + from.width / 2 - (to.left + to.width / 2);
+    const dy = from.top + from.height - (to.top + to.height);
+    el.style.transition = 'none'; el.style.transformOrigin = '50% 100%'; el.style.transform = `translate(${dx}px, ${dy}px) scale(${sc})`;
+    el.getBoundingClientRect();
+    requestAnimationFrame(() => { el.style.transition = 'transform 650ms cubic-bezier(.2,.9,.2,1)'; el.style.transform = 'none'; setOpen(true); });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const close = () => {
+    const el = stage.current; setOpen(false);
+    if (el && from?.height && !reduced) {
+      const to = el.getBoundingClientRect(); const sc = from.height / to.height;
+      el.style.transition = 'transform 420ms cubic-bezier(.4,0,.2,1)';
+      el.style.transform = `translate(${from.left + from.width / 2 - (to.left + to.width / 2)}px, ${from.top + from.height - (to.top + to.height)}px) scale(${sc})`;
+      window.setTimeout(onClose, 380);
+    } else onClose();
+  };
+  useEffect(() => {
+    const onKey = (ev) => { if (ev.key === 'Escape') close(); else if (frames.length > 1 && ev.key === 'ArrowRight') setK((v) => (v + 1) % frames.length); else if (frames.length > 1 && ev.key === 'ArrowLeft') setK((v) => (v - 1 + frames.length) % frames.length); };
+    const before = document.body.style.overflow; document.body.style.overflow = 'hidden';
+    window.addEventListener('keydown', onKey);
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = before; };
+  }); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true" aria-label={title}>
+      <div onClick={close} className={cx('absolute inset-0 bg-black/70 backdrop-blur-[3px] transition-opacity duration-500', open ? 'opacity-100' : 'opacity-0')} />
+      <button type="button" onClick={close} aria-label={ar ? 'إغلاق' : 'Close'} className={cx('absolute end-3 top-3 z-20 grid h-10 w-10 place-items-center rounded-full bg-white/90 text-[#141414] shadow ring-1 ring-black/10 transition duration-500 hover:bg-white sm:end-6 sm:top-6', open ? 'opacity-100' : 'opacity-0')}><X className="h-5 w-5" /></button>
+      <div onClick={close} dir={ar ? 'rtl' : 'ltr'} className="relative mx-auto flex h-full w-full max-w-[1180px] flex-col items-center justify-center gap-3 px-4 py-4 md:flex-row md:gap-10 md:px-8">
+        <div className="flex h-[52vh] min-h-0 w-full flex-col items-center md:h-[88vh] md:w-auto md:flex-1">
+          <div ref={stage} onClick={(ev) => ev.stopPropagation()} className="relative flex min-h-0 w-full flex-1 items-end justify-center will-change-transform">
+            {many && <button type="button" onClick={onPrev} aria-label={ar ? 'اللوك اللي قبله' : 'Previous look'} className={cx('absolute start-0 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#141414] shadow ring-1 ring-black/10 transition duration-500 hover:bg-white', open ? 'opacity-100' : 'opacity-0')}><ArrowLeft className="h-4 w-4 rtl:rotate-180" /></button>}
+            {many && <button type="button" onClick={onNext} aria-label={ar ? 'اللوك اللي بعده' : 'Next look'} className={cx('absolute end-0 top-1/2 z-10 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-white/90 text-[#141414] shadow ring-1 ring-black/10 transition duration-500 hover:bg-white', open ? 'opacity-100' : 'opacity-0')}><ArrowRight className="h-4 w-4 rtl:rotate-180" /></button>}
+            {src ? <img key={src} src={src} alt={title} draggable={false} decoding="async" className="h-full w-full object-contain object-bottom" style={{ filter: 'drop-shadow(0 18px 28px rgba(0,0,0,.45))' }} /> : <span className="grid h-full w-full place-items-center text-7xl font-black text-white/20">{title.slice(0, 2)}</span>}
+            <span className="pointer-events-none absolute -bottom-2 left-1/2 h-5 w-[46%] -translate-x-1/2 rounded-[50%]" style={{ background: 'radial-gradient(closest-side, rgba(0,0,0,.55), transparent)' }} aria-hidden="true" />
+          </div>
+          {frames.length > 1 && (
+            <div onClick={(ev) => ev.stopPropagation()} className={cx('flex justify-center gap-2 pt-3 transition-opacity duration-500', open ? 'opacity-100' : 'opacity-0')}>
+              {frames.map((f, i) => <button key={f} type="button" onClick={() => setK(i)} aria-label={`${ar ? 'زاوية' : 'View'} ${i + 1}`} aria-pressed={i === k} className={cx('h-14 w-11 overflow-hidden rounded-lg bg-white/90 ring-1 transition', i === k ? 'ring-2 ring-white' : 'ring-white/30 opacity-70 hover:opacity-100')}><img src={f} alt="" draggable={false} className="h-full w-full object-contain object-bottom" /></button>)}
+            </div>
+          )}
+        </div>
+        <div onClick={(ev) => ev.stopPropagation()} className={cx('flex max-h-[40vh] min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white shadow-2xl transition duration-500 md:max-h-[84vh] md:w-[360px] md:flex-none', open ? 'translate-y-0 opacity-100 delay-200' : 'translate-y-6 opacity-0')}>
+          <div className="px-5 pb-2 pt-4"><p className="text-[11px] font-medium uppercase tracking-[.14em] text-[#8b8b86]">{ar ? 'في اللوك ده' : 'In this look'}</p><p className="mt-0.5 line-clamp-1 text-base font-semibold">{title}</p></div>
+          <ul className="min-h-0 flex-1 divide-y divide-[#ecebe6] overflow-y-auto border-y border-[#ecebe6]">
+            {picks.map((p) => {
+              const done = added.includes(p.id);
+              return (
+                <li key={p.id} className="flex items-center gap-3 px-5 py-2.5">
+                  <Link to={`/s/${p.store.slug}/p/${p.slug}`} onClick={onClose} className="block h-[60px] w-[60px] shrink-0 overflow-hidden rounded-xl bg-[#f3f3f0]"><SmartImage media={p.image} ratio="1 / 1" className="h-full w-full" sizes="60px" /></Link>
+                  <Link to={`/s/${p.store.slug}/p/${p.slug}`} onClick={onClose} className="min-w-0 flex-1">
+                    <p className="truncate text-[10px] font-medium uppercase tracking-[.12em] text-[#8b8b86]">{tr(p.store.name)}</p>
+                    <p className="mt-0.5 line-clamp-1 text-[13px] font-medium">{tr(p.name)}</p>
+                    <p className="text-[13px] text-[#4a4a46]">{formatMoney(p.price, lang)}</p>
+                  </Link>
+                  <button type="button" onClick={() => onAddOne(p)} aria-label={`${ar ? 'أضف' : 'Add'} ${tr(p.name)}`} className={cx('grid h-9 w-9 shrink-0 place-items-center rounded-full border transition', done ? 'border-[#141414] bg-[#141414] text-white' : 'border-black/15 hover:bg-black/5')}>{done ? <Check className="h-4 w-4" /> : <Plus className="h-4 w-4" />}</button>
+                </li>
+              );
+            })}
+          </ul>
+          <div className="px-5 pb-4 pt-3">
+            <div className="mb-2 flex items-end justify-between"><p className="text-[13px] font-semibold">{ar ? 'كمّل اللوك' : 'Complete the look'}</p><p className="text-[17px] font-semibold tabular-nums">{formatMoney(total, lang)}</p></div>
+            <button type="button" disabled={!picks.length} onClick={onAddAll} className="flex h-11 w-full items-center justify-between rounded-[6px] bg-[#141414] px-5 text-[13px] font-medium text-white transition hover:bg-black disabled:opacity-40"><span>{ar ? 'أضف اللوك كله للسلة' : 'Add full look to bag'}</span><ArrowRight className="h-4 w-4 rtl:rotate-180" /></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function LookCarousel({ entries, active, onChange, headingAs: Heading = 'h3', visible = 7 }) {
   const { lang, t, tr } = useI18n();
   const ar = lang === 'ar';
@@ -105,6 +189,8 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   const nudge = () => { setPlaying(false); clearTimeout(resumeTimer.current); if (!userPaused.current) resumeTimer.current = setTimeout(() => setPlaying(true), 9000); };
   useEffect(() => () => clearTimeout(resumeTimer.current), []);
   const [hover, setHover] = useState(false);
+  const [zoom, setZoom] = useState(null); // the full-screen view of the look in front
+  const moved = useRef(false); // a drag to turn the model must not open the full-screen view
   const [quick, setQuick] = useState(null); // { queue: [product], i }
   const [added, setAdded] = useState([]);
   const start = useRef(null);
@@ -137,24 +223,31 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
   const reduced = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   const manualTurn = useRef(false); // once the shopper turns the model himself, it stops turning on its own
+  const shareLook = () => {
+    const e = entries[active] || {};
+    const url = `${window.location.origin}/?look=${active + 1}`;
+    const text = `${ar ? 'شوف اللوك ده على Twist' : 'Check out this look on Twist'}${e.title ? ` - ${e.title}` : ''}`;
+    if (navigator.share) { navigator.share({ title: 'Twist', text, url }).catch(() => {}); return; }
+    window.open(`https://wa.me/?text=${encodeURIComponent(`${text}\n${url}`)}`, '_blank', 'noopener');
+  };
   const framesNow = framesOf(entries[active]); const mNow = framesNow.length; const hasBackNow = mNow > 1; const stepNow = hasBackNow ? 360 / mNow : 360;
   const viewNow = hasBackNow ? frameAt(turn, mNow) : 0;
   const flip = () => { manualTurn.current = true; nudge(); setTurn((d) => (Math.round(d / stepNow) + 1) * stepNow); };
   // a look that can be turned turns by itself: through every angle and back to the front, then the row moves on
   useEffect(() => {
-    if (!hasBackNow || !playing || hover || quick || reduced || !inView || manualTurn.current) return undefined;
+    if (!hasBackNow || !playing || hover || quick || zoom || reduced || !inView || manualTurn.current) return undefined;
     const ids = []; for (let k = 1; k <= mNow; k += 1) ids.push(setTimeout(() => setTurn(k * stepNow), 1300 * k));
     return () => ids.forEach(clearTimeout);
-  }, [active, hasBackNow, mNow, stepNow, playing, hover, quick, reduced, inView]);
+  }, [active, hasBackNow, mNow, stepNow, playing, hover, quick, zoom, reduced, inView]);
   useEffect(() => {
-    if (!playing || hover || quick || reduced || n < 2 || !inView) return undefined;
+    if (!playing || hover || quick || zoom || reduced || n < 2 || !inView) return undefined;
     let onVisible = null;
     const id = setTimeout(() => {
       if (!document.hidden) go(active + 1);
       else { onVisible = () => { if (!document.hidden) setTick((t) => t + 1); }; document.addEventListener('visibilitychange', onVisible); } // a background tab: wait until it is shown, do not give up
     }, hasBackNow ? (mNow + 1) * 1300 + 500 : 4500);
     return () => { clearTimeout(id); if (onVisible) document.removeEventListener('visibilitychange', onVisible); };
-  }, [playing, hover, quick, reduced, n, active, inView, hasBackNow, mNow, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [playing, hover, quick, zoom, reduced, n, active, inView, hasBackNow, mNow, tick]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const picks = (e?.looks || []).map((l) => l.items?.[l.pick || 0]).filter(Boolean);
   const total = Number.isFinite(e?.total) && e.total > 0 ? e.total : picks.reduce((s, p) => s + (p.price || 0), 0);
@@ -224,18 +317,18 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
             const scale = off === 0 ? 1 : a === 1 ? 0.87 : a === 2 ? 0.77 : 0.68;
             const fr = framesOf(x); const m = fr.length; const hasBack = off === 0 && m > 1; // only a look with a back photo can be turned
             const turnHandlers = hasBack ? {
-              onPointerDown: (ev) => { ev.stopPropagation(); manualTurn.current = true; drag.current = { x: ev.clientX, base: turn }; ev.currentTarget.setPointerCapture?.(ev.pointerId); setDragging(true); nudge(); },
-              onPointerMove: (ev) => { if (drag.current) setTurn(drag.current.base - (ev.clientX - drag.current.x) * (m <= 2 ? 1.3 : 360 / m / 60)); },
+              onPointerDown: (ev) => { ev.stopPropagation(); manualTurn.current = true; moved.current = false; drag.current = { x: ev.clientX, base: turn }; ev.currentTarget.setPointerCapture?.(ev.pointerId); setDragging(true); nudge(); },
+              onPointerMove: (ev) => { if (drag.current && Math.abs(ev.clientX - drag.current.x) > 6) moved.current = true; if (drag.current) setTurn(drag.current.base - (ev.clientX - drag.current.x) * (m <= 2 ? 1.3 : 360 / m / 60)); },
               onPointerUp: () => { if (!drag.current) return; drag.current = null; setDragging(false); setTurn((d) => Math.round(d / (360 / m)) * (360 / m)); },
               onPointerCancel: () => { drag.current = null; setDragging(false); setTurn((d) => Math.round(d / (360 / m)) * (360 / m)); },
             } : {};
             return (
               <button
                 key={`${x.audience || x.persona || 'look'}-${x.age || ''}-${x.occasion || ''}-${i}`} type="button" tabIndex={-1}
-                onClick={() => { if (off !== 0) { touch(); go(i); } }}
+                onClick={(ev) => { if (off !== 0) { touch(); go(i); } else if (!moved.current) { touch(); setZoom(ev.currentTarget.querySelector('img')?.getBoundingClientRect() || {}); } moved.current = false; }}
                 aria-label={x.title || x.occasion || t('lod.title')} aria-current={off === 0 ? 'true' : undefined} aria-hidden={far} data-off={off} {...turnHandlers}
                 className={cx('absolute bottom-[12%] h-[76%] aspect-[4/5] outline-none focus:outline-none focus-visible:outline-none [--step:var(--step-m)] mix-blend-multiply transition-[transform,filter,opacity,left] duration-[900ms] ease-[cubic-bezier(.22,1.15,.36,1)] motion-reduce:transition-none sm:bottom-[9%] sm:h-[80%] sm:[--step:var(--step-d)] lg:h-[82%]', far && 'pointer-events-none', off === 0 ? (hasBack ? 'cursor-grab touch-pan-y active:cursor-grabbing' : 'cursor-default') : 'cursor-pointer')}
-                style={{ left: `calc(50% + ${off} * var(--step))`, transform: `translateX(-50%) scale(${scale})`, transformOrigin: '50% 100%', filter: off === 0 ? 'drop-shadow(0 0 2px rgba(20,20,20,.28))' : a === 1 ? 'none' : `blur(${a === 2 ? 0.5 : 1.1}px)${a >= 3 ? ' drop-shadow(-5px 0 0 rgba(20,20,20,.06)) drop-shadow(5px 0 0 rgba(20,20,20,.06))' : ''}`, opacity: far ? 0 : off === 0 ? 1 : a === 1 ? 0.95 : a === 2 ? 0.8 : 0.6, zIndex: 10 - a }}
+                style={{ visibility: zoom && off === 0 ? 'hidden' : undefined, left: `calc(50% + ${off} * var(--step))`, transform: `translateX(-50%) scale(${scale})`, transformOrigin: '50% 100%', filter: off === 0 ? 'drop-shadow(0 0 2px rgba(20,20,20,.28))' : a === 1 ? 'none' : `blur(${a === 2 ? 0.5 : 1.1}px)${a >= 3 ? ' drop-shadow(-5px 0 0 rgba(20,20,20,.06)) drop-shadow(5px 0 0 rgba(20,20,20,.06))' : ''}`, opacity: far ? 0 : off === 0 ? 1 : a === 1 ? 0.95 : a === 2 ? 0.8 : 0.6, zIndex: 10 - a }}
               >
                 <span className="block h-full w-full" style={{ transform: `translateX(calc(var(--px, 0) * ${-14 * (1 + a * 0.55)}px))`, transition: 'transform .5s ease-out' }}>
                   <span className={cx('relative block h-full w-full', ready ? 'tlk-enter' : 'opacity-0')} style={{ animationDelay: `${120 + a * 90}ms` }}>
@@ -276,6 +369,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-1.5">
+            <button type="button" onClick={() => { touch(); shareLook(); }} aria-label={ar ? 'شارك اللوك على واتساب' : 'Share this look'} className="me-1 inline-flex h-8 items-center gap-1.5 rounded-full border border-black/15 bg-white/80 px-3 text-[12px] font-semibold text-[#141414] shadow-sm backdrop-blur transition hover:bg-white"><Share2 className="h-3.5 w-3.5" aria-hidden="true" />{ar ? 'شارك' : 'Share'}</button>
             {hasBackNow && (
               <button type="button" onClick={flip} aria-pressed={viewNow !== 0} className="me-1 inline-flex h-8 items-center gap-1.5 rounded-full border border-black/15 bg-white/80 px-3 text-[12px] font-semibold text-[#141414] shadow-sm backdrop-blur transition hover:bg-white">
                 <RotateCw className={cx('h-3.5 w-3.5 transition-transform duration-500', viewNow !== 0 && 'rotate-180')} aria-hidden="true" />
@@ -328,6 +422,7 @@ export default function LookCarousel({ entries, active, onChange, headingAs: Hea
           </button>
         </div>
       </aside>
+      {zoom && <LookModal entry={entries[active]} picks={picks} total={shownTotal} added={added} ar={ar} from={zoom} many={n > 1} onPrev={() => { setZoom({}); go(active - 1); }} onNext={() => { setZoom({}); go(active + 1); }} onClose={() => setZoom(null)} onAddOne={(p) => { setZoom(null); startAdd([p]); }} onAddAll={() => { setZoom(null); startAdd(picks); }} />}
       {quick && <QuickAddSheet slug={quick.queue[quick.i].store.slug} product={quick.queue[quick.i]} marketplace step={quick.queue.length > 1 ? `${quick.i + 1}/${quick.queue.length}` : ''} onAdded={nextAdd} onClose={() => setQuick(null)} />}
       </div>
     </section>
