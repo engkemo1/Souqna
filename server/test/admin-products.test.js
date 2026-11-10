@@ -184,8 +184,88 @@ test('admin products: detects unclear names, missing departments, department mis
   assert.equal(notifRes.status, 200);
   assert.equal(typeof notifRes.body.productsIssues, 'number');
 
+  // Test Smart Fix endpoint on a product missing department, description, and sizes
+  const pSmart = insert('products', {
+    store_id: s1,
+    slug: 'p-smart-test',
+    name_ar: 'فستان سهرة قطيفة استراس',
+    name_en: '',
+    description_ar: '',
+    price: 1200,
+    stock: 4,
+    department: null,
+    category_id: null,
+  });
+  const smartFixRes = await call('POST', `/admin/products/${pSmart}/smart-fix`, {
+    approve: true,
+  });
+  assert.equal(smartFixRes.status, 200);
+  assert.ok(smartFixRes.body.product.department, 'smart-fix should set department');
+  assert.ok(smartFixRes.body.product.description_ar.length >= 20, 'smart-fix should generate description_ar');
+  assert.ok(!(smartFixRes.body.product.sizes || []).length, 'smart-fix must NOT invent sizes unless explicitly selected');
+  assert.ok(!/عالي الجودة|أصلي|ناعمة|فاخرة/.test(smartFixRes.body.product.description_ar), 'generated description must not make quality claims');
+  assert.equal(smartFixRes.body.product.moderation.reviewStatus, 'approved');
+
   // Test DELETE /admin/products/:id
   const delRes = await call('DELETE', `/admin/products/${pUnclear}`);
   assert.equal(delRes.status, 200);
   assert.equal(delRes.body.deleted, true);
+
+  // Test moderation edge cases (nested abaya under hijab, tracksuit in men's store, sandal in classic shoes)
+  const { buildModerationContext, analyzeProduct } = await import('../src/lib/product-moderation.js');
+  const customDepts = [
+    { slug: 'women', name_ar: 'حريمي', parent_slug: null, active: 1 },
+    { slug: 'women_hijab', name_ar: 'ملابس محجبات', parent_slug: 'women', active: 1 },
+    { slug: 'women_hijab_abaya', name_ar: 'عبايات', parent_slug: 'women_hijab', active: 1 },
+    { slug: 'women_hijab_abaya_emb', name_ar: 'عبايات مطرزة', parent_slug: 'women_hijab_abaya', active: 1 },
+    { slug: 'men', name_ar: 'رجالي', parent_slug: null, active: 1 },
+    { slug: 'men_sports', name_ar: 'ملابس رياضية رجالي', parent_slug: 'men', active: 1 },
+    { slug: 'women_sports', name_ar: 'ملابس رياضية حريمي', parent_slug: 'women', active: 1 },
+    { slug: 'shoes_men', name_ar: 'أحذية رجالي', parent_slug: 'men', active: 1 },
+    { slug: 'shoes_men_classic', name_ar: 'أحذية كلاسيك', parent_slug: 'shoes_men', active: 1 },
+    { slug: 'shoes_men_sandals', name_ar: 'صنادل وشباشب رجالي', parent_slug: 'shoes_men', active: 1 },
+  ];
+  const modCtx = buildModerationContext(customDepts);
+
+  const abayaReport = analyzeProduct({
+    id: 258,
+    name_ar: 'عبايه قطيفه استراس',
+    department: 'women_hijab_abaya_emb',
+    store_departments: ['women'],
+    photo_count: 5,
+    primary_quality: 80,
+    description_ar: 'عباية قطيفة استراس شيك جداً',
+    variant_count: 3,
+    price: 1050,
+  }, modCtx);
+  assert.equal(abayaReport.hasMajorIssues, false);
+  assert.equal(abayaReport.suggestedDepartment, null);
+
+  const trackReport = analyzeProduct({
+    id: 255,
+    name_ar: 'تراك انديه مستورد',
+    department: null,
+    store_departments: ['men'],
+    photo_count: 3,
+    primary_quality: 80,
+    description_ar: 'تراك رياضي مستورد خامة عالية',
+    variant_count: 4,
+    price: 770,
+  }, modCtx);
+  assert.ok(trackReport.issueCodes.includes('no_department'));
+  assert.equal(trackReport.suggestedDepartment?.slug, 'men_sports');
+
+  const sandalReport = analyzeProduct({
+    id: 254,
+    name_ar: 'صندل ياتكي جلد طبيعي',
+    department: 'shoes_men_classic',
+    store_departments: ['men'],
+    photo_count: 4,
+    primary_quality: 80,
+    description_ar: 'صندل جلد طبيعي مريح',
+    variant_count: 5,
+    price: 660,
+  }, modCtx);
+  assert.ok(sandalReport.issueCodes.includes('dept_mismatch'));
+  assert.equal(sandalReport.suggestedDepartment?.slug, 'shoes_men_sandals');
 });

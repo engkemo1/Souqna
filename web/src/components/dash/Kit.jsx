@@ -86,7 +86,7 @@ export function FilterTabs({ value, onChange, options, className }) {
             className={cx('relative inline-flex h-10 shrink-0 items-center gap-2 rounded-full px-4 text-sm font-medium transition', active ? 'text-canvas' : 'bg-elevated text-fg ring-1 ring-inset ring-line hover:ring-line-strong')}>
             {active && <motion.span layoutId={`tabs-${options.length}`} className="absolute inset-0 rounded-full bg-fg" transition={{ type: 'spring', stiffness: 500, damping: 40 }} />}
             <span className="relative">{o.label}</span>
-            {o.count != null && <span className={cx('relative rounded-full px-1.5 text-xs tabular', active ? 'bg-white/20' : 'bg-fg/[0.06] text-muted')}>{o.count}</span>}
+            {o.count != null && <span className={cx('relative rounded-full px-1.5 text-xs font-bold tabular', active ? 'bg-white/25 text-canvas' : 'bg-fg/[0.1] text-fg')}>{o.count}</span>}
           </button>
         );
       })}

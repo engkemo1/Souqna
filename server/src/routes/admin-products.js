@@ -10,7 +10,8 @@ import { invalidateModaCatalogue } from '../lib/stylist.js';
 import { triggerReindex } from '../lib/visual.js';
 import { notifyPriceDrop, notifyBackInStock } from '../lib/buyers.js';
 import { notifyStore } from '../lib/push.js';
-import { serializeMedia, mediaMap, getMedia, deleteMedia } from '../lib/media.js';
+import { serializeMedia, mediaMap, getMedia, deleteMedia, readMediaFile, processImage, purgeMediaFiles, CANVAS_VERSION } from '../lib/media.js';
+import sharp from 'sharp';
 import { stockStatus } from '../lib/serialize.js';
 import { nowIso, clampInt } from '../lib/util.js';
 import { ISSUE_TYPES, ISSUE_CODES, buildModerationContext, analyzeProduct } from '../lib/product-moderation.js';
@@ -100,6 +101,7 @@ function serializeAdminProductRow(p, ctx, mod, mediaLookup) {
       suggestedDepartment: mod.suggestedDepartment,
       suggestedModa: mod.suggestedModa,
       suggestedAudience: mod.suggestedAudience,
+      smartFix: mod.smartFix,
     },
   };
 }
@@ -361,10 +363,11 @@ const adminPatchSchema = z.object({
   track_stock: z.boolean().optional(),
   status: z.enum(['active', 'draft', 'archived']).optional(),
   featured: z.boolean().optional(),
-  department: z.string().trim().max(40).nullable().optional(),
+  department: z.string().trim().max(80).nullable().optional(),
   category_id: z.union([z.coerce.number().int().positive(), z.null()]).optional(),
   audience: z.string().trim().max(20).nullable().optional(),
   moda_key: z.string().trim().max(80).nullable().optional(),
+  sizes: z.array(z.string().trim().min(1).max(30)).max(30).optional(),
   variants_stock: z.array(z.object({ id: z.coerce.number().int().positive(), stock: z.coerce.number().int().min(0).max(100000) })).max(200).optional(),
   remove_media_ids: z.array(z.coerce.number().int().positive()).max(30).optional(),
   primary_media_id: z.coerce.number().int().positive().nullable().optional(),
@@ -431,6 +434,7 @@ r.patch('/products/:id', h(async (req, res) => {
     if (body.featured !== undefined) patch.featured = body.featured ? 1 : 0;
     if (body.audience !== undefined) patch.audience = body.audience && AUDIENCE_KEYS.has(body.audience) ? body.audience : null;
     if (body.moda_key !== undefined) patch.moda_key = body.moda_key || null;
+    if (body.sizes !== undefined) patch.sizes_json = JSON.stringify(body.sizes);
 
     if (body.department !== undefined) {
       if (body.department) {
@@ -484,8 +488,9 @@ r.patch('/products/:id', h(async (req, res) => {
     if (body.review_status !== undefined) {
       patch.admin_review_status = body.review_status === 'pending' ? null : body.review_status;
       patch.admin_reviewed_at = body.review_status === 'pending' ? null : now;
-      if (body.review_status === 'approved' && body.admin_flags === undefined) {
-        patch.admin_flags_json = null;
+      if (body.review_status === 'approved') {
+        if (body.admin_flags === undefined) patch.admin_flags_json = null;
+        if (body.review_note === undefined) patch.admin_review_note = null;
       }
     }
     if (body.review_note !== undefined) {
@@ -517,7 +522,15 @@ r.patch('/products/:id', h(async (req, res) => {
   triggerReindex();
 
   const ctx = buildModerationContext();
-  const fullRow = q.get(`
+  const fullRow = loadSingleAdminProductRow(pid);
+  const mod = analyzeProduct(fullRow, ctx);
+  const mediaLookup = mediaMap(fullRow.primary_media_id ? [fullRow.primary_media_id] : []);
+
+  res.json({ product: serializeAdminProductRow(fullRow, ctx, mod, mediaLookup) });
+}));
+
+function loadSingleAdminProductRow(pid) {
+  return q.get(`
     SELECT p.*,
       s.slug AS store_slug, s.name_ar AS store_name, s.phone AS store_phone, s.whatsapp AS store_whatsapp, s.status AS store_status, s.departments AS store_departments,
       u.name AS owner_name,
@@ -533,26 +546,216 @@ r.patch('/products/:id', h(async (req, res) => {
     LEFT JOIN categories c ON c.id = p.category_id
     WHERE p.id = ?
   `, [pid]);
+}
+
+/**
+ * Applies deterministic Smart Fix proposals to a product row inside a transaction.
+ */
+function applySmartFixToProduct(pid, ctx, { selectedKeys = null, customFields = null, approve = true } = {}) {
+  const row = loadSingleAdminProductRow(pid);
+  if (!row) return false;
+  const mod = analyzeProduct(row, ctx);
+  const proposed = { ...(mod.smartFix?.fields || {}), ...(customFields || {}) };
+  const allow = selectedKeys ? new Set(selectedKeys) : null;
+  const shouldApply = (k) => proposed[k] !== undefined && (!allow || allow.has(k));
+
+  const now = nowIso();
+  const patch = { updated_at: now };
+  let changed = false;
+
+  if (shouldApply('name_ar') && proposed.name_ar && proposed.name_ar !== row.name_ar) {
+    patch.name_ar = proposed.name_ar;
+    if (!row.name_en || row.name_en === row.name_ar) patch.name_en = proposed.name_en || proposed.name_ar;
+    changed = true;
+  }
+  if (shouldApply('name_en') && proposed.name_en && proposed.name_en !== row.name_en) {
+    patch.name_en = proposed.name_en;
+    changed = true;
+  }
+  if (shouldApply('description_ar') && proposed.description_ar && proposed.description_ar !== row.description_ar) {
+    patch.description_ar = proposed.description_ar;
+    changed = true;
+  }
+  if (shouldApply('department') && proposed.department && proposed.department !== row.department) {
+    const assigned = assignStoreDepartmentAndCategory(row.store_id, proposed.department, row.category_id);
+    patch.department = assigned.department;
+    if (assigned.category_id) patch.category_id = assigned.category_id;
+    changed = true;
+  }
+  if (shouldApply('moda_key') && proposed.moda_key && proposed.moda_key !== row.moda_key) {
+    const item = ctx.K.items.get(proposed.moda_key);
+    if (item && !item.virtual) {
+      patch.moda_key = proposed.moda_key;
+      changed = true;
+    }
+  }
+  if (shouldApply('audience') && proposed.audience && AUDIENCE_KEYS.has(proposed.audience) && proposed.audience !== row.audience) {
+    patch.audience = proposed.audience;
+    changed = true;
+  }
+  if (shouldApply('sizes') && allow && allow.has('sizes') /* only when the admin explicitly picked them */ && Array.isArray(proposed.sizes) && proposed.sizes.length > 0 && Number(row.variant_count || 0) === 0) {
+    patch.sizes_json = JSON.stringify(proposed.sizes);
+    changed = true;
+  }
+
+  // Promote the highest-quality photo to primary if current primary photo is weak
+  const mediaList = q.all(`
+    SELECT pm.media_id, pm.is_primary, m.quality
+    FROM product_media pm JOIN media m ON m.id = pm.media_id
+    WHERE pm.product_id = ?
+    ORDER BY pm.is_primary DESC, pm.position ASC
+  `, [pid]);
+  if (mediaList.length > 1) {
+    const curPrim = mediaList[0];
+    const bestPhoto = [...mediaList].sort((a, b) => (b.quality || 0) - (a.quality || 0))[0];
+    if (bestPhoto && bestPhoto.media_id !== curPrim.media_id && (curPrim.quality || 0) < 60 && (bestPhoto.quality || 0) > (curPrim.quality || 0) + 10) {
+      q.run('UPDATE product_media SET is_primary = CASE WHEN media_id = ? THEN 1 ELSE 0 END WHERE product_id = ?', [bestPhoto.media_id, pid]);
+      changed = true;
+    }
+  }
+
+  if (approve) {
+    patch.admin_review_status = 'approved';
+    patch.admin_reviewed_at = now;
+    patch.admin_flags_json = null;
+    patch.admin_review_note = null;
+    changed = true;
+  }
+
+  if (changed) {
+    update('products', pid, patch);
+  }
+  return changed;
+}
+
+/**
+ * Enhances low-quality photos of a product using sharp (exposure, contrast, clarity) and updates quality score.
+ */
+async function enhanceProductPhotos(pid) {
+  const rows = q.all(`
+    SELECT m.* FROM product_media pm
+    JOIN media m ON m.id = pm.media_id
+    WHERE pm.product_id = ?
+    ORDER BY pm.is_primary DESC, pm.position ASC
+  `, [pid]);
+  let enhancedCount = 0;
+  for (const m of rows) {
+    if (m.quality != null && m.quality >= 75) continue;
+    let srcBuf = null;
+    try {
+      srcBuf = await readMediaFile(m, 'source.jpg');
+    } catch {
+      try { srcBuf = await readMediaFile(m, 'original.jpg'); } catch { srcBuf = null; }
+    }
+    if (srcBuf) {
+      try {
+        const boosted = await sharp(srcBuf)
+          .rotate()
+          .modulate({ brightness: 1.06, saturation: 1.05 })
+          .sharpen({ sigma: 0.85, m1: 0.4, m2: 1.2 })
+          .jpeg({ quality: 95, chromaSubsampling: '4:4:4' })
+          .toBuffer();
+        const fresh = await processImage(boosted, { storeId: m.store_id, kind: 'product', noCut: true });
+        const newQuality = fresh.quality ?? m.quality; // the measured score of the new file, never an invented one
+        tx(() => {
+          q.run(
+            'UPDATE media SET key=?, width=?, height=?, sizes=?, original_ext=?, bytes=?, color=?, lqip=?, remote=?, quality=?, canvas_v=? WHERE id=?',
+            [fresh.key, fresh.width, fresh.height, fresh.sizes, fresh.original_ext, fresh.bytes, fresh.color, fresh.lqip, fresh.remote, newQuality, CANVAS_VERSION, m.id],
+          );
+          q.run('DELETE FROM media WHERE id=?', [fresh.id]);
+        });
+        // the previous files are deliberately NOT purged: if the enhanced photo looks worse, the original is still in storage
+        console.log(`[enhance-photos] media ${m.id}: previous key ${m.key} kept in storage`);
+        enhancedCount++;
+        continue;
+      } catch {
+        // Fallback if file processing fails in restricted/synthetic environments
+      }
+    }
+    // no file or processing failed: the photo is left exactly as it was (its quality score is never raised without a real change)
+  }
+  return enhancedCount;
+}
+
+/**
+ * POST /api/admin/products/:id/smart-fix
+ * Applies deterministic Smart Fix (department, description, name cleanup, sizes, moda_key, audience, photo enhancement) to a single product.
+ */
+r.post('/products/:id/smart-fix', h(async (req, res) => {
+  const pid = Number(req.params.id);
+  const exists = q.get('SELECT id FROM products WHERE id = ?', [pid]);
+  if (!exists) throw new AppError(404, 'not_found', 'المنتج غير موجود.');
+
+  const body = z.object({
+    selected_keys: z.array(z.string()).optional(),
+    custom_fields: z.object({
+      name_ar: z.string().trim().min(2).max(120).optional(),
+      name_en: z.string().trim().max(120).optional(),
+      description_ar: z.string().trim().max(4000).optional(),
+      department: z.string().trim().max(80).optional(),
+      moda_key: z.string().trim().max(80).optional(),
+      audience: z.string().trim().max(20).optional(),
+      sizes: z.array(z.string().trim().min(1).max(30)).max(30).optional(),
+    }).optional(),
+    enhance_photos: z.boolean().optional(),
+    approve: z.boolean().optional(),
+  }).parse(req.body || {});
+
+  if (body.enhance_photos) {
+    await enhanceProductPhotos(pid);
+  }
+
+  const ctx = buildModerationContext();
+  tx(() => {
+    applySmartFixToProduct(pid, ctx, {
+      selectedKeys: body.selected_keys || null,
+      customFields: body.custom_fields || null,
+      approve: body.approve !== false,
+    });
+  });
+
+  invalidateModaCatalogue();
+  triggerReindex();
+
+  const fullRow = loadSingleAdminProductRow(pid);
   const mod = analyzeProduct(fullRow, ctx);
   const mediaLookup = mediaMap(fullRow.primary_media_id ? [fullRow.primary_media_id] : []);
-
   res.json({ product: serializeAdminProductRow(fullRow, ctx, mod, mediaLookup) });
 }));
 
 /**
- * POST /api/admin/products/bulk
- * Bulk moderation / department assignment / status updates across selected products.
+ * POST /api/admin/products/:id/enhance-photos
+ * Enhances low-quality photos of a product and returns the updated product.
  */
-r.post('/products/bulk', h((req, res) => {
+r.post('/products/:id/enhance-photos', h(async (req, res) => {
+  const pid = Number(req.params.id);
+  const exists = q.get('SELECT id FROM products WHERE id = ?', [pid]);
+  if (!exists) throw new AppError(404, 'not_found', 'المنتج غير موجود.');
+
+  const enhanced = await enhanceProductPhotos(pid);
+  const ctx = buildModerationContext();
+  const fullRow = loadSingleAdminProductRow(pid);
+  const mod = analyzeProduct(fullRow, ctx);
+  const mediaLookup = mediaMap(fullRow.primary_media_id ? [fullRow.primary_media_id] : []);
+  res.json({ enhanced, product: serializeAdminProductRow(fullRow, ctx, mod, mediaLookup) });
+}));
+
+/**
+ * POST /api/admin/products/bulk
+ * Bulk moderation / department assignment / status updates / smart-fix across selected products.
+ */
+r.post('/products/bulk', h(async (req, res) => {
   const body = z.object({
     ids: z.array(z.coerce.number().int().positive()).min(1).max(200),
-    action: z.enum(['approve', 'flag', 'set_status', 'set_department', 'apply_suggested_department']),
+    action: z.enum(['approve', 'flag', 'set_status', 'set_department', 'apply_suggested_department', 'smart_fix']),
     status: z.enum(['active', 'draft', 'archived']).optional(),
-    department: z.string().trim().max(40).optional(),
+    department: z.string().trim().max(80).optional(),
     flag: z.enum(ISSUE_CODES).optional(),
     note: z.string().trim().max(500).optional(),
+    approve: z.boolean().optional(),
   }).parse(req.body || {});
 
+  if (body.action === 'smart_fix' && body.ids.length > 20) throw new AppError(422, 'too_many', 'الإصلاح الذكي بيشتغل على ٢٠ منتج كحد أقصى في المرة، عشان تقدر تراجع النتيجة.');
   const ctx = buildModerationContext();
   const now = nowIso();
   let updated = 0;
@@ -562,7 +765,7 @@ r.post('/products/bulk', h((req, res) => {
       const p = q.get('SELECT p.*, s.departments AS store_departments FROM products p JOIN stores s ON s.id = p.store_id WHERE p.id = ?', [id]);
       if (!p) continue;
       if (body.action === 'approve') {
-        update('products', id, { admin_review_status: 'approved', admin_reviewed_at: now, admin_flags_json: null, updated_at: now });
+        update('products', id, { admin_review_status: 'approved', admin_reviewed_at: now, admin_flags_json: null, admin_review_note: null, updated_at: now });
         updated++;
       } else if (body.action === 'flag') {
         const curFlags = new Set(json(p.admin_flags_json, []));
@@ -594,6 +797,10 @@ r.post('/products/bulk', h((req, res) => {
             ...(mod.suggestedAudience && !p.audience ? { audience: mod.suggestedAudience } : {}),
             updated_at: now,
           });
+          updated++;
+        }
+      } else if (body.action === 'smart_fix') {
+        if (applySmartFixToProduct(id, ctx, { approve: body.approve === true })) {
           updated++;
         }
       }

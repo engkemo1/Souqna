@@ -941,8 +941,8 @@ r.put('/products/:id', h((req, res) => {
   if (!p) throw notFound('Product');
   const data = productSchema.parse(req.body);
   saveProduct(req.store.id, data, p);
-  if (req.adminStore) update('products', p.id, { admin_review_status: 'approved', admin_reviewed_at: nowIso(), admin_flags_json: null });
-  else if (p.admin_review_status) update('products', p.id, { admin_review_status: null });
+  if (req.adminStore) update('products', p.id, { admin_review_status: 'approved', admin_reviewed_at: nowIso(), admin_flags_json: null, admin_review_note: null });
+  else if (p.admin_review_status || p.admin_review_note || p.admin_flags_json) update('products', p.id, { admin_review_status: null, admin_review_note: null, admin_flags_json: null });
   invalidateModaCatalogue();
   matchProductPhotos(p.id);
   notifyPriceDrop(p.id, p.price, data.price);

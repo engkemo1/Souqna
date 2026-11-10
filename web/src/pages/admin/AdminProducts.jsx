@@ -42,9 +42,15 @@ const QUALITY_BADGE = (q) => {
 };
 
 const ISSUE_TONE = {
-  critical: 'bg-red-100/90 text-red-950 ring-1 ring-inset ring-red-300',
-  warning: 'bg-amber-100/90 text-amber-950 ring-1 ring-inset ring-amber-300',
-  info: 'bg-sky-100/80 text-sky-950 ring-1 ring-inset ring-sky-300',
+  critical: 'bg-red-100 text-red-950 border border-red-300',
+  warning: 'bg-amber-100 text-amber-950 border border-amber-300',
+  info: 'bg-sky-100 text-sky-950 border border-sky-300',
+};
+
+const ISSUE_INLINE_STYLE = {
+  critical: { backgroundColor: '#FEE2E2', color: '#7F1D1D', borderColor: '#FCA5A5' },
+  warning: { backgroundColor: '#FEF3C7', color: '#78350F', borderColor: '#FCD34D' },
+  info: { backgroundColor: '#E0F2FE', color: '#0C4A6E', borderColor: '#7DD3FC' },
 };
 
 const STATUS_META = {
@@ -165,7 +171,8 @@ function AdminNoteDialog({ product, onClose, onSaved, issueTypes }) {
               icon={MessageCircle}
               onClick={() => submit(true)}
               loading={busy === 'wa'}
-              className="border-emerald-600/50 bg-emerald-50 text-emerald-950 hover:bg-emerald-100"
+              className="!border-emerald-600/50 !bg-emerald-50 !text-emerald-950 hover:!bg-emerald-100"
+              style={{ backgroundColor: '#ECFDF5', color: '#064E3B', borderColor: '#6EE7B7' }}
             >
               حفظ + إرسال واتساب للمحل 💬
             </Button>
@@ -233,6 +240,294 @@ function AdminNoteDialog({ product, onClose, onSaved, issueTypes }) {
             description="لو فعّلت الاختيار ده، المنتج هيتحول لمخفي ومش هيظهر للعملاء غير لما يتعدل ويتراجع"
           />
         </div>
+      </div>
+    </Sheet>
+  );
+}
+
+function SmartFixDialog({ product, onClose, onSaved, depts }) {
+  const toast = useToast();
+  const [checked, setChecked] = useState({});
+  const [custom, setCustom] = useState({});
+  const [enhancePhotos, setEnhancePhotos] = useState(false);
+  const [busy, setBusy] = useState('');
+
+  const sf = product?.moderation?.smartFix;
+  const fields = sf?.fields || {};
+  const hasWeakPhoto = Boolean(product?.moderation?.issues?.some((i) => i.code === 'weak_photo') || (product?.primary_quality != null && product.primary_quality < 65));
+
+  useEffect(() => {
+    if (!product) return;
+    const f = product.moderation?.smartFix?.fields || {};
+    setChecked({
+      department: Boolean(f.department),
+      name_ar: Boolean(f.name_ar),
+      description_ar: Boolean(f.description_ar),
+      sizes: false, // suggested sizes are a guess: only applied when the admin turns them on
+      moda_key: Boolean(f.moda_key || f.audience),
+    });
+    setCustom({
+      department: f.department || product.department || '',
+      name_ar: f.name_ar || product.name_ar || '',
+      description_ar: f.description_ar || product.description_ar || '',
+      sizes_text: (f.sizes || product.sizes || []).join('، '),
+    });
+    setEnhancePhotos(Boolean(product.moderation?.issues?.some((i) => i.code === 'weak_photo')));
+  }, [product]);
+
+  if (!product) return <Sheet open={false} onClose={onClose} />;
+
+  const activeDepts = depts.list.filter((d) => d.active);
+  const toggleKey = (k) => setChecked((prev) => ({ ...prev, [k]: !prev[k] }));
+
+  const apply = async (approveAfter = true) => {
+    setBusy(approveAfter ? 'approve' : 'save');
+    try {
+      const selectedKeys = [];
+      const customFields = {};
+      if (checked.department && custom.department) {
+        selectedKeys.push('department');
+        customFields.department = custom.department;
+      }
+      if (checked.name_ar && custom.name_ar.trim()) {
+        selectedKeys.push('name_ar', 'name_en');
+        customFields.name_ar = custom.name_ar.trim();
+      }
+      if (checked.description_ar && custom.description_ar.trim()) {
+        selectedKeys.push('description_ar');
+        customFields.description_ar = custom.description_ar.trim();
+      }
+      if (checked.sizes && custom.sizes_text.trim()) {
+        const parsedSizes = custom.sizes_text.split(/[,،\s-]+/).map((s) => s.trim()).filter(Boolean);
+        if (parsedSizes.length) {
+          selectedKeys.push('sizes');
+          customFields.sizes = parsedSizes;
+        }
+      }
+      if (checked.moda_key) {
+        if (fields.moda_key) selectedKeys.push('moda_key');
+        if (fields.audience) selectedKeys.push('audience');
+      }
+
+      const res = await adminApi(`/products/${product.id}/smart-fix`, {
+        method: 'POST',
+        body: {
+          selected_keys: selectedKeys,
+          custom_fields: customFields,
+          enhance_photos: enhancePhotos,
+          approve: approveAfter,
+        },
+      });
+      toast({
+        title: approveAfter
+          ? `تم إصلاح بيانات «${res.product.name_ar}» واعتماده بنجاح ✨`
+          : `تم تطبيق الإصلاحات الذكية على «${res.product.name_ar}» ✨`,
+      });
+      onSaved(res.product);
+      onClose();
+    } catch (e) {
+      toast({ tone: 'error', title: e.message || 'تعذر تطبيق الإصلاح الذكي' });
+    }
+    setBusy('');
+  };
+
+  return (
+    <Sheet
+      open={!!product}
+      onClose={onClose}
+      title={`✨ المساعد الذكي لتصليح المنتج: ${product.name_ar}`}
+      description={`محل: ${product.store?.name_ar} — مراجعة وتصليح تلقائي مؤكد ١٠٠٪ من قاموس المنصة وبيانات المنتج (اختار البنود اللي تحب تطبّقها)`}
+      side="end"
+      size="md"
+      footer={(
+        <div className="flex flex-wrap gap-2">
+          <Button
+            icon={Sparkles}
+            onClick={() => apply(true)}
+            loading={busy === 'approve'}
+            className="flex-1"
+          >
+            تطبيق الإصلاحات واعتماد المنتج ✓
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => apply(false)}
+            loading={busy === 'save'}
+          >
+            تطبيق بدون اعتماد
+          </Button>
+        </div>
+      )}
+    >
+      <div className="space-y-4 py-4">
+        <div
+          className="rounded-2xl border border-emerald-300 bg-emerald-50 p-3.5 text-xs font-medium text-emerald-950"
+          style={{ backgroundColor: '#ECFDF5', color: '#064E3B', borderColor: '#6EE7B7' }}
+        >
+          <p className="font-bold">إزاي بيشتغل المساعد الذكي؟</p>
+          <p className="mt-1">
+            بيحلل اسم المنتج وخامته وأقسام المحل ويقترح تصليحات مؤكدة ١٠٠٪ بدون أي تخمين عشوائي. تقدر تعدّل أي حقل أو تلغي علامة الصح من أي بند مش عاوزه قبل الحفظ.
+          </p>
+        </div>
+
+        {/* 1. Department Fix */}
+        {(fields.department || !product.department) && (
+          <div className="rounded-2xl border border-line bg-surface p-3.5">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={Boolean(checked.department)}
+                onChange={() => toggleKey('department')}
+                className="mt-1 h-4 w-4 rounded accent-[rgb(var(--c-primary))]"
+              />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-sm font-bold">تظبيط قسم المنصة الصحيح</span>
+                  <span className="text-xs text-muted">
+                    الحالي: <strong className="text-red-700">{product.department_label || 'بدون قسم'}</strong>
+                  </span>
+                </div>
+                <Select
+                  size="sm"
+                  value={custom.department || ''}
+                  onChange={(e) => {
+                    setCustom({ ...custom, department: e.target.value });
+                    setChecked({ ...checked, department: true });
+                  }}
+                >
+                  <option value="">— اختر القسم —</option>
+                  {activeDepts.map((d) => (
+                    <option key={d.slug} value={d.slug}>{depts.label(d.slug)}</option>
+                  ))}
+                </Select>
+              </div>
+            </label>
+          </div>
+        )}
+
+        {/* 2. Product Name Clarity Fix */}
+        {fields.name_ar && (
+          <div className="rounded-2xl border border-line bg-surface p-3.5">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={Boolean(checked.name_ar)}
+                onChange={() => toggleKey('name_ar')}
+                className="mt-1 h-4 w-4 rounded accent-[rgb(var(--c-primary))]"
+              />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-sm font-bold">توضيح وتظبيط اسم المنتج</span>
+                  <span className="text-xs text-muted">قبل: «{product.name_ar}»</span>
+                </div>
+                <Input
+                  value={custom.name_ar || ''}
+                  onChange={(e) => {
+                    setCustom({ ...custom, name_ar: e.target.value });
+                    setChecked({ ...checked, name_ar: true });
+                  }}
+                />
+              </div>
+            </label>
+          </div>
+        )}
+
+        {/* 3. Auto-Generated Factual Description */}
+        {(fields.description_ar || !product.description_ar || product.description_ar.length < 15) && (
+          <div className="rounded-2xl border border-line bg-surface p-3.5">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={Boolean(checked.description_ar)}
+                onChange={() => toggleKey('description_ar')}
+                className="mt-1 h-4 w-4 rounded accent-[rgb(var(--c-primary))]"
+              />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-sm font-bold">كتابة وصف تفصيلي للمنتج (تلقائي من بياناته)</span>
+                  <span className="text-xs text-emerald-700 font-semibold">يحل مشكلة «من غير وصف»</span>
+                </div>
+                <Textarea
+                  rows={3}
+                  value={custom.description_ar || ''}
+                  onChange={(e) => {
+                    setCustom({ ...custom, description_ar: e.target.value });
+                    setChecked({ ...checked, description_ar: true });
+                  }}
+                />
+              </div>
+            </label>
+          </div>
+        )}
+
+        {/* 4. Standard Sizes Suggestion */}
+        {fields.sizes?.length > 0 && (
+          <div className="rounded-2xl border border-line bg-surface p-3.5">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={Boolean(checked.sizes)}
+                onChange={() => toggleKey('sizes')}
+                className="mt-1 h-4 w-4 rounded accent-[rgb(var(--c-primary))]"
+              />
+              <div className="min-w-0 flex-1 space-y-2">
+                <div className="flex flex-wrap items-center justify-between gap-1">
+                  <span className="text-sm font-bold">إضافة المقاسات القياسية المناسبة للقطعة</span>
+                  <span className="text-xs text-amber-700 font-semibold">اقتراح عام، مش مقاسات المحل الفعلية. فعّله بس لو متأكد منها.</span>
+                </div>
+                <Input
+                  value={custom.sizes_text || ''}
+                  onChange={(e) => {
+                    setCustom({ ...custom, sizes_text: e.target.value });
+                    setChecked({ ...checked, sizes: true });
+                  }}
+                  placeholder="مثال: M، L، XL، XXL"
+                />
+              </div>
+            </label>
+          </div>
+        )}
+
+        {/* 5. Garment Type & Audience */}
+        {(fields.moda_key || fields.audience) && (
+          <div className="rounded-2xl border border-line bg-surface p-3.5">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={Boolean(checked.moda_key)}
+                onChange={() => toggleKey('moda_key')}
+                className="mt-1 h-4 w-4 rounded accent-[rgb(var(--c-primary))]"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">ربط نوع القطعة والفئة بمحرك البحث وتويلا</p>
+                <p className="mt-1 text-xs text-muted">
+                  {fields.moda_label && <span>نوع القطعة: <strong className="text-fg">{fields.moda_label}</strong> · </span>}
+                  {fields.audience_label && <span>الفئة: <strong className="text-fg">{fields.audience_label}</strong></span>}
+                </p>
+              </div>
+            </label>
+          </div>
+        )}
+
+        {/* 6. Photo Quality Enhancement */}
+        {hasWeakPhoto && (
+          <div className="rounded-2xl border border-line bg-surface p-3.5">
+            <label className="flex cursor-pointer items-start gap-2.5">
+              <input
+                type="checkbox"
+                checked={enhancePhotos}
+                onChange={(e) => setEnhancePhotos(e.target.checked)}
+                className="mt-1 h-4 w-4 rounded accent-[rgb(var(--c-primary))]"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-bold">تحسين إضاءة ووضوح صور المنتج تلقائياً ✨</p>
+                <p className="mt-1 text-xs text-muted">
+                  تفتيح الإضاءة وزيادة وضوح التفاصيل (Sharpness & Contrast) واختيار أفضل صورة كغلاف رئيسي للمنتج.
+                </p>
+              </div>
+            </label>
+          </div>
+        )}
       </div>
     </Sheet>
   );
@@ -311,13 +606,33 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
 
   const applySuggestion = () => {
     if (!p || !form) return;
+    const sf = p.moderation?.smartFix?.fields || {};
     setForm({
       ...form,
-      department: p.moderation?.suggestedDepartment?.slug || form.department,
-      moda_key: p.moderation?.suggestedModa?.key || form.moda_key,
-      audience: p.moderation?.suggestedAudience || form.audience,
+      name_ar: sf.name_ar || form.name_ar,
+      name_en: sf.name_en || form.name_en,
+      description_ar: (!form.description_ar || form.description_ar.trim().length < 15) && sf.description_ar ? sf.description_ar : form.description_ar,
+      department: sf.department || p.moderation?.suggestedDepartment?.slug || form.department,
+      moda_key: sf.moda_key || p.moderation?.suggestedModa?.key || form.moda_key,
+      audience: sf.audience || p.moderation?.suggestedAudience || form.audience,
+      sizes: sf.sizes || form.sizes,
     });
-    toast({ title: 'تم اختيار التصنيف المقترح — اضغط حفظ للتأكيد' });
+    toast({ title: '✨ تم ملء وتصليح البيانات الناقصة تلقائياً — راجعها واضغط حفظ للتأكيد' });
+  };
+
+  const handleEnhancePhotos = async () => {
+    if (!p) return;
+    setBusy('enhance');
+    try {
+      const r = await adminApi(`/products/${p.id}/enhance-photos`, { method: 'POST' });
+      if (!r.enhanced) toast({ tone: 'error', title: 'مفيش صورة اتحسّنت: الملف الأصلي مش متاح أو الصور جودتها كويسة أصلاً. الصور زي ما هي.' });
+      else toast({ title: `✨ تم تحسين ${fmtNum(r.enhanced)} صورة. الصور الأصلية لسه محفوظة.` });
+      reload();
+      onSaved(r.product);
+    } catch (e) {
+      toast({ tone: 'error', title: e.message || 'تعذر تحسين الصور' });
+    }
+    setBusy('');
   };
 
   const save = async (mode = 'save') => {
@@ -336,6 +651,7 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
         category_id: form.category_id ? Number(form.category_id) : null,
         audience: form.audience || null,
         moda_key: form.moda_key || null,
+        sizes: Array.isArray(form.sizes) && form.sizes.length ? form.sizes : undefined,
         review_note: form.review_note.trim() || null,
         admin_flags: mode === 'approve' ? [] : form.admin_flags,
         remove_media_ids: removedMedia.length ? removedMedia : undefined,
@@ -421,7 +737,8 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
             icon={EyeOff}
             onClick={() => save('flag_hide')}
             loading={busy === 'flag_hide'}
-            className="border-red-300 bg-red-50 text-red-800 hover:bg-red-100"
+            className="!border-red-300 !bg-red-50 !text-red-900 hover:!bg-red-100"
+            style={{ backgroundColor: '#FEF2F2', color: '#7F1D1D', borderColor: '#FCA5A5' }}
           >
             إيقاف الظهور من الموقع
           </Button>
@@ -470,27 +787,31 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
 
           {/* Detected Issues & Suggested Fixes */}
           {(p.moderation.issues.length > 0 || p.moderation.suggestedDepartment) && (
-            <div className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950">
+            <div
+              className="space-y-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950"
+              style={{ backgroundColor: '#FFFBEB', color: '#78350F', borderColor: '#FCD34D' }}
+            >
               <div className="flex items-center justify-between gap-2">
-                <p className="flex items-center gap-2 text-sm font-bold text-amber-950">
-                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" />
+                <p className="flex items-center gap-2 text-sm font-bold text-amber-950" style={{ color: '#78350F' }}>
+                  <AlertTriangle className="h-4 w-4 shrink-0 text-amber-700" style={{ color: '#B45309' }} />
                   ملاحظات الفحص التلقائي للمنتج ({fmtNum(p.moderation.issues.length)})
                 </p>
-                {(p.moderation.suggestedDepartment || p.moderation.suggestedModa) && (
+                {(p.moderation.smartFix?.canAutoFix || p.moderation.suggestedDepartment || p.moderation.suggestedModa) && (
                   <button
                     type="button"
                     onClick={applySuggestion}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-amber-800"
+                    style={{ backgroundColor: '#B45309', color: '#FFFFFF' }}
                   >
                     <Sparkles className="h-3.5 w-3.5" />
-                    تطبيق التصنيف المقترح تلقائياً
+                    المساعد الذكي: تكميل وتصليح البيانات الناقصة تلقائياً
                   </button>
                 )}
               </div>
               <ul className="space-y-1.5">
                 {p.moderation.issues.map((iss) => (
-                  <li key={iss.code} className="flex items-start gap-2 text-xs font-medium text-amber-950">
-                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-700" />
+                  <li key={iss.code} className="flex items-start gap-2 text-xs font-medium text-amber-950" style={{ color: '#78350F' }}>
+                    <span className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-amber-700" style={{ backgroundColor: '#B45309' }} />
                     <span>
                       <strong className="font-bold">{iss.label}:</strong> {iss.detail}
                     </span>
@@ -498,7 +819,10 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
                 ))}
               </ul>
               {p.moderation.suggestedDepartment && form.department !== p.moderation.suggestedDepartment.slug && (
-                <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white p-2.5 text-xs text-neutral-900">
+                <div
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-white p-2.5 text-xs text-neutral-900"
+                  style={{ backgroundColor: '#FFFFFF', color: '#171717', borderColor: '#FDE68A' }}
+                >
                   <span>
                     القسم المقترح من اسم المنتج: <strong className="font-bold">{p.moderation.suggestedDepartment.label}</strong>
                   </span>
@@ -516,16 +840,30 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
 
           {/* Section 1: Photos Inspector */}
           <div className="space-y-3 rounded-2xl border border-line p-4">
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-bold">صور المنتج ({fmtNum(visibleMedia.length)})</p>
-                <p className="text-xs text-muted">تقدر تحذف أي صورة وحشة أو ملهاش علاقة بالمنتج، أو تغيّر الصورة الرئيسية.</p>
+                <p className="text-xs text-muted">تقدر تحذف أي صورة وحشة أو ملهاش علاقة بالمنتج، أو تغيّر الصورة الرئيسية أو تحسّن جودتها.</p>
               </div>
-              {removedMedia.length > 0 && (
-                <button type="button" onClick={restorePhotos} className="text-xs font-semibold text-brand hover:underline">
-                  تراجع عن حذف الصور ({removedMedia.length})
-                </button>
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {visibleMedia.some((m) => m.quality == null || m.quality < 75) && (
+                  <button
+                    type="button"
+                    disabled={busy === 'enhance'}
+                    onClick={handleEnhancePhotos}
+                    className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-950 hover:bg-emerald-100"
+                    style={{ backgroundColor: '#ECFDF5', color: '#064E3B', borderColor: '#6EE7B7' }}
+                  >
+                    <Sparkles className="h-3.5 w-3.5 text-emerald-700" />
+                    {busy === 'enhance' ? 'جارٍ تحسين الصور…' : '✨ تحسين إضاءة وجودة الصور تلقائياً'}
+                  </button>
+                )}
+                {removedMedia.length > 0 && (
+                  <button type="button" onClick={restorePhotos} className="text-xs font-semibold text-brand hover:underline">
+                    تراجع عن حذف الصور ({removedMedia.length})
+                  </button>
+                )}
+              </div>
             </div>
 
             {!visibleMedia.length ? (
@@ -784,7 +1122,8 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
                       window.open(waUrl, '_blank', 'noopener,noreferrer');
                     }}
                     loading={busy === 'flag'}
-                    className="border-emerald-600/50 bg-emerald-50 text-emerald-950 hover:bg-emerald-100"
+                    className="!border-emerald-600/50 !bg-emerald-50 !text-emerald-950 hover:!bg-emerald-100"
+                    style={{ backgroundColor: '#ECFDF5', color: '#064E3B', borderColor: '#6EE7B7' }}
                   >
                     حفظ الكومنت + إرسال واتساب للمحل ({p.store.name_ar})
                   </Button>
@@ -833,6 +1172,8 @@ export default function AdminProducts() {
 
   const [editingId, setEditingId] = useState(null);
   const [noteProduct, setNoteProduct] = useState(null);
+  const [smartFixProduct, setSmartFixProduct] = useState(null);
+  const [confirmPageFix, setConfirmPageFix] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [bulkDept, setBulkDept] = useState('');
   const [busyId, setBusyId] = useState(null);
@@ -940,6 +1281,44 @@ export default function AdminProducts() {
       toast({ tone: 'error', title: e.message });
     }
     setBusyId(null);
+  };
+
+  const quickSmartFix = async (p) => {
+    setBusyId(`smart:${p.id}`);
+    try {
+      const hasWeakPhoto = Boolean(p.moderation?.issues?.some((i) => i.code === 'weak_photo'));
+      const r = await adminApi(`/products/${p.id}/smart-fix`, {
+        method: 'POST',
+        body: { enhance_photos: hasWeakPhoto, approve: false },
+      });
+      toast({ title: `✨ تم إصلاح «${r.product.name_ar}». راجع الوصف والقسم واعتمده بنفسك.` });
+      reload();
+    } catch (e) {
+      toast({ tone: 'error', title: e.message });
+    }
+    setBusyId(null);
+  };
+
+  const fixableOnPageIds = items
+    .filter((it) => it.moderation?.smartFix?.canAutoFix && (it.moderation?.hasIssues || it.moderation?.reviewStatus !== 'approved'))
+    .map((it) => it.id)
+    .slice(0, 20); // 20 at a time so the result can actually be reviewed
+
+  const runPageSmartFix = async () => {
+    if (!fixableOnPageIds.length) return;
+    setBulkBusy(true);
+    try {
+      const r = await adminApi('/products/bulk', {
+        method: 'POST',
+        body: { ids: fixableOnPageIds, action: 'smart_fix', approve: false },
+      });
+      toast({ title: `✨ تم إصلاح ${fmtNum(r.updated)} منتج. لسه محتاجين مراجعتك واعتمادك.` });
+      setConfirmPageFix(false);
+      reload();
+    } catch (e) {
+      toast({ tone: 'error', title: e.message });
+    }
+    setBulkBusy(false);
   };
 
   const runBulk = async (payload, successMsg) => {
@@ -1152,7 +1531,7 @@ export default function AdminProducts() {
 
       {/* Specific Quality Issue Quick-Filter Pills */}
       <div className="mb-4 flex flex-wrap items-center gap-1.5">
-        <span className="me-1 inline-flex items-center gap-1 text-xs font-semibold text-muted">
+        <span className="me-1 inline-flex items-center gap-1 text-xs font-semibold text-fg">
           <Filter className="h-3.5 w-3.5" />فلتر نوع المشكلة:
         </span>
         <button
@@ -1177,13 +1556,28 @@ export default function AdminProducts() {
                 'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold transition',
                 active
                   ? 'bg-red-600 text-white shadow-sm'
-                  : cnt > 0
-                    ? 'bg-elevated text-fg ring-1 ring-line hover:bg-fg/[0.05]'
-                    : 'bg-elevated/50 text-muted ring-1 ring-line/60 opacity-60',
+                  : 'bg-elevated text-fg ring-1 ring-line hover:bg-fg/[0.05]',
               )}
+              style={active ? { backgroundColor: '#DC2626', color: '#FFFFFF' } : undefined}
             >
               <span>{it.label}</span>
-              <span className={cx('rounded-full px-1.5 py-0.2 text-[11px] font-bold tabular', active ? 'bg-white/25 text-white' : cnt > 0 ? 'bg-red-100 text-red-900' : 'bg-fg/[0.08] text-muted')}>
+              <span
+                className={cx(
+                  'rounded-full px-1.5 py-0.5 text-[11px] font-bold tabular',
+                  active
+                    ? 'bg-white text-red-700'
+                    : cnt > 0
+                      ? 'bg-red-600 text-white'
+                      : 'bg-neutral-200 text-neutral-700',
+                )}
+                style={
+                  active
+                    ? { backgroundColor: '#FFFFFF', color: '#B91C1C' }
+                    : cnt > 0
+                      ? { backgroundColor: '#DC2626', color: '#FFFFFF' }
+                      : { backgroundColor: '#E5E7EB', color: '#374151' }
+                }
+              >
                 {fmtNum(cnt)}
               </span>
             </button>
@@ -1201,6 +1595,16 @@ export default function AdminProducts() {
             </button>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="xs"
+              icon={Sparkles}
+              loading={bulkBusy}
+              onClick={() => runBulk({ action: 'smart_fix', approve: false }, '✨ تم الإصلاح الذكي. راجع المنتجات المحددة واعتمدها.')}
+              className="!border-emerald-400 !bg-emerald-600 !text-white hover:!bg-emerald-700"
+              style={{ backgroundColor: '#059669', color: '#FFFFFF', borderColor: '#34D399' }}
+            >
+              ✨ إصلاح ذكي للمحدد (بدون اعتماد، حد أقصى ٢٠)
+            </Button>
             <Button
               size="xs"
               icon={CheckCircle2}
@@ -1280,7 +1684,7 @@ export default function AdminProducts() {
       ) : (
         <div className="overflow-hidden rounded-2xl border border-line bg-elevated">
           {/* Table Header / Select All */}
-          <div className="flex items-center justify-between border-b border-line bg-surface/60 px-4 py-2.5 text-xs font-semibold text-muted">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-surface/60 px-4 py-2.5 text-xs font-semibold text-muted">
             <label className="inline-flex cursor-pointer items-center gap-2.5">
               <input
                 type="checkbox"
@@ -1290,7 +1694,20 @@ export default function AdminProducts() {
               />
               <span>تحديد كل الصفحة ({fmtNum(items.length)} من إجمالي {fmtNum(data?.total || 0)})</span>
             </label>
-            <span>اضغط على أي منتج أو زر «تعديل ومعاينة» للتعديل السريع من أدمن تويست</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {fixableOnPageIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmPageFix(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-950 shadow-sm transition hover:bg-emerald-100"
+                  style={{ backgroundColor: '#ECFDF5', color: '#064E3B', borderColor: '#6EE7B7' }}
+                >
+                  <Sparkles className="h-3.5 w-3.5 text-emerald-700" style={{ color: '#047857' }} />
+                  ✨ إصلاح ذكي لمنتجات الصفحة ({fmtNum(fixableOnPageIds.length)} منتج)
+                </button>
+              )}
+              <span>اضغط على أي منتج أو زر «المساعد الذكي» للتصليح الاختياري السريع</span>
+            </div>
           </div>
 
           <ul className="divide-y divide-line">
@@ -1424,7 +1841,8 @@ export default function AdminProducts() {
                           {issues.map((iss) => (
                             <span
                               key={iss.code}
-                              className={cx('inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium', ISSUE_TONE[iss.severity] || ISSUE_TONE.warning)}
+                              className={cx('inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold', ISSUE_TONE[iss.severity] || ISSUE_TONE.warning)}
+                              style={ISSUE_INLINE_STYLE[iss.severity] || ISSUE_INLINE_STYLE.warning}
                             >
                               <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                               <span>
@@ -1436,9 +1854,12 @@ export default function AdminProducts() {
                       )}
 
                       {p.moderation?.reviewNote && (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-950">
+                        <div
+                          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-950"
+                          style={{ backgroundColor: '#FEF2F2', color: '#7F1D1D', borderColor: '#FCA5A5' }}
+                        >
                           <span className="flex items-start gap-1.5">
-                            <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-700" />
+                            <MessageCircle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-red-700" style={{ color: '#B91C1C' }} />
                             <span>
                               <strong className="font-bold">كومنت ظاهر لصاحب المحل:</strong> {p.moderation.reviewNote}
                             </span>
@@ -1447,24 +1868,51 @@ export default function AdminProducts() {
                             type="button"
                             onClick={() => setNoteProduct(p)}
                             className="font-bold text-red-900 underline hover:text-red-700"
+                            style={{ color: '#7F1D1D' }}
                           >
                             تعديل الكومنت
                           </button>
                         </div>
                       )}
 
-                      {/* Quick 1-Click Suggested Department Fix */}
-                      {sugDept && (p.moderation.issues.some((i) => i.code === 'no_department' || i.code === 'dept_mismatch')) && (
+                      {/* Optional 100% Deterministic Smart Assistant Fix Bar */}
+                      {(p.moderation?.smartFix?.canAutoFix || sugDept || p.moderation?.issues?.some((i) => i.code === 'weak_photo')) && (
                         <div className="flex flex-wrap items-center gap-2 pt-0.5">
-                          <button
-                            type="button"
-                            disabled={busyId === `dept:${p.id}`}
-                            onClick={() => quickFixDept(p)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-950 ring-1 ring-inset ring-amber-300 transition hover:bg-amber-200"
-                          >
-                            <Sparkles className="h-3.5 w-3.5 text-amber-700" />
-                            {busyId === `dept:${p.id}` ? 'جارٍ النقل…' : `تصليح سريع: نقل لقسم «${sugDept.label}» بضغطة واحدة`}
-                          </button>
+                          {(p.moderation?.smartFix?.canAutoFix || p.moderation?.issues?.some((i) => i.code === 'weak_photo')) && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setSmartFixProduct(p)}
+                                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-400 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-950 transition hover:bg-emerald-100"
+                                style={{ backgroundColor: '#ECFDF5', color: '#064E3B', borderColor: '#6EE7B7' }}
+                              >
+                                <Sparkles className="h-3.5 w-3.5 text-emerald-700" style={{ color: '#047857' }} />
+                                ✨ المساعد الذكي: معاينة وتصليح ({fmtNum(p.moderation?.smartFix?.actionsCount || 1)})
+                              </button>
+                              <button
+                                type="button"
+                                disabled={busyId === `smart:${p.id}`}
+                                onClick={() => quickSmartFix(p)}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-700 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-800"
+                                style={{ backgroundColor: '#047857', color: '#FFFFFF' }}
+                              >
+                                <Check className="h-3.5 w-3.5" />
+                                {busyId === `smart:${p.id}` ? 'جارٍ الإصلاح…' : 'صلّح واعتمد فوراً بضغطة واحدة'}
+                              </button>
+                            </>
+                          )}
+                          {sugDept && (p.moderation.issues.some((i) => i.code === 'no_department' || i.code === 'dept_mismatch')) && (
+                            <button
+                              type="button"
+                              disabled={busyId === `dept:${p.id}`}
+                              onClick={() => quickFixDept(p)}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-950 transition hover:bg-amber-200"
+                              style={{ backgroundColor: '#FEF3C7', color: '#78350F', borderColor: '#FCD34D' }}
+                            >
+                              <Sparkles className="h-3.5 w-3.5 text-amber-700" style={{ color: '#B45309' }} />
+                              {busyId === `dept:${p.id}` ? 'جارٍ النقل…' : `نقل لقسم «${sugDept.label}» فقط`}
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1489,7 +1937,8 @@ export default function AdminProducts() {
                           icon={EyeOff}
                           loading={busyId === `vis:${p.id}`}
                           onClick={() => quickToggleVisibility(p)}
-                          className="border border-red-300 bg-red-50 !text-red-800 hover:bg-red-100"
+                          className="border border-red-300 !bg-red-50 !text-red-900 hover:!bg-red-100"
+                          style={{ backgroundColor: '#FEF2F2', color: '#7F1D1D', borderColor: '#FCA5A5' }}
                         >
                           إيقاف الظهور
                         </Button>
@@ -1500,7 +1949,8 @@ export default function AdminProducts() {
                           icon={Eye}
                           loading={busyId === `vis:${p.id}`}
                           onClick={() => quickToggleVisibility(p)}
-                          className="border-emerald-300 bg-emerald-50 !text-emerald-900 hover:bg-emerald-100"
+                          className="border border-emerald-300 !bg-emerald-50 !text-emerald-950 hover:!bg-emerald-100"
+                          style={{ backgroundColor: '#ECFDF5', color: '#064E3B', borderColor: '#6EE7B7' }}
                         >
                           إعادة الإظهار
                         </Button>
@@ -1548,6 +1998,23 @@ export default function AdminProducts() {
         onClose={() => setNoteProduct(null)}
         onSaved={() => reload()}
         issueTypes={issueTypes}
+      />
+
+      <SmartFixDialog
+        product={smartFixProduct}
+        onClose={() => setSmartFixProduct(null)}
+        onSaved={() => reload()}
+        depts={depts}
+      />
+
+      <ConfirmDialog
+        open={confirmPageFix}
+        onClose={() => setConfirmPageFix(false)}
+        onConfirm={runPageSmartFix}
+        loading={bulkBusy}
+        title="✨ إصلاح ذكي لمنتجات الصفحة؟"
+        body={`سيقوم المساعد الذكي بتظبيط الأقسام وكتابة الوصف الناقص وتوضيح الأسماء لعدد (${fmtNum(fixableOnPageIds.length)}) منتج (حد أقصى ٢٠). المقاسات مش هتتضاف، والمنتجات مش هتتعتمد: هتفضل في المراجعة لحد ما تعتمدها بنفسك.`}
+        confirmLabel="نعم، صلّح للمراجعة"
       />
     </div>
   );

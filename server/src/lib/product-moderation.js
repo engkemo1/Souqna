@@ -1,7 +1,7 @@
 import { decodeDepartments } from '@souqna/shared';
 import { q, json } from '../db/index.js';
 import { inferDepartment } from './departments.js';
-import { deriveDepartment, sizeKindFor } from './product-types.js';
+import { deriveDepartment, sizeKindFor, SIZE_KINDS, AUDIENCES } from './product-types.js';
 import { inferKey, inferGender } from './moda/products.js';
 import { loadKnowledge } from './moda/knowledge.js';
 
@@ -41,9 +41,9 @@ const MEN_STRICT_KEYS = new Set(['tuxedo', 'tie', 'bow_tie', 'pocket_square', 'w
 /**
  * Builds a fast in-memory lookup context for department hierarchy and product knowledge.
  */
-export function buildModerationContext() {
+export function buildModerationContext(customDeptRows = null) {
   const K = loadKnowledge();
-  const deptRows = q.all('SELECT id, slug, name_ar, name_en, parent_slug, active, visibility FROM departments');
+  const deptRows = customDeptRows || q.all('SELECT id, slug, name_ar, name_en, parent_slug, active, visibility FROM departments');
   const deptsBySlug = new Map(deptRows.map((d) => [d.slug, d]));
   const activeDeptSlugs = deptRows.filter((d) => d.active).map((d) => d.slug);
   // Leaf active departments preferred for suggestions
@@ -64,8 +64,23 @@ export function buildModerationContext() {
     const ch = chainOf(slug);
     return ch[ch.length - 1] || null;
   };
+  const deptGender = (slug) => {
+    if (!slug) return null;
+    const ch = chainOf(slug);
+    const text = normAr(ch.map((s) => `${s} ${deptsBySlug.get(s)?.name_ar || ''} ${deptsBySlug.get(s)?.name_en || ''}`).join(' '));
+    if (/\b(اطفال|ولادي|بناتي|رضع|مواليد|بيبي|kids|boys|girls|baby)\b/.test(text) || ch.some((s) => s.startsWith('kids') || s.includes('_kids'))) return 'kids';
+    if (/\b(رجالي|رجال|شبابي|men|mens)\b/.test(text) || ch.some((s) => s === 'men' || s.startsWith('men_') || s.endsWith('_men'))) return 'men';
+    if (/\b(حريمي|نسائي|محجبات|طرح|عبايات|فساتين|لانجيري|مكياج|women|modest|hijab|abaya)\b/.test(text) || ch.some((s) => s === 'women' || s.startsWith('women_') || s.endsWith('_women') || s === 'modest' || s.startsWith('modest_') || s.startsWith('hijab'))) return 'women';
+    return null;
+  };
+  const expandStoreSlugs = (slugs) => {
+    const base = new Set(slugs);
+    if (!base.size) return [];
+    const expanded = candidateSlugs.filter((s) => chainOf(s).some((anc) => base.has(anc)));
+    return expanded.length ? expanded : [...base].filter((s) => deptsBySlug.get(s)?.active);
+  };
 
-  return { K, deptsBySlug, activeDeptSlugs, candidateSlugs, chainOf, labelOf, rootOf };
+  return { K, deptsBySlug, activeDeptSlugs, leafActiveDeptSlugs, candidateSlugs, chainOf, labelOf, rootOf, deptGender, expandStoreSlugs };
 }
 
 function checkUnclearName(nameAr, nameEn, inferredKey) {
@@ -126,9 +141,10 @@ function detectDeptMismatch(p, ctx, inferredKey, inferredGender, suggestedDeptSl
   const hasExplicitWomen = /\b(حريمي|نسائي|للنساء|مدامات|women|ladies)\b/i.test(nameNorm) && !/\b(رجالي|ولادي|اطفال)\b/i.test(nameNorm);
   const hasExplicitKids = /\b(اطفال|طفل|ولادي|بناتي|بيبي|حديثي الولاده|كيدز|kids|baby|boys|girls)\b/i.test(nameNorm);
 
-  const deptIsWomen = root === 'women' || chain.some((s) => s.startsWith('women') || s === 'shoes_women' || s === 'maternity');
-  const deptIsMen = root === 'men' || chain.some((s) => s.startsWith('men') || s === 'shoes_men');
-  const deptIsKids = root === 'kids' || chain.some((s) => s.startsWith('kids') || s === 'shoes_kids');
+  const dg = ctx.deptGender(slug);
+  const deptIsWomen = dg === 'women' || root === 'women' || chain.some((s) => s.startsWith('women') || s === 'shoes_women' || s === 'maternity');
+  const deptIsMen = dg === 'men' || root === 'men' || chain.some((s) => s.startsWith('men') || s === 'shoes_men');
+  const deptIsKids = dg === 'kids' || root === 'kids' || chain.some((s) => s.startsWith('kids') || s === 'shoes_kids');
 
   if ((hasExplicitMen || MEN_STRICT_KEYS.has(inferredKey)) && deptIsWomen) {
     return `المنتج رجالي («${item?.ar || p.name_ar}») لكنه محطوط في قسم حريمي «${dept.name_ar}»`;
@@ -144,13 +160,14 @@ function detectDeptMismatch(p, ctx, inferredKey, inferredGender, suggestedDeptSl
   }
 
   // 3) Check garment family vs department branch conflict
-  const deptIsShoes = root === 'shoes' || chainStr.includes('shoes');
-  const deptIsBags = chainStr.includes('bags');
-  const deptIsDresses = chainStr.includes('dress');
-  const deptIsPants = chainStr.includes('pants') || chainStr.includes('denim');
+  const chainArNorm = normAr(chain.map((s) => ctx.deptsBySlug.get(s)?.name_ar || '').join(' '));
+  const deptIsShoes = root === 'shoes' || chainStr.includes('shoes') || /(احذيه|حذاء|جزم|كوتشي|صندل|صنادل|شباشب)/.test(chainArNorm);
+  const deptIsBags = chainStr.includes('bags') || /(شنط|حقائب)/.test(chainArNorm);
+  const deptIsDresses = chainStr.includes('dress') || /فساتين/.test(chainArNorm);
+  const deptIsPants = chainStr.includes('pants') || chainStr.includes('denim') || /(بناطيل|جينز)/.test(chainArNorm);
   const deptIsTops = chainStr.includes('tops');
-  const deptIsAbaya = chainStr.includes('abaya');
-  const deptIsHijab = chainStr.includes('hijab');
+  const deptIsAbaya = chainStr.includes('abaya') || /عباي/.test(chainArNorm);
+  const deptIsHijab = (chainStr.includes('hijab') || /(طرح|ايشارب)/.test(chainArNorm)) && !deptIsAbaya;
   const deptIsSuits = chainStr.includes('suit');
   const deptIsUnderwear = chainStr.includes('underwear');
   const deptIsBeauty = root === 'perfume_makeup' || root === 'care';
@@ -158,6 +175,19 @@ function detectDeptMismatch(p, ctx, inferredKey, inferredGender, suggestedDeptSl
   if (family === 'shoes') {
     if (!deptIsShoes && !chainStr.includes('sport')) {
       return `المنتج حذاء/كوتشي («${item?.ar || p.name_ar}») لكنه محطوط في قسم «${dept.name_ar}»`;
+    }
+    const deptNameNorm = normAr(dept.name_ar || '');
+    if ((inferredKey === 'sandals' || inferredKey === 'slippers') && /(كلاسيك|رسمي|كوتش|رياض|بوت|كعب)/.test(deptNameNorm)) {
+      return `المنتج «${item?.ar || p.name_ar}» لكنه محطوط في قسم «${dept.name_ar}»`;
+    }
+    if ((inferredKey === 'sneakers' || inferredKey === 'sport_shoes') && /(كلاسيك|رسمي|صندل|صنادل|شبشب|شباشب|بوت|كعب)/.test(deptNameNorm)) {
+      return `المنتج «${item?.ar || p.name_ar}» لكنه محطوط في قسم «${dept.name_ar}»`;
+    }
+    if ((inferredKey === 'formal_shoes' || inferredKey === 'loafers') && /(صندل|صنادل|شبشب|شباشب|كوتش|رياض|بوت|كعب)/.test(deptNameNorm)) {
+      return `المنتج «${item?.ar || p.name_ar}» لكنه محطوط في قسم «${dept.name_ar}»`;
+    }
+    if (inferredKey === 'boots' && /(صندل|صنادل|شبشب|شباشب|كوتش|رياض|كلاسيك)/.test(deptNameNorm)) {
+      return `المنتج «${item?.ar || p.name_ar}» لكنه محطوط في قسم «${dept.name_ar}»`;
     }
   } else if (deptIsShoes && family && family !== 'shoes') {
     return `المنتج «${item?.ar || p.name_ar}» محطوط في قسم الأحذية «${dept.name_ar}»`;
@@ -227,29 +257,315 @@ function detectDeptMismatch(p, ctx, inferredKey, inferredGender, suggestedDeptSl
   return null;
 }
 
+function matchCustomSubDepartment(nameText, effectiveKey, candidates, ctx) {
+  const tokens = normAr(`${nameText} ${effectiveKey ? (ctx.K.items.get(effectiveKey)?.ar || '') : ''}`)
+    .split(/\s+/)
+    .filter((w) => w.length >= 3 && !FILLER_WORDS.has(w) && !['رجالي', 'حريمي', 'نسائي', 'اطفال', 'ولادي', 'بناتي'].includes(w));
+  if (!tokens.length) return null;
+  let best = null;
+  for (const slug of candidates) {
+    const d = ctx.deptsBySlug.get(slug);
+    if (!d?.active || !d.parent_slug) continue;
+    const dNorm = normAr(d.name_ar || '');
+    let hits = 0;
+    for (const tok of tokens) {
+      const stem = tok.replace(/^ال/, '');
+      if (stem.length >= 3 && (dNorm.includes(stem) || (stem === 'صندل' && dNorm.includes('صنادل')) || (stem === 'شبشب' && dNorm.includes('شباشب')) || (stem === 'عبايه' && dNorm.includes('عبايات')) || (stem === 'فستان' && dNorm.includes('فساتين')) || (stem === 'تراك' && /(رياض|جيم|تراك|ترينج)/.test(dNorm)))) {
+        hits++;
+      }
+    }
+    if (hits > 0) {
+      const depth = ctx.chainOf(slug).length;
+      const score = hits * 10 + depth;
+      if (!best || score > best.score) best = { slug, score };
+    }
+  }
+  return best?.slug || null;
+}
+
+function inferKeyFromDepartment(deptSlug, categoryName, ctx) {
+  const ch = deptSlug ? ctx.chainOf(deptSlug) : [];
+  const text = normAr(`${ch.join(' ')} ${ch.map((s) => ctx.deptsBySlug.get(s)?.name_ar || '').join(' ')} ${categoryName || ''}`);
+  if (!text) return null;
+  if (/(عباي|abaya)/.test(text)) return 'abaya';
+  if (/(طرح|ايشارب|اسكارف)/.test(text)) return 'tarha';
+  if (/(زفاف|عروسه|wedding_dress)/.test(text)) return 'dress_bridal';
+  if (/(سهره|سواريه|خطوبه|soiree)/.test(text)) return 'dress_evening';
+  if (/(فساتين|فستان|dress)/.test(text)) return 'dress_casual';
+  if (/(جينز|دنيم|denim)/.test(text)) return 'jeans';
+  if (/(جيبات|جيبه|skirt)/.test(text)) return 'skirt';
+  if (/(بناطيل|بنطلون|pants)/.test(text)) return 'trousers';
+  if (/(بدل|بدله|suits)/.test(text)) return 'suit';
+  if (/(جلابيه|عبايات رجالي|jalabiya)/.test(text)) return 'jalabiya';
+  if (/(صنادل|صندل|شباشب|شبشب|sandal)/.test(text)) return 'sandals';
+  if (/(بوت|هاف بوت|boot)/.test(text)) return 'boots';
+  if (/(كوتش|سنيكر|sneaker)/.test(text)) return 'sneakers';
+  if (/(كلاسيك|رسمي|classic)/.test(text) && /(احذيه|حذاء|shoes)/.test(text)) return 'formal_shoes';
+  if (/(شنط|حقيبه|حقائب|bags)/.test(text)) return 'handbag';
+  if (/(بيجام|لانجيري|ملابس داخليه|sleep|underwear)/.test(text)) return 'sleepwear';
+  if (/(رياض|ترينج|تراك|جيم|sport)/.test(text)) return 'tracksuit';
+  return null;
+}
+
+const AUDIENCE_AR_LABEL = new Map(AUDIENCES.map((a) => [a.key, a.ar]));
+
+const DEFAULT_SIZES_BY_KIND = {
+  letters: ['M', 'L', 'XL', 'XXL'],
+  length: ['L', 'XL', 'XXL', '3XL'],
+  waist_men: ['30', '32', '34', '36', '38'],
+  waist_women: ['36', '38', '40', '42', '44'],
+  suit: ['48', '50', '52', '54', '56'],
+  shoes_men: ['40', '41', '42', '43', '44', '45'],
+  shoes_women: ['37', '38', '39', '40', '41'],
+  shoes_kids: ['26', '28', '30', '32', '34'],
+  kids: ['4Y', '6Y', '8Y', '10Y', '12Y'],
+  belt: ['95', '100', '105', '110'],
+  free: ['Free size'],
+  none: [],
+};
+
+const FABRIC_PHRASES = [
+  { re: /قطيفه/, ar: 'بخامة قطيفة', en: 'Velvet' },
+  { re: /جلد طبيعي/, ar: 'بخامة جلد طبيعي', en: 'Genuine Leather' },
+  { re: /\bجلد\b/, ar: 'بخامة جلد', en: 'Leather' },
+  { re: /قطن/, ar: 'بخامة قطن', en: 'Cotton' },
+  { re: /كتان/, ar: 'بخامة كتان', en: 'Linen' },
+  { re: /ستان|ساتان/, ar: 'بخامة ستان', en: 'Satin' },
+  { re: /شيفون/, ar: 'بخامة شيفون', en: 'Chiffon' },
+  { re: /كريب/, ar: 'بخامة كريب', en: 'Crepe' },
+  { re: /جينز|دنيم/, ar: 'بخامة جينز', en: 'Denim' },
+  { re: /ميلتون/, ar: 'بخامة ميلتون', en: 'Melton' },
+  { re: /صوف|تريكو/, ar: 'بخامة تريكو', en: 'Knitwear' },
+  { re: /حرير/, ar: 'بخامة حرير', en: 'Silk' },
+  { re: /ليكرا/, ar: 'بخامة ليكرا', en: 'Stretch' },
+];
+
+const FEATURE_PHRASES = [
+  { re: /استراس/, ar: 'مزينة بالاستراس', en: 'Rhinestone' },
+  { re: /مطرز|تطريز/, ar: 'مطرزة', en: 'Embroidered' },
+  { re: /فرنساوي/, ar: 'خامة فرنساوي', en: 'French Fabric' },
+  { re: /تركي/, ar: 'موديل تركي', en: 'Turkish Style' },
+  { re: /مستورد/, ar: 'خامة مستوردة', en: 'Imported' },
+  { re: /مبطن/, ar: 'مبطن', en: 'Lined' },
+  { re: /اوفر\s*سايز|oversize/i, ar: 'بقصة أوفر سايز', en: 'Oversized' },
+  { re: /(?:^|\s)طبي(?:\s|$)/, ar: 'بنعل طبي', en: 'Comfort Sole' },
+];
+
+const FAMILY_CLOSING_AR = {
+  shoes: 'تصميم مريح للقدم مع نعل عملي متين مناسب للمشي والاستخدام اليومي.',
+  sport: 'تصميم عملي يمنحك حرية الحركة والراحة في الرياضة والخروجات الكاجوال.',
+  modest: 'قصة مريحة وأنيقة بتقفيل متقن مناسبة للخروجات والمناسبات.',
+  dresses: 'تصميم أنيق يبرز جمال الإطلالة ومناسب للمناسبات والخروجات المميزة.',
+  suiting: 'قصة كلاسيكية متقنة تمنحك إطلالة رسمية أنيقة ومميزة.',
+  bags: 'تصميم عملي وأنيق بتقسيم مريح لحمل احتياجاتك اليومية.',
+  outerwear: 'تصميم أنيق يمنحك الدفء والراحة مع تقفيل عالي الجودة.',
+  bottoms: 'قصة مريحة ومضبوطة في اللبس مع خامة عملية تتحمل الاستخدام اليومي.',
+  tops: 'قصة مريحة وعملية مناسبة للتنسيق في الإطلالات اليومية والخروجات.',
+};
+
 /**
- * Analyzes a single product row and returns its quality/moderation report.
+ * Generates a 100% deterministic, factual Smart Fix proposal for a product.
+ * Only proposes changes grounded in the product's actual title, department, store profile, and knowledge base.
  */
+export function buildSmartFixProposal(p, ctx, analysis) {
+  const {
+    inferredKey,
+    deptInferredKey,
+    effectiveKey,
+    effectiveGender,
+    missingDept,
+    mismatchReason,
+    suggestedDepartment,
+    nameProblem,
+    descLen,
+    needsSizes,
+    sizeKind,
+    sizes,
+  } = analysis;
+
+  const item = effectiveKey ? ctx.K.items.get(effectiveKey) : null;
+  const rawNameAr = String(p.name_ar || '').trim();
+  const rawNameEn = String(p.name_en || '').trim();
+  const normTitle = normAr(rawNameAr);
+
+  const audAr = effectiveGender === 'women'
+    ? 'حريمي'
+    : effectiveGender === 'men'
+      ? 'رجالي'
+      : effectiveGender === 'boys'
+        ? 'ولادي'
+        : effectiveGender === 'girls'
+          ? 'بناتي'
+          : effectiveGender === 'kids'
+            ? 'أطفال'
+            : '';
+
+  const fields = {};
+  const summary = [];
+
+  // 1) Department fix (if missing or mismatched and a confident suggestion exists)
+  if ((missingDept || mismatchReason) && suggestedDepartment?.slug) {
+    fields.department = suggestedDepartment.slug;
+    fields.department_label = suggestedDepartment.label;
+    summary.push(`تحديد القسم الصحيح: «${suggestedDepartment.label}»`);
+  }
+
+  // 2) Moda key & audience enrichment (helps search & Twayila)
+  if (effectiveKey && !item?.virtual && effectiveKey !== p.moda_key) {
+    fields.moda_key = effectiveKey;
+    fields.moda_label = item?.ar || effectiveKey;
+    summary.push(`تحديد نوع القطعة: «${item?.ar || effectiveKey}»`);
+  }
+  if (effectiveGender && effectiveGender !== 'unisex' && effectiveGender !== p.audience) {
+    fields.audience = effectiveGender;
+    fields.audience_label = AUDIENCE_AR_LABEL.get(effectiveGender) || effectiveGender;
+  }
+
+  // 3) Name cleanup & garment noun completion (when name is unclear or missing garment noun)
+  const cleanRawAr = rawNameAr
+    .replace(/[_#*~|+=<>]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  const pieceAr = item?.ar ? item.ar.split('/')[0].trim() : '';
+  const missingPieceInTitle = !inferredKey && Boolean(deptInferredKey && pieceAr && !normTitle.includes(normAr(pieceAr)));
+
+  if (nameProblem || missingPieceInTitle || cleanRawAr !== rawNameAr) {
+    let nextNameAr = cleanRawAr;
+    // Strip test words if any
+    nextNameAr = nextNameAr.replace(/\b(تست|تجربه|تجربة|test)\b/gi, '').replace(/\s{2,}/g, ' ').trim();
+
+    if (pieceAr && !normAr(nextNameAr).includes(normAr(pieceAr))) {
+      nextNameAr = nextNameAr ? `${pieceAr} ${nextNameAr}` : `${pieceAr}${audAr ? ` ${audAr}` : ''}`;
+    }
+    // If still a single short word, append audience or department leaf name
+    if (nextNameAr.split(/\s+/).filter(Boolean).length < 2) {
+      const deptLeaf = (fields.department ? ctx.deptsBySlug.get(fields.department) : ctx.deptsBySlug.get(p.department))?.name_ar || '';
+      if (audAr && !normAr(nextNameAr).includes(normAr(audAr))) {
+        nextNameAr = `${nextNameAr} ${audAr}`.trim();
+      } else if (deptLeaf && !normAr(nextNameAr).includes(normAr(deptLeaf))) {
+        nextNameAr = `${nextNameAr} - ${deptLeaf}`.trim();
+      } else {
+        nextNameAr = `${nextNameAr} موديل مميز`.trim();
+      }
+    }
+    if (nextNameAr && nextNameAr !== rawNameAr && nextNameAr.length >= 5) {
+      fields.name_ar = nextNameAr;
+      summary.push(`توضيح اسم المنتج: «${nextNameAr}»`);
+    }
+  }
+
+  // Also generate clean English title if missing or identical to Arabic
+  const finalNameAr = fields.name_ar || rawNameAr;
+  const hasArabicInEn = /[\u0600-\u06FF]/.test(rawNameEn);
+  if ((!rawNameEn || hasArabicInEn || fields.name_ar) && item?.en) {
+    const audEn = effectiveGender === 'women'
+      ? "Women's"
+      : effectiveGender === 'men'
+        ? "Men's"
+        : ['kids', 'boys', 'girls'].includes(effectiveGender)
+          ? "Kids'"
+          : '';
+    const normFull = normAr(finalNameAr);
+    const fabEn = FABRIC_PHRASES.find((f) => f.re.test(normFull))?.en || '';
+    const featEn = FEATURE_PHRASES.find((f) => f.re.test(normFull))?.en || '';
+    const partsEn = [audEn, featEn, fabEn, item.en].filter(Boolean);
+    const builtEn = [...new Set(partsEn)].join(' ');
+    if (builtEn && builtEn !== rawNameEn) {
+      fields.name_en = builtEn;
+    }
+  }
+
+  // 4) Standard Sizes suggestion when missing
+  const effectiveSizes = Array.isArray(sizes) && sizes.length > 0 ? sizes : null;
+  if (needsSizes) {
+    const defaultSizes = DEFAULT_SIZES_BY_KIND[sizeKind] || DEFAULT_SIZES_BY_KIND.letters;
+    if (defaultSizes.length > 0) {
+      fields.sizes = defaultSizes;
+      summary.push(`إضافة المقاسات القياسية المناسبة: (${defaultSizes.join(' - ')})`);
+    }
+  }
+
+  // 5) Factual Arabic Description generation when missing or too short (< 15 chars)
+  if (descLen < 15) {
+    const normFull = normAr(finalNameAr);
+    const matchedFabrics = FABRIC_PHRASES.filter((f) => f.re.test(normFull)).map((f) => f.ar);
+    const matchedFeatures = FEATURE_PHRASES.filter((f) => f.re.test(normFull)).map((f) => f.ar);
+
+    const leadTitle = pieceAr && !normAr(finalNameAr).startsWith(normAr(pieceAr))
+      ? `${pieceAr}${audAr ? ` ${audAr}` : ''} (${finalNameAr})`
+      : `${finalNameAr}${audAr && !normAr(finalNameAr).includes(normAr(audAr)) ? ` ${audAr}` : ''}`;
+
+    const descClauses = [leadTitle];
+    if (matchedFabrics.length > 0) {
+      descClauses.push(matchedFabrics.slice(0, 2).join(' و'));
+    }
+    if (matchedFeatures.length > 0) {
+      descClauses.push(matchedFeatures.slice(0, 2).join(' و'));
+    }
+
+    const firstSentence = `${descClauses.join('، ')}.`;
+    const familyClosing = ''; // only facts from the store's own data: no quality or comfort claims
+
+    const sizeList = effectiveSizes || []; // real sizes only: a suggested default list is never written into the description
+    const sizeSentence = sizeList.length > 0 && sizeList[0] !== 'Free size'
+      ? ` متوفر بمقاسات (${sizeList.join('، ')}).`
+      : sizeList[0] === 'Free size'
+        ? ' متوفر بمقاس موحد (Free Size).'
+        : '';
+
+    const generatedDesc = `${firstSentence} ${familyClosing}${sizeSentence}`.replace(/\s{2,}/g, ' ').trim();
+    if (generatedDesc.length >= 20) {
+      fields.description_ar = generatedDesc;
+      summary.push('كتابة وصف تفصيلي للمنتج تلقائياً من بياناته');
+    }
+  }
+
+  const canAutoFix = Object.keys(fields).length > 0;
+  return {
+    canAutoFix,
+    actionsCount: summary.length,
+    summary,
+    fields,
+  };
+}
 export function analyzeProduct(p, ctx = buildModerationContext()) {
   const nameText = `${p.name_ar || ''} ${p.name_en || ''}`.trim();
   const storeDepts = Array.isArray(p.store_departments) ? p.store_departments : decodeDepartments(p.store_departments);
-  const storeRoots = new Set(storeDepts.map((s) => ctx.rootOf(s)).filter(Boolean));
-  const storeDefaultGender = storeRoots.has('men') && !storeRoots.has('women')
+  const storeGenders = new Set(storeDepts.map((s) => ctx.deptGender(s)).filter(Boolean));
+  const storeDefaultGender = storeGenders.has('men') && !storeGenders.has('women')
     ? 'men'
-    : storeRoots.has('women') && !storeRoots.has('men')
+    : storeGenders.has('women') && !storeGenders.has('men')
       ? 'women'
-      : storeRoots.has('kids') && !storeRoots.has('men') && !storeRoots.has('women')
+      : storeGenders.has('kids') && !storeGenders.has('men') && !storeGenders.has('women')
         ? 'kids'
         : null;
 
   const inferredKey = inferKey(nameText, ctx.K);
-  const inferredGender = inferGender({ name_ar: p.name_ar, name_en: p.name_en, department: p.department, audience: p.audience || storeDefaultGender }, inferredKey || p.moda_key, ctx.K);
-  const effectiveKey = inferredKey || p.moda_key || null;
-  const effectiveGender = inferredGender === 'unisex' ? (p.audience || storeDefaultGender || 'unisex') : inferredGender;
+  const deptInferredKey = !inferredKey ? inferKeyFromDepartment(p.department, p.category_name_ar, ctx) : null;
+  const effectiveKey = inferredKey || p.moda_key || deptInferredKey || null;
+  const currentDeptGender = p.department ? ctx.deptGender(p.department) : null;
+  const inferredGender = inferGender({ name_ar: p.name_ar, name_en: p.name_en, department: p.department, audience: p.audience || storeDefaultGender || currentDeptGender }, effectiveKey, ctx.K);
+  const effectiveGender = inferredGender === 'unisex' ? (p.audience || storeDefaultGender || currentDeptGender || 'unisex') : inferredGender;
 
-  const storeCandidateSlugs = storeDepts.filter((s) => ctx.deptsBySlug.get(s)?.active);
-  const suggestedDeptSlug = (effectiveKey && storeCandidateSlugs.length && deriveDepartment(effectiveKey, effectiveGender, storeCandidateSlugs, ctx.K))
+  const fitsGender = (slug) => {
+    const dg = ctx.deptGender(slug);
+    if (!dg || !effectiveGender || effectiveGender === 'unisex') return true;
+    if (effectiveGender === 'men') return dg === 'men';
+    if (effectiveGender === 'women') return dg === 'women';
+    if (['kids', 'boys', 'girls'].includes(effectiveGender)) return dg === 'kids';
+    return true;
+  };
+
+  const storeCandidateSlugs = ctx.expandStoreSlugs(storeDepts).filter(fitsGender);
+  const genderCandidateSlugs = ctx.candidateSlugs.filter(fitsGender);
+
+  const suggestedDeptSlug = matchCustomSubDepartment(nameText, effectiveKey, storeCandidateSlugs, ctx)
+    || (effectiveKey && storeCandidateSlugs.length && deriveDepartment(effectiveKey, effectiveGender, storeCandidateSlugs, ctx.K))
     || (storeCandidateSlugs.length && inferDepartment(nameText, storeCandidateSlugs))
+    || matchCustomSubDepartment(nameText, effectiveKey, genderCandidateSlugs, ctx)
+    || (effectiveKey && deriveDepartment(effectiveKey, effectiveGender, genderCandidateSlugs, ctx.K))
+    || inferDepartment(nameText, genderCandidateSlugs)
     || (effectiveKey && deriveDepartment(effectiveKey, effectiveGender, ctx.candidateSlugs, ctx.K))
     || inferDepartment(nameText, ctx.candidateSlugs)
     || null;
@@ -361,6 +677,21 @@ export function analyzeProduct(p, ctx = buildModerationContext()) {
     ? { key: effectiveKey, label: inferredItem?.ar || effectiveKey }
     : null;
 
+  const smartFix = buildSmartFixProposal(p, ctx, {
+    inferredKey,
+    deptInferredKey,
+    effectiveKey,
+    effectiveGender,
+    missingDept,
+    mismatchReason,
+    suggestedDepartment,
+    nameProblem,
+    descLen,
+    needsSizes,
+    sizeKind,
+    sizes,
+  });
+
   return {
     issues,
     issueCodes: issues.map((i) => i.code),
@@ -372,5 +703,6 @@ export function analyzeProduct(p, ctx = buildModerationContext()) {
     suggestedDepartment,
     suggestedModa,
     suggestedAudience: !p.audience && effectiveGender ? effectiveGender : null,
+    smartFix,
   };
 }
