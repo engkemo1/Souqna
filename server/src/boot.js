@@ -25,7 +25,7 @@ warmup.listen(config.port, () =>
 // Production safety warnings (visible in the host logs).
 if (config.env === 'production') {
   if (!config.r2?.bucket || !config.r2?.accessKeyId) console.warn('[boot] WARNING: R2_* not set - uploaded photos live on the local disk and are lost on redeploy.');
-  if (config.jwtSecret.startsWith('dev-only')) console.warn('[boot] WARNING: JWT_SECRET is not set - using the insecure development secret.');
+  if (config.jwtSecretInsecure) console.warn('[boot] WARNING: JWT_SECRET is missing or weak - generated a random ephemeral secret for this boot. Set a strong JWT_SECRET (32+ chars) so sessions persist across restarts.');
   if (!process.env.BACKUP_R2_BUCKET) console.warn('[boot] WARNING: BACKUP_R2_BUCKET not set - the database is not replicated to R2.');
 }
 

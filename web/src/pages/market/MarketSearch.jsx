@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { SearchX, SlidersHorizontal, X } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { SearchX, SlidersHorizontal, X, Store, MapPin, MessageCircle, Sparkles } from 'lucide-react';
 import { useApi, useDebounced } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useDepartments } from '../../lib/departments.js';
@@ -121,6 +121,69 @@ export default function MarketSearch() {
             <button type="button" onClick={clearFilters} className="text-sm font-semibold text-brand hover:underline">{t('search.clearFilters')}</button>
           </div>
         )}
+        {data?.matchedStore && (
+          <div className="mb-6 overflow-hidden rounded-2xl border border-brand/20 bg-gradient-to-r from-brand/5 via-brand/10 to-transparent p-4 sm:p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3.5">
+                <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-xl border border-line bg-canvas shadow-sm">
+                  {data.matchedStore.logo ? (
+                    <img src={data.matchedStore.logo} alt={data.matchedStore.name[lang] || data.matchedStore.name.ar} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="grid h-full w-full place-items-center bg-secondary text-brand">
+                      <Store className="h-7 w-7" />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center rounded-full bg-brand/10 px-2 py-0.5 text-xs font-semibold text-brand">
+                      {lang === 'ar' ? 'محل في بنها' : 'Banha Store'}
+                    </span>
+                  </div>
+                  <h3 className="mt-0.5 font-display text-lg font-bold text-fg">
+                    {data.matchedStore.name[lang] || data.matchedStore.name.ar}
+                  </h3>
+                  {data.matchedStore.address && (
+                    <p className="mt-0.5 flex items-center gap-1 text-xs text-muted">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-brand" />
+                      <span>{data.matchedStore.address}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  to={`/${data.matchedStore.slug}`}
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-brand px-4 text-xs font-bold text-white shadow-sm transition hover:bg-brand/90"
+                >
+                  <span>{lang === 'ar' ? 'تصفح منتجات المحل' : 'Browse Store'}</span>
+                </Link>
+                {data.matchedStore.map_url && (
+                  <a
+                    href={data.matchedStore.map_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-line-strong bg-canvas px-3 text-xs font-semibold text-fg transition hover:bg-secondary"
+                  >
+                    <MapPin className="h-3.5 w-3.5 text-brand" />
+                    <span>{lang === 'ar' ? 'اللوكيشن' : 'Map'}</span>
+                  </a>
+                )}
+                {data.matchedStore.whatsapp && (
+                  <a
+                    href={`https://wa.me/${data.matchedStore.whatsapp.replace(/[^0-9]/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl border border-line-strong bg-canvas px-3 text-xs font-semibold text-fg transition hover:bg-secondary"
+                  >
+                    <MessageCircle className="h-3.5 w-3.5 text-emerald-600" />
+                    <span>{lang === 'ar' ? 'واتساب' : 'WhatsApp'}</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
         <FeaturedSlot placement="search_slot" store={params.get('store') || undefined} category={params.get('store') ? params.get('category') || undefined : undefined} />
         <p className="mb-5 text-sm text-muted" aria-live="polite">
           {loading && !data ? t('common.loading') : q || department
@@ -149,6 +212,33 @@ export default function MarketSearch() {
         ) : (
           <>
           <EmptyState icon={SearchX} title={q ? t('search.noResultsFor', { q }) : t('search.noResults')} body={q ? t('search.noResultsForBody') : t('search.noResultsBody')} action={<Button variant="outline" onClick={() => setParams({}, { replace: true })}>{t('common.clearAll')}</Button>} />
+          {q && (
+            <div className="mt-6 rounded-2xl border border-brand/20 bg-gradient-to-r from-brand/5 via-brand/10 to-transparent p-5 text-center sm:text-start">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-brand text-white">
+                    <Sparkles className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <h4 className="font-display text-base font-bold text-fg">
+                      {lang === 'ar' ? `مش لاقي "${q}" في النتايج السريعة؟` : `Can't find "${q}" in results?`}
+                    </h4>
+                    <p className="text-xs text-muted">
+                      {lang === 'ar' ? 'تويلا الفاشونيستا تقدر تدورلك في كل محلات بنها وتنسقلك اللوك المناسب' : 'Twyla can search all Banha stores and find the right outfit for you'}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: q } }))}
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-brand px-4 text-xs font-bold text-white shadow-sm transition hover:bg-brand/90"
+                >
+                  <Sparkles className="h-4 w-4" />
+                  <span>{lang === 'ar' ? 'اسأل تويلا تدورلك' : 'Ask Twyla to find it'}</span>
+                </button>
+              </div>
+            </div>
+          )}
           {q && <RequestBanner className="!px-0 mt-6" title={t('req.empty')} query={q} />}
           </>
         )}

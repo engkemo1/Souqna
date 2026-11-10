@@ -242,7 +242,18 @@ export default function MarketCheckout() {
         <OrderComments ar={ar} general={form.notes} onGeneral={(v) => { setError(''); setForm((f) => ({ ...f, notes: v })); }}
           stores={groups.map((g) => ({ slug: g.slug, name: g.name?.[lang] || g.name?.ar || g.slug, value: storeNotes[g.slug] || '' }))}
           onStore={(slug, v) => setStoreNotes((m) => ({ ...m, [slug]: v }))} />
-        <section className="flex items-center gap-4 rounded-3xl border-2 border-fg bg-elevated p-4"><Banknote className="h-6 w-6 shrink-0" /><span><strong className="block">{ar ? 'الدفع عند الاستلام' : 'Cash on delivery'}</strong><span className="text-sm text-muted">{feePending ? (ar ? 'منطقتك مش في جدول التوصيل. خدمة العملاء هتكلمك بمصاريف الشحن قبل ما المندوب يتحرك.' : 'Delivery is not priced yet. Twist will contact you with the final fee before dispatch.') : (ar ? 'هتدفعي إجمالي طلبك مرة واحدة لمندوب Twist.' : 'Pay the order total once to the Twist courier.')}</span></span></section>
+        <section className="rounded-3xl border-2 border-fg bg-elevated p-4">
+          <div className="flex items-center gap-4">
+            <Banknote className="h-6 w-6 shrink-0" />
+            <span>
+              <strong className="block">{ar ? 'الدفع عند الاستلام' : 'Cash on delivery'}</strong>
+              <span className="text-sm text-muted">{feePending ? (ar ? 'منطقتك مش في جدول التوصيل. خدمة العملاء هتكلمك بمصاريف الشحن قبل ما المندوب يتحرك.' : 'Delivery is not priced yet. Twist will contact you with the final fee before dispatch.') : (ar ? 'هتدفعي إجمالي طلبك مرة واحدة لمندوب Twist.' : 'Pay the order total once to the Twist courier.')}</span>
+            </span>
+          </div>
+          <div className="mt-3 flex items-center gap-2 rounded-xl bg-emerald-50 px-3.5 py-2 text-xs font-semibold text-emerald-800">
+            <span>✨ {ar ? 'قيس وعاين مع المندوب عند الاستلام، وتقدر تبدل المقاس فوراً داخل بنها.' : 'Try on with the courier before paying, with instant local exchanges in Banha.'}</span>
+          </div>
+        </section>
         <FinalSaleNote items={cart.items} />
         {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
         <Button type="submit" size="lg" full loading={busy} disabled={!quotes || !deliveryQuote || hasErrors}>{feePending ? (ar ? `إرسال الطلب · ${formatMoney(subtotal, lang)} منتجات` : `Place order · ${formatMoney(subtotal, lang)} items`) : groups.length > 1 ? (ar ? `تأكيد ${groups.length} طلبات · ${formatMoney(total, lang)}` : `Confirm ${groups.length} orders · ${formatMoney(total, lang)}`) : (ar ? `تأكيد الطلب · ${formatMoney(total, lang)}` : `Place order · ${formatMoney(total, lang)}`)}</Button>

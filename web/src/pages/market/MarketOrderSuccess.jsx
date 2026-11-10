@@ -91,6 +91,25 @@ export default function MarketOrderSuccess() {
 
     <div className="mt-8 space-y-3">{state.orders.map((order) => <section key={order.number} className="flex items-center gap-3 rounded-2xl border border-line bg-elevated p-4"><span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-secondary text-brand"><Store className="h-5 w-5" /></span><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold">{order.store?.[lang] || order.store?.ar || order.storeSlug}</p><p className="mt-1 text-xs text-muted">{ar ? 'رقم الطلب' : 'Order'}: <bdi dir="ltr">{order.number}</bdi></p></div><div className="text-end"><strong className="text-sm">{formatMoney(order.total, lang)}</strong>{order.shipping > 0 && <p className="mt-1 text-[11px] text-muted">{ar ? 'حصة رسوم توصيل Twist مرة واحدة' : 'Shared Twist delivery fee'}</p>}<Link to={`/track/${order.trackToken}`} className="mt-1 flex items-center justify-end gap-1 text-xs font-semibold text-brand"><PackageSearch className="h-3.5 w-3.5" />{ar ? 'تابعي الشحنة' : 'Track order'}</Link></div></section>)}</div>
     <section className="mt-4 rounded-2xl border border-line bg-elevated p-4">{!feePending && <div className="flex justify-between text-sm"><span className="text-muted">{ar ? 'توصيل Twist (مرة واحدة)' : 'Twist delivery (one fee)'}</span><span>{shipping ? formatMoney(shipping, lang) : (ar ? 'مجاني' : 'Free')}</span></div>}<div className="mt-2 flex justify-between border-t border-line pt-3 font-bold"><span>{feePending ? (ar ? 'قيمة المنتجات حاليًا' : 'Items subtotal so far') : (ar ? 'إجمالي الطلبات' : 'Order total')}</span><span>{formatMoney(total, lang)}{feePending && <span className="ms-1 text-xs font-normal text-muted">+</span>}</span></div><p className="mt-2 text-xs text-muted">{feePending ? (ar ? 'رسوم التوصيل هتتحدد لاحقًا، ومش مطلوب منك دفعها قبل موافقتك.' : 'Delivery will be priced later; you will not be asked to pay before approving it.') : (ar ? 'هتدفع الإجمالي مرة واحدة لمندوب Twist عند الاستلام.' : 'Pay the total once to the Twist courier on delivery.')}</p></section>
+
+    <div className="mt-6 rounded-2xl border border-line bg-secondary/50 p-4 text-center sm:p-5">
+      <p className="text-sm font-bold text-fg">
+        {ar ? 'محتاج مساعدة أو استفسار بخصوص شحنتك؟' : 'Need help with your shipment?'}
+      </p>
+      <p className="mt-1 text-xs text-muted">
+        {ar ? 'فريق خدمة عملاء Twist في بنها معاك ومتابع طلبياتك خطوة بخطوة' : 'Twist customer support in Banha is here to help'}
+      </p>
+      <a
+        href={`https://wa.me/201206928670?text=${encodeURIComponent(ar ? `أهلاً Twist، بخصوص طلبي رقم ${state.orders.map((o) => o.number).join(' و ')}` : `Hi Twist, regarding my order ${state.orders.map((o) => o.number).join(', ')}`)}`}
+        target="_blank"
+        rel="noreferrer"
+        className="mt-3 inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-emerald-600/30 bg-emerald-50 px-5 text-xs font-bold text-emerald-700 transition hover:bg-emerald-100"
+      >
+        <MessageCircle className="h-4 w-4 fill-emerald-600 text-emerald-600" />
+        <span>{ar ? 'تواصل مع خدمة عملاء Twist على واتساب' : 'Chat with Twist Support on WhatsApp'}</span>
+      </a>
+    </div>
+
     <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-center"><Button to="/track" variant="outline">{ar ? 'تتبّع طلبي برقم الموبايل' : 'Track by phone number'}</Button><Button to="/account" variant="outline">{ar ? 'طلباتي' : 'My orders'}</Button><Button to="/search">{ar ? 'كمّلي تسوق' : 'Continue shopping'}</Button></div>
   </main></div>;
 }

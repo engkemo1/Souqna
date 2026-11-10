@@ -380,4 +380,7 @@ export const json = (s, fallback) => {
   for (const [col, ddl] of [['width', 'INTEGER'], ['height', 'INTEGER'], ['phash', 'TEXT'], ['near_json', "TEXT NOT NULL DEFAULT '[]'"]]) if (ic.length && !ic.includes(col)) db.exec(`ALTER TABLE image_candidates ADD COLUMN ${col} ${ddl}`);
   const pc3 = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!pc3.includes('attrs_json')) db.exec('ALTER TABLE products ADD COLUMN attrs_json TEXT');
+  for (const [col, ddl] of [['admin_review_status', 'TEXT'], ['admin_review_note', 'TEXT'], ['admin_flags_json', 'TEXT'], ['admin_reviewed_at', 'TEXT']]) {
+    if (!pc3.includes(col)) db.exec(`ALTER TABLE products ADD COLUMN ${col} ${ddl}`);
+  }
 }

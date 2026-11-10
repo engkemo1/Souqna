@@ -14,12 +14,50 @@ import { matchFaq, faqAnswer } from './faq.js';
 import { offersAnswer, careForShown } from './offers.js';
 import { careFallback } from './parse.js';
 import { DEFAULT_CONTACT, fillContact } from './contact.js';
-import { matchStore, aspectsOf, mentionsStoreWord, storeAnswer, askWhichStore, allStoresHours } from './stores.js';
-import { norm } from './text.js';
+import { matchStore, aspectsOf, mentionsStoreWord, storeAnswer, askWhichStore, allStoresHours, GENERIC } from './stores.js';
+import { norm, trainingTokens } from './text.js';
+
+function matchTrainedLesson(text, lessons) {
+  if (!Array.isArray(lessons) || !lessons.length) return null;
+  const nText = norm(text);
+  if (!nText || nText.length < 3) return null;
+  const qTokens = trainingTokens(nText);
+  if (!qTokens.length) return null;
+  const qSet = new Set(qTokens);
+
+  let best = null;
+  let maxScore = 0;
+
+  for (const lesson of lessons) {
+    if (lesson.status === 'draft') continue;
+    const lTokens = trainingTokens(`${lesson.question} ${lesson.tags || ''} ${lesson.topic || ''}`);
+    if (!lTokens.length) continue;
+
+    const nQ = norm(lesson.question);
+    if (nText === nQ || nText.includes(nQ) || (nQ.length >= 8 && nQ.includes(nText))) {
+      const score = 20 + lTokens.length;
+      if (score > maxScore) { maxScore = score; best = lesson; }
+      continue;
+    }
+
+    let matches = 0;
+    for (const t of qSet) {
+      if (lTokens.includes(t)) matches += 1;
+    }
+
+    const ratio = matches / Math.min(qTokens.length, lTokens.length);
+    if (matches >= 2 && ratio >= 0.35) {
+      const score = matches * 3 + ratio * 2;
+      if (score > maxScore) { maxScore = score; best = lesson; }
+    }
+  }
+
+  return maxScore >= 6 ? best : null;
+}
 
 /** "طب ممكن ألبس إيه؟ / فيه بديل؟ / حاجة تانية" بعد رد ما لقاش المطلوب: العميل بيطلب بدائل لنفس المناسبة. */
 const ALT_RE = /(البس|ألبس|الاقي|اجيب|اشتري|اختار)( [^ ]+){0,3} (ايه|اي|ايش)( |$)|(^| )(بديل|بدائل|البديل|حاجه تانيه|حاجات تانيه|مفيش غيره|ايه المتاح|ايه الموجود|ايه اللي موجود)( |$)/;
-import { cairoParts, resolveEventTime } from './time.js';
+import { cairoParts, resolveEventTime, weatherAdvice } from './time.js';
 
 const enrichedCache = new WeakMap();
 function ensureEnriched(products, K) {
@@ -113,7 +151,7 @@ function withMemory(res, opts) {
 
 async function runModaCore(messages, opts = {}) {
   const K = loadKnowledge();
-  const { products = [], offers = null, stores = null, contact = null, profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, brain = null, curator = null, understand = null, fetcher, assistantName = null } = opts;
+  const { products = [], offers = null, stores = null, contact = null, profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, brain = null, curator = null, understand = null, fetcher, assistantName = null, training = null } = opts;
   const text = lastUserText(messages);
   const dow = cairoParts(now).dow;
   const seed = `${text}|${session?.turn || 0}`;
@@ -142,9 +180,23 @@ async function runModaCore(messages, opts = {}) {
         return reply(out.say, { storeCard: out.card });
       }
       if (m.ambiguous.length && aspects.length) return reply(`تقصد أنهي محل: ${m.ambiguous.slice(0, 5).map((s) => s.name_ar).join(' ولا ')}؟`);
-      if (!m.store && mentionsStoreWord(text) && !parsed.garments.length && asks.some((a) => a !== 'offers')) {
-        if (asks.length === 1 && asks[0] === 'hours') { const h = allStoresHours(list, now); if (h) return reply(h); }
-        const ask = askWhichStore(list); if (ask) return reply(ask);
+      const isStoreQuery = (asks.length > 0 || mentionsStoreWord(text)) && !parsed.garments.length;
+      if (!m.store && isStoreQuery && asks.some((a) => a !== 'offers')) {
+        if (asks.length === 1 && asks[0] === 'hours') {
+          const h = allStoresHours(list, now);
+          if (h) return reply(h);
+          const ask = askWhichStore(list);
+          if (ask) return reply(ask);
+        }
+        const STOP = new Set(['عاوز', 'عايز', 'عايزة', 'عاوزة', 'محتاج', 'محتاجة', 'فين', 'مكان', 'مكانها', 'مكانه', 'عنوان', 'عنوانه', 'عناوين', 'رقم', 'ارقام', 'نمرة', 'نمره', 'لوكيشن', 'موقع', 'موقعه', 'مواعيد', 'فروع', 'فرع', 'تليفون', 'واتس', 'واتساب', 'ازاي', 'اروح', 'اوصل', 'طريق', 'محل', 'المحل', 'محلات', 'المحلات', 'متجر', 'المتجر', 'ستور', 'الستور', 'store', 'shop', 'عندكم', 'عندكو', 'في', 'بنها', 'بتفتح', 'بيفتح', 'بتقفل', 'بيقفل', 'ساعات', 'امتي', 'امتى', 'فاتح', 'قافل', 'شغال', 'دلوقتي']);
+        const strippedTokens = norm(text).split(' ').filter((w) => w.length >= 2 && !GENERIC.has(w) && !STOP.has(w));
+        if (strippedTokens.length === 0) {
+          const ask = askWhichStore(list);
+          if (ask) return reply(ask);
+        } else {
+          const qName = strippedTokens.join(' ');
+          return reply(`مش لاقية متجر مسجل باسم «${qName}» في بنها على الموقع. اتأكد من اسم المحل، أو قولي بتدور على إيه بالظبط (زي شوزات أو كوتشيات أو لبس) وأرشحلك المحلات المتاحة عندنا.`);
+        }
       }
     }
   }
@@ -156,18 +208,25 @@ async function runModaCore(messages, opts = {}) {
     if (real) return { state: 'chat', intent: 'faq', faq: 'discounts', say: real, tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed: { ...parsed, advice: null }, };
   }
 
-  // ---------- أسئلة الخدمة (مين أنت، فين طلبي، الشحن، الدفع…) — مش طلب لبس ----------
-  if (!(answers && Object.keys(answers).length) && !session?.pending && !parsed.garments.length && !parsed.context && !(parsed.followup && session?.parsed)) {
-    const faq = matchFaq(text);
-    let say = faq ? faqAnswer(faq, { lang, name: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], contact }) : null;
-    if (faq === 'discounts' && !/(كود|كوبون|coupon|code)/i.test(text)) { // عروض حقيقيه لو موجوده، وإلا الرد العام
-      let live = [];
-      try { live = typeof offers === 'function' ? offers() : Array.isArray(offers) ? offers : []; } catch { live = []; }
-      const real = offersAnswer({ offers: live, products });
-      if (real) { say = real; lang = 'ar'; }
-      else say = 'مفيش عروض أو خصومات شغالة على الموقع دلوقتي. لو اتضاف عرض هيظهر على المنتج وفي «عروض بنها». تقدر تقولي تدور على إيه وأرشحلك أحسن سعر متاح.';
+  // ---------- أسئلة الخدمة أو قواعد التدريب المعتمدة ----------
+  const isQuestionOrInquiry = /(^| )(يعني ايه|ايه معنى|ايه معني|معنى|معني|ما هو|ما هي|ما الفرق|ايه الفرق|الفرق بين|الفرق مابين|لو حد سال|لو حد سأل|رشحي اولا|رشحي اول|احسن محل|احسن محلات|افضل محل|افضل محلات|فين الاقي|ازاي|كيف|طريقه|اعمل ايه|البس ايه|اختار ايه|تنصحيني|نصيحه|نصايح|قاعده|ينفع البس|ينفع ارجع|ينفع استبدل|لو المقاس|لو التيشرت|لو البنطلون|لو الهدوم|لو الطلب|علاج|حل لمشكله|طقم ل|طقم فرح|طقم جامعه|طقم انترفيو)( |$)/.test(norm(text));
+  if (!(answers && Object.keys(answers).length) && !session?.pending && (!parsed.garments.length || isQuestionOrInquiry) && (!parsed.context || isQuestionOrInquiry) && !(parsed.followup && session?.parsed)) {
+    const trained = matchTrainedLesson(text, training?.lessons);
+    if (trained) {
+      return { state: 'chat', intent: 'faq', faq: 'training', say: trained.answer, tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed: { ...parsed, advice: null } };
     }
-    if (say) return { state: 'chat', intent: 'faq', faq, say, tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
+    if (!parsed.garments.length) {
+      const faq = matchFaq(text);
+      let say = faq ? faqAnswer(faq, { lang, name: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], contact }) : null;
+      if (faq === 'discounts' && !/(كود|كوبون|coupon|code)/i.test(text)) { // عروض حقيقيه لو موجوده، وإلا الرد العام
+        let live = [];
+        try { live = typeof offers === 'function' ? offers() : Array.isArray(offers) ? offers : []; } catch { live = []; }
+        const real = offersAnswer({ offers: live, products });
+        if (real) { say = real; lang = 'ar'; }
+        else say = 'مفيش عروض أو خصومات شغالة على الموقع دلوقتي. لو اتضاف عرض هيظهر على المنتج وفي «عروض بنها». تقدر تقولي تدور على إيه وأرشحلك أحسن سعر متاح.';
+      }
+      if (say) return { state: 'chat', intent: 'faq', faq, say, tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
+    }
   }
 
   // ---------- فهم الموديل أولاً (اختياري): Gemini/Claude يحوّل الرسالة لبيانات، والكود بيتحقق، والقواعد تكمّل ----------
@@ -176,6 +235,18 @@ async function runModaCore(messages, opts = {}) {
       const u = await understand({ text, parsed });
       if (u) parsed = applyUnderstanding(parsed, u);
     } catch { /* نكمل بالقواعد */ }
+  }
+  if (parsed.intent === 'shop' && Array.isArray(training?.lessons)) {
+    const trained = matchTrainedLesson(text, training.lessons);
+    if (trained) {
+      let storeList = [];
+      try { storeList = typeof stores === 'function' ? stores() : stores || []; } catch { storeList = []; }
+      const matchedStore = storeList.find((s) => trained.answer?.includes(s.name_ar) || trained.tags?.includes(s.slug) || (s.name_en && trained.tags?.toLowerCase().includes(s.name_en.toLowerCase())));
+      if (matchedStore) {
+        parsed.preferredStore = matchedStore.slug || matchedStore.name_ar;
+        parsed.preferredStoreName = matchedStore.name_ar;
+      }
+    }
   }
 
   // ---------- دمج مع الجلسة ----------
@@ -260,6 +331,12 @@ async function runModaCore(messages, opts = {}) {
       materialNote = `خامة «${sp.name_ar}» حسب المحل: ${mat}.`;
     }
   }
+  if (parsed.intent === 'unknown') {
+    const trained = matchTrainedLesson(text, training?.lessons);
+    if (trained) {
+      return { state: 'chat', intent: 'faq', faq: 'training', say: trained.answer, tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed: { ...parsed, advice: null } };
+    }
+  }
   if (parsed.intent !== 'shop') {
     const res = respond({ state: 'chat', intent: parsed.intent === 'followup' ? 'unknown' : parsed.intent }, { seed, lang, profile, advice, assistantName });
     if (advice?.care && res.say) { const mine = careForShown(session?.shown || [], products); res.say = [materialNote, res.say, mine].filter(Boolean).join('\n\n'); }
@@ -268,8 +345,8 @@ async function runModaCore(messages, opts = {}) {
 
   // ---------- وقت ----------
   const eventTime = resolveEventTime(parsed, { now });
-  // Weather API disabled: no external call, no fabric/layer tips shown to the user.
-  const adv = null;
+  // Weather API disabled for latency, but compute advice if weatherMock is passed (e.g. in tests)
+  const adv = weatherMock ? weatherAdvice(weatherMock, eventTime) : null;
 
   // ---------- تخطيط ----------
   let rows = ensureEnriched(products, K);
@@ -296,7 +373,6 @@ async function runModaCore(messages, opts = {}) {
       if (cp) { plan = cp; curated = true; }
     } catch { /* نكمل بالقواعد */ }
   }
-
   // Finish every clarification before showing picks. Questions should not be
   // buried after a partial or low-confidence product result.
   // طلب قطعة/صورة من غير مناسبة: النتايج تظهر على طول والأسئلة (لون/ميزانية) اختيارية تحتها. لوك المناسبة (خطوبة/فرح…) بيفضل يخلّص أسئلته الأول.
@@ -316,6 +392,9 @@ async function runModaCore(messages, opts = {}) {
   const g = guardResponse(res, { lang });
   if (!g.ok) res = { ...res, say: pick(K.phrases.ar.fallback_generic, seed), guard: g.problems };
 
+  if (parsed.preferredStoreName && !needsClarificationFirst && ['full', 'alternatives', 'partial'].includes(plan.state) && !res.say?.includes(parsed.preferredStoreName)) {
+    res = { ...res, say: `رشحتلك أولاً من كولكشن «${parsed.preferredStoreName}» في بنها:\n\n${res.say}` };
+  }
   if (derivedBudget && plan.state === 'over_budget' && plan.total > 0) res = { ...res, say: `ده أرخص اختيار لقيته لطلبك دلوقتي: ${Number(plan.total).toLocaleString('en-US')} جنيه. لو عندك ميزانية معينة قوليلي رقمها بالظبط وأدورلك جواها.` };
   if (parsed.followup === 'show_more' && excludeIds.length && plan.people?.length && !needsClarificationFirst) {
     const ids = plan.people.flatMap((p) => p.picks.map((x) => x.product.id));

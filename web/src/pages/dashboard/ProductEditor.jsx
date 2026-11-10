@@ -1053,9 +1053,42 @@ export default function ProductEditor() {
     );
   }
 
+  const adminProduct = !isNew ? data?.product : null;
+  const adminBanner = adminProduct && (adminProduct.adminReviewNote || adminProduct.adminFlags?.length > 0 || adminProduct.adminReviewStatus === 'flagged') ? (
+    <div role="alert" className="mb-5 rounded-2xl border border-red-300 bg-red-50/90 p-4 text-red-950 shadow-sm dark:border-red-500/30 dark:bg-red-500/15 dark:text-red-100">
+      <div className="flex flex-wrap items-center gap-2 font-bold">
+        <MessageCircle className="h-5 w-5 shrink-0 text-red-600" />
+        <span className="text-base">{L('ملاحظة من إدارة منصة Twist لتعديل هذا المنتج:', 'Note from Twist Admin on this product:')}</span>
+        {adminProduct.status !== 'active' && (
+          <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white">
+            {L('موقوف من العرض لحين التعديل', 'Hidden until edited')}
+          </span>
+        )}
+      </div>
+      {adminProduct.adminFlags?.length > 0 && (
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {adminProduct.adminFlags.map((fl) => (
+            <span key={fl} className="rounded-full bg-red-200/80 px-2.5 py-0.5 text-xs font-bold text-red-950 dark:bg-red-500/30 dark:text-red-100">
+              {fl}
+            </span>
+          ))}
+        </div>
+      )}
+      {adminProduct.adminReviewNote && (
+        <p className="mt-2 rounded-xl bg-white/80 p-3 text-sm font-semibold leading-relaxed text-red-950 dark:bg-black/25 dark:text-red-100">
+          {adminProduct.adminReviewNote}
+        </p>
+      )}
+      <p className="mt-2 text-xs text-red-800/90 dark:text-red-200/80">
+        {L('عدّل المطلوب واضغط «حفظ» عشان يتراجع المنتج ويظهر للعملاء بأفضل شكل.', 'Update the required details and press Save so the product can be reviewed and shown to shoppers.')}
+      </p>
+    </div>
+  ) : null;
+
   return (
     <div className="pb-28">
       {header}
+      {adminBanner}
       {progress}
       <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
         {main}

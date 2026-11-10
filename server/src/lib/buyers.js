@@ -13,7 +13,7 @@ export const signBuyer = (b) => jwt.sign({ sub: b.id, k: 'buyer' }, SECRET, { ex
 export function buyerFromReq(req) {
   const t = req.headers['x-buyer-token'];
   if (!t || typeof t !== 'string') return null;
-  try { const p = jwt.verify(t, SECRET); return p.k === 'buyer' ? q.get('SELECT id, name, phone, phone_verified FROM buyers WHERE id=?', [p.sub]) || null : null; } catch { return null; }
+  try { const p = jwt.verify(t, SECRET, { algorithms: ['HS256'] }); return p.k === 'buyer' ? q.get('SELECT id, name, phone, phone_verified FROM buyers WHERE id=?', [p.sub]) || null : null; } catch { return null; }
 }
 export function requireBuyer(req, _res, next) {
   const b = buyerFromReq(req);

@@ -340,7 +340,7 @@ function ModaTestLabPanel() {
   );
 }
 
-function ModaTrainingPanel() {
+export function ModaTrainingPanel() {
   const toast = useToast();
   const { data, reload } = useAdminApi('/stylist/training');
   const { data: feedbackData, reload: reloadFeedback } = useAdminApi('/stylist/feedback');
@@ -431,7 +431,7 @@ function ModaTrainingPanel() {
               <Button size="sm" loading={busy === item.id} disabled={(feedbackAnswers[item.id] || '').trim().length < 10 || !!busy} onClick={() => teachFeedback(item)}>احفظ التصحيح كمسودة</Button></>}
           </article>) : <p className="text-sm text-muted">مفيش ملاحظات جديدة لحد دلوقتي.</p>}
         </section>
-        <label className="block"><span className="mb-1.5 block text-sm font-medium">قواعد الذوق اللي عايز المساعد الذكي يلتزم بيها</span><Textarea rows={3} maxLength={1600} value={guidance} onChange={(e) => setGuidance(e.target.value)} placeholder="مثال: اختاري ألوان متناسقة ومناسبة للمناسبة، وراعي الاحتشام والعمر، وما تقترحيش قطع مش راكبة على بعض." /></label>
+        <label className="block"><span className="mb-1.5 block text-sm font-medium">قواعد الذوق اللي عايز المساعد الذكي يلتزم بيها</span><Textarea rows={5} maxLength={5000} value={guidance} onChange={(e) => setGuidance(e.target.value)} placeholder="مثال: اختاري ألوان متناسقة ومناسبة للمناسبة، وراعي الاحتشام والعمر، وما تقترحيش قطع مش راكبة على بعض." /></label>
         <div className="flex flex-wrap items-center gap-3"><Button onClick={save} loading={busy === 'save'} disabled={guidance === baseline}>حفظ التوجيه</Button><span className="text-xs text-muted">{data.lessons.length} درس و{data.examples.length} أوتفيت محفوظين للمساعد الذكي</span></div>
         <form onSubmit={addLesson} className="space-y-3 rounded-2xl border border-line bg-canvas/50 p-3 sm:p-4">
           <h3 className="font-semibold">علّمها سؤال وإجابة خبير</h3>
@@ -559,7 +559,7 @@ function LookOfDayPanel() {
     setBusy(true);
     const manual = { showOthers: !!f.manual.showOthers, coverImage: f.manual.coverImage, title: f.manual.title.trim(), description: f.manual.description.trim(), badge: f.manual.badge.trim(), outfits: manualOutfits.filter((outfit) => outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).length >= 1)
       .map((outfit) => ({
-        audience: outfit.audience, age: outfit.age.trim(), say: outfit.say.trim(), tips: outfit.tips.trim(), occasion: outfit.occasion.trim(), coverImage: (outfit.images || [])[0] || '', images: outfit.images || [], backImage: outfit.backImage || '', rightImage: outfit.rightImage || '', leftImage: outfit.leftImage || '', rightImage: outfit.rightImage || '', leftImage: outfit.leftImage || '',
+        audience: outfit.audience, age: outfit.age.trim(), say: outfit.say.trim(), tips: outfit.tips.trim(), occasion: outfit.occasion.trim(), coverImage: (outfit.images || [])[0] || '', images: outfit.images || [], backImage: outfit.backImage || '', rightImage: outfit.rightImage || '', leftImage: outfit.leftImage || '',
         pieces: outfit.pieces.filter((piece) => piece.label.trim() && piece.productId).map((piece) => ({ label: piece.label.trim(), productId: Number(piece.productId) })),
       })) };
     try {

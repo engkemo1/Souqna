@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard, Eye, Wallet, TrendingUp, AlertTriangle, History } from 'lucide-react';
+import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard, Eye, Wallet, TrendingUp, AlertTriangle, History } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -15,6 +15,7 @@ const NAV_GROUPS = [
   { label: 'الرئيسية', items: [{ to: '/admin', end: true, icon: LayoutDashboard, label: 'نظرة عامة' }] },
   { label: 'إدارة السوق', items: [
     { to: '/admin/stores', icon: Store, label: 'المحلات' },
+    { to: '/admin/products', icon: Package, label: 'المنتجات والمعاينة', badge: 'products' },
     { to: '/admin/subscriptions', icon: CreditCard, label: 'اشتراكات المحلات' },
     { to: '/admin/departments', icon: Tags, label: 'الأقسام', badge: 'depts' },
     { to: '/admin/image-library', icon: Camera, label: 'مكتبة صور الأقسام' },
@@ -41,6 +42,7 @@ const NAV_GROUPS = [
     { to: '/admin/traffic', icon: Eye, label: 'الزيارات' },
     { to: '/admin/insights', icon: TrendingUp, label: 'تحليلات السوق' },
     { to: '/admin/stylist-log', icon: Sparkles, label: 'أسئلة تويلا وسرعتها' },
+    { to: '/admin/stylist/training', icon: Sparkles, label: 'تدريب تويلا وقواعدها' },
     { to: '/admin/campaigns', icon: Megaphone, label: 'الحملات والإعلانات' },
     { to: '/admin/reports', icon: BarChart3, label: 'التقارير' },
     { to: '/admin/audit', icon: History, label: 'سجل الحركات' },
@@ -98,7 +100,7 @@ function Gate({ onAuthed }) {
 /** Polls for new delivery requests: bell counter, toast, optional sound + browser notification. */
 function useDeliveryAlerts() {
   const toast = useToast();
-  const [counts, setCounts] = useState({ open: 0, ready: 0, services: 0, sourcing: 0, depts: 0 });
+  const [counts, setCounts] = useState({ open: 0, ready: 0, services: 0, sourcing: 0, depts: 0, products: 0 });
   const [recent, setRecent] = useState([]);
   const [sound, setSound] = useState(() => { try { return localStorage.getItem('bo.adminSound') !== '0'; } catch { return true; } });
   const since = useRef(null);
@@ -118,7 +120,7 @@ function useDeliveryAlerts() {
       try {
         const d = await adminApi(`/notifications${since.current ? `?since=${encodeURIComponent(since.current)}` : ''}`);
         if (stop) return;
-        setCounts({ open: d.open, ready: d.ready, services: d.servicesNew, sourcing: d.sourcingNew, depts: d.deptsPending || 0 });
+        setCounts({ open: d.open, ready: d.ready, services: d.servicesNew, sourcing: d.sourcingNew, depts: d.deptsPending || 0, products: d.productsIssues || 0 });
         const freshDepts = (d.deptPendingItems || []).filter((x) => !seenDepts.current.has(x.id));
         (d.deptPendingItems || []).forEach((x) => seenDepts.current.add(x.id));
         const freshStores = since.current ? (d.newStores || []) : [];

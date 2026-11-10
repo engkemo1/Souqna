@@ -75,10 +75,14 @@ export async function adminBlobUrl(path) {
 
 /** GET with loading/error/reload and optional polling. */
 export function useAdminApi(path, { every = 0 } = {}) {
-  const [state, setState] = useState({ data: undefined, error: null, loading: true });
+  const [state, setState] = useState({ data: undefined, error: null, loading: Boolean(path) });
   const [tick, setTick] = useState(0);
   const first = useRef(true);
   useEffect(() => {
+    if (!path) {
+      setState({ data: undefined, error: null, loading: false });
+      return undefined;
+    }
     const ctrl = new AbortController();
     if (first.current || path) setState((s) => ({ ...s, loading: s.data === undefined, error: null }));
     first.current = false;
@@ -88,10 +92,10 @@ export function useAdminApi(path, { every = 0 } = {}) {
     return () => ctrl.abort();
   }, [path, tick]);
   useEffect(() => {
-    if (!every) return undefined;
+    if (!every || !path) return undefined;
     const id = setInterval(() => setTick((x) => x + 1), every);
     return () => clearInterval(id);
-  }, [every]);
+  }, [every, path]);
   const reload = useCallback(() => setTick((x) => x + 1), []);
   return { ...state, reload };
 }

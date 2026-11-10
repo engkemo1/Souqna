@@ -10,7 +10,7 @@ export default function CategoryHeader({ department, bySlug, childrenOf, onPick 
   if (!d) return null;
   const nm = (x) => x.name?.[lang] || x.name?.ar;
   const trail = []; for (let c = d, i = 0; c && i < 5; c = bySlug.get(c.parent), i++) trail.unshift(c);
-  const kids = childrenOf(d.slug);
+  const kids = childrenOf(d.slug).filter((k) => (k.product_count == null || k.product_count > 0));
   const desc = d.description?.[lang] || d.description?.ar || '';
   return (
     <header className="mb-6">

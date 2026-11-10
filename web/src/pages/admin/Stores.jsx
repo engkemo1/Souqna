@@ -313,6 +313,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
             <Button size="sm" variant="outline" icon={LogIn} onClick={loginAs}>ادخل لوحته</Button>
             <Button size="sm" variant="outline" icon={Link2} onClick={setup}>لينك تفعيل / إعادة باسورد</Button>
             <Button size="sm" icon={Package} to={`/admin/manage/${store.slug}/products`}>إدارة المنتجات</Button>
+            <Button size="sm" variant="outline" icon={Search} to={`/admin/products?store=${store.slug}`}>معاينة الكتالوج</Button>
             <Button size="sm" variant="outline" icon={Pin} onClick={() => setProd(store)}>تثبيت منتجات</Button>
           </div>
           {link && <Input dir="ltr" readOnly value={link} onFocus={(e) => e.target.select()} />}

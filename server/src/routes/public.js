@@ -27,7 +27,8 @@ import { publicAdvertiser, recordAdvertiserEvent } from '../lib/advertisers.js';
 import { logoBrand } from '../lib/advertiser-shop.js';
 import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
 import { logVisualSearch } from '../lib/visual-demand.js';
-import { runStylist, modaBrain, modaCurator, modaUnderstander, stylistSettings, addStylistFeedback, lookOfDay, cardsByIds, liveOffersForModa, storesForModa } from '../lib/stylist.js';
+import { runStylist, modaBrain, modaCurator, modaUnderstander, stylistSettings, stylistTrainingSettings, addStylistFeedback, lookOfDay, cardsByIds, liveOffersForModa, storesForModa } from '../lib/stylist.js';
+import { matchStore } from '../lib/moda/stores.js';
 import { contactFromEnv } from '../lib/moda/contact.js';
 import { logStylist } from '../lib/stylist-log.js';
 import { runModa } from '../lib/moda/engine.js';
@@ -376,8 +377,27 @@ r.get('/search', h((req, res) => {
     const fixed = suggestCorrection(term, searchLookups().vocab);
     if (fixed && fixed !== normText(String(term))) { const p2 = searchPlan(fixed); if (p2 && p2.level <= 2 && p2.count > 0) didYouMean = fixed; }
   }
+  let matchedStore = null;
+  if (term && !storeSlug && pg === 1) {
+    try {
+      const ms = matchStore(String(term), storesForModa());
+      if (ms?.store) {
+        matchedStore = {
+          id: ms.store.id,
+          slug: ms.store.slug,
+          name: { ar: ms.store.name_ar, en: ms.store.name_en || ms.store.name_ar },
+          logo: ms.store.logo || null,
+          address: ms.store.address_ar || '',
+          city: ms.store.city || '',
+          phone: ms.store.phone || '',
+          whatsapp: ms.store.whatsapp || '',
+          map_url: ms.store.map_url || null,
+        };
+      }
+    } catch (_) {}
+  }
   cache(res, 20);
-  res.json({ items, total, didYouMean, match: plan ? (plan.level === 1 ? 'exact' : plan.level === 2 ? 'wide' : 'partial') : undefined, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences, materials, attrs: attrFacets } });
+  res.json({ items, total, didYouMean, matchedStore, match: plan ? (plan.level === 1 ? 'exact' : plan.level === 2 ? 'wide' : 'partial') : undefined, page: pg, pages: Math.max(1, Math.ceil(total / limit)), price: { min: price?.min ?? 0, max: price?.max ?? 0 }, facets: { departments, stores, sizes: facetSizes, colors: facetColors, categories, audiences, materials, attrs: attrFacets } });
 }));
 
 /* ---------------------------------------------------------- visual search: "snap it, find it in Banha" */
@@ -484,7 +504,7 @@ r.get('/stylist/prompts', h((_req, res) => { res.set('Cache-Control', 'public, m
 r.post('/stylist', h(async (req, res) => {
   const st = stylistSettings();
   if (!st.enabled) throw new AppError(503, 'stylist_disabled', 'The stylist is switched off.');
-  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1200) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string().max(500)).optional(), session: z.record(z.any()).optional(), answers: z.record(z.any()).optional(), startLook: z.boolean().optional(), similar: z.boolean().optional(), lang: z.enum(['ar', 'en']).optional() }).parse(req.body);
+  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1200) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string(), z.string().max(500)).optional(), session: z.record(z.string(), z.any()).optional(), answers: z.record(z.string(), z.any()).optional(), startLook: z.boolean().optional(), similar: z.boolean().optional(), lang: z.enum(['ar', 'en']).optional() }).parse(req.body);
   if (body.session && JSON.stringify(body.session).length > 8000) throw new AppError(422, 'validation_failed', 'Session too large.');
   if (body.messages[body.messages.length - 1].role !== 'user') throw new AppError(422, 'validation_failed', 'Last message must be from the shopper.');
   const ip = req.ip || 'x'; const now = Date.now();
@@ -523,7 +543,7 @@ r.post('/stylist', h(async (req, res) => {
       const cap = Number(process.env.MODA_UNDERSTAND_DAILY ?? 150); const inner = understand;
       understand = async (a) => { const k = `${ip}`; const hits = (understandHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; understandHits.set(k, [...hits, Date.now()]); return inner(a); };
     }
-    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv() });
+    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: stylistTrainingSettings() });
     logStylist(body.startLook ? '[start look]' : lastText, result, Date.now() - t0);
     return res.json(modaClientResponse(result));
   }

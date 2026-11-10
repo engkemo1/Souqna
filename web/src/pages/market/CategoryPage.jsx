@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Search, SlidersHorizontal } from 'lucide-react';
+import { ChevronLeft, Search, SlidersHorizontal, PackagePlus, Sparkles } from 'lucide-react';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import { CategoryImage, CircleRail, deptName } from '../../components/market/CategoryCards.jsx';
 import ProductCard, { ProductCardSkeleton, ProductGrid } from '../../components/store/ProductCard.jsx';
@@ -13,6 +13,7 @@ import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { PROFILES } from '@souqna/shared/catalog';
 import NotFound from '../NotFound.jsx';
+import StylistChat from '../../components/market/StylistChat.jsx';
 
 const SITE = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -124,12 +125,53 @@ export default function CategoryPage() {
                       <ProductGrid density={prof?.grid}>{items.map((p, i) => <ProductCard key={`${p.store.slug}-${p.id}`} product={p} slug={p.store.slug} index={i} showStore ratio={ratio} onQuickAdd={setQuick} />)}</ProductGrid>
                       {items.length < (prods.data?.total || 0) && <div className="mt-6 text-center"><Button variant="secondary" loading={busy} onClick={loadMore}>{t('common.loadMore')}</Button></div>}
                     </>
-                  ) : <EmptyState title={lang === 'ar' ? 'مفيش منتجات هنا لسه' : 'No products here yet'} body={lang === 'ar' ? 'جرّب قسم تاني أو ابحث بكلمة مختلفة.' : 'Try another section or a different search.'} />}
+                  ) : (
+                    <div className="py-6 sm:py-10">
+                      <div className="mx-auto max-w-xl rounded-3xl border border-line bg-elevated p-6 text-center shadow-sm sm:p-8">
+                        <div className="mx-auto grid h-14 w-14 place-items-center rounded-2xl bg-brand/10 text-brand">
+                          <PackagePlus className="h-7 w-7" />
+                        </div>
+                        <h3 className="mt-4 font-display text-xl font-bold text-fg">
+                          {lang === 'ar' ? `بضاعة قسم ${deptName(dept, lang)} بتتجدد باستمرار` : `${deptName(dept, lang)} items are being updated`}
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-muted">
+                          {lang === 'ar'
+                            ? 'محلات بنها بتضيف موديلات جديدة باستمرار. لو بتدور على قطعة معينة ومش لاقيها، اطلبها وفريق تويست هيوفرهالك لحد باب بيتك!'
+                            : 'Banha stores add new items regularly. Looking for a specific piece? Request it and the Twist team will get it for you!'}
+                        </p>
+
+                        <div className="mt-6 flex flex-col gap-2.5 sm:flex-row sm:justify-center">
+                          <Link
+                            to={`/request?title=${encodeURIComponent(deptName(dept, lang))}&from=category-empty`}
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-btn px-6 text-sm font-bold text-on-btn shadow-sm transition hover:brightness-95"
+                          >
+                            <PackagePlus className="h-4 w-4" />
+                            <span>{lang === 'ar' ? 'مش لاقيها؟ نوفرهالك 🛍️' : "Can't find it? We'll get it"}</span>
+                          </Link>
+                          <button
+                            type="button"
+                            onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: lang === 'ar' ? `عايز بدائل من محلات تانية لقسم ${deptName(dept, lang)}` : `Show me alternatives for ${deptName(dept, lang)}` } }))}
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-xl border border-brand/30 bg-brand/5 px-5 text-sm font-bold text-brand transition hover:bg-brand/10"
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            <span>{lang === 'ar' ? 'اسأل تويلا عن بدائل' : 'Ask Twyla for alternatives'}</span>
+                          </button>
+                        </div>
+
+                        <div className="mt-6 border-t border-line pt-4">
+                          <Link to="/search" className="text-xs font-semibold text-muted transition hover:text-fg hover:underline">
+                            {lang === 'ar' ? '← تصفح كل الأقسام والمنتجات المتاحة حالياً' : '← Browse all available products & sections'}
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  )}
               </section>
             </div>
           </>
         )}
       </main>
+      <StylistChat />
       <QuickAddSheet slug={quick?.store?.slug} product={quick} marketplace onClose={() => setQuick(null)} />
     </div>
   );

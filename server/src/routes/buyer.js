@@ -90,7 +90,7 @@ r.use(requireBuyer);
 r.get('/me', h((req, res) => res.json({ buyer: out(req.buyer), unread: unread(req.buyer.id) })));
 
 /* ------------------------------------------------ Twila chat history (signed-in buyers only; photos are never persisted) */
-const chatMessagesSchema = z.array(z.record(z.any())).min(2).max(40);
+const chatMessagesSchema = z.array(z.record(z.string(), z.any())).min(2).max(40);
 function cleanChatMessages(messages) {
   return messages.map((message) => {
     if (message.role === 'user') return { role: 'user', content: String(message.content || '').slice(0, 700) };
@@ -129,7 +129,7 @@ r.get('/chats/:id', h((req, res) => {
   res.json({ chat: { id: row.id, title: row.title, updatedAt: row.updatedAt, messages, session } });
 }));
 const saveChat = (req, res, create) => {
-  const body = z.object({ id: z.number().int().positive().optional(), messages: chatMessagesSchema, session: z.record(z.any()).optional().nullable() }).parse(req.body);
+  const body = z.object({ id: z.number().int().positive().optional(), messages: chatMessagesSchema, session: z.record(z.string(), z.any()).optional().nullable() }).parse(req.body);
   const messages = cleanChatMessages(body.messages);
   if (messages.length < 2 || !messages.some((message) => message.role === 'user') || !messages.some((message) => message.role === 'assistant')) throw new AppError(422, 'validation_failed', 'A saved chat needs a shopper message and a Twila reply.');
   const encoded = JSON.stringify(messages);

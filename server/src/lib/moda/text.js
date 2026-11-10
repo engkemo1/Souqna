@@ -107,3 +107,8 @@ export function extractNumbers(tokens, { ageUnits = [], multipliers = {}, curren
   }
   return { ages, amounts };
 }
+
+export const TRAINING_STOPWORDS = new Set('انا انت انتي هو هي احنا هم ده دي دول اللي اللى في من على مع عن لو هل ايه اي اية عايز عاوز عاوزه عاوزة ممكن محتاجه محتاج عايزة بقى جدا قوي او ولا يكون تكون كان كانت مش ده هو هي لها له'.split(' '));
+export function trainingTokens(value) {
+  return norm(value).replace(/[^\p{L}\p{N}]+/gu, ' ').split(/\s+/).map((token) => token.replace(/^(?:وال|بال|كال|لل|ال)/, '')).filter((token) => token.length > 1 && !TRAINING_STOPWORDS.has(token));
+}

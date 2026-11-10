@@ -155,6 +155,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     const k = garmentEntries[i].key;
     if ((k === 'shoes_any' && hasKey(SHOE_KEYS)) || (k === 'dress_any' && hasKey(DRESS_KEYS))) garmentEntries.splice(i, 1);
   }
+  const MATCH_PREFIXES = new Set(['تليق', 'يليق', 'يمشي', 'يمشوا', 'ينفع', 'يركب', 'يتماشى', 'تناسب', 'يناسب', 'نسقلي', 'نسقيلي', 'طقم']);
   const OWNED_PREFIXES = new Set(['عندي', 'معايا', 'معي', 'لابس', 'لابسه', 'لابسة', 'اشتريت', 'شريت', 'جبت', 'have', 'own', 'bought', 'wearing']);
   const NOT_OWNED_PREFIXES = new Set(['ماعنديش', 'معنديش', 'معيش', 'مش']);
   const seen = new Set();
@@ -166,7 +167,9 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
       for (const t of tokenize(norm(g.text))) { for (const v of tokenVariants(t)) { const hit = (K.index.exact.get(v) || []).find((x) => x.group === 'material'); if (hit) { mat = { key: hit.key }; break; } } if (mat) break; }
     }
     const prevTokens = tokens.slice(Math.max(0, g.start - 2), g.start);
-    const isOwned = prevTokens.some((t) => OWNED_PREFIXES.has(t)) && !prevTokens.some((t) => NOT_OWNED_PREFIXES.has(t));
+    const prev3 = tokens.slice(Math.max(0, g.start - 3), g.start);
+    const hasMatchLead = prev3.some((t) => MATCH_PREFIXES.has(t)) && prev3.some((t) => t === 'مع' || t === 'على' || t === 'معاه' || t === 'معاها');
+    const isOwned = (prevTokens.some((t) => OWNED_PREFIXES.has(t)) || hasMatchLead) && !prevTokens.some((t) => NOT_OWNED_PREFIXES.has(t));
     if (isOwned) {
       result.ownedPieces.push({ key: g.key, color: col?.key || null, material: mat?.key || null, text: g.text });
       if (col) col.used = true;
@@ -249,7 +252,10 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
 
   /* ---------- متابعة وتحية ---------- */
   const has = (k) => intents.includes(k);
-  const hasContent = result.garments.length || result.context || result.budget || result.persons.length;
+  const explicitAudience = aud.length > 0 || result.kidsUnspecified || partnerFemale || partnerMale;
+  const hasExplicitShopping = /(^| )(لبس|هدوم|ملابس|طقم|بدله|فستان|شوز|كوتشي|اشتري|اتسوق|شراء|تسوق|موديلات|ازياء|فاشون|كولكشن)( |$)/.test(n);
+  const hasGarmentsOrOccasion = result.garments.length > 0 || Boolean(result.context) || Boolean(result.budget) || result.fullLook;
+  const hasContent = hasGarmentsOrOccasion || explicitAudience || (hasExplicitShopping && (hasShopping || result.persons.length > 0));
   if (has('reset')) result.followup = 'reset';
   else if (has('show_more') && !result.garments.length) result.followup = 'show_more';
   else if (has('cheaper') && !result.garments.length && !result.context) result.followup = 'cheaper'; // "أقل سعر تيشيرت" is a product request, not "cheaper than before"
@@ -260,7 +266,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   else if (result.followup) result.intent = 'followup';
   else if (!hasContent && has('thanks') && tokens.length <= 5) result.intent = 'thanks';
   else if (!hasContent && has('greeting') && tokens.length <= 5) result.intent = 'greeting';
-  else if (hasContent || hasShopping) result.intent = 'shop';
+  else if (hasContent || (hasShopping && hasExplicitShopping)) result.intent = 'shop';
 
   // رقم لوحده أو رموز من غير أي كلمة (123 / ؟؟؟ / 😀) مش طلب لبس، إلا لو رقم ميزانية.
   if (result.intent === 'shop' && !/[A-Za-z\u0600-\u06FF]/.test(String(raw || '')) && !result.budget) result.intent = 'unknown';

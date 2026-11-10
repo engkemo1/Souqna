@@ -30,7 +30,7 @@ export const selectorSchema = z.object({
   all: z.boolean().default(false),
   products: ids,
   categories: ids,
-}).default({});
+}).default({ all: false, products: [], categories: [] });
 
 const condBase = { scope: z.enum(['qualifying', 'cart']).default('qualifying') };
 const condSchema = z.discriminatedUnion('kind', [

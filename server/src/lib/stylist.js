@@ -71,18 +71,18 @@ function readStylistTraining() {
   try {
     const saved = JSON.parse(q.get('SELECT value FROM app_settings WHERE key=?', [STYLIST_TRAINING_KEY])?.value || '{}');
     return {
-      guidance: String(saved.guidance || '').slice(0, 1600),
-      examples: Array.isArray(saved.examples) ? saved.examples.slice(0, 40) : [],
-      lessons: Array.isArray(saved.lessons) ? saved.lessons.slice(0, 100).map((lesson) => ({ ...lesson, status: lesson.status || 'approved' })) : [],
+      guidance: String(saved.guidance || '').slice(0, 5000),
+      examples: Array.isArray(saved.examples) ? saved.examples.slice(0, 60) : [],
+      lessons: Array.isArray(saved.lessons) ? saved.lessons.slice(0, 300).map((lesson) => ({ ...lesson, status: lesson.status || 'approved' })) : [],
     };
   } catch { return { guidance: '', examples: [], lessons: [] }; }
 }
 
 function writeStylistTraining(training) {
   const value = {
-    guidance: String(training.guidance || '').slice(0, 1600),
-    examples: Array.isArray(training.examples) ? training.examples.slice(0, 40) : [],
-    lessons: Array.isArray(training.lessons) ? training.lessons.slice(0, 100) : [],
+    guidance: String(training.guidance || '').slice(0, 5000),
+    examples: Array.isArray(training.examples) ? training.examples.slice(0, 60) : [],
+    lessons: Array.isArray(training.lessons) ? training.lessons.slice(0, 300) : [],
   };
   q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [STYLIST_TRAINING_KEY, JSON.stringify(value)]);
   q.run("DELETE FROM app_settings WHERE key='look_of_day'");
@@ -537,7 +537,7 @@ export function liveOffersForModa() {
 export function storesForModa() {
   const arr = (j) => { try { const v = JSON.parse(j || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
   return q.all("SELECT * FROM stores WHERE status='active' AND hidden=0 ORDER BY sort_order, id LIMIT 300").map((s) => ({
-    id: s.id, slug: s.slug, name_ar: s.name_ar, name_en: s.name_en, tagline_ar: s.tagline_ar || '', description_ar: s.description_ar || '', address_ar: s.address_ar || '', city: s.city || '',
+    id: s.id, slug: s.slug, name_ar: s.name_ar, name_en: s.name_en, logo: s.logo || null, cover: s.cover || null, tagline_ar: s.tagline_ar || '', description_ar: s.description_ar || '', address_ar: s.address_ar || '', city: s.city || '',
     phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.map_url || null, lat: s.lat ?? null, lng: s.lng ?? null, hours: storeHours(s), branches: arr(s.branches_json), contacts: arr(s.contacts_json),
     instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
   }));
@@ -593,7 +593,7 @@ export async function runModaStylist(messages, { profile, session, answers, imag
   const rows = modaCatalogue();
   // احتياطي مجاني: لو القواعد مافهمتش الرسالة، Cloudflare بيستخرج (شخص/مناسبة/قطعة) من قاموس محدد بس
   const llmExtract = providerReady.cloudflare() ? makeLlmExtract(async (system, msgs) => parseJson(await callLlm('cloudflare', system, msgs))) : null;
-  const out = await runModa(history, { products: rows, profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract, assistantName, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv() });
+  const out = await runModa(history, { products: rows, profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract, assistantName, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: readStylistTraining() });
   const ids = [...new Set((out.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.id)))];
   const byId = new Map(rows.filter((r) => ids.includes(r.id)).map((r) => [r.id, r]));
   const rowList = ids.map((id) => byId.get(id)).filter(Boolean);
@@ -608,7 +608,8 @@ export async function runModaStylist(messages, { profile, session, answers, imag
     state: out.state, say: out.say, remember: {}, palette: (out.blocks?.palette || []).map((c) => c.ar), tips: (out.tips || []).join(' '),
     looks, total: out.blocks?.total || 0, budget: out.blocks?.budget || null, overBudget: out.state === 'over_budget',
     missing: (out.missing || []).map((m) => m.label), over: out.blocks?.over || 0,
-    tabs, couple: !!out.blocks?.couple, questions: out.questions || [], missingItems: tabs.flatMap((t) => t.missing.map((m) => ({ ...m, tab: t.label }))), session: out.session,
+    tabs, couple: !!out.blocks?.couple, questions: out.questions || [], missingItems: tabs.flatMap((t) => t.missing.map((m) => ({ ...m, tab: t.label }))), session: out.session, storeCard: out.storeCard || null,
+    humanHandoff: Boolean(out.humanHandoff || ['none', 'no_look'].includes(out.state) || out.fallback || ['contact_whatsapp', 'support', 'contact_phone', 'contact_all', 'human_support'].includes(out.faq)),
   };
 }
 

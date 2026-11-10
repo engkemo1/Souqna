@@ -1,24 +1,61 @@
 /** أسئلة عن محل معيّن (رقمه، عنوانه، لوكيشنه، مواعيده، فروعه، بيبيع إيه، عروضه): الرد كله من بيانات المحل المسجّلة، ومفيش حاجة بتتخترع. */
-import { norm } from './text.js';
+import { norm, skeleton } from './text.js';
 
 const strip = (s) => String(s).split(' ').map((w) => (w.length > 3 ? w.replace(/^ال/, '') : w)).join(' ').trim();
-const GENERIC = new Set(['ستايل', 'ستور', 'شوب', 'فاشن', 'مول', 'كلوثز', 'wear', 'style', 'store', 'shop', 'fashion', 'clothes', 'stores', 'ملابس', 'لبس', 'محل', 'متجر', 'بيت', 'عالم', 'house', 'world', 'collection', 'brand', 'man', 'men', 'women', 'kids', 'design']);
+export const GENERIC = new Set(['ستايل', 'ستور', 'شوب', 'فاشن', 'مول', 'كلوثز', 'wear', 'style', 'store', 'shop', 'fashion', 'clothes', 'stores', 'ملابس', 'لبس', 'محل', 'متجر', 'بيت', 'عالم', 'house', 'world', 'collection', 'brand', 'man', 'men', 'women', 'kids', 'design']);
 
-/** أقرب محل مذكور بالاسم (كامل أو كلمة مميّزة)، أو ambiguous لو أكتر من محل بنفس القوة. */
+const AR_TO_LAT_MAP = {
+  'ا': 'a', 'أ': 'a', 'إ': 'e', 'آ': 'a', 'ء': '', 'ئ': 'e', 'ؤ': 'o',
+  'ب': 'b', 'ت': 't', 'ة': 'a', 'ث': 'th', 'ج': 'g', 'ح': 'h', 'خ': 'kh',
+  'د': 'd', 'ذ': 'z', 'ر': 'r', 'ز': 'z', 'س': 's', 'ش': 'sh', 'ص': 's',
+  'ض': 'd', 'ط': 't', 'ظ': 'z', 'ع': 'a', 'غ': 'gh', 'ف': 'f', 'ق': 'k',
+  'ك': 'k', 'ل': 'l', 'م': 'm', 'ن': 'n', 'ه': 'h', 'و': 'o', 'ي': 'y', 'ى': 'a'
+};
+
+export function arToLat(str) {
+  return String(str || '').split('').map((c) => AR_TO_LAT_MAP[c] !== undefined ? AR_TO_LAT_MAP[c] : c).join('')
+    .replace(/oo/g, 'u').replace(/ee/g, 'i');
+}
+
+/** أقرب محل مذكور بالاسم (كامل أو كلمة مميّزة، عربي أو إنجليزي أو فرانكو)، أو ambiguous لو أكتر من محل بنفس القوة. */
 export function matchStore(text, stores = []) {
-  const t = ` ${strip(norm(text))} `;
+  const normText = norm(text);
+  const t = ` ${strip(normText)} `;
+  const tLat = ` ${strip(arToLat(normText))} `;
+  const queryToks = normText.split(' ').filter((w) => w.length >= 3 && !GENERIC.has(w));
+  const querySkels = queryToks.map((w) => skeleton(arToLat(w))).filter((sk) => sk.length >= 3);
+
   const tokenCount = new Map();
   const cands = stores.map((s) => {
-    const names = [s.name_ar, s.name_en, String(s.slug || '').replace(/-/g, ' ')].map((x) => strip(norm(x || ''))).filter((x) => x.length >= 3);
-    const toks = new Set(names.flatMap((n) => n.split(' ')).filter((w) => w.length >= 4 && !GENERIC.has(w)));
+    const rawNames = [s.name_ar, s.name_en, String(s.slug || '').replace(/-/g, ' ')].filter(Boolean);
+    const translit = s.name_ar ? arToLat(s.name_ar) : '';
+    const names = [...rawNames, translit].map((x) => strip(norm(x || ''))).filter((x) => x.length >= 3);
+    const toks = new Set(names.flatMap((n) => n.split(' ')).filter((w) => w.length >= 3 && !GENERIC.has(w)));
+    const skels = new Set([...toks].map((w) => skeleton(arToLat(w))).filter((sk) => sk.length >= 3));
     for (const w of toks) tokenCount.set(w, (tokenCount.get(w) || 0) + 1);
-    return { s, names, toks };
+    return { s, names, toks, skels };
   });
+
   const scored = [];
-  for (const { s, names, toks } of cands) {
+  for (const { s, names, toks, skels } of cands) {
     let best = 0;
-    for (const n of names) if (t.includes(` ${n} `)) best = Math.max(best, 100 + n.length);
-    if (!best) for (const w of toks) if (tokenCount.get(w) === 1 && t.includes(` ${w} `)) best = Math.max(best, w.length);
+    for (const n of names) {
+      if (t.includes(` ${n} `) || tLat.includes(` ${n} `)) best = Math.max(best, 100 + n.length);
+    }
+    if (!best) {
+      for (const w of toks) {
+        if (tokenCount.get(w) === 1 && (t.includes(` ${w} `) || tLat.includes(` ${w} `))) {
+          best = Math.max(best, w.length);
+        }
+      }
+    }
+    if (!best) {
+      for (const qsk of querySkels) {
+        if (skels.has(qsk)) {
+          best = Math.max(best, 10 + qsk.length);
+        }
+      }
+    }
     if (best) scored.push({ s, best });
   }
   if (!scored.length) return { store: null, ambiguous: [] };
@@ -29,11 +66,11 @@ export function matchStore(text, stores = []) {
 
 const W = (alts) => new RegExp(`(^| )(ال ?)?(${alts})( |$)`);
 const ASPECTS = [
-  ['phone', W('رقم|ارقام|نمره|تليفون|تلفون|موبايل|هاتف|فون|واتس|واتساب|وتساب|اكلم|اكلمه|اكلمهم|اتصل|كلم|كلمه|كلمهم|تواصل|اتواصل|phone|number|call|whatsapp|contact')],
-  ['map', W('لوكيشن|لوكشن|موقع|موقعه|خريطه|ماب|map|location|اوصل|اروح|توصف|اتجاهات|directions|مكانه|مكان')],
-  ['address', W('عنوان|عنوانه|address|ساكن|شارع|فين|where')],
+  ['phone', W('رقم|ارقام|نمره|نمرة|تليفون|تلفون|موبايل|هاتف|فون|واتس|واتساب|وتساب|اكلم|اكلمه|اكلمهم|اتصل|كلم|كلمه|كلمهم|تواصل|اتواصل|phone|number|call|whatsapp|contact')],
+  ['map', W('لوكيشن|لوكشن|موقع|موقعه|خريطه|خريطة|ماب|map|location|اوصل|اروح|توصف|اتجاهات|directions|مكانه|مكان|طريق|ازاي اروح|اروح ازاي|ازاي اوصل')],
+  ['address', W('عنوان|عنوانه|عناوين|address|ساكن|شارع|فين|where|مكان|مكانه')],
   ['branches', W('فرع|فروع|فروعه|branch|branches')],
-  ['hours', W('مواعيد|مواعيده|بتفتح|بيفتح|بتقفل|بيقفل|فاتح|مفتوح|مقفول|قافل|ساعات|امتي|open|opens|close|closes|hours|اجازه|اجازته|يفتح|يقفل|دلوقتي فاتح')],
+  ['hours', W('مواعيد|مواعيده|بتفتح|بيفتح|بتقفل|بيقفل|فاتح|مفتوح|مقفول|قافل|ساعات|امتي|open|opens|close|closes|hours|اجازه|اجازته|يفتح|يقفل|دلوقتي فاتح|شغال دلوقتي')],
   ['sells', W('بيبيع|بتبيع|بيبيعوا|بيبيعو|عندهم|عنده|بيعمل|بيشتغل|تخصص|تخصصه|منتجات|منتجاته|بضاعه|sells|sell|products|carry|بيقدم|بيوفر|نوع')],
   ['social', W('سوشيال|سوشال|حسابات|حساباته|حسابهم|صفحته|صفحاته|فيسبوك|فيسبك|فيس بوك|فيس|انستجرام|انستا|انستغرام|انستقرام|تيك توك|تيكتوك|تك توك|facebook|fb|instagram|insta|ig|tiktok|social|socials')],
   ['offers', W('عروض|عروضه|عرض|خصم|خصومات|تخفيضات|اوكازيون|offers|deals|discount|discounts|sale')],

@@ -29,6 +29,7 @@ import { trafficStats } from '../lib/traffic.js';
 import { auditMiddleware } from '../lib/insights.js';
 import insightsRoutes from './admin-insights.js';
 import featuredRoutes from './admin-featured.js';
+import adminProductsRoutes, { countProductsWithIssues } from './admin-products.js';
 import { verifyTotp } from '../lib/totp.js';
 import { snapshotDb, runBackup, lastBackup, runOffsiteBackup, lastOffsite } from '../lib/backup.js';
 import { offsiteEnabled, r2Enabled } from '../lib/r2.js';
@@ -80,6 +81,7 @@ r.use((req, _res, next) => {
 r.use(auditMiddleware);
 r.use(insightsRoutes);
 r.use(featuredRoutes);
+r.use(adminProductsRoutes);
 
 /** Step 2 of admin sign-in. The key (checked above) + a 6-digit authenticator code → a 12-hour session proof. */
 let lastStep = 0;
@@ -728,7 +730,7 @@ const demoPasswordsUnchanged = () => {
 };
 
 r.get('/status', h((_req, res) => {
-  const insecureJwt = config.jwtSecret.startsWith('dev-only') || config.jwtSecret.length < 24;
+  const insecureJwt = Boolean(config.jwtSecretInsecure || config.jwtSecret.startsWith('dev-only') || config.jwtSecret.length < 24);
   res.json({
     backup: lastBackup(), backupDir: !!config.backupDir, offsite: { enabled: offsiteEnabled, last: lastOffsite() }, mediaR2Enabled: r2Enabled,
     whatsappConfigured: isWhatsAppConfigured(), template: config.wa.template, registrationOpen: config.allowRegister,
@@ -829,7 +831,7 @@ const trainingLessonSchema = z.object({
 });
 r.get('/stylist/training', h((_req, res) => res.json(stylistTrainingSettings())));
 r.put('/stylist/training', h((req, res) => {
-  const body = z.object({ guidance: z.string().trim().max(1600) }).parse(req.body);
+  const body = z.object({ guidance: z.string().trim().max(5000) }).parse(req.body);
   res.json(saveStylistTrainingGuidance(body.guidance));
 }));
 r.post('/stylist/training/examples', h((req, res) => {
@@ -863,12 +865,12 @@ const modaLabScenarioSchema = z.object({
   expectedContext: z.string().max(80).optional().default(''), expectedQuestions: z.array(z.string().max(80)).max(3).optional().default([]),
   forbiddenGarments: z.array(z.string().max(80)).max(12).optional().default([]),
   maxBudget: z.coerce.number().int().positive().max(1000000).nullable().optional().default(null),
-  answers: z.record(z.union([z.string().max(100), z.number().int(), z.array(z.union([z.string().max(100), z.number().int()])).max(4)])).optional().default({}),
+  answers: z.record(z.string(), z.union([z.string().max(100), z.number().int(), z.array(z.union([z.string().max(100), z.number().int()])).max(4)])).optional().default({}),
 });
 r.get('/stylist/lab', h((_req, res) => res.json(modaLabSettings())));
 r.post('/stylist/lab/run', h(async (req, res) => {
   const body = modaLabScenarioSchema.omit({ id: true, name: true, answers: true }).extend({
-    session: z.record(z.any()).nullable().optional(), answers: modaLabScenarioSchema.shape.answers,
+    session: z.record(z.string(), z.any()).nullable().optional(), answers: modaLabScenarioSchema.shape.answers,
     replayAnswers: z.boolean().optional().default(false),
   }).parse(req.body || {});
   const { message, expectedGarment, expectedAudience, maxBudget, expectedContext, expectedQuestions, forbiddenGarments, session, answers, replayAnswers } = body;
@@ -1081,6 +1083,7 @@ r.get('/notifications', h((req, res) => {
     services, servicesNew: q.val("SELECT COUNT(*) FROM service_requests WHERE status='new'"),
     sourcing: q.all("SELECT id, number, title, created_at AS at FROM sourcing_requests WHERE created_at > ? ORDER BY created_at DESC LIMIT 10", [since]), sourcingNew: q.val("SELECT COUNT(*) FROM sourcing_requests WHERE status IN ('new','approved')"),
     deptsPending: pendingDepts.length, deptPendingItems: pendingDepts.map((d) => ({ id: d.id, name: d.name_ar })),
+    productsIssues: countProductsWithIssues(),
     newStores: q.all('SELECT id, name_ar FROM stores WHERE created_at > ? ORDER BY id DESC LIMIT 10', [since]),
     items, readyItems, now: new Date().toISOString().slice(0, 19).replace('T', ' '),
     open: q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform' AND status NOT IN ('delivered','cancelled')"),

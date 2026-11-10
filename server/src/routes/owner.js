@@ -35,6 +35,17 @@ import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMedi
 import {
   serializeStore, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi, stockStatus,
 } from '../lib/serialize.js';
+import { ISSUE_TYPES } from '../lib/product-moderation.js';
+
+const ISSUE_LABEL_MAP = new Map(ISSUE_TYPES.map((i) => [i.code, i.label]));
+function serializeOwnerModeration(p) {
+  const rawFlags = json(p.admin_flags_json, []);
+  return {
+    adminReviewStatus: p.admin_review_status || null,
+    adminReviewNote: p.admin_review_note || '',
+    adminFlags: Array.isArray(rawFlags) ? rawFlags.map((c) => ISSUE_LABEL_MAP.get(c) || c) : [],
+  };
+}
 
 const r = Router();
 // Store-owner JWT, or — when mounted under /api/admin/stores/:slug/as — the platform admin acting on that store (key-checked upstream).
@@ -70,7 +81,8 @@ r.get('/notifications', h((req, res) => {
     [req.store.id, since],
   );
   const pending = q.val("SELECT COUNT(*) FROM orders WHERE store_id=? AND status='pending'", [req.store.id]);
-  res.json({ pending, newOrders, now: nowIso() });
+  const adminFlagged = q.val("SELECT COUNT(*) FROM products WHERE store_id=? AND status<>'archived' AND (admin_review_status='flagged' OR (admin_review_note IS NOT NULL AND admin_review_note<>''))", [req.store.id]) || 0;
+  res.json({ pending, adminFlagged, newOrders, now: nowIso() });
 }));
 
 r.get('/store', h((req, res) => {
@@ -466,7 +478,19 @@ r.get('/store-health', h((req, res) => {
     const hit = rows.filter(fn);
     return { key, count: hit.length, items: hit.slice(0, 3).map((p) => ({ id: p.id, name: p.name_ar })) };
   }).filter((i) => i.count > 0);
-  res.json({ total: rows.length, issues });
+  const adminFlaggedRows = q.all(
+    `SELECT id, name_ar, status, admin_review_status, admin_review_note, admin_flags_json
+     FROM products
+     WHERE store_id=? AND status<>'archived' AND (admin_review_status='flagged' OR (admin_review_note IS NOT NULL AND admin_review_note<>'') OR (admin_flags_json IS NOT NULL AND admin_flags_json<>'[]'))
+     ORDER BY updated_at DESC LIMIT 10`,
+    [req.store.id],
+  ).map((p) => ({
+    id: p.id,
+    name: p.name_ar,
+    status: p.status,
+    ...serializeOwnerModeration(p),
+  }));
+  res.json({ total: rows.length, issues, adminNotes: adminFlaggedRows });
 }));
 
 r.get('/overview', h((req, res) => {
@@ -679,6 +703,7 @@ r.get('/products', h((req, res) => {
   if (stock === 'low') where.push('p.track_stock=1 AND p.stock>0 AND p.stock<=p.low_stock_at');
   if (stock === 'out') where.push('p.track_stock=1 AND p.stock<=0');
   if (req.query.photo === 'weak') where.push('(COALESCE((SELECT m.quality FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.is_primary=1 LIMIT 1), 100) < 50)');
+  if (req.query.admin === 'flagged') where.push("(p.admin_review_status='flagged' OR (p.admin_review_note IS NOT NULL AND p.admin_review_note<>'') OR (p.admin_flags_json IS NOT NULL AND p.admin_flags_json<>'[]'))");
   if (term) { const like = `%${String(term).slice(0, 60)}%`; where.push('(p.name_ar LIKE ? OR p.name_en LIKE ? OR p.sku LIKE ?)'); params.push(like, like, like); }
   const order = { newest: 'p.created_at DESC', oldest: 'p.created_at ASC', price_asc: 'p.price ASC', price_desc: 'p.price DESC', stock: 'p.stock ASC', best: 'p.sold_count DESC', name: 'p.name_en ASC' }[sort] || 'p.created_at DESC';
   const limit = clampInt(req.query.limit, 1, 100, 24);
@@ -692,7 +717,8 @@ r.get('/products', h((req, res) => {
   const images = firstImage(rows.map((p) => p.id));
   const counts = q.get(
     `SELECT COUNT(*) AS all_, SUM(status='active') AS active, SUM(status='draft') AS draft,
-      SUM(track_stock=1 AND stock>0 AND stock<=low_stock_at) AS low, SUM(track_stock=1 AND stock<=0) AS out_
+      SUM(track_stock=1 AND stock>0 AND stock<=low_stock_at) AS low, SUM(track_stock=1 AND stock<=0) AS out_,
+      SUM(admin_review_status='flagged' OR (admin_review_note IS NOT NULL AND admin_review_note<>'') OR (admin_flags_json IS NOT NULL AND admin_flags_json<>'[]')) AS admin_flagged
      FROM products WHERE store_id=? AND status<>'archived'`, [sid],
   );
   const weak = q.val(`SELECT COUNT(*) FROM products p WHERE p.store_id=? AND p.status<>'archived' AND (COALESCE((SELECT m.quality FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.is_primary=1 LIMIT 1), 100) < 50)`, [sid]);
@@ -701,9 +727,10 @@ r.get('/products', h((req, res) => {
       id: p.id, slug: p.slug, name: bi(p, 'name'), price: p.price, compareAt: p.compare_at_price, sku: p.sku, status: p.status,
       stock: p.stock, stockStatus: stockStatus(p), trackStock: !!p.track_stock, sold: p.sold_count, featured: !!p.featured,
       category: p.cat_en ? { ar: p.cat_ar, en: p.cat_en } : null, variantCount: p.variant_count, image: images.get(p.id) || null, updatedAt: p.updated_at,
+      ...serializeOwnerModeration(p),
     })),
     total, page, pages: Math.max(1, Math.ceil(total / limit)),
-    counts: { all: counts.all_ || 0, active: counts.active || 0, draft: counts.draft || 0, low: counts.low || 0, out: counts.out_ || 0, weak: weak || 0 },
+    counts: { all: counts.all_ || 0, active: counts.active || 0, draft: counts.draft || 0, low: counts.low || 0, out: counts.out_ || 0, weak: weak || 0, adminFlagged: counts.admin_flagged || 0 },
   });
 }));
 
@@ -731,6 +758,7 @@ r.get('/products/:id', h((req, res) => {
       ...serializeProductDetail(p),
       status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, noReturn: !!p.no_return, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '', audience: p.audience || '', badgeText: p.badge_text || '', badgeTone: p.badge_tone || '', ...suggestTypeFor(p),
       compareAt: p.compare_at_price, sold: p.sold_count, views: p.views,
+      ...serializeOwnerModeration(p),
     },
   });
 }));
@@ -900,6 +928,7 @@ export function saveProduct(storeId, data, existing) {
 r.post('/products', h((req, res) => {
   const data = productSchema.parse(req.body);
   const id = saveProduct(req.store.id, data, null);
+  if (req.adminStore) update('products', id, { admin_review_status: 'approved', admin_reviewed_at: nowIso() });
   invalidateModaCatalogue();
   triggerReindex();
   matchProductPhotos(id); // in the background: all photos of the product end up with the same kind of background
@@ -912,6 +941,8 @@ r.put('/products/:id', h((req, res) => {
   if (!p) throw notFound('Product');
   const data = productSchema.parse(req.body);
   saveProduct(req.store.id, data, p);
+  if (req.adminStore) update('products', p.id, { admin_review_status: 'approved', admin_reviewed_at: nowIso(), admin_flags_json: null });
+  else if (p.admin_review_status) update('products', p.id, { admin_review_status: null });
   invalidateModaCatalogue();
   matchProductPhotos(p.id);
   notifyPriceDrop(p.id, p.price, data.price);
@@ -935,6 +966,9 @@ r.patch('/products/:id', h((req, res) => {
   const price = body.price ?? p.price;
   const cmp = body.compare_at_price === undefined ? p.compare_at_price : body.compare_at_price;
   if (cmp && cmp <= price) throw new AppError(422, 'validation_failed', 'Compare-at price must be higher than price.', { compare_at_price: 'compare_gt_price' });
+  if (!req.adminStore && p.admin_review_status === 'flagged' && body.status === 'active') {
+    throw new AppError(403, 'admin_flagged', 'المنتج موقوف من العرض بواسطة إدارة المنصة — افتح تعديل المنتج وعدّل البيانات أو الصور المطلوبة أولاً.');
+  }
   const hasVariants = q.val('SELECT COUNT(*) FROM variants WHERE product_id=?', [p.id]) > 0;
   if (body.stock !== undefined && hasVariants) throw badRequest('has_variants', 'Update stock per variant for this product.');
   update('products', p.id, { price: body.price, compare_at_price: body.compare_at_price === undefined ? undefined : body.compare_at_price || null, stock: body.stock, status: body.status, featured: body.featured === undefined ? undefined : Number(body.featured), updated_at: nowIso() });

@@ -220,3 +220,41 @@ test('owned piece phrase prevents searching for it and coach jacket infers jacke
   assert.match(missing[0].hint, /Twist/);
 });
 
+
+test('store questions: address, map, hours, transliteration (madas <-> مداس) and unknown store queries', async () => {
+  const testStores = [
+    { id: 10, slug: 'madas-shoes', name_ar: 'مداس', name_en: null, address_ar: 'شارع سعد زغلول، بنها', phone: '01012345678', map_url: 'https://maps.google.com/?q=madas' },
+    { id: 11, slug: 'town-style', name_ar: 'تاون ستايل', name_en: 'Town Style', address_ar: 'شارع الأهرام، بنها' },
+  ];
+
+  // 1. English/Franco "madas" matches Arabic "مداس"
+  const r1 = await runModa('عاوز عنوان madas', { stores: testStores });
+  assert.equal(r1.state, 'chat');
+  assert.equal(r1.faq, 'store');
+  assert.ok(r1.say.includes('مداس'));
+  assert.ok(r1.say.includes('سعد زغلول'));
+
+  // 2. Arabic query
+  const r2 = await runModa('عايز عنوان مداس', { stores: testStores });
+  assert.ok(r2.say.includes('مداس'));
+
+  // 3. Location/map
+  const r3 = await runModa('لوكيشن madas', { stores: testStores });
+  assert.ok(r3.say.includes('مداس'));
+  assert.ok(r3.storeCard?.mapUrl);
+
+  // 4. Unknown store doesn't trigger "ده لأنهي مناسبة؟"
+  const r4 = await runModa('عاوز عنوان zara', { stores: testStores });
+  assert.ok(!r4.say.includes('لأنهي مناسبة'));
+  assert.ok(r4.say.includes('zara') || r4.say.includes('مش لاقية متجر'));
+
+  // 5. "عاوز اسأل سؤال" / "عندي سؤال" doesn't trigger shopping
+  const r5 = await runModa('عاوز اسأل سؤال');
+  assert.equal(r5.faq, 'help_me');
+  assert.ok(!r5.say.includes('لأنهي مناسبة'));
+
+  // 6. "عاوز اعرف انتي مين" triggers identity FAQ
+  const r6 = await runModa('عاوز اعرف انتي مين');
+  assert.equal(r6.faq, 'identity');
+  assert.ok(!r6.say.includes('لأنهي مناسبة'));
+});

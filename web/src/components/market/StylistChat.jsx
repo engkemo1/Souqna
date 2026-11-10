@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { X, Send, Mic, MicOff, Loader2, Check, Camera, ThumbsUp, ThumbsDown, RotateCcw, History, Plus, Trash2 } from 'lucide-react';
+import { X, Send, Mic, MicOff, Loader2, Check, Camera, ThumbsUp, ThumbsDown, RotateCcw, History, Plus, Trash2, MapPin, Phone, MessageCircle, Store, ExternalLink } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useApi } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
@@ -74,19 +74,57 @@ function StoreCardView({ c, lang }) {
   const ar = lang !== 'en';
   const embed = c.lat != null && c.lng != null ? `https://www.openstreetmap.org/export/embed.html?bbox=${c.lng - 0.004}%2C${c.lat - 0.003}%2C${c.lng + 0.004}%2C${c.lat + 0.003}&layer=mapnik&marker=${c.lat}%2C${c.lng}` : null;
   const tel = telHref(c.phone);
-  const btn = 'inline-flex h-9 items-center rounded-full border border-line-strong px-3.5 text-[13px] font-semibold transition hover:bg-fg/[0.06] active:scale-95';
+  const btn = 'inline-flex h-9 items-center gap-1.5 rounded-full border border-line-strong px-3.5 text-[12.5px] font-semibold transition hover:bg-fg/[0.06] active:scale-95';
   return (
-    <div className="mt-2 max-w-[90%] overflow-hidden rounded-2xl border border-line bg-elevated">
+    <div className="mt-2.5 max-w-[92%] overflow-hidden rounded-2xl border border-line bg-elevated shadow-sm">
       {embed && <iframe title={c.name} src={embed} loading="lazy" className="h-40 w-full border-0" />}
-      <div className="p-3">
-        <p className="text-sm font-bold">{c.name}</p>
-        {c.address && <p className="mt-0.5 text-[13px] text-muted">{c.address}</p>}
-        {c.hours && <p className="mt-0.5 text-[12px] text-muted">{c.hours}</p>}
-        <div className="mt-2.5 flex flex-wrap gap-2">
-          {c.mapUrl && <a href={c.mapUrl} target="_blank" rel="noopener noreferrer" className={btn}>{ar ? 'افتح الخريطة' : 'Open map'}</a>}
-          {tel && <a href={tel} className={btn}>{ar ? 'اتصل' : 'Call'}</a>}
-          {c.whatsapp && <a href={c.whatsapp} target="_blank" rel="noopener noreferrer" className={btn}>{ar ? 'واتساب' : 'WhatsApp'}</a>}
-          <Link to={`/s/${c.slug}`} className={btn}>{ar ? 'افتح المحل' : 'Open store'}</Link>
+      <div className="p-3.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="grid h-7 w-7 place-items-center rounded-lg bg-brand/10 text-brand">
+              <Store className="h-4 w-4" />
+            </span>
+            <p className="text-[15px] font-bold text-fg">{c.name}</p>
+          </div>
+          <span className="rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-muted">
+            {ar ? 'محل في بنها 📍' : 'Banha Store 📍'}
+          </span>
+        </div>
+        {c.address && (
+          <p className="mt-2 flex items-start gap-1.5 text-[13px] leading-relaxed text-muted">
+            <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand" />
+            <span>{c.address}</span>
+          </p>
+        )}
+        {c.hours && (
+          <p className="mt-1 text-[12px] text-muted">
+            ⏱️ {c.hours}
+          </p>
+        )}
+        <div className="mt-3.5 flex flex-wrap gap-2 border-t border-line/60 pt-3">
+          {c.mapUrl && (
+            <a href={c.mapUrl} target="_blank" rel="noopener noreferrer" className={btn + ' bg-brand/5 text-brand border-brand/20 hover:bg-brand/10'}>
+              <MapPin className="h-3.5 w-3.5" />
+              <span>{ar ? 'اللوكيشن على الخريطة' : 'Google Maps'}</span>
+              <ExternalLink className="h-3 w-3 opacity-60" />
+            </a>
+          )}
+          <Link to={`/s/${c.slug}`} className={btn + ' bg-fg text-canvas hover:bg-fg/90'}>
+            <Store className="h-3.5 w-3.5" />
+            <span>{ar ? 'تصفح منتجات المحل' : 'Browse products'}</span>
+          </Link>
+          {c.whatsapp && (
+            <a href={c.whatsapp} target="_blank" rel="noopener noreferrer" className={btn + ' text-emerald-600 hover:bg-emerald-50'}>
+              <MessageCircle className="h-3.5 w-3.5" />
+              <span>{ar ? 'واتساب' : 'WhatsApp'}</span>
+            </a>
+          )}
+          {tel && (
+            <a href={tel} className={btn}>
+              <Phone className="h-3.5 w-3.5 text-muted" />
+              <span>{ar ? 'اتصال' : 'Call'}</span>
+            </a>
+          )}
         </div>
       </div>
     </div>
@@ -271,9 +309,22 @@ export default function StylistChat() {
   const mic = () => {
     if (!SR) return;
     if (listening) { rec.current?.stop(); return; }
-    const r = new SR(); rec.current = r; r.lang = lang === 'ar' ? 'ar-EG' : 'en-US'; r.interimResults = false; r.maxAlternatives = 1;
-    r.onresult = (ev) => { const said = ev.results?.[0]?.[0]?.transcript; if (said) send(said); };
-    r.onend = () => setListening(false); r.onerror = () => setListening(false);
+    const r = new SR(); rec.current = r; r.lang = lang === 'ar' ? 'ar-EG' : 'en-US'; r.interimResults = true; r.maxAlternatives = 1;
+    let finalSaid = '';
+    r.onresult = (ev) => {
+      let interim = '';
+      for (let i = ev.resultIndex; i < ev.results.length; ++i) {
+        if (ev.results[i].isFinal) finalSaid += ev.results[i][0].transcript;
+        else interim += ev.results[i][0].transcript;
+      }
+      const current = (finalSaid || interim).trim();
+      if (current) setText(current);
+    };
+    r.onend = () => {
+      setListening(false);
+      if (finalSaid.trim()) send(finalSaid.trim());
+    };
+    r.onerror = () => setListening(false);
     setListening(true); try { r.start(); } catch { setListening(false); }
   };
 
@@ -304,7 +355,7 @@ export default function StylistChat() {
     delete nextProfile.dislikedProductIds;
     setProfile(nextProfile); store.set('moda.profile', nextProfile);
   };
-  const chips = promptCfg ? promptCfg.chips.map((c) => (lang === 'ar' ? c.ar : c.en)) : [t('stylist.chip1'), t('stylist.chip2'), t('stylist.chip3')];
+  const chips = promptCfg ? promptCfg.chips.map((c) => (lang === 'ar' ? c.ar : c.en)) : [t('stylist.chip1'), t('stylist.chip2'), t('stylist.chip3'), t('stylist.chip4')];
   return (
     <>
       {!open && (
@@ -335,6 +386,16 @@ export default function StylistChat() {
               <div className="flex min-w-0 items-center gap-3"><ModaAvatar src={avatar} size={46} thinking={busy} />
                 <div className="min-w-0"><p className="font-display text-base font-bold leading-tight">{name}</p><p className="truncate text-[12px] text-muted">{historyError ? t('stylist.historyError') : buyer ? t('stylist.historyStored') : t('stylist.sub')}</p></div></div>
               <div className="flex shrink-0 items-center gap-1">
+                <a
+                  href="https://wa.me/201206928670?text=%D8%A3%D9%87%D9%84%D8%A7%D9%8B%20Twist%D8%8C%20%D9%85%D8%AD%D8%AA%D8%A7%D8%AC%20%D9%85%D8%B3%D8%A7%D8%B9%D8%AF%D8%A9%20%D9%85%D9%86%20%D8%B3%D8%AA%D8%A7%D9%8A%D9%84%D8%B3%D8%AA%20%D8%AD%D9%82%D9%8A%D9%82%D9%8A"
+                  target="_blank"
+                  rel="noreferrer"
+                  title={lang === 'ar' ? 'تواصل مع ستايلست حقيقي على واتساب' : 'Chat with a real stylist on WhatsApp'}
+                  className="grid h-9 w-9 place-items-center rounded-full text-emerald-600 hover:bg-emerald-50 transition"
+                  aria-label="WhatsApp Support"
+                >
+                  <MessageCircle className="h-4 w-4" />
+                </a>
                 <button type="button" disabled={busy} onClick={startNewChat} aria-label={t('stylist.newChat')} title={t('stylist.newChat')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg disabled:opacity-40"><Plus className="h-5 w-5" /></button>
                 {buyer && <button type="button" disabled={busy} onClick={showHistory} aria-label={t('stylist.history')} title={t('stylist.history')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg disabled:opacity-40"><History className="h-5 w-5" /></button>}
                 {!!(profile.styleMemory || profile.likedProductIds || profile.dislikedProductIds) && <button type="button" onClick={clearStyleMemory} aria-label={t('stylist.clearLearning')} title={t('stylist.clearLearning')} className="grid h-9 w-9 place-items-center rounded-full text-muted hover:bg-secondary hover:text-fg"><RotateCcw className="h-4 w-4" /></button>}
@@ -372,6 +433,34 @@ export default function StylistChat() {
                 <div key={i} className="max-w-full">
                   {(m.say || m.error) && <div className={cx('max-w-[90%] rounded-2xl rounded-ss-sm px-3.5 py-2.5 text-[14.5px] leading-relaxed', m.error ? 'bg-sale/10 text-sale' : 'bg-secondary whitespace-pre-line')}>{m.error || <Linkified text={m.say} />}</div>}
                   {m.storeCard && <StoreCardView c={m.storeCard} lang={lang} />}
+                  {(m.humanHandoff || m.error) && (
+                    <div className="mt-2.5 max-w-[90%] overflow-hidden rounded-2xl border border-emerald-600/30 bg-emerald-50/70 p-3 text-xs sm:text-sm">
+                      <div className="flex items-start gap-2.5">
+                        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-emerald-600 text-white shadow-sm">
+                          <MessageCircle className="h-3.5 w-3.5 fill-white text-white" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-emerald-950">
+                            {lang === 'ar' ? 'عاوز مساعدة من ستايلست حقيقي أو خدمة العملاء؟' : 'Need help from a real stylist or support?'}
+                          </p>
+                          <p className="mt-0.5 text-xs text-emerald-800/80">
+                            {lang === 'ar'
+                              ? 'فريق تويست في بنها يقدر ينسقلك طلبك بنفسه على واتساب فوراً'
+                              : 'Twist Banha team can assist you directly on WhatsApp'}
+                          </p>
+                          <a
+                            href={`https://wa.me/201206928670?text=${encodeURIComponent(lang === 'ar' ? `أهلاً Twist، كنت بكلم تويلا ومحتاج مساعدة بخصوص: ${msgs.slice(0, i + 1).reverse().find((x) => x.role === 'user')?.content || ''}` : `Hi Twist, I was chatting with Twyla and need help with: ${msgs.slice(0, i + 1).reverse().find((x) => x.role === 'user')?.content || ''}`)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-emerald-700 active:scale-[0.98]"
+                          >
+                            <MessageCircle className="h-3.5 w-3.5 fill-white text-white" />
+                            <span>{lang === 'ar' ? 'تكلم مع ستايلست حقيقي على واتساب 💬' : 'Chat on WhatsApp 💬'}</span>
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {m.weatherSource === 'met_norway' && m.tips?.length > 0 && <p className="mt-1 text-[10px] text-muted"><a href="https://api.met.no/" target="_blank" rel="noreferrer" className="underline">{lang === 'ar' ? 'بيانات الطقس: MET Norway' : 'Weather data: MET Norway'}</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer" className="underline">CC BY 4.0</a></p>}
                   <LookSet data={m} name={name} />
                   {i === msgs.length - 1 && m.questions?.length > 0 && !busy && <>
@@ -395,7 +484,7 @@ export default function StylistChat() {
             {!historyOpen && <form onSubmit={(e) => { e.preventDefault(); send(); }} className="flex items-center gap-2 border-t border-line bg-elevated p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-3">
               <input ref={fileRef} type="file" accept="image/*" hidden onChange={pick} />
               <button type="button" onClick={() => fileRef.current?.click()} aria-label={t('stylist.photo')} className={cx('grid h-11 w-11 shrink-0 place-items-center rounded-full border transition', photo ? 'border-brand text-brand' : 'border-line-strong hover:border-fg')}><Camera className="h-5 w-5" /></button>
-              {SR && <button type="button" onClick={mic} aria-label={t('stylist.mic')} className={cx('grid h-11 w-11 shrink-0 place-items-center rounded-full border transition', listening ? 'border-sale bg-sale/10 text-sale' : 'border-line-strong hover:border-fg')}>{listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}</button>}
+              {SR && <button type="button" onClick={mic} aria-label={t('stylist.mic')} className={cx('grid h-11 w-11 shrink-0 place-items-center rounded-full border transition', listening ? 'border-red-500 bg-red-50 text-red-600 ring-2 ring-red-400/40 animate-pulse' : 'border-line-strong hover:border-fg')}>{listening ? <MicOff className="h-5 w-5" /> : <Mic className="h-5 w-5" />}</button>}
               <input data-moda-input value={text} onChange={(e) => setText(e.target.value)} maxLength={500} placeholder={listening ? t('stylist.listening') : t('stylist.placeholder')} aria-label={t('stylist.placeholder')}
                 className="h-11 min-w-0 flex-1 rounded-full border border-line-strong bg-canvas px-4 text-base outline-none focus:border-ring" />
               <button type="submit" disabled={busy || (!text.trim() && !photo)} aria-label={t('stylist.send')} className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-btn text-on-btn transition disabled:opacity-40"><Send className="h-5 w-5 rtl:-scale-x-100" /></button>

@@ -54,7 +54,21 @@ const CSP = {
 };
 app.use(helmet({ contentSecurityPolicy: CSP, crossOriginResourcePolicy: { policy: 'cross-origin' }, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
 app.use(compression());
-app.use(cors());
+const ALLOWED_ORIGINS = new Set([
+  config.siteUrl,
+  'https://twistegy.com',
+  'https://www.twistegy.com',
+  ...(process.env.CORS_ORIGIN || '').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean),
+]);
+app.use(cors({
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true);
+    const clean = origin.replace(/\/+$/, '');
+    if (ALLOWED_ORIGINS.has(clean)) return cb(null, true);
+    if (config.env !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(clean)) return cb(null, true);
+    return cb(null, false);
+  },
+}));
 app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/wa/')) req.rawBody = buf; } }));
 
 const SITE_ORIGIN = 'https://twistegy.com';
@@ -164,6 +178,8 @@ if (fs.existsSync(config.webDist)) {
     .replace(/<meta property="og:description" content="[^"]*"\s*\/>/, `<meta property="og:description" content="${esc(description)}" />`)
     .replace(/<meta property="og:url" content="[^"]*"\s*\/>/, `<meta property="og:url" content="${esc(url)}" />`)
     .replace(/<meta property="og:image" content="[^"]*"\s*\/>/, `<meta property="og:image" content="${esc(image)}" />`)
+    .replace(/<meta name="twitter:title" content="[^"]*"\s*\/>/, `<meta name="twitter:title" content="${esc(title)}" />`)
+    .replace(/<meta name="twitter:description" content="[^"]*"\s*\/>/, `<meta name="twitter:description" content="${esc(description)}" />`)
     .replace(/<meta name="twitter:image" content="[^"]*"\s*\/>/, `<meta name="twitter:image" content="${esc(image)}" />`);
   // A URL that does not exist must answer 404 (not 200) so search engines drop it; the page body is still the app so shoppers see the friendly "not found" screen.
   const notFoundPage = (res) => res.status(404).set('X-Robots-Tag', 'noindex').set('Cache-Control', 'no-cache').type('html').send(fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8'));
@@ -195,8 +211,9 @@ if (fs.existsSync(config.webDist)) {
     const inStock = !item.track_stock || item.stock > 0;
     const product = {
       '@context': 'https://schema.org', '@type': 'Product', name: item.name_ar, image: [image], description,
+      brand: { '@type': 'Brand', name: item.store_name_ar },
       ...(item.sku ? { sku: item.sku } : {}),
-      offers: { '@type': 'Offer', url, priceCurrency: 'EGP', price: item.price, itemCondition: 'https://schema.org/NewCondition',
+      offers: { '@type': 'Offer', url, priceCurrency: 'EGP', price: item.price, priceValidUntil: new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10), itemCondition: 'https://schema.org/NewCondition',
         availability: inStock ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock', seller: { '@type': 'Organization', name: item.store_name_ar } },
       ...(item.rating_count > 0 ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: item.rating, reviewCount: item.rating_count } } : {}),
     };
@@ -240,6 +257,22 @@ if (fs.existsSync(config.webDist)) {
       { '@type': 'ListItem', position: 1, name: 'الرئيسية', item: `${SITE_ORIGIN}/` },
       { '@type': 'ListItem', position: 2, name: store.name_ar, item: url }] };
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withLd(withSeo(html, { title, description, url, image, h1: store.name_ar, intro: description }), [storeLd, crumbs]));
+  });
+  app.get('/look-of-day/:index', async (req, res, next) => {
+    try {
+      const { lookOfDay } = await import('./lib/stylist.js');
+      const entries = (await lookOfDay()).entries || [];
+      const e = entries[Number(req.params.index) - 1] ?? entries[Number(req.params.index)];
+      if (!e) return next();
+      const name = e.title || e.occasion || 'لوك اليوم';
+      const title = `${name} | لوك كامل من محلات بنها | Twist`;
+      const description = trunc(e.description || e.say || `${name}: لوك متكامل من محلات بنها، شوف كل قطعة وسعرها وضيف اللوك كله للسلة على Twist.`);
+      const cover = e.coverImage || e.images?.[0];
+      const image = cover ? `${String(cover).startsWith('http') ? '' : SITE_ORIGIN}${cover}` : `${SITE_ORIGIN}/brand/twist-share.png`;
+      const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+      res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html')
+        .send(withSeo(html, { title, description, url: `${SITE_ORIGIN}${req.path}`, image, h1: name, intro: description }));
+    } catch { next(); }
   });
   app.get('/stores', (_req, res) => {
     const title = 'كل محلات الملابس في بنها | Twist';
@@ -291,7 +324,12 @@ if (fs.existsSync(config.webDist)) {
       const homeHtml = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8').replace('<div id="root"></div>', '<div id="root"><div style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"><h1>كل محلات الملابس في بنها في مكان واحد</h1><p>تويست (Twist) بنها: اكتشف الموضة، قارن الأسعار واطلب أونلاين من محلات الملابس.</p><nav><a href="/stores">محلات الملابس في بنها</a></nav></div></div>');
       return res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(homeHtml);
     }
-    if (!hit) return res.sendFile(path.join(config.webDist, 'index.html'));
+    if (!hit) {
+      // any other app page must not claim the home page as its canonical (index.html's default): point it at itself, query stripped
+      const self = `${SITE_ORIGIN}${req.path === '/' ? '/' : req.path.replace(/\/+$/, '')}`;
+      const generic = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8').replace(/<link rel="canonical" href="[^"]*"\s*\/>/, `<link rel="canonical" href="${esc(self)}" />`).replace(/<meta property="og:url" content="[^"]*"\s*\/>/, `<meta property="og:url" content="${esc(self)}" />`);
+      return res.set('Cache-Control', 'no-cache').type('html').send(generic);
+    }
     const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8')
       .replace('<link rel="manifest" href="/manifest.webmanifest" />', `<link rel="manifest" href="${hit[1]}" />`)
       .replace('<meta name="apple-mobile-web-app-title" content="Twist Store" />', `<meta name="apple-mobile-web-app-title" content="${hit[2]}" />`);

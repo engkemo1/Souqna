@@ -26,6 +26,7 @@ import FeaturedSlot from '../../components/featured/FeaturedSlot.jsx';
 import SeasonSpotlight from '../../components/store/SeasonSpotlight.jsx';
 import { HeroSplit, HeroCompact } from '../../components/store/HeroVariants.jsx';
 import { HeroPlayful } from '../../components/store/HeroPlayful.jsx';
+import StylistChat from '../../components/market/StylistChat.jsx';
 import { useDesign, kidTint } from '../../lib/design.js';
 
 export function SectionHeader({ title, eyebrow, to, className = '' }) {
@@ -339,6 +340,7 @@ export default function StoreHome() {
         allSections.map(renderSection)
       )}
       <QuickAddSheet slug={store.slug} product={quick} onClose={() => setQuick(null)} />
+      <StylistChat />
     </PageTransition>
   );
 }

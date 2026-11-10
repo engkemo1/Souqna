@@ -25,7 +25,7 @@ export default function Overview() {
         {k('مبيعات اليوم', t?.revenueToday, Banknote, 'brand', `${fmtNum(t?.ordersToday)} طلب النهاردة`, fmtMoney)}
         {k('إجمالي المبيعات', t?.revenue, Banknote, 'neutral', `${fmtNum(t?.orders)} طلب`, fmtMoney)}
         {k('المحلات النشطة', t?.stores, Store, 'violet', t ? `${fmtNum(t.storesHidden)} مخفي · ${fmtNum(t.storesSuspended)} موقوف` : '')}
-        {k('المنتجات', t?.products, Package, 'sky', t ? `${fmtNum(t.customers)} عميل` : '')}
+        <Link to="/admin/products" className="contents">{k('المنتجات', t?.products, Package, 'sky', t ? `${fmtNum(t.customers)} عميل · اضغط للمعاينة` : '')}</Link>
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3 sm:mt-4 sm:gap-4 xl:grid-cols-4">

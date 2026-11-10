@@ -66,8 +66,41 @@ export default function MarketCart() {
       ? <p className="mb-5 rounded-2xl bg-success/10 px-4 py-3 text-sm font-semibold text-success">{ar ? 'التوصيل مجاني على طلبك من Twist' : 'Delivery is free on your Twist order'}</p>
       : <p className="mb-5 rounded-2xl bg-secondary px-4 py-3 text-sm font-medium">{ar ? `ضيف ${formatMoney(pfs.over - cart.subtotal, lang)} كمان والتوصيل يبقى مجاني` : `Add ${formatMoney(pfs.over - cart.subtotal, lang)} more for free delivery`}</p>)}
     {!groups.length ? <div className="rounded-3xl border border-line bg-elevated px-5 py-16 text-center"><ShoppingBag className="mx-auto h-10 w-10 text-muted" /><h2 className="mt-4 text-lg font-semibold">{ar ? 'السلة لسه فاضية' : 'Your basket is empty'}</h2><p className="mt-2 text-sm text-muted">{ar ? 'ضيف منتجات من صفحات المحلات لسلة Twist.' : 'Add products from store pages to this basket.'}</p><Button to="/search" className="mt-6">{ar ? 'اكتشف المنتجات' : 'Explore products'}</Button></div> : <>
+      {groups.length > 1 && (
+        <div className="mb-5 flex items-center gap-3.5 rounded-2xl border border-brand/20 bg-gradient-to-r from-brand/5 via-brand/10 to-transparent p-4">
+          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-white shadow-sm text-base">
+            📦
+          </span>
+          <div className="text-xs sm:text-sm">
+            <p className="font-bold text-fg">
+              {ar
+                ? `طلبك يحتوي على منتجات من ${groups.length} محلات في بنها`
+                : `Your order contains items from ${groups.length} Banha stores`}
+            </p>
+            <p className="mt-0.5 text-muted">
+              {ar
+                ? 'مندوب Twist هيجمعلك كل القطع في شحنة واحدة وتدفع مصاريف شحن موحدة عند الاستلام!'
+                : 'Twist courier collects all your items in a single consolidated delivery with one shipping fee!'}
+            </p>
+          </div>
+        </div>
+      )}
       <div className="space-y-5">{groups.map((group) => <StoreGroup key={group.slug} group={group} cart={cart} lang={lang} ar={ar} freeOver={storeBySlug.get(group.slug)?.freeShippingOver} onSaving={reportSaving} />)}</div>
       <FinalSaleNote items={cart.items} className="mt-5" />
+      <div className="mt-5 grid grid-cols-1 gap-3 rounded-2xl border border-line bg-secondary/50 p-4 text-xs sm:grid-cols-3">
+        <div className="flex items-center gap-2.5 text-fg">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand text-sm">📦</span>
+          <span className="font-semibold leading-snug">{ar ? 'شحنة مجمعة واحدة من كل المحلات' : 'Consolidated parcel from all stores'}</span>
+        </div>
+        <div className="flex items-center gap-2.5 text-fg">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand text-sm">⏱️</span>
+          <span className="font-semibold leading-snug">{ar ? 'توصيل لباب بيتك خلال 24 ساعة' : 'Delivery to your door in 24 hours'}</span>
+        </div>
+        <div className="flex items-center gap-2.5 text-fg">
+          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand text-sm">👕</span>
+          <span className="font-semibold leading-snug">{ar ? 'قيس وعاين مع المندوب قبل الدفع' : 'Try on with courier before paying'}</span>
+        </div>
+      </div>
       <section className="mt-6 rounded-3xl border border-line bg-elevated p-5 sm:p-6"><div className="flex justify-between text-lg font-bold"><span>{ar ? 'إجمالي المنتجات' : 'Items subtotal'}</span><span>{formatMoney(cart.subtotal - totalSaving, lang)}</span></div>{totalSaving > 0 && <p className="mt-1 flex justify-between text-sm font-semibold text-success"><span>{ar ? 'وفّرت بالعروض' : 'Offers saved you'}</span><span>−{formatMoney(totalSaving, lang)}</span></p>}<p className="mt-2 text-sm leading-6 text-muted">{ar ? 'Twist هتجمع الطلبات الجاهزة من المحلات وتوصلها برسوم توصيل واحدة. رسوم الشحن المجاني يحددها كل محل من إعداداته.' : 'Twist collects ready orders from stores and delivers them for one fee. Each store sets its free-delivery threshold in its settings.'}</p><div className="mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between"><button type="button" onClick={cart.clear} className="inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm text-muted hover:bg-fg/[0.05]"><Trash2 className="h-4 w-4" />{ar ? 'فضّي السلة' : 'Empty basket'}</button><Button to="/market-checkout" iconEnd={ArrowRight}>{ar ? 'كمّل الطلب' : 'Continue to checkout'}</Button></div></section>
     </>}
   </main><RecentlyViewed /></div>;

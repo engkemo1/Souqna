@@ -1,13 +1,23 @@
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const ROOT = path.resolve(__dirname, '..');
 
+const env = process.env.NODE_ENV || 'development';
+const rawJwtSecret = process.env.JWT_SECRET || '';
+const jwtSecretInsecure = !rawJwtSecret || rawJwtSecret.startsWith('dev-only') || rawJwtSecret.length < 24;
+
 export const config = {
   port: Number(process.env.PORT || 4000),
-  env: process.env.NODE_ENV || 'development',
-  jwtSecret: process.env.JWT_SECRET || 'dev-only-change-me-souqna',
+  env,
+  jwtSecretInsecure,
+  jwtSecret: !jwtSecretInsecure
+    ? rawJwtSecret
+    : env === 'production'
+      ? crypto.randomBytes(32).toString('hex')
+      : rawJwtSecret || 'dev-only-change-me-souqna',
   dbFile: process.env.DB_FILE || path.join(ROOT, 'data', 'souqna.db'),
   mediaDir: process.env.MEDIA_DIR || path.join(ROOT, 'data', 'media'),
   // Set to your CDN origin (e.g. https://cdn.banhalook.app/media) — the API emits URLs relative to this base.

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Camera, Eye } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Camera, Eye, Pencil } from 'lucide-react';
 import { PageHeader } from '../../components/dash/Kit.jsx';
 import { ErrorState, EmptyState } from '../../components/ui/States.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
@@ -20,8 +21,15 @@ function Card({ it }) {
           : <SmartImage media={it.media} ratio="4 / 5" sizes="200px" />}
         {lv && <span className={cx('absolute bottom-1.5 end-1.5 rounded-full px-2 py-0.5 text-[11px] font-bold shadow-sm', lv[1])}>{lv[0]} {it.quality}</span>}
       </div>
-      <p className="mt-2 truncate text-[13px] font-semibold">{it.store.name}</p>
-      <p className="truncate text-xs text-muted">{it.product?.name || 'صورة من غير منتج'}</p>
+      <Link to={`/admin/products?store=${encodeURIComponent(it.store.slug)}`} className="mt-2 block truncate text-[13px] font-semibold hover:text-brand hover:underline">{it.store.name}</Link>
+      {it.product ? (
+        <Link to={`/admin/products?q=${encodeURIComponent(`#${it.product.id}`)}`} className="flex items-center gap-1 truncate text-xs text-muted hover:text-fg hover:underline">
+          <Pencil className="h-3 w-3 shrink-0" />
+          <span className="truncate">{it.product.name}</span>
+        </Link>
+      ) : (
+        <p className="truncate text-xs text-muted">صورة من غير منتج</p>
+      )}
       <div className="mt-1 flex items-center justify-between gap-1 text-[11px] text-muted">
         <span>{fmtDateTime(it.createdAt)}</span>
         {it.quality != null && <button type="button" onClick={() => setOrig((v) => !v)} className="inline-flex items-center gap-1 rounded-lg px-1.5 py-1 font-semibold hover:bg-fg/[0.05]"><Eye className="h-3.5 w-3.5" />{orig ? 'بعد التحسين' : 'الأصلية'}</button>}

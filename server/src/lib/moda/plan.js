@@ -108,6 +108,10 @@ function scoreProduct(p, slot, ctx) {
   if (partnerHero && p.key === 'pocket_square' && cols.some((c) => partnerHero.includes(c))) s += 2;
   if (taste.length && look?.taste?.some((t) => taste.includes(t))) s += 1;
   if (learnedPreferences?.liked.has(String(p.id))) s += 2;
+  if (learnedPreferences?.preferredStore) {
+    const ps = String(learnedPreferences.preferredStore).toLowerCase();
+    if (p.store_slug === ps || (p.store_name && p.store_name.toLowerCase().includes(ps)) || String(p.store_id) === ps) s += 6;
+  }
   if (learnedPreferences?.disliked.has(String(p.id))) s -= 2;
   s += Math.min(2.5, p.popularity || 0);
   { const ki = slot.keys.indexOf(p.key); if (ki > 0) s -= ki * 1.5; else if (ki < 0) s -= 4; }
@@ -299,7 +303,7 @@ export function planOutfit(parsed, products, env = {}) {
 
   const userAvoid = [...(parsed.avoidColors || []), ...(profile.avoidColors || [])];
   const productIds = (value) => new Set(String(value || '').split(',').filter((id) => /^\d{1,15}$/.test(id)));
-  const learnedPreferences = { liked: productIds(profile.likedProductIds), disliked: productIds(profile.dislikedProductIds) };
+  const learnedPreferences = { liked: productIds(profile.likedProductIds), disliked: productIds(profile.dislikedProductIds), preferredStore: profile.preferredStore || parsed.preferredStore || null };
   const envC = { adv, role, context, userAvoid, profileTaste: profile.taste || [], learnedPreferences };
   const wsum = persons.reduce((t, a) => t + (AUD_WEIGHT[a] || 1), 0);
   const pBudget = (a) => (budget ? (audienceOpen ? budget : (budget * (AUD_WEIGHT[a] || 1)) / wsum) : null);

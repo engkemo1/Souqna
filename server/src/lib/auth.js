@@ -10,7 +10,7 @@ export function requireOwner(req, _res, next) {
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
   if (!token) return next(new AppError(401, 'unauthorized', 'Please sign in to continue.'));
   try {
-    const { sub } = jwt.verify(token, config.jwtSecret);
+    const { sub } = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
     const user = q.get('SELECT id, name, email, role FROM users WHERE id=?', [sub]);
     if (!user) throw new Error('no user');
     if (user.role === 'disabled') return next(new AppError(403, 'account_disabled', 'This account is disabled. Contact Twist.'));

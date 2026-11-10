@@ -69,6 +69,7 @@ const StoreDesigner = lazy(() => import('./pages/dashboard/StoreDesigner.jsx'));
 const AdminApp = lazy(() => import('./pages/admin/AdminApp.jsx'));
 const AdminOverview = lazy(() => import('./pages/admin/Overview.jsx'));
 const AdminStores = lazy(() => import('./pages/admin/Stores.jsx'));
+const AdminProducts = lazy(() => import('./pages/admin/AdminProducts.jsx'));
 const AdminDepartments = lazy(() => import('./pages/admin/Departments.jsx'));
 const AdminImageLibrary = lazy(() => import('./pages/admin/ImageLibrary.jsx'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
@@ -88,6 +89,7 @@ const AdminAlerts = lazy(() => import('./pages/admin/Alerts.jsx'));
 const AdminGrowth = lazy(() => import('./pages/admin/Growth.jsx'));
 const AdminInsights = lazy(() => import('./pages/admin/Insights.jsx'));
 const AdminStylistLog = lazy(() => import('./pages/admin/StylistLog.jsx'));
+const AdminStylistTraining = lazy(() => import('./pages/admin/StylistTraining.jsx'));
 const AdminAudit = lazy(() => import('./pages/admin/AuditLog.jsx'));
 const AdminCampaigns = lazy(() => import('./pages/admin/Campaigns.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
@@ -190,6 +192,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminOverview /> },
           { path: 'stores', element: <AdminStores /> },
+          { path: 'products', element: <AdminProducts /> },
           { path: 'departments', element: <AdminDepartments /> },
           { path: 'image-library', element: <AdminImageLibrary /> },
           { path: 'orders', element: <AdminOrders /> },
@@ -212,6 +215,8 @@ const router = createBrowserRouter([
           { path: 'growth', element: <AdminGrowth /> },
           { path: 'insights', element: <AdminInsights /> },
           { path: 'stylist-log', element: <AdminStylistLog /> },
+          { path: 'stylist/training', element: <AdminStylistTraining /> },
+          { path: 'stylist-training', element: <AdminStylistTraining /> },
           { path: 'audit', element: <AdminAudit /> },
           { path: 'campaigns', element: <AdminCampaigns /> },
           { path: 'reports', element: <AdminReports /> },
