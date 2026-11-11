@@ -64,6 +64,12 @@ function ManualLookCards({ looks, lang, tr, t, added, onAdd, editorial = false }
                 <p className={cx('font-bold leading-snug', editorial ? 'line-clamp-3 text-xs sm:text-base' : 'line-clamp-2 min-h-[2.6em] text-sm sm:text-base')}>{tr(p.name)}</p>
                 <p className="mt-1 truncate text-[11px] text-muted sm:text-xs">{tr(p.store.name)}</p>
                 <p className="mt-2 text-base font-extrabold text-sale sm:text-lg">{formatMoney(p.price, lang)}</p>
+                {p.fitTip && (
+                  <p className="mt-1.5 flex items-start gap-1 rounded-xl bg-brand/5 px-2.5 py-1 text-[11px] leading-snug text-brand">
+                    <span className="shrink-0 text-xs">💡</span>
+                    <span>{p.fitTip}</span>
+                  </p>
+                )}
               </Link>
               {editorial && Array.isArray(p.colors) && p.colors.length > 0 && <div className="mt-2 flex flex-wrap items-center gap-1" aria-label={lang === 'ar' ? 'الألوان المتاحة' : 'Available colours'}>{p.colors.slice(0, 5).map((color) => <span key={color.hex} title={lang === 'ar' ? color.name_ar : color.name_en} className="h-3.5 w-3.5 rounded-full border border-black/15 sm:h-4 sm:w-4" style={{ backgroundColor: color.hex }} />)}</div>}
               <button type="button" onClick={() => onAdd(p)} className={cx('mt-2 inline-flex w-full items-center justify-center gap-1.5 rounded-full border px-2 py-2 text-[10px] font-bold transition sm:text-sm', added.includes(p.id) ? 'border-[#F8620A] bg-[#FFF3EB] text-fg' : 'border-line-strong bg-elevated hover:border-fg/30 hover:bg-[#F6F8FB]')}>
@@ -204,6 +210,12 @@ function CardsBlock({ looks, total, lang, tr, t, added, onAdd, onAddAll, onShare
               <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="min-w-0 text-start">
                 <p className="line-clamp-2 min-h-[2.5em] text-[12.5px] font-bold leading-snug">{tr(p.name)}</p>
                 <p className="mt-0.5 truncate text-[11px] text-muted">{tr(p.store.name)}</p>
+                {p.fitTip && (
+                  <p className="mt-1 flex items-start gap-1 rounded-lg bg-brand/5 px-2 py-0.5 text-[10.5px] font-medium leading-tight text-brand">
+                    <span className="shrink-0 text-[10px]">💡</span>
+                    <span>{p.fitTip}</span>
+                  </p>
+                )}
               </Link>
               <div className="mt-auto flex items-center justify-between gap-2 pt-2">
                 <p className="text-sm font-extrabold text-sale">{formatMoney(p.price, lang)}</p>
@@ -251,8 +263,11 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
     {m.palette?.length > 0 && <p className="mb-1 text-[12px] font-semibold text-brand">{ar ? 'ألوان مقترحة' : 'Suggested colours'}: {m.palette.join(' · ')}</p>}
     {weatherTips.map((tip, i) => <p key={`weather-${i}`} className={i ? 'mt-1' : ''}>✨ {tip}</p>)}
     {styleTips.length > 0 && <div className={weatherTips.length ? 'mt-2 border-t border-line pt-2' : ''}>
-      <p className="mb-1 font-semibold text-brand">{t('stylist.styleProposal')}</p>
-      {styleTips.map((tip, i) => <p key={`style-${i}`} className={i ? 'mt-1' : ''}>{tip}</p>)}
+      <p className="mb-1 font-bold text-brand flex items-center gap-1.5">
+        <span>✨</span>
+        <span>{ar ? 'رؤية الستايلست وسر التناسق' : t('stylist.styleProposal')}</span>
+      </p>
+      {styleTips.map((tip, i) => <p key={`style-${i}`} className={cx('leading-relaxed', i ? 'mt-1.5' : '')}>{tip}</p>)}
     </div>}
   </div>;
   if (!m.looks?.length) return <>{advice}{missing}</>;

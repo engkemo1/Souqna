@@ -485,7 +485,10 @@ function modaClientResponse(result) {
   const cards = new Map(cardsByIds(result.blocks.tabs.flatMap((tab) => tab.items.map((item) => item.id))).map((card) => [card.id, card]));
   const tabs = result.blocks.tabs.map((tab) => ({
     id: tab.id, label: tab.label, subtotal: tab.subtotal,
-    items: tab.items.map((item) => ({ ...item, card: cards.get(item.id) || null })).filter((item) => item.card),
+    items: tab.items.map((item) => {
+      const card = cards.get(item.id);
+      return card ? { ...item, card: { ...card, fitTip: item.fitTip || null } } : null;
+    }).filter(Boolean),
   }));
   const looks = tabs.flatMap((tab) => tab.items.map((item) => ({ label: item.label, items: [item.card], pick: 0 })));
   const missingItems = result.blocks.tabs.flatMap((tab) => tab.missing.map((item) => ({

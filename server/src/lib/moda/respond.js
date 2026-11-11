@@ -3,6 +3,7 @@
  * مفيش نص بيتولّد من موديل هنا.
  */
 import { loadKnowledge } from './knowledge.js';
+import { generateColorHarmonyInsight, generateFitAndSizingTip } from './stylingInsights.js';
 
 const hashStr = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i += 1) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 export const pick = (list, seed = '') => (Array.isArray(list) && list.length ? list[hashStr(String(seed)) % list.length] : (list ?? ''));
@@ -31,7 +32,8 @@ function tabLabel(aud, persons, P) {
 
 const itemCard = (K, pk) => {
   const p = pk.product;
-  return { id: p.id, key: p.key, label: itemAr(K, p.key || pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null };
+  const fitTip = generateFitAndSizingTip(p);
+  return { id: p.id, key: p.key, label: itemAr(K, p.key || pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null, fitTip: fitTip || null };
 };
 
 /** بيحوّل plan → رد. opts: { seed, lang } */
@@ -146,6 +148,10 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
     if (adv.approximate && (plan.eventTime?.daysAhead || 0) > 0) tips.push(say('weather_approx'));
   }
   if (!condolence) {
+    const harmony = (!condolence && plan.palette?.length && plan.state !== 'none')
+      ? generateColorHarmonyInsight(plan.palette, plan.context, couple)
+      : null;
+    if (harmony) styleTips.push(harmony);
     const seen = new Set();
     for (const pe of plan.people) if (pe.look?.tip_ar && !seen.has(pe.look.tip_ar)) {
       seen.add(pe.look.tip_ar);
