@@ -33,7 +33,45 @@ const anthropicKey = () => process.env.ANTHROPIC_API_KEY || '';
 const cfAccount = () => process.env.CF_ACCOUNT_ID || process.env.R2_ACCOUNT_ID || '';
 const cfToken = () => process.env.CF_AI_TOKEN || '';
 const geminiKey = () => process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-export const providerReady = { anthropic: () => !!anthropicKey(), cloudflare: () => !!(cfAccount() && cfToken()), gemini: () => !!geminiKey() };
+// مزوّدين مجانيين متوافقين مع OpenAI (بحدود يومية). كل واحد بيتفعّل لما تحط مفتاحه في Variables؛ الموديل ممكن يتغيّر بـ <NAME>_MODEL (موديلات بفاصلة = بنجرّب بالترتيب).
+const COMPAT = {
+  groq:       { label: 'Groq',       base: 'https://api.groq.com/openai/v1',       key: 'GROQ_API_KEY',       models: ['openai/gpt-oss-120b', 'qwen/qwen3.8-27b', 'openai/gpt-oss-20b'], effort: true },
+  mistral:    { label: 'Mistral',    base: 'https://api.mistral.ai/v1',            key: 'MISTRAL_API_KEY',    models: ['mistral-medium-latest', 'mistral-small-latest'] },
+  sambanova:  { label: 'SambaNova',  base: 'https://api.sambanova.ai/v1',          key: 'SAMBANOVA_API_KEY',  models: ['gpt-oss-120b', 'DeepSeek-V3.1', 'Meta-Llama-3.3-70B-Instruct'] },
+  openrouter: { label: 'OpenRouter', base: 'https://openrouter.ai/api/v1',         key: 'OPENROUTER_API_KEY', models: ['google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free'] },
+  nvidia:     { label: 'NVIDIA',     base: 'https://integrate.api.nvidia.com/v1',  key: 'NVIDIA_API_KEY',     models: ['openai/gpt-oss-120b', 'openai/gpt-oss-20b'] },
+  cerebras:   { label: 'Cerebras',   base: 'https://api.cerebras.ai/v1',           key: 'CEREBRAS_API_KEY',   models: ['gpt-oss-120b', 'llama-3.3-70b'], effort: true },
+  qwen:       { label: 'Alibaba Qwen', base: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1', key: 'DASHSCOPE_API_KEY', models: ['qwen-plus', 'qwen-turbo'] },
+  huggingface:{ label: 'Hugging Face', base: 'https://router.huggingface.co/v1',   key: 'HF_TOKEN',           models: ['openai/gpt-oss-120b', 'Qwen/Qwen3-32B'] },
+  scaleway:   { label: 'Scaleway',   base: 'https://api.scaleway.ai/v1',           key: 'SCALEWAY_API_KEY',   models: ['llama-3.3-70b-instruct', 'mistral-small-3.2-24b-instruct-2506'] },
+  cohere:     { label: 'Cohere',     base: 'https://api.cohere.ai/compatibility/v1', key: 'COHERE_API_KEY',   models: ['command-a-03-2025', 'command-r-plus-08-2024'] },
+};
+// مزوّد إضافي حر: EXTRA_LLM_BASE_URL + EXTRA_LLM_KEY + EXTRA_LLM_MODEL
+const extraCfg = () => ({ base: (process.env.EXTRA_LLM_BASE_URL || '').replace(/\/+$/, ''), key: process.env.EXTRA_LLM_KEY || '', model: process.env.EXTRA_LLM_MODEL || '' });
+const compatModels = (name) => (process.env[`${name.toUpperCase()}_MODEL`] || '').split(',').map((x) => x.trim()).filter(Boolean).concat(process.env[`${name.toUpperCase()}_MODEL`] ? [] : COMPAT[name].models);
+export const providerReady = {
+  anthropic: () => !!anthropicKey(), cloudflare: () => !!(cfAccount() && cfToken()), gemini: () => !!geminiKey(),
+  extra: () => { const c = extraCfg(); return !!(c.base && c.key && c.model); },
+  ...Object.fromEntries(Object.entries(COMPAT).map(([n, c]) => [n, () => !!process.env[c.key]])),
+};
+// ترتيب المزوّدين (MODA_LLM_ORDER=gemini,anthropic,groq,cerebras,mistral,sambanova,qwen,openrouter,nvidia,huggingface,scaleway,cohere,cloudflare,extra). لو واحد رصيده/حدّه خلص بنوقفه شوية وننتقل للّي بعده من غير ما كل رسالة تستنى فشله.
+const LLM_ORDER = () => (process.env.MODA_LLM_ORDER || 'gemini,anthropic,groq,cerebras,mistral,sambanova,qwen,openrouter,nvidia,huggingface,scaleway,cohere,cloudflare,extra').split(',').map((x) => x.trim()).filter(Boolean);
+const llmPausedUntil = new Map();
+function pauseProvider(k, err) {
+  const m = String(err?.message || err);
+  const ms = /\b(402|401|403)\b|credit|billing|balance|quota exceeded|insufficient|api key/i.test(m) ? 30 * 60e3 : /\b429\b|rate|limit|resource_exhausted/i.test(m) ? 3 * 60e3 : 0;
+  if (ms) llmPausedUntil.set(k, Date.now() + ms);
+}
+function liveProviders() {
+  const ready = LLM_ORDER().filter((k) => providerReady[k]?.());
+  const live = ready.filter((k) => (llmPausedUntil.get(k) || 0) <= Date.now());
+  return live.length ? live : ready; // لو الكل موقوف نجرّبهم برضه بدل ما تويلا تقف
+}
+export const llmFallbackCall = async (system, msgs) => {
+  let last;
+  for (const k of liveProviders()) { try { const out = await callLlm(k, system, msgs); lastError = ''; return out; } catch (e) { last = e; pauseProvider(k, e); lastError = String(e.message || e).slice(0, 200); } }
+  throw last || new Error('no AI provider configured');
+};
 let lastError = '';
 
 export async function testProvider(provider) {
@@ -65,7 +103,7 @@ export function saveStylistSettings({ enabled, provider, dailyFree, nameAr, name
   if (nameEn) put('stylist_name_en', nameEn.slice(0, 20));
   return stylistSettings();
 }
-export const stylistStatus = () => ({ ...stylistSettings(), providers: { anthropic: { configured: providerReady.anthropic() }, cloudflare: { configured: providerReady.cloudflare() }, gemini: { configured: providerReady.gemini() } }, lastError, model: process.env.STYLIST_MODEL || 'claude-haiku-4-5' });
+export const stylistStatus = () => ({ ...stylistSettings(), providers: { anthropic: { configured: providerReady.anthropic() }, cloudflare: { configured: providerReady.cloudflare() }, gemini: { configured: providerReady.gemini() }, extra: { configured: providerReady.extra(), model: extraCfg().model || null }, ...Object.fromEntries(Object.keys(COMPAT).map((n) => [n, { configured: providerReady[n](), models: compatModels(n) }])), order: LLM_ORDER(), active: liveProviders() }, lastError, model: process.env.STYLIST_MODEL || 'claude-haiku-4-5' });
 
 function readStylistTraining() {
   try {
@@ -347,8 +385,40 @@ async function callGemini(system, messages) {
   throw lastErr || new Error('Gemini: no model available');
 }
 
+async function callCompat(name, system, messages) {
+  const c = COMPAT[name]; let lastErr;
+  for (const model of compatModels(name)) {
+    try {
+      const body = { model, messages: [{ role: 'system', content: system }, ...messages], max_tokens: 1600, temperature: 0.4 };
+      if (c.effort && /gpt-oss/.test(model)) body.reasoning_effort = 'low';
+      const res = await fetch(`${c.base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${process.env[c.key]}` }, body: JSON.stringify(body), signal: AbortSignal.timeout(40000) });
+      if (!res.ok) { const t = (await res.text()).slice(0, 160); const e = new Error(`${c.label} ${res.status} (${model}): ${t}`); e.status = res.status; throw e; }
+      const j = await res.json();
+      const out = j.choices?.[0]?.message?.content || '';
+      if (!String(out).trim()) throw new Error(`${c.label} (${model}): empty reply`);
+      recordAi(name, 'moda', 'ok', '', model);
+      return out;
+    } catch (e) {
+      lastErr = e;
+      if (e.status === 401 || e.status === 402 || e.status === 403) break; // المفتاح/الرصيد: مفيش فايدة من موديل تاني
+    }
+  }
+  throw lastErr || new Error(`${c.label}: no model`);
+}
+
 export async function callLlm(provider, system, messages) {
   if (provider === 'gemini') return callGemini(system, messages);
+  if (COMPAT[provider]) return callCompat(provider, system, messages);
+  if (provider === 'extra') {
+    const c = extraCfg();
+    const res = await fetch(`${c.base}/chat/completions`, {
+      method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${c.key}` },
+      body: JSON.stringify({ model: c.model, messages: [{ role: 'system', content: system }, ...messages], max_tokens: 1100, temperature: 0.4 }), signal: AbortSignal.timeout(40000),
+    });
+    if (!res.ok) throw new Error(`Extra AI ${res.status} (${c.model}): ${(await res.text()).slice(0, 160)}`);
+    const j = await res.json();
+    return j.choices?.[0]?.message?.content || '';
+  }
   if (provider === 'anthropic') {
     const res = await fetch(process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages', {
       method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': anthropicKey(), 'anthropic-version': '2023-06-01' },
@@ -551,13 +621,8 @@ export const modaEngineEnabled = () => (process.env.STYLIST_ENGINE || 'moda') !=
 /** عقل تويلا (موديل لغة): بيرجّع دالة أو null لو مفيش مزوّد AI متظبط. المحرك بيشتغل من غيره عادي. */
 function modaChainCall() {
   if (process.env.MODA_BRAIN === '0') return null;
-  const chain = ['gemini', 'anthropic', 'cloudflare'].filter((k) => providerReady[k]());
-  if (!chain.length) return null;
-  return async (system, msgs) => {
-    let last;
-    for (const k of chain) { try { const out = await callLlm(k, system, msgs); lastError = ''; return out; } catch (e) { last = e; lastError = String(e.message || e).slice(0, 200); } }
-    throw last;
-  };
+  if (!liveProviders().length) return null;
+  return llmFallbackCall;
 }
 
 /** سلسلة المزوّدين (Claude ← Gemini ← Cloudflare) كدالة (system, messages) → نص. null لو مفيش مزوّد. */
@@ -586,13 +651,8 @@ export function modaUnderstander() {
 export function modaBrain() {
   if (process.env.MODA_BRAIN === '0') return null;
   // الترتيب حسب جودة العامية المصرية: Claude ثم Gemini (مجاني) ثم Cloudflare (مجاني، الأضعف). لو واحد فشل (رصيد خلص/حد يومي) نجرّب اللي بعده.
-  const chain = ['gemini', 'anthropic', 'cloudflare'].filter((k) => providerReady[k]());
-  if (!chain.length) return null;
-  const callFn = async (system, msgs) => {
-    let last;
-    for (const k of chain) { try { const out = await callLlm(k, system, msgs); lastError = ''; return out; } catch (e) { last = e; lastError = String(e.message || e).slice(0, 200); } }
-    throw last;
-  };
+  if (!liveProviders().length) return null;
+  const callFn = llmFallbackCall;
   return makeBrain(callFn, { training: (text) => stylistTrainingPrompt(text) });
 }
 

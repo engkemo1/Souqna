@@ -805,7 +805,7 @@ r.put('/ai-usage', h((req, res) => {
 /* ---- stylist chat settings ---- */
 r.get('/stylist', h((_req, res) => res.json(stylistStatus())));
 r.get('/stylist/test/:provider', h(async (req, res) => {
-  if (!['anthropic', 'gemini', 'cloudflare'].includes(req.params.provider)) throw new AppError(400, 'bad_provider', 'Unknown provider');
+  if (!['anthropic', 'gemini', 'cloudflare', 'extra', 'groq', 'mistral', 'sambanova', 'openrouter', 'nvidia', 'cerebras', 'qwen', 'huggingface', 'scaleway', 'cohere'].includes(req.params.provider)) throw new AppError(400, 'bad_provider', 'Unknown provider');
   res.json(await testProvider(req.params.provider));
 }));
 r.put('/stylist', h((req, res) => {

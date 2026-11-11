@@ -115,8 +115,10 @@ async function polishRgba(data, w, h, { aggressive = false } = {}) {
   {
     const white = (i) => { const r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2]; const lo = Math.min(r, g, b); return lo > 222 && Math.max(r, g, b) - lo < 30; };
     const seen = new Uint8Array(n); const st = new Int32Array(n); let sp = 0, person = 0, killed = 0;
-    for (let i = 0; i < n; i++) if (data[i * 4 + 3] >= 128) person++;
-    const edge = (j) => { if (!seen[j] && data[j * 4 + 3] >= 128 && white(j)) { seen[j] = 1; st[sp++] = j; } };
+    let top = h, bottom = 0;
+    for (let i = 0; i < n; i++) if (data[i * 4 + 3] >= 128) { person++; const y = (i / w) | 0; if (y < top) top = y; if (y > bottom) bottom = y; }
+    const feetY = top + (bottom - top) * 0.8; // الجزمة البيضا ماتتاكلش: مفيش مسح للأبيض في آخر 20% من الشخص
+    const edge = (j) => { if (!seen[j] && data[j * 4 + 3] >= 128 && ((j / w) | 0) < feetY && white(j)) { seen[j] = 1; st[sp++] = j; } };
     for (let i = 0; i < n; i++) {
       if (data[i * 4 + 3] >= 128) continue;
       const x = i % w; edge(x > 0 ? i - 1 : i); edge(x < w - 1 ? i + 1 : i); edge(i >= w ? i - w : i); edge(i < n - w ? i + w : i);

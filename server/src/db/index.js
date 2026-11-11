@@ -108,9 +108,9 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!pcols.includes('badge_text')) db.exec('ALTER TABLE products ADD COLUMN badge_text TEXT'); // شارة مخصصة على كارت المنتج (مثلاً: قطن مصري 100%)
   if (!pcols.includes('badge_tone')) db.exec('ALTER TABLE products ADD COLUMN badge_tone TEXT');
   if (!pcols.includes('audience')) db.exec('ALTER TABLE products ADD COLUMN audience TEXT'); // الفئة: men|women|boys|girls|kids|unisex (فاضي = مستنتج من الاسم)
-  if (!pcols.includes('material_ar')) db.exec('ALTER TABLE products ADD COLUMN material_ar TEXT'); // الخامه بالنص زي ما كتبها صاحب المحل (قطن 100%، جلد طبيعي...)
-  if (!pcols.includes('care_ar')) db.exec('ALTER TABLE products ADD COLUMN care_ar TEXT'); // تعليمات الغسيل والعناية اللي كتبها صاحب المحل (اختياري)
   if (!pcols.includes('moda_key')) db.exec('ALTER TABLE products ADD COLUMN moda_key TEXT'); // نوع القطعة الصريح لمحرك تويلا (فاضي = تلقائي)
+  if (!pcols.includes('photo_mismatch')) db.exec('ALTER TABLE products ADD COLUMN photo_mismatch INTEGER'); // فحص الصورة (CLIP): 1 = الصورة نوعها مختلف عن الاسم/القسم → تويلا ما بترشحوش، 0/فاضي = سليم
+  if (!pcols.includes('photo_note')) db.exec('ALTER TABLE products ADD COLUMN photo_note TEXT');
   // Cashier linking: barcodes (matched together with sku when a cashier file or API call arrives).
   if (!pcols.includes('barcode')) db.exec('ALTER TABLE products ADD COLUMN barcode TEXT');
   const vcols = db.prepare('PRAGMA table_info(variants)').all().map((c) => c.name);
@@ -380,7 +380,4 @@ export const json = (s, fallback) => {
   for (const [col, ddl] of [['width', 'INTEGER'], ['height', 'INTEGER'], ['phash', 'TEXT'], ['near_json', "TEXT NOT NULL DEFAULT '[]'"]]) if (ic.length && !ic.includes(col)) db.exec(`ALTER TABLE image_candidates ADD COLUMN ${col} ${ddl}`);
   const pc3 = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!pc3.includes('attrs_json')) db.exec('ALTER TABLE products ADD COLUMN attrs_json TEXT');
-  for (const [col, ddl] of [['admin_review_status', 'TEXT'], ['admin_review_note', 'TEXT'], ['admin_flags_json', 'TEXT'], ['admin_reviewed_at', 'TEXT']]) {
-    if (!pc3.includes(col)) db.exec(`ALTER TABLE products ADD COLUMN ${col} ${ddl}`);
-  }
 }

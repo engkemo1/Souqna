@@ -14,6 +14,7 @@
   "time_of_day": "time_if_dressy",
   "season": "season_if_unknown",
     "color": "color_preference",
+    "size": "size_needed",
     "taste": "taste_quick",
   "dress_kind": "dress_kind"
  },
@@ -302,6 +303,22 @@
      "[6000, null]": "Over 6,000 EGP",
      "flexible": "Not important"
     }
+   }
+  },
+  "size_needed": {
+   "text": "مقاسك كام؟",
+   "type": "single",
+   "options": [
+    { "label": "S", "value": "S" },
+    { "label": "M", "value": "M" },
+    { "label": "L", "value": "L" },
+    { "label": "XL", "value": "XL" },
+    { "label": "XXL", "value": "XXL" },
+    { "label": "مش متأكد", "value": "unknown" }
+   ],
+   "en": {
+    "text": "What size are you?",
+    "options": { "S": "S", "M": "M", "L": "L", "XL": "XL", "XXL": "XXL", "unknown": "Not sure" }
    }
   },
   "color_preference": {

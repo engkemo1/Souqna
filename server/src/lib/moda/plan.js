@@ -129,7 +129,8 @@ function scoreProduct(p, slot, ctx) {
 
 const CASUAL_ONLY = new Set(['sneakers', 'sport_shoes', 'slippers']);
 /** قطع مش بتتركّب في أطقم أبدًا إلا بطلب صريح (ملابس داخلية/نوم وإكسسوارات فرعية). */
-export const NEVER_UNASKED = new Set(['sleepwear', 'lingerie', 'robe', 'cufflinks']);
+export const SIZE_ASK_KEYS = new Set(['underwear', 'sleepwear', 'lingerie', 'robe']);
+export const NEVER_UNASKED = new Set(['sleepwear', 'lingerie', 'robe', 'cufflinks', 'underwear']);
 
 /** يجيب المرشحين لـ slot عند مستوى تخفيف معين. */
 function candidatesAt(slot, lvl, aud, products, ctx) {
@@ -330,6 +331,9 @@ export function planOutfit(parsed, products, env = {}) {
   const budget = parsed.budget?.value || null;
   if (parsed.intent && parsed.intent !== 'shop') return { parsed, state: 'chat', intent: parsed.intent, persons: [], people: [], ask: [] };
   const asks = [];
+  // مقاس العميل (لو معروف) بيفلتر المنتجات اللي ليها مقاسات متاحة؛ المنتج من غير بيانات مقاسات بيفضل.
+  const wantSize = parsed.flags?.size ? String(parsed.flags.size).toUpperCase() : null;
+  if (wantSize) products = products.filter((p) => !p.size_list || String(p.size_list).toUpperCase().split(',').includes(wantSize));
   const base = { parsed, weather: adv, eventTime: env.eventTime || null };
 
   // ---- أسئلة لازم تتسأل قبل أي ترشيح ----
@@ -429,7 +433,10 @@ export function planOutfit(parsed, products, env = {}) {
   // Twila must not reveal a provisional look between these answers.
   if (!budget && !parsed.flags?.budgetFlexible && !audienceOpen && (persons.length > 1 || slotTotal > 2) && state !== 'none' && state !== 'no_look') asks.push('budget');
   if (context && !parsed.daypart && (K.contexts.get(context)?.formality?.[1] || 0) >= 4 && state !== 'none' && state !== 'no_look') asks.push('time_if_dressy');
-  if (parsed.garments.length === 1 && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && !parsed.flags?.cheapest && state !== 'none' && state !== 'no_look') asks.push('color_preference');
+  // لبس داخلي/نوم/لانجري/روب: نسأل عن المقاس (مش المناسبة ولا اللون) عشان يتضاف للسلة بمقاسه
+  const SIZE_FIRST = parsed.garments.length >= 1 && parsed.garments.every((g) => SIZE_ASK_KEYS.has(g.key));
+  if (SIZE_FIRST) { if (!wantSize && state !== 'none' && state !== 'no_look') asks.push('size_needed'); }
+  else if (parsed.garments.length === 1 && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && !parsed.flags?.cheapest && state !== 'none' && state !== 'no_look') asks.push('color_preference');
 
   const palette = [];
   for (const f of fills) for (const p of f.picks) { const c = primary(p.product); if (c && !palette.includes(c) && !['black', 'white'].includes(c) || (c && palette.length < 1 && !palette.includes(c))) palette.push(c); }

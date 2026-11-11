@@ -209,7 +209,8 @@
       "items": [
         { "key": "sleepwear", "ar": "بيجامة / لبس نوم", "formality": [1, 1] },
         { "key": "lingerie",  "ar": "لانجري",           "formality": [1, 1] },
-        { "key": "robe",      "ar": "روب / برنس",       "formality": [1, 1] }
+        { "key": "robe",      "ar": "روب / برنس",       "formality": [1, 1] },
+        { "key": "underwear", "ar": "ملابس داخلية",     "formality": [1, 1] }
       ]
     }
   },

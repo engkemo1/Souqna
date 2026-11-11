@@ -97,6 +97,9 @@ function applyAnswers(parsed, answers = {}, K) {
         if (out.garments.length === 1) out.garments = out.garments.map((g) => ({ ...g, color: v }));
         else out.colors = [v];
       }
+    } else if (id === 'size_needed') {
+      if (v && v !== 'unknown') out.flags = { ...out.flags, size: String(v).toUpperCase() };
+      else out.flags = { ...out.flags, sizeSkipped: true };
     } else if (id === 'dress_kind') out.garments = [{ key: v, color: null, material: null, text: v, position: 0 }];
     else if (id === 'taste_style') out.taste = [].concat(v);
     else if (id === 'engagement_role') { out.role = v === 'self' ? 'self' : 'guest'; if (v === 'self' && out.context === 'engagement_guest') out.contextEffective = 'engagement_self'; }
@@ -265,6 +268,16 @@ async function runModaCore(messages, opts = {}) {
   }
   if (session?.pendingQuestion === 'color_preference' && /أي لون|اي لون|مش فارق|مش فارقة|سيبها علي|اختاري|any color|no preference/i.test(parsed.normalized || '')) {
     parsed.flags = { ...parsed.flags, colorFlexible: true };
+  }
+  { // مقاس مكتوب في الكلام: "مقاس L" / "سايز 42" / أو رد لوحده على سؤال المقاس
+    const t = String(parsed.normalized || text || '');
+    const WORDS = { 'اكس لارج': 'XL', 'اكس اكس لارج': 'XXL', لارج: 'L', ميديم: 'M', سمول: 'S', وسط: 'M' };
+    let sz = (t.match(/(?:مقاس|سايز|size)\s*(xxl|xl|xs|s|m|l|3xl|\d{2})(?![a-z0-9])/i) || [])[1];
+    if (!sz && session?.pendingQuestion === 'size_needed') {
+      sz = (t.trim().match(/^(xxl|xl|xs|s|m|l|3xl|\d{2})$/i) || [])[1];
+      if (!sz) for (const [w, v] of Object.entries(WORDS)) if (t.includes(w)) { sz = v; break; }
+    }
+    if (sz) parsed.flags = { ...parsed.flags, size: String(sz).toUpperCase() };
   }
   if (parsed.flags?.colorPreference && parsed.garments.length === 1) {
     parsed.garments = parsed.garments.map((g) => ({ ...g, color: parsed.flags.colorPreference }));

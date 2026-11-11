@@ -473,7 +473,8 @@ const curatorHits = new Map();
 const understandHits = new Map();
 function modaCatalogRows() {
   return q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en,
-      COALESCE(c.name_ar || ' ' || c.name_en, '') AS cat_text
+      COALESCE(c.name_ar || ' ' || c.name_en, '') AS cat_text,
+      (SELECT GROUP_CONCAT(DISTINCT v.size) FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND v.size IS NOT NULL) AS size_list
     FROM products p JOIN stores s ON s.id=p.store_id LEFT JOIN categories c ON c.id=p.category_id
     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (p.track_stock=0 OR p.stock>0)
     ORDER BY p.featured DESC, p.sold_count DESC, p.id DESC LIMIT 5000`);

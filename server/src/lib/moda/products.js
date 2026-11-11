@@ -37,6 +37,7 @@ const FORCE_RULES = [
   ['lingerie', /(^|\s)(لانجيري|لانجري|لينجري|لانجريه|لانجيريه|بيبي دول)(\s|$)|\b(lingerie|babydoll|baby doll)\b/i],
   ['sleepwear', /(^|\s)(قميص نوم|قمصان نوم|فستان نوم|لبس نوم|ملابس نوم|بيجامه|بيجاما|بجامه|بجاما|بيجامات)(\s|$)|\b(nightgown|nightwear|sleepwear|pajamas?|pyjamas?)\b/i],
   ['robe', /(^|\s)(روب|ارواب|رواب|برنس|برنس حمام)(\s|$)|\b(robe|bathrobe|dressing gown)\b/i],
+  ['underwear', /(^|\s)(فانله|فانلة|فانلات|بوكسر|بوكسرات|سليب|ملابس داخليه|ملابس داخلية|لبس داخلي|تيشرت داخلي|تيشيرت داخلي|شورت داخلي|بنطلون داخلي|سوتيان|بدي داخلي)(\s|$)|\b(underwear|undershirt|boxers?|briefs|bra)\b/i],
 ];
 // صفات بتتغلب على اسم القطعة الصريح لو اتساوت: بنقلل وزنها بقوة
 const ALIAS_PENALTY = { 'sweater:اوفر سايز': 14, 'sweater:اوفرسايز': 14, 'sweater:oversize': 14, 'sweater:تريكو': 6, 'sweater:knit': 6, 'joggers:ميلتون': 6, 'dress_evening:سهره': 6, 'dress_evening:ماكسي': 6, 'dress_party:سواريه': 6, 'dress_party:كوكتيل': 6, 'bow_tie:فراشه': 6, 'tote:توت': 6 };
@@ -158,6 +159,14 @@ export function enrichProduct(row, K = loadKnowledge()) {
   // كلمات الكوتشي في الاسم حاسمة: أي حذاء اسمه كوتشي/sneakers/running يتصنّف كوتشي مهما كان النوع المحفوظ.
   if (key && SHOE_KEYS.has(key) && key !== 'sneakers' && SNEAKER_NAME_RE.test(name)) { key = 'sneakers'; typeConflict = false; }
   if (!key) key = inferKey(`${row.cat_text || ''}`, K);
+  // تأكيد ثلاثي: الاسم + القسم (+ النوع المحفوظ): لو الاسم بيقول نوع والقسم نوع من عيلة تانية خالص، المنتج مش موثوق → مايترشحش.
+  if (key && !typeConflict) {
+    const catKey = row.cat_text ? inferKey(String(row.cat_text), K) : null;
+    const nameKey = inferKey(name, K);
+    const fam = (k) => K.items.get(k)?.family || null;
+    if (catKey && nameKey && !WEAK_KEYS.has(catKey) && !WEAK_KEYS.has(nameKey) && fam(catKey) && fam(nameKey) && fam(catKey) !== fam(nameKey)) typeConflict = true;
+  }
+  if (Number(row.photo_mismatch) === 1) typeConflict = true; // صورة المنتج (CLIP) نوعها مختلف عن اسمه/قسمه
   const desc = `${row.description_ar || ''}`;
   if (key === 'dress_any') {
     const f0 = inferFormality('dress_any', name, desc, K);
