@@ -132,22 +132,10 @@ function StoreCardView({ c, lang }) {
 }
 
 function AnalysisSteps({ t }) {
-  const steps = ['stylist.step1', 'stylist.step2', 'stylist.step3', 'stylist.step4', 'stylist.step5'];
-  const [i, setI] = useState(0);
-  useEffect(() => {
-    const id = setInterval(() => setI((n) => Math.min(n + 1, steps.length - 1)), 2300);
-    return () => clearInterval(id);
-  }, []);
   return (
-    <div role="status" aria-live="polite" className="max-w-[90%] rounded-2xl rounded-ss-sm bg-secondary px-3.5 py-3 text-[13.5px]">
-      <ul className="space-y-1.5">
-        {steps.slice(0, i + 1).map((k, n) => (
-          <li key={k} className={cx('flex items-center gap-2 transition-opacity', n < i ? 'text-muted' : 'font-medium')}>
-            {n < i ? <Check className="h-4 w-4 shrink-0 text-brand" /> : <Loader2 className="h-4 w-4 shrink-0 animate-spin" />}
-            <span>{t(k)}</span>
-          </li>
-        ))}
-      </ul>
+    <div role="status" aria-live="polite" className="inline-flex items-center gap-2 rounded-2xl rounded-ss-sm bg-secondary px-3.5 py-2.5 text-[13.5px] font-medium text-fg">
+      <Loader2 className="h-4 w-4 shrink-0 animate-spin text-brand" />
+      <span>{t('stylist.step1')}</span>
     </div>
   );
 }
