@@ -18,9 +18,10 @@ import { loadKnowledge } from '../lib/moda/knowledge.js';
 
 const K = loadKnowledge();
 const MIN_P = Number(process.env.MIN_P || 0.8); const LIMIT = Number(process.env.LIMIT || 100000);
-// عائلات متقاربة بصريًا: مش بنعتبر الاختلاف بينها تعارض
-const NEAR = [['tops', 'outerwear'], ['tops', 'sport'], ['bottoms', 'sport'], ['dresses', 'modest'], ['outerwear', 'modest'], ['outerwear', 'suiting'], ['tops', 'suiting'], ['bottoms', 'suiting'], ['tops', 'underwear_sleep'], ['bottoms', 'underwear_sleep'], ['dresses', 'underwear_sleep'], ['accessories', 'bags']];
-const near = (a, b) => NEAR.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+// CLIP بيفرّق كويس بين (لبس / شنطة / جزمة / إكسسوار)، لكن بيتلخبط جدًا بين أنواع اللبس نفسها (محجبة في الصورة ← "محتشم"، طقم ← قميص/بنطلون).
+// فبنعتبر التعارض حقيقي بس لو الصورة والاسم في مجموعتين مختلفتين من دول.
+const GROUP = { tops: 'clothes', bottoms: 'clothes', dresses: 'clothes', suiting: 'clothes', outerwear: 'clothes', modest: 'clothes', sport: 'clothes', underwear_sleep: 'clothes', shoes: 'shoes', bags: 'bags', accessories: 'accessories' };
+const near = (a, b) => (GROUP[a] || a) === (GROUP[b] || b);
 
 if (!(await clipReady())) { console.error(`CLIP model not available: ${clipStatus().error}`); process.exit(1); }
 const protos = { text: await buildTextPrototypes(clipEmbedTexts), centroids: new Map() };
