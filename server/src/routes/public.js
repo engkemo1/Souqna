@@ -32,6 +32,7 @@ import { matchStore } from '../lib/moda/stores.js';
 import { contactFromEnv } from '../lib/moda/contact.js';
 import { logStylist } from '../lib/stylist-log.js';
 import { runModa } from '../lib/moda/engine.js';
+import { enrichAll as enrichModaRows } from '../lib/moda/products.js';
 import { getModaPrompts } from '../lib/modaPrompts.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
 import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
@@ -479,6 +480,10 @@ function modaCatalogRows() {
     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (p.track_stock=0 OR p.stock>0)
     ORDER BY p.featured DESC, p.sold_count DESC, p.id DESC LIMIT 5000`);
 }
+// تسخين: تحليل المنتجات أول مرة تقيل (ثواني)، فنعمله مرة عند التشغيل وكل 10 دقايق، والطلبات بتلاقيه جاهز في الكاش.
+const warmModa = () => { try { enrichModaRows(modaCatalogRows(), loadModaKnowledge()); } catch { /* مش حرج */ } };
+setTimeout(warmModa, 4000).unref?.();
+setInterval(warmModa, 10 * 60 * 1000).unref?.();
 function modaClientResponse(result) {
   const base = { intent: result.intent === 'brain' ? 'chat' : result.intent || (result.state === 'chat' ? 'chat' : 'shop'), state: result.state, say: result.say, tips: result.tips || [], styleTips: result.styleTips || [], questions: result.questions || [], session: result.session, remember: result.remember || {}, storeCard: result.storeCard || null };
   if (!result.blocks) return { ...base, looks: [], total: 0, weatherSource: result.weatherSource || null };

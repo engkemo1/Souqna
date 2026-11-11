@@ -544,8 +544,8 @@ export default function ProductEditor() {
   );
 
   const [aiBusy, setAiBusy] = useState(false);
-  const aiFill = async () => {
-    const first = f.media[0]; if (!first || aiBusy) return;
+  const aiFill = async (mediaArg) => {
+    const first = (Array.isArray(mediaArg) ? mediaArg[0] : null) || f.media[0]; if (!first || aiBusy) return;
     setAiBusy(true);
     try {
       const { suggestion: a } = await api('/owner/ai/product', { method: 'POST', body: { mediaId: first.id, hint: f.name_ar || undefined } });
@@ -631,8 +631,7 @@ export default function ProductEditor() {
 
   const WSTEPS = [
     { k: 'images', short: L('الصور', 'Photos'), title: L('صوّر المنتج', 'Add photos'), lead: L('المطلوب: ارفع صورة واحدة على الأقل من موبايلك. الأفضل 3 صور: من قدّام ومن ورا وتفصيلة. أول صورة هي الغلاف اللي العميل بيشوفه الأول. بعد الرفع تقدر تخلّي الذكاء الاصطناعي يكتب الاسم والوصف عنك.', 'What to do: upload at least one photo from your phone, ideally 3 (front, back, a detail). The first photo is the cover shoppers see first. After uploading, AI can write the name and description for you.') },
-    { k: 'name', short: L('الاسم', 'Name'), title: L('الاسم والوصف', 'Name & description'), lead: L('المطلوب: اكتب اسم واضح من كلمتين أو أكتر فيه النوع واللون أو الخامة، زي «لانجيري شيفون قصير أسود». اسم زي «لانجيري» لوحده بيقلّل المبيعات. الوصف اختياري، لكن سطرين عن الخامة والمقاس بيقلّلوا أسئلة العملاء.', 'What to do: write a clear name of two or more words with the type plus colour or fabric, e.g. “short black chiffon lingerie”. A one-word name sells less. The description is optional, but two lines about fabric and fit save customers questions.') },
-    { k: 'type', short: L('النوع', 'Type'), title: L('إيه المنتج ده؟', 'What is it?'), lead: L('المطلوب: اختار قسم المنتج. هنرشّحلك الأقسام المناسبة من الاسم اللي كتبته. اختار: لمين هو (ستات، رجالي، أطفال…) وإيه نوعه (فستان، تيشيرت، لانجيري…). لو مش لاقي النوع بالظبط اختار أقرب قسم موجود، والمقاسات هتتظبط لوحدها.', 'What to do: pick who it is for (women, men, kids…) and its type (dress, T-shirt, lingerie…). If you cannot find the exact type, pick the closest existing one, and sizes are set up automatically.') },
+    { k: 'name', short: L('الاسم والقسم', 'Name & section'), title: L('اسم المنتج وقسمه', 'Name & section'), lead: L('اكتب اسم المنتج (كلمتين أو أكتر، زي «فستان سواريه أسود»)، وبعدها اضغط على القسم المناسب من اللي هيظهرلك تحت. لو مش لاقي القسم اكتب الاسم في خانة البحث. الوصف اختياري.', 'What to do: write a clear name of two or more words with the type plus colour or fabric, e.g. “short black chiffon lingerie”. A one-word name sells less. The description is optional, but two lines about fabric and fit save customers questions.') },
     { k: 'pricing', short: L('السعر', 'Price'), title: L('بكام؟', 'Price'), lead: L('المطلوب: اكتب سعر البيع بالجنيه. لو في خصم اكتب السعر القديم (قبل الخصم) في الخانة التانية وهيظهر للعميل مشطوب. السعر القديم لازم يكون أكبر من سعر البيع.', 'What to do: enter the selling price in EGP. For a discount, enter the old (before-discount) price in the second field and shoppers will see it crossed out. The old price must be higher than the selling price.') },
     { k: 'variants', short: L('الكمية', 'Stock'), title: L('الألوان والمقاسات والكمية', 'Colours, sizes & stock'), lead: L('اختياري: لو المنتج ليه ألوان (أو درجات في المكياج) أو مقاسات (أو أحجام في العطور) اختارهم وحدد الكمية المتاحة. لو مفيش، قفّل الألوان واكتب الكمية بس واضغط «التالي». لو الكمية بقت صفر المنتج بيظهر للعميل إنه خلص.', 'Optional: if the product comes in colours (or shades for makeup) or sizes (or volumes for perfume), pick them and set the available quantity. If not, switch colours off, enter the quantity and press Next. At zero stock the product shows as sold out.') },
     { k: 'publish', short: L('المراجعة', 'Review'), title: L('راجع وانشر', 'Review & publish'), lead: L('المطلوب: راجع شكل المنتج زي ما العميل هيشوفه. لو تمام اضغط «نشر المنتج» وهيظهر للعملاء. ولو لسه مش جاهز احفظه كمسودة وكمّله بعدين.', 'What to do: check how the product looks to shoppers. If it is right, press “Publish product” and it goes live. If not ready, save it as a draft and finish later.') },
@@ -641,8 +640,8 @@ export default function ProductEditor() {
     const e = {};
     if (i === 0 && !f.media.length) e.media = t('editor.needImage');
     if (i === 1 && f.name_ar.trim().length < 2) e.name_ar = t('field.required');
-    if (i === 2 && !(f.moda_key || customType || f.department)) e.type = L('اختار قسم المنتج', 'Pick the product section');
-    if (i === 3) {
+    if (i === 1 && !e.name_ar && !(f.moda_key || customType || f.department)) e.type = L('اختار قسم المنتج', 'Pick the product section');
+    if (i === 2) {
       if (!Number(f.price)) e.price = t('field.price_required');
       else if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
     }
@@ -652,7 +651,7 @@ export default function ProductEditor() {
   const nextStep = () => {
     const e = stepErr(step);
     if (Object.keys(e).length) { setErrors(e); toast({ tone: 'error', title: Object.values(e)[0] }); return; }
-    if (step === 4 && missing.length && !warned) { setWarned(true); toast({ tone: 'error', duration: 8000, title: missing[0].text + ' ' + L('ولو عايز تكمّل كده، اضغط «التالي» تاني.', 'To continue anyway, press Next again.') }); return; }
+    if (step === 3 && missing.length && !warned) { setWarned(true); toast({ tone: 'error', duration: 8000, title: missing[0].text + ' ' + L('ولو عايز تكمّل كده، اضغط «التالي» تاني.', 'To continue anyway, press Next again.') }); return; }
     const n = Math.min(step + 1, WSTEPS.length - 1);
     setMaxStep((m) => Math.max(m, n));
     gotoStep(n);
@@ -694,7 +693,7 @@ export default function ProductEditor() {
       {step > 0 && <Button variant="outline" className="shrink-0" onClick={() => gotoStep(step - 1)} disabled={saving}>{L('رجوع', 'Back')}</Button>}
       {step < WSTEPS.length - 1 ? (
         <div className="flex flex-1 items-center gap-3">
-          {step === 4 && <Button variant="outline" onClick={nextStep}>{L('تخطّي', 'Skip')}</Button>}
+          {step === 3 && <Button variant="outline" onClick={nextStep}>{L('تخطّي', 'Skip')}</Button>}
           <Button full className={desktop ? 'ms-auto min-w-[160px] w-auto' : undefined} onClick={nextStep}>{L('التالي', 'Next')}</Button>
         </div>
       ) : (
@@ -774,18 +773,12 @@ export default function ProductEditor() {
   const main = (
     <div className="min-w-0 space-y-4">
       {(!isNew || step === 0) && (<Card id="images" bare={isNew} step={1} title={L('صور المنتج', 'Product photos')} hint={L('أول صورة هي الغلاف. الصور الواضحة بتبيع أكتر.', 'The first photo is the cover.')} done={done.images}>
-        <MediaUploader value={f.media} onChange={(media) => { set({ media }); if (media.length) setErrors((x) => ({ ...x, media: undefined })); }} error={errors.media} />
+        <MediaUploader value={f.media} onChange={(media) => { const firstUpload = isNew && !f.media.length && media.length && !f.name_ar.trim(); set({ media }); if (media.length) setErrors((x) => ({ ...x, media: undefined })); if (firstUpload) setTimeout(() => aiFill(media), 0); }} error={errors.media} />
         {f.media.length > 0 && (
-          <button type="button" onClick={aiFill} disabled={aiBusy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/40 bg-brand/5 px-4 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-60">
+          <button type="button" onClick={() => aiFill()} disabled={aiBusy} className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-brand/40 bg-brand/5 px-4 py-3 text-sm font-semibold text-brand transition hover:bg-brand/10 disabled:opacity-60">
             {aiBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}{L('املا الاسم والوصف والألوان تلقائيًا من الصورة', 'Fill name, description and colours from the photo')}
           </button>
         )}
-      </Card>)}
-
-      {(!isNew || step === 2) && (<Card id="type" bare={isNew} step={2} title={L('المنتج في أنهي قسم؟', 'Which section is it in?')} hint={L('اكتب اسم المنتج في خانة البحث (مثلًا: فستان) واختار من اللي يظهر. ولو مش لاقيه اختار أقرب قسم.', 'Type what it is in the search box (e.g. dress) and pick from the results. If you cannot find it, pick the closest section.')} done={done.type}>
-        <SectionTreePicker items={pickerData?.departments || []} productName={f.name_ar} value={f.department} error={errors.type} customName={customType && !f.department ? customType : ''}
-          onPick={(slug, root) => { setCustomType(''); set({ department: slug, deptTouched: true, attrs: {}, moda_key: '', ...(customType ? { category_id: '' } : {}), ...(['women', 'men', 'kids'].includes(root) ? { audience: root } : {}) }); }} onAddSection={addTypeSection} />
-        {deptDefs.filter((d) => d.key).length > 0 && f.department && <div className="mt-4"><AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} /></div>}
       </Card>)}
 
       {(!isNew || step === 1) && (<Card id="name" bare={isNew} step={3} title={L('الاسم والوصف', 'Name & description')} done={done.name}>
@@ -827,7 +820,13 @@ export default function ProductEditor() {
         </div>
       </Card>)}
 
-      {(!isNew || step === 3) && (<Card id="pricing" bare={isNew} step={4} title={t('editor.pricing')} done={done.pricing}>
+      {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('المنتج في أنهي قسم؟', 'Which section is it in?')} hint={L('اكتب اسم المنتج في خانة البحث (مثلًا: فستان) واختار من اللي يظهر. ولو مش لاقيه اختار أقرب قسم.', 'Type what it is in the search box (e.g. dress) and pick from the results. If you cannot find it, pick the closest section.')} done={done.type}>
+        <SectionTreePicker items={pickerData?.departments || []} productName={f.name_ar} value={f.department} error={errors.type} customName={customType && !f.department ? customType : ''}
+          onPick={(slug, root) => { setCustomType(''); set({ department: slug, deptTouched: true, attrs: {}, moda_key: '', ...(customType ? { category_id: '' } : {}), ...(['women', 'men', 'kids'].includes(root) ? { audience: root } : {}) }); }} onAddSection={addTypeSection} />
+        {deptDefs.filter((d) => d.key).length > 0 && f.department && <div className="mt-4"><AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} /></div>}
+      </Card>)}
+
+      {(!isNew || step === 2) && (<Card id="pricing" bare={isNew} step={4} title={t('editor.pricing')} done={done.pricing}>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('editor.price')} error={errors.price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.price} onChange={(e) => set({ price: e.target.value.replace(/\D/g, '') })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} /></Field>
           <Field label={t('editor.compareAt')} optional={t('common.optional')} hint={!errors.compare_at_price ? t('editor.compareHint') : undefined} error={errors.compare_at_price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.compare_at_price} onChange={(e) => set({ compare_at_price: e.target.value.replace(/\D/g, '') })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} /></Field>
@@ -847,7 +846,7 @@ export default function ProductEditor() {
         </div>
       </Card>)}
 
-      {(!isNew || step === 4) && (<Card id="variants" bare={isNew} step={5} title={L('الألوان والمقاسات والكمية', 'Colours, sizes & stock')} done={f.colors.length > 0 || f.sizes.length > 0 || Number(f.stock) > 0}>
+      {(!isNew || step === 3) && (<Card id="variants" bare={isNew} step={5} title={L('الألوان والمقاسات والكمية', 'Colours, sizes & stock')} done={f.colors.length > 0 || f.sizes.length > 0 || Number(f.stock) > 0}>
         <div className="space-y-6">
           {missing.length > 0 && (warned || !isNew) && missingBox}
           <VariantsEditor f={f} set={set} sizeKind={sizeKind} mode={variantMode} hasColors={hasColors} setHasColors={setHasColors} typeChosen={!!type || !!f.department || !!customType} />
@@ -1025,8 +1024,8 @@ export default function ProductEditor() {
           <AnimatePresence mode="wait" initial={false}>
             <motion.div key={step} initial={{ opacity: 0, x: 28 * dirRef.current * (lang === 'ar' ? -1 : 1) }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -28 * dirRef.current * (lang === 'ar' ? -1 : 1) }} transition={{ duration: 0.18 }}>
               {wizHead}
-              {step === 5 && <div className="mb-4 space-y-4">{missing.length > 0 && <div className="space-y-2">{missingBox}<button type="button" onClick={() => gotoStep(4)} className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline"><Pencil className="h-3.5 w-3.5" />{L('ارجع كمّلها', 'Go back and fix')}</button></div>}{previewRow}{publishCard}</div>}
-              {step < 5 && main}
+              {step === 4 && <div className="mb-4 space-y-4">{missing.length > 0 && <div className="space-y-2">{missingBox}<button type="button" onClick={() => gotoStep(4)} className="inline-flex items-center gap-1 text-[13px] font-semibold text-brand hover:underline"><Pencil className="h-3.5 w-3.5" />{L('ارجع كمّلها', 'Go back and fix')}</button></div>}{previewRow}{publishCard}</div>}
+              {step < 4 && main}
             </motion.div>
           </AnimatePresence>
           {wizBar}

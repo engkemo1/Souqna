@@ -24,6 +24,7 @@ export function understandPrompt(K = loadKnowledge()) {
     'budget: only if the customer states money limits. {"max":number,"min":number|null,"kind":"total"|"per_item"}. A range like "من 200 ل 1000" or "between 500 and 1500" means min=200,max=1000 (max is the limit). "لحد 1000" / "up to 1000" means max=1000,min=null. "ألف" = 1000, "ألفين" = 2000, "5k" = 5000. Never invent a budget.',
     'Never guess an occasion the customer did not mention: if they only ask for one piece (e.g. sneakers to go with a shirt they already own), leave context null and list only that piece in garments.',
     'daypart: "day" or "night" only if stated (بالليل, الصبح, الضهر, evening…), else null.',
+    'If a CONTEXT block is given (previous request + pieces already in the current look), use it only to resolve references: a message like "على الفستان" / "مع البدلة" / "عليها" just points at a piece already in the look, so do NOT list that piece as wanted; list the pieces the customer still wants (e.g. the previous request). "عليها" = the woman, "عليه" = the man.',
     'Never output values outside these lists. Leave unknown fields empty/null.',
   ].join('\n');
 }
@@ -101,8 +102,11 @@ export function rulesConfident(parsed, text) {
 /** callFn(system, messages) → string|object. بيرجّع async ({text, parsed}) => understanding|null */
 export function makeUnderstander(callFn, { timeoutMs = 6500 } = {}) {
   const system = understandPrompt();
-  return async ({ text }) => {
-    const raw = await Promise.race([callFn(system, [{ role: 'user', content: String(text).slice(0, 400) }]), new Promise((_, rej) => setTimeout(() => rej(new Error('understand timeout')), timeoutMs))]);
+  return async ({ text, session = null }) => {
+    const look = (session?.activeLook?.items || []).map((i) => `${i.aud || ''}: ${i.name}`).join(' | ');
+    const prev = (session?.parsed?.garments || []).map((g) => g.key).join(', ');
+    const ctx = look || prev ? `CONTEXT (previous request: ${prev || 'none'}; current look: ${look || 'none'})\nMESSAGE: ` : '';
+    const raw = await Promise.race([callFn(system, [{ role: 'user', content: ctx + String(text).slice(0, 400) }]), new Promise((_, rej) => setTimeout(() => rej(new Error('understand timeout')), timeoutMs))]);
     let out = raw;
     if (typeof raw === 'string') { const a = raw.indexOf('{'); const b = raw.lastIndexOf('}'); try { out = a >= 0 && b > a ? JSON.parse(raw.slice(a, b + 1)) : null; } catch { out = null; } }
     return sanitizeUnderstanding(out, text);

@@ -2,7 +2,7 @@
 import { norm, skeleton } from './text.js';
 
 const strip = (s) => String(s).split(' ').map((w) => (w.length > 3 ? w.replace(/^ال/, '') : w)).join(' ').trim();
-export const GENERIC = new Set(['ستايل', 'ستور', 'شوب', 'فاشن', 'مول', 'كلوثز', 'wear', 'style', 'store', 'shop', 'fashion', 'clothes', 'stores', 'ملابس', 'لبس', 'محل', 'متجر', 'بيت', 'عالم', 'house', 'world', 'collection', 'brand', 'man', 'men', 'women', 'kids', 'design']);
+export const GENERIC = new Set(['ستايل', 'ستور', 'شوب', 'فاشن', 'مول', 'كلوثز', 'wear', 'style', 'store', 'shop', 'fashion', 'clothes', 'stores', 'ملابس', 'لبس', 'محل', 'متجر', 'بيت', 'عالم', 'house', 'world', 'collection', 'brand', 'man', 'men', 'women', 'kids', 'design', 'بنها', 'banha', 'benha', 'bnha', 'بنهه', 'مصر', 'egypt', 'القاهره', 'cairo']);
 
 const AR_TO_LAT_MAP = {
   'ا': 'a', 'أ': 'a', 'إ': 'e', 'آ': 'a', 'ء': '', 'ئ': 'e', 'ؤ': 'o',

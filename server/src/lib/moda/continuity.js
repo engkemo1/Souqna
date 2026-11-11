@@ -21,6 +21,64 @@ export function isContinuationRequest(text, session) {
   return false;
 }
 
+const FAM = [
+  ['dress', /(فستان|فساتين|دريس)/, /dress|abaya|gown/i],
+  ['suit', /(بدل[هة]|بدل)/, /suit|tuxedo/i],
+  ['shirt', /(قميص|قمصان|بلوز[هة])/, /shirt|blouse|polo/i],
+  ['trousers', /(بنطلون|بنطال|شينو)/, /trouser|chino|pants/i],
+  ['skirt', /(جيب[هة])/, /skirt/i],
+  ['jacket', /(جاكيت|بليزر)/, /jacket|blazer/i],
+  ['abaya', /(عباي[هة])/, /abaya/i],
+  ['shoes', /(جزم[هة]|جزم|حذاء|احذي[هة]|كوتشي|كوتشيات|صندل|شوز|بوت|لوفر|كعب)/, /shoe|sneaker|loafer|boot|sandal|heel|flat|slipper/i],
+  ['bag', /(شنط[هة]|شنط|حقيب[هة])/, /bag|tote|clutch/i],
+];
+const FEM_PRON_RE = /(^|\s)(عليها|معاها|ليها|لها|تحتها|فوقها|تليق عليها|عليهاا)(\s|$)/;
+const MASC_PRON_RE = /(^|\s)(عليه|معاه|ليه|له|تحته|فوقه|يليق عليه)(\s|$)/;
+const FEM_AUD = new Set(['women', 'women_hijab', 'girls']);
+const MASC_AUD = new Set(['men', 'boys']);
+
+/** العميل بيشاور على قطعة موجودة في اللوك الحالي كمرجع ("على الفستان"، "مع البدلة"، "تحت الفستان"). بيرجّع {item, fam} أو null. */
+export function resolveAnchor(text, session) {
+  const items = session?.activeLook?.items || [];
+  if (!items.length) return null;
+  const n = norm(text || '');
+  const words = n.split(' ').filter(Boolean);
+  const wanted = (session?.parsed?.garments || []).map((g) => String(g.key || ''));
+  for (const [fam, re, keyRe] of FAM) {
+    const strong = new RegExp(`(^|\\s)(علي|على|عل|ع|مع|معا|تحت|فوق|ل|لل|ب|وعلي|وعلى)\\s*(ال)?${re.source}`).test(n);
+    const bare = words.length <= 3 && new RegExp(`^(ال)?${re.source}$`).test(words.join(' '));
+    if (!strong && !bare) continue;
+    const hits = items.filter((it) => keyRe.test(String(it.key || '')) || keyRe.test(String(it.slotKey || '')) || re.test(norm(it.name || '')));
+    // لو القطعة المذكورة هي نفسها المطلوبة («عاوز جزمة» واللوك فيه جزمة) فده طلب مش إشارة
+    if (hits.length && wanted.some((k) => keyRe.test(k)) && !/(علي|على|عل|ع|مع|معا|تحت|فوق)\s*(ال)?/.test(n)) continue;
+    if (hits.length === 1) return { item: hits[0], fam, keyRe };
+    if (hits.length > 1) return { ambiguous: hits, fam, keyRe };
+  }
+  // إشارة بالإصبع: «القطعة دي»، «اللي فوق»، «الأولى» — لو في قطعة واحدة نثبّتها، لو أكتر نسأل
+  if (words.length <= 5 && /(^|\s)(القطع[هة] (دي|ده|دا)|اللي (فوق|فات|قبل|اخترناه[ا]?)|الاول[يى]|الاخير[هة]?)(\s|$)/.test(n) && items.length) {
+    const free = items.filter((it) => !wanted.some((k) => k && (String(it.key || '').includes(k) || String(it.slotKey || '').includes(k))));
+    const pool = free.length ? free : items;
+    if (pool.length === 1) { const k = String(pool[0].key || pool[0].slotKey || ''); return { item: pool[0], fam: 'ref', keyRe: new RegExp(k.replace(/[^a-z_]/gi, '') || 'zzz') }; }
+    return { ambiguous: pool, fam: 'ref', keyRe: /(?!)/ };
+  }
+  return null;
+}
+
+/** ضمير جمع («عليهم»، «معاهم») = الاتنين → لو اللوك فيه أكتر من شخص لازم نسأل ليك ولا ليها ولا الاتنين. */
+export const PLURAL_PRON_RE = /(^|\s)(عليهم|معاهم|ليهم|لهم|عليهما|معاهما|فوقهم|تحتهم)(\s|$)/;
+export function needsWhoPart(text, session) {
+  const auds = new Set((session?.activeLook?.items || []).map((x) => x.aud).filter(Boolean));
+  return auds.size > 1 && PLURAL_PRON_RE.test(norm(text || ''));
+}
+
+/** ضمير مؤنث/مذكر في الكلام ("عليها" = السيدة، "عليه" = الراجل) → مجموعة aud المقصودة أو null. */
+export function pronounAuds(text) {
+  const n = norm(text || '');
+  if (FEM_PRON_RE.test(n)) return FEM_AUD;
+  if (MASC_PRON_RE.test(n)) return MASC_AUD;
+  return null;
+}
+
 /** هل العميل بيشير لقطعة سابقة معينة بالاسم ("نفس البدلة"، "البدلة اللي قولتلك عليها")؟ */
 export function isSameGarmentReference(text) {
   return SAME_GARMENT_RE.test(norm(text || ''));
@@ -29,8 +87,9 @@ export function isSameGarmentReference(text) {
 /**
  * استخراج القطع المثبتة (Pinned) من الجلسة السابقة التي يجب الحفاظ عليها وعدم استبدالها:
  */
-export function resolvePinnedItems(text, session, requestedGarments = [], products = []) {
+export function resolvePinnedItems(text, session, requestedGarments = [], products = [], anchor = null, audFilter = null) {
   if (!session) return [];
+  if (anchor?.item) { const row = new Map((products || []).map((p) => [p.id, p])).get(anchor.item.id); return row ? [{ ...anchor.item, product: row }] : []; }
   const activeItems = session.activeLook?.items || [];
   const history = session.lookHistory || [];
   const n = norm(text || '');
@@ -83,7 +142,9 @@ export function resolvePinnedItems(text, session, requestedGarments = [], produc
         if (row) pinned.push({ ...it, product: row });
       }
     }
-    if (pinned.length) return pinned;
+    const pa = audFilter || pronounAuds(n);
+    const mine = pa && new Set(activeItems.map((x) => x.aud)).size > 1 ? pinned.filter((x) => pa.has(x.aud)) : pinned;
+    if (mine.length) return mine;
   }
 
   return [];

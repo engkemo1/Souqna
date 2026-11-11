@@ -200,6 +200,10 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   result.flags.hijab = hijab;
 
   /* ---------- الميزانية ---------- */
+  // أرقام الطول/الوزن/المقاس/العمر مش ميزانية («طولي 180»، «وزني 85»، «مقاس 42»)
+  const BODY_BEFORE = new Set(['طولي', 'طول', 'وزني', 'وزن', 'مقاس', 'مقاسي', 'عمر', 'عمري', 'عمره', 'عمرها', 'رقم', 'مقاسه', 'مقاسها', 'نمرة', 'نمره', 'size']);
+  const BODY_AFTER = new Set(['سم', 'سنتي', 'كيلو', 'كجم', 'كج', 'kg', 'cm', 'سنه', 'سنين']);
+  nums.amounts = nums.amounts.filter((a) => !a.currencyNear && !([1, 2].some((d) => BODY_BEFORE.has(tokens[a.index - d])) || BODY_AFTER.has(tokens[a.index + 1])) || a.currencyNear);
   if (nums.amounts.length) {
     const marker = new Set(K.synonyms.budget_words.total_markers.map(norm));
     let pick = nums.amounts.find((a) => a.currencyNear) || nums.amounts.find((a) => [1, 2, 3].some((d) => marker.has(tokens[a.index - d]))) || nums.amounts[0];

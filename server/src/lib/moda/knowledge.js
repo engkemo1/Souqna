@@ -47,19 +47,19 @@ export function loadKnowledge({ force = false } = {}) {
   const contexts = new Map(taxonomy.contexts.map((c) => [c.key, c]));
 
   const entries = [];
-  for (const [key, aliases] of Object.entries(synonyms.garments)) entries.push({ group: 'garment', key, aliases });
-  for (const [key, aliases] of Object.entries(synonyms.contexts)) entries.push({ group: 'context', key, aliases });
-  for (const [key, aliases] of Object.entries(synonyms.audiences)) entries.push({ group: 'audience', key, aliases });
-  for (const [key, aliases] of Object.entries(synonyms.colors)) entries.push({ group: 'color', key, aliases });
-  for (const [key, aliases] of Object.entries(synonyms.materials)) entries.push({ group: 'material', key, aliases });
-  for (const [key, aliases] of Object.entries(synonyms.tastes)) entries.push({ group: 'taste', key, aliases });
-  for (const [key, aliases] of Object.entries(synonyms.intents)) entries.push({ group: 'intent', key, aliases });
+  for (const [key, aliases] of Object.entries(synonyms.garments)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'garment', key, aliases });
+  for (const [key, aliases] of Object.entries(synonyms.contexts)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'context', key, aliases });
+  for (const [key, aliases] of Object.entries(synonyms.audiences)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'audience', key, aliases });
+  for (const [key, aliases] of Object.entries(synonyms.colors)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'color', key, aliases });
+  for (const [key, aliases] of Object.entries(synonyms.materials)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'material', key, aliases });
+  for (const [key, aliases] of Object.entries(synonyms.tastes)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'taste', key, aliases });
+  for (const [key, aliases] of Object.entries(synonyms.intents)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'intent', key, aliases });
   for (const [key, aliases] of Object.entries(synonyms.relationships)) if (Array.isArray(aliases)) entries.push({ group: 'relation', key, aliases });
   for (const [key, aliases] of Object.entries(synonyms.time_words)) if (Array.isArray(aliases)) entries.push({ group: 'time', key, aliases });
   for (const [wd, aliases] of Object.entries(synonyms.time_words.weekdays)) entries.push({ group: 'weekday', key: wd, aliases });
-  for (const [key, aliases] of Object.entries(synonyms.season_words)) entries.push({ group: 'season', key, aliases });
+  for (const [key, aliases] of Object.entries(synonyms.season_words)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'season', key, aliases });
   for (const [key, aliases] of Object.entries(synonyms.partner_strict)) if (Array.isArray(aliases) && key !== 'pair_prefix') entries.push({ group: 'partner', key, aliases });
-  for (const [key, aliases] of Object.entries(synonyms.gender_hints)) entries.push({ group: 'gender', key, aliases });
+  for (const [key, aliases] of Object.entries(synonyms.gender_hints)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'gender', key, aliases });
   for (const [key, aliases] of Object.entries(synonyms.kids_words)) entries.push({ group: 'kids', key, aliases });
   entries.push({ group: 'negation', key: 'neg', aliases: synonyms.negation_markers });
   entries.push({ group: 'advice', key: 'question', aliases: synonyms.advice_markers.question });

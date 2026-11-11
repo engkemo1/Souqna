@@ -7,8 +7,17 @@ const ARABIC_INDIC = '٠١٢٣٤٥٦٧٨٩';
 const EXT_INDIC = '۰۱۲۳۴۵۶۷۸۹';
 
 /** توحيد النص: همزات، تاء مربوطة، ياء، تشكيل، أرقام هندية، حروف مكررة، رموز. */
+const NORM_CACHE = new Map();
 export function norm(input) {
-  let s = String(input ?? '').toLowerCase();
+  const raw = String(input ?? '');
+  if (raw.length <= 400) { const hit = NORM_CACHE.get(raw); if (hit !== undefined) return hit; }
+  const out = normUncached(raw);
+  if (raw.length <= 400) { if (NORM_CACHE.size > 30000) NORM_CACHE.clear(); NORM_CACHE.set(raw, out); }
+  return out;
+}
+
+function normUncached(raw) {
+  let s = raw.toLowerCase();
   s = s.replace(/[٠-٩]/g, (d) => String(ARABIC_INDIC.indexOf(d)))
     .replace(/[۰-۹]/g, (d) => String(EXT_INDIC.indexOf(d)))
     .replace(/٫/g, '.').replace(/٬/g, '')
@@ -50,7 +59,16 @@ export const skeletonPhrase = (phrase) => phrase.split(' ').map(skeleton).join('
 
 /** تجريد بادئات الجر والعطف العربية: للخطوبه، والبدله، بالليل، فالفرح */
 const PREFIXES = ['وال', 'بال', 'فال', 'كال', 'لل', 'ال', 'و', 'ب', 'ل', 'ف', 'ك'];
+const TV_CACHE = new Map();
 export function tokenVariants(token) {
+  const cached = TV_CACHE.get(token);
+  if (cached) return cached;
+  const res = tokenVariantsUncached(token);
+  if (TV_CACHE.size > 30000) TV_CACHE.clear();
+  TV_CACHE.set(token, res);
+  return res;
+}
+function tokenVariantsUncached(token) {
   const out = [token];
   if (!hasArabic(token)) return out;
   for (const p of PREFIXES) {

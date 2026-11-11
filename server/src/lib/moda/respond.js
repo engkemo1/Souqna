@@ -10,7 +10,8 @@ export const pick = (list, seed = '') => (Array.isArray(list) && list.length ? l
 const fill = (tpl, vars) => String(tpl).replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? `{${k}}`));
 const itemAr = (K, key) => String(K.items.get(key)?.ar || key).replace(/\s*\(.*?\)\s*/g, '').split(' / ')[0].trim();
 const colorAr = (K, key) => K.colors.get(key)?.ar || key;
-const joinAr = (arr) => (arr.length <= 1 ? arr.join('') : `${arr.slice(0, -1).join('، ')} و${arr[arr.length - 1]}`);
+const joinAr = (input) => { const arr = [...new Set(input)]; return arr.length <= 1 ? arr.join('') : `${arr.slice(0, -1).join('، ')} و${arr[arr.length - 1]}`; };
+const dedupeSay = (t) => { const seen = new Set(); return String(t || '').split(/(?<=[.!؟?])\s+/).filter((x) => { const k = x.trim(); if (!k || seen.has(k)) return false; seen.add(k); return true; }).join(' '); };
 const nf = (n) => Number(n).toLocaleString('en-US');
 
 const QUESTION_FOR = { audience: 'who_is_it_for', occasion: 'what_occasion', budget: 'budget', dress_kind: 'dress_kind' };
@@ -57,9 +58,11 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
     const asks = plan.ask || [];
     const first = asks[0];
     const couple = plan.persons?.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
-    const text = first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'budget' ? say(couple ? 'clarify_budget_couple' : 'clarify_budget') : first === 'time_if_dressy' ? say('clarify_time') : first === 'venue_if_dressy' ? say('clarify_venue') : first === 'color_preference' ? say('clarify_color') : first === 'dress_kind' ? say('dress_clarify') : say('clarify_generic');
+    const herText = first === 'modest_preference' && (plan.persons?.includes('men') || plan.soloFromCouple === 'women') ? 'هي محجبة ولا لأ؟' : null;
+    const text = herText ? herText : first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'budget' ? say(couple ? 'clarify_budget_couple' : 'clarify_budget') : first === 'time_if_dressy' ? say('clarify_time') : first === 'venue_if_dressy' ? say('clarify_venue') : first === 'color_preference' ? say('clarify_color') : first === 'dress_kind' ? say('dress_clarify') : (buildQuestion(K, first, L)?.text || say('clarify_generic'));
     const questions = asks.slice(0, K.questions.limits.max_questions_per_turn).map((a) => {
       const q = buildQuestion(K, a, L);
+      if (a === 'modest_preference' && q && (plan.persons?.includes('men') || plan.soloFromCouple === 'women')) return { ...q, text: 'هي محجبة ولا لأ؟' };
       return a === 'budget' && couple && q ? { ...q, text: say('clarify_budget_couple') } : q;
     }).filter(Boolean);
     return { state: 'clarify', intent: 'shop', say: text, questions, blocks: null, ask: asks };
@@ -167,10 +170,12 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
     missing: pe.missing.map((m) => ({ key: m.base, material: m.material, label: m.title || itemAr(K, m.base), button: P.order_missing_button, hint: pick(P.order_missing_hint, `${seed}:hint`), payload: { type: 'request_item', key: m.base, material: m.material, color: m.color, audience: pe.aud } })),
   }));
 
+  // نفس المنتج مايظهرش في أكتر من تاب (قطعة للجنسين)
+  { const seenIds = new Set(); for (const t of tabs) { t.items = t.items.filter((it) => (seenIds.has(it.id) ? false : (seenIds.add(it.id), true))); } for (let i = tabs.length - 1; i >= 0 && tabs.length > 1; i -= 1) if (!tabs[i].items.length && !tabs[i].missing.length) tabs.splice(i, 1); }
   const questions = condolence ? [] : (plan.ask || []).slice(0, 1).map((a) => buildQuestion(K, a, L)).filter(Boolean);
 
   return {
-    state: plan.state, intent: 'shop', say: parts.filter(Boolean).join(' '), tips: tips.slice(0, 2), styleTips: styleTips.slice(0, 2), questions,
+    state: plan.state, intent: 'shop', say: dedupeSay(parts.filter(Boolean).join(' ')), tips: tips.slice(0, 2), styleTips: styleTips.slice(0, 2), questions,
     blocks: { tabs, total: plan.total, budget: plan.budget, over: plan.over, palette: (plan.palette || []).map((c) => ({ key: c, ar: colorAr(K, c) })), couple },
     missing: plan.missing || [], relaxed: plan.relaxed || [],
   };

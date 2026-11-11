@@ -129,6 +129,10 @@ export function colorKeysOf(row, K = loadKnowledge()) {
     const m = matchTokens(tokenize(norm(`${row.name_ar || ''} ${row.name_en || ''}`)), K).flatMap((x) => x.entries).filter((e) => e.group === 'color').map((e) => e.key);
     keys.push(...m.slice(0, 1));
   }
+  if (!keys.length) { // عبارة زي «بدلة سوداء» ممكن تاخد الكلمتين كقطعة؛ نمسح كل كلمة لوحدها عشان اللون مايضيعش
+    const toks = tokenize(norm(`${row.name_ar || ''} ${row.name_en || ''}`));
+    for (const t of toks) { const hit = matchTokens([t], K).flatMap((x) => x.entries).find((e) => e.group === 'color'); if (hit) { keys.push(hit.key); break; } }
+  }
   return [...new Set(keys)];
 }
 
@@ -186,4 +190,19 @@ export function enrichProduct(row, K = loadKnowledge()) {
   };
 }
 
-export const enrichAll = (rows, K = loadKnowledge()) => rows.map((r) => enrichProduct(r, K));
+// كاش بين الطلبات: نفس الصف (نفس القيم بالظبط) مايتحللش تاني. أي تعديل في المنتج بيغيّر المفتاح.
+const ENRICH_CACHE = new Map(); let ENRICH_K = null;
+export function enrichAll(rows, K = loadKnowledge()) {
+  if (ENRICH_K !== K) { ENRICH_CACHE.clear(); ENRICH_K = K; }
+  if (ENRICH_CACHE.size > 20000) ENRICH_CACHE.clear();
+  return rows.map((r) => {
+    let key = null;
+    try { key = JSON.stringify(r); } catch { /* صف غريب: نحلله من غير كاش */ }
+    if (key === null) return enrichProduct(r, K);
+    const hit = ENRICH_CACHE.get(key);
+    if (hit) return hit;
+    const out = enrichProduct(r, K);
+    ENRICH_CACHE.set(key, out);
+    return out;
+  });
+}
