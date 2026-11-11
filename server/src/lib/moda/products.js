@@ -11,6 +11,8 @@ const GENERIC_KEYS = new Set(['trousers', 'jacket', 'shirt', 'tshirt']);
 // "wrap" can mean a shawl, but in catalogue names like "wrap jacket" it must
 // not override the explicit garment noun. Keep the alias for standalone wraps.
 const AMBIGUOUS_ALIASES = new Set(['shawl:wrap', 'sneakers:كوتش', 'sneakers:coach']);
+// short aliases that must match the exact word only: "روب" (robe) would otherwise also match "كروب" (crop top) through the prefix rule
+const EXACT_ONLY_ALIASES = new Set(['robe:روب']);
 const SHOE_KEYS = new Set(['sneakers', 'formal_shoes', 'loafers', 'heels_low', 'heels_high', 'flats', 'sandals', 'boots', 'slippers', 'sport_shoes', 'shoes_any']);
 const SNEAKER_NAME_RE = /(sneaker|trainers?\b|running shoe|sport shoe|كوتش|كوتشي|حذاء رياضي|جزمه رياضه|جزمة رياضة)/i;
 const OUTERWEAR_WORDS = new Set(['جاكيت', 'جاكت', 'جواكت', 'jacket', 'bomber', 'معطف', 'بالطو', 'بليزر', 'blazer']);
@@ -29,17 +31,33 @@ function table(K) {
 
 const hasToken = (set, tok) => tokenVariants(tok).some((v) => set.has(v));
 
+/** كلمات حاسمة: الاسم اللي فيه كفلينج/روب/لانجري/قميص نوم مستحيل يبقى قميص/فستان مهما كان معاه. */
+const FORCE_RULES = [
+  ['cufflinks', /(^|\s)(كافلينج|كفلينج|كافلينك|كفلينك|كافلنج|كفلنج|كفلينجز|ازرار اكمام|زرار قميص|ازرار قميص|زراير قميص)(\s|$)|\b(cufflinks?|cuff links?)\b/i],
+  ['lingerie', /(^|\s)(لانجيري|لانجري|لينجري|لانجريه|لانجيريه|بيبي دول)(\s|$)|\b(lingerie|babydoll|baby doll)\b/i],
+  ['sleepwear', /(^|\s)(قميص نوم|قمصان نوم|فستان نوم|لبس نوم|ملابس نوم|بيجامه|بيجاما|بجامه|بجاما|بيجامات)(\s|$)|\b(nightgown|nightwear|sleepwear|pajamas?|pyjamas?)\b/i],
+  ['robe', /(^|\s)(روب|ارواب|رواب|برنس|برنس حمام)(\s|$)|\b(robe|bathrobe|dressing gown)\b/i],
+];
+// صفات بتتغلب على اسم القطعة الصريح لو اتساوت: بنقلل وزنها بقوة
+const ALIAS_PENALTY = { 'sweater:اوفر سايز': 14, 'sweater:اوفرسايز': 14, 'sweater:oversize': 14, 'sweater:تريكو': 6, 'sweater:knit': 6, 'joggers:ميلتون': 6, 'dress_evening:سهره': 6, 'dress_evening:ماكسي': 6, 'dress_party:سواريه': 6, 'dress_party:كوكتيل': 6, 'bow_tie:فراشه': 6, 'tote:توت': 6 };
+const SHORT_NEXT = new Set(['sleeve', 'sleeves', 'sleeved', 'dress', 'jacket', 'coat', 'boot', 'boots', 'top', 'shirt', 'skirt', 'cardigan', 'heel', 'heels']);
+
 /** نوع القطعة من النص (اسم + تصنيف): أطول alias مكتمل، مع تفضيل الأقدم موضعًا. */
 export function inferKey(text, K = loadKnowledge()) {
+  const cleaned = norm(text || '');
+  for (const [key, re] of FORCE_RULES) if (K.items.has(key) && re.test(cleaned)) return key;
   const tokens = tokenize(norm(text)); const set = new Set(tokens);
   const pos = new Map(); tokens.forEach((t, i) => { for (const v of tokenVariants(t)) if (!pos.has(v)) pos.set(v, i); });
   const hasOuterwear = [...OUTERWEAR_WORDS].some((w) => hasToken(set, w));
   let best = null;
   for (const row of table(K).rows) {
     if (hasOuterwear && SHOE_KEYS.has(row.key)) continue;
+    if (EXACT_ONLY_ALIASES.has(`${row.key}:${row.tokens.join(' ')}`) && !row.tokens.every((t) => set.has(t))) continue;
     if (!row.tokens.every((t) => hasToken(set, t) || [...set].some((s) => tokenVariants(s).includes(t)))) continue;
     const first = Math.min(...row.tokens.map((t) => pos.get(t) ?? 99));
-    const ambiguous = AMBIGUOUS_ALIASES.has(`${row.key}:${row.tokens.join(' ')}`) ? 4 : 0;
+    const aliasId = `${row.key}:${row.tokens.join(' ')}`;
+    if (row.key === 'shorts' && aliasId === 'shorts:short' && SHORT_NEXT.has(tokens[tokens.indexOf('short') + 1])) continue;
+    const ambiguous = ALIAS_PENALTY[aliasId] ?? (AMBIGUOUS_ALIASES.has(aliasId) ? 4 : 0);
     const score = row.tokens.length * 10 - (WEAK_KEYS.has(row.key) ? 4 : 0) - (GENERIC_KEYS.has(row.key) ? 2 : 0) - ambiguous - first * 0.1;
     if (!best || score > best.score) best = { key: row.key, score };
   }
@@ -133,7 +151,8 @@ export function enrichProduct(row, K = loadKnowledge()) {
   if (explicitKey) {
     const byName = inferKey(name, K);
     if (byName && byName !== explicitKey) {
-      if (K.items.get(byName)?.family === K.items.get(explicitKey)?.family) key = byName; else typeConflict = true;
+      if (FORCE_RULES.some(([k]) => k === byName)) key = byName; // الاسم حاسم (كفلينج/لانجري/روب/نوم) مهما كان النوع المحفوظ
+      else if (K.items.get(byName)?.family === K.items.get(explicitKey)?.family) key = byName; else typeConflict = true;
     }
   }
   // كلمات الكوتشي في الاسم حاسمة: أي حذاء اسمه كوتشي/sneakers/running يتصنّف كوتشي مهما كان النوع المحفوظ.

@@ -190,7 +190,8 @@
         { "key": "jewelry",      "ar": "إكسسوار / مجوهرات","formality": [2, 5] },
         { "key": "cap",          "ar": "كاب",             "formality": [1, 2] },
         { "key": "socks",        "ar": "شراب",            "formality": [1, 5] },
-        { "key": "perfume",      "ar": "برفان",           "formality": [1, 5] }
+        { "key": "perfume",      "ar": "برفان",           "formality": [1, 5] },
+        { "key": "cufflinks",    "ar": "كفلينج / أزرار أكمام", "formality": [4, 5] }
       ]
     },
     "sport": {
@@ -206,7 +207,9 @@
       "ar": "داخلي ونوم",
       "_note": "تويلا لا تركّب أطقم من الملابس الداخلية. تعرضها فقط لو طلب العميل صراحة.",
       "items": [
-        { "key": "sleepwear", "ar": "بيجامة / لبس نوم", "formality": [1, 1] }
+        { "key": "sleepwear", "ar": "بيجامة / لبس نوم", "formality": [1, 1] },
+        { "key": "lingerie",  "ar": "لانجري",           "formality": [1, 1] },
+        { "key": "robe",      "ar": "روب / برنس",       "formality": [1, 1] }
       ]
     }
   },

@@ -74,7 +74,7 @@ export async function saveLookOfDayImage(buffer) {
     if (cutoutEnabled()) { try { const cut = await knockOutBackground(buffer); if (cut.buffer) source = cut.buffer; } catch { /* a failed cut keeps the original photo */ } }
     webp = await sharp(source)
       .rotate()
-      .resize(1600, 2000, { fit: 'inside', withoutEnlargement: true })
+      .resize(2200, 2750, { fit: 'inside', withoutEnlargement: true }) // big enough to stay sharp when the shopper zooms in
       .webp({ quality: 88, alphaQuality: 100, smartSubsample: true })
       .toBuffer();
   } catch (e) {
@@ -104,7 +104,7 @@ export async function removeDeptImage(url) {
 }
 
 /** Cuts the background out of a look photo that was uploaded before cutting existed. Returns the new URL, or the same URL when nothing needed (or could be) cut. */
-export async function recutLookImage(url) {
+export async function recutLookImage(url, { rebuild = false } = {}) {
   if (!url || !cutoutEnabled()) return url;
   const m = String(url).match(/(?:^|\/)((?:look-of-day|homepage-ads)\/[a-f0-9]{24}\.webp)(?:[?#]|$)/i);
   if (!m) return url;
@@ -112,7 +112,15 @@ export async function recutLookImage(url) {
     let buf;
     if (r2Enabled && String(url).startsWith(config.r2.publicUrl)) { const r = await fetch(url); if (!r.ok) return url; buf = Buffer.from(await r.arrayBuffer()); }
     else buf = await fs.readFile(path.join(config.mediaDir, m[1]));
-    const cut = await knockOutBackground(buf);
+    let cut = await knockOutBackground(buf);
+    if (cut.already && rebuild) {
+      // an old cut with white leftovers: lay it on white and let the person model decide again what is the person. Only a model result is
+      // accepted: the colour fill would punch holes in pale clothes, so without the model the photo is left as it is.
+      const flat = await sharp(buf).rotate().flatten({ background: '#ffffff' }).png().toBuffer();
+      const again = await knockOutBackground(flat);
+      if (!again.ml) return url;
+      cut = again;
+    }
     const next = cut.buffer || (cut.already ? await polishCutImage(buf) : null);
     if (!next) return url;
     return await saveLookOfDayImage(next);

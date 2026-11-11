@@ -128,6 +128,8 @@ function scoreProduct(p, slot, ctx) {
 }
 
 const CASUAL_ONLY = new Set(['sneakers', 'sport_shoes', 'slippers']);
+/** قطع مش بتتركّب في أطقم أبدًا إلا بطلب صريح (ملابس داخلية/نوم وإكسسوارات فرعية). */
+export const NEVER_UNASKED = new Set(['sleepwear', 'lingerie', 'robe', 'cufflinks']);
 
 /** يجيب المرشحين لـ slot عند مستوى تخفيف معين. */
 function candidatesAt(slot, lvl, aud, products, ctx) {
@@ -137,6 +139,8 @@ function candidatesAt(slot, lvl, aud, products, ctx) {
   for (const p of products) {
     if (!p.key || !keys.has(p.key)) continue;
     if (!p.inStock) continue;
+    if (NEVER_UNASKED.has(p.key) && !slot.keys.includes(p.key)) continue; // لانجري/روب/بيجامة/كفلينج: بطلب صريح بس
+    if (p.key === 'slippers' && context !== 'home' && context !== 'sahel_beach' && !slot.explicit && !slot.keys.includes('slippers')) continue;
     // مناسبة رسمية (خطوبة/فرح…): الكوتشي والجزم الرياضي والشبشب مش بدائل مقبولة إلا لو العميل طلبها بنفسه
     if (CASUAL_ONLY.has(p.key) && fTargetRange && fTargetRange[0] >= 4 && !slot.keys.includes(p.key) && !p.minimalSneaker) continue;
     if (p.key === 'jalabiya' && !slot.explicit) continue;

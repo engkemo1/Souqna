@@ -27,7 +27,7 @@ export function candidatePool(rows, aud, K, { context = null, max = 48, perKey =
   const byKey = new Map();
   for (const p of rows || []) {
     if (!p.key || p.inStock === false || p.typeConflict || !(p.price > 0) || !ok(p.gender)) continue;
-    const item = K.items.get(p.key); if (!item || item.virtual) continue;
+    const item = K.items.get(p.key); if (!item || item.virtual || item.family === 'underwear_sleep' || p.key === 'cufflinks') continue;
     if (p.formality != null && (p.formality < lo || p.formality > hi)) continue;
     if (fr && fr[0] >= 4 && ['sneakers', 'sport_shoes', 'slippers'].includes(p.key) && !(p.minimalSneaker && fr[1] < 5)) continue; // رسمي: كوتشي ساده أبيض/أسود بس
     if (!byKey.has(p.key)) byKey.set(p.key, []);
@@ -114,5 +114,42 @@ export function makeCurator(callFn, { timeoutMs = 16000 } = {}) {
     let out = raw;
     if (typeof raw === 'string') { const a = raw.indexOf('{'); const b = raw.lastIndexOf('}'); try { out = a >= 0 && b > a ? JSON.parse(raw.slice(a, b + 1)) : null; } catch { out = null; } }
     return buildCuratedPlan(out, { plan, pools, persons, budget: plan.budget || null, K });
+  };
+}
+
+/**
+ * ????? ????? ???????? (Gemini ?????): ??? ?? ????? ?????? ?????? ?? ????: ????? ???????? ???????? ???????
+ * (????? "???????" ?? ???? ????? ?? ?????? ?? ???? ?????). ????? ????? ?????? ??????? ????? "?????".
+ * ?? ??? ?? ?? ???? = ????? ?? ?? ?? (??????? ?? plan.js ?? ?? ?????? ?????).
+ */
+export function makeVerifier(callFn, { timeoutMs = 7000 } = {}) {
+  return async ({ plan, K }) => {
+    const rows = [];
+    for (const pe of plan.people || []) for (const pk of pe.picks || []) rows.push({ id: pk.product.id, slot: pk.slotKey, name: clean(pk.product.name_ar || pk.product.name_en, 70), cat: clean(pk.product.cat_text, 50) });
+    if (!rows.length) return plan;
+    const system = [
+      'You audit an outfit built by a fashion stylist for an online clothing store in Egypt. For each line (id | slot the piece fills | product name | store category) decide if the PRODUCT is really the garment of that SLOT.',
+      'Mark a line BAD when the product is a different thing than its slot: e.g. cufflinks / shirt buttons / pins / brooches in a shirt, suit or dress slot; lingerie, babydoll, robe, pajamas or underwear in a dress, outfit, shirt or suit slot; a belt, sock, bag or beauty product in a clothing slot; house slippers for an outing or a formal occasion; a hoodie in a formal slot.',
+      'Judge by the real name, not by the slot label. When unsure, keep it (not BAD).',
+      'Reply with ONE JSON object only: {"bad":[ids of BAD lines]}',
+    ].join('\n');
+    const msg = rows.map((r) => `${r.id} | ${r.slot} | ${r.name} | ${r.cat || '-'}`).join('\n');
+    let raw;
+    try { raw = await Promise.race([callFn(system, [{ role: 'user', content: msg }]), new Promise((_, rej) => setTimeout(() => rej(new Error('verifier timeout')), timeoutMs))]); } catch { return plan; }
+    let out = raw;
+    if (typeof raw === 'string') { const a = raw.indexOf('{'); const b = raw.lastIndexOf('}'); try { out = a >= 0 && b > a ? JSON.parse(raw.slice(a, b + 1)) : null; } catch { out = null; } }
+    const valid = new Set(rows.map((r) => String(r.id)));
+    const bad = new Set((Array.isArray(out?.bad) ? out.bad : []).map(String).filter((id) => valid.has(id)));
+    if (!bad.size) return plan;
+    const people = (plan.people || []).map((pe) => {
+      const dropped = pe.picks.filter((pk) => bad.has(String(pk.product.id)));
+      if (!dropped.length) return pe;
+      const picks = pe.picks.filter((pk) => !bad.has(String(pk.product.id)));
+      const missing = [...(pe.missing || []), ...dropped.map((pk) => ({ keys: [pk.slotKey], base: pk.slotKey, material: null, color: null, label: itemAr(K, pk.slotKey), title: itemAr(K, pk.slotKey), aud: pe.aud }))];
+      return { ...pe, picks, missing, subtotal: picks.reduce((t, pk) => t + pk.product.price, 0) };
+    });
+    if (!people.some((pe) => pe.picks.length)) return plan;
+    const total = people.reduce((t, pe) => t + pe.subtotal, 0);
+    return { ...plan, people, missing: people.flatMap((pe) => pe.missing || []), total, state: people.some((pe) => (pe.missing || []).length) ? 'partial' : plan.state, verified: true };
   };
 }

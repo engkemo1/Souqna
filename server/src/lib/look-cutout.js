@@ -106,7 +106,7 @@ async function floodKnockOut(input) {
  *     nearest solid clothing, and near-pure-white pixels right on the rim fade out.
  * Never touches the inside of the person.
  */
-async function polishRgba(data, w, h) {
+async function polishRgba(data, w, h, { aggressive = false } = {}) {
   const n = w * h;
   const raw1 = { raw: { width: w, height: h, channels: 1 } };
   // 0. white leftovers of the studio wall that the cut missed (a strip along the trousers, the wedge between the legs, a patch next to a
@@ -126,7 +126,7 @@ async function polishRgba(data, w, h) {
       const i = st[--sp]; hit.push(i); killed++; const x = i % w;
       if (x > 0) edge(i - 1); if (x < w - 1) edge(i + 1); if (i >= w) edge(i - w); if (i < n - w) edge(i + w);
     }
-    if (killed <= person * 0.12) for (const i of hit) data[i * 4 + 3] = 0;
+    if (aggressive && killed <= person * 0.18) for (const i of hit) data[i * 4 + 3] = 0;
   }
   // 1. keep the large connected shapes only
   const label = new Int32Array(n); const stack = new Int32Array(n); const sizes = [0];
@@ -164,7 +164,7 @@ async function polishRgba(data, w, h) {
   for (let i = 0; i < n; i++) {
     let r = data[i * 4], g = data[i * 4 + 1], b = data[i * 4 + 2], a = alpha[i];
     if (a < 255 && wMap[i] > 4) { const k = 255 / wMap[i]; r = Math.min(255, cMap[i * 3] * k); g = Math.min(255, cMap[i * 3 + 1] * k); b = Math.min(255, cMap[i * 3 + 2] * k); }
-    else if (a > 0 && inside[i] < 235) { // the rim just inside the outline: a white-ish pixel there is studio, not clothing
+    else if (aggressive && a > 0 && inside[i] < 235) { // the rim just inside the outline: a white-ish pixel there is studio, not clothing
       const lo = Math.min(r, g, b), spread = Math.max(r, g, b) - lo;
       if (lo > 222 && spread < 26) { a = Math.max(0, a - (lo - 222) * 14); if (wMap[i] > 4) { const k = 255 / wMap[i]; r = Math.min(255, cMap[i * 3] * k); g = Math.min(255, cMap[i * 3 + 1] * k); b = Math.min(255, cMap[i * 3 + 2] * k); } }
     }
@@ -174,11 +174,31 @@ async function polishRgba(data, w, h) {
 }
 
 /** Polish an RGBA/PNG/WebP buffer that is already cut (transparent background). Returns a PNG buffer, or null when it has no person in it. */
-export async function polishCutImage(input) {
+export async function polishCutImage(input, opts = {}) {
   const { data, info } = await sharp(input).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-  const out = await polishRgba(data, info.width, info.height);
+  const out = await polishRgba(data, info.width, info.height, opts);
   if (!out) return null;
   return sharp(out, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+}
+
+
+/** A person has no small see-through holes: a white label, a white print or a pale highlight the model was unsure about. Small enclosed holes (not touching the photo border) become solid; big gaps (arm against the body) stay open. */
+export function fillSmallHoles(alpha, w, h, maxShare = 0.004) {
+  const n = w * h; const seen = new Uint8Array(n); const stack = new Int32Array(n); let filled = 0;
+  for (let s0 = 0; s0 < n; s0++) {
+    if (seen[s0] || alpha[s0] >= 230) continue;
+    let sp = 0, size = 0, border = false; const list = []; stack[sp++] = s0; seen[s0] = 1;
+    while (sp) {
+      const i = stack[--sp]; list.push(i); size++; const x = i % w, y = (i - x) / w;
+      if (x === 0 || y === 0 || x === w - 1 || y === h - 1) border = true;
+      if (x > 0 && !seen[i - 1] && alpha[i - 1] < 230) { seen[i - 1] = 1; stack[sp++] = i - 1; }
+      if (x < w - 1 && !seen[i + 1] && alpha[i + 1] < 230) { seen[i + 1] = 1; stack[sp++] = i + 1; }
+      if (y > 0 && !seen[i - w] && alpha[i - w] < 230) { seen[i - w] = 1; stack[sp++] = i - w; }
+      if (y < h - 1 && !seen[i + w] && alpha[i + w] < 230) { seen[i + w] = 1; stack[sp++] = i + w; }
+    }
+    if (!border && size <= n * maxShare) { for (const i of list) alpha[i] = 255; filled += size; }
+  }
+  return filled;
 }
 
 /**
@@ -208,16 +228,14 @@ export async function knockOutBackground(input) {
         if (whole) {
           const { data } = await sharp(input).rotate().ensureAlpha().raw().toBuffer({ resolveWithObject: true });
           const out = Buffer.from(data);
+          fillSmallHoles(alpha, w, h);
           for (let p = 0; p < n; p++) out[p * 4 + 3] = alpha[p];
-          const polished = await polishRgba(out, w, h).catch(() => null);
-          const buffer = await sharp(polished || out, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
+          // a fresh model cut is already clean: polishing it removed white shoes and white labels, so it is used as is
+          const buffer = await sharp(out, { raw: { width: w, height: h, channels: 4 } }).png().toBuffer();
           return { buffer, removed: 1 - cover, ml: true };
         }
       }
     } catch (e) { console.error(`[look-cutout] model cut skipped: ${e.message}`); }
   }
-  const flood = await floodKnockOut(input);
-  if (!flood.buffer) return flood;
-  try { const polished = await polishCutImage(flood.buffer); if (polished) return { ...flood, buffer: polished }; } catch { /* keep the unpolished cut */ }
-  return flood;
+  return floodKnockOut(input);
 }

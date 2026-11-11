@@ -27,7 +27,7 @@ import { publicAdvertiser, recordAdvertiserEvent } from '../lib/advertisers.js';
 import { logoBrand } from '../lib/advertiser-shop.js';
 import { searchByImage, visualSettings, visualTypeOptions, VisualProviderError } from '../lib/visual.js';
 import { logVisualSearch } from '../lib/visual-demand.js';
-import { runStylist, modaBrain, modaCurator, modaUnderstander, stylistSettings, stylistTrainingSettings, addStylistFeedback, lookOfDay, cardsByIds, liveOffersForModa, storesForModa } from '../lib/stylist.js';
+import { runStylist, modaBrain, modaCurator, modaUnderstander, modaVerifier, stylistSettings, stylistTrainingSettings, addStylistFeedback, lookOfDay, cardsByIds, liveOffersForModa, storesForModa } from '../lib/stylist.js';
 import { matchStore } from '../lib/moda/stores.js';
 import { contactFromEnv } from '../lib/moda/contact.js';
 import { logStylist } from '../lib/stylist-log.js';
@@ -539,11 +539,12 @@ r.post('/stylist', h(async (req, res) => {
       curator = async (a) => { const k = `${ip}`; const hits = (curatorHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; curatorHits.set(k, [...hits, Date.now()]); return inner(a); };
     }
     let understand = modaUnderstander();
+    const verifier = modaVerifier();
     if (understand) {
       const cap = Number(process.env.MODA_UNDERSTAND_DAILY ?? 150); const inner = understand;
       understand = async (a) => { const k = `${ip}`; const hits = (understandHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; understandHits.set(k, [...hits, Date.now()]); return inner(a); };
     }
-    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: stylistTrainingSettings() });
+    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand, verifier, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: stylistTrainingSettings() });
     logStylist(body.startLook ? '[start look]' : lastText, result, Date.now() - t0);
     return res.json(modaClientResponse(result));
   }

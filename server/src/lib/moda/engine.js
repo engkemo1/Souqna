@@ -151,7 +151,7 @@ function withMemory(res, opts) {
 
 async function runModaCore(messages, opts = {}) {
   const K = loadKnowledge();
-  const { products = [], offers = null, stores = null, contact = null, profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, brain = null, curator = null, understand = null, fetcher, assistantName = null, training = null } = opts;
+  const { products = [], offers = null, stores = null, contact = null, profile = {}, now = new Date(), weatherMock = null, imageText = '', session = null, answers = null, llmExtract = null, brain = null, curator = null, understand = null, verifier = null, fetcher, assistantName = null, training = null } = opts;
   const text = lastUserText(messages);
   const dow = cairoParts(now).dow;
   const seed = `${text}|${session?.turn || 0}`;
@@ -377,6 +377,10 @@ async function runModaCore(messages, opts = {}) {
   // buried after a partial or low-confidence product result.
   // طلب قطعة/صورة من غير مناسبة: النتايج تظهر على طول والأسئلة (لون/ميزانية) اختيارية تحتها. لوك المناسبة (خطوبة/فرح…) بيفضل يخلّص أسئلته الأول.
   const needsClarificationFirst = plan.state === 'clarify' || (Boolean(plan.ask?.length) && plan.state !== 'none' && Boolean(plan.context));
+  // مراجع Gemini: آخر خط دفاع قبل العرض. بيشيل أي قطعة اسمها مش بتطابق خانتها (كافلينج كقميص، لانجري كفستان).
+  if (typeof verifier === 'function' && !needsClarificationFirst && ['full', 'alternatives', 'partial', 'over_budget'].includes(plan.state)) {
+    try { const vp = await verifier({ plan, K }); if (vp) plan = vp; } catch { /* نكمل */ }
+  }
   // أسماء القطع والتابات عربي بس: لما نعرض منتجات نرد بالعربي حتى لو الطلب بحروف لاتينية (shoes / hoodie aswad)، بدل رد نص إنجليزي وأسماء عربي مخلوطين.
   if (!(needsClarificationFirst || ['clarify', 'chat', 'no_look'].includes(plan.state))) lang = 'ar';
   let res = respond(needsClarificationFirst ? { ...plan, state: 'clarify' } : plan, { seed, lang, profile, assistantName });

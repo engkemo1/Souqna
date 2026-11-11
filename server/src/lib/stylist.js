@@ -12,7 +12,7 @@ import { listDepartments } from './departments.js';
 import { serializeCards, bi } from './serialize.js';
 import { runModa } from './moda/engine.js';
 import { makeBrain } from './moda/brain.js';
-import { makeCurator } from './moda/curate.js';
+import { makeCurator, makeVerifier } from './moda/curate.js';
 import { makeUnderstander } from './moda/understand.js';
 import { loadKnowledge } from './moda/knowledge.js';
 import { contactFromEnv } from './moda/contact.js';
@@ -551,7 +551,7 @@ export const modaEngineEnabled = () => (process.env.STYLIST_ENGINE || 'moda') !=
 /** عقل تويلا (موديل لغة): بيرجّع دالة أو null لو مفيش مزوّد AI متظبط. المحرك بيشتغل من غيره عادي. */
 function modaChainCall() {
   if (process.env.MODA_BRAIN === '0') return null;
-  const chain = ['anthropic', 'gemini', 'cloudflare'].filter((k) => providerReady[k]());
+  const chain = ['gemini', 'anthropic', 'cloudflare'].filter((k) => providerReady[k]());
   if (!chain.length) return null;
   return async (system, msgs) => {
     let last;
@@ -570,6 +570,12 @@ export function modaCurator() {
   return callFn ? makeCurator(callFn) : null;
 }
 
+export function modaVerifier() {
+  if (process.env.MODA_VERIFY === '0') return null;
+  const callFn = modaChainCall();
+  return callFn ? makeVerifier(callFn) : null;
+}
+
 /** فاهم الرسالة بالموديل (Gemini/Claude): بيحوّلها لبيانات منظمة قبل القواعد. null لو مفيش مزوّد أو MODA_UNDERSTAND=0. */
 export function modaUnderstander() {
   if (process.env.MODA_UNDERSTAND === '0') return null;
@@ -580,7 +586,7 @@ export function modaUnderstander() {
 export function modaBrain() {
   if (process.env.MODA_BRAIN === '0') return null;
   // الترتيب حسب جودة العامية المصرية: Claude ثم Gemini (مجاني) ثم Cloudflare (مجاني، الأضعف). لو واحد فشل (رصيد خلص/حد يومي) نجرّب اللي بعده.
-  const chain = ['anthropic', 'gemini', 'cloudflare'].filter((k) => providerReady[k]());
+  const chain = ['gemini', 'anthropic', 'cloudflare'].filter((k) => providerReady[k]());
   if (!chain.length) return null;
   const callFn = async (system, msgs) => {
     let last;
@@ -596,7 +602,7 @@ export async function runModaStylist(messages, { profile, session, answers, imag
   const rows = modaCatalogue();
   // احتياطي مجاني: لو القواعد مافهمتش الرسالة، Cloudflare بيستخرج (شخص/مناسبة/قطعة) من قاموس محدد بس
   const llmExtract = providerReady.cloudflare() ? makeLlmExtract(async (system, msgs) => parseJson(await callLlm('cloudflare', system, msgs))) : null;
-  const out = await runModa(history, { products: rows, profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract, assistantName, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: readStylistTraining() });
+  const out = await runModa(history, { products: rows, verifier: modaVerifier(), profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract, assistantName, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: readStylistTraining() });
   const ids = [...new Set((out.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.id)))];
   const byId = new Map(rows.filter((r) => ids.includes(r.id)).map((r) => [r.id, r]));
   const rowList = ids.map((id) => byId.get(id)).filter(Boolean);

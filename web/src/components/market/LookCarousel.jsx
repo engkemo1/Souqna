@@ -88,8 +88,11 @@ function LookModal({ entry, picks: initialPicks, total: initialTotal, added, ar,
   const [k, setK] = useState(0);
   const [open, setOpen] = useState(false); // false = still at its place on the row, true = grown
   const stage = useRef(null);
+  const [zm, setZm] = useState(null); // null = normal, {x, y} (percent of the photo) = zoomed in on that spot
   const frames = framesOf(entry);
   useEffect(() => { setK(0); }, [entry]); // a new look starts facing front
+  useEffect(() => { setZm(null); }, [entry, k]); // a new look or angle starts zoomed out
+  const spot = (ev) => { const im = ev.currentTarget, pr = im.parentElement.getBoundingClientRect(); const x = (ev.clientX - pr.left - im.offsetLeft) / im.offsetWidth, y = (ev.clientY - pr.top - im.offsetTop) / im.offsetHeight; return { x: Math.min(100, Math.max(0, x * 100)), y: Math.min(100, Math.max(0, y * 100)) }; }; // measured on the un-zoomed layout box, so the point under the finger does not drift while zoomed
   const src = frames[k] || photoOf(entry);
   const title = entry?.title || entry?.occasion || (ar ? 'اللوك' : 'The look');
   const { lang, tr } = useI18n();
@@ -128,7 +131,7 @@ function LookModal({ entry, picks: initialPicks, total: initialTotal, added, ar,
 
   useEffect(() => {
     const onKey = (ev) => {
-      if (ev.key === 'Escape') close();
+      if (ev.key === 'Escape') { if (zm) setZm(null); else close(); }
       else if (frames.length > 1 && ev.key === 'ArrowRight') setK((v) => (v + 1) % frames.length);
       else if (frames.length > 1 && ev.key === 'ArrowLeft') setK((v) => (v - 1 + frames.length) % frames.length);
     };
@@ -178,8 +181,14 @@ function LookModal({ entry, picks: initialPicks, total: initialTotal, added, ar,
           <div
             ref={stage}
             onClick={(ev) => ev.stopPropagation()}
-            className="relative flex min-h-0 w-full flex-1 items-end justify-center will-change-transform pb-2"
+            className="relative flex min-h-0 w-full flex-1 items-end justify-center overflow-hidden rounded-[28px] will-change-transform pb-2"
           >
+            {/* Light studio backdrop: the model photos were shot on white, so a leftover patch of studio wall or a soft edge is invisible here (on the black overlay it showed as white cut marks). */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-0"
+              style={{ background: 'radial-gradient(ellipse 70% 75% at 50% 42%, #ffffff 0%, #fbfaf8 45%, #efece6 100%)', boxShadow: 'inset 0 0 70px rgba(60,50,40,.08)' }}
+            />
             {many && (
               <button
                 type="button"
@@ -214,7 +223,11 @@ function LookModal({ entry, picks: initialPicks, total: initialTotal, added, ar,
                 alt={title}
                 draggable={false}
                 decoding="async"
-                className="h-full w-auto max-w-full select-none object-contain object-bottom drop-shadow-[0_20px_40px_rgba(0,0,0,.65)]"
+                onClick={(ev) => setZm(zm ? null : spot(ev))}
+                onPointerMove={(ev) => { if (zm && ev.pointerType !== 'touch') setZm(spot(ev)); }}
+                onTouchMove={(ev) => { if (zm && ev.touches[0]) setZm(spot({ currentTarget: ev.currentTarget, clientX: ev.touches[0].clientX, clientY: ev.touches[0].clientY })); }}
+                style={{ transform: zm ? 'scale(2.6)' : 'none', transformOrigin: zm ? `${zm.x}% ${zm.y}%` : '50% 100%', transition: 'transform 380ms cubic-bezier(.2,.8,.2,1)', cursor: zm ? 'zoom-out' : 'zoom-in', touchAction: zm ? 'none' : 'auto' }}
+                className="relative h-full w-auto max-w-full select-none object-contain object-bottom"
               />
             ) : (
               <span className="grid h-full w-full place-items-center text-7xl font-black text-white/20">
@@ -223,11 +236,16 @@ function LookModal({ entry, picks: initialPicks, total: initialTotal, added, ar,
             )}
             <span
               className="pointer-events-none absolute -bottom-1 left-1/2 h-5 w-[48%] -translate-x-1/2 rounded-[50%]"
-              style={{ background: 'radial-gradient(closest-side, rgba(0,0,0,.65), transparent)' }}
+              style={{ background: 'radial-gradient(closest-side, rgba(60,50,40,.30), transparent)' }}
               aria-hidden="true"
             />
           </div>
 
+          {src && (
+            <p className="pointer-events-none absolute bottom-1 left-1/2 z-10 -translate-x-1/2 rounded-full bg-black/55 px-3 py-1 text-[11px] font-bold text-white backdrop-blur-md" aria-hidden="true">
+              {zm ? (ar ? 'حرّك إصبعك أو الماوس على التفاصيل · اضغط للرجوع' : 'Move to look around · tap to zoom out') : (ar ? 'اضغط على الصورة للتقريب' : 'Tap the photo to zoom in')}
+            </p>
+          )}
           {frames.length > 1 && (
             <div
               onClick={(ev) => ev.stopPropagation()}

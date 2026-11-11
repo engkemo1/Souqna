@@ -53,7 +53,7 @@ const TYPE_SIZE = {
   chinos: { men: 'waist_men', boys: 'kids', girls: 'kids', kids: 'kids', women: 'waist_women', unisex: 'waist_men' },
   suit: { men: 'suit', unisex: 'suit', boys: 'kids', kids: 'kids' }, classic_set: { men: 'suit', unisex: 'suit', boys: 'kids', kids: 'kids' }, tuxedo: { men: 'suit', unisex: 'suit', boys: 'kids', kids: 'kids' },
   abaya: 'length', jalabiya: { men: 'length', boys: 'kids', girls: 'kids', kids: 'kids', women: 'length', unisex: 'length' },
-  belt: 'belt', perfume: 'none', watch: 'none', jewelry: 'none', tie: 'none', bow_tie: 'none', pocket_square: 'none', cap: 'free', socks: 'free',
+  belt: 'belt', perfume: 'none', cufflinks: 'none', watch: 'none', jewelry: 'none', tie: 'none', bow_tie: 'none', pocket_square: 'none', cap: 'free', socks: 'free',
   hijab_set: 'free', tarha: 'free', shawl: 'free',
 };
 
