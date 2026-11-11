@@ -513,8 +513,17 @@ r.get('/stylist/prompts', h((_req, res) => { res.set('Cache-Control', 'public, m
 r.post('/stylist', h(async (req, res) => {
   const st = stylistSettings();
   if (!st.enabled) throw new AppError(503, 'stylist_disabled', 'The stylist is switched off.');
+  // محادثة طويلة ما تتحوّلش لخطأ تحقّق: نقصّ التاريخ لآخر 30 رسالة ونقصّ النص الطويل
+  if (req.body && Array.isArray(req.body.messages)) {
+    req.body.messages = req.body.messages.slice(-30).map((m) => (m && typeof m.content === 'string' ? { ...m, content: m.content.slice(0, 1200) } : m));
+    while (req.body.messages.length > 1 && req.body.messages[0]?.role !== 'user') req.body.messages.shift();
+  }
   const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1200) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string(), z.string().max(500)).optional(), session: z.record(z.string(), z.any()).optional(), answers: z.record(z.string(), z.any()).optional(), startLook: z.boolean().optional(), similar: z.boolean().optional(), lang: z.enum(['ar', 'en']).optional() }).parse(req.body);
-  if (body.session && JSON.stringify(body.session).length > 8000) throw new AppError(422, 'validation_failed', 'Session too large.');
+  if (body.session && JSON.stringify(body.session).length > 8000) {
+    // نشيل التقيل (قوائم العناصر الكبيرة) ونحتفظ بالتفضيلات بدل ما نرفض الرسالة
+    for (const [k, v] of Object.entries(body.session)) if (JSON.stringify(v ?? null).length > 1500) delete body.session[k];
+    if (JSON.stringify(body.session).length > 8000) body.session = undefined;
+  }
   if (body.messages[body.messages.length - 1].role !== 'user') throw new AppError(422, 'validation_failed', 'Last message must be from the shopper.');
   const ip = req.ip || 'x'; const now = Date.now();
   const recent = (chatHits.get(ip) || []).filter((t) => now - t < 86400e3);

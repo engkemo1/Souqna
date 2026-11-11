@@ -30,7 +30,10 @@
       "tee",
       "tishert",
       "tisherte",
-      "tshert"
+      "tshert",
+      "tisort",
+      "teeshirt",
+      "camiseta"
     ],
     "polo": [
       "بولو",
@@ -50,7 +53,16 @@
       "amees",
       "2ames",
       "2amees",
-      "3amees"
+      "3amees",
+      "qamees",
+      "qamis",
+      "kamis",
+      "2ameez",
+      "camisa",
+      "hemd",
+      "gomlee",
+      "قميس",
+      "قميص رجالي"
     ],
     "blouse": [
       "بلوزه",
@@ -92,7 +104,11 @@
       "هوديز",
       "hoodie",
       "hoody",
-      "hodi"
+      "hodi",
+      "hoodi",
+      "sudadera",
+      "هوديه",
+      "هودية"
     ],
     "tunic": [
       "تونيك",
@@ -116,7 +132,9 @@
       "jeans",
       "denim",
       "jins",
-      "jeanz"
+      "jeanz",
+      "vaqueros",
+      "jean"
     ],
     "trousers": [
       "بنطلون",
@@ -142,7 +160,10 @@
       "bantalon",
       "bantaloon",
       "bantlon",
-      "pantaloon"
+      "pantaloon",
+      "bnatlon",
+      "pantalones",
+      "hose"
     ],
     "chinos": [
       "شينو",
@@ -165,7 +186,11 @@
       "skirt",
       "gheba",
       "jeepa",
-      "gibba"
+      "gibba",
+      "falda",
+      "jupe",
+      "rock",
+      "etek"
     ],
     "leggings": [
       "ليجنز",
@@ -210,7 +235,11 @@
       "fostan",
       "fustan",
       "fostaan",
-      "fostann"
+      "fostann",
+      "fostane",
+      "vestido",
+      "kleid",
+      "elbise"
     ],
     "dress_casual": [
       "دريس خروج",
@@ -245,7 +274,9 @@
       "swarih",
       "sawareeh",
       "fostan swaree",
-      "fustan sawareh"
+      "fustan sawareh",
+      "فستان فرح",
+      "fostan fara7"
     ],
     "dress_evening": [
       "فستان سهره",
@@ -263,13 +294,11 @@
     ],
     "dress_bridal": [
       "فستان زفاف",
-      "فستان فرح",
       "فستان عروسه",
       "فستان العروسه",
       "wedding dress",
       "bridal gown",
-      "fostan 3arosa",
-      "fostan fara7"
+      "fostan 3arosa"
     ],
     "dress_beach": [
       "فستان صيفي",
@@ -285,7 +314,9 @@
       "اوفرول",
       "jumpsuit",
       "romper",
-      "playsuit"
+      "playsuit",
+      "سالوبيت",
+      "افرول"
     ],
     "two_piece_set": [
       "طقم قطعتين",
@@ -387,7 +418,11 @@
       "jean jacket",
       "جاكيت كوتش",
       "جاكت كوتش",
-      "coach jacket"
+      "coach jacket",
+      "veste",
+      "chaqueta",
+      "jacke",
+      "ceket"
     ],
     "coat": [
       "بالطو",
@@ -430,7 +465,8 @@
       "3abaya",
       "3abaia",
       "3abayah",
-      "abaia"
+      "abaia",
+      "abeya"
     ],
     "jalabiya": [
       "جلابيه",
@@ -445,7 +481,9 @@
       "caftan",
       "galabia",
       "gelabya",
-      "galabiyya"
+      "galabiyya",
+      "جلباب",
+      "جلبيه"
     ],
     "hijab_set": [
       "طقم محجبات",
@@ -509,7 +547,10 @@
       "جزمه جري",
       "sport shoes",
       "running shoes",
-      "running"
+      "running",
+      "kooshy",
+      "zapatillas",
+      "baskets"
     ],
     "shoes_any": [
       "حذاء",
@@ -524,7 +565,12 @@
       "footwear",
       "gazma",
       "gozma",
-      "gazam"
+      "gazam",
+      "gazmah",
+      "zapatos",
+      "chaussures",
+      "schuhe",
+      "ayakkabi"
     ],
     "formal_shoes": [
       "حذاء رسمي",
@@ -645,7 +691,11 @@
       "shanta",
       "shanta eed",
       "shanta yad",
-      "shantah"
+      "shantah",
+      "bolso",
+      "sac",
+      "tasche",
+      "canta"
     ],
     "clutch": [
       "كلتش",
@@ -728,7 +778,13 @@
       "earrings",
       "ring",
       "ikseswar",
-      "accessory"
+      "accessory",
+      "اسوره",
+      "اساور",
+      "سواره",
+      "سوارة",
+      "انسيال",
+      "اكسسوار ذهب"
     ],
     "cap": [
       "كاب",
@@ -753,7 +809,9 @@
       "perfume",
       "parfum",
       "scent",
-      "birfan"
+      "birfan",
+      "3otr",
+      "otr"
     ],
     "sport_top": [
       "تيشيرت رياضي",
@@ -797,7 +855,13 @@
       "tracksuit",
       "track suit",
       "trenj",
-      "trening"
+      "trening",
+      "tarnag",
+      "trnag",
+      "tranig",
+      "chandal",
+      "survetement",
+      "jogging"
     ],
     "sport_shoes": [
       "حذاء جري",
@@ -827,7 +891,10 @@
       "lingerie",
       "langerie",
       "بيبي دول",
-      "babydoll"
+      "babydoll",
+      "برا",
+      "ستيان",
+      "سنتيان"
     ],
     "robe": [
       "روب",
@@ -879,7 +946,9 @@
       "underwear",
       "undershirt",
       "briefs",
-      "bra"
+      "bra",
+      "كلوت",
+      "داخلي"
     ]
   },
   "contexts": {
@@ -1236,7 +1305,6 @@
     "men": [
       "انا راجل",
       "رجالي",
-      "ولادي",
       "للرجاله",
       "ليا انا راجل",
       "men",
@@ -1249,13 +1317,33 @@
       "regaly",
       "ragel",
       "ana ragel",
-      "lel regala"
+      "lel regala",
+      "راجل",
+      "رجل",
+      "رجال",
+      "للرجل",
+      "للراجل",
+      "لراجل",
+      "للرجال",
+      "لشاب",
+      "للشباب",
+      "شباب",
+      "شاب",
+      "رجاليه",
+      "رجالى",
+      "gent",
+      "gentleman",
+      "homme",
+      "hombre",
+      "mann",
+      "herren",
+      "erkek",
+      "uomo",
+      "guy"
     ],
     "women": [
       "انا ست",
       "حريمي",
-      "بناتي",
-      "للبنات",
       "ليا انا ست",
       "women",
       "woman",
@@ -1265,10 +1353,30 @@
       "7areemy",
       "harimi",
       "7arimi",
-      "banaty",
-      "lel banat",
       "ana set",
-      "ana bent"
+      "ana bent",
+      "للست",
+      "لست",
+      "ستات",
+      "سيدات",
+      "للسيدات",
+      "سيده",
+      "انسه",
+      "مدام",
+      "للانسه",
+      "حريمى",
+      "نسائي",
+      "نسايي",
+      "نسائى",
+      "ladies",
+      "lady",
+      "femme",
+      "mujer",
+      "frau",
+      "damen",
+      "dames",
+      "kadin",
+      "donna"
     ],
     "women_hijab": [
       "محجبات",
@@ -1300,7 +1408,21 @@
       "benty",
       "tefla",
       "tefl banat",
-      "banoty"
+      "banoty",
+      "بناتي",
+      "بناتى",
+      "للبنات",
+      "للبنت",
+      "لبنت",
+      "بنوته",
+      "للبنوته",
+      "fille",
+      "niña",
+      "nina",
+      "mädchen",
+      "madchen",
+      "ragazza",
+      "kiz"
     ],
     "boys": [
       "ابني",
@@ -1315,7 +1437,20 @@
       "ibny",
       "tefl awlad",
       "walad",
-      "walady"
+      "walady",
+      "ولادي",
+      "ولادى",
+      "للولاد",
+      "ولاد",
+      "للولد",
+      "لولد",
+      "صبي",
+      "garcon",
+      "niño",
+      "nino",
+      "junge",
+      "ragazzo",
+      "oglan"
     ]
   },
   "relationships": {
@@ -1810,7 +1945,28 @@
     "مش",
     "بلاش",
     "ماعدا",
-    "غير"
+    "غير",
+    "لا مش",
+    "مش عايزه",
+    "مش عايزة",
+    "مش عاوزه",
+    "مش عاوزة",
+    "مش محتاج",
+    "مش محتاجه",
+    "مش محتاجة",
+    "مش عايزين",
+    "مش عاوزين",
+    "ماعايزش",
+    "معايزش",
+    "ماعوزش",
+    "مش حابه",
+    "مش حابة",
+    "مش حاب",
+    "مش بحبه",
+    "مش بحبها",
+    "not a",
+    "nothing",
+    "no sport"
   ],
   "colors": {
     "black": [
@@ -1823,7 +1979,20 @@
       "sooda",
       "aswad",
       "eswed",
-      "اسوده"
+      "اسوده",
+      "اسوود",
+      "اسودد",
+      "noir",
+      "negro",
+      "schwarz",
+      "siyah",
+      "nero",
+      "nera",
+      "preto",
+      "ana3",
+      "aswed",
+      "eswid",
+      "dark"
     ],
     "white": [
       "ابيض",
@@ -1833,7 +2002,18 @@
       "abyad",
       "abyed",
       "byda",
-      "بيضه"
+      "بيضه",
+      "blanc",
+      "blanco",
+      "weiss",
+      "weiß",
+      "beyaz",
+      "bianco",
+      "bianca",
+      "branco",
+      "abiad",
+      "ابيد",
+      "ابيظ"
     ],
     "grey": [
       "رمادي",
@@ -1845,7 +2025,14 @@
       "ramadi",
       "رمادية",
       "رمادى",
-      "رصاصية"
+      "رصاصية",
+      "جراي",
+      "جري",
+      "rasasi",
+      "gris",
+      "grau",
+      "gri",
+      "grigio"
     ],
     "navy": [
       "كحلي",
@@ -1857,20 +2044,29 @@
       "ka7ly",
       "كحلية",
       "كحليه",
-      "كحلى"
+      "كحلى",
+      "نيفي",
+      "سرمه",
+      "سرمي",
+      "kohly",
+      "nevy",
+      "marine",
+      "azulmarino"
     ],
     "beige": [
       "بيج",
       "beige",
       "bej",
-      "بيجا"
+      "بيجا",
+      "بيجي"
     ],
     "cream": [
       "كريمي",
       "كريم",
       "cream",
       "kremy",
-      "كريمية"
+      "كريمية",
+      "كريمى"
     ],
     "off_white": [
       "اوف وايت",
@@ -1890,13 +2086,36 @@
       "benny",
       "بنية",
       "بنيه",
-      "قهوية"
+      "قهوية",
+      "اسمر",
+      "سمرا",
+      "سمراء",
+      "سمره",
+      "قهوه",
+      "قهوة",
+      "قهوتي",
+      "تراب",
+      "ترابي",
+      "شوكلاته",
+      "شوكولاته",
+      "شيكولاته",
+      "asmar",
+      "asmr",
+      "smar",
+      "marron",
+      "cafe",
+      "braun",
+      "kahverengi",
+      "marrone",
+      "chocolate",
+      "tan"
     ],
     "camel": [
       "جملي",
       "camel",
       "gamaly",
-      "جملية"
+      "جملية",
+      "جملى"
     ],
     "olive": [
       "زيتي",
@@ -1905,7 +2124,12 @@
       "zeity",
       "zaity",
       "زيتية",
-      "زيتونية"
+      "زيتونية",
+      "زيتى",
+      "خاكي",
+      "خاكى",
+      "khaki",
+      "zeiti"
     ],
     "burgundy": [
       "بوردو",
@@ -1915,17 +2139,27 @@
       "bordeaux",
       "3enaby",
       "enaby",
-      "عنابية"
+      "عنابية",
+      "نبيتي",
+      "نبيتى",
+      "خمري",
+      "عنابى",
+      "nabeety",
+      "maroon",
+      "wine"
     ],
     "emerald": [
       "اخضر زمردي",
       "زمردي",
       "emerald",
-      "zomorrody"
+      "zomorrody",
+      "زمرد"
     ],
     "royal_blue": [
       "ازرق ملكي",
-      "royal blue"
+      "royal blue",
+      "رويال",
+      "ملكي"
     ],
     "purple": [
       "بنفسجي",
@@ -1934,7 +2168,14 @@
       "mauve",
       "banafsegy",
       "بنفسجية",
-      "بنفسجيه"
+      "بنفسجيه",
+      "بنفسجى",
+      "violet",
+      "morado",
+      "lila",
+      "mor",
+      "banafsegi",
+      "mov"
     ],
     "pink": [
       "وردي",
@@ -1943,7 +2184,16 @@
       "wardy",
       "وردية",
       "وردى",
-      "ورديه"
+      "ورديه",
+      "بمبي",
+      "روز",
+      "روزي",
+      "roz",
+      "rose",
+      "rosa",
+      "wardi",
+      "bambi",
+      "rosado"
     ],
     "blush": [
       "وردي فاتح",
@@ -1958,12 +2208,17 @@
       "light blue",
       "samawy",
       "سماوية",
-      "سمائية"
+      "سمائية",
+      "سماوى",
+      "تركواز",
+      "تركوازي",
+      "turquoise"
     ],
     "lavender": [
       "لافندر",
       "lavender",
-      "lavander"
+      "lavander",
+      "لافندري"
     ],
     "mint": [
       "مينت",
@@ -1972,26 +2227,39 @@
     ],
     "coral": [
       "كورال",
-      "coral"
+      "coral",
+      "مرجاني"
     ],
     "yellow": [
       "اصفر",
       "yellow",
       "asfar",
       "صفراء",
-      "صفرا"
+      "صفرا",
+      "asfer",
+      "jaune",
+      "amarillo",
+      "gelb",
+      "sari",
+      "giallo"
     ],
     "orange": [
       "برتقالي",
       "orange",
       "bortoaly",
       "برتقالية",
-      "برتقاليه"
+      "برتقاليه",
+      "برتقالى",
+      "برتقان",
+      "naranja",
+      "portokali",
+      "ortokali"
     ],
     "fuchsia": [
       "فوشيا",
       "fuchsia",
-      "fushia"
+      "fushia",
+      "فيوشيا"
     ],
     "gold": [
       "ذهبي",
@@ -2001,7 +2269,12 @@
       "dahabi",
       "ذهبية",
       "ذهبيه",
-      "دهبية"
+      "دهبية",
+      "دهبى",
+      "ذهبى",
+      "dore",
+      "oro",
+      "golden"
     ],
     "silver": [
       "فضي",
@@ -2009,7 +2282,11 @@
       "silver",
       "fedy",
       "فضية",
-      "فضيه"
+      "فضيه",
+      "فضى",
+      "fedi",
+      "argent",
+      "plata"
     ],
     "red": [
       "احمر",
@@ -2018,7 +2295,14 @@
       "ahmar",
       "a7mar",
       "حمراء",
-      "حمرة"
+      "حمرة",
+      "ahmer",
+      "ahmr",
+      "rouge",
+      "rojo",
+      "rot",
+      "kirmizi",
+      "rosso"
     ],
     "blue": [
       "ازرق",
@@ -2026,7 +2310,14 @@
       "azra2",
       "azra",
       "زرقاء",
-      "زرقا"
+      "زرقا",
+      "azraq",
+      "azrak",
+      "bleu",
+      "azul",
+      "blau",
+      "mavi",
+      "blu"
     ],
     "green": [
       "اخضر",
@@ -2034,11 +2325,19 @@
       "akhdar",
       "a5dar",
       "خضراء",
-      "خضرا"
+      "خضرا",
+      "akhder",
+      "vert",
+      "verde",
+      "gruen",
+      "grün",
+      "yesil"
     ],
     "nude": [
       "نود",
-      "nude"
+      "nude",
+      "نيود",
+      "لحمي"
     ]
   },
   "materials": {
@@ -2104,7 +2403,49 @@
       "rayih",
       "mehtag",
       "muhtag",
-      "ana ragel"
+      "ana ragel",
+      "عايزني",
+      "محتاجني",
+      "جاي",
+      "مسافر",
+      "معزوم",
+      "مخطوب",
+      "متجوز",
+      "لابس",
+      "ناوى",
+      "حابب",
+      "عايز اشتري",
+      "انا راجل",
+      "انا ولد",
+      "انا شاب",
+      "انا عريس",
+      "انا رجل",
+      "انا اب",
+      "انا ابو",
+      "انا زوج",
+      "انا gentleman",
+      "ayez",
+      "3ayiz",
+      "aayez",
+      "aayz",
+      "ayz",
+      "ayiz",
+      "7abeb",
+      "habib ashtry",
+      "ana rajel",
+      "ana ragul",
+      "ana shab",
+      "i am a man",
+      "im a man",
+      "i'm a man",
+      "i am a guy",
+      "im a guy",
+      "i'm a guy",
+      "as a man",
+      "i am male",
+      "im male",
+      "i'm male",
+      "as a guy"
     ],
     "female": [
       "عايزه",
@@ -2119,7 +2460,54 @@
       "ray7a",
       "rayah",
       "mehtaga",
-      "muhtaga"
+      "muhtaga",
+      "عايزاني",
+      "محتاجاني",
+      "جايه",
+      "مسافره",
+      "معزومه",
+      "مخطوبه",
+      "متجوزه",
+      "لابسه",
+      "حابه",
+      "حامل",
+      "محجبه",
+      "انا بنت",
+      "انا ست",
+      "انا واحده",
+      "انا انسه",
+      "انا ام",
+      "انا مامي",
+      "انا عروسه",
+      "انا سيده",
+      "انا مدام",
+      "انا مراه",
+      "انا حاجه بنت",
+      "ayza",
+      "ayzah",
+      "aayza",
+      "ayeza",
+      "aiza",
+      "aizah",
+      "7abba",
+      "7abeba",
+      "ana bent",
+      "ana set",
+      "ana ost",
+      "ana banat",
+      "i am a girl",
+      "im a girl",
+      "i'm a girl",
+      "i am a woman",
+      "im a woman",
+      "i'm a woman",
+      "as a woman",
+      "i am female",
+      "im female",
+      "i'm female",
+      "as a lady",
+      "i am a lady",
+      "i'm a lady"
     ],
     "plural": [
       "عايزين",

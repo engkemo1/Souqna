@@ -228,7 +228,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
       if (!list.length) continue;
       const cap = personBudget ? (personBudget * slot.share) / 100 * 1.3 : null;
       const sctx = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fR ? (fR[0] + fR[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], budgetCap: cap, learnedPreferences: env.learnedPreferences };
-      const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => (parsed.flags?.cheapest ? a.p.price - b.p.price || b.s - a.s : b.s - a.s || a.p.price - b.p.price));
+      const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => (parsed.flags?.priciest ? b.p.price - a.p.price || b.s - a.s : parsed.flags?.cheapest ? a.p.price - b.p.price || b.s - a.s : b.s - a.s || a.p.price - b.p.price));
       chosen = { lvl, li, ranked };
       break;
     }

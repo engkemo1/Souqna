@@ -116,13 +116,16 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   result.ages = nums.ages;
   // «لولد / لبنت / لولاد / لبنات» (ل + كلمة): الطلب لطفل حتى من غير سن، فمايرجعش تيشيرت رجالي كبير.
   for (const t of tokens) {
-    if (/^ل(ولد|ولاد)$/.test(t)) personSet.add('boys');
-    else if (/^ل(بنت|بنوته|بنات|طفله)$/.test(t)) personSet.add('girls');
+    if (/^ل(ال)?(ولد|ولاد)$/.test(t)) personSet.add('boys');
+    else if (/^ل(ال)?(بنت|بنوته|بنات|طفله)$/.test(t)) personSet.add('girls');
   }
 
   /* ---------- المناسبة ---------- */
   const ctxEntries = entriesOf(matches, 'context');
-  const ctxKeys = new Set(ctxEntries.map((e) => e.key));
+  const _negs0 = entriesOf(matches, 'negation');
+  const ctxNeg = (c) => _negs0.some((ng) => ng.end <= c.start && c.start - ng.end <= 1);
+  result.avoidContexts = ctxEntries.filter(ctxNeg).map((e) => e.key);
+  const ctxKeys = new Set(ctxEntries.filter((e) => !ctxNeg(e)).map((e) => e.key));
   for (const c of CONTEXT_PRIORITY) if (ctxKeys.has(c)) { result.context = c; break; }
   if (/كتابي|ketabi|ketbi/.test(n)) { result.role = 'self'; if (!result.context) result.context = 'katb_kitab'; }
   if (result.context?.endsWith('_self')) result.role = 'self';
@@ -188,6 +191,9 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
 
   /* ---------- مين من القطع ---------- */
   const allGarmentPieces = [...result.garments, ...result.ownedPieces];
+  const MENSWEAR_ONLY = new Set(['suit', 'blazer', 'waistcoat', 'classic_set']);
+  const femaleCtx = speaker === 'female' && !partnerFemale && !(personSet.has('men') && !personSet.has('women'));
+  if (femaleCtx && personSet.size === 0 && allGarmentPieces.length && allGarmentPieces.every((x) => MENSWEAR_ONLY.has(x.key))) personSet.add('women');
   if (personSet.size === 0 && allGarmentPieces.length) {
     const g = new Set(allGarmentPieces.map((x) => GENDER_BY_KEY[x.key]).filter(Boolean));
     if (g.size === 1) { const only = [...g][0]; personSet.add(only === 'women_hijab' ? 'women' : only); if (only === 'women_hijab') result.flags.hijabFromGarment = true; }
@@ -196,6 +202,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   // محجبة
   const personList = ['men', 'women', 'boys', 'girls'].filter((p) => personSet.has(p));
   result.persons = personList.map((p) => (p === 'women' && (hijab || result.flags.hijabFromGarment) ? 'women_hijab' : p));
+  if (personSet.has('women') && !personSet.has('men')) for (const g of result.garments) if (g.key === 'suit') g.key = 'womens_suit';
   if (hijab && !result.persons.includes('women_hijab') && result.persons.length === 0) result.persons = ['women_hijab'];
   result.flags.hijab = hijab;
 
@@ -237,6 +244,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   if (seasons.length) result.season = seasons[0];
   result.taste = [...new Set(entriesOf(matches, 'taste').map((e) => e.key))];
   if (intents.includes('cheaper') && result.garments.length) result.flags.cheapest = true;
+  if (result.garments.length && /(^| )(الاغلي|الاغلى|اغلي|اغلى|اعلي سعر|اعلى سعر|افخم|الافخم|most expensive|priciest|highest price)( |$)/.test(n)) { result.flags.priciest = true; delete result.flags.cheapest; }
   const fl = entriesOf(matches, 'advice').some((e) => e.key === 'full_look');
   result.fullLook = fl;
 
@@ -260,7 +268,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   const hasExplicitShopping = /(^| )(لبس|هدوم|ملابس|طقم|بدله|فستان|شوز|كوتشي|اشتري|اتسوق|شراء|تسوق|موديلات|ازياء|فاشون|كولكشن|حاجه|حاجة|قطعه|قطعة|لوك|ستايل|استايل|اتشيك|انقي|اجيب|شياكه|شياكة|سمبل|روشه|روشة)( |$)/.test(n);
   const hasEgyptianShopping = hasShopping && (hasExplicitShopping || result.taste.length > 0 || /(على قد|علي قد|حنين|لقطة|لقطه|في المعقول|سمبل|روق عليا|نقيلي|شوفيلي|ظبطني|اتشيك)/.test(n));
   const hasGarmentsOrOccasion = result.garments.length > 0 || Boolean(result.context) || Boolean(result.budget) || result.fullLook;
-  const hasContent = hasGarmentsOrOccasion || explicitAudience || (hasExplicitShopping && (hasShopping || result.persons.length > 0)) || hasEgyptianShopping;
+  const hasContent = hasGarmentsOrOccasion || explicitAudience || (hasExplicitShopping && (hasShopping || result.persons.length > 0)) || hasEgyptianShopping || (result.colors.length > 0 && result.tokens.length <= 4 && (!hasQuestion || tokens.length <= 2 || /^(?:لبس|ملابس|هدوم|حاجه) /.test(n)) && !/[?؟]/.test(String(raw)));
   if (has('reset')) result.followup = 'reset';
   else if (has('show_more') && !result.garments.length) result.followup = 'show_more';
   else if (has('cheaper') && !result.garments.length && !result.context) result.followup = 'cheaper'; // "أقل سعر تيشيرت" is a product request, not "cheaper than before"

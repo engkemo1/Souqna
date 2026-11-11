@@ -4,6 +4,8 @@ import { norm, skeleton } from './text.js';
 const strip = (s) => String(s).split(' ').map((w) => (w.length > 3 ? w.replace(/^ال/, '') : w)).join(' ').trim();
 export const GENERIC = new Set(['ستايل', 'ستور', 'شوب', 'فاشن', 'مول', 'كلوثز', 'wear', 'style', 'store', 'shop', 'fashion', 'clothes', 'stores', 'ملابس', 'لبس', 'محل', 'متجر', 'بيت', 'عالم', 'house', 'world', 'collection', 'brand', 'man', 'men', 'women', 'kids', 'design', 'بنها', 'banha', 'benha', 'bnha', 'بنهه', 'مصر', 'egypt', 'القاهره', 'cairo']);
 
+// كلمات أشخاص/ألوان/ملابس عامة: عمرها ما تطابق اسم محل (مثلاً «بنت» ≠ Bonita)
+const NOT_STORE = new Set(norm('بنت بنات ولد ولاد راجل رجل رجاله ست ستات واحده واحد حد انا هي هو طفل اطفال عيل عيله بيبي بنوته صبي شاب شابه سيده سيدات انسه اسمر اسود ابيض احمر اصفر اخضر ازرق بيج بني رمادي وردي بنفسجي برتقالي دهبي فضي كحلي نبيتي بدله طقم فستان قميص بنطلون جاكيت حذاء جزمه شنطه girl boy man men woman women lady ladies kid kids black white red blue green brown beige pink grey gray yellow orange purple navy gold silver dark light dress suit shirt pants').split(' '));
 const AR_TO_LAT_MAP = {
   'ا': 'a', 'أ': 'a', 'إ': 'e', 'آ': 'a', 'ء': '', 'ئ': 'e', 'ؤ': 'o',
   'ب': 'b', 'ت': 't', 'ة': 'a', 'ث': 'th', 'ج': 'g', 'ح': 'h', 'خ': 'kh',
@@ -22,8 +24,8 @@ export function matchStore(text, stores = []) {
   const normText = norm(text);
   const t = ` ${strip(normText)} `;
   const tLat = ` ${strip(arToLat(normText))} `;
-  const queryToks = normText.split(' ').filter((w) => w.length >= 3 && !GENERIC.has(w));
-  const querySkels = queryToks.map((w) => skeleton(arToLat(w))).filter((sk) => sk.length >= 3);
+  const queryToks = normText.split(' ').filter((w) => w.length >= 3 && !GENERIC.has(w) && !NOT_STORE.has(w));
+  const querySkels = queryToks.filter((w) => w.length >= 4).map((w) => skeleton(arToLat(w))).filter((sk) => sk.length >= 4);
 
   const tokenCount = new Map();
   const cands = stores.map((s) => {
@@ -31,7 +33,7 @@ export function matchStore(text, stores = []) {
     const translit = s.name_ar ? arToLat(s.name_ar) : '';
     const names = [...rawNames, translit].map((x) => strip(norm(x || ''))).filter((x) => x.length >= 3);
     const toks = new Set(names.flatMap((n) => n.split(' ')).filter((w) => w.length >= 3 && !GENERIC.has(w)));
-    const skels = new Set([...toks].map((w) => skeleton(arToLat(w))).filter((sk) => sk.length >= 3));
+    const skels = new Set([...toks].map((w) => skeleton(arToLat(w))).filter((sk) => sk.length >= 4));
     for (const w of toks) tokenCount.set(w, (tokenCount.get(w) || 0) + 1);
     return { s, names, toks, skels };
   });
