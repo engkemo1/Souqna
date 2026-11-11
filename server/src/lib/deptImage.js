@@ -64,18 +64,19 @@ export async function saveHomepageAdImage(buffer) {
 }
 
 /** Look of the day / outfit worn photos. Vertical/portrait format (e.g. 4:5 or full body), never cropped to landscape! */
-export async function saveLookOfDayImage(buffer) {
+export async function saveLookOfDayImage(buffer, { cutout = false } = {}) {
   let webp;
   try {
     const meta = await sharp(buffer, { failOn: 'error' }).metadata();
     if (Math.min(meta.width || 0, meta.height || 0) < 200) throw badRequest('image_too_small', 'Image is too small (min 200px).');
-    // Rotate EXIF and resize within max 1600x2000, preserving full aspect ratio (NO forced cropping):
+    // Rotate EXIF and resize within max 2200x2750, preserving full aspect ratio and crisp studio detail (no forced cutout unless asked):
     let source = buffer;
-    if (cutoutEnabled()) { try { const cut = await knockOutBackground(buffer); if (cut.buffer) source = cut.buffer; } catch { /* a failed cut keeps the original photo */ } }
+    if (cutout && cutoutEnabled()) { try { const cut = await knockOutBackground(buffer); if (cut.buffer) source = cut.buffer; } catch { /* a failed cut keeps the original photo */ } }
     webp = await sharp(source)
       .rotate()
       .resize(2200, 2750, { fit: 'inside', withoutEnlargement: true }) // big enough to stay sharp when the shopper zooms in
-      .webp({ quality: 88, alphaQuality: 100, smartSubsample: true })
+      .sharpen({ sigma: 0.8, m1: 0.5, m2: 2 })
+      .webp({ quality: 92, alphaQuality: 100, smartSubsample: true })
       .toBuffer();
   } catch (e) {
     if (e.code === 'image_too_small') throw e;

@@ -1482,7 +1482,8 @@ r.post('/category-requests/:id/reject', h((req, res) => {
 const deptUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
 r.post('/look-of-day/image', deptUpload.single('file'), h(async (req, res) => {
   if (!req.file) throw new AppError(422, 'validation_failed', 'Pick an image.', { file: 'required' });
-  res.json({ image: await saveLookOfDayImage(req.file.buffer) });
+  const cutout = req.query.cutout === '1' || req.body?.cutout === 'true';
+  res.json({ image: await saveLookOfDayImage(req.file.buffer, { cutout }) });
 }));
 r.post('/departments/:id/image', deptUpload.single('file'), h(async (req, res) => {
   const d = q.get('SELECT * FROM departments WHERE id=?', [Number(req.params.id)]);

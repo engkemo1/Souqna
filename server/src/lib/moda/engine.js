@@ -16,6 +16,7 @@ import { careFallback } from './parse.js';
 import { DEFAULT_CONTACT, fillContact } from './contact.js';
 import { matchStore, aspectsOf, mentionsStoreWord, storeAnswer, askWhichStore, allStoresHours, GENERIC } from './stores.js';
 import { norm, trainingTokens } from './text.js';
+import { isContinuationRequest, isSameGarmentReference, resolvePinnedItems, auditPlanPicks } from './continuity.js';
 
 function matchTrainedLesson(text, lessons) {
   if (!Array.isArray(lessons) || !lessons.length) return null;
@@ -253,7 +254,8 @@ async function runModaCore(messages, opts = {}) {
   const hasAnswers = answers && Object.keys(answers).length;
   const wasUnknown = parsed.intent === 'unknown' && !hasAnswers;
   const altRequest = parsed.intent === 'unknown' && !hasAnswers && Boolean(session?.parsed?.context) && ALT_RE.test(norm(text));
-  const continuing = session?.parsed && (altRequest || session.pending || parsed.intent === 'followup' || hasAnswers || (parsed.intent === 'shop' && !parsed.persons.length && !parsed.garments.length && session.parsed.persons?.length));
+  const isContinuation = isContinuationRequest(text, session);
+  const continuing = session?.parsed && (isContinuation || altRequest || session.pending || parsed.intent === 'followup' || hasAnswers || (parsed.intent === 'shop' && !parsed.persons.length && !parsed.garments.length && session.parsed.persons?.length));
   if (hasAnswers) parsed = applyAnswers({ ...parsed, intent: 'shop' }, answers, K);
   if (continuing && (parsed.intent === 'shop' || parsed.intent === 'followup' || parsed.intent === 'unknown')) { parsed = mergeFromSession(parsed, session.parsed); parsed.intent = 'shop'; }
   if (altRequest) parsed = { ...parsed, garments: [], flags: { ...parsed.flags, altRequest: true } }; // اعرض تركيبة المناسبة بالمتاح بدل ما نكرر الطلب الناقص
@@ -350,8 +352,10 @@ async function runModaCore(messages, opts = {}) {
 
   // ---------- تخطيط ----------
   let rows = ensureEnriched(products, K);
-  let plan = planOutfit(parsed, excludeIds.length ? rows.filter((p) => !excludeIds.includes(p.id)) : rows, { adv, eventTime, profile, K });
-  if (excludeIds.length && plan.state === 'none') plan = planOutfit(parsed, rows, { adv, eventTime, profile, K });
+  const pinnedItems = isContinuation ? resolvePinnedItems(text, session, parsed.garments, rows) : [];
+  let plan = planOutfit(parsed, excludeIds.length ? rows.filter((p) => !excludeIds.includes(p.id)) : rows, { adv, eventTime, profile, K, pinnedItems });
+  if (excludeIds.length && plan.state === 'none') plan = planOutfit(parsed, rows, { adv, eventTime, profile, K, pinnedItems });
+  plan = auditPlanPicks(plan, K);
 
   // المطلوب بالاسم مش متاح بس المناسبة معروفة: نجرّب تركيبة المناسبة بالمتاح ونسيب زرار "اطلبه" للقطعة الناقصة
   if (plan.state === 'none' && parsed.context && parsed.garments.length) {
@@ -380,6 +384,7 @@ async function runModaCore(messages, opts = {}) {
   // مراجع Gemini: آخر خط دفاع قبل العرض. بيشيل أي قطعة اسمها مش بتطابق خانتها (كافلينج كقميص، لانجري كفستان).
   if (typeof verifier === 'function' && !needsClarificationFirst && ['full', 'alternatives', 'partial', 'over_budget'].includes(plan.state)) {
     try { const vp = await verifier({ plan, K }); if (vp) plan = vp; } catch { /* نكمل */ }
+    plan = auditPlanPicks(plan, K);
   }
   // أسماء القطع والتابات عربي بس: لما نعرض منتجات نرد بالعربي حتى لو الطلب بحروف لاتينية (shoes / hoodie aswad)، بدل رد نص إنجليزي وأسماء عربي مخلوطين.
   if (!(needsClarificationFirst || ['clarify', 'chat', 'no_look'].includes(plan.state))) lang = 'ar';
@@ -399,15 +404,46 @@ async function runModaCore(messages, opts = {}) {
   if (parsed.preferredStoreName && !needsClarificationFirst && ['full', 'alternatives', 'partial'].includes(plan.state) && !res.say?.includes(parsed.preferredStoreName)) {
     res = { ...res, say: `رشحتلك أولاً من كولكشن «${parsed.preferredStoreName}» في بنها:\n\n${res.say}` };
   }
+  if (pinnedItems.length > 0 && plan.people?.length && !needsClarificationFirst) {
+    const heroPin = pinnedItems[0]?.product;
+    const allPicks = plan.people.flatMap((p) => p.picks);
+    const newPicks = allPicks.filter((pk) => !pinnedItems.some((pin) => pin.id === pk.product.id));
+    if (newPicks.length > 0) {
+      const newNames = newPicks.map((pk) => pk.product.name_ar).slice(0, 2).join(' و ');
+      res = { ...res, say: `احتفظتلك بنفس القطعة اللي اخترناها («${heroPin.name_ar}»)، ونسقتلك معاها ${newNames} تليق عليها جداً.` };
+    } else if (plan.missing?.length > 0) {
+      res = { ...res, say: `احتفظتلك بنفس القطعة اللي اخترناها («${heroPin.name_ar}»)، لكن للأسف مفيش قطعة مناسبة ومضمونة متاحة حالياً لطلبك في المحلات. تقدري تطلبيها ونوفرها لك فوراً بالزرار تحت.` };
+    }
+  }
   if (derivedBudget && plan.state === 'over_budget' && plan.total > 0) res = { ...res, say: `ده أرخص اختيار لقيته لطلبك دلوقتي: ${Number(plan.total).toLocaleString('en-US')} جنيه. لو عندك ميزانية معينة قوليلي رقمها بالظبط وأدورلك جواها.` };
   if (parsed.followup === 'show_more' && excludeIds.length && plan.people?.length && !needsClarificationFirst) {
     const ids = plan.people.flatMap((p) => p.picks.map((x) => x.product.id));
     if (ids.length && ids.every((id) => excludeIds.includes(id))) res = { ...res, say: 'ده اللي متاح دلوقتي لطلبك، ومفيش بدائل تانية غيره. لو عايز، غيّر اللون أو النوع أو الميزانية وأدورلك تاني.' };
   }
   const shown = !needsClarificationFirst && plan.people ? plan.people.flatMap((p) => p.picks.map((x) => x.product.id)) : [];
+  const activeLook = !needsClarificationFirst && plan.people?.length ? {
+    context: plan.context || parsed.context || null,
+    persons: plan.persons || parsed.persons || [],
+    items: plan.people.flatMap((p) => p.picks.map((pk) => ({
+      id: pk.product.id,
+      name: pk.product.name_ar,
+      key: pk.product.key,
+      slotKey: pk.slotKey,
+      aud: p.aud,
+      price: pk.product.price,
+      formality: pk.product.formality,
+      colorKeys: pk.product.colorKeys || [],
+    }))),
+  } : (session?.activeLook || null);
+  const lookHistory = [
+    ...(session?.lookHistory || []),
+    ...(session?.activeLook ? [session.activeLook] : [])
+  ].filter(Boolean).slice(-6);
   const nextSession = {
     turn: (session?.turn || 0) + 1, parsed: { ...parsed, advice: null, ...(derivedBudget ? { budget: session?.parsed?.budget ?? null } : {}) }, pending: plan.state === 'clarify' || Boolean(plan.ask?.length), pendingQuestion: plan.ask?.[0] || null, shown: [...new Set([...(session?.shown || []), ...shown])].slice(-60),
     lastState: plan.state, lastTotal: needsClarificationFirst ? (session?.lastTotal ?? null) : (plan.total ?? null), lastBudgetUsed: needsClarificationFirst ? (session?.lastBudgetUsed ?? null) : (plan.budget ?? plan.total ?? null),
+    activeLook,
+    lookHistory,
   };
   return { ...res, session: nextSession, parsed, curated, debug: { eventTime } };
 }

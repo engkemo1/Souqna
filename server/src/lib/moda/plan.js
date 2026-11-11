@@ -166,12 +166,53 @@ function candidatesAt(slot, lvl, aud, products, ctx) {
 function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHero) {
   const { adv, role, context, userAvoid } = env;
   const ctxRange = K.contexts.get(context)?.formality || null;
+  const picks = []; const missing = []; const relaxed = [];
+  let palette = [];
+
+  const myPinned = (env.pinnedItems || []).filter((p) => !p.aud || p.aud === aud);
+  if (myPinned.length) {
+    for (const pin of myPinned) {
+      const pRow = pin.product || products.find((x) => x.id === pin.id);
+      if (!pRow) continue;
+      const baseKey = pin.slotKey || pin.base || pRow.key;
+      const slot = { keys: [pRow.key, baseKey].filter(Boolean), base: baseKey, share: 60, required: true, hero: true, explicit: true };
+      const c0 = primary(pRow);
+      if (c0 && !palette.includes(c0)) palette.push(c0);
+      picks.push({ slot, product: pRow, ranked: [{ p: pRow, s: 20 }], pool: [], relaxedKind: null });
+    }
+
+    const pinnedKeys = new Set(picks.map((pk) => pk.product.key).concat(picks.map((pk) => pk.slot.base)));
+    const unfulfilled = parsed.garments.filter((g) => keyFits(aud, g.key) && !pinnedKeys.has(g.key));
+
+    const heroPin = picks[0]?.product;
+    const pinF = heroPin?.formality ?? 4;
+    const fRangeLook = [Math.max(1, pinF - 1), Math.min(5, pinF + 1)];
+
+    for (const g of unfulfilled) {
+      const keys = resolveKeys([g.key], aud, fRangeLook);
+      const slot = { keys, base: g.key, required: true, share: 40, color: g.color || null, material: g.material || null, explicit: true, hero: false };
+      const list = candidatesAt(slot, { keys: slot.keys, color: !!slot.color, fd: 1, rel: null }, aud, products, {
+        K, fTargetRange: fRangeLook, role, context, userAvoid, lookAvoidHard: null,
+      });
+
+      if (list.length) {
+        const taste = [...(parsed.taste || []), ...(env.profileTaste || [])];
+        const sctx = { look: null, K, adv, fTarget: pinF, partnerHero: palette, palette, taste, requestedColors: parsed.colors || [], budgetCap: personBudget, learnedPreferences: env.learnedPreferences };
+        const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => b.s - a.s || a.p.price - b.p.price);
+        picks.push({ slot, product: ranked[0].p, ranked, pool: [], relaxedKind: null });
+      } else {
+        missing.push({ keys: slot.keys, base: slot.base, material: slot.material, color: slot.color, label: slot.material ? `${slot.material}_${slot.base}` : slot.base });
+      }
+    }
+
+    const slotCount = picks.length + missing.length;
+    return { aud, mode: 'pinned', look: null, picks, missing, relaxed: [], score: picks.length * 20, maxLevel: 0, slotsCount: slotCount, palette };
+  }
+
   const built = slotsFor(aud, parsed, look, K, ctxRange, adv);
   const fRangeLook = look && built.mode === 'look' ? [look.formality, look.formality] : ctxRange;
   const taste = [...(parsed.taste || []), ...(env.profileTaste || [])];
   const lookAvoidHard = context === 'condolence' && look?.avoid_colors ? look.avoid_colors : null;
-  const picks = []; const missing = []; const relaxed = [];
-  let palette = [];
   const ordered = [...built.slots].sort((a, b) => Number(b.hero) - Number(a.hero));
   let scoreSum = 0; let maxLevel = 0;
   for (const slot of ordered) {
@@ -316,6 +357,10 @@ export function planOutfit(parsed, products, env = {}) {
   const tgt = cr ? (env.eventTime?.isNight && cr[1] >= 4 ? cr[1] : (cr[0] + cr[1]) / 2) : null;
   // ---- اختيار look لكل شخص (أفضل 3 مرشحين) ثم أفضل توليفة ----
   const perPerson = persons.map((aud) => {
+    const myPinned = (env.pinnedItems || []).filter((p) => !p.aud || p.aud === aud);
+    if (myPinned.length) {
+      return [fillPerson(aud, parsed, null, products, K, { ...envC, pinnedItems: env.pinnedItems }, pBudget(aud), null)];
+    }
     const hasExplicit = parsed.garments.some((g) => keyFits(aud, g.key)) && !(persons.length > 1 && !parsed.garments.some((g) => keyFits(aud, g.key) && (WOMEN_KEYS.has(g.key) || MEN_KEYS.has(g.key))));
     let cands = context ? lookCandidates(aud, context, K, parsed, role) : lookForOwned(aud, parsed, K);
     // No approved look for this occasion: borrow one only if it is about as formal AND not a leisure-only look
