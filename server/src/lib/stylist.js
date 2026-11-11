@@ -54,8 +54,8 @@ export const providerReady = {
   extra: () => { const c = extraCfg(); return !!(c.base && c.key && c.model); },
   ...Object.fromEntries(Object.entries(COMPAT).map(([n, c]) => [n, () => !!process.env[c.key]])),
 };
-// ترتيب المزوّدين (MODA_LLM_ORDER=gemini,anthropic,groq,cerebras,mistral,sambanova,qwen,openrouter,nvidia,huggingface,scaleway,cohere,cloudflare,extra). لو واحد رصيده/حدّه خلص بنوقفه شوية وننتقل للّي بعده من غير ما كل رسالة تستنى فشله.
-const LLM_ORDER = () => (process.env.MODA_LLM_ORDER || 'gemini,anthropic,groq,cerebras,mistral,sambanova,qwen,openrouter,nvidia,huggingface,scaleway,cohere,cloudflare,extra').split(',').map((x) => x.trim()).filter(Boolean);
+// ترتيب المزوّدين (MODA_LLM_ORDER=anthropic,gemini,mistral,qwen,groq,cerebras,sambanova,huggingface,nvidia,scaleway,openrouter,cohere,cloudflare,extra). لو واحد رصيده/حدّه خلص بنوقفه شوية وننتقل للّي بعده من غير ما كل رسالة تستنى فشله.
+const LLM_ORDER = () => (process.env.MODA_LLM_ORDER || 'anthropic,gemini,mistral,qwen,groq,cerebras,sambanova,huggingface,nvidia,scaleway,openrouter,cohere,cloudflare,extra').split(',').map((x) => x.trim()).filter(Boolean);
 const llmPausedUntil = new Map();
 function pauseProvider(k, err) {
   const m = String(err?.message || err);
@@ -587,10 +587,13 @@ function findCandidates(slot, limit = 4) {
 /* ---------------- تويلا v2: محرك بقواعد وبيانات (بدون موديل في المسار الأساسي) ---------------- */
 let modaRowsCache = { at: 0, rows: null };
 export function invalidateModaCatalogue() { modaRowsCache = { at: 0, rows: null }; }
+let aiFactsTable = false;
 function modaCatalogue() {
   if (modaRowsCache.rows && Date.now() - modaRowsCache.at < 60000) return modaRowsCache.rows;
+  if (!aiFactsTable) { try { q.run('CREATE TABLE IF NOT EXISTS product_ai_facts (product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE, facts_json TEXT NOT NULL, media_id INTEGER, model TEXT, created_at TEXT NOT NULL DEFAULT (datetime(\'now\')))'); aiFactsTable = true; } catch { /* بنكمّل من غيره */ } }
   const rows = q.all("SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en, " +
-    "(SELECT c.name_ar || char(32) || c.name_en FROM categories c WHERE c.id=p.category_id) AS cat_text " +
+    "(SELECT c.name_ar || char(32) || c.name_en FROM categories c WHERE c.id=p.category_id) AS cat_text, " +
+    (aiFactsTable ? "(SELECT f.facts_json FROM product_ai_facts f WHERE f.product_id=p.id) AS ai_json " : "NULL AS ai_json ") +
     "FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 LIMIT 5000");
   modaRowsCache = { at: Date.now(), rows };
   return rows;
@@ -611,7 +614,7 @@ export function storesForModa() {
   const arr = (j) => { try { const v = JSON.parse(j || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
   return q.all("SELECT * FROM stores WHERE status='active' AND hidden=0 ORDER BY sort_order, id LIMIT 300").map((s) => ({
     id: s.id, slug: s.slug, name_ar: s.name_ar, name_en: s.name_en, logo: s.logo || null, cover: s.cover || null, tagline_ar: s.tagline_ar || '', description_ar: s.description_ar || '', address_ar: s.address_ar || '', city: s.city || '',
-    phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.map_url || null, lat: s.lat ?? null, lng: s.lng ?? null, hours: storeHours(s), branches: arr(s.branches_json), contacts: arr(s.contacts_json),
+    return_days: s.return_days ?? null,     phone: s.phone || '', whatsapp: s.whatsapp || '', map_url: s.map_url || null, lat: s.lat ?? null, lng: s.lng ?? null, hours: storeHours(s), branches: arr(s.branches_json), contacts: arr(s.contacts_json),
     instagram: s.instagram || '', facebook: s.facebook || '', tiktok: s.tiktok || '',
   }));
 }

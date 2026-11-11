@@ -24,7 +24,7 @@ export function catalogDigest(rows, K = loadKnowledge(), { maxPerGroup = 14 } = 
   return Object.entries(groups).filter(([, m]) => m.size).map(([g, m]) => `${label[g]}: ${[...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, maxPerGroup).map(([k, n]) => `${itemAr(K, k)} (${k}) ×${n}`).join('، ')}`).join('\n');
 }
 
-export function brainPrompt({ K = loadKnowledge(), digest = '', assistantName = 'تويلا', training = '', facts = null } = {}) {
+export function brainPrompt({ K = loadKnowledge(), digest = '', assistantName = 'تويلا', training = '', facts = null, kb = '' } = {}) {
   const ctx = [...K.contexts.keys()].filter((c) => c !== 'condolence');
   const garments = [...K.items.keys()].filter((k) => !['dress_any', 'shoes_any', 'underwear_sleep', 'sleepwear'].includes(k));
   const colors = [...K.colors.keys()];
@@ -37,6 +37,8 @@ export function brainPrompt({ K = loadKnowledge(), digest = '', assistantName = 
     digest ? `What is actually in stock right now (type (key) ×count):\n${digest}` : 'Stock information is not available; do not promise specific items.',
     facts?.mode === 'opinion' ? 'OPINION MODE: the customer asks for your opinion/advice about a look or a choice. Give a real, honest stylist opinion in 1-3 short sentences (what works, what to tweak, colours, fit), like a friend. Do NOT list products and do NOT ask unrelated questions. End by offering to pull matching pieces from our stock (for example: تحب أجيبلك المتاح عندنا؟). Always set ready=false, but still fill persons/context/garments/colors with what the opinion is about so the system can search the stock if they say yes.' : '',
     facts && facts.mode !== 'opinion' ? `Facts from the recommendation engine for this turn: ${JSON.stringify(facts)}` : '',
+    kb ? `FACTS (the ONLY source for details about specific products and stores — material, care, sizes, colours, stock, address, phone, opening hours, return days):\n${kb}` : 'No product/store facts are available for this turn.',
+    'KNOWLEDGE RULE: for any question about a specific product or store (fabric, size chart, fit, how it feels, opening hours, address, phone, whether something is available) answer ONLY from FACTS above. If the answer is not in FACTS, or says مش مسجل/مش مسجلة/مفيش, say plainly in Egyptian Arabic that you are not sure about that detail (مش متأكدة من ده) and that the store can confirm it — give the store phone/WhatsApp only if it appears in FACTS. Details marked "من تحليل الصورة" are only an estimate: say "شكلها كده من الصورة بس مش مؤكد من المحل". NEVER guess or invent a detail. General fashion advice (what suits an occasion, colours, styling) is fine without FACTS.',
     training ? training.trim() : '',
     'Reply with ONE JSON object only, no prose around it:',
     '{"reply":"your message to the customer","persons":[],"context":null,"garments":[],"colors":[],"budget":null,"ready":false}',
@@ -55,7 +57,7 @@ const toHistory = (messages) => (Array.isArray(messages) ? messages : [{ role: '
   .filter((m) => m.content.trim());
 
 /** يرجّع رد الموديل بعد التنضيف، أو null لو مش سليم. */
-export function sanitizeBrain(out, { K = loadKnowledge(), lang = 'ar', userBudget = null } = {}) {
+export function sanitizeBrain(out, { K = loadKnowledge(), lang = 'ar', userBudget = null, kb = '' } = {}) {
   if (!out || typeof out !== 'object') return null;
   let reply = String(out.reply ?? out.say ?? '').replace(/\s+/g, ' ').trim();
   if (reply.length > 520) reply = reply.slice(0, 520).replace(/[^.!؟?،,]*$/, '').trim() || reply.slice(0, 520);
@@ -63,7 +65,10 @@ export function sanitizeBrain(out, { K = loadKnowledge(), lang = 'ar', userBudge
   const priceLike = /(\d[\d,.]*)\s*(جنيه|جنية|ج\.?م|EGP|LE|pounds?)/gi;
   const prices = [...reply.matchAll(priceLike)].map((m) => Number(m[1].replace(/,/g, '')));
   const invented = prices.some((n) => !userBudget || Math.abs(n - userBudget) > 1);
-  const bad = !reply || !guard.ok || invented || /https?:\/\/|www\./i.test(reply) || /[*#`]{2,}/.test(reply);
+  const digitsOf = (t) => String(t).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D+/g, ' ').split(' ').filter((x) => x.length >= 7);
+  const kbDigits = String(kb).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '');
+  const inventedPhone = digitsOf(reply).some((n) => !kbDigits.includes(n));
+  const bad = !reply || !guard.ok || invented || inventedPhone || /https?:\/\/|www\./i.test(reply) || /[*#`]{2,}/.test(reply);
   const list = (v, set) => [...new Set((Array.isArray(v) ? v : []).filter((x) => typeof x === 'string' && set.has(x)))];
   const budget = Number(out.budget); 
   return {
@@ -79,14 +84,14 @@ export function sanitizeBrain(out, { K = loadKnowledge(), lang = 'ar', userBudge
 
 /** callFn(system, messages) → string|object. opts: { training(query) → string, timeoutMs } */
 export function makeBrain(callFn, { training = () => '', timeoutMs = 14000 } = {}) {
-  return async ({ messages, rows, assistantName, lang = 'ar', userBudget = null, facts = null, text = '' }) => {
+  return async ({ messages, rows, assistantName, lang = 'ar', userBudget = null, facts = null, text = '', kb = '' }) => {
     const K = loadKnowledge();
-    const system = brainPrompt({ K, digest: catalogDigest(rows, K), assistantName: assistantName || 'تويلا', training: training(text) || '', facts });
+    const system = brainPrompt({ K, digest: catalogDigest(rows, K), assistantName: assistantName || 'تويلا', training: training(text) || '', facts, kb });
     const history = toHistory(messages);
     if (!history.length || history[history.length - 1].role !== 'user') return null;
     const raw = await Promise.race([callFn(system, history), new Promise((_, rej) => setTimeout(() => rej(new Error('brain timeout')), timeoutMs))]);
     let out = raw;
     if (typeof raw === 'string') { const a = raw.indexOf('{'); const b = raw.lastIndexOf('}'); try { out = a >= 0 && b > a ? JSON.parse(raw.slice(a, b + 1)) : { reply: raw }; } catch { out = { reply: raw }; } }
-    return sanitizeBrain(out, { K, lang, userBudget });
+    return sanitizeBrain(out, { K, lang, userBudget, kb });
   };
 }

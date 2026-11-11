@@ -15,6 +15,7 @@ import { keywordSearch } from './search.js';
 import { offersAnswer, careForShown } from './offers.js';
 import { careFallback } from './parse.js';
 import { DEFAULT_CONTACT, fillContact } from './contact.js';
+import { buildKb } from './kb.js';
 import { matchStore, aspectsOf, mentionsStoreWord, storeAnswer, askWhichStore, allStoresHours, GENERIC } from './stores.js';
 import { norm, trainingTokens } from './text.js';
 import { isContinuationRequest, isSameGarmentReference, resolvePinnedItems, auditPlanPicks, resolveAnchor, pronounAuds, needsWhoPart } from './continuity.js';
@@ -223,6 +224,12 @@ async function runModaCore(messages, opts = {}) {
     return { ...res, session: { turn: 1 }, parsed };
   }
 
+  // حقائق حقيقية (منتجات/محلات) للعقل: ممنوع يجاوب عن منتج أو محل بحاجة مش فيها
+  const kbText = () => {
+    let list = []; try { list = typeof stores === 'function' ? stores() : stores || []; } catch { list = []; }
+    let c = contact; try { c = typeof contact === 'function' ? contact() : contact; } catch { c = null; }
+    try { return buildKb({ products: ensureEnriched(products, K), lookItems: session?.activeLook?.items || [], stores: list, text, contact: c }); } catch { return ''; }
+  };
   // ---------- أسئلة عن محل معيّن (رقمه/لوكيشنه/عنوانه/فروعه/مواعيده/سوشيال/بيبيع إيه/عروضه) ----------
   if (!(answers && Object.keys(answers).length) && !session?.pending && stores) {
     let list = [];
@@ -314,7 +321,7 @@ async function runModaCore(messages, opts = {}) {
     return { ...res0, say: 'عشان أقولك رأيي صح محتاجة أعرف: اللبس لمين ولأنهي مناسبة؟ وقولي القطعتين اللي محتار بينهم وأقارنهملك وأجيبلك المتاح عندنا.', intent: 'chat', session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
   } else if (noAnswers && typeof brain === 'function' && nOp.split(' ').length >= 3 && /(رايك|رايكم|تشوف|شايف|شايفه|يليق|هيليق|هينفع|ينفع|تنفع|يمشي|مناسب لي|احسن ولا|افضل ولا|محتار|مش عارف اختار|اعمل ايه|اخد ايه|حلو ولا|تخين|تخينه|تخينة|نحيف|نحيفه|نحيفة|قصير|قصيره|قصيرة|طويل جدا|طويله|سمراء|سمرا|بشره|بشرتي|مثلث|كمثري|ساعه رمليه|كرش|بطن|حامل|حمل|ممتلئ|ممتلئه|مقاس كبير|وزني)/.test(nOp) && !/(رقم|لوكيشن|عنوان|فرع|توصيل|شحن|دفع|استرجاع|استبدال)/.test(nOp)) {
     let b = null;
-    try { b = await brain({ messages, rows: ensureEnriched(products, K), assistantName: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], lang, userBudget: null, facts: { mode: 'opinion' }, text }); } catch { b = null; }
+    try { b = await brain({ messages, rows: ensureEnriched(products, K), assistantName: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], lang, userBudget: null, facts: { mode: 'opinion' }, text, kb: kbText() }); } catch { b = null; }
     if (b?.reply) {
       const slots = { ...parsed, intent: 'shop', persons: b.persons.length ? b.persons : parsed.persons, context: b.context || parsed.context, contextEffective: b.context || parsed.contextEffective, garments: b.garments.length ? b.garments.map((key, position) => ({ key, color: null, material: null, text: key, position })) : parsed.garments, colors: b.colors.length ? b.colors : parsed.colors, advice: null };
       const res = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
@@ -513,7 +520,7 @@ async function runModaCore(messages, opts = {}) {
   let brainUsed = false;
   const callBrain = async (facts = null) => {
     if (typeof brain !== 'function') return null;
-    try { return await brain({ messages, rows: ensureEnriched(products, K), assistantName: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], lang, userBudget: parsed.budget?.value || null, facts, text }); } catch { return null; }
+    try { return await brain({ messages, rows: ensureEnriched(products, K), assistantName: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], lang, userBudget: parsed.budget?.value || null, facts, text, kb: kbText() }); } catch { return null; }
   };
   // «غيره / حاجة تانية / مش دي»: بديل للقطعة المعروضة قبل كده
   if (session?.parsed?.garments?.length && !hasAnswers && /^(غيره|غيرها|غيرهم|غير ده|غير دي|غير دا|حاجه تانيه|حاجات تانيه|حاجه غيرها|مش دي|مش ده|مش دا|واحد تاني|واحده تانيه|بديل|بدائل|فيه غيره|فيه غيرها|في غيره|في غيرها|اغلي|اغلي شويه|احسن|احسن من كده|افضل|افضل من كده|حاجه احسن|حاجه افضل|اشيك|اشيك من كده)$/.test(norm(text).trim())) {

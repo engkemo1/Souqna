@@ -134,6 +134,30 @@ export default function Overview() {
 
       {/* secondary cards sit under the numbers an owner opens the dashboard for */}
       <div className="mt-6 space-y-6">
+        {d?.dataGaps?.incomplete > 0 && (
+          <Panel title={t('dash.gaps.title')}>
+            <p className="text-sm leading-6 text-muted">{t('dash.gaps.why')}</p>
+            <p className="mt-3 text-sm font-semibold">{t('dash.gaps.count', { n: num(d.dataGaps.incomplete), total: num(d.dataGaps.total) })}</p>
+            <div className="mt-2 flex flex-wrap gap-2 text-xs">
+              {d.dataGaps.noDesc > 0 && <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">{t('dash.gaps.noDesc')}: {num(d.dataGaps.noDesc)}</span>}
+              {d.dataGaps.noMaterial > 0 && <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">{t('dash.gaps.noMaterial')}: {num(d.dataGaps.noMaterial)}</span>}
+              {d.dataGaps.noSizes > 0 && <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-800">{t('dash.gaps.noSizes')}: {num(d.dataGaps.noSizes)}</span>}
+            </div>
+            <ul className="mt-3 space-y-1">
+              {d.dataGaps.items.map((p) => (
+                <li key={p.id}>
+                  <Link to={`/dashboard/products/${p.id}`} className="-mx-2 flex items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm transition hover:bg-fg/[0.04]">
+                    <span className="min-w-0 truncate">{tr(p.name)}</span>
+                    <span className="flex shrink-0 items-center gap-2 text-xs text-muted">
+                      {p.missing.map((m) => t(m === 'desc' ? 'dash.gaps.noDesc' : m === 'material' ? 'dash.gaps.noMaterial' : 'dash.gaps.noSizes')).join(' · ')}
+                      <span className="font-semibold text-fg">{t('dash.gaps.fix')}</span>
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </Panel>
+        )}
         <StoreHealthCard />
         <WeeklyReportCard />
         <DemandCard />

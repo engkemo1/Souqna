@@ -511,6 +511,19 @@ r.get('/overview', h((req, res) => {
   const tm = mediaMap(top.map((t) => t.media_id));
   const lowStock = q.all("SELECT * FROM products WHERE store_id=? AND status='active' AND track_stock=1 AND stock <= low_stock_at ORDER BY stock ASC LIMIT 5", [sid]);
   const lm = mediaMap(lowStock.map((p) => q.val('SELECT media_id FROM product_media WHERE product_id=? ORDER BY is_primary DESC, position LIMIT 1', [p.id])));
+  // بيانات ناقصة تأثر على البيع وعلى إجابات تويلا (وصف / خامة / مقاسات)
+  const gapRows = q.all("SELECT id, name_ar, name_en, description_ar, material_ar, sizes_json FROM products WHERE store_id=? AND status='active'", [sid]);
+  const noSizesRow = (x) => { try { const v = JSON.parse(x.sizes_json || '[]'); return !Array.isArray(v) || !v.length; } catch { return true; } };
+  const gapMissing = (x) => [!(x.description_ar || '').trim() && 'desc', !(x.material_ar || '').trim() && 'material', noSizesRow(x) && 'sizes'].filter(Boolean);
+  const gapList = gapRows.map((x) => ({ x, miss: gapMissing(x) })).filter((g) => g.miss.length);
+  const dataGaps = {
+    total: gapRows.length,
+    incomplete: gapList.length,
+    noDesc: gapList.filter((g) => g.miss.includes('desc')).length,
+    noMaterial: gapList.filter((g) => g.miss.includes('material')).length,
+    noSizes: gapList.filter((g) => g.miss.includes('sizes')).length,
+    items: gapList.sort((a, b) => b.miss.length - a.miss.length).slice(0, 5).map((g) => ({ id: g.x.id, name: bi(g.x, 'name'), missing: g.miss })),
+  };
   res.json({
     range: n,
     today: { ...todayStats, pending: statusCounts.pending || 0 },
@@ -522,6 +535,7 @@ r.get('/overview', h((req, res) => {
       visits: { value: a.visits, delta: pct(a.visits, b.visits) },
       conversion: { value: a.conversion, delta: Math.round((a.conversion - b.conversion) * 10) / 10 },
     },
+    dataGaps,
     totals: {
       products: q.val("SELECT COUNT(*) FROM products WHERE store_id=? AND status<>'archived'", [sid]),
       customers: q.val('SELECT COUNT(*) FROM customers WHERE store_id=?', [sid]),
