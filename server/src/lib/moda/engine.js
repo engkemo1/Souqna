@@ -122,6 +122,7 @@ const mergeFromSession = (cur, prev) => {
   for (const k of ['persons', 'garments', 'colors', 'avoidColors', 'taste', 'ownedPieces']) if (!m[k]?.length && prev[k]?.length) m[k] = prev[k];
   for (const k of ['context', 'contextEffective', 'budget', 'daypart', 'dateOffsetDays', 'season']) if ((m[k] === null || m[k] === undefined) && prev[k] != null) m[k] = prev[k];
   if (!cur.context && prev.role) m.role = prev.role;
+  if (cur.avoidContexts?.length && m.context && cur.avoidContexts.includes(m.context)) { m.context = null; m.contextEffective = null; }
   // «لا اسود» / «خليه كحلي»: لون جديد في الرسالة بيغيّر لون القطعة الوحيدة المطلوبة قبل كده
   if (!cur.garments?.length && cur.colors?.length === 1 && prev.garments?.length === 1) { m.garments = [{ ...prev.garments[0], color: cur.colors[0] }]; m.colors = []; }
   if (cur.avoidColors?.length && Array.isArray(m.garments)) m.garments = m.garments.map((g) => (g.color && cur.avoidColors.includes(g.color) ? { ...g, color: null } : g));
@@ -260,6 +261,17 @@ async function runModaCore(messages, opts = {}) {
     let c = contact; try { c = typeof contact === 'function' ? contact() : contact; } catch { c = null; }
     try { return buildKb({ products: ensureEnriched(products, K), lookItems: session?.activeLook?.items || [], stores: list, text, contact: c }); } catch { return ''; }
   };
+  // بعد «لبنت صغيرة ولا لحضرتك؟»: رد بسن أو «ليا»
+  if (session?.girlAsk && !(answers && Object.keys(answers).length)) {
+    const nG = norm(text); const age = nG.match(/(\d{1,2})\s*(?:سنه|سنين|سنوات|شهور|شهر)/);
+    const mine = /(^| )(ليا|لي|لنفسي|لحضرتي|لحضرتك|لنفسى|انا)( |$)/.test(nG) && !parsed.garments.length;
+    if (age || mine) {
+      const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
+      const base = { ...(session.parsed || parsed), intent: 'shop', garments: [], flags: { ...(session.parsed?.flags || {}) } };
+      const sp = age ? { ...base, persons: ['girls'], ages: [Number(age[1])] } : { ...base, persons: ['women'] };
+      return { ...res0, say: age ? `تمام، لبنت ${age[1]} ${Number(age[1]) <= 10 ? 'سنين' : 'سنة'}. عايزة قطعة إيه (فستان، ترنج، جزمة…) أو لأنهي مناسبة؟` : 'تمام، ليكي. عايزة قطعة إيه (فستان، قميص، جزمة…) أو لأنهي مناسبة؟', intent: 'chat', tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1, parsed: sp, girlAsk: false, pending: false }, parsed };
+    }
+  }
   // كلمة شخص لوحدها («بنت»، «ولد»، «ست»، «راجل»، «واحدة»…): مش اسم محل ومش قطعة — بنسأل عايزة إيه
   if (!(answers && Object.keys(answers).length) && !session?.pending) {
     const bare = norm(text).replace(/^(?:انا|ده|دي|يعني|اه|لا|لـ)\s+/, '').replace(/[؟?!.،,]+/g, '').trim();
@@ -269,7 +281,7 @@ async function runModaCore(messages, opts = {}) {
       const res = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
       const label = { women: 'للستات', men: 'للرجالة', boys: 'للولاد', girls: 'للبنات' }[who];
       const ask = who === 'girls' ? 'ده لبنت صغيرة ولا لحضرتك؟ وعايزة قطعة إيه (فستان، ترنج، جزمة…) أو لأنهي مناسبة؟' : `تمام، ${label}. عايز/عايزة قطعة إيه (قميص، فستان، ترنج، جزمة…) أو لأنهي مناسبة؟`;
-      return { ...res, say: ask, intent: 'chat', tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1, parsed: who === 'girls' ? session?.parsed : { ...parsed, intent: 'shop', persons: [who], garments: [], flags: { ...parsed.flags } }, pending: false }, parsed };
+      return { ...res, say: ask, intent: 'chat', tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1, parsed: { ...parsed, intent: 'shop', persons: [who], garments: [], flags: { ...parsed.flags } }, girlAsk: who === 'girls', pending: false }, parsed };
     }
   }
   // ---------- أسئلة عن محل معيّن (رقمه/لوكيشنه/عنوانه/فروعه/مواعيده/سوشيال/بيبيع إيه/عروضه) ----------
@@ -282,7 +294,11 @@ async function runModaCore(messages, opts = {}) {
       const m = matchStore(text, list);
       const reply = (say, extra = {}) => ({ state: 'chat', intent: 'faq', faq: 'store', say: fillContact(say, contact), tips: [], styleTips: [], questions: [], blocks: null, ...extra, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed: { ...parsed, advice: null } });
       const nameHit = m.store && [m.store.name_ar, m.store.name_en].some((n) => n && norm(text).includes(norm(n)));
-      if (m.store && !(parsed.garments.length && !aspects.length) && !(parsed.garments.length && !nameHit)) {
+      // كارت المحل مبيظهرش غير لو العميل سأل عن المحل (رقم/عنوان/لوكيشن…) أو قال كلمة «محل» أو كتب الاسم لوحده؛ اسم منتج مش بيفتح محل
+      const nTxt = norm(text).replace(/^(?:محل|متجر|ستور|store|shop)\s+/, '').replace(/\s+(?:محل|متجر)$/, '').trim();
+      const nameOnly = m.store && [m.store.name_ar, m.store.name_en].some((n) => n && norm(n) === nTxt);
+      const storeCue = asks.length > 0 || aspects.some((x) => x !== 'all') || mentionsStoreWord(text) || nameOnly;
+      if (m.store && storeCue && !(parsed.garments.length && !aspects.length) && !(parsed.garments.length && !nameHit)) {
         let live = [];
         try { live = (typeof offers === 'function' ? offers() : Array.isArray(offers) ? offers : []).filter((o) => o.store === m.store.name_ar); } catch { live = []; }
         const out = storeAnswer(m.store, aspects, { products, offers: live, now });
@@ -297,7 +313,7 @@ async function runModaCore(messages, opts = {}) {
           const ask = askWhichStore(list);
           if (ask) return reply(ask);
         }
-        const STOP = new Set(['عاوز', 'عايز', 'عايزة', 'عاوزة', 'محتاج', 'محتاجة', 'فين', 'مكان', 'مكانها', 'مكانه', 'عنوان', 'عنوانه', 'عناوين', 'رقم', 'ارقام', 'نمرة', 'نمره', 'لوكيشن', 'موقع', 'موقعه', 'مواعيد', 'فروع', 'فرع', 'تليفون', 'واتس', 'واتساب', 'ازاي', 'اروح', 'اوصل', 'طريق', 'محل', 'المحل', 'محلات', 'المحلات', 'متجر', 'المتجر', 'ستور', 'الستور', 'store', 'shop', 'عندكم', 'عندكو', 'في', 'بنها', 'بتفتح', 'بيفتح', 'بتقفل', 'بيقفل', 'ساعات', 'امتي', 'امتى', 'فاتح', 'قافل', 'شغال', 'دلوقتي']);
+        const STOP = new Set(['ابعتلي', 'ابعت', 'ابعتيلي', 'ابعتهولي', 'قولي', 'قوليلي', 'ورني', 'وريني', 'بنها', 'في', 'ف', 'اي', 'ايه', 'اللي', 'لو', 'سمحت', 'اللوكيشن', 'اللوكشن', 'محل', 'المحل', 'محلات', 'المحلات', 'متجر', 'المتجر', 'عايز', 'عاوز', 'عايزة', 'عاوزة', 'محتاج', 'محتاجة', 'فين', 'مكان', 'مكانها', 'مكانه', 'عنوان', 'عنوانه', 'عناوين', 'رقم', 'ارقام', 'نمرة', 'نمره', 'لوكيشن', 'موقع', 'موقعه', 'مواعيد', 'فروع', 'فرع', 'تليفون', 'واتس', 'واتساب', 'ازاي', 'اروح', 'اوصل', 'طريق', 'محل', 'المحل', 'محلات', 'المحلات', 'متجر', 'المتجر', 'ستور', 'الستور', 'store', 'shop', 'عندكم', 'عندكو', 'في', 'بنها', 'بتفتح', 'بيفتح', 'بتقفل', 'بيقفل', 'ساعات', 'امتي', 'امتى', 'فاتح', 'قافل', 'شغال', 'دلوقتي']);
         const strippedTokens = norm(text).split(' ').filter((w) => w.length >= 2 && !GENERIC.has(w) && !STOP.has(w));
         if (strippedTokens.length === 0) {
           const ask = askWhichStore(list);
@@ -355,7 +371,7 @@ async function runModaCore(messages, opts = {}) {
     const ao = session.altOffer;
     const base = ao ? { ...session.parsed, garments: (session.parsed.garments || []).map((g) => (g.key === ao.wanted ? { ...g, key: ao.type, color: null, text: ao.type } : g)) } : session.parsed;
     parsed = { ...base, intent: 'shop', followup: null, flags: { ...(base.flags || {}), fromOpinion: true, roleAsked: true, budgetFlexible: true } };
-  } else if (noAnswers && typeof brain !== 'function' && !parsed.garments.length && !/(?:وزني|وزن|طولي|طول|weight|height) ?\d|\d ?(?:كيلو|كجم|سم|kg|cm)/.test(nOp) && /(تخين|تخينه|تخينة|نحيف|نحيفه|نحيفة|قصير|قصيره|قصيرة|طويل جدا|سمراء|سمرا|بشرتي|مثلث|كمثري|حامل|حمل|ممتلئ|وزني|كرش)/.test(nOp) && nOp.split(' ').length >= 2 && [null, 'unlisted_item'].includes(matchFaq(text))) {
+  } else if (noAnswers && typeof brain !== 'function' && !parsed.garments.length && !/(^| )(كم|اكمام|بكم|قصير الكم)( |$)/.test(nOp) && !/(?:وزني|وزن|طولي|طول|weight|height) ?\d|\d ?(?:كيلو|كجم|سم|kg|cm)/.test(nOp) && /(تخين|تخينه|تخينة|نحيف|نحيفه|نحيفة|قصير|قصيره|قصيرة|طويل جدا|سمراء|سمرا|بشرتي|مثلث|كمثري|حامل|حمل|ممتلئ|وزني|كرش)/.test(nOp) && nOp.split(' ').length >= 2 && [null, 'unlisted_item'].includes(matchFaq(text))) {
     const advTxt = bodyAdvice(nOp);
     const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
     return { ...res0, say: advTxt || 'تمام، عشان أرشحلك اللي يناسبك صح قولي: اللبس لأنهي مناسبة، وطولك ووزنك (أو مقاسك)، والقطعة اللي عاوزها لو في حاجة معينة. وأنا أدورلك في المتاح عندنا.', intent: 'chat', session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
@@ -374,7 +390,7 @@ async function runModaCore(messages, opts = {}) {
   }
 
   // ---------- أسئلة الخدمة أو قواعد التدريب المعتمدة ----------
-  const giftToSomeone = /(^| )(هدي[هة]|هديه|هدايا|gift)( |$)/.test(norm(text)) && /(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي|لزوجتي|لوالدتي|لجوزي|لخطيبي|لحبيبي|لابويا|لبابا|لاخويا|لابني|لصاحبي|لزوجي|لوالدي)/.test(norm(text));
+  const giftToSomeone = /(^| )(هدي[هة]|هديه|هدايا|gift)( |$)/.test(norm(text)) && /(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي|لزوجتي|لوالدتي|لجوزي|لخطيبي|لحبيبي|لابويا|لبابا|لاخويا|لابني|لصاحبي|لزوجي|لوالدي|للاكس|لاكسي|للبت|الاكس|البت|اجيبلها|جيبلها|ليها)/.test(norm(text));
   // «حلو / عجبني / تمام خدته» بعد ما اتعرضلها قطع: رد قصير بدل «مش فاهمة»
   if (!(answers && Object.keys(answers).length) && !session?.pending && !session?.opinionOffer && !session?.altOffer && session?.parsed && (session.shown?.length || session.activeLook?.items?.length) && /^(حلو|حلوه|جميل|جميله|تحفه|عجبني|عجبتني|عجبني اوي|تمام خدته|خدته|هاخده|هاخدها|هاخدهم|هشتريه|هشتريها|ماشي هاخده|ممتاز|perfect|nice|great|love it|i love it|زي الفل|يجنن)( [^ ]+){0,2}$/.test(nOp)) {
     const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
@@ -441,6 +457,11 @@ async function runModaCore(messages, opts = {}) {
     questions: [{ id, text: qtext, type: 'single', options }],
     session: { ...(session || {}), turn: (session?.turn || 0) + 1, pending: true, pendingQuestion: id }, parsed,
   });
+  // «لعيالي / لاولادي / لرضيع»: نسأل ولد ولا بنت بدل ما نخمن
+  if (!hasAnswers && !session?.pending && parsed.kidsUnspecified && !parsed.persons.length) {
+    const baby = parsed.flags?.baby;
+    return clarify(baby ? 'تمام! ولد ولا بنت؟ وعنده كام شهر أو سنة؟' : 'تمام! ولد ولا بنت ولا الاتنين؟', 'who_is_it_for', baby ? 'ولد ولا بنت؟' : 'اللبس لمين من الأطفال؟', [{ label: 'ولد', value: 'boys' }, { label: 'بنت', value: 'girls' }, { label: 'ولد وبنت', value: 'kids' }]);
+  }
   const itemLabel = (it) => `${it.name}${it.aud === 'men' ? ' (ليه)' : it.aud === 'women' || it.aud === 'women_hijab' ? ' (ليها)' : ''}`;
   const famRe = (it) => new RegExp(String(it.key || it.slotKey || 'zzz').replace(/[^a-z_]/gi, '') || 'zzz', 'i');
   const pickedItem = answers?.which_piece != null ? lookItems.find((i) => String(i.id) === String(answers.which_piece)) : null;
@@ -623,7 +644,7 @@ async function runModaCore(messages, opts = {}) {
     parsed = { ...session.parsed, intent: 'shop', followup: null, budget: null, flags: { ...(session.parsed.flags || {}), priciest: true, cheapest: undefined, budgetFlexible: true } };
   }
   if (parsed.followup === 'cheaper' && prevTotal) { parsed.budget = { value: Math.max(100, Math.round((session.lastBudgetUsed || prevTotal) * 0.8 / 50) * 50), kind: 'total' }; derivedBudget = true; }
-  if (parsed.followup === 'show_more') excludeIds = session?.shown || [];
+  if (parsed.followup === 'show_more' || parsed.flags?.showOther) excludeIds = session?.shown || [];
   if (parsed.flags?.swapId) excludeIds = [...excludeIds, parsed.flags.swapId];
 
   // ---------- فهم احتياطي بالموديل المجاني (اختياري) ----------
@@ -680,7 +701,7 @@ async function runModaCore(messages, opts = {}) {
   }
   // هدية من غير ما يقول لمين: نسأل بدل ما نقول «مفهمتش»
   const GIFT_W = /(^| )(هدي[هة]|هديه|هدايا|gift)( |$)/;
-  if (!hasAnswers && !session?.pending && GIFT_W.test(norm(text)) && !parsed.garments.length && !/(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي|لزوجتي|لوالدتي|لجوزي|لخطيبي|لحبيبي|لابويا|لبابا|لاخويا|لابني|لصاحبي|لزوجي|لوالدي|لولد|لبنت|لطفل)/.test(norm(text))) {
+  if (!hasAnswers && !session?.pending && GIFT_W.test(norm(text)) && !parsed.garments.length && !/(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي|لزوجتي|لوالدتي|لجوزي|لخطيبي|لحبيبي|لابويا|لبابا|لاخويا|لابني|لصاحبي|لزوجي|لوالدي|لولد|لبنت|لطفل|للبت|لاكسي|للاكس|للواد|لزميلي|لزميلتي|لصحبي|لصحبتي|لعمتي|لخالتي|لعمي|لخالي|لجدتي|لجدي|لحماتي|لحفيدي|لابن|لعيالي|لاولادي|لحبيبي|لصحبتي|للراجل|للست|للاكس|لاكسي|للبت|الاكس|البت|اجيبلها|جيبلها|ليها)/.test(norm(text))) {
     parsed = { ...parsed, intent: 'shop', persons: [], flags: { ...parsed.flags, gift: true } };
     return clarify('تمام، الهدية لمين؟', 'gift_for', 'الهدية لمين؟', [{ label: 'ست (مراتي / خطيبتي / أمي / أختي)', value: 'women' }, { label: 'راجل (جوزي / أبويا / أخويا)', value: 'men' }, { label: 'طفل', value: 'kids' }]);
   }
@@ -690,8 +711,8 @@ async function runModaCore(messages, opts = {}) {
     else parsed = { ...parsed, intent: 'shop', persons: ['boys', 'girls'], garments: ['tshirt', 'dress_casual', 'sneakers'].map((key, position) => ({ key, color: null, material: null, text: key, position })), flags: { ...parsed.flags, gift: true, colorFlexible: true, budgetFlexible: true } };
   }
   // هدية: المستلم هو اللي بنختار له، مش العميل نفسه
-  if (!hasAnswers && (parsed.intent === 'shop' || parsed.intent === 'advice' || parsed.intent === 'unknown') && !parsed.garments.length && /(^| )(هدي[هة]|هديه|هدايا|gift)( |$)/.test(norm(text)) && /(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي|لزوجتي|لوالدتي|لجوزي|لخطيبي|لحبيبي|لابويا|لبابا|لاخويا|لابني|لصاحبي|لزوجي|لوالدي)/.test(norm(text))) {
-    const toHer = /(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي|لزوجتي|لوالدتي|لها|حريمي)/.test(norm(text)) || /(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي)/.test(String(text));
+  if (!hasAnswers && (parsed.intent === 'shop' || parsed.intent === 'advice' || parsed.intent === 'unknown') && !parsed.garments.length && /(^| )(هدي[هة]|هديه|هدايا|gift)( |$)/.test(norm(text)) && /(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي|لزوجتي|لوالدتي|لجوزي|لخطيبي|لحبيبي|لابويا|لبابا|لاخويا|لابني|لصاحبي|لزوجي|لوالدي|للاكس|لاكسي|للبت|الاكس|البت|اجيبلها|جيبلها|ليها)/.test(norm(text))) {
+    const toHer = /(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي|لزوجتي|لوالدتي|لها|حريمي|للاكس|لاكسي|للبت|الاكس|البت|اجيبلها|جيبلها|ليها)/.test(norm(text)) || /(لمراتي|لخطيبتي|لحبيبتي|لامي|لماما|لاختي|لبنتي|لصاحبتي)/.test(String(text));
     const toHim = /(لجوزي|لخطيبي|لحبيبي|لابويا|لبابا|لاخويا|لابني|لصاحبي|لزوجي|لوالدي)/.test(norm(text));
     const recipient = toHer ? 'women' : toHim ? 'men' : null;
     if (recipient) parsed = { ...parsed, intent: 'shop', advice: null, persons: [recipient], garments: (recipient === 'women' ? ['handbag', 'perfume', 'tarha'] : ['watch', 'perfume', 'belt']).map((key, position) => ({ key, color: null, material: null, text: key, position })), flags: { ...parsed.flags, gift: true, colorFlexible: true } };
@@ -825,7 +846,16 @@ async function runModaCore(messages, opts = {}) {
   }
   // أسماء القطع والتابات عربي بس: لما نعرض منتجات نرد بالعربي حتى لو الطلب بحروف لاتينية (shoes / hoodie aswad)، بدل رد نص إنجليزي وأسماء عربي مخلوطين.
   if (!(needsClarificationFirst || ['clarify', 'chat', 'no_look'].includes(plan.state))) lang = 'ar';
+  // شبكة أمان: التخطيط ملقاش (أو لقى بديل) لكن في منتج اسمه/لونه فيه كل كلمات العميل بالظبط: نعرضه بدل «مش موجود»
+  if (!needsClarificationFirst && !hasAnswers && ['none', 'alternatives', 'partial'].includes(plan.state) && !parsed.followup && !parsed.flags?.showOther && text.trim().length >= 3) {
+    try {
+      const hitsNet = keywordSearch(text, ensureEnriched(products, K), { limit: 6 });
+      const wantGarm = (parsed.garments || []).length <= 1 || (parsed.garments || []).every((g) => g.text === g.key);
+      if (hitsNet.length && wantGarm && (plan.state === 'none' || (parsed.garments?.[0]?.color || parsed.colors?.length))) return searchReply(hitsNet);
+    } catch { /* ignore */ }
+  }
   let res = respond(needsClarificationFirst ? { ...plan, state: 'clarify' } : plan, { seed, lang, profile, assistantName });
+  if ((parsed.flags?.groupMixed || parsed.flags?.groupFriends) && res?.questions?.[0]?.id === 'who_is_it_for') res = { ...res, say: parsed.flags.groupMixed ? 'تمام! العيلة فيها مين؟ اختار اللي ينطبق وأرشحلك لبس للكل.' : 'تمام! أنتوا شلة بنات ولا شباب ولا مخلوط؟ اختار وأرشحلك.' };
   if (sizeNote && res?.say && !needsClarificationFirst) res = { ...res, say: sizeNote + res.say };
   let altOffer = null;
   if (typeof brain === 'function' && ['none', 'no_look', 'partial', 'alternatives', 'full'].includes(plan.state) && !needsClarificationFirst) {
@@ -849,7 +879,7 @@ async function runModaCore(messages, opts = {}) {
     const b = await callBrain({ result: plan.state, requested: parsed.garments.map((x) => x.key), occasion: parsed.context || null, missing: (plan.missing || []).map((m) => m.base).filter(Boolean), availableAlternativeTypes: avail, found, stockAlternatives, relaxed: (plan.relaxed || []).map((r) => r.kind || r.base || r.key).filter(Boolean).slice(0, 4), note: NOTE });
     // رد الموديل ما يتقبلش لو بيذكر قطع مش في النتيجة (مثلاً هودي/جينز/بوتس وإحنا عارضين بنطلون وكوتشي).
     const planKeys = new Set([...avail, ...stockAlternatives.map((x) => x.type), ...(plan.missing || []).map((m) => m.base), ...parsed.garments.map((x) => x.key), ...(plan.people || []).flatMap((p) => p.picks.flatMap((x) => String(x.slotKey || '').split('|')))].filter(Boolean));
-    const stray = b?.reply ? [...strayGarments(K, b.reply, planKeys), ...(!avail.length && /(هتلاقي|هتلاقى|هتلاقو|ستجد|you'll find|you will find).{0,40}(تحت|below)/i.test(b.reply) ? ['claims_items_below'] : [])] : [];
+    const stray = b?.reply ? [...strayGarments(K, b.reply, planKeys), ...(plan.state === 'full' && avail.length && /(مش موجود|مش موجوده|مش متاح|مش متاحه|ملقتش|مفيش|مش لاقي|مش لاقيه|مش لاقية|مش عندنا|غير متاح|للأسف)/.test(b.reply) ? ['contradicts_found'] : []), ...(!avail.length && /(هتلاقي|هتلاقى|هتلاقو|ستجد|you'll find|you will find).{0,40}(تحت|below)/i.test(b.reply) ? ['claims_items_below'] : [])] : [];
     if (b?.reply && !stray.length) { res = { ...res, say: b.reply, brainReply: true }; brainUsed = true; const mentioned = stockAlternatives.find((x) => b.reply.includes(x.name) || b.reply.includes(String(K.items.get(x.type)?.ar || '\u0000').split(' ')[0])); if (mentioned) altOffer = { wanted: mentioned.wanted, type: mentioned.type }; }
     else if (b?.reply) res = { ...res, brainRejected: stray };
   }
@@ -868,6 +898,17 @@ async function runModaCore(messages, opts = {}) {
     if (wantMat.length && ['full', 'alternatives', 'partial'].includes(plan.state) && !needsClarificationFirst && !res.brainReply) {
       const picks = (plan.people || []).flatMap((pe) => pe.picks.map((x) => x.product));
       if (picks.length && !picks.some((pr) => pr.materials?.size && wantMat.some((m) => pr.materials.has(m)))) res = { ...res, say: `${res.say} الخامة مش مكتوبة عند المحل، فاتأكد منها من صفحة المنتج أو كلّم المحل.` };
+    } }
+  // تفاصيل مطلوبة مش مسجلة (كم/ذكية/مطرز…): نقولها بصراحة بدل ما نسيب العميل يفتكر إنها اتحققت
+  { const nq = norm(text);
+    if (['full', 'alternatives', 'partial'].includes(plan.state) && !needsClarificationFirst && !res.brainReply && !/(ملقتش|مش متاح بالظبط)/.test(res.say || '')) {
+      const picksD = (plan.people || []).flatMap((pe) => pe.picks.map((x) => x.product));
+      const notes = [];
+      if (/(كم (قصير|طويل|واسع|ضيق|نص|ربع)|(^| )بكم (قصير|طويل)|من غير كم|بدون كم|حمالات|قصير الكم|طويل الكم)/.test(nq)) notes.push('تفصيلة الكم');
+      for (const w of ['ذكيه', 'مطرز', 'مخرم', 'دانتيل', 'ستان', 'حرير', 'مطبوع', 'مخطط', 'كارو', 'منقوش', 'مشجر', 'لامع', 'ضد الماء']) {
+        if (nq.includes(w) && picksD.length && !picksD.some((pr) => norm(`${pr.name_ar || ''} ${pr.description_ar || ''} ${pr.cat_text || ''}`).includes(w))) notes.push(`«${w}»`);
+      }
+      if (notes.length) res = { ...res, say: `${res.say} مش متأكدة إن ${notes.join(' و')} متسجل عند المحل للقطعة دي، فتأكد منه من صورها ووصفها أو كلّم المحل.` };
     } }
   // العميل حدد لون ومفيش حاجة بيه في الترشيح: نقولها بصراحة
   { const want = [...new Set([...(parsed.colors || []), ...(parsed.garments || []).map((x) => x.color)].filter(Boolean))];
@@ -900,9 +941,13 @@ async function runModaCore(messages, opts = {}) {
     }
   }
   if (derivedBudget && plan.state === 'over_budget' && plan.total > 0) res = { ...res, say: `ده أرخص اختيار لقيته لطلبك دلوقتي: ${Number(plan.total).toLocaleString('en-US')} جنيه. لو عندك ميزانية معينة قوليلي رقمها بالظبط وأدورلك جواها.` };
-  if (parsed.followup === 'show_more' && excludeIds.length && plan.people?.length && !needsClarificationFirst) {
+  if ((parsed.followup === 'show_more' || parsed.flags?.showOther) && excludeIds.length && plan.people?.length && !needsClarificationFirst) {
     const ids = plan.people.flatMap((p) => p.picks.map((x) => x.product.id));
     if (ids.length && ids.every((id) => excludeIds.includes(id))) res = { ...res, say: 'ده اللي متاح دلوقتي لطلبك، ومفيش بدائل تانية غيره. لو عايز، غيّر اللون أو النوع أو الميزانية وأدورلك تاني.' };
+  }
+  if ((parsed.followup === 'show_more' || parsed.flags?.showOther) && ['alternatives', 'partial'].includes(plan.state) && !res.brainReply && !needsClarificationFirst && !((plan.people || []).flatMap((p) => p.picks.map((x) => x.product.id)).every((id) => excludeIds.includes(id)))) {
+    const pr = String(res.say || '').match(/(السعر|الإجمالي)[^.]*\./);
+    res = { ...res, say: `دي اختيارات تانية قريبة من اللي كنت بتدور عليه.${pr ? ' ' + pr[0] : ''}` };
   }
   const shown = !needsClarificationFirst && plan.people ? plan.people.flatMap((p) => p.picks.map((x) => x.product.id)) : [];
   const activeLook = !needsClarificationFirst && plan.people?.length ? {

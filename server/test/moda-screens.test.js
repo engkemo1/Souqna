@@ -91,3 +91,72 @@ test('مصطلحات الموضة', async () => {
   assert.match((await chat(['يعني ايه سموكن'])).say, /رسمية/);
   assert.match((await chat(['ايه الفرق بين سواريه وسهره'])).say, /السواريه/);
 });
+test('«شكل تاني» مبيكررش نفس القطعة', async () => {
+  const two = [P('هودي رمادي', 'هوديز', 500, { color: 'رمادي' }), P('هودي بيج', 'هوديز', 450, { color: 'بيج' })];
+  let session = null; const msgs = []; const seen = [];
+  for (const t of ['عايز هودي', 'وريني هودي شكل تاني']) { msgs.push({ role: 'user', content: t }); const r = await runModa(msgs, { products: two, K, session }); session = r.session; msgs.push({ role: 'assistant', content: r.say || '' }); seen.push((r.blocks?.tabs || []).flatMap((x) => x.items.map((i) => i.id)).join(',')); }
+  assert.notEqual(seen[0], seen[1]);
+});
+test('منتج باسم/لون العميل بيظهر حتى لو مش في قاموس القطع (سوت بناتي)', async () => {
+  const kids = [P('سوت بناتي', 'أطفال', 400, { color: 'وردي' })];
+  const r = await runModa([{ role: 'user', content: 'عايزه سوت بناتي اطفال' }], { products: kids, K });
+  assert.equal(r.state, 'full'); assert.equal((r.blocks?.tabs || []).flatMap((x) => x.items).length, 1);
+});
+test('طلب لوكيشن محل من غير اسم بيسأل أي محل مش بيدوّر باسم «ابعتلي»', async () => {
+  const r = await runModa([{ role: 'user', content: 'ابعتلي لوكيشن محل في بنها' }], { products, K, stores: () => stores });
+  assert.match(r.say, /أي محل/);
+});
+test('اسم منتج («سوت بناتي») مبيفتحش كارت محل، والمحل بيظهر بس لو اتكتب اسمه', async () => {
+  const kids = [P('سوت بناتي', 'أطفال', 400, { color: 'وردي' })];
+  const st = [{ slug: 'a', name_ar: 'سوت كيدز', name_en: 'Suit Kids' }, { slug: 'c', name_ar: 'ميرا' }];
+  const r1 = await runModa([{ role: 'user', content: 'سوت بناتي' }], { products: kids, K, stores: () => st });
+  assert.ok(!r1.storeCard); assert.equal(r1.state, 'full');
+  const r2 = await runModa([{ role: 'user', content: 'رقم سوت كيدز' }], { products: kids, K, stores: () => st });
+  assert.ok(r2.storeCard);
+});
+test('«بنات» بعدها سن بيكمل مش «مفهمتش»', async () => {
+  const r = await chat(['بنات', 'عندها 6 سنين']); assert.match(r.say, /لبنت 6/);
+});
+test('«لا مش رياضي» بتشيل المناسبة وتكمل', async () => {
+  const r = await chat(['عايز قميص ابيض', 'رياضي', 'لا مش رياضي']); assert.equal(r.state, 'full');
+});
+test('تفصيلة مش مسجلة (كم/ذكية) بتتقال بصراحة', async () => {
+  const r = await chat(['عايزه فستان بكم طويل']); assert.match(r.say, /مش متأكدة/);
+});
+test('«ايه المتاح عندكم»', async () => {
+  assert.match((await chat(['ايه المتاح عندكم'])).say, /عندنا/);
+});
+test('رفقة: انا واختي / واخويا / وصحبتي / وصحبي', () => {
+  const p = (t) => parseMessage(t).persons;
+  assert.deepEqual(p('انا واختي عايزين فستان'), ['women']);
+  assert.deepEqual(p('انا واخويا عايزين بدله'), ['men']);
+  assert.deepEqual(p('انا وصحبتي رايحين فرح'), ['women']);
+  assert.deepEqual(p('انا وصحبي رايحين فرح'), ['men']);
+  assert.deepEqual(p('انا وبنت عمي رايحين فرح'), ['women']);
+  assert.deepEqual([...p('عايز بدله انا واختي')].sort(), ['men', 'women']);
+  assert.deepEqual(p('عايز هدية لاختي'), ['women']);
+});
+test('انا وعيلتي / وصحابي: بيسأل مين فيهم بدل ما يخمن', async () => {
+  const r = await chat(['انا وعيلتي رايحين فرح']); assert.equal(r.state, 'clarify'); assert.match(r.say, /العيلة/);
+  const r2 = await chat(['انا واصحابي رايحين رحله']); assert.match(r2.say, /شلة/);
+});
+test('ابني/بنتي/اخويا الصغير/عيالي/مراتي', async () => {
+  const p = (t) => parseMessage(t).persons;
+  assert.deepEqual(p('عايز بدله ابني'), ['boys']);
+  assert.deepEqual(p('عايزه فستان بنتي'), ['girls']);
+  assert.deepEqual(p('عايز تيشيرت اخويا الصغير'), ['boys']);
+  assert.deepEqual(p('عايزه فستان اختي الصغيره'), ['girls']);
+  assert.deepEqual(p('هدية لمراتي'), ['women']);
+  assert.deepEqual(p('هدية لجوزي'), ['men']);
+  assert.deepEqual([...p('عايز لبس لابني او بنتي')].sort(), ['boys', 'girls']);
+});
+test('لعيالي / رضيع بيسأل ولد ولا بنت بدل ما يخمن', async () => {
+  for (const t of ['عايز لبس لعيالي', 'عايزه لبس لرضيع', 'لبس مواليد']) { const r = await chat([t]); assert.equal(r.state, 'clarify', t); assert.match(r.say, /ولد ولا بنت/); }
+});
+test('حبيبتي/الاكس/البت بتاعتي + سكسي/جامده', async () => {
+  const p = (t) => parseMessage(t).persons;
+  assert.deepEqual(p('عايز لبس لحبيبتي'), ['women']);
+  assert.deepEqual(p('عايز لبس للبت بتاعتي'), ['women']);
+  for (const t of ['عايز هدية للاكس بتاعي', 'عايز هدية للبت بتاعتي', 'الاكس از البت عايز اجيبلها هدية']) { const r = await chat([t]); assert.doesNotMatch(r.say, /الهدية لمين/, t); }
+  for (const t of ['عايزه حاجه سكسي', 'وعاوزه حاجه جامده']) { const r = await chat([t]); assert.notEqual(r.intent, 'unknown', t); }
+});

@@ -45,7 +45,11 @@ export default function SectionTreePicker({ items = [], value = '', onPick, erro
     return () => clearTimeout(id);
   }, [suggestions, value, customName, productName]); // eslint-disable-line react-hooks/exhaustive-deps
   const trail = node ? trailOf(node) : [];
-  const submitAdd = async () => { setBusy(true); const ok = await onAddSection?.(adding); setBusy(false); if (ok) { setAdding(null); setQ(''); } };
+  const skelAll = (s) => { const n = nz(s).replace(/(^| )ال/g, '$1').replace(/\s+/g, ''); return (n[0] || '') + n.slice(1).replace(/[اويىه]/g, ''); };
+  const dupOf = (name) => { const k = skelAll(name); return k.length >= 2 ? items.find((d) => skelAll(d.name?.ar) === k || (d.name?.en && skelAll(d.name.en) === k)) : null; };
+  const useExisting = (d) => { setAdding(null); setQ(''); if (d.leaf) pick(d); else setNode(d.slug); };
+  const dup = adding ? dupOf(adding.name) : null;
+  const submitAdd = async () => { if (dup) { useExisting(dup); return; } setBusy(true); const ok = await onAddSection?.(adding); setBusy(false); if (ok) { setAdding(null); setQ(''); } };
   const btn = 'flex min-h-[3rem] items-center justify-between gap-2 rounded-xl border border-line-strong px-3.5 py-2 text-start text-sm font-medium transition hover:border-fg active:scale-[0.98]';
 
   if ((picked || customName) && !open) {
@@ -99,7 +103,13 @@ export default function SectionTreePicker({ items = [], value = '', onPick, erro
         <div className="space-y-2.5 rounded-xl border border-dashed border-line-strong p-3">
           <p className="text-[13px] text-muted">{L('اكتب اسم القسم وهنضيفه في متجرك ونختاره للمنتج ده.', 'Name the section — we add it to your store and pick it for this product.')}</p>
           <Input value={adding.name} autoFocus onChange={(e) => setAdding({ name: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } }} />
-          <div className="flex gap-2"><button type="button" disabled={busy} onClick={submitAdd} className="h-10 flex-1 rounded-xl bg-fg text-sm font-semibold text-canvas disabled:opacity-60">{busy ? '…' : L('إضافة', 'Add')}</button><button type="button" onClick={() => setAdding(null)} className="h-10 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-fg/5">{L('إلغاء', 'Cancel')}</button></div>
+          {dup && (
+            <div role="status" className="rounded-xl bg-brand/10 px-3 py-2.5 text-[13px]">
+              <p className="font-semibold">{L(`القسم ده موجود: «${nm(dup)}»`, `This section already exists: “${nm(dup)}”`)}{trailOf(dup.slug).length > 1 && <span className="font-normal text-muted"> ({trailOf(dup.slug).slice(0, -1).map(nm).join(' › ')})</span>}</p>
+              <button type="button" onClick={() => useExisting(dup)} className="mt-1.5 inline-flex h-9 items-center rounded-full bg-brand px-4 text-sm font-semibold text-white">{dup.leaf ? L('اختاره', 'Use it') : L('افتحه واختار اللي تحته', 'Open it and pick inside')}</button>
+            </div>
+          )}
+          <div className="flex gap-2"><button type="button" disabled={busy || !!dup} onClick={submitAdd} className="h-10 flex-1 rounded-xl bg-fg text-sm font-semibold text-canvas disabled:opacity-40">{busy ? '…' : L('إضافة', 'Add')}</button><button type="button" onClick={() => setAdding(null)} className="h-10 rounded-xl px-4 text-sm font-semibold text-muted hover:bg-fg/5">{L('إلغاء', 'Cancel')}</button></div>
         </div>
       ) : <button type="button" onClick={() => setAdding({ name: q.trim() })} className="inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-brand hover:bg-brand/10"><Plus className="h-4 w-4" />{L('مش لاقي القسم؟ اطلب إضافته', 'Can’t find it? Request a section')}</button>)}
       {error && <p role="alert" className="text-[13px] font-medium text-sale">{error}</p>}

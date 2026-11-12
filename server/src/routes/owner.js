@@ -1401,6 +1401,13 @@ r.post('/categories', h((req, res) => {
   const mine = q.all('SELECT name_ar, name_en, system FROM categories WHERE store_id=?', [req.store.id]);
   if (!req.adminStore && mine.filter((c) => !c.system).length >= 12) throw badRequest('too_many_sections', 'You reached the maximum number of sections.');
   if (mine.some((c) => norm(c.name_ar) === norm(d.name_ar) || norm(c.name_en) === norm(d.name_en))) throw badRequest('section_exists', 'A section with this name already exists.');
+  // Same name (or plural/singular of it: فستان ~ فساتين) as an official section ANYWHERE in the tree = use that one, do not create a duplicate.
+  const skelN = (x) => { const n = norm(x).replace(/(^| )ال/g, '$1').replace(/\s+/g, ''); return (n[0] || '') + n.slice(1).replace(/[اويىه]/g, ''); };
+  const mineKey = [skelN(d.name_ar), skelN(d.name_en)].filter((k) => k.length >= 2);
+  if (mineKey.length) {
+    const hit = q.all('SELECT slug, name_ar, name_en, parent_slug FROM departments WHERE active=1').find((x) => mineKey.includes(skelN(x.name_ar)) || mineKey.includes(skelN(x.name_en)));
+    if (hit && !req.adminStore) throw new AppError(409, 'section_exists', 'This section already exists.', { existing: hit.slug, existing_name: hit.name_ar });
+  }
   const parentId = checkCatParent(req.store.id, d.parent_id, null);
   // The section shows in this store right away. It is also filed as a REQUEST for a platform department: it only reaches the marketplace
   // (strip, search filters, store listing) once the platform admin accepts it. Same name under the same parent = one shared request/department.

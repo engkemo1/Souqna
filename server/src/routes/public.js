@@ -657,7 +657,7 @@ r.get('/marketplace', h((req, res) => {
   // A few trending products across stores for the marketplace home
   const trendingRows = q.all(
     `SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id
-     WHERE p.status='active' AND s.status='active' AND (p.track_stock=0 OR p.stock>0) ORDER BY p.sold_count DESC LIMIT 18`,
+     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.sold_count > 0 AND (p.track_stock=0 OR p.stock>0) ORDER BY p.sold_count DESC LIMIT 18`,
   );
   // home rails: skip sold-out items and exact repeats (same store + same name + same price), then cap the list
   const dedupe = (rows, cap) => { const seen = new Set(); const out = []; for (const r0 of rows) { const k = `${r0.store_slug}|${r0.name_ar}|${r0.price}`; if (seen.has(k)) continue; seen.add(k); out.push(r0); if (out.length >= cap) break; } return out; };
@@ -675,8 +675,29 @@ r.get('/marketplace', h((req, res) => {
   const countBy = new Map();
   for (const d of deptCounts) for (const sl of [d.slug, ...deptAncestors(d.slug)]) countBy.set(sl, (countBy.get(sl) || 0) + d.n);
   const departments = listDepartments().map((d) => ({ slug: d.slug, name: d.name, image: d.image, parent: d.parent, products: countBy.get(d.slug) || 0 }));
-  const deptRails = departments.filter((d) => !d.parent && d.products >= 3).sort((a, b) => b.products - a.products).slice(0, 4)
-    .map((d) => { const sub = deptSubtree(d.slug); return { slug: d.slug, name: d.name, items: railRows(`AND p.department IN (${sub.map(() => '?').join(',')}) ORDER BY p.sold_count DESC, p.id DESC LIMIT 24`, sub, 10) }; });
+  // Home order: men → women → kids → cosmetics (fixed, not by product count). A section with no products simply renders nothing.
+  // Home order: men → women → kids → cosmetics (fixed, not by product count). A section with no products simply renders nothing.
+  // "Cosmetics" is one shelf that gathers every beauty section (makeup, skincare, perfumes…) even if they are separate top-level departments.
+  const DEPT_GROUPS = [
+    { re: /^men(_|$)|رجالي/i, name: null },
+    { re: /^women(_|$)|حريمي/i, name: null },
+    { re: /^kids(_|$)|أطفال|اطفال/i, name: null },
+    { re: /cosmetic|beauty|make-?up|skin|perfume|fragrance|تجميل|مكياج|ماك ?اب|ميك ?اب|عطور|عطر|برفان|بيرفيوم|عناية|بشرة/i, name: { ar: 'مستحضرات تجميل', en: 'Cosmetics' } },
+  ];
+  const deptKey = (d) => `${d.slug || ''} ${d.name?.ar || ''} ${d.name?.en || ''}`;
+  const tops = departments.filter((d) => !d.parent && d.products >= 1);
+  const BEST_MIN = 10;
+  // Per shelf: until it has 10 products that actually sold, show its regular products (newest first);
+  // once it has 10 sellers, it turns into "الأكثر طلباً في <القسم>" (best sellers of that shelf only).
+  const deptRails = DEPT_GROUPS.map((g) => {
+    const hits = tops.filter((x) => g.re.test(deptKey(x))).sort((a, b) => b.products - a.products);
+    if (!hits.length) return null;
+    const sub = [...new Set(hits.flatMap((d) => deptSubtree(d.slug)))]; const ph = sub.map(() => '?').join(',');
+    const name = g.name || hits[0].name; // shelf title (cosmetics is always «مستحضرات تجميل»)
+    const sold = railRows(`AND p.sold_count > 0 AND p.department IN (${ph}) ORDER BY p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
+    if (sold.length >= BEST_MIN) return { slug: hits[0].slug, name, bestSellers: true, items: sold };
+    return { slug: hits[0].slug, name, bestSellers: false, items: railRows(`AND p.department IN (${ph}) ORDER BY p.is_new DESC, p.created_at DESC LIMIT 40`, sub, BEST_MIN) };
+  }).filter(Boolean);
   cache(res, 60);
   res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });
 }));

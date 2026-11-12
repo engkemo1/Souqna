@@ -20,7 +20,6 @@ import LookOfDay from '../../components/market/LookOfDay.jsx';
 const StreetScene = lazy(() => import('../../components/market/StreetScene.jsx'));
 const streetFallback = <div aria-hidden="true" className="h-[360px] w-full sm:h-[440px] lg:h-[540px]" style={{ background: 'linear-gradient(180deg,#F6F9FD 0%,#EEF3FA 50%,#F4F7FB 100%)' }} />;
 import { useDepartments } from '../../lib/departments.js';
-import DeptStrip from '../../components/market/DeptStrip.jsx';
 import ProductRail from '../../components/market/ProductRail.jsx';
 import RecentlyViewed from '../../components/market/RecentlyViewed.jsx';
 import BuyAgain from '../../components/market/BuyAgain.jsx';
@@ -207,28 +206,26 @@ export default function MarketHome() {
       {/* Why Strip */}
       <div className="container mt-6 sm:mt-8"><Why /></div>
 
-      {/* shop by department: right under the trust strip (secure payment · easy exchange · local products) */}
-      <div className="mt-8 sm:mt-10"><DeptStrip /></div>
       <StoreStrip stores={base?.stores || []} />
       </div>
       <LookOfDay />
 
-      {/* product shelves */}
-      <div id="products" className="mt-8 scroll-mt-32 border-y border-line bg-secondary/50">
-        <ProductRail title={t('market.trending')} items={base?.trending} loading={!base} to="/search?sort=best" />
-      </div>
+      {/* product shelves — order: men → women → kids → cosmetics (each turns into its own best-sellers shelf once it has 10 sold products) → offers → best sellers (only if any sold) → new arrivals */}
+      <div id="products" className="scroll-mt-32" />
+      {(base?.deptRails || []).map((r, i) => (
+        <div key={r.slug} className={i % 2 === 0 ? '' : 'border-y border-line bg-secondary/50'}>
+          <ProductRail title={r.bestSellers ? (lang === 'ar' ? `الأكثر طلباً في ${r.name?.ar}` : `Best sellers in ${r.name?.en || r.name?.ar}`) : (r.name?.[lang] || r.name?.ar)} items={r.items} to={r.href} />
+        </div>
+      ))}
       <ProductRail title={t('market.deals')} items={base?.deals} to="/search?sale=1" />
-      <div className="border-y border-line bg-secondary/50">
-        <ProductRail title={t('market.newArrivals')} items={base?.newest} to="/search?sort=newest" />
-      </div>
+      {/* best sellers: hidden entirely until products have actually sold (ProductRail renders nothing when empty) */}
+      {base?.trending?.length > 0 && <div className="border-y border-line bg-secondary/50">
+        <ProductRail title={t('market.trending')} items={base.trending} to="/search?sort=best" />
+      </div>}
+      <ProductRail title={t('market.newArrivals')} items={base?.newest} to="/search?sort=newest" />
       <BuyAgain />
       <RecentlyViewed />
       <SimilarViewed />
-      {(base?.deptRails || []).map((r, i) => (
-        <div key={r.slug} className={i % 2 === 0 ? '' : 'border-y border-line bg-secondary/50'}>
-          <ProductRail title={t('market.topIn', { d: r.name?.[lang] || r.name?.ar })} items={r.items} to={`/search?department=${r.slug}`} />
-        </div>
-      ))}
 
       {/* A small shop preview leads to a dedicated, searchable store directory. */}
       <FeaturedSlot placement="market_strip" />

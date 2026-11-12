@@ -200,6 +200,77 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   }
   if (personSet.size === 0 && speaker && !result.kidsUnspecified) personSet.add(speaker === 'female' ? 'women' : 'men');
   // محجبة
+  /* ---------- رفقة: «انا واختي / انا وصحبي / انا وعيلتي / لاخويا» ---------- */
+  {
+    const COMP = {
+      f: 'اختي|اخواتي|خواتي|اختى|صحبتي|صاحبتي|صحباتي|صاحباتي|زميلتي|زميلاتي|جارتي|بنت عمي|بنت عمتي|بنت خالي|بنت خالتي|بنات عمي|بنات عمتي|بنات خالي|بنات خالتي|بنات اخويا|بنت اخويا|بنت اختي|عمتي|خالتي|امي|ماما|والدتي|ام|جدتي|حماتي|مامتي|صحبه|sister|sisters|my sister|girlfriends|my friend girl',
+      m: 'اخويا|اخوي|اخواي|اخوتي|اخويه|صحبي|صاحبي|زميلي|جاري|ابن عمي|ابن عمتي|ابن خالي|ابن خالتي|ولاد عمي|اولاد عمي|ولاد خالي|اولاد خالي|ابويا|بابا|والدي|ابوي|جدي|عمي|خالي|حمايا|ابن اخويا|ابن اختي|brother|brothers|my brother',
+      mixed: 'عيلتي|عايلتي|عائلتي|اهلي|اسرتي|العيله كلها|العايله كلها|اهل بيتي|family|my family',
+      grp: 'اصحابي|صحابي|زمايلي|اصدقائي|زملائي|شلتي|الشله|صحوبي|friends|my friends|colleagues',
+    };
+    const REL = new Set(['اختي', 'اخواتي', 'خواتي', 'اختى', 'عمتي', 'خالتي', 'امي', 'ماما', 'والدتي', 'ام', 'جدتي', 'حماتي', 'مامتي', 'اخويا', 'اخوي', 'اخواي', 'اخوتي', 'اخويه', 'ابويا', 'بابا', 'والدي', 'ابوي', 'جدي', 'عمي', 'خالي', 'حمايا', 'ابن عمي', 'ابن عمتي', 'ابن خالي', 'ابن خالتي', 'بنت عمي', 'بنت عمتي', 'بنت خالي', 'بنت خالتي', 'بنات عمي', 'بنات عمتي', 'بنات خالي', 'بنات خالتي', 'ولاد عمي', 'اولاد عمي', 'ولاد خالي', 'اولاد خالي', 'بنت اخويا', 'بنت اختي', 'بنات اخويا', 'ابن اخويا', 'ابن اختي', 'sister', 'sisters', 'my sister', 'brother', 'brothers', 'my brother']);
+    const PARENT = new Set(['امي', 'ماما', 'والدتي', 'ام', 'مامتي', 'ابويا', 'بابا', 'والدي', 'ابوي', 'جدتي', 'جدي', 'حماتي', 'حمايا', 'عمتي', 'خالتي', 'عمي', 'خالي']);
+    const found = []; let withMe = false;
+    const nn = ` ${n} `;
+    for (const [kind, alts] of Object.entries(COMP)) {
+      const re = new RegExp(`(?:^| )(و|مع |ل|لل)?(${alts})(?= |$)`, 'g'); let m;
+      while ((m = re.exec(nn))) { const pre = m[1] || ''; const w = m[2]; const before = nn.slice(0, m.index + 1).trim().split(' ').slice(-1)[0] || '';
+        const together = pre === 'و' || pre === 'مع ' || /^(انا|احنا|ana|me)$/.test(before) || /(^| )(انا|احنا) $/.test(nn.slice(0, m.index + 1));
+        const forThem = pre === 'ل' || pre === 'لل';
+        if ((together && (pre === 'و' || pre === 'مع ' || before === 'مع')) || forThem) found.push({ kind, w, forThem, together: !forThem });
+      }
+    }
+    if (found.length) {
+      const sp = genderMatches.includes('female') ? 'female' : genderMatches.includes('male') ? 'male' : null;
+      const add = (g) => { if (g === 'f') personSet.add('women'); else if (g === 'm') personSet.add('men'); };
+      let ambiguous = false;
+      if (found.every((f) => f.forThem && f.kind !== 'mixed' && f.kind !== 'grp')) personSet.clear();
+      for (const f of found) {
+        if (f.kind === 'mixed') { ambiguous = true; result.flags.groupMixed = true; continue; }
+        if (f.kind === 'grp') { if (sp) { add(sp === 'female' ? 'f' : 'm'); } else ambiguous = true; result.flags.groupFriends = true; continue; }
+        add(f.kind);
+        if (f.together) {
+          if (sp) add(sp === 'female' ? 'f' : 'm');
+          else if (PARENT.has(f.w)) ambiguous = true; // أم/أب/عم/خال: مش عارفين المتكلم → نسأل
+          else add(f.kind); // رفقة من نفس الجنس غالبًا: «انا واختي» = ستات، «انا واخويا» = رجالة
+        }
+      }
+      if (ambiguous && !found.some((f) => f.kind === 'f' || f.kind === 'm') ) { /* نسيب persons فاضية فنسأل «لمين؟» */ }
+      if (ambiguous && found.some((f) => PARENT.has(f.w) && !sp)) { personSet.clear(); }
+      result.flags.companions = found.map((f) => f.w).slice(0, 6);
+    }
+  }
+  /* ---------- لحد تاني بس (من غير «انا»): لمراتي = ستات بس، لجوزي = رجالة بس، لاخويا الصغير/اختي الصغيرة = طفل ---------- */
+  {
+    const nn2 = ` ${n} `;
+    const me = /(^| )(انا|احنا)( |$)/.test(nn2) || /(^| )و?(لانا|ليا|لنفسي)( |$)/.test(nn2);
+    if (!me && /(^| )ل(مراتي|زوجتي|خطيبتي|عروستي|حبيبتي|صاحبتي)( |$)/.test(nn2)) { personSet.clear(); personSet.add('women'); }
+    if (!me && /(^| )ل(جوزي|زوجي|خطيبي|حبيبي|صاحبي)( |$)/.test(nn2)) { personSet.clear(); personSet.add('men'); }
+    const smallB = /(^| )(ل)?(اخويا|اخوي|ابن اخويا|ابن اختي|ابن عمي|ابن خالي|حفيدي)( ال)?(صغير|اصغر|صغنن|الصغير|الاصغر|صغيرتي)( |$)/.test(nn2) || /(^| )(ل)?(حفيدي|اخويا صغير)( |$)/.test(nn2);
+    const smallG = /(^| )(ل)?(اختي|بنت اخويا|بنت اختي|بنت عمي|بنت خالي|حفيدتي)( ال)?(صغيره|صغيرة|اصغر|صغنن|الصغيره|الاصغر)( |$)/.test(nn2) || /(^| )(ل)?(حفيدتي)( |$)/.test(nn2);
+    if (smallB) { personSet.delete('men'); personSet.add('boys'); }
+    if (smallG) { personSet.delete('women'); personSet.add('girls'); }
+    if (/(^| )(لولادي|لاولادي|لعيالي|لاطفالي|لعيلي|لولادى)( |$)/.test(nn2)) { personSet.delete('boys'); personSet.delete('men'); result.kidsUnspecified = true; }
+    if (/(^| )(ل|ل ال)?(عيالي|اولادي|ولادي|اطفالي|عيلي|ولادى|عيال|اطفالى)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls') && !/(^| )(ترنج|لبس|فستان|بدله|طقم|تيشيرت|هودي|جاكيت|بنطلون|جزمه|كوتشي) ولادي( |$)/.test(nn2)) { result.kidsUnspecified = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
+    if (/(^| )(ل)?(رضيع|رضع|بيبي|بيبيه|مواليد|مولود|مولوده|حديث الولاده|طفلي|طفلتي|طفلى|baby|newborn|infant|toddler)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls')) { result.kidsUnspecified = true; result.flags.baby = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
+  }
+  /* ---------- حبيبتي / البت بتاعتي / الاكس بتاعي ---------- */
+  {
+    const nn3 = ` ${n} `;
+    const sp3 = genderMatches.includes('female') ? 'female' : genderMatches.includes('male') ? 'male' : null;
+    const gf = /(^| )(ل|لل)?(البت|البنت) (بتاعتي|بتاعتى|دي|اللي معايا|حقتي)( |$)/.test(nn3) || /(^| )(للبت|لبت|البت)( |$)/.test(nn3) || /(^| )(جيرل فريند|girlfriend|gf)( |$)/.test(nn3);
+    const bf = /(^| )(ل|لل)?(الواد|الراجل|الشاب) (بتاعي|بتاعى|حقي)( |$)/.test(nn3) || /(^| )(بوي فريند|boyfriend|bf)( |$)/.test(nn3);
+    const ex = /(^| )(ل|لل)?(الاكس|اكسي|اكسى|الايكس|اكس|ex)( بتاعي| بتاعتي| بتاعى| بتاعتى)?( |$)/.test(nn3);
+    const forThemOnly = !/(^| )(انا|احنا)( |$)/.test(nn3.replace(/^ *(?:انا )?(?:عايز|عايزه|عاوز|عاوزه)/, ''));
+    if (gf && !personSet.has('girls')) { if (forThemOnly) personSet.clear(); personSet.add('women'); }
+    else if (bf) { if (forThemOnly) personSet.clear(); personSet.add('men'); }
+    else if (ex) {
+      if (/(^| )(الاكس|اكسي|اكسى) (از|هي|هو) (البت|البنت)( |$)/.test(nn3)) { personSet.clear(); personSet.add('women'); }
+      else if (sp3) { personSet.clear(); personSet.add(sp3 === 'male' ? 'women' : 'men'); }
+      else personSet.clear(); // مش عارفين نوع الاكس → نسأل
+      result.flags.ex = true;
+    }
+  }
   const personList = ['men', 'women', 'boys', 'girls'].filter((p) => personSet.has(p));
   result.persons = personList.map((p) => (p === 'women' && (hijab || result.flags.hijabFromGarment) ? 'women_hijab' : p));
   if (personSet.has('women') && !personSet.has('men')) for (const g of result.garments) if (g.key === 'suit') g.key = 'womens_suit';
@@ -268,9 +339,10 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   const hasExplicitShopping = /(^| )(لبس|هدوم|ملابس|طقم|بدله|فستان|شوز|كوتشي|اشتري|اتسوق|شراء|تسوق|موديلات|ازياء|فاشون|كولكشن|حاجه|حاجة|قطعه|قطعة|لوك|ستايل|استايل|اتشيك|انقي|اجيب|شياكه|شياكة|سمبل|روشه|روشة)( |$)/.test(n);
   const hasEgyptianShopping = hasShopping && (hasExplicitShopping || result.taste.length > 0 || /(على قد|علي قد|حنين|لقطة|لقطه|في المعقول|سمبل|روق عليا|نقيلي|شوفيلي|ظبطني|اتشيك)/.test(n));
   const hasGarmentsOrOccasion = result.garments.length > 0 || Boolean(result.context) || Boolean(result.budget) || result.fullLook;
-  const hasContent = hasGarmentsOrOccasion || explicitAudience || (hasExplicitShopping && (hasShopping || result.persons.length > 0)) || hasEgyptianShopping || (result.colors.length > 0 && result.tokens.length <= 4 && (!hasQuestion || tokens.length <= 2 || /^(?:لبس|ملابس|هدوم|حاجه) /.test(n)) && !/[?؟]/.test(String(raw)));
+  const hasContent = hasGarmentsOrOccasion || explicitAudience || (hasExplicitShopping && (hasShopping || result.persons.length > 0)) || hasEgyptianShopping || (result.avoidContexts || []).length > 0 || (result.colors.length > 0 && result.tokens.length <= 4 && (!hasQuestion || tokens.length <= 2 || /^(?:لبس|ملابس|هدوم|حاجه) /.test(n)) && !/[?؟]/.test(String(raw)));
   if (has('reset')) result.followup = 'reset';
   else if (has('show_more') && !result.garments.length) result.followup = 'show_more';
+  if (has('show_more') && result.garments.length && !result.followup) result.flags.showOther = true;
   else if (has('cheaper') && !result.garments.length && !result.context) result.followup = 'cheaper'; // "أقل سعر تيشيرت" is a product request, not "cheaper than before"
   else if (!hasContent && has('yes') && tokens.length <= 3) result.followup = 'yes';
   else if (!hasContent && has('no') && tokens.length <= 3) result.followup = 'no';

@@ -31,21 +31,43 @@ const DeptPicker = ({ value, onChange, depts }) => {
   const tops = act.filter((d) => !d.parent);
   const t = nzAr(term);
   const Box = ({ on }) => <span className={cx('grid h-[18px] w-[18px] shrink-0 place-items-center rounded-md border transition', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-canvas')}>{on && <Check className="h-3 w-3" strokeWidth={3} />}</span>;
-  const Row = ({ d, depth = 0, sub }) => {
+  const Row = ({ d, sub, count = 0, strong = false }) => {
     const on = value.includes(d.slug);
     return (
-      <button type="button" aria-pressed={on} onClick={() => toggle(d.slug)} style={{ paddingInlineStart: 8 + depth * 18 }}
-        className={cx('flex min-h-[2.5rem] w-full items-center gap-2.5 rounded-lg pe-2 text-start text-sm transition hover:bg-fg/[0.05]', on && 'bg-fg/[0.06] font-semibold')}>
+      <button type="button" aria-pressed={on} onClick={() => toggle(d.slug)}
+        className={cx('flex min-h-[2.5rem] min-w-0 flex-1 items-center gap-2.5 rounded-lg px-2 text-start text-sm transition hover:bg-fg/[0.05]', on && 'bg-fg/[0.06] font-semibold', strong && !on && 'font-semibold')}>
         <Box on={on} /><span className="min-w-0 flex-1 truncate">{d.name_ar}{sub && <span className="ms-2 text-xs font-normal text-muted">{sub}</span>}</span>
+        {count > 0 && <span className="shrink-0 text-[11px] font-normal text-muted">{count} قسم</span>}
       </button>
     );
   };
-  const Nested = ({ d, depth }) => <>{kids(d.slug).map((k) => <div key={k.slug}><Row d={k} depth={depth} /><Nested d={k} depth={depth + 1} /></div>)}</>;
+  // One section row. A section with sub-sections gets its own chevron (collapsed unless something inside is picked) and a guide line for its children.
+  const Node = ({ d }) => {
+    const ks = kids(d.slug); const inside = subtree(d.slug).filter((x) => x !== d.slug && value.includes(x)).length;
+    const isO = open[d.slug] ?? inside > 0;
+    return (
+      <div>
+        <div className="flex items-center gap-0.5">
+          <Row d={d} strong={ks.length > 0} count={ks.length} />
+          {ks.length > 0 && (
+            <button type="button" aria-expanded={isO} aria-label={`${isO ? 'إخفاء' : 'عرض'} أقسام ${d.name_ar}`} onClick={() => setOpen({ ...open, [d.slug]: !isO })} className="relative grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted hover:bg-fg/[0.05]">
+              <ChevronDown className={cx('h-4 w-4 transition-transform', isO && 'rotate-180')} />
+              {inside > 0 && <span className="absolute -top-0.5 -end-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-fg px-1 text-[10px] font-bold text-canvas">{inside}</span>}
+            </button>
+          )}
+        </div>
+        {isO && ks.length > 0 && <div className="ms-[1.15rem] space-y-0.5 border-s-2 border-line ps-1.5">{ks.map((k) => <Node key={k.slug} d={k} />)}</div>}
+      </div>
+    );
+  };
   const known = new Set(act.map((d) => d.slug));
   const orphans = value.filter((v) => !known.has(v));
   const addDept = async () => {
     const name = nf.name.trim();
     if (name.length < 2) { toast({ tone: 'error', title: 'اكتب اسم القسم' }); return; }
+    const sk = (x) => { const n = nzAr(x).replace(/(^| )ال/g, '$1').replace(/\s+/g, ''); return (n[0] || '') + n.slice(1).replace(/[اويىه]/g, ''); };
+    const same = act.find((d) => sk(d.name_ar) === sk(name));
+    if (same) { onChange([...new Set([...value, same.slug])]); setAdding(false); setTerm(''); toast({ title: `«${same.name_ar}» موجود أصلًا واتختار` }); return; }
     setBusy(true);
     try {
       const slug = `custom_${Date.now().toString(36)}`;
@@ -72,7 +94,7 @@ const DeptPicker = ({ value, onChange, depts }) => {
       )}
       {t ? (
         <div className="rounded-xl border border-line p-1.5">
-          {hits.length === 0 ? <p className="py-6 text-center text-sm text-muted">مفيش قسم بالاسم ده.</p> : hits.map((d) => <Row key={d.slug} d={d} sub={d.parent ? depts.label(d.parent) : null} />)}
+          {hits.length === 0 ? <p className="py-6 text-center text-sm text-muted">مفيش قسم بالاسم ده.</p> : hits.map((d) => <div key={d.slug} className="flex"><Row d={d} sub={d.parent ? depts.label(d.parent) : null} /></div>)}
         </div>
       ) : (
         <div className="space-y-2">
@@ -86,14 +108,14 @@ const DeptPicker = ({ value, onChange, depts }) => {
                   <button type="button" onClick={() => setOpen({ ...open, [top.slug]: !isOpen })} aria-expanded={isOpen} className="flex min-h-[3rem] flex-1 items-center gap-2 px-3 text-start">
                     <ChevronDown className={cx('h-4 w-4 shrink-0 text-muted transition-transform', !isOpen && 'rtl:rotate-90 -rotate-90')} />
                     <span className="flex-1 text-[15px] font-bold">{top.name_ar}</span>
-                    {hasKids && <span className="text-xs text-muted">{all.length - 1} قسم</span>}
+                    {hasKids && <span className="text-xs text-muted">{kids(top.slug).length} قسم</span>}
                     {picked > 0 && <span className="grid h-5 min-w-5 place-items-center rounded-full bg-fg px-1.5 text-[11px] font-bold text-canvas">{picked}</span>}
                   </button>
-                  <button type="button" aria-pressed={topOn} onClick={() => toggle(top.slug)} className={cx('h-8 shrink-0 rounded-full border px-3 text-xs font-semibold transition', topOn ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{topOn ? 'كل الأقسام ✓' : 'كل الأقسام'}</button>
+                  <button type="button" aria-pressed={topOn} onClick={() => toggle(top.slug)} className={cx('h-8 shrink-0 rounded-full border px-3 text-xs font-semibold transition', topOn ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{topOn ? 'كل القسم ✓' : 'كل القسم'}</button>
                 </div>
                 {isOpen && hasKids && (
-                  <div className="grid gap-x-2 gap-y-0.5 border-t border-line bg-secondary/20 p-2 sm:grid-cols-2">
-                    {kids(top.slug).map((k) => <div key={k.slug}><Row d={k} /><Nested d={k} depth={1} /></div>)}
+                  <div className="space-y-0.5 border-t border-line bg-secondary/20 p-2">
+                    {kids(top.slug).map((k) => <Node key={k.slug} d={k} />)}
                   </div>
                 )}
               </div>

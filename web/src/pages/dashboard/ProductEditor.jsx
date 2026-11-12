@@ -429,7 +429,7 @@ export default function ProductEditor() {
         const ex = (cats?.items || []).find((c) => nz(tr(c.name)) === nz(name) || nz(c.name?.ar) === nz(name));
         if (ex) { set({ category_id: String(ex.id), moda_key: '' }); setCustomType(name); toast({ title: L(`اخترنا قسم «${name}» الموجود عندك`, `Selected your existing “${name}” section`) }); return true; }
       }
-      toast({ tone: 'error', duration: x.code === 'too_many_sections' ? 10000 : 3200, title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى: 12 قسم خاص في متجرك، فمش هينفع تضيف قسم جديد. اختار قسم من الأقسام الموجودة في القائمة (هتلاقي اللي محتاجه فيها)، أو امسح قسم مش بتستخدمه من صفحة «الأقسام» وجرّب تاني.', 'You have reached the limit of 12 custom sections, so a new one cannot be added. Pick one of your existing sections from the list (you will most likely find what you need there), or delete an unused section from the Sections page and try again.') : (errorMessage ? errorMessage(t, x) : (x.message || 'Error')) });
+      toast({ tone: 'error', duration: x.code === 'too_many_sections' ? 10000 : 3200, title: x.code === 'section_exists' ? L('القسم ده موجود بالفعل في القايمة. اكتب اسمه في خانة البحث واختاره.', 'This section already exists. Type its name in the search box and pick it.') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى: 12 قسم خاص في متجرك، فمش هينفع تضيف قسم جديد. اختار قسم من الأقسام الموجودة في القائمة (هتلاقي اللي محتاجه فيها)، أو امسح قسم مش بتستخدمه من صفحة «الأقسام» وجرّب تاني.', 'You have reached the limit of 12 custom sections, so a new one cannot be added. Pick one of your existing sections from the list (you will most likely find what you need there), or delete an unused section from the Sections page and try again.') : (errorMessage ? errorMessage(t, x) : (x.message || 'Error')) });
       return false;
     }
   };
@@ -445,7 +445,7 @@ export default function ProductEditor() {
       set({ category_id: String(r.category.id) });
       setNewCat(null);
       toast({ title: r.pending ? L(`اتضاف «${name}» في متجرك. هيظهر في السوق بعد موافقة الإدارة`, `Added “${name}” to your store. It shows on the marketplace once the admin accepts it`) : L(`اتضاف قسم «${name}» في متجرك`, `Added “${name}” to your store`) });
-    } catch (x) { toast({ tone: 'error', duration: x.code === 'too_many_sections' ? 10000 : 3200, title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى: 12 قسم خاص في متجرك، فمش هينفع تضيف قسم جديد. اختار قسم من الأقسام الموجودة في القائمة (هتلاقي اللي محتاجه فيها)، أو امسح قسم مش بتستخدمه من صفحة «الأقسام» وجرّب تاني.', 'You have reached the limit of 12 custom sections, so a new one cannot be added. Pick one of your existing sections from the list (you will most likely find what you need there), or delete an unused section from the Sections page and try again.') : (errorMessage ? errorMessage(x) : (x.message || 'Error')) }); } finally { setCatBusy(false); }
+    } catch (x) { toast({ tone: 'error', duration: x.code === 'too_many_sections' ? 10000 : 3200, title: x.code === 'section_exists' ? L('القسم ده موجود بالفعل في القايمة. اكتب اسمه في خانة البحث واختاره.', 'This section already exists. Type its name in the search box and pick it.') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى: 12 قسم خاص في متجرك، فمش هينفع تضيف قسم جديد. اختار قسم من الأقسام الموجودة في القائمة (هتلاقي اللي محتاجه فيها)، أو امسح قسم مش بتستخدمه من صفحة «الأقسام» وجرّب تاني.', 'You have reached the limit of 12 custom sections, so a new one cannot be added. Pick one of your existing sections from the list (you will most likely find what you need there), or delete an unused section from the Sections page and try again.') : (errorMessage ? errorMessage(x) : (x.message || 'Error')) }); } finally { setCatBusy(false); }
   };
   const { data: tree } = useApi('/owner/product-types');
   const { data: pubDepts, reload: reloadPubDepts } = useApi('/departments?all=1');
@@ -580,7 +580,7 @@ export default function ProductEditor() {
     const e = validate(status);
     if (Object.keys(e).length) {
       const first = e.media ? 'images' : e.type ? 'type' : e.name_ar ? 'name' : 'pricing';
-      if (isNew) { const k = { images: 0, name: 1, type: 2, pricing: 3 }[first]; dirRef.current = k > step ? 1 : -1; setStep(k); }
+      if (isNew) { const k = { images: 0, name: 1, type: 1, pricing: e.compare_at_price && !e.price ? 2 : 1 }[first]; dirRef.current = k > step ? 1 : -1; setStep(k); }
       setTimeout(() => { document.getElementById(first)?.scrollIntoView({ behavior: 'smooth', block: 'center' }); if (first === 'name') nameRef.current?.focus({ preventScroll: true }); }, 60);
       toast({ tone: 'error', title: Object.values(e)[0] || t('error.validation_failed') });
       return;
@@ -631,8 +631,8 @@ export default function ProductEditor() {
 
   const WSTEPS = [
     { k: 'images', short: L('الصور', 'Photos'), title: L('صوّر المنتج', 'Add photos'), lead: L('المطلوب: ارفع صورة واحدة على الأقل من موبايلك. الأفضل 3 صور: من قدّام ومن ورا وتفصيلة. أول صورة هي الغلاف اللي العميل بيشوفه الأول. بعد الرفع تقدر تخلّي الذكاء الاصطناعي يكتب الاسم والوصف عنك.', 'What to do: upload at least one photo from your phone, ideally 3 (front, back, a detail). The first photo is the cover shoppers see first. After uploading, AI can write the name and description for you.') },
-    { k: 'name', short: L('الاسم والقسم', 'Name & section'), title: L('اسم المنتج وقسمه', 'Name & section'), lead: L('اكتب اسم المنتج (كلمتين أو أكتر، زي «فستان سواريه أسود»)، وبعدها اضغط على القسم المناسب من اللي هيظهرلك تحت. لو مش لاقي القسم اكتب الاسم في خانة البحث. الوصف اختياري.', 'What to do: write a clear name of two or more words with the type plus colour or fabric, e.g. “short black chiffon lingerie”. A one-word name sells less. The description is optional, but two lines about fabric and fit save customers questions.') },
-    { k: 'pricing', short: L('السعر', 'Price'), title: L('بكام؟', 'Price'), lead: L('المطلوب: اكتب سعر البيع بالجنيه. لو في خصم اكتب السعر القديم (قبل الخصم) في الخانة التانية وهيظهر للعميل مشطوب. السعر القديم لازم يكون أكبر من سعر البيع.', 'What to do: enter the selling price in EGP. For a discount, enter the old (before-discount) price in the second field and shoppers will see it crossed out. The old price must be higher than the selling price.') },
+    { k: 'name', short: L('الأساسيات', 'Basics'), title: L('اسم المنتج وقسمه وسعره وكميته', 'Name, section, price & quantity'), lead: L('اكتب اسم المنتج (كلمتين أو أكتر، زي «فستان سواريه أسود»)، وبعدها اختار القسم المناسب، وبعدين السعر والكمية المتاحة. كل ده في خطوة واحدة.', 'Write the product name (two or more words), pick its section, then enter the price and the quantity in stock. All in one step.') },,
+    { k: 'pricing', short: L('تفاصيل', 'Details'), title: L('تفاصيل إضافية', 'More details'), lead: L('اختياري: الوصف والخامة وطريقة الغسيل، وسعر قبل الخصم لو في تخفيض، وسعر التكلفة. تقدر تضغط «تخطّي».', 'Optional: description, material, care, the old price if on sale, and your cost price. You can skip this step.') },
     { k: 'variants', short: L('الكمية', 'Stock'), title: L('الألوان والمقاسات والكمية', 'Colours, sizes & stock'), lead: L('اختياري: لو المنتج ليه ألوان (أو درجات في المكياج) أو مقاسات (أو أحجام في العطور) اختارهم وحدد الكمية المتاحة. لو مفيش، قفّل الألوان واكتب الكمية بس واضغط «التالي». لو الكمية بقت صفر المنتج بيظهر للعميل إنه خلص.', 'Optional: if the product comes in colours (or shades for makeup) or sizes (or volumes for perfume), pick them and set the available quantity. If not, switch colours off, enter the quantity and press Next. At zero stock the product shows as sold out.') },
     { k: 'publish', short: L('المراجعة', 'Review'), title: L('راجع وانشر', 'Review & publish'), lead: L('المطلوب: راجع شكل المنتج زي ما العميل هيشوفه. لو تمام اضغط «نشر المنتج» وهيظهر للعملاء. ولو لسه مش جاهز احفظه كمسودة وكمّله بعدين.', 'What to do: check how the product looks to shoppers. If it is right, press “Publish product” and it goes live. If not ready, save it as a draft and finish later.') },
   ];
@@ -641,10 +641,8 @@ export default function ProductEditor() {
     if (i === 0 && !f.media.length) e.media = t('editor.needImage');
     if (i === 1 && f.name_ar.trim().length < 2) e.name_ar = t('field.required');
     if (i === 1 && !e.name_ar && !(f.moda_key || customType || f.department)) e.type = L('اختار قسم المنتج', 'Pick the product section');
-    if (i === 2) {
-      if (!Number(f.price)) e.price = t('field.price_required');
-      else if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
-    }
+    if (i === 1 && !e.name_ar && !e.type && !Number(f.price)) e.price = t('field.price_required');
+    if (i === 2 && f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
     return e;
   };
   const gotoStep = (n) => { dirRef.current = n > step ? 1 : -1; setErrors({}); setWarned(false); setStep(n); };
@@ -781,7 +779,7 @@ export default function ProductEditor() {
         )}
       </Card>)}
 
-      {(!isNew || step === 1) && (<Card id="name" bare={isNew} step={3} title={L('الاسم والوصف', 'Name & description')} done={done.name}>
+      {(!isNew || step === 1) && (<Card id="name" bare={isNew} step={1} title={L('اسم المنتج', 'Product name')} done={done.name}>
         <div className="space-y-4">
           <Field label={L('اسم المنتج', 'Product name')} error={errors.name_ar} hint={type ? L(`مثال: ${type.ar} ${f.colors[0] ? f.colors[0].name_ar : 'أسود'} قطن`, undefined) : undefined}>
             <Input ref={nameRef} dir="auto" value={f.name_ar} onChange={(e) => set({ name_ar: e.target.value })} maxLength={120} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} />
@@ -802,6 +800,30 @@ export default function ProductEditor() {
               </button>
             </div>
           )}
+        </div>
+      </Card>)}
+
+      {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('المنتج في أنهي قسم؟', 'Which section is it in?')} hint={L('اكتب اسم المنتج في خانة البحث (مثلًا: فستان) واختار من اللي يظهر. ولو مش لاقيه اختار أقرب قسم.', 'Type what it is in the search box (e.g. dress) and pick from the results. If you cannot find it, pick the closest section.')} done={done.type}>
+        <SectionTreePicker items={pickerData?.departments || []} productName={f.name_ar} value={f.department} error={errors.type} customName={customType && !f.department ? customType : ''}
+          onPick={(slug, root) => { setCustomType(''); set({ department: slug, deptTouched: true, attrs: {}, moda_key: '', ...(customType ? { category_id: '' } : {}), ...(['women', 'men', 'kids'].includes(root) ? { audience: root } : {}) }); }} onAddSection={addTypeSection} />
+        {deptDefs.filter((d) => d.key).length > 0 && f.department && <div className="mt-4"><AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} /></div>}
+      </Card>)}
+
+      {(!isNew || step === 1) && (<Card id="pricing" bare={isNew} step={4} title={L('السعر والكمية', 'Price & quantity')} done={done.pricing}>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label={t('editor.price')} error={errors.price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.price} onChange={(e) => set({ price: e.target.value.replace(/\D/g, '') })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} /></Field>
+          {f.track_stock && !f.colors.length && !f.sizes.length ? (
+            <Field label={L('الكمية المتاحة', 'Quantity in stock')} hint={L('لو المنتج ليه ألوان أو مقاسات، هتحدد الكمية لكل واحد في خطوة الألوان والمقاسات.', 'If it has colours or sizes you will set the quantity for each in the colours & sizes step.')}>
+              <Input inputMode="numeric" value={f.stock} onChange={(e) => set({ stock: e.target.value.replace(/\D/g, '') })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} />
+            </Field>
+          ) : (
+            <p className="self-end rounded-xl bg-secondary/60 px-3 py-2.5 text-[13px] text-muted">{f.colors.length || f.sizes.length ? L('الكمية بتتحدد لكل لون ومقاس في خطوة الألوان والمقاسات.', 'Quantity is set per colour and size in the colours & sizes step.') : L('تتبّع الكمية مقفول لهذا المنتج.', 'Stock tracking is off for this product.')}</p>
+          )}
+        </div>
+      </Card>)}
+
+      {(!isNew || step === 2) && (<Card id="details" bare={isNew} step={5} title={L('تفاصيل إضافية (اختيارية)', 'More details (optional)')} done={false}>
+        <div className="space-y-4">
           <Field label={L('وصف قصير', 'Short description')} optional={t('common.optional')} hint={L('الخامة، الاستخدام، أي تفصيلة مهمة.', 'Fabric, use, any key detail.')}>
             <Textarea dir="auto" rows={3} value={f.description_ar} onChange={(e) => set({ description_ar: e.target.value })} />
           </Field>
@@ -817,18 +839,7 @@ export default function ProductEditor() {
               <Field label={t('editor.descEn')} optional={t('common.optional')}><Textarea dir="auto" rows={2} value={f.description_en} onChange={(e) => set({ description_en: e.target.value })} /></Field>
             </div>
           ) : <button type="button" onClick={() => setShowEn(true)} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline"><Plus className="h-4 w-4" />{L('إضافة اسم ووصف بالإنجليزي (اختياري)', 'Add English name & description (optional)')}</button>}
-        </div>
-      </Card>)}
-
-      {(!isNew || step === 1) && (<Card id="type" bare={isNew} step={2} title={L('المنتج في أنهي قسم؟', 'Which section is it in?')} hint={L('اكتب اسم المنتج في خانة البحث (مثلًا: فستان) واختار من اللي يظهر. ولو مش لاقيه اختار أقرب قسم.', 'Type what it is in the search box (e.g. dress) and pick from the results. If you cannot find it, pick the closest section.')} done={done.type}>
-        <SectionTreePicker items={pickerData?.departments || []} productName={f.name_ar} value={f.department} error={errors.type} customName={customType && !f.department ? customType : ''}
-          onPick={(slug, root) => { setCustomType(''); set({ department: slug, deptTouched: true, attrs: {}, moda_key: '', ...(customType ? { category_id: '' } : {}), ...(['women', 'men', 'kids'].includes(root) ? { audience: root } : {}) }); }} onAddSection={addTypeSection} />
-        {deptDefs.filter((d) => d.key).length > 0 && f.department && <div className="mt-4"><AttrFields defs={deptDefs} values={f.attrs || {}} onChange={(attrs) => set({ attrs })} /></div>}
-      </Card>)}
-
-      {(!isNew || step === 2) && (<Card id="pricing" bare={isNew} step={4} title={t('editor.pricing')} done={done.pricing}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label={t('editor.price')} error={errors.price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.price} onChange={(e) => set({ price: e.target.value.replace(/\D/g, '') })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} /></Field>
+          <div className="grid gap-4 sm:grid-cols-2">
           <Field label={t('editor.compareAt')} optional={t('common.optional')} hint={!errors.compare_at_price ? t('editor.compareHint') : undefined} error={errors.compare_at_price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.compare_at_price} onChange={(e) => set({ compare_at_price: e.target.value.replace(/\D/g, '') })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} /></Field>
           {f.compare_at_price && Number(f.compare_at_price) > Number(f.price) && <div className="sm:col-span-2"><span className="rounded-full bg-sale/10 px-3 py-1.5 text-sm font-semibold text-sale">-{Math.round((1 - f.price / f.compare_at_price) * 100)}%</span></div>}
           <Field label={L('سعر التكلفة عليك', 'Cost price')} optional={t('common.optional')} hint={L('خاص بيك فقط لحساب أرباحك — مش هيظهر للعميل نهائيًا.', 'For your eyes only — shoppers will never see this.')}>
@@ -843,6 +854,7 @@ export default function ProductEditor() {
               </div>
             </div>
           )}
+          </div>
         </div>
       </Card>)}
 
@@ -999,7 +1011,7 @@ export default function ProductEditor() {
             </div>
           </div>
           <div className="mt-2.5 flex justify-center border-t border-line/60 pt-2">
-            <button type="button" onClick={() => gotoStep(4)} className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:underline">
+            <button type="button" onClick={() => gotoStep(3)} className="inline-flex items-center gap-1 text-[11.5px] font-semibold text-brand hover:underline">
               <Pencil className="h-3 w-3" />
               {L('تعديل الألوان والمقاسات والكمية', 'Edit variants & stock')}
             </button>
