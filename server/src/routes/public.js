@@ -695,8 +695,8 @@ r.get('/marketplace', h((req, res) => {
     const sub = [...new Set(hits.flatMap((d) => deptSubtree(d.slug)))]; const ph = sub.map(() => '?').join(',');
     const name = g.name || hits[0].name; // shelf title (cosmetics is always «مستحضرات تجميل»)
     const sold = railRows(`AND p.sold_count > 0 AND p.department IN (${ph}) ORDER BY p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
-    if (sold.length >= BEST_MIN) return { slug: hits[0].slug, name, bestSellers: true, items: sold };
-    return { slug: hits[0].slug, name, bestSellers: false, items: railRows(`AND p.department IN (${ph}) ORDER BY p.is_new DESC, p.created_at DESC LIMIT 40`, sub, BEST_MIN) };
+    if (sold.length >= BEST_MIN) return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: true, items: sold };
+    return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`AND p.department IN (${ph}) ORDER BY p.is_new DESC, p.created_at DESC LIMIT 40`, sub, BEST_MIN) };
   }).filter(Boolean);
   cache(res, 60);
   res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });
