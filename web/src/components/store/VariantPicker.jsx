@@ -10,12 +10,12 @@ export function resolveVariant(product, color, size) {
   if (!vs.length) return { variant: null, available: product?.trackStock ? product.stockCount : 99, needsSize: false };
   const hasSizes = vs.some((v) => v.size);
   const variant = vs.find((v) => (v.color || null) === (color || null) && (!hasSizes || v.size === size)) || null;
-  return { variant, available: variant ? variant.stock : 0, needsSize: hasSizes && !size };
+  return { variant, available: variant ? (product?.trackStock === false ? 99 : variant.stock) : 0, needsSize: hasSizes && !size };
 }
 
 export function sizeStock(product, color, size) {
   const v = product.variants.find((x) => (x.color || null) === (color || null) && x.size === size);
-  return v ? v.stock : 0;
+  return v ? (product.trackStock === false ? 99 : v.stock) : 0; // stock tracking off = always available
 }
 
 export default function VariantPicker({ product, color, size, onColor: setColor, onSize, sizeError }) {
@@ -33,7 +33,7 @@ export default function VariantPicker({ product, color, size, onColor: setColor,
           <div className="flex flex-wrap gap-2.5">
             {colors.map((c) => {
               const active = c.hex === color;
-              const any = product.variants.some((v) => v.color === c.hex && v.stock > 0);
+              const any = product.variants.some((v) => v.color === c.hex && (product.trackStock === false || v.stock > 0));
               return (
                 <button key={c.hex} type="button" onClick={() => setColor(c.hex)} aria-pressed={active}
                   aria-label={tr({ ar: c.name_ar, en: c.name_en })} title={tr({ ar: c.name_ar, en: c.name_en })}

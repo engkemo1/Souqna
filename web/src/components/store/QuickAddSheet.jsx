@@ -31,7 +31,7 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step, m
 
   useEffect(() => {
     if (!p) return;
-    const firstInStock = p.colors.find((c) => p.variants.some((v) => v.color === c.hex && v.stock > 0)) || p.colors[0];
+    const firstInStock = p.colors.find((c) => p.variants.some((v) => v.color === c.hex && (p.trackStock === false || v.stock > 0))) || p.colors[0];
     setColor(firstInStock?.hex || null);
     setSize(p.sizes.length === 1 ? p.sizes[0] : null);
     setSizeError(false);

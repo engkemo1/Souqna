@@ -138,7 +138,7 @@ export default function Product() {
 
   useEffect(() => {
     if (!p) return;
-    const first = p.colors.find((c) => p.variants.some((v) => v.color === c.hex && v.stock > 0)) || p.colors[0];
+    const first = p.colors.find((c) => p.variants.some((v) => v.color === c.hex && (p.trackStock === false || v.stock > 0))) || p.colors[0];
     setColor(first?.hex || null);
     setSize(p.sizes.length === 1 ? p.sizes[0] : null);
     setQty(1);
