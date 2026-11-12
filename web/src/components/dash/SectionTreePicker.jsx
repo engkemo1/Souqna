@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, Check, Pencil, Plus, Search } from 'lucide-react';
 import { Input } from '../ui/Field.jsx';
 import { cx } from '../ui/cx.js';
@@ -26,15 +26,24 @@ export default function SectionTreePicker({ items = [], value = '', onPick, erro
   const [busy, setBusy] = useState(false);
   const term = nz(q);
   const picked = value ? by.get(value) : null;
-  const pick = (d) => { onPick?.(d.slug, trailOf(d.slug)[0]?.slug || d.slug); setOpen(false); setQ(''); setNode(''); };
+  const pick = (d) => { autoDone.current = true; onPick?.(d.slug, trailOf(d.slug)[0]?.slug || d.slug); setOpen(false); setQ(''); setNode(''); };
   const hits = term ? items.filter((d) => d.leaf && nz(`${d.name?.ar} ${d.name?.en} ${trailOf(d.slug).map((x) => x.name?.ar).join(' ')}`).includes(term)).slice(0, 10) : [];
   const list = kids.get(node) || [];
-  // Suggestions only (the merchant taps one): sections whose name shares a word-start with the product name. Never applied automatically.
+  // Sections whose name shares a word with the product name (plural/singular tolerant: فستان ~ فساتين). One clear match is picked automatically.
+  const skel = (w) => (w[0] || '') + w.slice(1).replace(/[اويىه]/g, '');
   const suggestions = useMemo(() => {
     const words = nz(productName).split(' ').filter((w) => w.length >= 3);
     if (!words.length) return [];
-    return items.filter((d) => d.leaf && nz(d.name?.ar).split(' ').some((n) => n.length >= 3 && words.some((w) => n.startsWith(w) || w.startsWith(n)))).slice(0, 4);
+    return items.filter((d) => d.leaf && nz(d.name?.ar).split(' ').some((n) => n.length >= 3 && words.some((w) => n.startsWith(w) || w.startsWith(n) || (skel(w).length >= 3 && skel(w) === skel(n))))).slice(0, 4);
   }, [items, productName]);
+  const autoDone = useRef(false);
+  const [autoSlug, setAutoSlug] = useState('');
+  useEffect(() => {
+    if (autoDone.current || value || customName || suggestions.length !== 1 || nz(productName).length < 4) return undefined;
+    const d = suggestions[0];
+    const id = setTimeout(() => { if (autoDone.current) return; autoDone.current = true; setAutoSlug(d.slug); onPick?.(d.slug, trailOf(d.slug)[0]?.slug || d.slug); }, 800);
+    return () => clearTimeout(id);
+  }, [suggestions, value, customName, productName]); // eslint-disable-line react-hooks/exhaustive-deps
   const trail = node ? trailOf(node) : [];
   const submitAdd = async () => { setBusy(true); const ok = await onAddSection?.(adding); setBusy(false); if (ok) { setAdding(null); setQ(''); } };
   const btn = 'flex min-h-[3rem] items-center justify-between gap-2 rounded-xl border border-line-strong px-3.5 py-2 text-start text-sm font-medium transition hover:border-fg active:scale-[0.98]';
@@ -46,6 +55,7 @@ export default function SectionTreePicker({ items = [], value = '', onPick, erro
           <div className="min-w-0">
             <p className="text-[13px] text-muted">{picked ? trailOf(picked.slug).slice(0, -1).map(nm).join(' › ') || L('القسم', 'Section') : L('قسم جديد في متجرك', 'New section in your store')}</p>
             <p className="truncate text-base font-semibold">{picked ? nm(picked) : customName}</p>
+            {picked && autoSlug === picked.slug && <p className="mt-0.5 text-[12px] text-muted">{L('اخترناه تلقائيًا من اسم المنتج. غيّره لو مش مظبوط.', 'Picked automatically from the product name. Change it if wrong.')}</p>}
           </div>
           <button type="button" onClick={() => setOpen(true)} className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-sm font-semibold text-brand hover:bg-brand/10"><Pencil className="h-3.5 w-3.5" />{L('تغيير', 'Change')}</button>
         </div>
