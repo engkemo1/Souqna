@@ -52,7 +52,8 @@ const CSP = {
     upgradeInsecureRequests: [],
   },
 };
-app.use(helmet({ contentSecurityPolicy: CSP, crossOriginResourcePolicy: { policy: 'cross-origin' }, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
+// Google sign-in opens a popup that hands the token back to this page: helmet's default COOP (same-origin) cuts that link and the popup stays blank.
+app.use(helmet({ contentSecurityPolicy: CSP, crossOriginResourcePolicy: { policy: 'cross-origin' }, crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
 app.use(compression());
 const ALLOWED_ORIGINS = new Set([
   config.siteUrl,
