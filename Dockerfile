@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1
 FROM node:22-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
@@ -10,13 +11,20 @@ ENV MODEL_CACHE_DIR=/app/.model-cache
 # If GitHub is unreachable the build still succeeds and the server downloads the model itself on first use.
 ENV BG_MODEL_FILE=/app/models/isnet-general-use.onnx
 RUN mkdir -p /app/models && node -e "const fs=require('fs'),c=require('crypto');fetch('https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx').then(async r=>{if(!r.ok)throw new Error('HTTP '+r.status);const b=Buffer.from(await r.arrayBuffer());const h=c.createHash('sha256').update(b).digest('hex');if(h!=='60920e99c45464f2ba57bee2ad08c919a52bbf852739e96947fbb4358c0d964a')throw new Error('checksum '+h);fs.writeFileSync(process.env.BG_MODEL_FILE,b);console.log('[build] background model ready')}).catch(e=>{console.error('[build] background model skipped:',e.message);process.exit(0)})"
+# Dependencies first, in their own layer: only the package files are copied, so a code change
+# no longer re-downloads every package. This layer is rebuilt only when a package.json / lock changes.
 COPY package*.json ./
+COPY shared/package.json ./shared/package.json
+COPY server/package.json ./server/package.json
+COPY web/package.json ./web/package.json
+RUN --mount=type=cache,target=/root/.npm npm install --no-audit --no-fund
+# Source code (changes often): only the steps below re-run on a normal deploy.
 COPY shared ./shared
 COPY server ./server
 COPY web ./web
 RUN sed -i 's/\r$//' /app/server/start.sh /app/server/litestream.yml \
  && chmod +x /app/server/start.sh && cp /app/server/litestream.yml /etc/litestream.yml
-RUN npm install && DB_FILE=/app/seed-db/souqna.db MEDIA_DIR=/app/seed-db/media npm run seed && npm run build && npm prune --omit=dev
+RUN DB_FILE=/app/seed-db/souqna.db MEDIA_DIR=/app/seed-db/media npm run seed && npm run build && npm prune --omit=dev
 ENV PORT=10000
 EXPOSE 10000
 CMD ["/app/server/start.sh"]

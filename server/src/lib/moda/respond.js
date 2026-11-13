@@ -34,7 +34,8 @@ function tabLabel(aud, persons, P) {
 const itemCard = (K, pk) => {
   const p = pk.product;
   const fitTip = generateFitAndSizingTip(p);
-  return { id: p.id, key: p.key, label: itemAr(K, p.key || pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null, fitTip: fitTip || null };
+  return { id: p.id, key: p.key, label: itemAr(K, p.key || pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null, fitTip: fitTip || null,
+    alts: (pk.alts || []).map((a) => ({ id: a.id, key: a.key, label: itemAr(K, a.key || pk.slotKey), name: a.name_ar || a.name_en, price: a.price, store: a.store_slug || null, image: a.image || a.image_url || a.thumb || null, colors: a.colorKeys })) };
 };
 
 /** بيحوّل plan → رد. opts: { seed, lang } */

@@ -28,6 +28,7 @@ export default function WhatsAppSignIn({ onPassword, onDone, intro, className })
     otp_locked: L('محاولات كتير غلط، اطلب كود جديد', 'Too many wrong tries, ask for a new one'),
     wa_send_failed: L('معرفناش نبعت الكود. اتأكد إن الرقم عليه واتساب', 'Could not send the code. Make sure the number has WhatsApp'),
     wa_unavailable: L('الدخول بواتساب مش متاح دلوقتي، ادخل بالباسورد', 'WhatsApp sign-in is unavailable, use your password'),
+    phone_linked_other_google: L('الرقم ده مربوط بحساب جوجل تاني. ادخل بالرقم ده بالواتساب بدل جوجل', 'This number is linked to another Google account. Sign in with WhatsApp instead'),
     too_many_attempts: L('محاولات كتير، استنى دقايق', 'Too many attempts, wait a few minutes'),
   }[x?.fields?.phone === 'phone_invalid' ? 'phone_invalid' : x?.code] || errorMessage(t, x));
   const send = async (e) => {

@@ -73,6 +73,11 @@ export function quote(store, items = [], couponCode, { phone, giftChoices } = {}
       error: available <= 0 ? 'out_of_stock' : qty > available ? 'insufficient_stock' : null,
     });
   }
+  // The same piece can sit in the cart on more than one line (added twice, or from two pages): check the combined quantity too,
+  // so two lines of 2 can never buy a piece that only has 3 left.
+  const want = new Map();
+  for (const l of lines) if (!l.error) { const k = `${l.productId}:${l.variantId ?? ''}`; want.set(k, (want.get(k) || 0) + l.qty); }
+  for (const l of lines) if (!l.error && want.get(`${l.productId}:${l.variantId ?? ''}`) > l.available) l.error = 'insufficient_stock';
   const paid = lines.filter((l) => !l.error);
   const subtotal = paid.reduce((s, l) => s + l.price * l.qty, 0);
 

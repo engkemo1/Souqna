@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
-import { q, insert } from '../db/index.js';
+import { q, insert, tx } from '../db/index.js';
 import { h, AppError, notFound } from '../lib/errors.js';
 import { signBuyer, requireBuyer, buyerFromReq } from '../lib/buyers.js';
 import { googleReady, verifyGoogleCredential } from '../lib/google.js';
@@ -25,6 +25,22 @@ function throttle(key, max = 10) {
 const phoneSchema = z.string().trim().transform(normPhone).refine((p) => /^01[0-9]{9}$/.test(p), 'phone_invalid');
 // Accounts made with Google start without a phone: the phone column holds a placeholder "g_<google id>" until a WhatsApp code proves a real number.
 const noPhone = (p) => String(p || '').startsWith('g_');
+/** Move everything a Google-made account owns onto the shopper's existing phone account, then drop the empty Google account.
+ *  Used when someone signed in with Google and then proved (by WhatsApp code) a number that already has an account. */
+function mergeInto(fromId, toId, google) {
+  tx(() => {
+    q.run('UPDATE orders SET buyer_id=? WHERE buyer_id=?', [toId, fromId]);
+    q.run('UPDATE buyer_notifications SET buyer_id=? WHERE buyer_id=?', [toId, fromId]);
+    q.run('UPDATE buyer_push SET buyer_id=? WHERE buyer_id=?', [toId, fromId]);
+    q.run('UPDATE buyer_stylist_chats SET buyer_id=? WHERE buyer_id=?', [toId, fromId]);
+    q.run('UPDATE OR IGNORE buyer_watches SET buyer_id=? WHERE buyer_id=?', [toId, fromId]); // already watched on both: keep one
+    q.run('UPDATE OR IGNORE buyer_follows SET buyer_id=? WHERE buyer_id=?', [toId, fromId]);
+    q.run('DELETE FROM buyer_watches WHERE buyer_id=?', [fromId]); // leftovers were duplicates
+    q.run('DELETE FROM buyer_follows WHERE buyer_id=?', [fromId]);
+    q.run('DELETE FROM buyers WHERE id=?', [fromId]);
+    if (google?.sub) q.run('UPDATE buyers SET google_sub=?, email=COALESCE(email, ?) WHERE id=?', [google.sub, google.email || null, toId]);
+  });
+}
 const out = (b) => ({ id: b.id, name: b.name, phone: noPhone(b.phone) ? '' : b.phone, hasPhone: !noPhone(b.phone), phoneVerified: !!b.phone_verified });
 const unread = (id) => q.val('SELECT COUNT(*) FROM buyer_notifications WHERE buyer_id=? AND read=0', [id]);
 
@@ -78,9 +94,17 @@ r.post('/otp/verify', h((req, res) => {
   if (!ok) { q.run('UPDATE wa_otps SET tries=tries+1 WHERE phone=?', [b.phone]); throw new AppError(400, 'otp_wrong', 'The code is not correct.', { code: 'otp_wrong' }); }
   let buyer = q.get('SELECT * FROM buyers WHERE phone=?', [b.phone]);
   const me = buyerFromReq(req);
-  if (!buyer && me && noPhone(me.phone)) { // signed in with Google and now proved a number: attach it to that account
-    q.run('UPDATE buyers SET phone=? WHERE id=?', [b.phone, me.id]);
-    buyer = q.get('SELECT * FROM buyers WHERE id=?', [me.id]);
+  if (me && noPhone(me.phone) && me.id !== buyer?.id) { // signed in with Google and now proved a number
+    const g = q.get('SELECT google_sub, email FROM buyers WHERE id=?', [me.id]);
+    if (!buyer) { // new number: attach it to the Google account
+      q.run('UPDATE buyers SET phone=? WHERE id=?', [b.phone, me.id]);
+      buyer = q.get('SELECT * FROM buyers WHERE id=?', [me.id]);
+    } else if (buyer.google_sub && buyer.google_sub !== g?.google_sub) {
+      throw new AppError(409, 'phone_linked_other_google', 'This number is already linked to another Google account.', { code: 'phone_linked_other_google' });
+    } else { // the number already has an account (orders, wardrobe…): one account, both ways in
+      mergeInto(me.id, buyer.id, { sub: g?.google_sub, email: g?.email });
+      buyer = q.get('SELECT * FROM buyers WHERE id=?', [buyer.id]);
+    }
   }
   if (!buyer) {
     if (!b.name) return res.status(200).json({ needName: true }); // code stays valid until the name is sent

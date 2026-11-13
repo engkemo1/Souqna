@@ -666,14 +666,15 @@ export async function runModaStylist(messages, { profile, session, answers, imag
   // احتياطي مجاني: لو القواعد مافهمتش الرسالة، Cloudflare بيستخرج (شخص/مناسبة/قطعة) من قاموس محدد بس
   const llmExtract = providerReady.cloudflare() ? makeLlmExtract(async (system, msgs) => parseJson(await callLlm('cloudflare', system, msgs))) : null;
   const out = await runModa(history, { products: rows, verifier: modaVerifier(), profile: profile || {}, session: session || null, answers: answers || null, imageText, llmExtract, assistantName, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: readStylistTraining() });
-  const ids = [...new Set((out.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.id)))];
+  const ids = [...new Set((out.blocks?.tabs || []).flatMap((t) => t.items.flatMap((i) => [i.id, ...(i.alts || []).map((a) => a.id)])))];
   const byId = new Map(rows.filter((r) => ids.includes(r.id)).map((r) => [r.id, r]));
   const rowList = ids.map((id) => byId.get(id)).filter(Boolean);
   const cards = serializeCards(rowList);
   const cardById = new Map(rowList.map((r, i) => [r.id, { ...cards[i], store: { slug: r.store_slug, name: bi(r, 'store_name') } }]));
   const multi = (out.blocks?.tabs || []).length > 1;
-  const tabs = (out.blocks?.tabs || []).map((t) => ({ ...t, items: t.items.map((i) => ({ ...i, card: cardById.get(i.id) || null })) }));
-  const looks = tabs.flatMap((t) => t.items.filter((i) => i.card).map((i) => ({ label: `${multi ? `${t.label} · ` : ''}${i.label}`, shown: multi ? `${i.label} (${t.label})` : i.label, palette: (out.blocks.palette || []).map((c) => c.ar), items: [i.card], pick: 0 })));
+  // البدائل (لحد 2 لكل قطعة) بتظهر جنب القطعة المختارة، والعميل يقدر يبدّل بينهم
+  const tabs = (out.blocks?.tabs || []).map((t) => ({ ...t, items: t.items.map((i) => ({ ...i, card: cardById.get(i.id) || null, altCards: (i.alts || []).map((a) => cardById.get(a.id)).filter(Boolean) })) }));
+  const looks = tabs.flatMap((t) => t.items.filter((i) => i.card).map((i) => ({ label: `${multi ? `${t.label} · ` : ''}${i.label}`, shown: multi ? `${i.label} (${t.label})` : i.label, palette: (out.blocks.palette || []).map((c) => c.ar), items: [i.card, ...i.altCards], pick: 0 })));
   lastError = '';
   return {
     intent: out.state === 'clarify' ? 'clarify' : out.state === 'chat' ? 'chat' : 'shop',

@@ -16,7 +16,7 @@ function StoreCartLink({ slug, name, tr, t }) {
   return <Link to={sp(slug, 'cart')} className="inline-flex items-center gap-1.5 rounded-full bg-btn px-3.5 py-2 text-[13px] font-bold text-on-btn"><ShoppingBag className="h-4 w-4" />{t('stylist.cartOf', { s: tr(name), n: c.count })}</Link>;
 }
 
-function LookRow({ look, lang, tr, t, added, onAdd }) {
+function LookRow({ look, lang, tr, t, added, onAdd, onPick }) {
   return (
     <div className="mt-4 rounded-2xl border border-line bg-canvas/60 p-3 sm:p-4">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -33,6 +33,9 @@ function LookRow({ look, lang, tr, t, added, onAdd }) {
             <p className="mt-2 line-clamp-2 min-h-[2.6em] text-[12px] font-semibold leading-snug sm:text-[13px]">{tr(p.name)}</p>
             <p className="mt-1 text-sm font-bold text-sale">{formatMoney(p.price, lang)}</p>
             <p className="mt-0.5 truncate text-[11px] text-muted">{tr(p.store.name)}</p>
+            {onPick && look.items.length > 1 && i !== look.pick && (
+              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); onPick(i); }} className="mt-2 w-full rounded-full border border-line-strong px-2 py-1.5 text-[11.5px] font-bold transition hover:border-fg">{lang === 'ar' ? 'اختار ده بداله' : 'Swap to this'}</button>
+            )}
           </Link>
         ))}
       </div>
@@ -245,14 +248,17 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
   const [quick, setQuick] = useState(null); // { queue: [product], i }
   const [added, setAdded] = useState([]);
   const [tab, setTab] = useState(0);
-  const m = data; const miss = (m?.missing || []).slice(0, 4);
+  const [swap, setSwap] = useState({}); // label → index of the alternative the shopper picked
+  const m0 = data;
+  const m = m0?.looks?.length && Object.keys(swap).length ? (() => { const looks = m0.looks.map((l) => (swap[l.label] != null && l.items[swap[l.label]] ? { ...l, pick: swap[l.label] } : l)); const delta = looks.reduce((d, l, i) => d + (l.items[l.pick]?.price || 0) - (m0.looks[i].items[m0.looks[i].pick]?.price || 0), 0); return { ...m0, looks, total: (m0.total || 0) + delta, overBudget: m0.budget ? (m0.total || 0) + delta > m0.budget : m0.overBudget }; })() : m0; const miss = (m?.missing || []).slice(0, 4);
   const ar = lang === 'ar';
   const weatherTips = Array.isArray(m?.tips) ? m.tips.filter(Boolean) : m?.tips ? [m.tips] : [];
   const styleTips = Array.isArray(m?.styleTips) ? m.styleTips.filter(Boolean) : m?.styleTips ? [m.styleTips] : [];
   const hasAdvice = weatherTips.length > 0 || styleTips.length > 0 || (m?.palette?.length || 0) > 0;
   if (!m?.looks?.length && !miss.length && !hasAdvice) return null;
   const tabs = m.tabs?.length > 1 ? m.tabs : null;
-  const shownLooks = tabs ? (tabs[Math.min(tab, tabs.length - 1)].items.filter((i) => i.card).map((i) => ({ label: i.label, items: [i.card], pick: 0 }))) : m.looks;
+  const tabNow = tabs ? tabs[Math.min(tab, tabs.length - 1)] : null;
+  const shownLooks = tabs ? (tabNow.items.filter((i) => i.card).map((i) => { const key = `${tabNow.label} · ${i.label}`; const items = [i.card, ...(i.altCards || [])]; return { label: i.label, key, items, pick: swap[key] != null && items[swap[key]] ? swap[key] : 0 }; })) : m.looks;
   const orderItems = (m.missingItems || []);
   const missing = orderItems.length > 0 ? (
     <div className="mt-3 space-y-1.5">{orderItems.slice(0, 4).map((x, i) => <Link key={`${x.key}-${i}`} to={`/request?title=${encodeURIComponent(`${x.label}${x.material ? ' ' + x.material : ''}`)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-line bg-[#F1F4F9] px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" /><span className="flex-1">{x.label}{x.tab && tabs ? ` (${x.tab})` : ''} — {x.hint}</span><span className="rounded-full bg-btn px-3 py-1 text-[12px] text-on-btn">{x.button}</span></Link>)}</div>
@@ -303,7 +309,7 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
         <ShowComp looks={m.looks} total={m.total} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} onAddAll={() => startAdd(picks)} onShare={shareLink} storeLinks={[...new Map(picks.map((p) => [p.store.slug, p.store.name])).entries()].map(([sl, nm]) => <StoreCartLink key={sl} slug={sl} name={nm} tr={tr} t={t} />)} />
       ) : (
       <>
-      {m.manual ? <><p className="mt-4 text-sm font-bold">{editorial ? (ar ? 'هذا اللوك يحتوي على:' : 'Pieces in this look:') : 'قطع الأوتفيت المختارة'}</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} editorial={editorial} /></> : shownLooks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} />)}
+      {m.manual ? <><p className="mt-4 text-sm font-bold">{editorial ? (ar ? 'هذا اللوك يحتوي على:' : 'Pieces in this look:') : 'قطع الأوتفيت المختارة'}</p><ManualLookCards looks={m.looks} lang={lang} tr={tr} t={t} added={added} onAdd={(p) => startAdd([p])} editorial={editorial} /></> : shownLooks.map((l) => <LookRow key={l.label} look={l} lang={lang} tr={tr} t={t} added={added.includes(l.items[l.pick]?.id)} onAdd={(p) => startAdd([p])} onPick={(i) => setSwap((s) => ({ ...s, [l.key || l.label]: i }))} />)}
       <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-line bg-canvas/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
         <div>
           <p className="text-[11px] font-semibold text-muted">{ar ? 'إجمالي القطع المختارة' : 'Selected items total'}</p>

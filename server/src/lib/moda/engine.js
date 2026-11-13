@@ -553,7 +553,7 @@ async function runModaCore(messages, opts = {}) {
     const auds = [...new Set(lookItems.map((x) => x.aud).filter((x) => x && (!audFilter || audFilter.has(x))))];
     if (auds.length) parsed = { ...parsed, intent: 'shop', persons: auds };
   }
-  if (/(مش|غير|من غير|بدون)\s*(محجب|حجاب|طرحه)/.test(norm(text))) parsed = { ...parsed, flags: { ...parsed.flags, notHijab: true } };
+  if (/(مش|غير|من غير|بدون)\s*(محجب|حجاب|طرحه)/.test(norm(text))) parsed = { ...parsed, persons: (parsed.persons || []).map((a) => (a === 'women_hijab' ? 'women' : a)), flags: { ...parsed.flags, notHijab: true, hijabAsked: true } }; // «مش محجبة» مش «محجبة»
   if (/(انا|انتي|هي|خطيبتي|مراتي)?\s*(الخطوبه|الفرح|كتب الكتاب)\s*(بتاع|بتاعت|بتاعتي|بتاعتنا|بتاعتها)|خطوبتي|خطوبتنا|فرحي|فرحنا|كتب كتابي/.test(norm(text))) parsed = { ...parsed, flags: { ...parsed.flags, roleAsked: true } };
   if (/(ضيف|ضيفه|مدعو|معزوم|حضور|رايح خطوبه|رايحين خطوبه|رايحه خطوبه|رايحه فرح|رايح فرح)/.test(norm(text))) parsed = { ...parsed, flags: { ...parsed.flags, roleAsked: true } };
   // "جبت بدلة ومجبتش ليها" / "عاوز لخطيبتي فستان": one side is already dressed, style only the other one
@@ -794,6 +794,11 @@ async function runModaCore(messages, opts = {}) {
   // عنده قطعة ومقالش عاوز إيه: نسأل بدل ما نقول «مفهمتش»
   if (!hasAnswers && !session?.pending && parsed.ownedPieces?.length && !parsed.garments.length && !parsed.context && /^(عندي|معايا|عندى|لابس)(?=\s|$)/.test(text.trim()) && !/(عايز|عاوز|عايزه|عاوزه|طقم|نسق|يليق|يمشي|رايح|مناسب)/.test(text)) {
     const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
+    const ok0 = parsed.ownedPieces[0].key;
+    if (ok0 === 'slippers' || ok0 === 'tracksuit') { // الشبشب والترنج بيتلبسوا مع حاجات كتير: نسأل «مع إيه؟» من غير اختيارات
+      const what = ok0 === 'tracksuit' ? 'الترنج' : 'الشبشب';
+      return { ...res0, say: `${what} بيتلبس مع حاجات كتير. هتلبسه مع إيه؟ اكتبلي وأنا أدورلك عليه في المحلات.`, intent: 'chat', session: { ...(session || {}) } };
+    }
     return { ...res0, say: 'حلو القطعة دي! تحب أنسقلك معاها إيه؟ قميص ولا جاكيت ولا جزمة ولا إكسسوار؟ أو قولي رايح فين وأرشحلك طقم كامل.', intent: 'chat', session: { ...(session || {}) } };
   }
   // «بدلة/لبس رقص»: مش بدلة رسمي — لو في منتج بالاسم ده نعرضه، وإلا نقول مفيش بدل ما نعرض بدلة رجالي

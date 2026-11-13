@@ -339,6 +339,22 @@ function fitBudget(fills, budget) {
  * الخطة الكاملة.
  * env: { adv (weatherAdvice), eventTime, profile }
  */
+/** بدائل للخانة (لحد 2): الأول نوع مختلف لو موجود (بنطلون قماش ↔ بدلة)، وبعدين أحسن قطعة تانية من نفس النوع.
+ *  مفيش قطعة مستخدمة في خانة تانية، ومع الميزانية البديل ما يزيدش عن ربع سعر القطعة المختارة. */
+function altsFor(pk, picks, budget) {
+  const used = new Set(picks.map((x) => x.product.id));
+  const max = budget ? pk.product.price * 1.25 : Infinity;
+  const seen = new Set();
+  const list = [...(pk.ranked || []), ...(pk.pool || [])]
+    .filter((r) => !used.has(r.p.id) && r.p.price <= max && !seen.has(r.p.id) && seen.add(r.p.id))
+    .sort((a, b) => b.s - a.s);
+  const out = [];
+  const otherKind = list.find((r) => !r.viaPool && r.p.key && r.p.key !== pk.product.key); // نوع تاني من نفس الخانة بس، مش بديل أرخص من الـpool
+  if (otherKind) out.push(otherKind.p);
+  for (const r of list) { if (out.length >= 2) break; if (!r.viaPool && !out.includes(r.p)) out.push(r.p); }
+  return out;
+}
+
 export function planOutfit(parsed, products, env = {}) {
   const K = env.K || loadKnowledge();
   const adv = env.adv || null; const profile = env.profile || {};
@@ -471,7 +487,7 @@ export function planOutfit(parsed, products, env = {}) {
     ...base, soloFromCouple: parsed.flags?.soloFromCouple || null, state, persons, audienceOpen, context, role, budget, total, over, dropped, missing, relaxed, ask: asks, palette: palette.slice(0, 3), pickColors: [...new Set(fills.flatMap((f) => f.picks.map((p) => primary(p.product))).filter(Boolean))], pickCount: fills.reduce((n, f) => n + f.picks.length, 0),
     people: fills.map((f) => ({
       aud: f.aud, mode: f.mode, look: f.look ? { id: f.look.id, name_ar: f.look.name_ar, tip_ar: f.look.tip_ar, formality: f.look.formality } : null,
-      picks: f.picks.map((p) => ({ slotKey: p.slot.base, optional: !p.slot.required, hero: p.slot.hero, product: p.product, relaxed: p.relaxedKind })),
+      picks: f.picks.map((p) => ({ slotKey: p.slot.base, optional: !p.slot.required, hero: p.slot.hero, product: p.product, relaxed: p.relaxedKind, alts: altsFor(p, f.picks, budget) })),
       missing: f.missing, subtotal: sumPicks(f.picks),
     })),
     tone: context === 'condolence' ? 'sober' : 'normal',

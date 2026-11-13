@@ -16,3 +16,7 @@ scripts
 *.log
 *.wav
 tall
+*.mp4
+TM-ad
+scratch
+*/dist

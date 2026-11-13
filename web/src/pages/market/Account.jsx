@@ -183,7 +183,7 @@ function Alerts() {
 }
 
 export default function Account() {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const me = useBuyer();
   const [sp, setSp] = useSearchParams();
   const tab = ['orders', 'wardrobe', 'alerts'].includes(sp.get('tab')) ? sp.get('tab') : 'orders';
@@ -196,6 +196,12 @@ export default function Account() {
         <div><h1 className="font-display text-2xl font-bold sm:text-3xl">{t('acc.hello', { name: me.buyer.name.split(' ')[0] })}</h1><p className="text-sm text-muted" dir="ltr">{me.buyer.phone}</p></div>
         <Button variant="outline" size="sm" icon={LogOut} onClick={me.logout}>{t('acc.logout')}</Button>
       </div>
+      {me.buyer.hasPhone === false && (
+        <WhatsAppSignIn
+          className="mt-5 space-y-4 rounded-3xl border border-brand/40 bg-elevated p-5 sm:p-6"
+          intro={lang === 'en' ? 'Add your mobile number (we confirm it with a WhatsApp code). It lets you reserve in stores, and if you already ordered with this number, your orders and wardrobe join this account.' : 'ضيف رقم موبايلك (هنأكده بكود على واتساب). ده بيخليك تحجز من المحلات، ولو كنت طلبت قبل كده بالرقم ده، طلباتك وخزانتك هتتجمع في الحساب ده.'}
+        />
+      )}
       <div role="tablist" className="mt-5 grid grid-cols-3 gap-1 rounded-2xl bg-secondary p-1">
         {tabs.map(([k, Icon]) => <button key={k} role="tab" aria-selected={tab === k} type="button" onClick={() => setSp({ tab: k }, { replace: true })} className={cx('relative inline-flex h-11 items-center justify-center gap-1.5 rounded-xl text-sm font-semibold transition', tab === k ? 'bg-elevated shadow-sm' : 'text-muted')}><Icon className="h-4 w-4" />{t(`acc.${k}`)}{k === 'alerts' && me.unread > 0 && <span className="h-2 w-2 rounded-full bg-sale" />}</button>)}
       </div>
