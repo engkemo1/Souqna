@@ -18,6 +18,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { SALES_WHATSAPP } from '../../config/contact.js';
 import { cx } from '../../components/ui/cx.js';
 import WhatsAppSignIn from '../../components/market/WhatsAppSignIn.jsx';
+import GoogleSignIn from '../../components/market/GoogleSignIn.jsx';
 
 function Shell({ children }) {
   return <div className="min-h-dvh bg-canvas"><MarketHeader /><main className="container max-w-2xl pb-20 pt-6 sm:pt-10">{children}</main></div>;
@@ -48,6 +49,7 @@ function AuthForm() {
         <p className="mt-2 text-muted">{t('acc.sub')}</p>
       </div>
       <p className="mt-5 rounded-2xl bg-secondary p-4 text-sm text-on-secondary">{t('acc.why')}</p>
+      {otp?.google && <GoogleSignIn clientId={otp.google} />}
       {viaWa ? <WhatsAppSignIn onPassword={() => setUsePassword(true)} /> : (<>
       <div role="tablist" className="mt-5 grid grid-cols-2 gap-1 rounded-2xl bg-secondary p-1">
         {['login', 'register'].map((m) => <button key={m} role="tab" aria-selected={mode === m} type="button" onClick={() => { setMode(m); setMsg(''); }} className={cx('h-11 rounded-xl text-sm font-semibold transition', mode === m ? 'bg-elevated shadow-sm' : 'text-muted')}>{t(`acc.tab.${m}`)}</button>)}

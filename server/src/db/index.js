@@ -61,7 +61,10 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
     if (!pc.includes('expires_at')) db.exec('ALTER TABLE products ADD COLUMN expires_at INTEGER'); // ms; set for products added by WhatsApp (auto-hidden after it)
     if (!pc.includes('source')) db.exec('ALTER TABLE products ADD COLUMN source TEXT'); }
   { const bc = db.prepare('PRAGMA table_info(buyers)').all().map((c) => c.name);
-    if (bc.length && !bc.includes('phone_verified')) db.exec('ALTER TABLE buyers ADD COLUMN phone_verified INTEGER NOT NULL DEFAULT 0'); } // 1 = proved by a WhatsApp code
+    if (bc.length && !bc.includes('phone_verified')) db.exec('ALTER TABLE buyers ADD COLUMN phone_verified INTEGER NOT NULL DEFAULT 0'); // 1 = proved by a WhatsApp code
+    if (bc.length && !bc.includes('google_sub')) db.exec('ALTER TABLE buyers ADD COLUMN google_sub TEXT'); // Google account id (accounts made with Google sign-in)
+    if (bc.length && !bc.includes('email')) db.exec('ALTER TABLE buyers ADD COLUMN email TEXT');
+    if (bc.length) db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_buyers_google_sub ON buyers(google_sub) WHERE google_sub IS NOT NULL'); }
   db.exec(`CREATE TABLE IF NOT EXISTS wa_otps (phone TEXT PRIMARY KEY, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, tries INTEGER NOT NULL DEFAULT 0, sent_at INTEGER NOT NULL)`);
   db.exec(`CREATE TABLE IF NOT EXISTS wa_inbound (id TEXT PRIMARY KEY, from_wa TEXT NOT NULL, type TEXT NOT NULL, body TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   db.exec(`CREATE TABLE IF NOT EXISTS pickup_zones (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, fee INTEGER NOT NULL DEFAULT 0 CHECK (fee >= 0 AND fee <= 5000), courier_cost INTEGER NOT NULL DEFAULT 0 CHECK (courier_cost >= 0 AND courier_cost <= 5000), created_at TEXT NOT NULL DEFAULT (datetime('now')))`);

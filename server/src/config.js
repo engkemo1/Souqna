@@ -38,6 +38,8 @@ export const config = {
   // The public demo account (ahmed@…): always read-only, so "Try the dashboard" can never change a real store or the site.
   demoEmail: (process.env.DEMO_EMAIL || 'ahmed@banhalook.app').toLowerCase(),
   adminKey: process.env.ADMIN_KEY || '',
+  // Google sign-in: the OAuth Web client id (public value). Leave empty to hide the Google button.
+  googleClientId: (process.env.GOOGLE_CLIENT_ID || '982783137966-un49hfr1o0mkajd46nahhc2higrvm6e8.apps.googleusercontent.com').trim(),
   // Optional two-step confirmation for /admin: a base32 secret (generate with `npm run admin-totp -w server`). When set, the key alone is not enough.
   adminTotpSecret: (process.env.ADMIN_TOTP_SECRET || '').replace(/\s/g, ''),
   // Daily backup (database + photos). Set BACKUP_DIR to a folder on a persistent disk / synced drive. BACKUP_KEEP_DAYS = how many daily DB copies to keep.

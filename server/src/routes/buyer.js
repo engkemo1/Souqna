@@ -3,7 +3,8 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { q, insert } from '../db/index.js';
 import { h, AppError, notFound } from '../lib/errors.js';
-import { signBuyer, requireBuyer } from '../lib/buyers.js';
+import { signBuyer, requireBuyer, buyerFromReq } from '../lib/buyers.js';
+import { googleReady, verifyGoogleCredential } from '../lib/google.js';
 import { vapidPublicKey } from '../lib/push.js';
 import { mediaMap } from '../lib/media.js';
 import { bi, serializeCards } from '../lib/serialize.js';
@@ -22,7 +23,9 @@ function throttle(key, max = 10) {
   attempts.set(key, [...a, now]);
 }
 const phoneSchema = z.string().trim().transform(normPhone).refine((p) => /^01[0-9]{9}$/.test(p), 'phone_invalid');
-const out = (b) => ({ id: b.id, name: b.name, phone: b.phone, phoneVerified: !!b.phone_verified });
+// Accounts made with Google start without a phone: the phone column holds a placeholder "g_<google id>" until a WhatsApp code proves a real number.
+const noPhone = (p) => String(p || '').startsWith('g_');
+const out = (b) => ({ id: b.id, name: b.name, phone: noPhone(b.phone) ? '' : b.phone, hasPhone: !noPhone(b.phone), phoneVerified: !!b.phone_verified });
 const unread = (id) => q.val('SELECT COUNT(*) FROM buyer_notifications WHERE buyer_id=? AND read=0', [id]);
 
 r.post('/register', h((req, res) => {
@@ -46,7 +49,7 @@ r.post('/login', h((req, res) => {
 const OTP_TTL = 10 * 60e3, OTP_RESEND = 45e3, OTP_TRIES = 5;
 const otpHash = (phone, code) => crypto.createHmac('sha256', config.jwtSecret).update(`${phone}:${code}`).digest('hex');
 
-r.get('/otp/available', (_req, res) => res.json({ whatsapp: waAuthReady() }));
+r.get('/otp/available', (_req, res) => res.json({ whatsapp: waAuthReady(), google: googleReady() ? config.googleClientId : null }));
 
 r.post('/otp/send', h(async (req, res) => {
   const b = z.object({ phone: phoneSchema }).parse(req.body);
@@ -74,6 +77,11 @@ r.post('/otp/verify', h((req, res) => {
   const ok = crypto.timingSafeEqual(Buffer.from(otpHash(b.phone, b.code)), Buffer.from(row.code_hash));
   if (!ok) { q.run('UPDATE wa_otps SET tries=tries+1 WHERE phone=?', [b.phone]); throw new AppError(400, 'otp_wrong', 'The code is not correct.', { code: 'otp_wrong' }); }
   let buyer = q.get('SELECT * FROM buyers WHERE phone=?', [b.phone]);
+  const me = buyerFromReq(req);
+  if (!buyer && me && noPhone(me.phone)) { // signed in with Google and now proved a number: attach it to that account
+    q.run('UPDATE buyers SET phone=? WHERE id=?', [b.phone, me.id]);
+    buyer = q.get('SELECT * FROM buyers WHERE id=?', [me.id]);
+  }
   if (!buyer) {
     if (!b.name) return res.status(200).json({ needName: true }); // code stays valid until the name is sent
     const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10) });
@@ -82,6 +90,20 @@ r.post('/otp/verify', h((req, res) => {
   q.run('DELETE FROM wa_otps WHERE phone=?', [b.phone]);
   q.run('UPDATE buyers SET phone_verified=1 WHERE id=?', [buyer.id]); // the code proved this number belongs to them
   buyer = { ...buyer, phone_verified: 1 };
+  res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });
+}));
+
+/* Sign in with Google: the browser sends the ID token; we verify it and open (or create) the shopper account. */
+r.post('/google', h(async (req, res) => {
+  const b = z.object({ credential: z.string().min(20).max(4000) }).parse(req.body);
+  throttle(`google:${req.ip}`, 20);
+  const g = await verifyGoogleCredential(b.credential);
+  let buyer = q.get('SELECT * FROM buyers WHERE google_sub=?', [g.sub]);
+  if (!buyer) {
+    const name = (g.name || (g.email || '').split('@')[0] || '').slice(0, 60);
+    const id = insert('buyers', { phone: `g_${g.sub}`, name: name.length >= 2 ? name : 'عميل', password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10), google_sub: g.sub, email: g.email });
+    buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
+  }
   res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });
 }));
 
@@ -274,7 +296,7 @@ r.delete('/cart-snapshot', requireBuyer, h((req, res) => { clearSnapshot(req.buy
 
 /* "Buy again": products from this shopper's delivered orders that can still be bought, most recent first */
 r.get('/buy-again', requireBuyer, h((req, res) => {
-  const tail = String(req.buyer.phone || '').replace(/\D/g, '').slice(-10);
+  const tail = noPhone(req.buyer.phone) ? '' : String(req.buyer.phone || '').replace(/\D/g, '').slice(-10);
   const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en
     FROM order_items oi JOIN orders o ON o.id=oi.order_id JOIN products p ON p.id=oi.product_id JOIN stores s ON s.id=p.store_id
     WHERE o.status='delivered' AND (o.buyer_id=? OR (? <> '' AND substr(o.phone,-10)=?))

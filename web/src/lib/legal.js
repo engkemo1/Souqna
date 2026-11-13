@@ -1,6 +1,6 @@
 /** Legal pages (privacy, terms). Arabic is the reference text; English is a faithful translation.
  *  Contact details come from config/contact.js at render time. Keep UPDATED in sync when the text changes. */
-export const LEGAL_UPDATED = '2026-10-27';
+export const LEGAL_UPDATED = '2026-11-13';
 
 export const LEGAL = {
   privacy: {
@@ -11,6 +11,7 @@ export const LEGAL = {
         ['البيانات اللي بنجمعها', [
           'عند إتمام الطلب: الاسم، رقم الموبايل، المحافظة والمدينة والعنوان، وملاحظات التوصيل، وتفاصيل الطلب.',
           'لو عملت حساب (اختياري): الاسم ورقم الموبايل وباسورد متشفّر (إحنا مش بنشوف الباسورد)، بالإضافة لخزانتك والمنتجات اللي بتتابعها وإشعاراتك.',
+          'لو دخلت بحساب جوجل (اختياري): بنستلم من جوجل اسمك وبريدك الإلكتروني وصورة حسابك بس، ونستخدمهم لإنشاء حسابك وتسجيل دخولك على Twist. مش بنوصل لأي بيانات تانية في حساب جوجل بتاعك (زي الإيميلات أو الملفات أو جهات الاتصال)، ومش بنشاركهم مع أي جهة. تقدر تمسح حسابك وبياناتك في أي وقت من خلال التواصل معانا.',
           'التقييمات: نص التقييم وأي صور بترفعها، وبيظهروا للناس باسمك الأول فقط.',
           'طلبات "مش لاقي في بنها": الوصف والصورة (لو رفعتها) وبيانات التواصل والعنوان اللي بتكتبها.',
           'المساعد تويلا: الرسائل والصور اللي بتبعتها للمساعد بتتبعت لمزوّد الذكاء الاصطناعي (Anthropic أو Cloudflare) عشان يرد عليك. لو عامل حساب، بنحفظ آخر 20 محادثة نصية في حسابك عشان تقدر ترجع لها أو تمسحها من سجل المحادثات. صور الشات نفسها مش بتتحفظ في السجل. من غير حساب، المحادثة بتفضل على جهازك طول ما الصفحة مفتوحة بس. وممكن نحتفظ بنص قصير عن تفضيلاتك وتقييماتك لتويلا على جهازك، وتقدر تمسح التفضيلات من داخل المحادثة.',
@@ -56,6 +57,7 @@ export const LEGAL = {
         ['Data we collect', [
           'When you place an order: your name, mobile number, governorate, city and address, delivery notes and the order details.',
           'If you create an account (optional): your name, mobile number and a hashed password (we never see it), plus your wardrobe, the products you watch and your notifications.',
+          'If you sign in with Google (optional): we receive only your name, email address and profile picture from Google, and use them to create your account and sign you in to Twist. We do not access any other data in your Google account (such as emails, files or contacts) and do not share it with anyone. You can ask us to delete your account and data at any time.',
           'Reviews: the review text and any photos you upload; they are shown with your first name only.',
           '"Can\'t find it in Banha" requests: the description, photo (if you add one), contact details and address you enter.',
           'The Twila assistant: messages and photos you send are passed to our AI provider (Anthropic or Cloudflare) so it can answer. If you have an account, we save your latest 20 text conversations to your account so you can revisit or delete them from chat history. Chat photos are not saved in that history. Without an account, the conversation stays on your device only while the page is open. A short note of your preferences and Twila ratings may also be kept on your device; you can clear the learned preference memory in the chat.',

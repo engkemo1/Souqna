@@ -753,7 +753,9 @@ export async function runStylist(messages, { image, image2, profile, session, an
     }
   }
   if (!plan) {
-    try { plan = parseJson(await callLlm(provider, systemPrompt(name.ar, profile, stylistTrainingPrompt(history.at(-1)?.content || '')), history)); lastError = ''; }
+    // نص عادي → سلسلة المزوّدين (Claude ← Gemini ← ...) عشان لو رصيد Claude خلص يكمّل على Gemini. الصور بـ Claude بس لأنها blocks خاصة بيه.
+    const legacyCall = image && provider === 'anthropic' ? (sys, h) => callLlm(provider, sys, h) : llmFallbackCall;
+    try { plan = parseJson(await legacyCall(systemPrompt(name.ar, profile, stylistTrainingPrompt(history.at(-1)?.content || '')), history)); lastError = ''; }
     catch (e) { lastError = String(e.message).slice(0, 200); console.error('[stylist]', lastError); throw Object.assign(new Error('llm'), { code: 'stylist_unavailable' }); }
   }
   const intent = ['shop', 'clarify', 'chat'].includes(plan.intent) ? plan.intent : 'shop';
