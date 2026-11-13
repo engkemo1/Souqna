@@ -13,7 +13,7 @@ export default function GoogleSignIn({ clientId, onDone }) {
   cb.current = async (resp) => {
     setMsg('');
     try { const r = await api('/buyer/google', { method: 'POST', body: { credential: resp.credential } }); acceptSession(r); onDone?.(r); }
-    catch { setMsg(lang === 'ar' ? 'معرفناش ندخلك بجوجل. جرّب تاني أو ادخل بالواتساب.' : 'Google sign-in failed. Try again or use WhatsApp.'); }
+    catch (x) { setMsg(x?.code === 'customer_blocked' ? (lang === 'ar' ? 'مش قادرين ندخلك بالحساب ده. كلمنا على واتساب خدمة عملاء Twist.' : 'This account cannot sign in. Please contact Twist support on WhatsApp.') : (lang === 'ar' ? 'معرفناش ندخلك بجوجل. جرّب تاني أو ادخل بالواتساب.' : 'Google sign-in failed. Try again or use WhatsApp.')); }
   };
   useEffect(() => {
     if (!clientId) return undefined;

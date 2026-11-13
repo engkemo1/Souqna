@@ -23,7 +23,7 @@ const NAV_GROUPS = [
     { to: '/admin/featured', icon: Sparkles, label: 'الإعلانات والعروض المميزة' },
     { to: '/admin/advertisers', icon: Megaphone, label: 'المعلنون الخارجيون' },
     { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
-    { to: '/admin/buyers', icon: Users, label: 'حسابات العملاء' },
+    { to: '/admin/buyers', icon: Users, label: 'العملاء والحسابات' },
     { to: '/admin/photos', icon: Camera, label: 'أحدث الصور' },
   ] },
   { label: 'الطلبات والتشغيل', items: [

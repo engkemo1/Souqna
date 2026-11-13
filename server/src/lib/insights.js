@@ -4,6 +4,7 @@
  * Days are Cairo dates. Money is whole EGP like the rest of the app.
  */
 import { q, db, tx } from '../db/index.js';
+import { adminBuyersCsv } from './buyers.js';
 import { cairoNow } from './sameDay.js';
 import { shiftDay } from './traffic.js';
 import { notifyStore } from './push.js';
@@ -328,6 +329,7 @@ export function exportCsv(kind, days = 30) {
     const seg = segments()[kind === 'segment-repeat' ? 'repeat' : 'lapsed'].sort((a, b) => b.spent - a.spent);
     return { name: kind, csv: toCsv(['الاسم', 'الموبايل', 'عدد الطلبات', 'إجمالي المشتريات', 'آخر طلب'], seg.map((c) => [c.name, c.phone, c.orders, c.spent, c.last])) };
   }
+  if (kind === 'buyers') { const b = adminBuyersCsv(); return { name: 'buyers', csv: toCsv(b.header, b.rows) }; }
   if (kind === 'couriers') {
     const rep = couriersReport(Math.max(d, 7));
     const rows = rep.couriers.flatMap((c) => c.daily.map((x) => [c.name, x.day, x.runs, x.orders, x.collected, x.storePay, x.sponsor, x.handover, x.wage, x.net]));

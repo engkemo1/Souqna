@@ -64,7 +64,12 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
     if (bc.length && !bc.includes('phone_verified')) db.exec('ALTER TABLE buyers ADD COLUMN phone_verified INTEGER NOT NULL DEFAULT 0'); // 1 = proved by a WhatsApp code
     if (bc.length && !bc.includes('google_sub')) db.exec('ALTER TABLE buyers ADD COLUMN google_sub TEXT'); // Google account id (accounts made with Google sign-in)
     if (bc.length && !bc.includes('email')) db.exec('ALTER TABLE buyers ADD COLUMN email TEXT');
+    if (bc.length && !bc.includes('signup_via')) db.exec('ALTER TABLE buyers ADD COLUMN signup_via TEXT'); // google | whatsapp | password (older accounts: worked out from the other columns)
+    if (bc.length && !bc.includes('blocked')) db.exec('ALTER TABLE buyers ADD COLUMN blocked INTEGER NOT NULL DEFAULT 0'); // blocked by the platform admin (accounts without a phone)
+    if (bc.length && !bc.includes('last_seen_at')) db.exec('ALTER TABLE buyers ADD COLUMN last_seen_at TEXT'); // last time the account used the site (updated at most every 10 minutes)
     if (bc.length) db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_buyers_google_sub ON buyers(google_sub) WHERE google_sub IS NOT NULL'); }
+  // Shoppers the team flagged (by mobile number, so guests count too): a private note, and a block that stops new orders and sign-ins.
+  db.exec(`CREATE TABLE IF NOT EXISTS customer_flags (phone TEXT PRIMARY KEY, blocked INTEGER NOT NULL DEFAULT 0, reason TEXT, note TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   db.exec(`CREATE TABLE IF NOT EXISTS wa_otps (phone TEXT PRIMARY KEY, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, tries INTEGER NOT NULL DEFAULT 0, sent_at INTEGER NOT NULL)`);
   db.exec(`CREATE TABLE IF NOT EXISTS wa_inbound (id TEXT PRIMARY KEY, from_wa TEXT NOT NULL, type TEXT NOT NULL, body TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   db.exec(`CREATE TABLE IF NOT EXISTS pickup_zones (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, fee INTEGER NOT NULL DEFAULT 0 CHECK (fee >= 0 AND fee <= 5000), courier_cost INTEGER NOT NULL DEFAULT 0 CHECK (courier_cost >= 0 AND courier_cost <= 5000), created_at TEXT NOT NULL DEFAULT (datetime('now')))`);

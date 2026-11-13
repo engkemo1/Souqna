@@ -23,7 +23,7 @@ import { adminModaPrompts, saveModaPrompts, resetModaPrompts, suggestPrompts } f
 import { saveAsset, assignAsset, unassign, deleteAsset, bulkUpload, libraryStatus, listAssets, duplicatesReport, checkLinks, serializeAsset } from '../lib/image-assets.js';
 import { generationStatus, requestCandidate, listCandidates, candidateRow, approveCandidate, rejectCandidate, defaultPrompt, eligibleSections, createBatch, startBatch, pauseBatch, cancelBatch, retryFailed, batchStatus, listBatches } from '../lib/image-gen.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage, recutLookImage } from '../lib/deptImage.js';
-import { notifyBuyer, notifyOrderStatus } from '../lib/buyers.js';
+import { notifyBuyer, notifyOrderStatus, adminBuyersList, adminBuyerDetail, adminCustomersList, adminCustomerDetail, setCustomerFlag, setBuyerBlocked } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
 import { trafficStats } from '../lib/traffic.js';
 import { auditMiddleware } from '../lib/insights.js';
@@ -1048,9 +1048,33 @@ r.get('/photos', h((req, res) => {
   });
 }));
 r.get('/buyers', h((req, res) => {
-  const term = String(req.query.q || '').replace(/\D/g, '');
-  const items = q.all(`SELECT b.id, b.name, b.phone, b.created_at, (SELECT COUNT(*) FROM orders o WHERE o.buyer_id=b.id) AS orders FROM buyers b ${term ? 'WHERE b.phone LIKE ?' : ''} ORDER BY b.id DESC LIMIT 50`, term ? [`%${term}%`] : []);
-  res.json({ items, total: q.val('SELECT COUNT(*) FROM buyers') });
+  res.json(adminBuyersList({ term: req.query.q, via: req.query.via, sort: req.query.sort, page: req.query.page }));
+}));
+const custPhone = (v) => { const p = String(v || '').replace(/\D/g, '').replace(/^20(?=1\d{9}$)/, '0'); if (!/^01\d{9}$/.test(p)) throw new AppError(400, 'phone_invalid', 'Invalid mobile number.'); return p; };
+r.get('/customers', h((req, res) => {
+  res.json(adminCustomersList({ term: req.query.q, filter: req.query.filter, sort: req.query.sort, page: req.query.page }));
+}));
+r.get('/customers/:phone', h((req, res) => {
+  const d = adminCustomerDetail(custPhone(req.params.phone));
+  if (!d) throw new AppError(404, 'not_found', 'Customer not found.');
+  res.json(d);
+}));
+r.put('/customers/:phone', h((req, res) => {
+  const body = z.object({ blocked: z.boolean().optional(), reason: z.string().trim().max(200).optional(), note: z.string().trim().max(1000).optional() }).parse(req.body);
+  res.json(setCustomerFlag(custPhone(req.params.phone), body));
+}));
+r.put('/buyers/:id/block', h((req, res) => {
+  const body = z.object({ blocked: z.boolean(), reason: z.string().trim().max(200).optional() }).parse(req.body);
+  const b = q.get('SELECT id, phone FROM buyers WHERE id=?', [Number(req.params.id)]);
+  if (!b) throw new AppError(404, 'not_found', 'Account not found.');
+  if (/^01\d{9}$/.test(b.phone)) setCustomerFlag(b.phone, { blocked: body.blocked, reason: body.reason }); // block the number: covers guest orders too
+  setBuyerBlocked(b.id, body.blocked);
+  res.json({ ok: true });
+}));
+r.get('/buyers/:id', h((req, res) => {
+  const d = adminBuyerDetail(Number(req.params.id));
+  if (!d) throw new AppError(404, 'not_found', 'Account not found.');
+  res.json(d);
 }));
 r.post('/buyers/:id/reset-password', h((req, res) => {
   const b = q.get('SELECT id FROM buyers WHERE id=?', [Number(req.params.id)]);

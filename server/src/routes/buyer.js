@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { q, insert, tx } from '../db/index.js';
 import { h, AppError, notFound } from '../lib/errors.js';
-import { signBuyer, requireBuyer, buyerFromReq } from '../lib/buyers.js';
+import { signBuyer, requireBuyer, buyerFromReq, isPhoneBlocked } from '../lib/buyers.js';
 import { googleReady, verifyGoogleCredential } from '../lib/google.js';
 import { vapidPublicKey } from '../lib/push.js';
 import { mediaMap } from '../lib/media.js';
@@ -22,6 +22,7 @@ function throttle(key, max = 10) {
   if (a.length >= max) throw new AppError(429, 'too_many_attempts', 'Too many attempts. Please wait a few minutes.');
   attempts.set(key, [...a, now]);
 }
+const blockedErr = () => new AppError(403, 'customer_blocked', 'This account cannot sign in. Please contact Twist support on WhatsApp.');
 const phoneSchema = z.string().trim().transform(normPhone).refine((p) => /^01[0-9]{9}$/.test(p), 'phone_invalid');
 // Accounts made with Google start without a phone: the phone column holds a placeholder "g_<google id>" until a WhatsApp code proves a real number.
 const noPhone = (p) => String(p || '').startsWith('g_');
@@ -46,9 +47,10 @@ const unread = (id) => q.val('SELECT COUNT(*) FROM buyer_notifications WHERE buy
 
 r.post('/register', h((req, res) => {
   const b = z.object({ name: z.string().trim().min(2, 'required').max(60), phone: phoneSchema, password: z.string().min(6, 'password_short').max(100) }).parse(req.body);
+  if (isPhoneBlocked(b.phone)) throw blockedErr();
   throttle(`reg:${req.ip}`, 8);
   if (q.get('SELECT 1 AS x FROM buyers WHERE phone=?', [b.phone])) throw new AppError(409, 'phone_taken', 'This number already has an account. Sign in instead.', { phone: 'phone_taken' });
-  const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: bcrypt.hashSync(b.password, 10) });
+  const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: bcrypt.hashSync(b.password, 10), signup_via: 'password' });
   const buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
   res.status(201).json({ token: signBuyer(buyer), buyer: out(buyer), unread: 0 });
 }));
@@ -58,6 +60,7 @@ r.post('/login', h((req, res) => {
   throttle(`login:${req.ip}:${b.phone}`);
   const buyer = q.get('SELECT * FROM buyers WHERE phone=?', [b.phone]);
   if (!buyer || !bcrypt.compareSync(b.password, buyer.password_hash)) throw new AppError(401, 'invalid_credentials', 'Number or password is incorrect.');
+  if (buyer.blocked || isPhoneBlocked(buyer.phone)) throw blockedErr();
   res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });
 }));
 
@@ -70,6 +73,7 @@ r.get('/otp/available', (_req, res) => res.json({ whatsapp: waAuthReady(), googl
 r.post('/otp/send', h(async (req, res) => {
   const b = z.object({ phone: phoneSchema }).parse(req.body);
   if (!waAuthReady()) throw new AppError(503, 'wa_unavailable', 'WhatsApp sign-in is not available right now.');
+  if (isPhoneBlocked(b.phone)) throw blockedErr();
   throttle(`otp-ip:${req.ip}`, 12);
   throttle(`otp-phone:${b.phone}`, 5);
   const prev = q.get('SELECT sent_at FROM wa_otps WHERE phone=?', [b.phone]);
@@ -108,9 +112,10 @@ r.post('/otp/verify', h((req, res) => {
   }
   if (!buyer) {
     if (!b.name) return res.status(200).json({ needName: true }); // code stays valid until the name is sent
-    const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10) });
+    const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10), signup_via: 'whatsapp' });
     buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
   }
+  if (buyer.blocked || isPhoneBlocked(buyer.phone)) throw blockedErr();
   q.run('DELETE FROM wa_otps WHERE phone=?', [b.phone]);
   q.run('UPDATE buyers SET phone_verified=1 WHERE id=?', [buyer.id]); // the code proved this number belongs to them
   buyer = { ...buyer, phone_verified: 1 };
@@ -123,9 +128,10 @@ r.post('/google', h(async (req, res) => {
   throttle(`google:${req.ip}`, 20);
   const g = await verifyGoogleCredential(b.credential);
   let buyer = q.get('SELECT * FROM buyers WHERE google_sub=?', [g.sub]);
+  if (buyer && (buyer.blocked || isPhoneBlocked(buyer.phone))) throw blockedErr();
   if (!buyer) {
     const name = (g.name || (g.email || '').split('@')[0] || '').slice(0, 60);
-    const id = insert('buyers', { phone: `g_${g.sub}`, name: name.length >= 2 ? name : 'عميل', password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10), google_sub: g.sub, email: g.email });
+    const id = insert('buyers', { phone: `g_${g.sub}`, name: name.length >= 2 ? name : 'عميل', password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10), google_sub: g.sub, email: g.email, signup_via: 'google' });
     buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
   }
   res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });

@@ -17,7 +17,7 @@ import { storeOffers, productOffers, offerBadges, countView } from '../lib/promo
 // Soft ranking: a product whose main photo scored clearly weak (<50) sits just below the others of the same standing. Older photos (no score) are never demoted.
 const WEAK_PHOTO = `(CASE WHEN COALESCE((SELECT m.quality FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.is_primary=1 LIMIT 1), 100) < 50 THEN 1 ELSE 0 END)`;
 import { sameDaySql, cairoNow } from '../lib/sameDay.js';
-import { buyerFromReq } from '../lib/buyers.js';
+import { buyerFromReq, assertCustomerAllowed } from '../lib/buyers.js';
 import { recordSiteVisit, recordConversion, cairoDay } from '../lib/traffic.js';
 import { logSearch, trackEvent } from '../lib/insights.js';
 import { buildQuery, matchProducts, prepareRow, vocabFrom, suggestCorrection } from '../lib/search-text.js';
@@ -1057,6 +1057,7 @@ const orderSchema = z.object({
 r.post('/stores/:slug/orders', h((req, res) => {
   const s = loadStore(req.params.slug);
   const body = orderSchema.parse(req.body);
+  assertCustomerAllowed(body.phone, req);
   const result = tx(() => {
     const qt = quote(s, body.items, body.coupon, { phone: body.phone, giftChoices: body.gifts });
     if (body.coupon && qt.couponError) throw new AppError(409, qt.couponError, 'This coupon can no longer be applied.'); // never charge more than the customer was shown
@@ -1133,6 +1134,7 @@ r.post('/stores/:slug/reserve', h((req, res) => {
   const hours = s.reserve_hours ?? 24;
   if (!hours) throw new AppError(409, 'reserve_off', 'This store does not take reservations.');
   const body = reserveSchema.parse(req.body);
+  assertCustomerAllowed(body.phone, req);
   const branch = branchOf(s, body.branch);
   if (branch) body.notes = `الفرع: ${branch.name}${body.notes ? ` — ${body.notes}` : ''}`; // the shop sees it in the order note
   const hits = (reserveHits.get(req.ip) || []).filter((t) => Date.now() - t < 3600e3);
@@ -1192,6 +1194,7 @@ const marketplaceOrderSchema = orderSchema.omit({ coupon: true, items: true, gif
 // A single marketplace checkout is recorded as one independently managed order per store.
 r.post('/marketplace/orders', h((req, res) => {
   const body = marketplaceOrderSchema.parse(req.body);
+  assertCustomerAllowed(body.phone, req);
   if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
   const result = tx(() => {
     const prepared = body.stores.map(({ slug, items, coupon, gifts, storeNote }) => {
