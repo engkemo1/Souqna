@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard, Eye, Wallet, TrendingUp, AlertTriangle, History } from 'lucide-react';
+import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard, Eye, Wallet, TrendingUp, AlertTriangle, History, MessageCircle } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -50,6 +50,7 @@ const NAV_GROUPS = [
   { label: 'الذكاء الاصطناعي والمنصة', items: [
     { to: '/admin/system?section=cashier', icon: DatabaseBackup, label: 'ربط الكاشير' },
     { to: '/admin/system?section=moda', icon: Sparkles, label: 'المساعد الذكي' },
+    { to: '/admin/system?section=whatsapp', icon: MessageCircle, label: 'واتساب' },
     { to: '/admin/system?section=visual', icon: ScanSearch, label: 'البحث المرئي' },
     { to: '/admin/system?section=security', icon: DatabaseBackup, label: 'السيرفر والنسخ' },
   ] },

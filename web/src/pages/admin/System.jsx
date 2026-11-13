@@ -1050,7 +1050,7 @@ function CashierSyncPanel() {
 export default function System() {
   const [searchParams] = useSearchParams();
   const requestedSection = searchParams.get('section');
-  const section = ['moda', 'visual', 'security', 'cashier'].includes(requestedSection) ? requestedSection : 'security';
+  const section = ['moda', 'visual', 'security', 'cashier', 'whatsapp'].includes(requestedSection) ? requestedSection : 'security';
   const { data, error, loading, reload } = useAdminApi('/status');
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
   const required = (data?.checks || []).filter((c) => !c.optional);
@@ -1058,8 +1058,8 @@ export default function System() {
   return (
     <div>
       <PageHeader
-        title={section === 'moda' ? 'المساعد الذكي' : section === 'visual' ? 'البحث المرئي' : section === 'cashier' ? 'ربط أنظمة الكاشير' : 'السيرفر والنسخ'}
-        subtitle={section === 'moda' ? 'إعداداته، اقتراحاته، ومراجعتها وتعليمه' : section === 'visual' ? 'إعدادات البحث بالصور' : section === 'cashier' ? 'إتاحة الميزة ومتابعة جاهزيتها' : 'جاهزية الموقع، النسخ الاحتياطي، وحالة التشغيل'}
+        title={section === 'moda' ? 'المساعد الذكي' : section === 'whatsapp' ? 'واتساب' : section === 'visual' ? 'البحث المرئي' : section === 'cashier' ? 'ربط أنظمة الكاشير' : 'السيرفر والنسخ'}
+        subtitle={section === 'moda' ? 'إعداداته، اقتراحاته، ومراجعتها وتعليمه' : section === 'whatsapp' ? 'التوكن والقوالب ورسائل الطلبات' : section === 'visual' ? 'إعدادات البحث بالصور' : section === 'cashier' ? 'إتاحة الميزة ومتابعة جاهزيتها' : 'جاهزية الموقع، النسخ الاحتياطي، وحالة التشغيل'}
       />
       {loading && !data ? <Skeleton className="h-64 w-full rounded-2xl" /> : (
         <div className="grid gap-4 lg:grid-cols-3">
@@ -1087,8 +1087,8 @@ export default function System() {
           </>}
           {section === 'visual' && <VisualPanel />}
           {section === 'cashier' && <><CashierSyncPanel /><CashierGuidePanel /></>}
+          {section === 'whatsapp' && <WhatsAppPanel />}
           {section === 'moda' && <>
-          <WhatsAppPanel />
           <StylistPanel />
           <ModaPromptsPanel />
           <ModaTestLabPanel />
