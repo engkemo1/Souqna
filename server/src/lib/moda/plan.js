@@ -13,7 +13,7 @@ const FABRIC_KEYS = new Set(['tops', 'bottoms', 'dresses', 'suiting', 'modest'])
 const LEISURE_CONTEXTS = new Set(['sahel_beach', 'sport', 'home', 'condolence', 'travel']);
 // وصفات مرتبطة بمناسبة موسمية بعينها (عيد/إفطار): ماتتستلفش كبديل لمناسبة تانية (مثلاً الجامعة).
 const EVENT_ONLY_CONTEXTS = new Set(['eid', 'ramadan_iftar']);
-const OWNED_EXPAND = { dress_any: ['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_beach'], shoes_any: ['shoes_any', 'sneakers', 'formal_shoes', 'loafers', 'flats', 'heels_low', 'heels_high', 'sandals', 'boots'] };
+const OWNED_EXPAND = { dress_any: ['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_beach'], shoes_any: ['shoes_any', 'sneakers', 'formal_shoes', 'loafers', 'flats', 'heels_low', 'heels_high', 'sandals', 'boots'], slippers: ['slippers', 'sneakers', 'formal_shoes', 'loafers', 'flats', 'heels_low', 'heels_high', 'sandals', 'boots'] }; // شبشب/جلوجز: هو الحذاء اللي لابسه، فمنرشحش حذاء تاني
 const AUD_WEIGHT = { men: 1, women: 1, women_hijab: 1, boys: 0.6, girls: 0.6 };
 
 const genderOK = (aud, g) => {
@@ -55,7 +55,7 @@ function slotsFor(aud, parsed, look, K, ctxF, adv) {
   if (explicit.length) {
     return {
       mode: 'explicit',
-      slots: explicit.map((g, i) => ({ keys: resolveKeys([g.key], aud, ctxF), base: g.key, required: true, share: Math.round(100 / explicit.length), color: g.color || null, material: g.material || null, explicit: true, hero: i === 0 })),
+      slots: explicit.map((g, i) => ({ keys: resolveKeys([g.key, ...(g.alts || [])], aud, ctxF), base: g.key, required: true, share: Math.round(100 / explicit.length), color: g.color || null, material: g.material || null, explicit: true, hero: i === 0 })),
     };
   }
   if (!look) return { mode: 'none', slots: [] };
@@ -115,6 +115,10 @@ function scoreProduct(p, slot, ctx) {
   if (learnedPreferences?.disliked.has(String(p.id))) s -= 2;
   s += Math.min(2.5, p.popularity || 0);
   { const ki = slot.keys.indexOf(p.key); if (ki > 0) s -= ki * 1.5; else if (ki < 0) s -= 4; }
+  // الموسم من اسم المنتج (قطيفه/ميلتون/مبطن... شتوي، وكتان/شيفون/صيفي... صيفي)
+  { const nmz = String(p.name_ar || ''); const wb = adv?.band;
+    if ((wb === 'hot' || wb === 'warm') && /(قطيفه|قطيفة|ميلتون|مبطن|فرو|صوف|بامب|دفايه|دفاية|شتوي|شتوى|فليس|بلوفر|تريكو|جوخ|كوت )/.test(nmz)) s -= 6;
+    if ((wb === 'cool' || wb === 'cold') && /(صيفي|صيفى|كتان|شيفون|شورت|بدون اكمام)/.test(nmz)) s -= 4; }
   // الجو
   const item = K.items.get(p.key); const band = adv?.band;
   if (item && FABRIC_KEYS.has(item.family)) {
@@ -289,7 +293,8 @@ function lookForOwned(aud, parsed, K) {
   // «دريس» عامة من الصورة بتطابق أي لوك فيه فستان (مش بس dress_any اللي مفيش لوك بيستخدمه).
   const owned = (parsed.ownedPieces || []).flatMap((o) => OWNED_EXPAND[o.key] || [o.key]);
   if (!owned.length) return [];
-  return K.outfits.looks.filter((l) => l.status !== 'draft' && l.audience.includes(aud) && l.slots.some(([k]) => String(k).split('|').some((x) => owned.includes(x)))).sort((a, b) => b.formality - a.formality).map((l) => ({ look: l, t: 0 }));
+  const onlySlippers = (parsed.ownedPieces || []).every((o) => o.key === 'slippers'); // شبشب/جلوجز: لوك كاجوال بس، مش مناسبات رسمية
+  return K.outfits.looks.filter((l) => l.status !== 'draft' && l.audience.includes(aud) && (!onlySlippers || (l.formality <= 2 && !l.contexts.includes('sport'))) && l.slots.some(([k]) => String(k).split('|').some((x) => owned.includes(x)))).sort((a, b) => b.formality - a.formality).map((l) => ({ look: l, t: 0 }));
 }
 
 const rankFill = (f, tgt = null) => [f.missing.length, f.maxLevel, f.look && tgt != null ? Math.round(Math.abs(f.look.formality - tgt) * 2) : 0, -f.slotsCount, -f.score];
@@ -463,7 +468,7 @@ export function planOutfit(parsed, products, env = {}) {
   for (const f of fills) for (const p of f.picks) { const c = primary(p.product); if (c && !palette.includes(c) && !['black', 'white'].includes(c) || (c && palette.length < 1 && !palette.includes(c))) palette.push(c); }
 
   return {
-    ...base, soloFromCouple: parsed.flags?.soloFromCouple || null, state, persons, audienceOpen, context, role, budget, total, over, dropped, missing, relaxed, ask: asks, palette: palette.slice(0, 3),
+    ...base, soloFromCouple: parsed.flags?.soloFromCouple || null, state, persons, audienceOpen, context, role, budget, total, over, dropped, missing, relaxed, ask: asks, palette: palette.slice(0, 3), pickColors: [...new Set(fills.flatMap((f) => f.picks.map((p) => primary(p.product))).filter(Boolean))], pickCount: fills.reduce((n, f) => n + f.picks.length, 0),
     people: fills.map((f) => ({
       aud: f.aud, mode: f.mode, look: f.look ? { id: f.look.id, name_ar: f.look.name_ar, tip_ar: f.look.tip_ar, formality: f.look.formality } : null,
       picks: f.picks.map((p) => ({ slotKey: p.slot.base, optional: !p.slot.required, hero: p.slot.hero, product: p.product, relaxed: p.relaxedKind })),

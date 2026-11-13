@@ -144,7 +144,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   const tips = [];
   const styleTips = [];
   const adv = plan.weather;
-  if (!condolence && adv) {
+  if (!condolence && adv && !adv.seasonOnly) {
     if (adv.fabrics_ar?.length) tips.push(say('weather_line', { temp: adv.temp, fabrics: joinAr(adv.fabrics_ar.slice(0, 2)) }));
     if ((adv.band === 'cool' || adv.band === 'cold') && plan.eventTime?.isNight) tips.push(say('weather_layer', { layers: adv.layers === 1 ? 'جاكيت أو شال خفيف' : 'جاكيت تقيل' }));
     if (adv.notes?.includes('rain')) tips.push(say('weather_rain'));
@@ -152,7 +152,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   }
   if (!condolence) {
     const harmony = (!condolence && plan.palette?.length && plan.state !== 'none')
-      ? generateColorHarmonyInsight(plan.palette, plan.context, couple)
+      ? generateColorHarmonyInsight(plan.pickColors || plan.palette, plan.context, couple, plan.pickCount)
       : null;
     if (harmony) styleTips.push(harmony);
     const seen = new Set();

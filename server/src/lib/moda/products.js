@@ -33,7 +33,7 @@ const hasToken = (set, tok) => tokenVariants(tok).some((v) => set.has(v));
 
 /** كلمات حاسمة: الاسم اللي فيه كفلينج/روب/لانجري/قميص نوم مستحيل يبقى قميص/فستان مهما كان معاه. */
 const FORCE_RULES = [
-  ['cufflinks', /(^|\s)(كافلينج|كفلينج|كافلينك|كفلينك|كافلنج|كفلنج|كفلينجز|ازرار اكمام|زرار قميص|ازرار قميص|زراير قميص)(\s|$)|\b(cufflinks?|cuff links?)\b/i],
+  ['cufflinks', /(^|\s)(كافلينج|كفلينج|كافلينك|كفلينك|كافلينح|كفلينح|كافلنج|كفلنج|كفلينجز|ازرار اكمام|زرار قميص|ازرار قميص|زراير قميص)(\s|$)|\b(cufflinks?|cuff links?)\b/i],
   ['lingerie', /(^|\s)(لانجيري|لانجري|لينجري|لانجريه|لانجيريه|بيبي دول)(\s|$)|\b(lingerie|babydoll|baby doll)\b/i],
   ['sleepwear', /(^|\s)(قميص نوم|قمصان نوم|فستان نوم|لبس نوم|ملابس نوم|بيجامه|بيجاما|بجامه|بجاما|بيجامات)(\s|$)|\b(nightgown|nightwear|sleepwear|pajamas?|pyjamas?)\b/i],
   ['robe', /(^|\s)(روب|ارواب|رواب|برنس|برنس حمام)(\s|$)|\b(robe|bathrobe|dressing gown)\b/i],
@@ -91,7 +91,7 @@ export function inferFormality(key, name, desc, K = loadKnowledge()) {
 }
 
 const KIDS_GIRL = ['بنات', 'بنوته', 'بناتي', 'girls', 'girl'];
-const KIDS_BOY = ['ولادي', 'اولاد', 'ولد', 'boys', 'boy'];
+const KIDS_BOY = ['ولادي', 'ولادى', 'اولادي', 'اولادى', 'اولاد', 'ولد', 'boys', 'boy'];
 const KIDS_BOTH = ['اطفال', 'كيدز', 'kids', 'children'];
 const MEN_WORDS = ['رجالي', 'للرجال', 'men', 'mens', 'man'];
 const WOMEN_WORDS = ['حريمي', 'نسائي', 'للنساء', 'women', 'womens', 'woman', 'ladies'];
@@ -170,6 +170,7 @@ export function enrichProduct(row, K = loadKnowledge()) {
     const fam = (k) => K.items.get(k)?.family || null;
     if (catKey && nameKey && !WEAK_KEYS.has(catKey) && !WEAK_KEYS.has(nameKey) && fam(catKey) && fam(nameKey) && fam(catKey) !== fam(nameKey)) typeConflict = true;
   }
+  if (/(^|\s)(رقص|راقصه|راقصة)(\s|$)|belly\s?dance/i.test(norm(name))) typeConflict = true; // أزياء الرقص مش للتنسيق
   if (Number(row.photo_mismatch) === 1) typeConflict = true; // صورة المنتج (CLIP) نوعها مختلف عن اسمه/قسمه
   const desc = `${row.description_ar || ''}`;
   if (key === 'dress_any') {

@@ -39,7 +39,7 @@ import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
 import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, getPlatformFreeShipping } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
-import { sendNewOrderAlert, notifyPlatformAlert } from '../lib/whatsapp.js';
+import { sendNewOrderAlert, notifyPlatformAlert, notifyCustomerOrderPlaced } from '../lib/whatsapp.js';
 import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
 import { storeHours } from '../lib/hours.js';
 import { waAuthReady } from '../lib/wa.js';
@@ -1095,6 +1095,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
       .then((r) => { if (r.sent) console.log(`[whatsapp] ${result.number} → ${r.to}`); else console.log(`[whatsapp] ${result.number} skipped: ${r.skipped}`); })
       .catch((e) => console.error(`[whatsapp] ${result.number} failed: ${e.message}`));
   }
+  notifyCustomerOrderPlaced({ phone: body.phone, name: body.name, number: result.number, token: result.trackToken, orderId: result.orderId });
   notifyStore(s.id, { title: `طلب جديد 🛍️ ${result.number}`, body: `${body.name} · ${result.total} ج.م`, url: `/dashboard/orders/${result.orderId}`, tag: `order-${result.orderId}` });
   notifyPlatformAlert(`طلب جديد من ${s.name_ar} 🛍️ ${result.number} بقيمة ${result.total} ج.م للعميل ${body.name}`);
   delete result.orderId;
@@ -1257,6 +1258,7 @@ r.post('/marketplace/orders', h((req, res) => {
     const store = loadStore(order.storeSlug);
     // Store notifications are best-effort, after all sub-orders have committed atomically.
     if (store.auto_whatsapp) sendNewOrderAlert(store, order.orderId).catch((e) => console.error(`[whatsapp] ${order.number} failed: ${e.message}`));
+    notifyCustomerOrderPlaced({ phone: body.phone, name: body.name, number: order.number, token: order.trackToken, orderId: order.orderId });
     notifyStore(store.id, { title: `طلب جديد 🛍️ ${order.number}`, body: `${body.name} · ${order.total} ج.م`, url: `/dashboard/orders/${order.orderId}`, tag: `order-${order.orderId}` });
     notifyPlatformAlert(`طلب تويست جديد 🛍️ ${order.number} من ${store.name_ar} بقيمة ${order.total} ج.م للعميل ${body.name}${order.deliveryFeeStatus === 'pending' ? ` ⚠️ المنطقة (${body.city}) خارج جدول التوصيل: كلّموا العميل ${body.phone} بمصاريف الشحن` : ''}`);
     // Marketplace orders are always delivered by Twist, regardless of the

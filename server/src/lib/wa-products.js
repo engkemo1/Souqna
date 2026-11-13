@@ -147,6 +147,7 @@ async function handleReply(store, m, text) {
 
 onWhatsAppMessage(async (m) => {
   if (!waReady()) return;
+  if (/^(ord|cust):/.test(m.button?.payload || m.interactive?.button_reply?.id || '')) return; // order buttons: handled in wa-orders.js
   const store = storeFor(m.from);
   if (!store) {
     if (m.type === 'image' || m.type === 'text') await reply(m.from, 'أهلاً بيك في تويست 👋\nالرقم ده لأصحاب المحلات المسجّلين. لو عندك محل وعايز تنضم، كلمنا من الموقع: twistegy.com', m.id);
@@ -171,3 +172,4 @@ export function expireWhatsAppProducts(now = Date.now()) {
   return r.changes;
 }
 setInterval(() => { try { expireWhatsAppProducts(); } catch (e) { console.error(`[wa] expiry sweep failed: ${e.message}`); } }, 3600e3).unref();
+import './wa-orders.js'; // order buttons (store confirm steps + customer quick questions)

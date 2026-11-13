@@ -8,7 +8,7 @@ import { norm } from './text.js';
 /**
  * تحليل وتفسير تناسق الألوان والستايل بأسلوب ستايلست مصري أنيق
  */
-export function generateColorHarmonyInsight(palette = [], context = null, couple = false) {
+export function generateColorHarmonyInsight(palette = [], context = null, couple = false, pickCount = 0) {
   const pSet = new Set(palette.map((c) => String(c).toLowerCase()));
 
   if (couple) {
@@ -35,7 +35,7 @@ export function generateColorHarmonyInsight(palette = [], context = null, couple
   }
 
   // مونوكروم (أسود كامل، رمادي كامل، كحلي كامل)
-  if (pSet.size === 1) {
+  if (pSet.size === 1 && pickCount >= 2) {
     const single = [...pSet][0];
     if (single === 'black') return 'الستايل المونوكروم بالأسود بالكامل قمة الفخامة والغموض والشياكة، وبيخلي القوام يبان أرشق.';
     if (single === 'navy') return 'اللوك الكحلي بالكامل بيدي طابع ملكي هادي وأنيق يناسب المقابلات والمناسبات.';
@@ -49,11 +49,11 @@ export function generateColorHarmonyInsight(palette = [], context = null, couple
 
   // ألوان باستيل أو فاتحة
   const pastelCount = ['baby_blue', 'light_blue', 'pink', 'lavender', 'mint', 'peach', 'white'].filter((c) => pSet.has(c)).length;
-  if (pastelCount >= 2) {
+  if (pastelCount >= 2 && pastelCount === pSet.size) {
     return 'الألوان الفاتحة بتعكس إشراقة وانتعاش وأناقة هادية، ومثالية للمناسبات واللقاءات الصباحية.';
   }
 
-  return 'توليفة الألوان دي مدروسة بعناية عشان تديك طلة متوازنة ومتجانسة تبرز شياكة القطع مع بعضها.';
+  return null; // مفيش جملة نقولها غير لو الألوان فعلًا بتثبتها
 }
 
 /**

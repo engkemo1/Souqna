@@ -17,9 +17,44 @@ export function toWaNumber(raw) {
   return `20${digits.replace(/^0/, '')}`;
 }
 
+/** Runtime overrides saved from the admin screen (app_settings wa_*) win over the .env values. */
+const WA_KEYS = { wa_token: 'token', wa_phone_id: 'phoneId', wa_template: 'template', wa_customer_template: 'customerTemplate', wa_platform_template: 'platformTemplate', wa_service_template: 'serviceTemplate', wa_alert_template: 'alertTemplate', wa_owner_btn_template: 'ownerBtnTemplate', wa_customer_btn_template: 'customerBtnTemplate', wa_lang: 'lang' };
+export function applyWaSettings() {
+  try {
+    for (const r of q.all("SELECT key, value FROM app_settings WHERE key LIKE 'wa\\_%' ESCAPE '\\'")) {
+      const k = WA_KEYS[r.key]; if (k && String(r.value || '').trim()) config.wa[k] = String(r.value).trim();
+    }
+  } catch { /* table not ready yet: .env values stay */ }
+}
+applyWaSettings();
+export function saveWaSettings(b) {
+  const put = (k, v) => q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [k, String(v).trim()]);
+  const map = { token: 'wa_token', phoneId: 'wa_phone_id', template: 'wa_template', customerTemplate: 'wa_customer_template', platformTemplate: 'wa_platform_template', serviceTemplate: 'wa_service_template', alertTemplate: 'wa_alert_template', ownerBtnTemplate: 'wa_owner_btn_template', customerBtnTemplate: 'wa_customer_btn_template', lang: 'wa_lang' };
+  for (const [k, key] of Object.entries(map)) if (typeof b[k] === 'string' && (k !== 'token' || b[k].trim())) put(key, b[k]);
+  applyWaSettings();
+}
+export function waSettingsView() {
+  const w = config.wa;
+  return { configured: isWhatsAppConfigured(), tokenSet: !!w.token, tokenHint: w.token ? `…${w.token.slice(-4)}` : '', phoneId: w.phoneId, template: w.template, customerTemplate: w.customerTemplate, platformTemplate: w.platformTemplate, serviceTemplate: w.serviceTemplate, alertTemplate: w.alertTemplate, ownerBtnTemplate: w.ownerBtnTemplate || '', customerBtnTemplate: w.customerBtnTemplate || '', lang: w.lang, platformWa: config.platformWa };
+}
+/** Sends Meta's built-in hello_world template to a number, to prove token + phone id work. */
+export async function sendWaTest(rawTo) {
+  const to = toWaNumber(rawTo); if (!to) throw new Error('رقم غير صالح');
+  if (!isWhatsAppConfigured()) throw new Error('التوكن أو Phone ID مش مضبوطين');
+  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, { method: 'POST', headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: 'hello_world', language: { code: 'en_US' } } }) });
+  const txt = await res.text().catch(() => '');
+  if (!res.ok) throw new Error(`Meta ${res.status}: ${txt.slice(0, 300)}`);
+  return { sent: true, to };
+}
+
 export function isWhatsAppConfigured() {
   return Boolean(config.wa.token && config.wa.phoneId);
 }
+
+/** Buttons of the store-owner template: 3 quick replies (confirm / can't / how) + a link that opens the order in the dashboard. Order must match the template in Meta. */
+const qr = (i, payload) => ({ type: 'button', sub_type: 'quick_reply', index: String(i), parameters: [{ type: 'payload', payload }] });
+const ownerButtons = (orderId) => [qr(0, `ord:confirm:${orderId}`), qr(1, `ord:nope:${orderId}`), qr(2, `ord:help:${orderId}`), { type: 'button', sub_type: 'url', index: '3', parameters: [{ type: 'text', text: String(orderId) }] }];
+const customerButtons = (orderId) => [qr(0, `cust:track:${orderId}`), qr(1, `cust:address:${orderId}`), qr(2, `cust:cancel:${orderId}`), qr(3, `cust:store:${orderId}`)];
 
 export async function sendNewOrderAlert(store, orderId) {
   const to = toWaNumber(store.whatsapp);
@@ -40,7 +75,7 @@ export async function sendNewOrderAlert(store, orderId) {
       messaging_product: 'whatsapp',
       to,
       type: 'template',
-      template: { name: config.wa.template, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }] },
+      template: { name: config.wa.ownerBtnTemplate || config.wa.template, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }, ...(config.wa.ownerBtnTemplate ? ownerButtons(orderId) : [])] },
     }),
   });
   if (!res.ok) {
@@ -125,7 +160,7 @@ export function notifyPlatformAlert(text) {
  * Order update to a customer who ordered without an account (signed-in shoppers get an in-app/push notice instead).
  * Needs an approved template named in WA_CUSTOMER_TEMPLATE; does nothing until it is set. Never throws.
  */
-export function notifyGuestOrderWhatsApp({ phone, name, number, text, token }) {
+export function notifyGuestOrderWhatsApp({ phone, name, number, text, token, orderId }) {
   try {
     if (!isWhatsAppConfigured() || !config.wa.customerTemplate) return;
     const to = toWaNumber(phone);
@@ -134,8 +169,13 @@ export function notifyGuestOrderWhatsApp({ phone, name, number, text, token }) {
     fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: config.wa.customerTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }] } }),
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: (orderId && config.wa.customerBtnTemplate) || config.wa.customerTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }, ...(orderId && config.wa.customerBtnTemplate ? customerButtons(orderId) : [])] } }),
     }).then(async (res) => { if (!res.ok) console.error(`[whatsapp] customer update ${number} failed: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`); })
       .catch((e) => console.error(`[whatsapp] customer update ${number} failed: ${e.message}`));
   } catch (e) { console.error(`[whatsapp] customer update failed: ${e.message}`); }
+}
+
+/** Order received → the customer (account or guest) gets a WhatsApp saying the store will confirm it. Needs WA_CUSTOMER_TEMPLATE; never throws. */
+export function notifyCustomerOrderPlaced({ phone, name, number, token, orderId }) {
+  notifyGuestOrderWhatsApp({ phone, name, number, token, orderId, text: 'وصلنا طلبك وبانتظار تأكيد المحل. هنبلغك أول ما يتأكد' });
 }

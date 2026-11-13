@@ -187,6 +187,51 @@ function CashierGuidePanel() {
   );
 }
 
+function WhatsAppPanel() {
+  const toast = useToast();
+  const { data, reload } = useAdminApi('/whatsapp');
+  const [f, setF] = useState(null);
+  const [testTo, setTestTo] = useState('');
+  const [busy, setBusy] = useState(false);
+  if (data && !f) setF({ token: '', phoneId: data.phoneId || '', template: data.template || '', customerTemplate: data.customerTemplate || '', ownerBtnTemplate: data.ownerBtnTemplate || '', customerBtnTemplate: data.customerBtnTemplate || '', lang: data.lang || 'ar' });
+  if (!data || !f) return <Panel title="واتساب (Meta)"><Skeleton className="h-40 w-full" /></Panel>;
+  const save = async () => {
+    setBusy(true);
+    try { await adminApi('/whatsapp', { method: 'PUT', body: f }); toast({ title: 'اتحفظ' }); setF(null); reload(); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy(false);
+  };
+  const test = async () => {
+    setBusy(true);
+    try { await adminApi('/whatsapp/test', { method: 'POST', body: { to: testTo } }); toast({ title: 'اتبعتت رسالة تجربة، شوف الواتساب' }); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy(false);
+  };
+  const fld = (k, label, hint, ltr = true) => (
+    <label className="block"><span className="mb-1.5 block text-sm font-medium">{label}</span><Input dir={ltr ? 'ltr' : undefined} value={f[k]} onChange={(e) => setF({ ...f, [k]: e.target.value })} className="text-start" />{hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}</label>
+  );
+  return (
+    <Panel title="واتساب (Meta)" subtitle={data.configured ? 'متوصل ✓ — رسايل الأوردرات بتتبعت من رقمك' : 'مش متوصل: حط التوكن و Phone ID'} className="lg:col-span-2">
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          {fld('phoneId', 'Phone Number ID', 'من Meta → WhatsApp → API Setup (أرقام بس، مش رقم التليفون نفسه)')}
+          <label className="block"><span className="mb-1.5 block text-sm font-medium">Access Token {data.tokenSet && <span className="text-xs text-muted">(محفوظ {data.tokenHint} — سيبه فاضي لو مش هتغيره)</span>}</span><Input dir="ltr" type="password" autoComplete="off" value={f.token} onChange={(e) => setF({ ...f, token: e.target.value })} className="text-start" /></label>
+          {fld('template', 'قالب «أوردر جديد» لصاحب المحل', 'يوصل لصاحب المحل عشان يدخل يأكد الطلب من لوحته')}
+          {fld('customerTemplate', 'قالب العميل (استلام الطلب وتحديثاته)', '4 متغيرات: الاسم، رقم الطلب، النص، رابط التتبع')}
+          {fld('ownerBtnTemplate', 'قالب صاحب المحل بالأزرار (اختياري)', 'لو اتحط، بيتبعت بدل القالب العادي ومعاه أزرار: تأكيد / مش هقدر / إزاي أأكد / افتح الطلب')}
+          {fld('customerBtnTemplate', 'قالب العميل بالأسئلة الجاهزة (اختياري)', 'أزرار: فين طلبي / تغيير العنوان / إلغاء / كلّم المحل')}
+          {fld('lang', 'لغة القوالب', 'ar')}
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <button type="button" disabled={busy} onClick={save} className="rounded-full bg-btn px-5 py-2 text-sm font-bold text-on-btn disabled:opacity-50">حفظ</button>
+          <label className="block"><span className="mb-1.5 block text-sm font-medium">تجربة إرسال</span><Input dir="ltr" placeholder="01xxxxxxxxx" value={testTo} onChange={(e) => setTestTo(e.target.value)} className="text-start" /></label>
+          <button type="button" disabled={busy || !testTo} onClick={test} className="rounded-full border border-line-strong px-4 py-2 text-sm font-semibold hover:border-fg disabled:opacity-50">ابعت رسالة تجربة</button>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
 function StylistPanel() {
   const toast = useToast();
   const { data, reload } = useAdminApi('/stylist');
@@ -1043,6 +1088,7 @@ export default function System() {
           {section === 'visual' && <VisualPanel />}
           {section === 'cashier' && <><CashierSyncPanel /><CashierGuidePanel /></>}
           {section === 'moda' && <>
+          <WhatsAppPanel />
           <StylistPanel />
           <ModaPromptsPanel />
           <ModaTestLabPanel />

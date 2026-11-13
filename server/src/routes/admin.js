@@ -36,7 +36,7 @@ import { offsiteEnabled, r2Enabled } from '../lib/r2.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { isWhatsAppConfigured, notifyPlatformDelivery } from '../lib/whatsapp.js';
+import { isWhatsAppConfigured, notifyPlatformDelivery, saveWaSettings, waSettingsView, sendWaTest } from '../lib/whatsapp.js';
 import { mountCashierAdmin } from './admin-cashier.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { CASHIER_SYSTEMS, CASHIER_IDS, CASHIER_LINK_STATUSES } from '../lib/cashier-catalog.js';
@@ -803,6 +803,17 @@ r.put('/ai-usage', h((req, res) => {
 }));
 
 /* ---- stylist chat settings ---- */
+r.get('/whatsapp', h((_req, res) => res.json(waSettingsView())));
+r.put('/whatsapp', h((req, res) => {
+  const s = z.string().trim().max(400).optional();
+  const b = z.object({ token: s, phoneId: z.string().trim().regex(/^\d{0,30}$/).optional(), template: s, customerTemplate: s, ownerBtnTemplate: s, customerBtnTemplate: s, platformTemplate: s, serviceTemplate: s, alertTemplate: s, lang: z.string().trim().max(10).optional() }).parse(req.body || {});
+  saveWaSettings(b);
+  res.json(waSettingsView());
+}));
+r.post('/whatsapp/test', h(async (req, res) => {
+  const b = z.object({ to: z.string().trim().min(8).max(20) }).parse(req.body || {});
+  try { res.json(await sendWaTest(b.to)); } catch (e) { throw new AppError(502, 'wa_test_failed', String(e.message || e)); }
+}));
 r.get('/stylist', h((_req, res) => res.json(stylistStatus())));
 r.get('/stylist/test/:provider', h(async (req, res) => {
   if (!['anthropic', 'gemini', 'cloudflare', 'extra', 'groq', 'mistral', 'sambanova', 'openrouter', 'nvidia', 'cerebras', 'qwen', 'huggingface', 'scaleway', 'cohere'].includes(req.params.provider)) throw new AppError(400, 'bad_provider', 'Unknown provider');

@@ -37,6 +37,11 @@ export function sendText(to, text, { replyTo } = {}) {
   return post({ to: waNumber(to), type: 'text', text: { body: String(text).slice(0, 4000), preview_url: true }, ...(replyTo ? { context: { message_id: replyTo } } : {}) });
 }
 
+/** Reply with up to 3 tap buttons (only inside the 24h window after the person wrote/pressed something). buttons: [{id, title<=20}] */
+export function sendButtons(to, body, buttons) {
+  return post({ to: waNumber(to), type: 'interactive', interactive: { type: 'button', body: { text: String(body).slice(0, 1000) }, action: { buttons: buttons.slice(0, 3).map((b) => ({ type: 'reply', reply: { id: String(b.id).slice(0, 256), title: String(b.title).slice(0, 20) } })) } } });
+}
+
 /** One-time sign-in code through the approved AUTHENTICATION template (body {{1}} + copy-code button). */
 export function sendAuthCode(to, code) {
   return post({

@@ -226,7 +226,7 @@ export default function StylistChat() {
     const answered = questions.filter((q) => Object.hasOwn(next, q.id));
     const sameValue = (left, right) => left === right || JSON.stringify(left) === JSON.stringify(right);
     setQuestionAnswers(next);
-    sendRef.current?.(answered.map((q) => `${q.text} ${q.options.find((opt) => sameValue(opt.value, next[q.id]))?.label || ''}`.trim()).join('، '), next);
+    sendRef.current?.(answered.map((q) => q.options.find((opt) => sameValue(opt.value, next[q.id]))?.label || '').filter(Boolean).join('، '), next);
   };
 
   const startGuidedLook = async () => {
