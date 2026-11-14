@@ -28,7 +28,6 @@ import { ErrorState, EmptyState } from '../../components/ui/States.jsx';
 import Button, { IconButton } from '../../components/ui/Button.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
-import StylistChat from '../../components/market/StylistChat.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { rememberViewed } from '../../lib/recentlyViewed.js';
 
@@ -111,6 +110,13 @@ export default function Product() {
   const { store } = useStore();
   const { t, tr, lang } = useI18n();
   const { data, error, loading, reload } = useApi(`/stores/${store.slug}/products/${pslug}`);
+  // opened under the wrong shop (a link from another shop's page): find the shop that really sells it and go there
+  useEffect(() => {
+    if (error?.status !== 404) return undefined;
+    let live = true;
+    api(`/product-owner/${encodeURIComponent(pslug)}`).then((r) => { if (live && r?.store && r.store !== store.slug) nav(sp(r.store, `p/${encodeURIComponent(pslug)}`), { replace: true }); }).catch(() => {});
+    return () => { live = false; };
+  }, [error, pslug, store.slug]); // eslint-disable-line react-hooks/exhaustive-deps
   const favs = useFavorites(store.slug);
   const toast = useToast();
   const add = useAddToCart(store.slug);
@@ -359,7 +365,6 @@ export default function Product() {
         )}
       </AnimatePresence>
       <div className="h-24 lg:hidden" />
-      <StylistChat />
       <QuickAddSheet slug={store.slug} product={quick} onClose={() => setQuick(null)} />
     </PageTransition>
   );

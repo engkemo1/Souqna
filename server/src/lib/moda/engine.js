@@ -124,7 +124,13 @@ function applyAnswers(parsed, answers = {}, K) {
   return out;
 }
 
-const BODY_WORDS_RE = /(جسمي|بشرتي|طولي|اكتاف|كتافي|اكتافي|ارداف|اردافي|رقبتي|كمثري|كمثرى|تفاحه|مليان|مليانه|تخين|تخينه|نحيف|نحيفه|رفيع|رفيعه|اتخن|يبلعني|قصيره|قصير|سمرا|اسمر|قمحي|قمحاوي|قمحاويه|خمري|خمريه)/;
+// طلب ترشيح من غير اسم قطعة («رشحيلي/اقترحيلي/نقيلي/اختارلي حاجة») = تسوق عام، مش اسم منتج
+const RECO_RE = /(^| )(ت?رشح|ت?رشحي|ت?رشحو|اقترح|تقترح|تقترحي|اقترحي|نقي|تنقي|اختار|تختار|اختاري|تختاري)(لي|يلي|ولي|لنا|يلنا|ولنا)( |$)|(^| )(ترشيح|ترشيحات|ترشيحاتك|اقتراحاتك)( |$)/;
+const RECO_LATIN_RE = /(^|\s)(rash7ly|rashe7ly|rashe7li|rash7li|ra4a7ly|ra4e7ly|e2tere7ly|eqtere7ly|2tere7ly|na2eely|na2ily)(?=\s|$|[?!.,])/;
+const DISCOVERY_RE = /(^| )(وريني|ورينى|عايز|عايزه|عاوز|عاوزه|هاتلي|رشحلي|رشحيلي|اقترحي|اقترحلي|عندك|عندكم)( [^ ]+){0,3} (احلي|احلى|احسن|اجمل|حاجه حلوه|حاجات حلوه|حاجه شيك|حاجات شيك|حاجه عمليه|حاجات عمليه|حاجه جديده|حاجات جديده|الجديد|جديدكم|اي حاجه|حاجات لقطه|حاجه لقطه|لقطات|لقطه)( |$)|(^| )(اجدد|اغير|نجدد|نغير) (دولاب|لبس|هدوم|ستايل|الدولاب)[^ ]*( |$)|(^| )(اشوف|نشوف) (عندكم|عندك|عندكو) (ايه|اي)( |$)|(^| )(ashoof|ashof|nshoof|a4oof|ashouf)( [^ ]+){0,2} (gded|gdeed|gedid|gdid|el gded|el gdeed)( |$)|(^| )(زهقان|زهقانه|زهقت) من (لبسي|هدومي|دولابي)( |$)/;
+// وصف جسم المتكلم نفسه (مش وصف القطعة: «فستان قصير» مش هنا)
+const BODY_SELF_RE = /(جسمي|بشرتي|طولي|اكتافي|كتافي|اكتاف عريضه|اردافي|ارداف عريضه|رقبتي|كمثري|كمثرى|تفاحه|كرش|بطني|انا (طويل|طويله|قصير|قصيره|مليان|مليانه|نحيف|نحيفه|رفيع|رفيعه|تخين|تخينه))/;
+const BODY_WORDS_RE = /(كرش|بطني|البطن|عندي بطن|انا طويل|انا طويله|جسمي|بشرتي|طولي|اكتاف|كتافي|اكتافي|ارداف|اردافي|رقبتي|كمثري|كمثرى|تفاحه|مليان|مليانه|تخين|تخينه|نحيف|نحيفه|رفيع|رفيعه|اتخن|يبلعني|قصيره|قصير|سمرا|اسمر|قمحي|قمحاوي|قمحاويه|خمري|خمريه)/;
 const AMBIG_BARE_GARMENT = new Set(['ماكسي', 'ميدي', 'سواريه', 'سهره']);
 const REFINE_RE = /(^| )(?:لل|بال|وال|ال|ل|و|ب)?(سهره|سواريه|ميدي|ماكسي|قصير|قصيره|طويل|طويله|بكم|باكمام|بأكمام|كم طويل|نص كم|كم قصير|من غير كم|بسوسته|سوسته|سوستة|مقفول|مقفوله|مفتوح|سادة|ساده|مشجر|مشجره|منقوش|منقوشه|نقشه|تطريز|مطرز|بتطريز|الخامه|خامه|قماشه|شيفون|قطن|كتان|ساتان|صوف|تريكو|حرير|لينين|واسع|واسعه|ضيق|ضيقه|اوفر سايز|فيت|سليم|ريجولار)( |$)/;
 
@@ -146,7 +152,7 @@ const mergeFromSession = (cur, prev) => {
   if (!cur.context && prev.role) m.role = prev.role;
   if (cur.avoidContexts?.length && m.context && cur.avoidContexts.includes(m.context)) { m.context = null; m.contextEffective = null; }
   // «لا اسود» / «خليه كحلي»: لون جديد في الرسالة بيغيّر لون القطعة الوحيدة المطلوبة قبل كده
-  if (!cur.garments?.length && cur.colors?.length === 1 && prev.garments?.length === 1) { m.garments = [{ ...prev.garments[0], color: cur.colors[0] }]; m.colors = []; }
+  if (!cur.garments?.length && cur.colors?.length === 1 && prev.garments?.length === 1) { const pc = prev.garments[0].color; m.garments = [{ ...prev.garments[0], color: cur.colors[0] }]; m.colors = []; if (pc && pc !== cur.colors[0]) { const ph = prev.flags?.colorHistory?.key === prev.garments[0].key ? prev.flags.colorHistory.colors : []; m.flags = { ...m.flags, colorHistory: { key: prev.garments[0].key, colors: [...new Set([...ph, pc])].slice(-3) } }; } }
   if (cur.avoidColors?.length && Array.isArray(m.garments)) m.garments = m.garments.map((g) => (g.color && cur.avoidColors.includes(g.color) ? { ...g, color: null } : g));
   return m;
 };
@@ -223,7 +229,7 @@ function bodyAdvice(n) {
     else if (/(قمحي|قمحيه|قمحاوي|قمحاويه|خمري|خمريه|حنطي)/.test(n)) parts.push('البشرة القمحي بتحلو مع الألوان الدافية والترابية: الزيتي، القرميدي، الأخضر الغامق، الكحلي، الوردي الدافي، والذهبي.');
     else parts.push('البشرة البيضا بتحلو مع الباستيل والألوان الهادية: الأزرق السماوي، الوردي، الكحلي، النبيتي، والأخضر الزمردي. وابعدي (أو ابعد) عن الكريمي والبيج الفاتح جدًا لأنهم بيبهتوا البشرة.');
   }
-  if (/(تخين|تخينه|ممتلئ|ممتلئه|سمين|سمينه|وزني زايد|كرش|مليان|مليانه|اتخن)/.test(n)) parts.push('للجسم الممتلئ: الألوان الغامقة الموحدة (أسود، كحلي، نبيتي، زيتي) بتدّي رشاقة، والخطوط الرأسية والقصات المستقيمة أو الـA-line أحسن من الأقمشة اللاصقة أو الواسعة جدًا. ركّز على مقاس مظبوط على الكتف مش ضيق ولا فضفاض.');
+  if (/(تخين|تخينه|ممتلئ|ممتلئه|سمين|سمينه|وزني زايد|كرش|مليان|مليانه|اتخن|البطن|بطني|بطن|تداري بطني)/.test(n) && !/(نحيف|نحيفه|رفيع|رفيعه)/.test(n)) parts.push('للجسم الممتلئ: الألوان الغامقة الموحدة (أسود، كحلي، نبيتي، زيتي) بتدّي رشاقة، والخطوط الرأسية والقصات المستقيمة أو الـA-line أحسن من الأقمشة اللاصقة أو الواسعة جدًا. ركّز على مقاس مظبوط على الكتف مش ضيق ولا فضفاض.');
   if (/(نحيف|نحيفه|رفيع|رفيعه|مفيش جسم)/.test(n)) parts.push('للجسم النحيف: الطبقات (قميص تحت سويتر أو جاكيت)، والألوان الفاتحة، والخطوط العرضية، والأقمشة السميكة شوية بتضيف حجم.');
   if (/(قصير|قصيره)/.test(n) && !/(قصير الكم|كم قصير)/.test(n) && !/(رقبتي|رقبه)( [^ ]+){0,1} (قصيره|قصير)/.test(n)) parts.push('للطول القصير: بنطلون عالي الخصر، ولون واحد من فوق لتحت، وطول فستان فوق الركبة أو ميدي من غير حاشية طويلة بيطوّلوا الشكل.');
   if (/(طويل|طويله)( |$)/.test(n)) parts.push('للطول الفارع: تقدر تلبس الماكسي والقصات الطويلة والأوفر سايز براحتك، والألوان المقسومة (جزء فوق وجزء تحت) بتوازن الطول.');
@@ -245,23 +251,30 @@ async function runModaCore(messages, opts = {}) {
     // «لازرق / لاسود / لكحلي» = «ازرق…» (حرف اللام لزق في اللون)
     t = t.replace(/(^|\s)ل([اأإ](?:زرق|حمر|سود|بيض|خضر|صفر|سمر)|كحلي|بيج|رمادي|بني|وردي|بنفسجي|برتقالي|ذهبي|فضي|بوردو|زيتي)(?=\s|$)/g, '$1$2');
     // مقاس لوحده بعد طلب قبل كده («XL» / «لا 43» / «خليه L»)
-    const mm = t.trim().replace(/[.!،,؟?]+$/, '').match(/^(?:(?:لا|لأ|لاء|بل|معلش)[،,]?\s+)?(?:(?:خليه|خليها|هاته|هاتها|مقاسي|خليهولي)\s+)?(xxs|xs|s|m|l|xl|xxl|xxxl|[3-5][0-9])$/i);
+    const mm = t.trim().replace(/[.!،,؟?]+$/, '').match(/^(?:(?:لا|لأ|لاء|بل)[،,]?\s+)?(?:معلش[،,]?\s+)?(?:(?:خليه|خليها|هاته|هاتها|مقاسي|خليهولي)\s+)?(xxs|xs|s|m|l|xl|xxl|xxxl|[3-5][0-9])$/i);
     if (mm && rawSession?.parsed?.garments?.length) t = `مقاس ${mm[1]}`;
     // «لأ معلش المقاس خليه 36» / «خلي المقاس XL»: تغيير مقاس على نفس الطلب
     const mc = !mm && t.trim().replace(/[.!،,؟?]+$/, '').match(/^(?:(?:لا|لأ|لاء)[،,]?\s+)?(?:معلش\s+)?(?:(?:ال)?(?:مقاس|سايز)\s+(?:خليه|خليها|يبقى|يكون|هيبقى)|(?:خلي|خليه|خليها)\s+(?:ال)?(?:مقاس|سايز))\s+(xxs|xs|s|m|l|xl|xxl|xxxl|[3-5][0-9])$/i);
     if (mc && rawSession?.parsed?.garments?.length) t = `مقاس ${mc[1]}`;
+    // «اسود 34» / «eswed 34»: لون + مقاس كرد على طلب شغال
+    const mcs = !mm && !mc && t.trim().replace(/[.!،,؟?]+$/, '').match(/^([أا]سود|سود[اه]|[أا]بيض|بيض[اه]|كحلي|بيج|رمادي|[أا]زرق|زرق[اه]|[أا]حمر|حمر[اه]|[أا]خضر|خضر[اه]|بني|eswed|aswad|iswed|soda|abyad|abyd|beda|bida|ko7li|kohly|ko7ly|bej|beige|rmadi|ramady|rmady|azra2|zar2a|a7mar|7amra|akhdar|a5dar|bonni|bonny|black|white|navy|grey|gray|blue|red|green|brown)\s+(xxs|xs|s|m|l|xl|xxl|xxxl|[3-5][0-9])$/i);
+    if (mcs && rawSession?.parsed?.garments?.length) t = `${mcs[1]} مقاس ${mcs[2]}`;
     return t;
   })();
   const dow = cairoParts(now).dow;
   const seed = `${text}|${session?.turn || 0}`;
   let parsed = parseMessage(text, { profile, imageText, now, cairoDow: dow });
+  // «وريني أحلى حاجة / عايزة أجدد دولابي / حاجة عملية ألبسها»: طلب استكشاف عام = تسوق (من غير قطعة محددة)
+  const discoveryAsk = !parsed.garments.length && !parsed.context && parsed.intent !== 'advice' && !matchFaq(text)
+    && (DISCOVERY_RE.test(` ${parsed.normalized || norm(text)} `) || RECO_RE.test(` ${norm(text)} `) || RECO_LATIN_RE.test(` ${String(text).toLowerCase()} `));
+  if (discoveryAsk && (parsed.intent === 'unknown' || parsed.intent === 'followup')) parsed = { ...parsed, intent: 'shop', flags: { ...parsed.flags, discovery: true } };
   // «معايا X نسقلي عليه»: لو X كلمة مش معروفة كقطعة لبس، نقول مش فاهمين بدل ما نسأل أسئلة ونرشح من التخمين
   if (!(answers && Object.keys(answers).length) && !imageText && !parsed.garments.length && !parsed.ownedPieces?.length) {
     const nt = parsed.normalized || norm(text);
     const mm = nt.match(/(?:^| )(?:معايا|معايه|عندي|لابس|لابسه|لابسة|اشتريت|شريت|جبت|عايز|عايزه|عايزة|عاوز|عاوزه|عاوزة|محتاج|محتاجه|محتاجة|دورلي|هاتلي|وريني|ورينى|نفسي في|ابغي|عايزين|عاوزين) (?:ال)?([^ ]+)/);
     const w = mm?.[1];
     const SKIP = new Set(['حاجه', 'حاجة', 'حاجات', 'قطعه', 'قطعة', 'واحد', 'واحده', 'واحدة', 'طقم', 'شويه', 'شوية', 'ميزانيه', 'ميزانية', 'فلوس', 'مبلغ', 'مناسبه', 'مناسبة', 'ورقه', 'صوره', 'صورة', 'مشكله', 'مشكلة', 'سؤال', 'استفسار', 'وقت', 'ساعه', 'ساعة', 'يوم', 'مقاس', 'اسأل', 'اعرف', 'اشوف', 'اشتري', 'اروح', 'احجز', 'اطلب', 'اسالك', 'اساعد', 'مساعده', 'مساعدة', 'خصم', 'عروض', 'توصيل', 'شحن', 'رقم', 'سعر', 'اسعار', 'حاجة', 'شيء', 'اي', 'ايه', 'كام', 'تغيير', 'استرجاع', 'ارجاع', 'استبدال', 'تتبع', 'اوردر', 'طلب', 'حساب', 'تسجيل', 'مشاركه', 'اتكلم', 'اكلم', 'اتواصل', 'كوبون', 'محل', 'محلات', 'متجر']);
-    if (w && w.length >= 3 && !SKIP.has(w) && !isNumberToken(w) && /^[\u0600-\u06FF]+$/.test(w) && !matchTokens([w], K).length && !matchTokens([`ال${w}`], K).length && !parsed.context && !parsed.advice && !parsed.followup && !matchFaq(text) && !session?.pending && !(BODY_WORDS_RE.test(nt) && bodyAdvice(nt))) { // سؤال عن الجسم/البشرة («عندي أكتاف عريضة») مش قطعة لبس مجهولة
+    if (w && w.length >= 3 && !SKIP.has(w) && !isNumberToken(w) && /^[\u0600-\u06FF]+$/.test(w) && !matchTokens([w], K).length && !matchTokens([`ال${w}`], K).length && !parsed.context && !parsed.advice && !parsed.followup && !matchFaq(text) && !session?.pending && !(BODY_WORDS_RE.test(nt) && bodyAdvice(nt)) && !discoveryAsk) { // سؤال عن الجسم/البشرة («عندي أكتاف عريضة») مش قطعة لبس مجهولة
       const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang: parsed.lang === 'en' ? 'en' : 'ar', profile, assistantName });
       return { ...res0, say: `مش فاهمة طلبك: «${w}» مش عارفاها كقطعة لبس. اكتبيلي اسمها تاني (زي شبشب أو فستان أو بنطلون) أو ابعتيلي صورتها وأنا أنسقلك الباقي.`, tips: [], styleTips: [], questions: [], blocks: null, intent: 'chat', session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
     }
@@ -292,8 +305,17 @@ async function runModaCore(messages, opts = {}) {
   if (/(^| )مدرس[هة]( |$)/.test(norm(text)) && (parsed.context === 'graduation' || parsed.context === 'university')) parsed = { ...parsed, context: null, contextEffective: null };
   if (/(^| )مدرس[هة]( |$)/.test(norm(text)) && !parsed.context && (parsed.persons.includes('boys') || parsed.persons.includes('girls') || /(ابني|بنتي|ولدي|اولادي|ولادي|بناتي|عيل|طفل)/.test(norm(text))) && !parsed.garments.length) parsed = { ...parsed, intent: 'shop', persons: parsed.persons.length ? parsed.persons : (/(بنتي|بناتي)/.test(norm(text)) ? ['girls'] : ['boys']), flags: { ...parsed.flags, colorFlexible: true } };
   // «عندي قميص أزرق نسقلي عليه / عاوز حاجة تمشي معاه»: قطعة معاه + طلب تنسيق = طلب شراء حول القطعة
-  if (parsed.intent === 'unknown' && parsed.ownedPieces?.length && !parsed.garments.length && /(نسق|طقم|لوك|عليه|عليها|عليهم|اكمل|يمشي|يليق|معاه|معاها|حاجه|اجيب|اشتري|ينفع|يتلبس)/.test(norm(text))) parsed = { ...parsed, intent: 'shop', fullLook: true };
+  if (parsed.intent === 'unknown' && parsed.ownedPieces?.length && (!parsed.garments.length || parsed.flags?.pairedFromOwned) && /(نسق|طقم|لوك|عليه|عليها|عليهم|اكمل|يمشي|يليق|معاه|معاها|حاجه|اجيب|اشتري|ينفع|يتلبس)/.test(norm(text))) parsed = { ...parsed, intent: 'shop', fullLook: true };
+  // «فرح صاحبي / خطوبة أختي / كتب كتاب ابن عمي»: المناسبة بتاعة حد تاني → ضيف، من غير ما نسأل «إنت ضيف ولا الفرح بتاعك؟»
+  if (/(فرح|الفرح|لفرح|خطوب[هة]|لخطوب[هة]|كتب كتاب|كتب الكتاب) (صاحب|صاحبي|صاحبتي|صاحبه|صاحبت|اخت|اختي|اخويا|اخو|ابن|بنت|خال|خالي|خالتي|عم|عمي|عمتي|قريب|قريبتي|جار|جارتي|جاري|زميل|زميلتي|زميلي|واحد|واحده|ناس)/.test(norm(text)) && !parsed.flags?.roleAsked && parsed.role !== 'self') parsed = { ...parsed, role: 'guest', flags: { ...parsed.flags, roleAsked: true } };
   let lang = parsed.lang === 'en' ? 'en' : 'ar';
+  // «جسمي تفاحة… إيه أنسب قصة فستان ليا؟ / أرداف عريضة ألبس بليزر قصير ولا طويل؟»: سؤال نصيحة عن الجسم حتى لو فيه اسم قطعة
+  if (!(answers && Object.keys(answers).length) && parsed.garments.length && BODY_SELF_RE.test(norm(text)) && (/[؟?]/.test(String(text)) || /(^| )(انسب|احسن|ايه|ازاي|ولا|يليق|تليق|ينفع|انهي|يداري|يداريه|تداري|تداريه)( |$)/.test(` ${norm(text)} `))
+    && !/(^| )(عايز|عايزه|عاوز|عاوزه|هاتلي|وريني|ورينى|محتاج|محتاجه)( |$)/.test(norm(text))) {
+    const nt0 = norm(text); const selfHeight = /(انا (قصير|قصيره|طويل|طويله)|طولي)/.test(nt0);
+    const adv0 = bodyAdvice(selfHeight ? nt0.replace(/(^| )ال(قصير|قصيره|طويل|طويله)(?= |$)/g, ' ') : nt0.replace(/(^| )(قصير|قصيره|طويل|طويله)(?= |$)/g, ' ')); // «بليزر قصير ولا طويل» وصف القطعة، مش طول المتكلم
+    if (adv0) { const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName }); return { ...res0, say: `${adv0}`, intent: 'advice', session: { ...(session || {}), turn: (session?.turn || 0) + 1, pending: false, parsed: { ...(session?.parsed || parsed), genderHint: parsed.genderHint || session?.parsed?.genderHint || null } }, parsed }; }
+  }
   // «نسقلي طقم على القطعة دي / على جاكيت X»: القطعة هي اللي معاه، والمطلوب باقي الطقم
   if (!(answers && Object.keys(answers).length) && parsed.garments.length && !parsed.ownedPieces?.length && /(نسق|نسقلي|اطقم|طقم|لوك|اطلاله|تنسيق)[^؟?]*?(علي|على|حوالين|مع|يليق|يلبس|تليق)|(علي|على|حوالين|مع) (القطع[هة]|الجاكيت|القميص|البنطلون|الفستان|البدل[هة]|الحذاء) (دي|ده|دا)/.test(norm(text)) && !/(عاوز|عايز|محتاج|هاتلي)\s+(?:\S+\s+){0,2}(?:جاكيت|قميص|بنطلون|فستان|بدل[هة]|حذاء|جزم[هة])\s*$/.test(norm(text))) {
     parsed = { ...parsed, ownedPieces: parsed.garments.map((g) => ({ key: g.key, color: g.color || null, material: g.material || null, text: g.text })), garments: [], fullLook: true };
@@ -427,7 +449,7 @@ async function runModaCore(messages, opts = {}) {
     const ao = session.altOffer;
     const base = ao ? { ...session.parsed, garments: (session.parsed.garments || []).map((g) => (g.key === ao.wanted ? { ...g, key: ao.type, color: null, text: ao.type } : g)) } : session.parsed;
     parsed = { ...base, intent: 'shop', followup: null, flags: { ...(base.flags || {}), fromOpinion: true, roleAsked: true, budgetFlexible: true } };
-  } else if (noAnswers && typeof brain !== 'function' && !parsed.garments.length && !/(^| )(كم|اكمام|بكم|قصير الكم)( |$)/.test(nOp) && !/(?:وزني|وزن|طولي|طول|weight|height) ?\d|\d ?(?:كيلو|كجم|سم|kg|cm)/.test(nOp) && /(رفيع|رفيعه|مليان|مليانه|اتخن|يبلعني|تفاحه|اكتافي|اكتاف عريضه|كتافي|ارداف|اردافي|رقبتي|قمحاوي|قمحاويه|خمري|خمريه|تخين|تخينه|تخينة|نحيف|نحيفه|نحيفة|قصير|قصيره|قصيرة|طويل جدا|سمراء|سمرا|بشرتي|مثلث|كمثري|حامل|حمل|ممتلئ|وزني|كرش)/.test(nOp) && nOp.split(' ').length >= 2 && [null, 'unlisted_item'].includes(matchFaq(text))) {
+  } else if (noAnswers && typeof brain !== 'function' && !parsed.garments.length && !/(^| )(كم|اكمام|بكم|قصير الكم)( |$)/.test(nOp) && !/(?:وزني|وزن|طولي|طول|weight|height) ?\d|\d ?(?:كيلو|كجم|سم|kg|cm)/.test(nOp) && /(عندي بطن|تداري البطن|يداري البطن|تداري بطني|انا طويل|انا طويله|طويله جدا|رفيع|رفيعه|مليان|مليانه|اتخن|يبلعني|تفاحه|اكتافي|اكتاف عريضه|كتافي|ارداف|اردافي|رقبتي|قمحاوي|قمحاويه|خمري|خمريه|تخين|تخينه|تخينة|نحيف|نحيفه|نحيفة|قصير|قصيره|قصيرة|طويل جدا|سمراء|سمرا|بشرتي|مثلث|كمثري|حامل|حمل|ممتلئ|وزني|كرش)/.test(nOp) && nOp.split(' ').length >= 2 && [null, 'unlisted_item'].includes(matchFaq(text))) {
     const advTxt = bodyAdvice(nOp);
     const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
     return { ...res0, say: advTxt || 'تمام، عشان أرشحلك اللي يناسبك صح قولي: اللبس لأنهي مناسبة، وطولك ووزنك (أو مقاسك)، والقطعة اللي عاوزها لو في حاجة معينة. وأنا أدورلك في المتاح عندنا.', intent: advTxt ? 'advice' : 'chat', /* نصيحة جسم/بشرة = advice مش دردشة */ session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
@@ -460,24 +482,35 @@ async function runModaCore(messages, opts = {}) {
       if (say) { const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName }); return { ...res0, say: `${say} تحب أرشحلك قطع بالألوان دي من المتاح؟`, intent: 'chat', tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed }; }
     }
   }
-  const isReturnRequest = /(^| )(ارجع|ارجعه|ارجعها|ارجاع|استرجع|استرجاع|ابدل|ابدله|ابدلها|استبدل|استبدله|استبدلها|استبدال)( |$)/.test(norm(text)) && !/(ارجع (تاني|اشتري|البس|الابس|اجيب|اطلب|اشوف|اكمل|اتفرج)|ابدل (لون|اللون) (الطقم|اللوك))/.test(norm(text)); // «عايز أرجع ألبس بدل» = أرجع لعادة، مش استرجاع // «عايزة أرجع الفستان» = استرجاع حتى لو فيه اسم قطعة
+  const isReturnRequest = (/(^|\s)(a8ayar|a8ayaro|a8ayarha|aghayar|abadel|abadlo|abadelha|araga3|arga3|arag3o|estbdal|estebdal|esterga3|estrga3)(?=\s|$|[?!.,])/i.test(String(text)) || /(^| )(ارجع|ارجعه|ارجعها|ارجاع|استرجع|استرجاع|ابدل|ابدله|ابدلها|استبدل|استبدله|استبدلها|استبدال)( |$)/.test(norm(text))) && !/(ارجع (تاني|اشتري|البس|الابس|اجيب|اطلب|اشوف|اكمل|اتفرج)|ابدل (لون|اللون) (الطقم|اللوك))/.test(norm(text)); // «عايز أرجع ألبس بدل» = أرجع لعادة، مش استرجاع // «عايزة أرجع الفستان» = استرجاع حتى لو فيه اسم قطعة
   // «عايزة أرجع الفستان / أبدل القميص بمقاس أصغر»: طلب استرجاع/استبدال حتى لو فيه اسم قطعة → إجابة الاسترجاع مش ترشيح منتجات
+  // «بتوصلوا لحد الشغل في القاهرة؟»: سؤال توصيل/تتبع حتى لو فيه كلمة مناسبة
+  if (!parsed.garments.length && parsed.context && ['shipping_where', 'shipping_time', 'shipping_cost', 'order_track'].includes(matchFaq(text)) && !(answers && Object.keys(answers).length)) {
+    const sf = matchFaq(text);
+    return { state: 'chat', intent: 'faq', faq: sf, say: faqAnswer(sf, { lang, name: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], contact }), tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed: { ...parsed, advice: null } };
+  }
+  // «طلبت جاكيت من أسبوع ولسه موصلش»: متابعة طلب حتى لو فيه اسم قطعة
+  if (parsed.garments.length && matchFaq(text) === 'order_track' && /(^| )(طلبت|طلبنا|طلبته|طلبتها|اوردري|طلبي|الاوردر|الطلب)( |$)/.test(norm(text)) && /(^| )(موصلش|ماوصلش|موصلتش|ماوصلتش|موصلوش|اتاخر|اتأخر|فين|لسه)( |$)/.test(norm(text)) && !(answers && Object.keys(answers).length)) {
+    return { state: 'chat', intent: 'faq', faq: 'order_track', say: faqAnswer('order_track', { lang, name: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], contact }), tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed: { ...parsed, advice: null } };
+  }
   // «في خصم على الجواكت؟»: سؤال خصومات حتى لو فيه اسم قطعة
   if (!isReturnRequest && parsed.garments.length && matchFaq(text) === 'discounts' && /[؟?]|(^| )(في|فيه|عندكم|هل)( |$)/.test(` ${norm(text)} `) && !(answers && Object.keys(answers).length)) {
     return { state: 'chat', intent: 'faq', faq: 'discounts', say: faqAnswer('discounts', { lang, name: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], contact }), tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed: { ...parsed, advice: null } };
   }
-  if (isReturnRequest && parsed.garments.length && !(answers && Object.keys(answers).length) && !session?.pending) {
+  // جوه محادثة تسوق شغالة «ابدله بمقاس أكبر» ممكن تبقى تبديل في الترشيح، فبنعتبرها استرجاع بس لو مفيش طلب شغال أو الكلام عن حاجة اشتراها/وصلته
+  const postPurchase = /(^| )(وصلني|وصلتني|وصل|وصلت|جالي|جاني|استلمت|استلمته|استلمتها|اشتريت|اشتريته|اشتريتها|طلع|طلعت|الاوردر|الطلب|اللي جه|اللي جالي)( |$)/.test(norm(text));
+  if (isReturnRequest && parsed.garments.length && (!session?.parsed?.garments?.length || postPurchase) && !(answers && Object.keys(answers).length) && !session?.pending) {
     const rf = ['refund_money', 'wrong_item', 'size_change_after'].includes(matchFaq(text)) ? matchFaq(text) : 'returns';
     return { state: 'chat', intent: 'faq', faq: rf, say: faqAnswer(rf, { lang, name: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], contact }), tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed: { ...parsed, advice: null } };
   }
   const isQuestionOrInquiry = /(^| )(الفرق بين|الفرق ما بين|ايه الفرق|فرق بين|ايه خامه|ايه خامة|ايه هي خامه|مقاسات الاطفال|مقاسات اطفال|الدفع عند الاستلام|جبتلي حاجه غلط|اجرب الاول|يعني ايه|ايه معنى|ايه معني|معنى|معني|ما هو|ما هي|ما الفرق|ايه الفرق|الفرق بين|الفرق مابين|لو حد سال|لو حد سأل|رشحي اولا|رشحي اول|احسن محل|احسن محلات|افضل محل|افضل محلات|فين الاقي|ازاي|كيف|طريقه|اعمل ايه|البس ايه|اختار ايه|تنصحيني|نصيحه|نصايح|قاعده|ينفع البس|ينفع ارجع|ينفع استبدل|لو المقاس|لو التيشرت|لو البنطلون|لو الهدوم|لو الطلب|علاج|حل لمشكله|طقم ل|طقم فرح|طقم جامعه|طقم انترفيو|يركب علي|يركب على|يركبوا|يمشوا مع بعض|يمشي مع|يليقوا مع بعض|يليق علي|يليق على|لايقين|تداري الكرش|يداري الكرش|تداري البطن|تخسسني|تنحفني|تبين طولي|تطولني|يطولني|متحررش|تطري علي الجسم|تطري على الجسم|متكتمش|تدفيني|سقعه|سقعة|برد الشتا|برد الشتاء|بتكش|بيكش|بيبهت|بتبهت|بيوبر|بتوبر|سيكا|للشقا|تستحمل بهدله|تستحمل بهدلة|تستحمل كرف|صيف وشتا|صيف وشتاء|ولا|احسن|افضل|يتلبس عليه|يتلبس معاه|يتلبس مع|يتلبس علي|يتلبس على|تتلبس عليها|تتلبس معاه|تتلبس مع|تتلبس علي|تتلبس على|البس عليه|البس معاه|مفتوح ولا مقفول|القوالب|قوالب|لحد الدور|نفس اسعار|نفس سعر|طويل ورفيع|مسلوع|قصير ومليان|افتح الشحنه|افتح الشحنة|افتح الاوردر|افتح الطلب|وزني|طولي|الموديل لابس|الموديل لابسه|الموديل لابسة|بتمط|ليكرا|استريتش|ناشفه وقافشه|ناشفة وقافشة|علي الطبيعه|على الطبيعة|زي الصوره|زي الصورة|فلاتر|كود الخصم|كوبون الخصم|مش شغال|بروموكود|احجز|احجزلي|حجز|اول الشهر|هتيجي تاني|هتوفر تاني|خلصت|فيزا مع المندوب|عيب صناعه|عيب صناعة|خياطه مقطوعه|خياطة مقطوعة|14 يوم|اربعتاشر يوم|ممنوع استرجاع|بياناتي|رقم تليفوني|خصوصيه|خصوصية|اهل العروسه|أهل العروسة|قعدة تعارف|عزاء|مأتم|امتحان شفوي|مناقشة تخرج|فاتح ولا غامق|اكسفورد|أكسفورد|مبيشفش|مبيشف|بيشف|غسيل البمب|الجواكت البمب|اشيل الوبر|شيل الوبر|مكنة الوبر|شوز قماش|كانفاس|كونفرس|فانس|كفر الجزار|بطا|دملو|جمجرة|ورورة|استلم في الشغل|استلم في الكلية|حد ادنى|حد أدنى|المندوب اتأخر|اتاخر|بينزل امتى|بيخلص امتى|ترانزيشنال|طرحه جوكر|طرحة جوكر|طرحه شيفون|طرحة شيفون|دريس كت|فستان كت|طرحه منقوشه|طرحة منقوشة|طرحه مشجره|طرحة مشجرة|عرض الكرافته|عرض الكرافتة|زرار البدله|زرار البدلة|منديل الجيب|منديل البدله|منديل البدلة|شراب مخفي|سوسته معلقه|سوستة معلقة|ريحه الكمكمه|ريحة الكمكمة|اصفرار الياقه|اصفرار الياقة|اوبن اير|فرح في جنينه|فرح في جنينة|بعد الساعه 5|بعد الساعة 5|منتج مختلف)( |$)/.test(norm(text));
-  const SERVICE_FAQ = new Set(['support', 'goodbye', 'returns', 'refund_money', 'order_track', 'order_change', 'complaint_contact', 'insult', 'identity', 'about_me', 'about_ai', 'payment', 'payment_options', 'cod', 'shipping_cost', 'shipping_time', 'shipping_where', 'contact_phone', 'contact_all', 'contact_address', 'contact_hours', 'how_order', 'wrong_item', 'authenticity', 'size_change_after', 'merchant_login_help', 'seller_join', 'nearest_store']);
+  const SERVICE_FAQ = new Set(['price_final', 'discounts', 'support', 'goodbye', 'returns', 'refund_money', 'order_track', 'order_change', 'complaint_contact', 'insult', 'identity', 'about_me', 'about_ai', 'payment', 'payment_options', 'cod', 'shipping_cost', 'shipping_time', 'shipping_where', 'contact_phone', 'contact_all', 'contact_address', 'contact_hours', 'how_order', 'wrong_item', 'authenticity', 'size_change_after', 'merchant_login_help', 'seller_join', 'nearest_store']);
   if (!giftToSomeone && !(answers && Object.keys(answers).length) && (!session?.pending || SERVICE_FAQ.has(matchFaq(text))) && (!parsed.garments.length || isQuestionOrInquiry) && (!parsed.context || isQuestionOrInquiry) && !(parsed.followup && session?.parsed)) {
     const trained = matchTrainedLesson(text, training?.lessons);
     if (trained) {
       return { state: 'chat', intent: 'faq', faq: 'training', say: trained.answer, tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed: { ...parsed, advice: null } };
     }
-    if ((!parsed.garments.length || matchFaq(text) === 'fabric' || String(matchFaq(text)).startsWith('gloss_')) && !(matchFaq(text) === 'size_other' && session?.parsed?.garments?.length) && !(matchFaq(text) === 'sizes_available' && session?.parsed?.garments?.length && /^مقاس (?:xxs|xs|s|m|l|xl|xxl|xxxl|3xl|[3-5][0-9])$/i.test(text.trim())) && !(matchFaq(text) === 'budget_only' && session?.parsed && (session.parsed.garments?.length || session.parsed.context))) {
+    if ((!parsed.garments.length || matchFaq(text) === 'fabric' || String(matchFaq(text)).startsWith('gloss_')) && !(matchFaq(text) === 'size_other' && session?.parsed?.garments?.length) && !(matchFaq(text) === 'sizes_available' && session?.parsed?.garments?.length && !/[؟?]|(^| )(عندكم|موجود|فيه|متاح|متوفر)( |$)/.test(norm(text)) && /^(?:(?:عايز|عايزه|عاوز|عاوزه|خليه|خليها|هات|هاته|هاتها|هاتهولي)\s+)?(?:ال)?مقاس\s+(?:xxs|xs|s|m|l|xl|xxl|xxxl|3xl|[3-5][0-9]|اكس لارج|اكس اكس لارج|دبل اكس لارج|دبل اكس|اكسل)$/i.test(norm(text).trim())) && !(matchFaq(text) === 'budget_only' && session?.parsed && (session.parsed.garments?.length || session.parsed.context))) {
       const faq = matchFaq(text);
       if (faq === 'unlisted_item') { const found = keywordSearch(text, ensureEnriched(products, K), { limit: 6 }); if (found.length) return searchReply(found); }
       let say = faq ? faqAnswer(faq, { lang, name: typeof assistantName === 'string' ? assistantName : assistantName?.[lang], contact }) : null;
@@ -610,6 +643,12 @@ async function runModaCore(messages, opts = {}) {
     }
   }
   let refinementTurn = false;
+  // «هاخد الاتنين / الاتنين حلوين»: اللونين اللي اتعرضوا على نفس القطعة
+  if (!hasAnswers && session?.parsed?.garments?.length === 1 && session.parsed.flags?.colorHistory?.key === session.parsed.garments[0].key && session.parsed.flags.colorHistory.colors?.length && /(^| )(الاتنين|الاثنين|التنين|الاتنين دول|هما الاتنين|اللونين|الالوان الاتنين)( |$)/.test(norm(text)) && !parsed.garments.length) {
+    const cur = session.parsed.garments[0];
+    parsed = { ...mergeFromSession(parsed, session.parsed), intent: 'shop', followup: null };
+    parsed.colors = [...new Set([...session.parsed.flags.colorHistory.colors, cur.color].filter(Boolean))];
+  }
   // «تمام هات الجاكيت مقاس L» بعد سؤال جانبي: نفس القطعة اتذكرت تاني → نكمل بنفس مواصفاتها (لون/خامة/موسم…) مش طلب جديد من الصفر
   if (!hasAnswers && session?.parsed?.garments?.length && parsed.garments.length && parsed.intent === 'shop'
     && parsed.garments.every((g) => session.parsed.garments.some((p) => p.key === g.key))
@@ -625,7 +664,7 @@ async function runModaCore(messages, opts = {}) {
   const samePeople = !parsed.persons.length || parsed.persons.every((a) => (session?.parsed?.persons || []).includes(a) || (a === 'women' && (session?.parsed?.persons || []).includes('women_hijab')));
   if (!hasAnswers && session?.parsed?.garments?.length && !parsed.garments.length && !parsed.context && samePeople && !parsed.ownedPieces?.length
     && (parsed.intent === 'unknown' || parsed.intent === 'shop' || parsed.intent === 'followup') && norm(text).split(' ').filter(Boolean).length <= 10
-    && REFINE_RE.test(` ${norm(text)} `) && !matchFaq(text)) {
+    && (REFINE_RE.test(` ${norm(text)} `) || parsed.flags?.looseMaterials?.length) && !matchFaq(text)) {
     parsed = { ...mergeFromSession(parsed, session.parsed), intent: 'shop', followup: null };
     const lm = parsed.flags?.looseMaterials;
     if (lm?.length === 1 && parsed.garments?.length === 1) parsed.garments = [{ ...parsed.garments[0], material: lm[0] }];
@@ -665,6 +704,8 @@ async function runModaCore(messages, opts = {}) {
       sz = (t.trim().match(/^(xxl|xl|xs|s|m|l|3xl|\d{2})$/i) || [])[1];
       if (!sz) for (const [w, v] of Object.entries(WORDS)) if (t.includes(w)) { sz = v; break; }
     }
+    if (!sz && parsed.garments.length) { const m = String(text).match(/(?:^|\s)(XXXL|XXL|XL|XS|L|M|S)(?=\s|$|[؟?!.،,])/); if (m) sz = m[1]; } // «sweatshirt ramady XL»: مقاس لاتيني كابيتال جنب قطعة
+    if (!sz) { const m = t.match(/(?:مقاسي|مقاسى|مقاس|سايزي|سايز|size)\s*(?:هو )?(اكس اكس لارج|دبل اكس لارج|دبل اكس|اكس لارج|اكسل)/); if (m) sz = { 'اكس اكس لارج': 'XXL', 'دبل اكس لارج': 'XXL', 'دبل اكس': 'XXL', 'اكس لارج': 'XL', اكسل: 'XL' }[m[1]]; }
     if (!sz) { const m = t.match(/(?:مقاسي|مقاسى|مقاس|سايزي|سايز|size)\s*(?:هو )?(كبير جدا|كبير|لارج|صغير|سمول|وسط|ميديم)/); if (m) sz = { 'كبير جدا': 'XL', كبير: 'L', لارج: 'L', صغير: 'S', سمول: 'S', وسط: 'M', ميديم: 'M' }[m[1]]; }
     if (!sz && session?.parsed?.garments?.length && !parsed.garments.length) {
       const m2 = t.trim().match(/^(?:مقاسي |انا )?(?:(?:لارج|ميديم|سمول|اكس لارج|اكس اكس لارج)|(?:xxl|xl|xs|s|m|l|3xl))$/i);
@@ -844,7 +885,7 @@ async function runModaCore(messages, opts = {}) {
   if (!hasAnswers && !session?.pending && (parsed.intent === 'unknown' || (parsed.intent === 'shop' && !parsed.ownedPieces?.length && !parsed.garments.length && !parsed.context && !parsed.persons.length)) && text.trim().length >= 3) {
     const hits = keywordSearch(text, ensureEnriched(products, K), { limit: 6 });
     if (hits.length) return searchReply(hits);
-    if (parsed.intent === 'unknown' && text.trim().split(/\s+/).length <= 3 && /^[\u0600-\u06FFa-zA-Z ]+$/.test(text.trim()) && !session?.parsed && !/^(ايه|ايوه|ايوا|اه|لا|تمام|طب|طيب|هو|هي|بس|كمل|كمان|تاني|وبعدين|ممكن|ازاي|ليه|مين|فين|امتي|انتي|انت|انا|خلاص|ماشي|اوكي|يعني|هاتلي|ورينا|ورني|مش|ده|دي|دا|كده|كدا|حلو|وحش|غبي|غبيه|سيئ|سيء|مدير|خدمه)( |$)/.test(norm(text).trim()) && !/(غبي|غبيه|وحش|سيئ|سيء|بتفهمي|بتفهم|مدير|شكوي|شكوى)/.test(norm(text))) {
+    if (parsed.intent === 'unknown' && !/(^| )(حاجه|حاجات|حلوه|حلو|شيك|لقطه|حاجه حلوه)( |$)/.test(` ${norm(text)} `) && text.trim().split(/\s+/).length <= 3 && /^[\u0600-\u06FFa-zA-Z ]+$/.test(text.trim()) && !session?.parsed && !/^(ايه|ايوه|ايوا|اه|لا|تمام|طب|طيب|هو|هي|بس|كمل|كمان|تاني|وبعدين|ممكن|ازاي|ليه|مين|فين|امتي|انتي|انت|انا|خلاص|ماشي|اوكي|يعني|هاتلي|ورينا|ورني|مش|ده|دي|دا|كده|كدا|حلو|وحش|غبي|غبيه|سيئ|سيء|مدير|خدمه)( |$)/.test(norm(text).trim()) && !/(غبي|غبيه|وحش|سيئ|سيء|بتفهمي|بتفهم|مدير|شكوي|شكوى)/.test(norm(text))) {
       const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
       return { ...res0, say: `ملقتش «${text.trim()}» في المحلات دلوقتي. جرّب اسم تاني للقطعة، أو قولي المناسبة ولمين وأرشحلك من المتاح.`, intent: 'chat', session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
     }
@@ -1017,7 +1058,7 @@ async function runModaCore(messages, opts = {}) {
       const notes = [];
       if (/(كم (قصير|طويل|واسع|ضيق|نص|ربع)|(^| )بكم (قصير|طويل)|من غير كم|بدون كم|حمالات|قصير الكم|طويل الكم)/.test(nq)) notes.push('تفصيلة الكم');
       for (const w of ['ذكيه', 'مطرز', 'مخرم', 'دانتيل', 'ستان', 'حرير', 'مطبوع', 'مخطط', 'كارو', 'منقوش', 'مشجر', 'لامع', 'ضد الماء']) {
-        if (nq.includes(w) && picksD.length && !picksD.some((pr) => norm(`${pr.name_ar || ''} ${pr.description_ar || ''} ${pr.cat_text || ''}`).includes(w))) notes.push(`«${w}»`);
+        if (new RegExp(`(^| )(و|ب|بال|ال|وال)?${w}( |$)`).test(nq) && picksD.length /* كلمة مستقلة: «فستان» مش «ستان» */ && !picksD.some((pr) => norm(`${pr.name_ar || ''} ${pr.description_ar || ''} ${pr.cat_text || ''}`).includes(w))) notes.push(`«${w}»`);
       }
       if (notes.length) res = { ...res, say: `${res.say} مش متأكدة إن ${notes.join(' و')} متسجل عند المحل للقطعة دي، فتأكد منه من صورها ووصفها أو كلّم المحل.` };
     } }

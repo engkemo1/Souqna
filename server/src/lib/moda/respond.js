@@ -24,6 +24,17 @@ export function buildQuestion(K, askKey, lang = 'ar') {
   return { id, text: q.text, type: q.type, options: q.options };
 }
 
+// سؤال «ضيف ولا صاحب المناسبة»: اسم المناسبة الصح (فرح/كتب كتاب/خطوبة) ومخاطبة الست بالمؤنث، بدل «إنت ضيف ولا الخطوبة بتاعتك؟» لكل الحالات
+function fitRoleQ(q, plan, L) {
+  if (!q || q.id !== 'engagement_role' || L === 'en') return q;
+  const ctx = plan?.parsed?.context || plan?.context || '';
+  const ev = /wedding/.test(ctx) ? ['الفرح', 'بتاعك', 'بتاعي'] : /katb/.test(ctx) ? ['كتب الكتاب', 'بتاعك', 'بتاعي'] : ['الخطوبة', 'بتاعتك', 'بتاعتي'];
+  const pp = plan?.parsed?.persons || plan?.persons || [];
+  const fem = plan?.parsed?.genderHint === 'female' || (!plan?.parsed?.genderHint && pp.length && pp.every((p) => p === 'women' || p === 'women_hijab'));
+  const text = fem ? `إنتي ضيفة ولا ${ev[0]} ${ev[1]}؟` : `إنت ضيف ولا ${ev[0]} ${ev[1]}؟`;
+  return { ...q, text, options: q.options.map((o) => ({ ...o, label: o.value === 'guest' ? (fem ? 'ضيفة' : 'ضيف') : `${ev[0]} ${ev[2]}` })) };
+}
+
 function tabLabel(aud, persons, P) {
   const hasMan = persons.includes('men'); const hasWoman = persons.includes('women') || persons.includes('women_hijab');
   if (aud === 'men') return P.tab_him; if (aud === 'women' || aud === 'women_hijab') return hasMan ? P.tab_her : P.tab_all;
@@ -92,11 +103,11 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
     const herText = first === 'modest_preference' && (plan.persons?.includes('men') || plan.soloFromCouple === 'women') ? 'هي محجبة ولا لأ؟' : null;
     const text = herText ? herText : first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'budget' ? say(couple ? 'clarify_budget_couple' : 'clarify_budget') : first === 'time_if_dressy' ? say('clarify_time') : first === 'venue_if_dressy' ? say('clarify_venue') : first === 'color_preference' ? say('clarify_color') : first === 'dress_kind' ? say('dress_clarify') : (buildQuestion(K, first, L)?.text || say('clarify_generic'));
     const questions = asks.slice(0, K.questions.limits.max_questions_per_turn).map((a) => {
-      const q = buildQuestion(K, a, L);
+      const q = fitRoleQ(buildQuestion(K, a, L), plan, L);
       if (a === 'modest_preference' && q && (plan.persons?.includes('men') || plan.soloFromCouple === 'women')) return { ...q, text: 'هي محجبة ولا لأ؟' };
       return a === 'budget' && couple && q ? { ...q, text: say('clarify_budget_couple') } : q;
     }).filter(Boolean);
-    return { state: 'clarify', intent: 'shop', say: text, questions, blocks: null, ask: asks };
+    return { state: 'clarify', intent: 'shop', say: first === 'engagement_role' && questions[0]?.id === 'engagement_role' ? questions[0].text : text, questions, blocks: null, ask: asks };
   }
 
   if (plan.state === 'no_look') {
@@ -169,7 +180,9 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   // ملاحظة الكوتشي الرسمي بتظهر بس لو المناسبة نفسها رسمية (خطوبة/فرح/تخرج...). في الجامعة والخروجات الكوتشي طبيعي ومفيش داعي لتبرير.
   const dressyOccasion = !!plan.context && (K.contexts.get(plan.context)?.formality?.[0] || 0) >= 4;
   const formalSneaker = dressyOccasion && plan.people.some((pe) => pe.picks.some((pk) => pk.product?.minimalSneaker && (['formal_shoes', 'loafers'].includes(pk.slotKey) || pk.product?.key === 'sneakers')));
-  if (formalSneaker) parts.push(say('minimal_sneaker_note'));
+  // للست: «تحب أدورلك جزمة رسمية؟» كانت بتودّي لحذاء أوكسفورد رجالي → نسأل عن كعب أو فلات
+  const sneakerForWoman = formalSneaker && plan.people.some((pe) => (pe.aud === 'women' || pe.aud === 'women_hijab' || pe.aud === 'girls') && pe.picks.some((pk) => pk.product?.minimalSneaker));
+  if (formalSneaker) parts.push(say(sneakerForWoman && K.phrases?.[L]?.minimal_sneaker_note_women ? 'minimal_sneaker_note_women' : 'minimal_sneaker_note'));
 
   // ---------- جو ووقت ----------
   const tips = [];
@@ -205,7 +218,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   { const seenIds = new Set(); for (const t of tabs) { const before = t.items; t.items = t.items.filter((it) => (seenIds.has(it.id) ? false : (seenIds.add(it.id), true))); if (before.length && !t.items.length && !t.missing.length) t.missing = before.map((it) => ({ label: it.label || it.key, base: it.key, keys: [it.key].filter(Boolean), color: null, material: null })); /* التاب فضي بعد التكرار: نعرضه «مش متاح» بدل ما يختفي بصمت */ } for (let i = tabs.length - 1; i >= 0 && tabs.length > 1; i -= 1) if (!tabs[i].items.length && !tabs[i].missing.length) tabs.splice(i, 1); }
   // سبب كل قطعة: الحارس + الربط بالطقم بيتطبقوا بعد إزالة التكرار بين التابات، عشان السبب ما يشيرش لقطعة اتشالت
   for (const t of tabs) t.items = tieWhyToLook(K, t.items, L, (plan.parsed?.ownedPieces || []).map((o) => itemAr(K, o.key)), (plan.parsed?.ownedPieces || []).map((o) => o.key));
-  const questions = condolence ? [] : (plan.ask || []).slice(0, 1).map((a) => buildQuestion(K, a, L)).filter(Boolean);
+  const questions = condolence ? [] : (plan.ask || []).slice(0, 1).map((a) => fitRoleQ(buildQuestion(K, a, L), plan, L)).filter(Boolean);
 
   return {
     state: plan.state, intent: 'shop', say: dedupeSay(parts.filter(Boolean).join(' ')), tips: tips.slice(0, 2), styleTips: styleTips.slice(0, 2), questions,

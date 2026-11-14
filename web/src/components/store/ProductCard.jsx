@@ -21,7 +21,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
   const toast = useToast();
   const fav = favs.has(p.id);
   const [popKey, setPopKey] = useState(0);
-  const href = sp(slug, `p/${p.slug}`);
+  const href = sp(p.store?.slug || slug, `p/${p.slug}`);
   const out = p.stock === 'out';
   const { card } = useDesign();
   const bubble = card === 'bubble'; // kids template: pastel card, bubbly corners, a little bounce

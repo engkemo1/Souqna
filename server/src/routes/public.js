@@ -865,6 +865,12 @@ r.get('/stores/:slug/products', h((req, res) => {
   });
 }));
 
+/** A product link that carries the wrong shop (e.g. opened from another shop's page): tell the page which shop really sells it. */
+r.get('/product-owner/:pslug', h((req, res) => {
+  const row = q.get("SELECT s.slug AS store FROM products p JOIN stores s ON s.id=p.store_id WHERE p.slug=? AND p.status='active' AND s.status='active' AND s.hidden=0 ORDER BY p.sold_count DESC, p.id DESC LIMIT 1", [req.params.pslug]);
+  if (!row) throw notFound('Product');
+  res.json({ store: row.store });
+}));
 r.get('/stores/:slug/products/:pslug', h((req, res) => {
   const s = loadStore(req.params.slug);
   const p = q.get("SELECT * FROM products WHERE store_id=? AND slug=? AND status='active'", [s.id, req.params.pslug]);

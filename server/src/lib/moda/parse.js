@@ -93,7 +93,9 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     const one = (k) => new Set((gh[k] || []).filter((w) => typeof w === 'string' && !w.includes(' ')).map((w) => norm(w)));
     const F = one('female'); const M = one('male');
     const toks = n.split(' ');
-    const fT = toks.filter((t) => F.has(t)); const hasM = toks.some((t) => M.has(t));
+    const fT = toks.filter((t) => F.has(t)); let hasM = toks.some((t) => M.has(t));
+    const multi = (k) => (gh[k] || []).filter((w) => typeof w === 'string' && w.includes(' ')).map((w) => norm(w)).filter((w) => ` ${n} `.includes(` ${w} `) || ` ${n} `.includes(` و${w} `));
+    if (!fT.length && !hasM) { const mf = multi('female'); const mm2 = multi('male').filter((w) => !mf.some((f) => f.startsWith(w))); if (mf.length && !mm2.length) fT.push(...mf); else if (mm2.length && !mf.length) hasM = true; }
     if (fT.length && !hasM) { speaker = 'female'; femaleTexts.push(...fT); } else if (hasM && !fT.length) speaker = 'male';
   }
   result.genderHint = speaker;
@@ -141,7 +143,8 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   /* ---------- المناسبة ---------- */
   const ctxEntries = entriesOf(matches, 'context');
   const _negs0 = entriesOf(matches, 'negation');
-  const ctxNeg = (c) => _negs0.some((ng) => ng.end <= c.start && c.start - ng.end <= 1);
+  const CTX_NEG_FILLER = new Set(['ال', 'في', 'فى', 'ل', 'لل', 'اي', 'خالص', 'رايح', 'رايحه', 'عشان', 'علشان', 'لبس']);
+  const ctxNeg = (c) => _negs0.some((ng) => ng.end <= c.start && (c.start - ng.end === 0 || (c.start - ng.end === 1 && CTX_NEG_FILLER.has(tokens[ng.end])))); // «من غير كمام للشغل»: الشغل مش منفي
   result.avoidContexts = ctxEntries.filter(ctxNeg).map((e) => e.key);
   const ctxKeys = new Set(ctxEntries.filter((e) => !ctxNeg(e)).map((e) => e.key));
   for (const c of CONTEXT_PRIORITY) if (ctxKeys.has(c)) { result.context = c; break; }
@@ -214,6 +217,20 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     const host = result.garments.find((h) => h !== g && h.key !== 'jeans' && h.position === g.position - 1);
     if (host) { if (!host.material) host.material = 'denim'; result.garments.splice(i, 1); }
   }
+  // «سيبك من الفستان، وريني جاكيت» / «بلاش جينز، خليه قماش»: القطعة المرفوضة مش مطلوبة (لو فيه قطعة تانية مطلوبة)
+  { const NEG_G = /^(سيبك|بلاش|انسي|انسى|شيل|مش|مو)$/;
+    const negated = (g) => { const a = tokens[g.position - 1] || ''; const b = tokens[g.position - 2] || ''; return NEG_G.test(a) || (a === 'من' && /^(سيبك|سيبيك|بلاش)$/.test(b)) || (/^(عايز|عايزه|عاوز|عاوزه)$/.test(a) && b === 'مش'); };
+    const keep = result.garments.filter((g) => !negated(g));
+    if (keep.length && keep.length < result.garments.length) { result.flags.rejectedGarments = result.garments.filter(negated).map((g) => g.key); result.garments = keep; } }
+  // «هودي أوفر سايز»: أوفر سايز وصف للقطعة، مش سويتر تاني
+  if (result.garments.length > 1) { const os = result.garments.filter((g) => /^(اوفر سايز|اوفرسايز)$/.test(norm(g.text))); if (os.length && os.length < result.garments.length) { const rest = result.garments.filter((g) => !os.includes(g)); for (const o of os) { const host = rest.reduce((a, g) => (Math.abs(g.position - o.position) < Math.abs((a?.position ?? 1e9) - o.position) ? g : a), null); if (host) { if (!host.color && o.color) host.color = o.color; if (!host.material && o.material) host.material = o.material; } } result.garments = rest; } }
+  // «شنطة كلاتش / شنطة كروس / شنطة ضهر»: نوع الشنطة المحدد يكفي، مش شنطة + نوع
+  if (result.garments.length > 1) { const specific = result.garments.filter((g) => ['clutch', 'crossbody', 'backpack', 'tote'].includes(g.key)); const hb = result.garments.filter((g) => g.key === 'handbag' && specific.some((x) => Math.abs(x.position - g.position) <= 1 && !String(tokens[Math.max(x.position, g.position)] || '').startsWith('و'))); if (hb.length) { for (const h of hb) { const x = specific.find((y) => Math.abs(y.position - h.position) <= 1); if (x && !x.color && h.color) x.color = h.color; } result.garments = result.garments.filter((g) => !hb.includes(g)); } }
+  // «ستان» كخامة: بنقراها كتوكن مستقل بس (مش جوه «فستان»)
+  if (tokens.some((t) => t === 'ستان' || t === 'الستان')) { if (result.garments.length === 1 && !result.garments[0].material) result.garments[0].material = 'satin'; else if (!result.garments.length) result.flags.looseMaterials = [...new Set([...(result.flags.looseMaterials || []), 'satin'])]; }
+  // «تيشيرت بولو»: بولو هنا نوع التيشيرت، مش قطعتين
+  { const pi = result.garments.findIndex((g) => g.key === 'polo'); const ti = result.garments.findIndex((g) => g.key === 'tshirt');
+    if (pi >= 0 && ti >= 0 && result.garments[pi].position === result.garments[ti].position + 1 && !String(tokens[result.garments[pi].position] || '').startsWith('و')) { const t = result.garments[ti]; const p = result.garments[pi]; if (!p.color) p.color = t.color; if (!p.material) p.material = t.material; result.garments.splice(ti, 1); } }
   for (const g of result.garments) if (g.key !== 'jeans' && !g.material && norm(g.text).split(' ').includes('جينز')) g.material = 'denim'; // «جاكيت جينز» كاسم قطعة واحد
   // خامة لوحدها من غير قطعة («تكون شيفون»): نحفظها عشان المحرك يطبقها على القطعة اللي بنتكلم عنها
   if (!result.garments.length && !result.ownedPieces.length) {
@@ -402,10 +419,11 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   result.fullLook = fl;
 
   /* ---------- نصيحة ---------- */
+  const availAsk = result.garments.length > 0 && /^(عندكم|عندكو|عندك|فيه|في|موجود|متاح)( |$)/.test(n);
   if (hasQuestion) {
     let best = null;
     for (const item of K.phrases.advice.items) {
-      if (hasShopping && !item.care) continue; // سؤال غسيل/عنايه عن قطعه («ازاي انضف الجاكيت الجلد») مش طلب شراء
+      if ((hasShopping || availAsk) && !item.care) continue; // سؤال غسيل/عنايه عن قطعه («ازاي انضف الجاكيت الجلد») مش طلب شراء — و«عندكم هودي اوفر سايز؟» سؤال توفر مش شرح
       for (const kw of [...(item.keywords_ar || []), ...(item.keywords_en || [])]) {
         const k = norm(kw); if (!k) continue;
         if ((` ${n} `).includes(` ${k} `) && (!best || k.length > best.len)) best = { id: item.id, len: k.length };

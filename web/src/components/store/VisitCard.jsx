@@ -34,12 +34,19 @@ function MapArt() {
   );
 }
 
+const socialUrl = (v, base) => { const x = String(v || '').trim(); if (!x) return ''; if (/^https?:\/\//i.test(x)) return x; return `${base}${x.replace(/^@/, '')}`; };
+
 export default function VisitCard() {
   const { store } = useStore();
   const { tr, lang } = useI18n();
   const ar = lang === 'ar';
   const address = tr(store.address);
-  if (!address && !store.phone) return null;
+  const socials = [
+    ['Instagram', socialUrl(store.instagram, 'https://www.instagram.com/'), ar ? 'إنستجرام' : 'Instagram'],
+    ['TikTok', socialUrl(store.tiktok, 'https://www.tiktok.com/@'), ar ? 'تيك توك' : 'TikTok'],
+    ['Facebook', socialUrl(store.facebook, 'https://www.facebook.com/'), ar ? 'فيسبوك' : 'Facebook'],
+  ].filter(([, u]) => u);
+  if (!address && !store.phone && !socials.length) return null;
   const maps = mapsLinks(store, address);
   const open = openNow(store.hours);
   const row = 'flex items-start gap-3.5 border-t border-on-footer/10 py-4 first:border-t-0 first:pt-0';
@@ -104,6 +111,11 @@ export default function VisitCard() {
                 <MessageCircle className="h-4 w-4" />{ar ? 'واتساب' : 'WhatsApp'}
               </a>
             )}
+            {socials.map(([k, u, label]) => (
+              <a key={k} href={u} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-full border border-on-footer/25 px-5 py-3 text-base font-semibold transition hover:bg-on-footer/10">
+                {label}
+              </a>
+            ))}
           </div>
         </div>
         {address && (

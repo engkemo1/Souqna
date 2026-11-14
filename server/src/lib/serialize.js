@@ -42,6 +42,7 @@ export function serializeStore(s, { withTheme = true } = {}) {
     hours: storeHours(s),
     instagram: s.instagram,
     facebook: s.facebook,
+    tiktok: s.tiktok,
     logo: media.get(s.logo_media_id) || null,
     logoInitials: s.logo_initials || '',
     logoColor: s.logo_color || '#1B1B1B',

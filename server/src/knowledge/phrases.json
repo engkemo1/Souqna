@@ -213,6 +213,9 @@
     "tab_all": "الطقم",
     "unknown_followup": [
       "تمام، قولي عايز إيه بالظبط."
+    ],
+    "minimal_sneaker_note_women": [
+      "الكوتشي هنا سادة علشان مفيش كعب أو فلات شيك متاح حاليًا، وبيمشي مع الطقم في المناسبة دي. تحبي أدورلك على كعب أو فلات؟"
     ]
   },
   "en": {
@@ -314,6 +317,9 @@
     ],
     "alt_color": [
       "{wanted} isn't available in that exact colour, so I picked the closest"
+    ],
+    "minimal_sneaker_note_women": [
+      "The sneaker here is a plain one because no dressy heels or flats are available right now; it works with this look for the occasion. Want me to look for heels or flats?"
     ]
   },
   "advice": {

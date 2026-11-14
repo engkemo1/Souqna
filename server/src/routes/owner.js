@@ -116,6 +116,19 @@ r.patch('/reviews/:id', h((req, res) => {
   res.json({ ok: true });
 }));
 
+/** Social account: accepts @name, name, or a pasted profile link (any length) and stores just the handle. */
+const socialHandle = z.string().trim().max(400).transform((v) => {
+  let x = v;
+  try {
+    if (/^https?:\/\//i.test(x) || /^(www\.)?(instagram|tiktok|facebook|fb)\.com/i.test(x)) {
+      const u = new URL(/^https?:/i.test(x) ? x : `https://${x}`);
+      const seg = u.pathname.split('/').filter(Boolean)[0] || '';
+      x = seg === 'profile.php' ? (u.searchParams.get('id') || '') : seg;
+    }
+  } catch { /* keep as typed */ }
+  return x.replace(/^@/, '').replace(/[?#].*$/, '').trim();
+}).pipe(z.string().max(60));
+
 const storeSchema = z.object({
   name_ar: z.string().trim().min(2).max(60), name_en: z.string().trim().min(2).max(60),
   tagline_ar: z.string().trim().max(120).optional(), tagline_en: z.string().trim().max(120).optional(),
@@ -138,7 +151,7 @@ const storeSchema = z.object({
   day_off: z.union([z.literal(''), z.coerce.number().int().min(0).max(6)]).optional().nullable(),
   hours: hoursSchema.nullable().optional(), // weekly schedule + holidays (null clears it)
   map_url: z.union([z.literal(''), z.string().trim().url().max(400).refine((u) => /^https:\/\/(www\.)?(google\.[a-z.]+\/maps|maps\.google\.[a-z.]+|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(u), 'map_url_invalid')]).optional().nullable(),
-  instagram: z.string().trim().max(60).optional(), facebook: z.string().trim().max(60).optional(), tiktok: z.string().trim().max(60).optional(),
+  instagram: socialHandle.optional(), facebook: socialHandle.optional(), tiktok: socialHandle.optional(),
   shipping_fee: z.coerce.number().int().min(0).max(1000).optional(),
   free_shipping_over: z.coerce.number().int().min(0).max(100000).optional(),
   offer_badge_ar: z.string().trim().max(30).optional().nullable(), offer_badge_en: z.string().trim().max(30).optional().nullable(),

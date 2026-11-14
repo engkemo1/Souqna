@@ -139,6 +139,8 @@ export function inferGender(row, key, K = loadKnowledge()) {
   if (row.department === 'jalabiya') return 'unisex';
   if (WOMEN_KEYS.has(key)) return 'women';
   if (MEN_KEYS.has(key)) return 'men';
+  // «حذاء رسمي/قرنية/أوكسفورد» من غير أي دليل إنه حريمي = موديل رجالي، عشان ميترشحش لست طالبة حذاء رسمي مع فستان
+  if (key === 'formal_shoes') return 'men';
   return 'unisex';
 }
 
