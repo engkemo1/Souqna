@@ -4,6 +4,7 @@
  */
 import { loadKnowledge } from './knowledge.js';
 import { generateColorHarmonyInsight, generateFitAndSizingTip } from './stylingInsights.js';
+import { allowedGarments, guardWhy, genericWhy } from './whyGuard.js';
 
 const hashStr = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i += 1) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 export const pick = (list, seed = '') => (Array.isArray(list) && list.length ? list[hashStr(String(seed)) % list.length] : (list ?? ''));
@@ -31,10 +32,39 @@ function tabLabel(aud, persons, P) {
   return P.tab_all;
 }
 
+// سبب القطعة في الأطقم اللي من غير AI: سبب القطعة نفسها + ربطها بباقي القطع المختارة في نفس الطقم (مش وصف عام بس)
+const tieWhyToLook = (K, itemsIn, L, ownedLabels = [], ownedKeys = []) => {
+  if (L === 'en') return itemsIn;
+  // 1) حارس: سبب أي قطعة ما يشيرش لقطعة مش في نفس الطقم (ولا مع العميل). الجملة اللي بتذكر قطعة غايبة بتتشال، ولو مفضلش حاجة نرجع لسبب القطعة نفسها أو جملة عامة صادقة.
+  const allow = allowedGarments(K, itemsIn, ownedKeys);
+  const items = itemsIn.map((it) => {
+    if (!it.why || !['piece', 'look'].includes(it.whyKind)) return it;
+    const g = guardWhy(K, it.why, allow); if (!g.changed) return it;
+    if (g.text) return { ...it, why: g.text };
+    const own = K.kb?.whyAr?.(it.key); const og = own ? guardWhy(K, own, allow) : null;
+    if (og && og.text) return { ...it, why: og.text, whyKind: 'piece' };
+    const occ = K.kb?.occasionsAr?.(it.key) || [];
+    return { ...it, why: occ.length ? `بتناسب ${occ.join('، ')}` : genericWhy(), whyKind: 'piece' };
+  });
+  if (items.length < 2) return items;
+  const shortLabel = (i) => String(i.label || '').trim();
+  const words = (o) => [shortLabel(o), ...String(o.name || '').split(/\s+/).filter((w) => w.length >= 3).slice(0, 2)].filter(Boolean);
+  return items.map((it) => {
+    if (!it.why || !['piece', 'look'].includes(it.whyKind)) return it;
+    const others = items.filter((o) => o !== it && shortLabel(o)).map(shortLabel).filter((v, i, a) => a.indexOf(v) === i).slice(0, 3);
+    // سبب جاي من الـ AI وبيذكر فعلًا قطعة تانية في الطقم (أو القطعة اللي مع العميل): نسيبه زي ما هو. غير كده نضيف الربط بالكود، مش معتمدين على الموديل.
+    if (it.whyKind === 'look' && (items.some((o) => o !== it && words(o).some((w) => String(it.why).includes(w))) || /اللي (عندك|معاك)|عندك|معاك/.test(String(it.why)))) return it;
+    if (!others.length && !ownedLabels.length) return it;
+    const list = others.length === 1 ? others[0] : `${others.slice(0, -1).join('، ')} و${others[others.length - 1]}`;
+    const own = [...new Set(ownedLabels)].filter((l) => l && l !== it.label).slice(0, 2); const ownTxt = own.length ? ` ومع ${own.join(' و')} اللي معاك` : '';
+    return { ...it, why: `${String(it.why).replace(/[.؟!]+\s*$/, '')}. في الطقم ده بيتنسق مع ${list || 'باقي القطع'}${ownTxt}.`, whyKind: it.whyKind === 'look' ? 'look+outfit' : 'outfit' };
+  });
+};
+
 const itemCard = (K, pk) => {
   const p = pk.product;
   const fitTip = generateFitAndSizingTip(p);
-  return { id: p.id, key: p.key, label: itemAr(K, p.key || pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null, fitTip: fitTip || null,
+  return { id: p.id, key: p.key, label: itemAr(K, p.key || pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null, fitTip: fitTip || null, why: pk.why || K.kb?.whyAr?.(pk.slotKey) || null, whyKind: pk.why ? 'look' : (K.kb?.whyAr?.(pk.slotKey) ? 'piece' : null),
     alts: (pk.alts || []).map((a) => ({ id: a.id, key: a.key, label: itemAr(K, a.key || pk.slotKey), name: a.name_ar || a.name_en, price: a.price, store: a.store_slug || null, image: a.image || a.image_url || a.thumb || null, colors: a.colorKeys })) };
 };
 
@@ -172,7 +202,9 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   }));
 
   // نفس المنتج مايظهرش في أكتر من تاب (قطعة للجنسين)
-  { const seenIds = new Set(); for (const t of tabs) { t.items = t.items.filter((it) => (seenIds.has(it.id) ? false : (seenIds.add(it.id), true))); } for (let i = tabs.length - 1; i >= 0 && tabs.length > 1; i -= 1) if (!tabs[i].items.length && !tabs[i].missing.length) tabs.splice(i, 1); }
+  { const seenIds = new Set(); for (const t of tabs) { const before = t.items; t.items = t.items.filter((it) => (seenIds.has(it.id) ? false : (seenIds.add(it.id), true))); if (before.length && !t.items.length && !t.missing.length) t.missing = before.map((it) => ({ label: it.label || it.key, base: it.key, keys: [it.key].filter(Boolean), color: null, material: null })); /* التاب فضي بعد التكرار: نعرضه «مش متاح» بدل ما يختفي بصمت */ } for (let i = tabs.length - 1; i >= 0 && tabs.length > 1; i -= 1) if (!tabs[i].items.length && !tabs[i].missing.length) tabs.splice(i, 1); }
+  // سبب كل قطعة: الحارس + الربط بالطقم بيتطبقوا بعد إزالة التكرار بين التابات، عشان السبب ما يشيرش لقطعة اتشالت
+  for (const t of tabs) t.items = tieWhyToLook(K, t.items, L, (plan.parsed?.ownedPieces || []).map((o) => itemAr(K, o.key)), (plan.parsed?.ownedPieces || []).map((o) => o.key));
   const questions = condolence ? [] : (plan.ask || []).slice(0, 1).map((a) => buildQuestion(K, a, L)).filter(Boolean);
 
   return {

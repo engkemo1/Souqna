@@ -1,0 +1,4917 @@
+{
+  "schema_version": "1.0.0",
+  "dataset_name": "Egyptian Fashion Knowledge Base",
+  "language": [
+    "en",
+    "ar",
+    "ar-EG"
+  ],
+  "scope": [
+    "men",
+    "women",
+    "unisex",
+    "children"
+  ],
+  "description": "Structured starter knowledge base for an AI fashion stylist, with English, Arabic and Egyptian colloquial vocabulary.",
+  "usage_notes": [
+    "Egyptian colloquial names vary by region and store; treat them as searchable aliases, not strict definitions.",
+    "Compatibility is a recommendation, not a universal rule. Adapt to dress code, weather, fit, comfort and user taste.",
+    "Do not infer hidden fabric composition, brand, price, size, body measurements or identity from an image.",
+    "Ask for confirmation when visual recognition confidence is low."
+  ],
+  "taxonomy": [
+    {
+      "id": "tops",
+      "name_en": "Tops",
+      "name_ar": "ملابس الجزء العلوي",
+      "name_eg": "اللبس الفوقاني"
+    },
+    {
+      "id": "bottoms",
+      "name_en": "Bottoms",
+      "name_ar": "ملابس الجزء السفلي",
+      "name_eg": "البناطيل والجيبات"
+    },
+    {
+      "id": "one_piece",
+      "name_en": "One-piece clothing",
+      "name_ar": "ملابس قطعة واحدة",
+      "name_eg": "الفستان والجمبسوت"
+    },
+    {
+      "id": "outerwear",
+      "name_en": "Outerwear",
+      "name_ar": "ملابس خارجية",
+      "name_eg": "جاكيتات وقطع فوق اللبس"
+    },
+    {
+      "id": "footwear",
+      "name_en": "Footwear",
+      "name_ar": "أحذية",
+      "name_eg": "كوتشي وجزم وشباشب وصنادل"
+    },
+    {
+      "id": "bags",
+      "name_en": "Bags",
+      "name_ar": "حقائب",
+      "name_eg": "شنط"
+    },
+    {
+      "id": "accessories",
+      "name_en": "Accessories",
+      "name_ar": "إكسسوارات",
+      "name_eg": "إكسسوارات"
+    },
+    {
+      "id": "underwear_sleepwear",
+      "name_en": "Underwear and sleepwear",
+      "name_ar": "ملابس داخلية وملابس نوم",
+      "name_eg": "لبس داخلي وبيتي"
+    },
+    {
+      "id": "sportswear",
+      "name_en": "Sportswear",
+      "name_ar": "ملابس رياضية",
+      "name_eg": "تريننج ولبس جيم"
+    },
+    {
+      "id": "traditional",
+      "name_en": "Traditional and modest clothing",
+      "name_ar": "ملابس تقليدية ومحتشمة",
+      "name_eg": "جلابيات وعبايات ولبس واسع"
+    }
+  ],
+  "items": [
+    {
+      "id": "basic_tshirt",
+      "category": "tops",
+      "subcategory": "t_shirt",
+      "names": {
+        "en": [
+          "Basic T-shirt"
+        ],
+        "ar": [
+          "تيشيرت أساسي"
+        ],
+        "ar-EG": [
+          "تيشيرت سادة",
+          "تيشيرت نص كم",
+          "تيشيرت عادي"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "polyester"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "minimalist",
+        "streetwear"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "outing",
+        "travel"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "jeans",
+          "chinos",
+          "cargo_pants",
+          "shorts",
+          "skirts"
+        ],
+        "shoes": [
+          "sneakers",
+          "canvas_shoes",
+          "sandals"
+        ]
+      },
+      "alternatives": [
+        "polo_shirt",
+        "henley_shirt",
+        "long_sleeve_tshirt"
+      ]
+    },
+    {
+      "id": "polo_shirt",
+      "category": "tops",
+      "subcategory": "polo",
+      "names": {
+        "en": [
+          "Polo shirt"
+        ],
+        "ar": [
+          "قميص بولو"
+        ],
+        "ar-EG": [
+          "بولو",
+          "تيشيرت بياقة"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "polyester"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "preppy",
+        "sporty"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "office",
+        "outing"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "chinos",
+          "jeans",
+          "shorts",
+          "skirts"
+        ],
+        "shoes": [
+          "loafers",
+          "sneakers",
+          "boat_shoes"
+        ]
+      },
+      "alternatives": [
+        "basic_tshirt",
+        "knit_polo",
+        "henley_shirt"
+      ]
+    },
+    {
+      "id": "formal_shirt",
+      "category": "tops",
+      "subcategory": "shirt",
+      "names": {
+        "en": [
+          "Formal shirt / Dress shirt"
+        ],
+        "ar": [
+          "قميص رسمي"
+        ],
+        "ar-EG": [
+          "قميص كلاسيك",
+          "قميص فورمال",
+          "قميص شغل"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "poplin",
+          "twill"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "formal",
+        "business_casual",
+        "classic"
+      ],
+      "occasions": [
+        "office",
+        "meeting",
+        "interview",
+        "wedding_guest",
+        "engagement"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "formal_trousers",
+          "chinos",
+          "suit_trousers"
+        ],
+        "shoes": [
+          "oxford_shoes",
+          "derby_shoes",
+          "loafers"
+        ]
+      },
+      "alternatives": [
+        "oxford_shirt",
+        "linen_shirt",
+        "band_collar_shirt"
+      ]
+    },
+    {
+      "id": "oxford_shirt",
+      "category": "tops",
+      "subcategory": "shirt",
+      "names": {
+        "en": [
+          "Oxford shirt"
+        ],
+        "ar": [
+          "قميص أكسفورد"
+        ],
+        "ar-EG": [
+          "قميص أكسفورد",
+          "قميص كاجوال شيك"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "smart_casual",
+        "business_casual",
+        "preppy",
+        "classic"
+      ],
+      "occasions": [
+        "office",
+        "university",
+        "outing",
+        "meeting",
+        "dinner"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "chinos",
+          "jeans",
+          "formal_trousers"
+        ],
+        "shoes": [
+          "loafers",
+          "derby_shoes",
+          "white_sneakers"
+        ]
+      },
+      "alternatives": [
+        "formal_shirt",
+        "linen_shirt",
+        "denim_shirt"
+      ]
+    },
+    {
+      "id": "linen_shirt",
+      "category": "tops",
+      "subcategory": "shirt",
+      "names": {
+        "en": [
+          "Linen shirt"
+        ],
+        "ar": [
+          "قميص كتان"
+        ],
+        "ar-EG": [
+          "قميص كتان",
+          "قميص صيفي"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "linen",
+          "cotton"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "minimalist",
+        "resort"
+      ],
+      "occasions": [
+        "daily",
+        "outing",
+        "travel",
+        "beach",
+        "dinner"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "linen_trousers",
+          "chinos",
+          "shorts",
+          "jeans"
+        ],
+        "shoes": [
+          "loafers",
+          "espadrilles",
+          "sandals",
+          "white_sneakers"
+        ]
+      },
+      "alternatives": [
+        "cotton_shirt",
+        "camp_collar_shirt",
+        "viscose_shirt"
+      ]
+    },
+    {
+      "id": "denim_shirt",
+      "category": "tops",
+      "subcategory": "shirt",
+      "names": {
+        "en": [
+          "Denim shirt"
+        ],
+        "ar": [
+          "قميص دنيم"
+        ],
+        "ar-EG": [
+          "قميص جينز"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "denim"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "streetwear",
+        "workwear"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "outing",
+        "travel"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "black_jeans",
+          "beige_chinos",
+          "white_trousers"
+        ],
+        "shoes": [
+          "sneakers",
+          "boots",
+          "loafers"
+        ]
+      },
+      "alternatives": [
+        "chambray_shirt",
+        "overshirt",
+        "oxford_shirt"
+      ]
+    },
+    {
+      "id": "blouse",
+      "category": "tops",
+      "subcategory": "blouse",
+      "names": {
+        "en": [
+          "Blouse"
+        ],
+        "ar": [
+          "بلوزة"
+        ],
+        "ar-EG": [
+          "بلوزة",
+          "بلوزه شيك"
+        ]
+      },
+      "gender_scope": [
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "viscose",
+          "silk",
+          "chiffon",
+          "satin"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "formal",
+        "bohemian"
+      ],
+      "occasions": [
+        "office",
+        "university",
+        "outing",
+        "dinner",
+        "engagement"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "tailored_trousers",
+          "jeans",
+          "skirts",
+          "wide_leg_pants"
+        ],
+        "shoes": [
+          "flats",
+          "loafers",
+          "heels",
+          "sneakers"
+        ]
+      },
+      "alternatives": [
+        "shirt",
+        "tunic",
+        "knit_top"
+      ]
+    },
+    {
+      "id": "tank_top",
+      "category": "tops",
+      "subcategory": "tank_top",
+      "names": {
+        "en": [
+          "Tank top"
+        ],
+        "ar": [
+          "بلوزة كت"
+        ],
+        "ar-EG": [
+          "كت",
+          "توب كت",
+          "فانلة حمالات"
+        ]
+      },
+      "gender_scope": [
+        "women",
+        "men",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "knit"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "sporty",
+        "streetwear"
+      ],
+      "occasions": [
+        "daily",
+        "beach",
+        "gym",
+        "travel"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "jeans",
+          "shorts",
+          "skirts",
+          "wide_leg_pants"
+        ],
+        "shoes": [
+          "sneakers",
+          "sandals"
+        ]
+      },
+      "alternatives": [
+        "sleeveless_top",
+        "basic_tshirt",
+        "bodysuit"
+      ]
+    },
+    {
+      "id": "hoodie",
+      "category": "tops",
+      "subcategory": "hoodie",
+      "names": {
+        "en": [
+          "Hoodie"
+        ],
+        "ar": [
+          "هودي"
+        ],
+        "ar-EG": [
+          "هودي",
+          "سويت شيرت بكابيشو"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "fleece",
+          "polyester"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "streetwear",
+        "sporty"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "travel"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "jeans",
+          "joggers",
+          "cargo_pants",
+          "leggings"
+        ],
+        "shoes": [
+          "sneakers",
+          "boots"
+        ]
+      },
+      "alternatives": [
+        "crewneck_sweatshirt",
+        "zip_hoodie",
+        "knit_sweater"
+      ]
+    },
+    {
+      "id": "sweatshirt",
+      "category": "tops",
+      "subcategory": "sweatshirt",
+      "names": {
+        "en": [
+          "Crewneck sweatshirt"
+        ],
+        "ar": [
+          "سويت شيرت"
+        ],
+        "ar-EG": [
+          "سويت شيرت",
+          "بلوفر قطن من غير كابيشو"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "fleece"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "streetwear",
+        "sporty"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "travel"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "jeans",
+          "joggers",
+          "cargo_pants",
+          "leggings"
+        ],
+        "shoes": [
+          "sneakers",
+          "boots"
+        ]
+      },
+      "alternatives": [
+        "hoodie",
+        "knit_sweater",
+        "quarter_zip"
+      ]
+    },
+    {
+      "id": "knit_sweater",
+      "category": "tops",
+      "subcategory": "sweater",
+      "names": {
+        "en": [
+          "Knit sweater"
+        ],
+        "ar": [
+          "كنزة تريكو"
+        ],
+        "ar-EG": [
+          "بلوفر تريكو",
+          "بلوفر صوف"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "wool",
+          "cashmere",
+          "cotton",
+          "knit"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "classic",
+        "smart_casual",
+        "preppy",
+        "minimalist"
+      ],
+      "occasions": [
+        "office",
+        "university",
+        "outing",
+        "dinner"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "bottoms": [
+          "jeans",
+          "chinos",
+          "formal_trousers",
+          "skirts"
+        ],
+        "shoes": [
+          "loafers",
+          "boots",
+          "sneakers"
+        ]
+      },
+      "alternatives": [
+        "cardigan",
+        "sweatshirt",
+        "fleece_top"
+      ]
+    },
+    {
+      "id": "jeans",
+      "category": "bottoms",
+      "subcategory": "jeans",
+      "names": {
+        "en": [
+          "Jeans"
+        ],
+        "ar": [
+          "بنطلون جينز"
+        ],
+        "ar-EG": [
+          "جينز",
+          "بنطلون جينز",
+          "بنطلون دنيم"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "denim"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "streetwear",
+        "classic"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "outing",
+        "travel"
+      ],
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "tops": [
+          "tshirt",
+          "shirt",
+          "polo",
+          "sweater",
+          "blouse"
+        ],
+        "shoes": [
+          "sneakers",
+          "loafers",
+          "boots",
+          "flats"
+        ]
+      },
+      "alternatives": [
+        "chinos",
+        "cargo_pants",
+        "corduroy_trousers"
+      ]
+    },
+    {
+      "id": "chinos",
+      "category": "bottoms",
+      "subcategory": "trousers",
+      "names": {
+        "en": [
+          "Chino trousers"
+        ],
+        "ar": [
+          "بنطلون تشينو"
+        ],
+        "ar-EG": [
+          "تشينو",
+          "بنطلون قماش كاجوال"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "twill"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "smart_casual",
+        "business_casual",
+        "preppy",
+        "classic"
+      ],
+      "occasions": [
+        "office",
+        "meeting",
+        "outing",
+        "dinner",
+        "university"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "tops": [
+          "oxford_shirt",
+          "polo_shirt",
+          "tshirt",
+          "linen_shirt"
+        ],
+        "shoes": [
+          "loafers",
+          "derby_shoes",
+          "white_sneakers",
+          "boat_shoes"
+        ]
+      },
+      "alternatives": [
+        "jeans",
+        "tailored_trousers",
+        "linen_trousers"
+      ]
+    },
+    {
+      "id": "formal_trousers",
+      "category": "bottoms",
+      "subcategory": "trousers",
+      "names": {
+        "en": [
+          "Formal trousers / Dress pants"
+        ],
+        "ar": [
+          "بنطلون رسمي"
+        ],
+        "ar-EG": [
+          "بنطلون قماش",
+          "بنطلون كلاسيك",
+          "بنطلون فورمال"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "wool",
+          "polyester",
+          "twill",
+          "viscose"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "formal",
+        "business_casual",
+        "classic"
+      ],
+      "occasions": [
+        "office",
+        "meeting",
+        "interview",
+        "wedding_guest",
+        "engagement"
+      ],
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "tops": [
+          "formal_shirt",
+          "blouse",
+          "knit_sweater"
+        ],
+        "shoes": [
+          "oxford_shoes",
+          "derby_shoes",
+          "loafers",
+          "heels"
+        ]
+      },
+      "alternatives": [
+        "chinos",
+        "wide_leg_trousers"
+      ]
+    },
+    {
+      "id": "cargo_pants",
+      "category": "bottoms",
+      "subcategory": "trousers",
+      "names": {
+        "en": [
+          "Cargo pants"
+        ],
+        "ar": [
+          "بنطلون كارغو"
+        ],
+        "ar-EG": [
+          "كارغو",
+          "بنطلون بجيوب جانبية"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "nylon",
+          "twill"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "streetwear",
+        "workwear"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "outing",
+        "travel"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "tops": [
+          "basic_tshirt",
+          "hoodie",
+          "sweatshirt",
+          "overshirt"
+        ],
+        "shoes": [
+          "sneakers",
+          "combat_boots",
+          "sport_sandals"
+        ]
+      },
+      "alternatives": [
+        "joggers",
+        "utility_trousers",
+        "relaxed_jeans"
+      ]
+    },
+    {
+      "id": "joggers",
+      "category": "bottoms",
+      "subcategory": "sports_trousers",
+      "names": {
+        "en": [
+          "Joggers"
+        ],
+        "ar": [
+          "بنطلون رياضي بقصة مريحة"
+        ],
+        "ar-EG": [
+          "جوغر",
+          "بنطلون رياضي",
+          "تريننج"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "polyester",
+          "fleece"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "sporty",
+        "casual",
+        "streetwear"
+      ],
+      "occasions": [
+        "daily",
+        "travel",
+        "gym",
+        "home"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "tops": [
+          "hoodie",
+          "sweatshirt",
+          "basic_tshirt",
+          "sports_top"
+        ],
+        "shoes": [
+          "sneakers",
+          "running_shoes"
+        ]
+      },
+      "alternatives": [
+        "track_pants",
+        "cargo_pants",
+        "leggings"
+      ]
+    },
+    {
+      "id": "shorts",
+      "category": "bottoms",
+      "subcategory": "shorts",
+      "names": {
+        "en": [
+          "Shorts"
+        ],
+        "ar": [
+          "شورت"
+        ],
+        "ar-EG": [
+          "شورت",
+          "بنطلون قصير"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "linen",
+          "denim",
+          "nylon"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "sporty",
+        "resort",
+        "streetwear"
+      ],
+      "occasions": [
+        "daily",
+        "beach",
+        "travel",
+        "gym"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "tops": [
+          "basic_tshirt",
+          "polo_shirt",
+          "linen_shirt",
+          "tank_top"
+        ],
+        "shoes": [
+          "sneakers",
+          "slides",
+          "sandals",
+          "espadrilles"
+        ]
+      },
+      "alternatives": [
+        "bermuda_shorts",
+        "cropped_trousers",
+        "skort"
+      ]
+    },
+    {
+      "id": "skirt",
+      "category": "bottoms",
+      "subcategory": "skirt",
+      "names": {
+        "en": [
+          "Skirt"
+        ],
+        "ar": [
+          "جيبة / تنورة"
+        ],
+        "ar-EG": [
+          "جيبة",
+          "تنورة"
+        ]
+      },
+      "gender_scope": [
+        "women",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "denim",
+          "cotton",
+          "satin",
+          "chiffon",
+          "wool"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "formal",
+        "bohemian",
+        "preppy"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "office",
+        "outing",
+        "dinner",
+        "party"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "tops": [
+          "tshirt",
+          "blouse",
+          "shirt",
+          "knit_top"
+        ],
+        "shoes": [
+          "sneakers",
+          "flats",
+          "loafers",
+          "heels",
+          "boots"
+        ]
+      },
+      "alternatives": [
+        "trousers",
+        "skort",
+        "dress"
+      ]
+    },
+    {
+      "id": "casual_dress",
+      "category": "one_piece",
+      "subcategory": "dress",
+      "names": {
+        "en": [
+          "Casual dress"
+        ],
+        "ar": [
+          "فستان كاجوال"
+        ],
+        "ar-EG": [
+          "فستان خروج",
+          "فستان يومي"
+        ]
+      },
+      "gender_scope": [
+        "women",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "linen",
+          "viscose",
+          "denim"
+        ],
+        "fit_options": [],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "bohemian",
+        "minimalist"
+      ],
+      "occasions": [
+        "daily",
+        "outing",
+        "travel",
+        "beach"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "outerwear": [
+          "cardigan",
+          "denim_jacket"
+        ],
+        "shoes": [
+          "sneakers",
+          "sandals",
+          "flats",
+          "ankle_boots"
+        ]
+      },
+      "alternatives": [
+        "jumpsuit",
+        "skirt_and_top",
+        "shirt_dress"
+      ]
+    },
+    {
+      "id": "evening_dress",
+      "category": "one_piece",
+      "subcategory": "dress",
+      "names": {
+        "en": [
+          "Evening dress / Formal gown"
+        ],
+        "ar": [
+          "فستان سهرة"
+        ],
+        "ar-EG": [
+          "فستان سواريه",
+          "فستان سهرة",
+          "فستان فرح"
+        ]
+      },
+      "gender_scope": [
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "satin",
+          "silk",
+          "chiffon",
+          "velvet",
+          "lace"
+        ],
+        "fit_options": [],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "formal",
+        "black_tie"
+      ],
+      "occasions": [
+        "wedding_guest",
+        "engagement",
+        "party",
+        "dinner"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "outerwear": [
+          "shawl",
+          "blazer"
+        ],
+        "shoes": [
+          "heels",
+          "strappy_sandals",
+          "pumps"
+        ]
+      },
+      "alternatives": [
+        "cocktail_dress",
+        "formal_jumpsuit",
+        "two_piece_evening_set"
+      ]
+    },
+    {
+      "id": "jumpsuit",
+      "category": "one_piece",
+      "subcategory": "jumpsuit",
+      "names": {
+        "en": [
+          "Jumpsuit"
+        ],
+        "ar": [
+          "جمبسوت"
+        ],
+        "ar-EG": [
+          "جمبسوت",
+          "أوفرول حريمي"
+        ]
+      },
+      "gender_scope": [
+        "women",
+        "men"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "linen",
+          "viscose",
+          "satin",
+          "denim"
+        ],
+        "fit_options": [],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "formal"
+      ],
+      "occasions": [
+        "outing",
+        "office",
+        "dinner",
+        "party",
+        "travel"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "outerwear": [
+          "belt",
+          "blazer",
+          "cardigan"
+        ],
+        "shoes": [
+          "sneakers",
+          "loafers",
+          "heels",
+          "sandals"
+        ]
+      },
+      "alternatives": [
+        "dress",
+        "matching_set",
+        "trousers_and_top"
+      ]
+    },
+    {
+      "id": "blazer",
+      "category": "outerwear",
+      "subcategory": "blazer",
+      "names": {
+        "en": [
+          "Blazer"
+        ],
+        "ar": [
+          "سترة بليزر"
+        ],
+        "ar-EG": [
+          "بليزر",
+          "جاكيت بدلة",
+          "جاكيت فورمال"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "wool",
+          "linen",
+          "cotton",
+          "polyester",
+          "twill"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": []
+      },
+      "styles": [
+        "smart_casual",
+        "business_casual",
+        "formal",
+        "classic",
+        "old_money"
+      ],
+      "occasions": [
+        "office",
+        "meeting",
+        "interview",
+        "dinner",
+        "wedding_guest",
+        "engagement"
+      ],
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "tops": [
+          "formal_shirt",
+          "oxford_shirt",
+          "basic_tshirt",
+          "blouse",
+          "knit_top"
+        ],
+        "shoes": [
+          "loafers",
+          "derby_shoes",
+          "heels",
+          "clean_sneakers"
+        ]
+      },
+      "alternatives": [
+        "structured_cardigan",
+        "overshirt",
+        "suit_jacket"
+      ]
+    },
+    {
+      "id": "denim_jacket",
+      "category": "outerwear",
+      "subcategory": "jacket",
+      "names": {
+        "en": [
+          "Denim jacket"
+        ],
+        "ar": [
+          "جاكيت دنيم"
+        ],
+        "ar-EG": [
+          "جاكيت جينز"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "denim"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "streetwear",
+        "classic"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "outing",
+        "travel"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "tops": [
+          "tshirt",
+          "hoodie",
+          "dress",
+          "shirt"
+        ],
+        "shoes": [
+          "sneakers",
+          "boots",
+          "flats"
+        ]
+      },
+      "alternatives": [
+        "bomber_jacket",
+        "overshirt",
+        "leather_jacket"
+      ]
+    },
+    {
+      "id": "leather_jacket",
+      "category": "outerwear",
+      "subcategory": "jacket",
+      "names": {
+        "en": [
+          "Leather jacket"
+        ],
+        "ar": [
+          "جاكيت جلد"
+        ],
+        "ar-EG": [
+          "جاكيت جلد",
+          "جاكيت جلد طبيعي أو صناعي"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "faux_leather"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "streetwear",
+        "classic"
+      ],
+      "occasions": [
+        "daily",
+        "outing",
+        "dinner",
+        "travel"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "tops": [
+          "tshirt",
+          "knit_sweater",
+          "hoodie"
+        ],
+        "shoes": [
+          "boots",
+          "sneakers",
+          "loafers"
+        ]
+      },
+      "alternatives": [
+        "denim_jacket",
+        "bomber_jacket",
+        "wool_coat"
+      ]
+    },
+    {
+      "id": "coat",
+      "category": "outerwear",
+      "subcategory": "coat",
+      "names": {
+        "en": [
+          "Wool coat / Overcoat"
+        ],
+        "ar": [
+          "معطف صوف"
+        ],
+        "ar-EG": [
+          "بالطو",
+          "معطف",
+          "كوت طويل"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "wool",
+          "cashmere",
+          "polyester"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": []
+      },
+      "styles": [
+        "formal",
+        "classic",
+        "old_money",
+        "smart_casual"
+      ],
+      "occasions": [
+        "office",
+        "meeting",
+        "dinner",
+        "outing",
+        "travel"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "tops": [
+          "knit_sweater",
+          "formal_shirt",
+          "turtleneck"
+        ],
+        "shoes": [
+          "boots",
+          "loafers",
+          "derby_shoes"
+        ]
+      },
+      "alternatives": [
+        "trench_coat",
+        "puffer_jacket",
+        "cardigan"
+      ]
+    },
+    {
+      "id": "trench_coat",
+      "category": "outerwear",
+      "subcategory": "coat",
+      "names": {
+        "en": [
+          "Trench coat"
+        ],
+        "ar": [
+          "معطف ترنش"
+        ],
+        "ar-EG": [
+          "ترنش كوت",
+          "بالطو ترنش"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "gabardine",
+          "polyester"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": []
+      },
+      "styles": [
+        "classic",
+        "smart_casual",
+        "business_casual",
+        "old_money"
+      ],
+      "occasions": [
+        "office",
+        "outing",
+        "travel",
+        "meeting"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "tops": [
+          "shirt",
+          "knit_sweater",
+          "tshirt"
+        ],
+        "shoes": [
+          "loafers",
+          "boots",
+          "sneakers"
+        ]
+      },
+      "alternatives": [
+        "mac_coat",
+        "lightweight_coat",
+        "long_cardigan"
+      ]
+    },
+    {
+      "id": "suit",
+      "category": "outerwear",
+      "subcategory": "suit",
+      "names": {
+        "en": [
+          "Two-piece / Three-piece suit"
+        ],
+        "ar": [
+          "بدلة رسمية"
+        ],
+        "ar-EG": [
+          "بدلة",
+          "بدلة كلاسيك",
+          "بدلة 3 قطع"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "wool",
+          "polyester",
+          "linen_blend"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": []
+      },
+      "styles": [
+        "formal",
+        "classic"
+      ],
+      "occasions": [
+        "wedding_guest",
+        "engagement",
+        "meeting",
+        "interview",
+        "formal_event"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "tops": [
+          "formal_shirt"
+        ],
+        "shoes": [
+          "oxford_shoes",
+          "derby_shoes",
+          "formal_loafers"
+        ]
+      },
+      "alternatives": [
+        "blazer_and_trousers",
+        "formal_jumpsuit",
+        "separates"
+      ]
+    },
+    {
+      "id": "waistcoat",
+      "category": "outerwear",
+      "subcategory": "waistcoat",
+      "names": {
+        "en": [
+          "Waistcoat / Vest"
+        ],
+        "ar": [
+          "صديري"
+        ],
+        "ar-EG": [
+          "صديري",
+          "فيست",
+          "جيليه"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "wool",
+          "linen",
+          "cotton",
+          "knit"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": []
+      },
+      "styles": [
+        "formal",
+        "classic",
+        "smart_casual",
+        "preppy"
+      ],
+      "occasions": [
+        "office",
+        "meeting",
+        "wedding_guest",
+        "dinner"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "tops": [
+          "formal_shirt",
+          "oxford_shirt",
+          "tshirt"
+        ],
+        "shoes": [
+          "loafers",
+          "derby_shoes"
+        ]
+      },
+      "alternatives": [
+        "blazer",
+        "cardigan",
+        "sweater_vest"
+      ]
+    },
+    {
+      "id": "sneakers",
+      "category": "footwear",
+      "subcategory": "sneakers",
+      "names": {
+        "en": [
+          "Sneakers / Trainers"
+        ],
+        "ar": [
+          "حذاء رياضي يومي"
+        ],
+        "ar-EG": [
+          "كوتشي",
+          "سنيكرز",
+          "كوتشي كاجوال"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "canvas",
+          "mesh",
+          "synthetic"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "streetwear",
+        "sporty",
+        "smart_casual"
+      ],
+      "occasions": [
+        "daily",
+        "university",
+        "outing",
+        "travel"
+      ],
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "clothing": [
+          "jeans",
+          "chinos",
+          "cargo_pants",
+          "shorts",
+          "skirts"
+        ]
+      },
+      "alternatives": [
+        "canvas_shoes",
+        "loafers",
+        "minimal_leather_sneakers"
+      ]
+    },
+    {
+      "id": "running_shoes",
+      "category": "footwear",
+      "subcategory": "athletic_shoes",
+      "names": {
+        "en": [
+          "Running shoes"
+        ],
+        "ar": [
+          "حذاء جري"
+        ],
+        "ar-EG": [
+          "كوتشي جري",
+          "كوتشي رياضي"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "mesh",
+          "knit",
+          "synthetic"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "sporty"
+      ],
+      "occasions": [
+        "gym",
+        "sports",
+        "travel"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "joggers",
+          "leggings",
+          "sports_shorts"
+        ]
+      },
+      "alternatives": [
+        "training_shoes",
+        "walking_shoes"
+      ]
+    },
+    {
+      "id": "loafers",
+      "category": "footwear",
+      "subcategory": "loafers",
+      "names": {
+        "en": [
+          "Loafers"
+        ],
+        "ar": [
+          "حذاء لوفر"
+        ],
+        "ar-EG": [
+          "لوفر",
+          "جزمة من غير رباط",
+          "موكاسين"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "suede",
+          "faux_leather"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "smart_casual",
+        "business_casual",
+        "classic",
+        "preppy",
+        "old_money"
+      ],
+      "occasions": [
+        "office",
+        "meeting",
+        "outing",
+        "dinner",
+        "wedding_guest"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "chinos",
+          "formal_trousers",
+          "jeans",
+          "skirts"
+        ]
+      },
+      "alternatives": [
+        "derby_shoes",
+        "ballet_flats",
+        "clean_sneakers"
+      ]
+    },
+    {
+      "id": "oxford_shoes",
+      "category": "footwear",
+      "subcategory": "dress_shoes",
+      "names": {
+        "en": [
+          "Oxford shoes"
+        ],
+        "ar": [
+          "حذاء أوكسفورد"
+        ],
+        "ar-EG": [
+          "جزمة أوكسفورد",
+          "جزمة كلاسيك رسمية"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "patent_leather"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "formal",
+        "classic"
+      ],
+      "occasions": [
+        "wedding_guest",
+        "engagement",
+        "meeting",
+        "interview",
+        "office"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "suit",
+          "formal_trousers"
+        ]
+      },
+      "alternatives": [
+        "derby_shoes",
+        "formal_loafers"
+      ]
+    },
+    {
+      "id": "derby_shoes",
+      "category": "footwear",
+      "subcategory": "dress_shoes",
+      "names": {
+        "en": [
+          "Derby shoes"
+        ],
+        "ar": [
+          "حذاء ديربي"
+        ],
+        "ar-EG": [
+          "ديربي",
+          "جزمة كلاسيك برباط"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "suede"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "formal",
+        "business_casual",
+        "classic"
+      ],
+      "occasions": [
+        "office",
+        "meeting",
+        "interview",
+        "wedding_guest"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "formal_trousers",
+          "chinos",
+          "suit"
+        ]
+      },
+      "alternatives": [
+        "oxford_shoes",
+        "loafers",
+        "monk_straps"
+      ]
+    },
+    {
+      "id": "boots",
+      "category": "footwear",
+      "subcategory": "boots",
+      "names": {
+        "en": [
+          "Ankle boots / Chelsea boots"
+        ],
+        "ar": [
+          "أحذية برقبة قصيرة"
+        ],
+        "ar-EG": [
+          "بوت",
+          "هاف بوت",
+          "تشيلسي بوت"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "suede",
+          "faux_leather"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "streetwear",
+        "classic"
+      ],
+      "occasions": [
+        "daily",
+        "outing",
+        "travel",
+        "office"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "jeans",
+          "trousers",
+          "skirts",
+          "casual_dress"
+        ]
+      },
+      "alternatives": [
+        "high_top_sneakers",
+        "loafers",
+        "ankle_shoes"
+      ]
+    },
+    {
+      "id": "sandals",
+      "category": "footwear",
+      "subcategory": "sandals",
+      "names": {
+        "en": [
+          "Sandals / Flat sandals"
+        ],
+        "ar": [
+          "صندل"
+        ],
+        "ar-EG": [
+          "صندل",
+          "سندل",
+          "صندل فلات"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "synthetic",
+          "rubber"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "resort",
+        "bohemian"
+      ],
+      "occasions": [
+        "daily",
+        "beach",
+        "travel",
+        "outing"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "shorts",
+          "linen_trousers",
+          "skirts",
+          "casual_dress"
+        ]
+      },
+      "alternatives": [
+        "slides",
+        "espadrilles",
+        "ballet_flats"
+      ]
+    },
+    {
+      "id": "slides",
+      "category": "footwear",
+      "subcategory": "slides",
+      "names": {
+        "en": [
+          "Slides"
+        ],
+        "ar": [
+          "شبشب مفتوح من الأمام"
+        ],
+        "ar-EG": [
+          "شبشب",
+          "سلايدز",
+          "شبشب شريط"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "rubber",
+          "foam",
+          "leather"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "sporty"
+      ],
+      "occasions": [
+        "home",
+        "beach",
+        "daily",
+        "travel"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "shorts",
+          "joggers",
+          "casual_trousers"
+        ]
+      },
+      "alternatives": [
+        "flip_flops",
+        "sport_sandals",
+        "clogs"
+      ]
+    },
+    {
+      "id": "flip_flops",
+      "category": "footwear",
+      "subcategory": "flip_flops",
+      "names": {
+        "en": [
+          "Flip-flops"
+        ],
+        "ar": [
+          "شبشب إصبع"
+        ],
+        "ar-EG": [
+          "شبشب صباع",
+          "شبشب حمام",
+          "فليب فلوب"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "rubber",
+          "foam"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "beach"
+      ],
+      "occasions": [
+        "beach",
+        "home",
+        "pool"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "shorts",
+          "swimwear_coverup"
+        ]
+      },
+      "alternatives": [
+        "slides",
+        "sport_sandals"
+      ]
+    },
+    {
+      "id": "heels",
+      "category": "footwear",
+      "subcategory": "heels",
+      "names": {
+        "en": [
+          "High heels / Pumps / Stilettos"
+        ],
+        "ar": [
+          "أحذية بكعب"
+        ],
+        "ar-EG": [
+          "كعب عالي",
+          "هيلز",
+          "كعب رفيع"
+        ]
+      },
+      "gender_scope": [
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "suede",
+          "satin",
+          "synthetic"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "formal",
+        "classic",
+        "glamorous"
+      ],
+      "occasions": [
+        "office",
+        "dinner",
+        "wedding_guest",
+        "engagement",
+        "party"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "formal_trousers",
+          "skirts",
+          "jeans",
+          "evening_dress",
+          "jumpsuit"
+        ]
+      },
+      "alternatives": [
+        "block_heel_sandals",
+        "ballet_flats",
+        "dressy_loafers"
+      ]
+    },
+    {
+      "id": "ballet_flats",
+      "category": "footwear",
+      "subcategory": "flats",
+      "names": {
+        "en": [
+          "Ballet flats"
+        ],
+        "ar": [
+          "حذاء فلات باليرينا"
+        ],
+        "ar-EG": [
+          "فلات",
+          "باليرينا",
+          "كوتشي فلات"
+        ]
+      },
+      "gender_scope": [
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "suede",
+          "fabric"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "classic",
+        "smart_casual",
+        "preppy"
+      ],
+      "occasions": [
+        "office",
+        "university",
+        "daily",
+        "outing"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "jeans",
+          "trousers",
+          "skirts",
+          "casual_dress"
+        ]
+      },
+      "alternatives": [
+        "loafers",
+        "slingbacks",
+        "sneakers"
+      ]
+    },
+    {
+      "id": "belt",
+      "category": "accessories",
+      "subcategory": "belt",
+      "names": {
+        "en": [
+          "Belt"
+        ],
+        "ar": [
+          "حزام"
+        ],
+        "ar-EG": [
+          "حزام",
+          "وسط"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "faux_leather",
+          "canvas"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "formal",
+        "classic"
+      ],
+      "occasions": [
+        "office",
+        "outing",
+        "meeting",
+        "wedding_guest"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "jeans",
+          "chinos",
+          "formal_trousers"
+        ]
+      },
+      "alternatives": [
+        "fabric_belt",
+        "braided_belt"
+      ]
+    },
+    {
+      "id": "watch",
+      "category": "accessories",
+      "subcategory": "watch",
+      "names": {
+        "en": [
+          "Wristwatch"
+        ],
+        "ar": [
+          "ساعة يد"
+        ],
+        "ar-EG": [
+          "ساعة",
+          "ساعة إيد"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "metal",
+          "rubber",
+          "fabric"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "formal",
+        "sporty"
+      ],
+      "occasions": [
+        "office",
+        "meeting",
+        "daily",
+        "wedding_guest",
+        "gym"
+      ],
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "clothing": []
+      },
+      "alternatives": [
+        "smartwatch",
+        "bracelet"
+      ]
+    },
+    {
+      "id": "sunglasses",
+      "category": "accessories",
+      "subcategory": "eyewear",
+      "names": {
+        "en": [
+          "Sunglasses"
+        ],
+        "ar": [
+          "نظارة شمسية"
+        ],
+        "ar-EG": [
+          "نضارة شمس",
+          "نظارة شمس"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "acetate",
+          "metal",
+          "plastic"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "classic",
+        "streetwear",
+        "resort"
+      ],
+      "occasions": [
+        "daily",
+        "travel",
+        "beach"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": []
+      },
+      "alternatives": [
+        "optical_frames",
+        "cap"
+      ]
+    },
+    {
+      "id": "crossbody_bag",
+      "category": "bags",
+      "subcategory": "crossbody",
+      "names": {
+        "en": [
+          "Crossbody bag"
+        ],
+        "ar": [
+          "حقيبة كروس"
+        ],
+        "ar-EG": [
+          "شنطة كروس",
+          "شنطة كروس بودي",
+          "شنطة كتف طويلة"
+        ]
+      },
+      "gender_scope": [
+        "women",
+        "men",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "leather",
+          "faux_leather",
+          "canvas",
+          "nylon"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "smart_casual",
+        "streetwear",
+        "minimalist"
+      ],
+      "occasions": [
+        "daily",
+        "outing",
+        "travel",
+        "university"
+      ],
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "clothing": [
+          "casual_dress",
+          "jumpsuit",
+          "jeans",
+          "trousers",
+          "skirts"
+        ]
+      },
+      "alternatives": [
+        "shoulder_bag",
+        "belt_bag",
+        "mini_backpack"
+      ]
+    },
+    {
+      "id": "tote_bag",
+      "category": "bags",
+      "subcategory": "tote",
+      "names": {
+        "en": [
+          "Tote bag"
+        ],
+        "ar": [
+          "حقيبة يد كبيرة"
+        ],
+        "ar-EG": [
+          "توت باج",
+          "شنطة كبيرة",
+          "شنطة كتف كبيرة"
+        ]
+      },
+      "gender_scope": [
+        "women",
+        "men",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "canvas",
+          "cotton",
+          "leather",
+          "nylon"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "minimalist",
+        "workwear",
+        "smart_casual"
+      ],
+      "occasions": [
+        "office",
+        "university",
+        "daily",
+        "travel"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": []
+      },
+      "alternatives": [
+        "shopper_bag",
+        "work_tote",
+        "backpack"
+      ]
+    },
+    {
+      "id": "backpack",
+      "category": "bags",
+      "subcategory": "backpack",
+      "names": {
+        "en": [
+          "Backpack"
+        ],
+        "ar": [
+          "حقيبة ظهر"
+        ],
+        "ar-EG": [
+          "شنطة ضهر",
+          "باك باك"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "nylon",
+          "canvas",
+          "leather"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "sporty",
+        "streetwear",
+        "workwear"
+      ],
+      "occasions": [
+        "university",
+        "travel",
+        "daily"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": []
+      },
+      "alternatives": [
+        "messenger_bag",
+        "tote_bag",
+        "sling_bag"
+      ]
+    },
+    {
+      "id": "scarf",
+      "category": "accessories",
+      "subcategory": "scarf",
+      "names": {
+        "en": [
+          "Scarf / Headscarf"
+        ],
+        "ar": [
+          "وشاح / إيشارب"
+        ],
+        "ar-EG": [
+          "إيشارب",
+          "سكارف",
+          "طرحة"
+        ]
+      },
+      "gender_scope": [
+        "women",
+        "men",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "silk",
+          "wool",
+          "viscose",
+          "chiffon"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "classic",
+        "casual",
+        "formal",
+        "modest",
+        "bohemian"
+      ],
+      "occasions": [
+        "daily",
+        "office",
+        "outing",
+        "travel",
+        "religious_cultural"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "clothing": []
+      },
+      "alternatives": [
+        "shawl",
+        "pashmina",
+        "neck_scarf"
+      ]
+    },
+    {
+      "id": "tie",
+      "category": "accessories",
+      "subcategory": "tie",
+      "names": {
+        "en": [
+          "Necktie / Bow tie"
+        ],
+        "ar": [
+          "ربطة عنق"
+        ],
+        "ar-EG": [
+          "كرافتة",
+          "بابيون"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "silk",
+          "polyester",
+          "knit"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "formal",
+        "classic"
+      ],
+      "occasions": [
+        "wedding_guest",
+        "engagement",
+        "meeting",
+        "interview"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "formal_shirt",
+          "suit"
+        ]
+      },
+      "alternatives": [
+        "open_collar_shirt",
+        "pocket_square"
+      ]
+    },
+    {
+      "id": "socks",
+      "category": "accessories",
+      "subcategory": "socks",
+      "names": {
+        "en": [
+          "Socks"
+        ],
+        "ar": [
+          "جوارب"
+        ],
+        "ar-EG": [
+          "شراب",
+          "شرابات"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "wool",
+          "polyester"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "casual",
+        "formal",
+        "sporty"
+      ],
+      "occasions": [
+        "daily",
+        "office",
+        "gym",
+        "travel"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "clothing": []
+      },
+      "alternatives": [
+        "liner_socks",
+        "compression_socks"
+      ]
+    },
+    {
+      "id": "abaya",
+      "category": "traditional",
+      "subcategory": "abaya",
+      "names": {
+        "en": [
+          "Abaya"
+        ],
+        "ar": [
+          "عباءة"
+        ],
+        "ar-EG": [
+          "عباية",
+          "عباءة"
+        ]
+      },
+      "gender_scope": [
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "crepe",
+          "linen",
+          "cotton",
+          "chiffon"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "modest",
+        "classic",
+        "formal"
+      ],
+      "occasions": [
+        "daily",
+        "office",
+        "outing",
+        "religious_cultural",
+        "wedding_guest"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "outerwear": [
+          "inner_dress",
+          "basic_top"
+        ],
+        "shoes": [
+          "sandals",
+          "flats",
+          "heels"
+        ]
+      },
+      "alternatives": [
+        "kimono",
+        "long_cardigan",
+        "maxi_dress"
+      ]
+    },
+    {
+      "id": "galabeya",
+      "category": "traditional",
+      "subcategory": "robe",
+      "names": {
+        "en": [
+          "Galabeya / Thobe"
+        ],
+        "ar": [
+          "جلابية"
+        ],
+        "ar-EG": [
+          "جلابية",
+          "جلابية بلدي",
+          "جلابية رجالي"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "linen",
+          "polyester_blend"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "traditional",
+        "modest",
+        "casual"
+      ],
+      "occasions": [
+        "home",
+        "religious_cultural",
+        "daily"
+      ],
+      "seasons": [
+        "summer",
+        "spring"
+      ],
+      "pair_with": {
+        "outerwear": [],
+        "shoes": [
+          "sandals",
+          "slides"
+        ]
+      },
+      "alternatives": [
+        "kaftan",
+        "long_tunic"
+      ]
+    },
+    {
+      "id": "tracksuit",
+      "category": "sportswear",
+      "subcategory": "tracksuit",
+      "names": {
+        "en": [
+          "Tracksuit set"
+        ],
+        "ar": [
+          "بدلة رياضية"
+        ],
+        "ar-EG": [
+          "تريننج كامل",
+          "بدلة رياضية"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "unisex",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "polyester",
+          "cotton",
+          "fleece"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "sporty",
+        "casual"
+      ],
+      "occasions": [
+        "gym",
+        "sports",
+        "travel",
+        "daily"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ],
+      "pair_with": {
+        "clothing": []
+      },
+      "alternatives": [
+        "joggers_and_sweatshirt",
+        "leggings_and_sports_top"
+      ]
+    },
+    {
+      "id": "leggings",
+      "category": "bottoms",
+      "subcategory": "leggings",
+      "names": {
+        "en": [
+          "Leggings"
+        ],
+        "ar": [
+          "بنطلون ليجنز"
+        ],
+        "ar-EG": [
+          "ليجنز",
+          "بنطلون استرتش"
+        ]
+      },
+      "gender_scope": [
+        "women",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "nylon",
+          "polyester",
+          "cotton_spandex"
+        ],
+        "fit_options": [
+          "slim",
+          "regular",
+          "relaxed",
+          "oversized"
+        ],
+        "pattern_options": [
+          "plain",
+          "striped",
+          "checked",
+          "floral",
+          "graphic"
+        ]
+      },
+      "styles": [
+        "sporty",
+        "casual"
+      ],
+      "occasions": [
+        "gym",
+        "travel",
+        "home",
+        "daily"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "tops": [
+          "oversized_tshirt",
+          "hoodie",
+          "tunic",
+          "sports_top"
+        ],
+        "shoes": [
+          "sneakers",
+          "running_shoes"
+        ]
+      },
+      "alternatives": [
+        "joggers",
+        "flare_leggings",
+        "slim_knit_trousers"
+      ]
+    },
+    {
+      "id": "swimwear",
+      "category": "sportswear",
+      "subcategory": "swimwear",
+      "names": {
+        "en": [
+          "Swimwear / Swimsuit / Swim trunks"
+        ],
+        "ar": [
+          "ملابس سباحة"
+        ],
+        "ar-EG": [
+          "مايوه",
+          "مايوه قطعة واحدة",
+          "شورت بحر"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "children"
+      ],
+      "attributes": {
+        "materials": [
+          "nylon",
+          "polyester",
+          "elastane"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "sporty",
+        "resort"
+      ],
+      "occasions": [
+        "beach",
+        "pool"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "rash_guard",
+          "shorts"
+        ]
+      },
+      "alternatives": [
+        "rash_guard_and_shorts",
+        "swim_shorts"
+      ]
+    },
+    {
+      "id": "underwear",
+      "category": "underwear_sleepwear",
+      "subcategory": "underwear",
+      "names": {
+        "en": [
+          "Underwear / Briefs / Boxers / Bra"
+        ],
+        "ar": [
+          "ملابس داخلية"
+        ],
+        "ar-EG": [
+          "بوكسر",
+          "كلوت",
+          "حمالة صدر",
+          "اندر وير"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "modal",
+          "microfiber",
+          "lace"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "basic"
+      ],
+      "occasions": [
+        "daily",
+        "sports"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": []
+      },
+      "alternatives": [
+        "seamless_underwear",
+        "sports_bra",
+        "boxer_briefs"
+      ]
+    },
+    {
+      "id": "pajamas",
+      "category": "underwear_sleepwear",
+      "subcategory": "sleepwear",
+      "names": {
+        "en": [
+          "Pajamas / Sleepwear"
+        ],
+        "ar": [
+          "ملابس نوم"
+        ],
+        "ar-EG": [
+          "بيجامة",
+          "لبس نوم"
+        ]
+      },
+      "gender_scope": [
+        "men",
+        "women",
+        "children",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "cotton",
+          "satin",
+          "viscose",
+          "flannel"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "homewear"
+      ],
+      "occasions": [
+        "home"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": []
+      },
+      "alternatives": [
+        "loungewear_set",
+        "cotton_nightshirt"
+      ]
+    },
+    {
+      "id": "sports_top",
+      "category": "sportswear",
+      "subcategory": "sports_top",
+      "names": {
+        "en": [
+          "Sports bra / Performance top"
+        ],
+        "ar": [
+          "بلوزة رياضية"
+        ],
+        "ar-EG": [
+          "برا رياضي",
+          "توب جيم",
+          "تيشيرت رياضي"
+        ]
+      },
+      "gender_scope": [
+        "women",
+        "men",
+        "unisex"
+      ],
+      "attributes": {
+        "materials": [
+          "polyester",
+          "nylon",
+          "elastane"
+        ],
+        "fit_options": [],
+        "pattern_options": []
+      },
+      "styles": [
+        "sporty"
+      ],
+      "occasions": [
+        "gym",
+        "sports"
+      ],
+      "seasons": [
+        "all"
+      ],
+      "pair_with": {
+        "clothing": [
+          "leggings",
+          "sports_shorts",
+          "joggers"
+        ]
+      },
+      "alternatives": [
+        "performance_tshirt",
+        "tank_top"
+      ]
+    }
+  ],
+  "colors": [
+    {
+      "id": "black",
+      "en": "Black",
+      "ar": "أسود",
+      "ar-EG": "أسود",
+      "family": "neutral"
+    },
+    {
+      "id": "white",
+      "en": "White",
+      "ar": "أبيض",
+      "ar-EG": "أبيض",
+      "family": "neutral"
+    },
+    {
+      "id": "ivory",
+      "en": "Ivory",
+      "ar": "عاجي",
+      "ar-EG": "أوف وايت",
+      "family": "neutral"
+    },
+    {
+      "id": "cream",
+      "en": "Cream",
+      "ar": "كريمي",
+      "ar-EG": "كريمي",
+      "family": "neutral"
+    },
+    {
+      "id": "beige",
+      "en": "Beige",
+      "ar": "بيج",
+      "ar-EG": "بيج",
+      "family": "neutral"
+    },
+    {
+      "id": "taupe",
+      "en": "Taupe",
+      "ar": "بني رمادي",
+      "ar-EG": "تاوب",
+      "family": "neutral"
+    },
+    {
+      "id": "gray",
+      "en": "Gray",
+      "ar": "رمادي",
+      "ar-EG": "رصاصي / رمادي",
+      "family": "neutral"
+    },
+    {
+      "id": "charcoal",
+      "en": "Charcoal",
+      "ar": "رمادي فحمي",
+      "ar-EG": "رصاصي غامق",
+      "family": "neutral"
+    },
+    {
+      "id": "navy",
+      "en": "Navy",
+      "ar": "كحلي",
+      "ar-EG": "كحلي",
+      "family": "blue"
+    },
+    {
+      "id": "light_blue",
+      "en": "Light blue",
+      "ar": "أزرق فاتح",
+      "ar-EG": "لبني / سماوي",
+      "family": "blue"
+    },
+    {
+      "id": "royal_blue",
+      "en": "Royal blue",
+      "ar": "أزرق ملكي",
+      "ar-EG": "أزرق ملكي",
+      "family": "blue"
+    },
+    {
+      "id": "olive",
+      "en": "Olive",
+      "ar": "زيتوني",
+      "ar-EG": "زيتوني",
+      "family": "green"
+    },
+    {
+      "id": "sage",
+      "en": "Sage green",
+      "ar": "أخضر مريمي",
+      "ar-EG": "سيج",
+      "family": "green"
+    },
+    {
+      "id": "forest_green",
+      "en": "Forest green",
+      "ar": "أخضر غامق",
+      "ar-EG": "أخضر غامق",
+      "family": "green"
+    },
+    {
+      "id": "brown",
+      "en": "Brown",
+      "ar": "بني",
+      "ar-EG": "بني",
+      "family": "earth"
+    },
+    {
+      "id": "camel",
+      "en": "Camel",
+      "ar": "جملي",
+      "ar-EG": "جملي",
+      "family": "earth"
+    },
+    {
+      "id": "tan",
+      "en": "Tan",
+      "ar": "بني فاتح",
+      "ar-EG": "تان",
+      "family": "earth"
+    },
+    {
+      "id": "rust",
+      "en": "Rust",
+      "ar": "صدئي",
+      "ar-EG": "طوبي",
+      "family": "earth"
+    },
+    {
+      "id": "burgundy",
+      "en": "Burgundy",
+      "ar": "خمري",
+      "ar-EG": "نبيتي",
+      "family": "red"
+    },
+    {
+      "id": "red",
+      "en": "Red",
+      "ar": "أحمر",
+      "ar-EG": "أحمر",
+      "family": "red"
+    },
+    {
+      "id": "pink",
+      "en": "Pink",
+      "ar": "وردي",
+      "ar-EG": "بينك",
+      "family": "pink"
+    },
+    {
+      "id": "blush",
+      "en": "Blush pink",
+      "ar": "وردي هادئ",
+      "ar-EG": "بينك هادي",
+      "family": "pink"
+    },
+    {
+      "id": "lavender",
+      "en": "Lavender",
+      "ar": "لافندر",
+      "ar-EG": "موف فاتح",
+      "family": "purple"
+    },
+    {
+      "id": "purple",
+      "en": "Purple",
+      "ar": "بنفسجي",
+      "ar-EG": "موف",
+      "family": "purple"
+    },
+    {
+      "id": "yellow",
+      "en": "Yellow",
+      "ar": "أصفر",
+      "ar-EG": "أصفر",
+      "family": "yellow"
+    },
+    {
+      "id": "mustard",
+      "en": "Mustard",
+      "ar": "خردلي",
+      "ar-EG": "مستردة",
+      "family": "yellow"
+    },
+    {
+      "id": "orange",
+      "en": "Orange",
+      "ar": "برتقالي",
+      "ar-EG": "برتقالي",
+      "family": "orange"
+    },
+    {
+      "id": "terracotta",
+      "en": "Terracotta",
+      "ar": "طوبي محروق",
+      "ar-EG": "تيراكوتا",
+      "family": "earth"
+    }
+  ],
+  "materials": [
+    {
+      "id": "cotton",
+      "en": "Cotton",
+      "ar": "قطن",
+      "ar-EG": "قطن",
+      "properties": [
+        "breathable",
+        "soft"
+      ],
+      "seasons": [
+        "spring",
+        "summer",
+        "autumn"
+      ]
+    },
+    {
+      "id": "linen",
+      "en": "Linen",
+      "ar": "كتان",
+      "ar-EG": "كتان",
+      "properties": [
+        "breathable",
+        "textured",
+        "wrinkles_easily"
+      ],
+      "seasons": [
+        "spring",
+        "summer"
+      ]
+    },
+    {
+      "id": "wool",
+      "en": "Wool",
+      "ar": "صوف",
+      "ar-EG": "صوف",
+      "properties": [
+        "warm",
+        "insulating"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "id": "cashmere",
+      "en": "Cashmere",
+      "ar": "كشمير",
+      "ar-EG": "كشمير",
+      "properties": [
+        "soft",
+        "warm",
+        "delicate"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "id": "denim",
+      "en": "Denim",
+      "ar": "دنيم",
+      "ar-EG": "جينز",
+      "properties": [
+        "durable",
+        "structured"
+      ],
+      "seasons": [
+        "spring",
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "id": "leather",
+      "en": "Leather",
+      "ar": "جلد طبيعي",
+      "ar-EG": "جلد",
+      "properties": [
+        "durable",
+        "structured"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "id": "faux_leather",
+      "en": "Faux leather",
+      "ar": "جلد صناعي",
+      "ar-EG": "جلد صناعي",
+      "properties": [
+        "structured"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "id": "polyester",
+      "en": "Polyester",
+      "ar": "بوليستر",
+      "ar-EG": "بوليستر",
+      "properties": [
+        "durable",
+        "quick_drying"
+      ],
+      "seasons": [
+        "all"
+      ]
+    },
+    {
+      "id": "viscose",
+      "en": "Viscose",
+      "ar": "فيسكوز",
+      "ar-EG": "فيسكوز",
+      "properties": [
+        "soft",
+        "drapey"
+      ],
+      "seasons": [
+        "spring",
+        "summer"
+      ]
+    },
+    {
+      "id": "silk",
+      "en": "Silk",
+      "ar": "حرير",
+      "ar-EG": "حرير",
+      "properties": [
+        "smooth",
+        "drapey",
+        "delicate"
+      ],
+      "seasons": [
+        "all"
+      ]
+    },
+    {
+      "id": "satin",
+      "en": "Satin",
+      "ar": "ساتان",
+      "ar-EG": "ستان",
+      "properties": [
+        "smooth",
+        "shiny"
+      ],
+      "seasons": [
+        "all"
+      ]
+    },
+    {
+      "id": "chiffon",
+      "en": "Chiffon",
+      "ar": "شيفون",
+      "ar-EG": "شيفون",
+      "properties": [
+        "lightweight",
+        "sheer"
+      ],
+      "seasons": [
+        "spring",
+        "summer"
+      ]
+    },
+    {
+      "id": "velvet",
+      "en": "Velvet",
+      "ar": "مخمل",
+      "ar-EG": "قطيفة",
+      "properties": [
+        "soft",
+        "heavy"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "id": "knit",
+      "en": "Knit",
+      "ar": "تريكو",
+      "ar-EG": "تريكو",
+      "properties": [
+        "stretchy",
+        "textured"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "id": "fleece",
+      "en": "Fleece",
+      "ar": "فليس",
+      "ar-EG": "فليس",
+      "properties": [
+        "warm",
+        "soft"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "id": "nylon",
+      "en": "Nylon",
+      "ar": "نايلون",
+      "ar-EG": "نايلون",
+      "properties": [
+        "lightweight",
+        "water_resistant"
+      ],
+      "seasons": [
+        "all"
+      ]
+    },
+    {
+      "id": "suede",
+      "en": "Suede",
+      "ar": "شمواه",
+      "ar-EG": "شمواه",
+      "properties": [
+        "soft",
+        "textured"
+      ],
+      "seasons": [
+        "autumn",
+        "winter"
+      ]
+    },
+    {
+      "id": "twill",
+      "en": "Twill",
+      "ar": "تويل",
+      "ar-EG": "تويل",
+      "properties": [
+        "durable",
+        "structured"
+      ],
+      "seasons": [
+        "all"
+      ]
+    }
+  ],
+  "styles": [
+    {
+      "id": "casual",
+      "en": "Casual",
+      "ar": "كاجوال",
+      "ar-EG": "كاجوال / يومي"
+    },
+    {
+      "id": "smart_casual",
+      "en": "Smart casual",
+      "ar": "كاجوال أنيق",
+      "ar-EG": "شيك من غير رسمي قوي"
+    },
+    {
+      "id": "business_casual",
+      "en": "Business casual",
+      "ar": "عملي شبه رسمي",
+      "ar-EG": "لبس شغل شيك"
+    },
+    {
+      "id": "formal",
+      "en": "Formal",
+      "ar": "رسمي",
+      "ar-EG": "فورمال"
+    },
+    {
+      "id": "black_tie",
+      "en": "Black tie",
+      "ar": "سهرة رسمية",
+      "ar-EG": "سواريه رسمي جداً"
+    },
+    {
+      "id": "streetwear",
+      "en": "Streetwear",
+      "ar": "ستايل الشارع",
+      "ar-EG": "ستريت وير"
+    },
+    {
+      "id": "minimalist",
+      "en": "Minimalist",
+      "ar": "بسيط",
+      "ar-EG": "مينيمال / هادي"
+    },
+    {
+      "id": "classic",
+      "en": "Classic",
+      "ar": "كلاسيك",
+      "ar-EG": "كلاسيك"
+    },
+    {
+      "id": "preppy",
+      "en": "Preppy",
+      "ar": "ستايل جامعي مرتب",
+      "ar-EG": "بريبي"
+    },
+    {
+      "id": "sporty",
+      "en": "Sporty",
+      "ar": "رياضي",
+      "ar-EG": "سبور"
+    },
+    {
+      "id": "bohemian",
+      "en": "Bohemian",
+      "ar": "بوهيمي",
+      "ar-EG": "بوهو"
+    },
+    {
+      "id": "old_money",
+      "en": "Old money inspired",
+      "ar": "كلاسيك راقٍ",
+      "ar-EG": "أولد ماني"
+    },
+    {
+      "id": "modest",
+      "en": "Modest fashion",
+      "ar": "موضة محتشمة",
+      "ar-EG": "لبس محتشم"
+    },
+    {
+      "id": "workwear",
+      "en": "Workwear",
+      "ar": "ملابس عملية",
+      "ar-EG": "ستايل عملي"
+    },
+    {
+      "id": "resort",
+      "en": "Resort wear",
+      "ar": "ستايل المصيف",
+      "ar-EG": "ستايل صيفي / مصيف"
+    }
+  ],
+  "occasions": [
+    {
+      "id": "daily",
+      "en": "Everyday",
+      "ar": "يومي",
+      "ar-EG": "مشاوير عادية"
+    },
+    {
+      "id": "university",
+      "en": "University",
+      "ar": "الجامعة",
+      "ar-EG": "الجامعة"
+    },
+    {
+      "id": "office",
+      "en": "Office",
+      "ar": "العمل",
+      "ar-EG": "الشغل"
+    },
+    {
+      "id": "meeting",
+      "en": "Business meeting",
+      "ar": "اجتماع عمل",
+      "ar-EG": "ميتينج"
+    },
+    {
+      "id": "interview",
+      "en": "Interview",
+      "ar": "مقابلة عمل",
+      "ar-EG": "إنترفيو"
+    },
+    {
+      "id": "outing",
+      "en": "Casual outing",
+      "ar": "خروجة",
+      "ar-EG": "خروجة"
+    },
+    {
+      "id": "date",
+      "en": "Date",
+      "ar": "موعد",
+      "ar-EG": "خروجة ديت"
+    },
+    {
+      "id": "dinner",
+      "en": "Dinner",
+      "ar": "عشاء",
+      "ar-EG": "عشا"
+    },
+    {
+      "id": "wedding_guest",
+      "en": "Wedding guest",
+      "ar": "حضور فرح",
+      "ar-EG": "فرح"
+    },
+    {
+      "id": "engagement",
+      "en": "Engagement party",
+      "ar": "حفل خطوبة",
+      "ar-EG": "خطوبة"
+    },
+    {
+      "id": "party",
+      "en": "Party",
+      "ar": "حفلة",
+      "ar-EG": "بارتي"
+    },
+    {
+      "id": "travel",
+      "en": "Travel",
+      "ar": "سفر",
+      "ar-EG": "سفر"
+    },
+    {
+      "id": "beach",
+      "en": "Beach",
+      "ar": "شاطئ",
+      "ar-EG": "مصيف / بحر"
+    },
+    {
+      "id": "gym",
+      "en": "Gym",
+      "ar": "النادي الرياضي",
+      "ar-EG": "الجيم"
+    },
+    {
+      "id": "sports",
+      "en": "Sports activity",
+      "ar": "نشاط رياضي",
+      "ar-EG": "تمرين"
+    },
+    {
+      "id": "home",
+      "en": "Home",
+      "ar": "المنزل",
+      "ar-EG": "البيت"
+    },
+    {
+      "id": "pool",
+      "en": "Pool",
+      "ar": "حمام سباحة",
+      "ar-EG": "حمام سباحة"
+    },
+    {
+      "id": "religious_cultural",
+      "en": "Religious or cultural occasion",
+      "ar": "مناسبة دينية أو ثقافية",
+      "ar-EG": "مناسبة عائلية أو دينية"
+    }
+  ],
+  "seasons": [
+    {
+      "id": "spring",
+      "en": "Spring",
+      "ar": "الربيع",
+      "ar-EG": "الربيع"
+    },
+    {
+      "id": "summer",
+      "en": "Summer",
+      "ar": "الصيف",
+      "ar-EG": "الصيف"
+    },
+    {
+      "id": "autumn",
+      "en": "Autumn / Fall",
+      "ar": "الخريف",
+      "ar-EG": "الخريف"
+    },
+    {
+      "id": "winter",
+      "en": "Winter",
+      "ar": "الشتاء",
+      "ar-EG": "الشتا"
+    },
+    {
+      "id": "all",
+      "en": "All seasons",
+      "ar": "كل الفصول",
+      "ar-EG": "طول السنة"
+    }
+  ],
+  "fit_types": [
+    {
+      "id": "slim",
+      "en": "Slim fit",
+      "ar": "قصة ضيقة نسبياً",
+      "ar-EG": "سليم فيت"
+    },
+    {
+      "id": "regular",
+      "en": "Regular fit",
+      "ar": "قصة عادية",
+      "ar-EG": "ريجولار"
+    },
+    {
+      "id": "relaxed",
+      "en": "Relaxed fit",
+      "ar": "قصة مريحة",
+      "ar-EG": "ريلاكسد"
+    },
+    {
+      "id": "oversized",
+      "en": "Oversized",
+      "ar": "واسع ومقاسه أكبر",
+      "ar-EG": "أوفر سايز"
+    },
+    {
+      "id": "skinny",
+      "en": "Skinny",
+      "ar": "ضيق جداً",
+      "ar-EG": "سكيني"
+    },
+    {
+      "id": "straight",
+      "en": "Straight fit",
+      "ar": "قصة مستقيمة",
+      "ar-EG": "ستريت"
+    },
+    {
+      "id": "wide_leg",
+      "en": "Wide leg",
+      "ar": "واسع من فوق لتحت",
+      "ar-EG": "وايد ليج"
+    },
+    {
+      "id": "tapered",
+      "en": "Tapered",
+      "ar": "أوسع فوق وأضيق عند الكاحل",
+      "ar-EG": "تيبرد"
+    },
+    {
+      "id": "flared",
+      "en": "Flared",
+      "ar": "واسع من تحت",
+      "ar-EG": "شارلستون / فليرد"
+    },
+    {
+      "id": "cropped",
+      "en": "Cropped",
+      "ar": "قصير الطول",
+      "ar-EG": "كروب"
+    }
+  ],
+  "patterns": [
+    {
+      "id": "plain",
+      "en": "Plain",
+      "ar": "سادة",
+      "ar-EG": "سادة"
+    },
+    {
+      "id": "striped",
+      "en": "Striped",
+      "ar": "مقلم",
+      "ar-EG": "مقلم"
+    },
+    {
+      "id": "checked",
+      "en": "Checked",
+      "ar": "مربعات",
+      "ar-EG": "كاروهات"
+    },
+    {
+      "id": "plaid",
+      "en": "Plaid",
+      "ar": "نقشة مربعات متقاطعة",
+      "ar-EG": "كارو"
+    },
+    {
+      "id": "floral",
+      "en": "Floral",
+      "ar": "زهور",
+      "ar-EG": "مشجر"
+    },
+    {
+      "id": "polka_dot",
+      "en": "Polka dot",
+      "ar": "منقط",
+      "ar-EG": "منقط"
+    },
+    {
+      "id": "graphic",
+      "en": "Graphic print",
+      "ar": "رسمة مطبوعة",
+      "ar-EG": "مطبوع / عليه رسمة"
+    },
+    {
+      "id": "animal_print",
+      "en": "Animal print",
+      "ar": "نقشة جلد حيوان",
+      "ar-EG": "ليوبارد / زيبرا"
+    },
+    {
+      "id": "abstract",
+      "en": "Abstract",
+      "ar": "نقشة تجريدية",
+      "ar-EG": "أبستراكت"
+    },
+    {
+      "id": "camouflage",
+      "en": "Camouflage",
+      "ar": "تمويه",
+      "ar-EG": "كاموفلاج"
+    }
+  ],
+  "color_harmony_rules": [
+    {
+      "id": "neutral_base",
+      "rule": "Build around one or two neutrals, then add one accent color.",
+      "example": [
+        "navy",
+        "white",
+        "camel"
+      ]
+    },
+    {
+      "id": "monochrome",
+      "rule": "Use different shades and textures from one color family.",
+      "example": [
+        "light_blue",
+        "navy"
+      ]
+    },
+    {
+      "id": "analogous",
+      "rule": "Neighboring color families can harmonize; vary lightness for contrast.",
+      "example": [
+        "olive",
+        "sage",
+        "cream"
+      ]
+    },
+    {
+      "id": "complementary_accent",
+      "rule": "Opposite color families can work as a small accent; avoid forcing equal intensity.",
+      "example": [
+        "navy",
+        "rust"
+      ]
+    },
+    {
+      "id": "earth_tones",
+      "rule": "Earth tones often work together when undertones are compatible.",
+      "example": [
+        "beige",
+        "olive",
+        "brown"
+      ]
+    },
+    {
+      "id": "pattern_balance",
+      "rule": "When one item has a strong print, keep supporting pieces simpler unless intentionally mixing patterns."
+    }
+  ],
+  "outfit_rules": [
+    {
+      "id": "formality_alignment",
+      "priority": 10,
+      "when": "meeting, interview or formal event",
+      "recommend": [
+        "formal_shirt",
+        "formal_trousers",
+        "blazer",
+        "suit",
+        "oxford_shoes",
+        "derby_shoes"
+      ],
+      "avoid_unless_requested": [
+        "flip_flops",
+        "running_shoes"
+      ],
+      "note": "Follow the actual dress code; workplaces vary."
+    },
+    {
+      "id": "smart_casual",
+      "priority": 8,
+      "when": "smart casual",
+      "combinations": [
+        [
+          "oxford_shirt",
+          "chinos",
+          "loafers"
+        ],
+        [
+          "basic_tshirt",
+          "blazer",
+          "dark_jeans",
+          "clean_sneakers"
+        ],
+        [
+          "polo_shirt",
+          "chinos",
+          "loafers"
+        ]
+      ]
+    },
+    {
+      "id": "summer_breathability",
+      "priority": 8,
+      "when": "hot weather",
+      "prefer_materials": [
+        "linen",
+        "cotton",
+        "viscose"
+      ],
+      "prefer_fits": [
+        "relaxed",
+        "regular"
+      ]
+    },
+    {
+      "id": "winter_layering",
+      "priority": 8,
+      "when": "cold weather",
+      "combinations": [
+        [
+          "base_layer",
+          "knit_sweater",
+          "coat"
+        ],
+        [
+          "tshirt",
+          "hoodie",
+          "puffer_jacket"
+        ]
+      ]
+    },
+    {
+      "id": "proportion_balance",
+      "priority": 7,
+      "when": "an oversized item is used",
+      "recommend": "Balance volume with a cleaner or structured item; oversized-on-oversized can work when intentional."
+    },
+    {
+      "id": "shoe_formality",
+      "priority": 9,
+      "when": "interview, wedding or formal event",
+      "recommend": [
+        "oxford_shoes",
+        "derby_shoes",
+        "loafers",
+        "heels",
+        "dressy_sandals"
+      ]
+    },
+    {
+      "id": "denim_on_denim",
+      "priority": 6,
+      "when": "denim shirt and jeans together",
+      "recommend": "Vary denim washes or create clear contrast."
+    },
+    {
+      "id": "comfort_first",
+      "priority": 10,
+      "when": "daily use or travel",
+      "recommend": "Prioritize fit, walking comfort, weather and the user's stated preferences."
+    }
+  ],
+  "compatibility_examples": [
+    {
+      "items": [
+        "basic_tshirt",
+        "jeans",
+        "sneakers"
+      ],
+      "style": "casual",
+      "score": 0.95
+    },
+    {
+      "items": [
+        "oxford_shirt",
+        "chinos",
+        "loafers"
+      ],
+      "style": "smart_casual",
+      "score": 0.94
+    },
+    {
+      "items": [
+        "linen_shirt",
+        "linen_trousers",
+        "sandals"
+      ],
+      "style": "resort",
+      "score": 0.92
+    },
+    {
+      "items": [
+        "blazer",
+        "dark_jeans",
+        "loafers"
+      ],
+      "style": "smart_casual",
+      "score": 0.9
+    },
+    {
+      "items": [
+        "hoodie",
+        "joggers",
+        "sneakers"
+      ],
+      "style": "streetwear",
+      "score": 0.96
+    },
+    {
+      "items": [
+        "formal_shirt",
+        "formal_trousers",
+        "oxford_shoes"
+      ],
+      "style": "formal",
+      "score": 0.97
+    },
+    {
+      "items": [
+        "blouse",
+        "wide_leg_pants",
+        "heels"
+      ],
+      "style": "smart_casual",
+      "score": 0.91
+    },
+    {
+      "items": [
+        "casual_dress",
+        "sandals"
+      ],
+      "style": "casual",
+      "score": 0.93
+    }
+  ],
+  "alternative_strategy": [
+    {
+      "type": "same_category",
+      "rule": "Offer another item in the same category with similar formality and use."
+    },
+    {
+      "type": "comfort",
+      "rule": "Offer a more comfortable alternative without ignoring the occasion."
+    },
+    {
+      "type": "weather",
+      "rule": "Swap fabric and layers for heat, cold, rain or humidity."
+    },
+    {
+      "type": "formality",
+      "rule": "Offer a dressier or more casual substitute and explain the change."
+    },
+    {
+      "type": "budget",
+      "rule": "If budget is provided, suggest similar silhouette and function at a lower price tier; do not invent prices."
+    }
+  ],
+  "recommendation_output_schema": {
+    "title": {
+      "en": "string",
+      "ar": "string",
+      "ar-EG": "string"
+    },
+    "style": "style_id",
+    "occasion": "occasion_id",
+    "season": "season_id",
+    "items": [
+      {
+        "item_id": "string",
+        "color_id": "string",
+        "fit_id": "string",
+        "role": "top|bottom|one_piece|outerwear|footwear|bag|accessory",
+        "reason": "string"
+      }
+    ],
+    "why_it_works": [
+      "color harmony",
+      "proportion",
+      "occasion",
+      "weather"
+    ],
+    "alternatives": [
+      {
+        "replace_item_id": "string",
+        "with_item_id": "string",
+        "reason": "string",
+        "tradeoff": "string"
+      }
+    ],
+    "confidence": 0.0,
+    "clarifying_questions": [
+      "string"
+    ]
+  },
+  "image_understanding_guidance": {
+    "return_fields": [
+      "category",
+      "item_id",
+      "color_id",
+      "material_id",
+      "pattern_id",
+      "fit_id",
+      "visible_details",
+      "confidence"
+    ],
+    "rule": "Only report visible properties. Do not guess exact material, brand, price, size or hidden details. Use null/unknown when uncertain."
+  },
+  "stylist_system_prompt": [
+    "Act as a knowledgeable fashion stylist fluent in English, Modern Standard Arabic and Egyptian colloquial Arabic.",
+    "Map Egyptian synonyms such as كوتشي، شبشب، صندل، قميص، تيشيرت، بنطلون قماش، جينز، بليزر، صديري، عباية، جلابية، تريننج to canonical item IDs.",
+    "Recommend a complete outfit where useful: top, bottom or one-piece, footwear, outerwear and optional accessories.",
+    "Respect items the user already owns before suggesting purchases.",
+    "Ask only for missing details that materially change the recommendation: occasion, weather, style, comfort, modesty preferences or budget.",
+    "Give two alternatives when possible and explain whether each is more casual, dressy, comfortable or weather-appropriate.",
+    "Never state fashion preferences as universal rules; explain trade-offs and adapt to user taste."
+  ],
+  "id_aliases": {
+    "white_tshirt": "basic_tshirt",
+    "blue_jeans": "jeans",
+    "black_jeans": "jeans",
+    "dark_jeans": "jeans",
+    "beige_chinos": "chinos",
+    "suit_trousers": "formal_trousers",
+    "tailored_trousers": "formal_trousers",
+    "linen_trousers": "formal_trousers",
+    "wide_leg_pants": "formal_trousers",
+    "oversized_tshirt": "basic_tshirt",
+    "clean_sneakers": "sneakers",
+    "white_sneakers": "sneakers",
+    "canvas_shoes": "sneakers",
+    "training_shoes": "running_shoes",
+    "dressy_sandals": "sandals",
+    "strappy_sandals": "sandals",
+    "sport_sandals": "sandals",
+    "espadrilles": "sandals",
+    "formal_loafers": "loafers",
+    "dress_loafers": "loafers",
+    "monk_straps": "derby_shoes",
+    "high_top_sneakers": "sneakers",
+    "block_heel_sandals": "heels",
+    "ballet_flats": "ballet_flats",
+    "puffer_jacket": "coat",
+    "suit_jacket": "blazer",
+    "overshirt": "denim_shirt",
+    "bomber_jacket": "denim_jacket",
+    "structured_cardigan": "knit_sweater",
+    "shirt_dress": "casual_dress",
+    "cocktail_dress": "evening_dress",
+    "formal_jumpsuit": "jumpsuit",
+    "shoulder_bag": "crossbody_bag",
+    "belt_bag": "crossbody_bag",
+    "messenger_bag": "crossbody_bag",
+    "shopper_bag": "tote_bag",
+    "work_tote": "tote_bag",
+    "sling_bag": "crossbody_bag",
+    "shawl": "scarf",
+    "pashmina": "scarf",
+    "neck_scarf": "scarf",
+    "bow_tie": "tie",
+    "smartwatch": "watch",
+    "cap": "sunglasses",
+    "kaftan": "galabeya",
+    "long_tunic": "galabeya",
+    "sweater_vest": "waistcoat",
+    "flipflops": "flip_flops"
+  },
+  "quality_flags": [
+    "This is a curated starter dataset, not an exhaustive global fashion ontology.",
+    "Some alternative IDs are aliases or future expansion targets; resolve through id_aliases before lookup.",
+    "The generic season and gender tags are broad defaults, not restrictions. Individual products may differ.",
+    "Add region-specific terms, local product photos, fit guidance and expert-reviewed combinations as the system grows."
+  ]
+}

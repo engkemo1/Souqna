@@ -14,7 +14,8 @@ import { runModa } from './moda/engine.js';
 import { makeBrain } from './moda/brain.js';
 import { makeCurator, makeVerifier } from './moda/curate.js';
 import { makeUnderstander } from './moda/understand.js';
-import { loadKnowledge } from './moda/knowledge.js';
+import { loadKnowledge, setKbOverride, kbFiles } from './moda/knowledge.js';
+import { validateKb } from './moda/kbBridge.js';
 import { contactFromEnv } from './moda/contact.js';
 import { makeLlmExtract } from './moda/llm.js';
 import { searchByImage, visualSettings } from './visual.js';
@@ -27,6 +28,50 @@ const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').rep
 /* ---------------- settings ---------------- */
 const DEF = { stylist_enabled: '1', stylist_provider: '', stylist_daily: '15', stylist_name_ar: 'تويلا', stylist_name_en: 'Twila', stylist_avatar: '' };
 const STYLIST_TRAINING_KEY = 'moda_training_data';
+
+/* ------------------------------------------------ قاعدة معرفة الموضة: مصدر معرفة تويلا (ملف في الكود، أو نسخة يرفعها الأدمن وتتطبق فورًا) */
+const KB_KEYS = { kb: 'stylist_kb_json', bridge: 'stylist_kb_bridge_json' };
+function applyStoredKb() {
+  try {
+    const get = (k) => q.get('SELECT value FROM app_settings WHERE key=?', [k])?.value || null;
+    setKbOverride({ kb: get(KB_KEYS.kb), bridge: get(KB_KEYS.bridge) });
+  } catch (e) { console.error(`[stylist kb] ${e.message}`); setKbOverride({ kb: null, bridge: null }); }
+}
+applyStoredKb();
+export function kbStatus() {
+  const K = loadKnowledge();
+  const r = K.kb?.report || {};
+  return {
+    name: K.kb?.name || null, version: K.kb?.version || null, custom: !!K.kb?.custom, bridgeCustom: !!K.kb?.bridgeCustom,
+    items: r.items || 0, mappedItems: r.mappedItems || 0, unmapped: r.unmapped || [], aliasesAdded: r.aliasesAdded || 0, colorAliasesAdded: r.colorAliasesAdded || 0,
+    aliasesSkipped: (r.aliasesSkipped || []).slice(0, 60), warnings: r.warnings || [],
+  };
+}
+export function kbDownload(kind) {
+  const key = KB_KEYS[kind]; if (!key) return null;
+  const saved = q.get('SELECT value FROM app_settings WHERE key=?', [key])?.value;
+  if (saved) return saved;
+  const f = kbFiles()[kind];
+  return f ? JSON.stringify(f, null, 2) : null;
+}
+export function saveKb(kind, value) {
+  const key = KB_KEYS[kind]; if (!key) throw Object.assign(new Error('unknown kind'), { status: 400 });
+  let obj;
+  try { obj = typeof value === 'string' ? JSON.parse(value) : value; } catch { return { ok: false, errors: ['الملف مش JSON سليم'] }; }
+  const errors = kind === 'kb' ? validateKb(obj) : (!obj || typeof obj !== 'object' || typeof obj.items !== 'object' ? ['ملف الجسر لازم يكون فيه items (معرّف القاعدة → نوع عندنا)'] : []);
+  if (errors.length) return { ok: false, errors };
+  const text = JSON.stringify(obj);
+  if (text.length > 900_000) return { ok: false, errors: ['الملف كبير قوي (الحد حوالي 900 كيلوبايت)'] };
+  q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [key, text]);
+  applyStoredKb();
+  return { ok: true, status: kbStatus() };
+}
+export function resetKb(kind) {
+  const key = KB_KEYS[kind]; if (!key) return kbStatus();
+  q.run('DELETE FROM app_settings WHERE key=?', [key]);
+  applyStoredKb();
+  return kbStatus();
+}
 const MODA_LAB_KEY = 'moda_test_scenarios';
 const STYLIST_FEEDBACK_KEY = 'moda_feedback';
 const anthropicKey = () => process.env.ANTHROPIC_API_KEY || '';
@@ -674,7 +719,7 @@ export async function runModaStylist(messages, { profile, session, answers, imag
   const multi = (out.blocks?.tabs || []).length > 1;
   // البدائل (لحد 2 لكل قطعة) بتظهر جنب القطعة المختارة، والعميل يقدر يبدّل بينهم
   const tabs = (out.blocks?.tabs || []).map((t) => ({ ...t, items: t.items.map((i) => ({ ...i, card: cardById.get(i.id) || null, altCards: (i.alts || []).map((a) => cardById.get(a.id)).filter(Boolean) })) }));
-  const looks = tabs.flatMap((t) => t.items.filter((i) => i.card).map((i) => ({ label: `${multi ? `${t.label} · ` : ''}${i.label}`, shown: multi ? `${i.label} (${t.label})` : i.label, palette: (out.blocks.palette || []).map((c) => c.ar), items: [i.card, ...i.altCards], pick: 0 })));
+  const looks = tabs.flatMap((t) => t.items.filter((i) => i.card).map((i) => ({ label: `${multi ? `${t.label} · ` : ''}${i.label}`, shown: multi ? `${i.label} (${t.label})` : i.label, palette: (out.blocks.palette || []).map((c) => c.ar), items: [i.card, ...i.altCards], pick: 0, why: i.why || null, whyKind: i.whyKind || null })));
   lastError = '';
   return {
     intent: out.state === 'clarify' ? 'clarify' : out.state === 'chat' ? 'chat' : 'shop',

@@ -83,7 +83,25 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   const personSet = new Set();
   const genderMatches = entriesOf(matches, 'gender').map((e) => e.key);
   let speaker = genderMatches.includes('female') ? 'female' : genderMatches.includes('male') ? 'male' : null;
+  // «لي ولمراتي المحجبة»: «المحجبة» وصف لمراته مش علامة إن المتكلم ست. لو فيه مراته/زوجته + علامة مذكر صريحة وعلامة المؤنث الوحيدة كلمة محجبة → المتكلم راجل.
+  if (speaker === 'female' && genderMatches.includes('male') && /(^| )و?ل?(مراتي|زوجتي|خطيبتي|حرمي)( |$)/.test(` ${n} `)
+    && entriesOf(matches, 'gender').filter((e) => e.key === 'female').every((e) => /محجب|حجاب|طرحه/.test(e.text))) speaker = 'male';
+  // كلمة جنس المتكلم ممكن تتاكل جوه عبارة أطول (مثلًا «رايح خطوبه» عبارة مناسبة) → ندوّر عليها كتوكن لوحده لو لسه مش عارفين
+  const femaleTexts = entriesOf(matches, 'gender').filter((e) => e.key === 'female').map((e) => e.text);
+  if (!speaker) {
+    const gh = K.synonyms?.gender_hints || {};
+    const one = (k) => new Set((gh[k] || []).filter((w) => typeof w === 'string' && !w.includes(' ')).map((w) => norm(w)));
+    const F = one('female'); const M = one('male');
+    const toks = n.split(' ');
+    const fT = toks.filter((t) => F.has(t)); const hasM = toks.some((t) => M.has(t));
+    if (fT.length && !hasM) { speaker = 'female'; femaleTexts.push(...fT); } else if (hasM && !fT.length) speaker = 'male';
+  }
   result.genderHint = speaker;
+  // «عايزه/عاوزه/محتاجه» بالهاء ممكن تكون «عايز + ـه» (عايزه مقاس XL = عايزه هو). لو كل علامات المؤنث مكتوبة بالهاء مش بالتاء المربوطة → علامة ضعيفة (بتفرق بس لو المحادثة عارفة جنس المتكلم قبل كده)
+  if (speaker === 'female') {
+    const rawS = String(raw || '');
+    if (!femaleTexts.some((t) => !t.endsWith('ه') || rawS.includes(`${t.slice(0, -1)}ة`))) result.flags.genderWeak = true;
+  }
   const partners = entriesOf(matches, 'partner');
   let partnerFemale = false; let partnerMale = false;
   for (const p of partners) {
@@ -142,7 +160,10 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   for (const m of matches) {
     const g = m.entries.filter((e) => e.group === 'garment');
     if (!g.length) continue;
-    const onlyBare = m.len === 1 && BARE_NOT_GARMENT.has(m.text);
+    const bareText = m.len === 1 ? String(m.text).replace(/^(?:وال|بال|لل|ال|و|ل|ب)(?=.{3,})/, '') : m.text; // «لسهره/والسهره» = «سهره»
+    const onlyBare = m.len === 1 && (BARE_NOT_GARMENT.has(m.text) || BARE_NOT_GARMENT.has(bareText));
+    // «خليه كحلي بدل أسود»: «بدل» هنا = عوضًا عن، مش بدلة. بنعرفها لما تيجي بعد لون
+    if (m.len === 1 && m.text === 'بدل' && matches.some((x) => x.end === m.start && x.entries.some((e) => e.group === 'color'))) continue;
     const hasCtx = m.entries.some((e) => e.group === 'context' || e.group === 'time');
     if (onlyBare || (m.len === 1 && hasCtx && BARE_NOT_GARMENT.has(m.text))) continue;
     for (const e of g) garmentEntries.push({ key: e.key, start: m.start, end: m.end, text: m.text });
@@ -161,9 +182,14 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   const MATCH_PREFIXES = new Set(['تليق', 'يليق', 'يمشي', 'يمشوا', 'ينفع', 'يركب', 'يتماشى', 'تناسب', 'يناسب', 'نسقلي', 'نسقيلي', 'طقم']);
   const OWNED_PREFIXES = new Set(['عندي', 'معايا', 'معي', 'لابس', 'لابسه', 'لابسة', 'اشتريت', 'شريت', 'جبت', 'have', 'own', 'bought', 'wearing']);
   const NOT_OWNED_PREFIXES = new Set(['ماعنديش', 'معنديش', 'معيش', 'مش']);
+  const isOwnedTok = (t) => OWNED_PREFIXES.has(t) || (/^و(عندي|معايا|معي|لابس|لابسه|لابسة)$/.test(t) && OWNED_PREFIXES.has(t.slice(1))); // «وعندي كوتشي ابيض»
   const seen = new Set();
   for (const g of garmentEntries) {
-    if (seen.has(g.key)) continue; seen.add(g.key);
+    // نفس النوع ممكن يتذكر مرتين: واحدة معاه («عندي كوتشي ابيض») وواحدة مطلوبة («وعايز كوتشي تاني اسود»): نفرّق بينهم
+    const leadTokens = tokens.slice(Math.max(0, g.start - 2), g.start);
+    const ownedLead = leadTokens.some((t) => isOwnedTok(t)) && !leadTokens.some((t) => NOT_OWNED_PREFIXES.has(t));
+    const seenKey = `${g.key}|${ownedLead ? 'own' : 'ask'}`;
+    if (seen.has(seenKey)) continue; seen.add(seenKey);
     const col = nearest(colorEntries.filter((c) => !isNegated(c) && !c.used), g, 2);
     let mat = nearest(matEntries, g, 2);
     if (!mat) { // الخامة ممكن تكون جزء من اسم القطعة نفسه (جاكيت جلد)
@@ -172,7 +198,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     const prevTokens = tokens.slice(Math.max(0, g.start - 2), g.start);
     const prev3 = tokens.slice(Math.max(0, g.start - 3), g.start);
     const hasMatchLead = prev3.some((t) => MATCH_PREFIXES.has(t)) && prev3.some((t) => t === 'مع' || t === 'على' || t === 'معاه' || t === 'معاها');
-    const isOwned = (prevTokens.some((t) => OWNED_PREFIXES.has(t)) || hasMatchLead) && !prevTokens.some((t) => NOT_OWNED_PREFIXES.has(t));
+    const isOwned = (prevTokens.some((t) => isOwnedTok(t)) || hasMatchLead) && !prevTokens.some((t) => NOT_OWNED_PREFIXES.has(t));
     if (isOwned) {
       result.ownedPieces.push({ key: g.key, color: col?.key || null, material: mat?.key || null, text: g.text });
       if (col) col.used = true;
@@ -181,10 +207,24 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
       if (col) col.used = true;
     }
   }
+  // «جيبة جينز / جاكيت جينز / شورت جينز»: «جينز» بعد قطعة تانية = خامة (دنيم)، مش قطعة جينز تانية
+  for (let i = result.garments.length - 1; i >= 0; i -= 1) {
+    const g = result.garments[i];
+    if (g.key !== 'jeans' || norm(g.text) !== 'جينز') continue;
+    const host = result.garments.find((h) => h !== g && h.key !== 'jeans' && h.position === g.position - 1);
+    if (host) { if (!host.material) host.material = 'denim'; result.garments.splice(i, 1); }
+  }
+  for (const g of result.garments) if (g.key !== 'jeans' && !g.material && norm(g.text).split(' ').includes('جينز')) g.material = 'denim'; // «جاكيت جينز» كاسم قطعة واحد
+  // خامة لوحدها من غير قطعة («تكون شيفون»): نحفظها عشان المحرك يطبقها على القطعة اللي بنتكلم عنها
+  if (!result.garments.length && !result.ownedPieces.length) {
+    const loose = [...new Set(matEntries.map((m) => m.key))];
+    if (loose.length) result.flags.looseMaterials = loose;
+  }
   // ألوان عامة مش ملتصقة بقطعة
   for (const c of colorEntries) {
     if (c.used) continue;
-    if (isNegated(c)) result.avoidColors.push(c.key); else result.colors.push(c.key);
+    const insteadOf = c.start > 1 && /^(بدل|بدال)$/.test(tokens[c.start - 1] || '') && colorEntries.some((x) => x !== c && x.end === c.start - 1); // «بيج بدل الأسود» (لون بدل لون): الأسود مرفوض — لكن «بدل رمادي» = بدل لونها رمادي
+    if (isNegated(c) || insteadOf) result.avoidColors.push(c.key); else result.colors.push(c.key);
   }
   // لو قطعة واحدة وفي لون عام قريب منها (مثلاً "ابيض" بعد القطعة بمسافة)
   if (result.garments.length === 1 && !result.garments[0].color && result.colors.length === 1) { result.garments[0].color = result.colors[0]; result.colors = []; }
@@ -198,6 +238,8 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     const g = new Set(allGarmentPieces.map((x) => GENDER_BY_KEY[x.key]).filter(Boolean));
     if (g.size === 1) { const only = [...g][0]; personSet.add(only === 'women_hijab' ? 'women' : only); if (only === 'women_hijab') result.flags.hijabFromGarment = true; }
   }
+  // «ليها / لها» لوحدها (من غير شخص تاني متحدد) = ست، مش المتكلم. «ليه/له» سايبينها لأنها بتتقرا «ليه؟» (why).
+  if (personSet.size === 0 && !result.kidsUnspecified && /(^| )(ليها|لها)( |$)/.test(` ${n} `) && !/[؟?]/.test(String(raw))) personSet.add('women');
   if (personSet.size === 0 && speaker && !result.kidsUnspecified) personSet.add(speaker === 'female' ? 'women' : 'men');
   // محجبة
   /* ---------- رفقة: «انا واختي / انا وصحبي / انا وعيلتي / لاخويا» ---------- */
@@ -243,7 +285,9 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   /* ---------- لحد تاني بس (من غير «انا»): لمراتي = ستات بس، لجوزي = رجالة بس، لاخويا الصغير/اختي الصغيرة = طفل ---------- */
   {
     const nn2 = ` ${n} `;
-    const me = /(^| )(انا|احنا)( |$)/.test(nn2) || /(^| )و?(لانا|ليا|لنفسي)( |$)/.test(nn2);
+    const PART = 'مراتي|زوجتي|خطيبتي|عروستي|حبيبتي|صاحبتي|جوزي|زوجي|خطيبي|حبيبي|صاحبي';
+    const me = /(^| )(انا|احنا)( |$)/.test(nn2) || /(^| )و?(لانا|ليا|لنفسي)( |$)/.test(nn2)
+      || new RegExp(`(?:^| )ل(?:${PART})(?: \S+){0,2} و?(?:لي|ليا|لنفسي)(?= |$)|(?:^| )(?:لي|ليا|لنفسي) و?ل(?:${PART})(?= |$)`).test(nn2); // «لمراتي ولي» / «لي ولمراتي» = الاتنين
     if (!me && /(^| )ل(مراتي|زوجتي|خطيبتي|عروستي|حبيبتي|صاحبتي)( |$)/.test(nn2)) { personSet.clear(); personSet.add('women'); }
     if (!me && /(^| )ل(جوزي|زوجي|خطيبي|حبيبي|صاحبي)( |$)/.test(nn2)) { personSet.clear(); personSet.add('men'); }
     const smallB = /(^| )(ل)?(اخويا|اخوي|ابن اخويا|ابن اختي|ابن عمي|ابن خالي|حفيدي)( ال)?(صغير|اصغر|صغنن|الصغير|الاصغر|صغيرتي)( |$)/.test(nn2) || /(^| )(ل)?(حفيدي|اخويا صغير)( |$)/.test(nn2);
@@ -269,6 +313,39 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
       else if (sp3) { personSet.clear(); personSet.add(sp3 === 'male' ? 'women' : 'men'); }
       else personSet.clear(); // مش عارفين نوع الاكس → نسأل
       result.flags.ex = true;
+    }
+  }
+  /* ---------- عيلة بصيغة الغائب (وكمان المتكلم بعد حرف عطف): «لراجل ومراته وابنه / وحرمه / وبنته / وولاده / ولمراتي» ----------
+     إضافة بس: بنزوّد أشخاص ومنشيلش حد. شرطين: لازم يكون فيه شخص متحدد قبلها، ولازم حرف عطف/لام قبل الكلمة (و / مع / ل). */
+  if (personSet.size > 0) {
+    const nn4 = ` ${n} `;
+    const kin = (words) => new RegExp(`(?:^| )(?:و|مع |ول|ل)(?:${words})(?= |$)`);
+    const hasWife = kin('مراته|مرته|مراتو|زوجته|زوجتو|حرمه|حريمه|مراتهم|مراتي|زوجتي|خطيبتي').test(nn4);
+    const hasHusband = kin('جوزها|زوجها|راجلها|جوزي|زوجي|خطيبي').test(nn4);
+    const hasSon = kin('ابنه|ابنها|ابنهم|ابنو|ولده|ولدها|ولدو|ابني|ولدي').test(nn4);
+    const hasDaughter = kin('بنته|بنتها|بنتهم|بنتو|بنوتته|بنوتتها|بنتي|بنوتتي').test(nn4);
+    const hasKids = kin('اولاده|اولادها|اولادهم|عياله|عيالها|عيالهم|اطفاله|اطفالها|ولاده|ولادها|ولادهم|ولادو').test(nn4);
+    // «لي ولمراتي المحجبة»: المتكلم نفسه (لي/ليا) مذكور بحرف عطف مع مراته/جوزها → هو كمان ضمن الأشخاص
+    const meConj = /(?:^| )(?:لي|ليا|لنفسي) و?ل(?:مراتي|زوجتي|خطيبتي|جوزي|زوجي|خطيبي)(?= |$)|(?:^| )ل(?:مراتي|زوجتي|خطيبتي|جوزي|زوجي|خطيبي)(?: \S+){0,2} و?(?:لي|ليا|لنفسي)(?= |$)/.test(nn4);
+    if (meConj && hasWife && speaker === 'male') personSet.add('men');
+    if (meConj && hasHusband && speaker === 'female') personSet.add('women');
+    if (hasWife && !personSet.has('women')) personSet.add('women');
+    if (hasHusband && !personSet.has('men')) personSet.add('men');
+    if (hasSon) personSet.add('boys');
+    if (hasDaughter) personSet.add('girls');
+    if (hasKids && !hasSon && !hasDaughter && !personSet.has('boys') && !personSet.has('girls')) result.kidsUnspecified = true;
+    if (hasWife || hasHusband || hasSon || hasDaughter || hasKids) result.flags.familyThirdPerson = true;
+    /* «لراجل وست» / «لست ورجل» / «لراجل وولد»: كلمة الشخص ملزوقة بواو العطف بعد شخص متحدد. بنتعامل بس مع الكلمات اللي معناها واضح
+       (ست/راجل/ولد)، و«وبنت/وبنات» سايبينها زي ما هي عشان تفسير «بنت» قرار منفصل. */
+    const GL = { 'ست': 'women', 'ستات': 'women', 'راجل': 'men', 'رجل': 'men', 'رجاله': 'men', 'ولد': 'boys', 'ولاد': 'boys' };
+    const DEST = /^ل(?:ال)?(?:راجل|رجل|رجاله|ست|ستات|ولد|ولاد|بنت|بنات)$/;
+    let chain = false;
+    for (let i = 0; i < tokens.length; i++) {
+      const t = tokens[i];
+      if (DEST.test(t)) { chain = true; continue; }
+      const m = chain && /^و(ست|ستات|راجل|رجل|رجاله|ولد|ولاد)$/.exec(t);
+      if (m) { personSet.add(GL[m[1]]); continue; }
+      chain = false;
     }
   }
   const personList = ['men', 'women', 'boys', 'girls'].filter((p) => personSet.has(p));
@@ -313,6 +390,11 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   else if (times.includes('today')) result.dateOffsetDays = 0;
   const seasons = entriesOf(matches, 'season').map((e) => e.key);
   if (seasons.length) result.season = seasons[0];
+  // «فستان صيفي / جاكيت شتوي»: كلمة الموسم ممكن تكون جزء من اسم القطعة نفسها → الموسم برضه معروف
+  if (!result.season) {
+    const sw = K.synonyms?.season_words || {};
+    for (const g of result.garments) for (const t of norm(g.text).split(' ')) for (const [sk, ws] of Object.entries(sw)) if (!result.season && sk !== 'mid' && Array.isArray(ws) && ws.some((w) => norm(w) === t)) result.season = sk;
+  }
   result.taste = [...new Set(entriesOf(matches, 'taste').map((e) => e.key))];
   if (intents.includes('cheaper') && result.garments.length) result.flags.cheapest = true;
   if (result.garments.length && /(^| )(الاغلي|الاغلى|اغلي|اغلى|اعلي سعر|اعلى سعر|افخم|الافخم|most expensive|priciest|highest price)( |$)/.test(n)) { result.flags.priciest = true; delete result.flags.cheapest; }

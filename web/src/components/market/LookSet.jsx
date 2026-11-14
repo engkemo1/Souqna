@@ -23,6 +23,7 @@ function LookRow({ look, lang, tr, t, added, onAdd, onPick }) {
         <p className="text-sm font-bold sm:text-base">{look.label}</p>
         <span className="text-[12px] text-muted">{look.items.length === 1 ? (lang === 'ar' ? 'اختيار واحد' : '1 option') : t('lod.options', { n: look.items.length })}</span>
       </div>
+      {look.why && !look.pick && <p data-testid="look-why" className="-mt-1 mb-3 text-[12.5px] leading-relaxed text-muted"><span className="font-semibold text-fg">{lang === 'ar' ? 'ليه اخترناها: ' : 'Why this: '}</span>{look.why}</p>}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
         {look.items.map((p, i) => (
           <Link key={p.id} to={'/s/' + p.store.slug + '/p/' + p.slug} className={cx('group min-w-0 rounded-2xl border bg-elevated p-2 text-start transition hover:-translate-y-0.5 hover:border-fg hover:shadow-sm', i === look.pick ? 'border-brand ring-1 ring-brand/40' : 'border-line')}>
@@ -258,7 +259,7 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
   if (!m?.looks?.length && !miss.length && !hasAdvice) return null;
   const tabs = m.tabs?.length > 1 ? m.tabs : null;
   const tabNow = tabs ? tabs[Math.min(tab, tabs.length - 1)] : null;
-  const shownLooks = tabs ? (tabNow.items.filter((i) => i.card).map((i) => { const key = `${tabNow.label} · ${i.label}`; const items = [i.card, ...(i.altCards || [])]; return { label: i.label, key, items, pick: swap[key] != null && items[swap[key]] ? swap[key] : 0 }; })) : m.looks;
+  const shownLooks = tabs ? (tabNow.items.filter((i) => i.card).map((i) => { const key = `${tabNow.label} · ${i.label}`; const items = [i.card, ...(i.altCards || [])]; return { label: i.label, key, items, why: i.why || null, pick: swap[key] != null && items[swap[key]] ? swap[key] : 0 }; })) : m.looks;
   const orderItems = (m.missingItems || []);
   const missing = orderItems.length > 0 ? (
     <div className="mt-3 space-y-1.5">{orderItems.slice(0, 4).map((x, i) => <Link key={`${x.key}-${i}`} to={`/request?title=${encodeURIComponent(`${x.label}${x.material ? ' ' + x.material : ''}`)}&from=moda`} className="flex items-center gap-2 rounded-xl border border-dashed border-line bg-[#F1F4F9] px-3 py-2 text-[13px] font-semibold text-brand"><PackagePlus className="h-4 w-4 shrink-0" /><span className="flex-1">{x.label}{x.tab && tabs ? ` (${x.tab})` : ''} — {x.hint}</span><span className="rounded-full bg-btn px-3 py-1 text-[12px] text-on-btn">{x.button}</span></Link>)}</div>

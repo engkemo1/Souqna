@@ -1,0 +1,490 @@
+{
+  "_about": "الجسر بين قاعدة المعرفة (fashion_kb.json) ومحرك تويلا. قاعدة المعرفة هي مصدر المعلومة؛ هنا بنقول كل معرّف فيها بيقابل أنهي نوع عندنا، وقواعد Twist الخاصة اللي بتغلب القاعدة. عدّل الملف ده أو ارفع نسخة جديدة من قاعدة المعرفة من الأدمن، من غير ما تغيّر كود.",
+  "version": 2,
+  "items": {
+    "basic_tshirt": "tshirt",
+    "oversized_tshirt": "tshirt",
+    "long_sleeve_tshirt": "tshirt",
+    "polo_shirt": "polo",
+    "knit_polo": "polo",
+    "formal_shirt": "shirt",
+    "oxford_shirt": "shirt",
+    "linen_shirt": "shirt",
+    "denim_shirt": "shirt",
+    "overshirt": "shirt",
+    "camp_collar_shirt": "shirt",
+    "blouse": "blouse",
+    "tank_top": "top",
+    "crop_top": "top",
+    "bodysuit": "top",
+    "knit_top": "top",
+    "tunic": "tunic",
+    "hoodie": "hoodie",
+    "zip_hoodie": "hoodie",
+    "sweatshirt": "sweater",
+    "knit_sweater": "sweater",
+    "turtleneck": "sweater",
+    "cardigan": "cardigan",
+    "long_cardigan": "long_cardigan",
+    "sports_top": "sport_top",
+    "jeans": "jeans",
+    "dark_jeans": "jeans",
+    "wide_leg_pants": "trousers",
+    "chinos": "chinos",
+    "formal_trousers": "trousers",
+    "linen_trousers": "trousers",
+    "cargo_pants": "trousers",
+    "joggers": "joggers",
+    "shorts": "shorts",
+    "bermuda_shorts": "shorts",
+    "sports_shorts": "sport_bottom",
+    "leggings": "leggings",
+    "skirt": "skirt",
+    "maxi_skirt": "skirt",
+    "casual_dress": "dress_casual",
+    "work_dress": "dress_work",
+    "party_dress": "dress_party",
+    "evening_dress": "dress_evening",
+    "bridal_dress": "dress_bridal",
+    "beach_dress": "dress_beach",
+    "jumpsuit": "jumpsuit",
+    "two_piece_set": "two_piece_set",
+    "womens_suit": "womens_suit",
+    "suit": "suit",
+    "tuxedo": "tuxedo",
+    "abaya": "abaya",
+    "galabeya": "jalabiya",
+    "kaftan": "jalabiya",
+    "tarha": "tarha",
+    "shawl": "shawl",
+    "blazer": "blazer",
+    "denim_jacket": "jacket",
+    "leather_jacket": "jacket",
+    "bomber_jacket": "jacket",
+    "puffer_jacket": "jacket",
+    "windbreaker": "jacket",
+    "coat": "coat",
+    "trench_coat": "coat",
+    "waistcoat": "waistcoat",
+    "sneakers": "sneakers",
+    "white_sneakers": "sneakers",
+    "running_shoes": "sport_shoes",
+    "loafers": "loafers",
+    "oxford_shoes": "formal_shoes",
+    "derby_shoes": "formal_shoes",
+    "boots": "boots",
+    "ankle_boots": "boots",
+    "sandals": "sandals",
+    "slides": "slippers",
+    "flip_flops": "slippers",
+    "heels": "heels_low",
+    "pumps": "heels_high",
+    "ballet_flats": "flats",
+    "tote_bag": "tote",
+    "crossbody_bag": "crossbody",
+    "handbag": "handbag",
+    "clutch": "clutch",
+    "backpack": "backpack",
+    "belt": "belt",
+    "watch": "watch",
+    "sunglasses": "sunglasses",
+    "cap": "cap",
+    "scarf": "shawl",
+    "tie": "tie",
+    "bow_tie": "bow_tie",
+    "jewelry": "jewelry",
+    "socks": "socks",
+    "tracksuit": "tracksuit",
+    "swimwear": "swimwear",
+    "underwear": "underwear",
+    "pajamas": "sleepwear",
+    "robe": "robe"
+  },
+  "unmapped_note": "معرّفات مالهاش نوع عندنا لسه (sunglasses, swimwear …) بتتجاهل في التنسيق لحد ما نضيف لها نوع.",
+  "colors": {
+    "black": "black",
+    "white": "white",
+    "ivory": "off_white",
+    "cream": "cream",
+    "beige": "beige",
+    "taupe": "beige",
+    "gray": "grey",
+    "charcoal": "grey",
+    "navy": "navy",
+    "light_blue": "sky_blue",
+    "royal_blue": "royal_blue",
+    "denim_blue": "blue",
+    "teal": "green",
+    "turquoise": "blue",
+    "olive": "olive",
+    "khaki": "olive",
+    "sage": "mint",
+    "forest_green": "emerald",
+    "brown": "brown",
+    "chocolate": "brown",
+    "camel": "camel",
+    "tan": "camel",
+    "mocha": "brown",
+    "rust": "orange",
+    "terracotta": "coral",
+    "burgundy": "burgundy",
+    "red": "red",
+    "pink": "pink",
+    "blush": "blush",
+    "coral": "coral",
+    "fuchsia": "fuchsia",
+    "lavender": "lavender",
+    "purple": "purple",
+    "yellow": "yellow",
+    "mustard": "yellow",
+    "orange": "orange",
+    "mint": "mint",
+    "gold": "gold",
+    "silver": "silver",
+    "nude": "nude"
+  },
+  "materials": {
+    "cotton": "cotton",
+    "linen": "linen",
+    "wool": "wool",
+    "cashmere": "wool",
+    "denim": "denim",
+    "leather": "leather",
+    "faux_leather": "leather",
+    "silk": "silk",
+    "satin": "satin",
+    "chiffon": "chiffon",
+    "velvet": "velvet",
+    "lace": "lace",
+    "crepe": "crepe"
+  },
+  "ignore_aliases": [
+    "تريننج",
+    "بلوزة كت",
+    "كت",
+    "وسط",
+    "بدي",
+    "Two-piece"
+  ],
+  "women_only": [
+    "abaya",
+    "blouse",
+    "clutch",
+    "crossbody",
+    "dress_beach",
+    "dress_bridal",
+    "dress_casual",
+    "dress_evening",
+    "dress_party",
+    "dress_work",
+    "flats",
+    "handbag",
+    "heels_high",
+    "heels_low",
+    "jumpsuit",
+    "leggings",
+    "skirt",
+    "tarha",
+    "tote",
+    "tunic",
+    "womens_suit"
+  ],
+  "men_only": [
+    "bow_tie",
+    "formal_shoes",
+    "suit",
+    "tie",
+    "tuxedo",
+    "waistcoat"
+  ],
+  "season_override": {
+    "_about": "لما فصول قاعدة المعرفة مش مناسبة للتنسيق في مصر. all = طول السنة، winter = شتا بس، summer = صيف بس.",
+    "jacket": "winter",
+    "blazer": "winter",
+    "cardigan": "winter",
+    "boots": "winter",
+    "shawl": "winter",
+    "long_cardigan": "winter",
+    "suit": "all",
+    "tracksuit": "all",
+    "joggers": "all",
+    "skirt": "all",
+    "dress_casual": "all",
+    "dress_evening": "all",
+    "blouse": "all",
+    "jumpsuit": "all",
+    "waistcoat": "all",
+    "abaya": "all",
+    "jalabiya": "all",
+    "socks": "all",
+    "sandals": "summer",
+    "coat": "winter"
+  },
+  "pair_rules": {
+    "_about": "قواعد Twist للتنسيق حوالين قطعة العميل (بتغلب pair_with في قاعدة المعرفة). كل خانة \"a|b\" = النوع الأول أو بدايله. الأنواع اللي مش هنا بتاخد تنسيقها من قاعدة المعرفة.",
+    "sneakers": {
+      "women": [
+        "tshirt|shirt",
+        "jeans",
+        "jacket"
+      ],
+      "men": [
+        "tshirt|shirt",
+        "jeans",
+        "jacket"
+      ]
+    },
+    "sport_shoes": {
+      "women": [
+        "sport_top",
+        "sport_bottom"
+      ],
+      "men": [
+        "sport_top",
+        "sport_bottom"
+      ]
+    },
+    "sandals": {
+      "women": [
+        "dress_casual",
+        "crossbody"
+      ],
+      "men": [
+        "tshirt",
+        "shorts"
+      ]
+    },
+    "flats": {
+      "women": [
+        "dress_casual",
+        "crossbody"
+      ],
+      "men": []
+    },
+    "heels_low": {
+      "women": [
+        "dress_party",
+        "clutch"
+      ],
+      "men": []
+    },
+    "heels_high": {
+      "women": [
+        "dress_party",
+        "clutch"
+      ],
+      "men": []
+    },
+    "formal_shoes": {
+      "women": [
+        "blouse",
+        "trousers"
+      ],
+      "men": [
+        "shirt",
+        "trousers|suit",
+        "belt"
+      ]
+    },
+    "loafers": {
+      "women": [
+        "blouse",
+        "trousers"
+      ],
+      "men": [
+        "shirt",
+        "chinos|trousers|suit",
+        "belt"
+      ]
+    },
+    "boots": {
+      "women": [
+        "jeans",
+        "sweater",
+        "jacket"
+      ],
+      "men": [
+        "jeans",
+        "sweater",
+        "jacket"
+      ]
+    },
+    "jeans": {
+      "women": [
+        "tshirt",
+        "sneakers",
+        "jacket"
+      ],
+      "men": [
+        "tshirt",
+        "sneakers",
+        "jacket"
+      ]
+    },
+    "trousers": {
+      "women": [
+        "blouse|tshirt|shirt|top",
+        "flats|sneakers|sandals",
+        "handbag"
+      ],
+      "men": [
+        "shirt|tshirt|polo|hoodie|sweater",
+        "formal_shoes|loafers|sneakers",
+        "belt",
+        "jacket|blazer"
+      ]
+    },
+    "skirt": {
+      "women": [
+        "blouse",
+        "flats",
+        "crossbody"
+      ],
+      "men": []
+    },
+    "tshirt": {
+      "women": [
+        "jeans",
+        "sneakers"
+      ],
+      "men": [
+        "jeans",
+        "sneakers"
+      ]
+    },
+    "hoodie": {
+      "women": [
+        "jeans",
+        "sneakers"
+      ],
+      "men": [
+        "jeans",
+        "sneakers"
+      ]
+    },
+    "shirt": {
+      "women": [
+        "trousers",
+        "flats"
+      ],
+      "men": [
+        "trousers",
+        "formal_shoes",
+        "belt"
+      ]
+    },
+    "polo": {
+      "women": [
+        "jeans",
+        "sneakers"
+      ],
+      "men": [
+        "chinos",
+        "sneakers"
+      ]
+    },
+    "chinos": {
+      "women": [
+        "blouse",
+        "flats"
+      ],
+      "men": [
+        "shirt",
+        "loafers",
+        "belt"
+      ]
+    },
+    "shorts": {
+      "women": [
+        "tshirt",
+        "sandals"
+      ],
+      "men": [
+        "tshirt",
+        "sandals"
+      ]
+    },
+    "jacket": {
+      "women": [
+        "tshirt",
+        "jeans",
+        "sneakers"
+      ],
+      "men": [
+        "tshirt",
+        "jeans",
+        "sneakers"
+      ]
+    },
+    "sweater": {
+      "women": [
+        "jeans",
+        "sneakers"
+      ],
+      "men": [
+        "jeans",
+        "sneakers"
+      ]
+    },
+    "jalabiya": {
+      "women": [
+        "slippers"
+      ],
+      "men": [
+        "slippers"
+      ]
+    },
+    "dress_any": {
+      "women": [
+        "sandals|flats|sneakers",
+        "crossbody|handbag|tote",
+        "cardigan|jacket"
+      ],
+      "men": []
+    },
+    "dress_casual": {
+      "women": [
+        "sandals|flats|sneakers",
+        "crossbody|handbag|tote",
+        "cardigan|jacket"
+      ],
+      "men": []
+    },
+    "dress_beach": {
+      "women": [
+        "sandals|flats",
+        "tote|crossbody|handbag"
+      ],
+      "men": []
+    },
+    "dress_work": {
+      "women": [
+        "flats|loafers|heels_low",
+        "handbag|crossbody",
+        "blazer|cardigan"
+      ],
+      "men": []
+    },
+    "dress_party": {
+      "women": [
+        "heels_low|heels_high|flats",
+        "clutch|handbag"
+      ],
+      "men": []
+    },
+    "dress_evening": {
+      "women": [
+        "heels_low|heels_high|flats",
+        "clutch|handbag"
+      ],
+      "men": []
+    },
+    "dress_bridal": {
+      "women": [
+        "heels_high|heels_low",
+        "clutch|handbag"
+      ],
+      "men": []
+    }
+  }
+}

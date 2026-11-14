@@ -19,6 +19,16 @@ const itemAr = (K, key) => String(K.items.get(key)?.ar || key).replace(/\s*\(.*?
 const clean = (v, max) => String(v ?? '').replace(/\s+/g, ' ').replace(/[*#`<>]/g, '').trim().slice(0, max);
 const PRICE_RE = /(\d[\d,.]*)\s*(جنيه|جنية|ج\.?م|EGP|LE|pounds?)/i;
 
+/** القطع اللي العميل قال إنها معاه («معايا كوتشي أبيض»): بنبني الطقم حواليها ومنقترحش نوع منها تاني، إلا لو طلب صراحةً قطعة منه. */
+const OWNED_GROUP = { sneakers: ['sneakers', 'sport_shoes'], sport_shoes: ['sneakers', 'sport_shoes'], dress_any: ['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_beach'], shoes_any: ['shoes_any', 'sneakers', 'sport_shoes', 'formal_shoes', 'loafers', 'flats', 'heels_low', 'heels_high', 'sandals', 'boots'], slippers: ['slippers', 'sneakers', 'sport_shoes', 'formal_shoes', 'loafers', 'flats', 'heels_low', 'heels_high', 'sandals', 'boots'] };
+export function ownedKeysOf(parsed) {
+  const asked = new Set((parsed?.garments || []).map((g) => g.key));
+  const out = new Set();
+  for (const o of parsed?.ownedPieces || []) for (const k of OWNED_GROUP[o.key] || [o.key]) if (!asked.has(k)) out.add(k);
+  return out;
+}
+const safeWhy = (v) => { const t = clean(v, 140); return t && !/https?:\/\/|www\./i.test(t) && !PRICE_RE.test(t) && checkText(t, { lang: 'ar', maxLen: 160 }).ok ? t : null; };
+
 /** قايمة المنتجات المتاحة لكل فئة، مفلترة على رسمية المناسبة، ومنوّعة (حد أقصى لكل نوع). */
 export function candidatePool(rows, aud, K, { context = null, max = 48, perKey = 5 } = {}) {
   const ok = AUD_OK[aud] || (() => true);
@@ -43,7 +53,7 @@ export function candidatePool(rows, aud, K, { context = null, max = 48, perKey =
 
 const line = (p, K) => `${p.id} | ${p.key} (${itemAr(K, p.key)}) | ${clean(p.name_ar || p.name_en, 60)} | ${(p.colorKeys || []).slice(0, 2).join('/') || '-'} | ${Math.round(p.price)} | f${p.formality ?? '?'}`;
 
-export function curatorPrompt({ K, pools, persons, context, budget, adv, eventTime, parsed, baseline, lang = 'ar', assistantName = 'تويلا' }) {
+export function curatorPrompt({ K, pools, persons, context, budget, adv, eventTime, parsed, baseline, lang = 'ar', assistantName = 'تويلا', level = 0, hintMax = 900, ruleChars = 3200 }) {
   const weather = adv ? `~${adv.temp}°C${adv.fabrics_ar?.length ? `, suited fabrics: ${adv.fabrics_ar.slice(0, 3).join(', ')}` : ''}${adv.notes?.includes('rain') ? ', rain expected' : ''}` : 'unknown';
   const formality = context ? K.contexts.get(context)?.formality : null;
   const asked = (parsed.garments || []).map((g) => `${g.key}${g.color ? `(${g.color})` : ''}`).join(', ');
@@ -53,16 +63,19 @@ export function curatorPrompt({ K, pools, persons, context, budget, adv, eventTi
     `Occasion: ${context || 'not specified'}${formality ? ` (formality ${formality[0]}-${formality[1]} out of 5)` : ''}. Time: ${eventTime?.isNight ? 'evening/night' : 'daytime'}. Weather: ${weather}.`,
     budget ? `Total budget for everyone together: ${budget} EGP. The sum of the prices of the chosen products MUST NOT exceed it; split it sensibly between people. If a complete look cannot fit, choose fewer/cheaper pieces and say so in the note.` : 'No budget limit was given.',
     asked ? `The customer explicitly asked for: ${asked}.` : '',
+    (parsed.ownedPieces || []).length ? `The customer ALREADY OWNS: ${parsed.ownedPieces.map((o) => `${o.key}${o.color ? ` (${o.color})` : ''}`).join(', ')}. Build the look AROUND it: pick pieces that go with it (colour, formality, season), do NOT choose another product of that type unless they asked for one, and say in the note how the piece they own fits.` : '',
     ...persons.map((a) => `STOCK for "${a}" (id | type (arabic) | name | colours | price EGP | formality):\n${pools[a].length ? pools[a].map((p) => line(p, K)).join('\n') : '(nothing in stock for this person)'}`),
-    baseline ? `The rule-based system suggested this baseline (you may improve or replace it): ${JSON.stringify(baseline)}` : '',
+    (K.kb?.guideFor ? K.kb.guideFor(level, { maxRuleChars: ruleChars, focus: [context, ...(parsed.garments || []).map((g) => g.key), ...(parsed.ownedPieces || []).map((o) => o.key)] }) : K.kb?.guide) || '',
+    K.kb?.pairingHint ? (() => { const h = K.kb.pairingHint([...(parsed.garments || []).map((g) => g.key), ...(parsed.ownedPieces || []).map((o) => o.key)], { maxPer: hintMax }); return h ? `Knowledge base pairing for the pieces in this request:\n${h}` : ''; })() : '',
+    baseline && level < 2 ? `The rule-based system suggested this baseline (you may improve or replace it): ${JSON.stringify(baseline)}` : '',
     'HARD RULES: (1) choose productId ONLY from the stock lists above for that same person, copied exactly. (2) Choose from our stock first. (3) If an essential piece has no suitable product in stock, DO NOT force a bad one: output it with productId null and a short Arabic "title" describing the piece to source from outside (e.g. "بدلة كحلي سليم فيت", with colour/style, no brand, no price) — Twist will offer to source it. (4) Never invent stock, brands, stores or prices; never write numbers or prices in any text field. (5) "type" must be one of the type keys shown in the lists (for outside pieces use a sensible type key such as suit, shirt, dress_party, heels_low, formal_shoes, loafers, blazer, trousers...).',
     `Reply with ONE JSON object only, no prose around it. Text fields in ${lang === 'en' ? 'English' : 'friendly Egyptian Arabic'}:`,
-    '{"people":[{"aud":"men","note":"one short styling tip for this person","items":[{"type":"suit","productId":123,"why":"few words"},{"type":"shirt","productId":null,"title":"قميص أبيض كلاسيك"}]}]}',
+    '{"people":[{"aud":"men","note":"one short styling tip for this person","items":[{"type":"suit","productId":123,"why":"one short sentence: why it suits + how it goes with another piece of this outfit"},{"type":"shirt","productId":null,"title":"قميص أبيض كلاسيك"}]}]}',
   ].filter(Boolean).join('\n');
 }
 
 /** يفحص رد الموديل ويبني plan بنفس شكل planOutfit. يرجّع null لو غير سليم. */
-export function buildCuratedPlan(out, { plan, pools, persons, budget, K }) {
+export function buildCuratedPlan(out, { plan, pools, persons, budget, K, owned = new Set() }) {
   if (!out || !Array.isArray(out.people)) return null;
   const people = []; const missing = []; let total = 0;
   for (const aud of persons) {
@@ -74,9 +87,10 @@ export function buildCuratedPlan(out, { plan, pools, persons, budget, K }) {
       const type = typeof it?.type === 'string' && K.items.has(it.type) ? it.type : null;
       const prod = it?.productId != null ? pool.get(String(it.productId)) : null;
       if (it?.productId != null && !prod) return null; // id مخترع أو من فئة تانية
+      if ((prod && owned.has(prod.key)) || (!prod && type && owned.has(type))) continue; // العميل عنده النوع ده: منكرروش
       if (prod) {
-        if (seen.has(prod.id)) continue; seen.add(prod.id);
-        picks.push({ slotKey: prod.key, optional: false, hero: picks.length === 0, product: prod, relaxed: null, why: clean(it.why, 80) });
+        if (seen.has(prod.id) || seen.has(`k:${prod.key}`)) continue; seen.add(prod.id); seen.add(`k:${prod.key}`); // منتج واحد لكل نوع (مفيش كوتشيين في طقم واحد)
+        picks.push({ slotKey: prod.key, optional: false, hero: picks.length === 0, product: prod, relaxed: null, why: safeWhy(it.why) });
         total += prod.price;
       } else if (type) {
         let title = clean(it.title, 60);
@@ -101,19 +115,42 @@ export function buildCuratedPlan(out, { plan, pools, persons, budget, K }) {
   return { ...plan, state, people, missing, relaxed: [], dropped: [], total, over: 0, ask: plan.ask || [], palette: palette.slice(0, 3), curated: true, tone: plan.tone };
 }
 
+/** حدّ حجم الـ prompt بالتوكن (تقديري): مزوّدين زي Groq المجاني حدّهم ~8k توكن/دقيقة شامل الرد. بنضغط تدريجيًا (من الأقل أهمية للطلب) بس لما الطلب كبير. CURATOR_PROMPT_TOKENS لتغييره. */
+export const CURATOR_TOKEN_BUDGET = () => Math.max(2500, Number(process.env.CURATOR_PROMPT_TOKENS) || 4500);
+export const estTokens = (str) => Math.ceil([...String(str)].reduce((n, c) => n + (/[\u0600-\u06FF]/.test(c) ? 0.45 : 0.26), 0)); // تقدير متحفظ: العربي ~2.2 حرف/توكن، اللاتيني ~4
+const TIERS = [
+  { level: 0, perKey: 5, max: 48, hintMax: 900, ruleChars: 3200 },
+  { level: 1, perKey: 4, max: 36, hintMax: 600, ruleChars: 3200 },
+  { level: 1, perKey: 3, max: 24, hintMax: 450, ruleChars: 3200 }, // درجة وسطية: القواعد كاملة، والقوايم أصغر
+  { level: 2, perKey: 3, max: 24, hintMax: 400, ruleChars: 3200 },
+  { level: 2, perKey: 2, max: 16, hintMax: 250, ruleChars: 2200 },
+];
+/** يبني الـ prompt + قوايم المنتجات (نفسها اللي بيتحقق منها الكود) بأقل ضغط يدخل في الحد. */
+export function buildCuratorRequest({ K, rows, persons, plan, parsed, adv, eventTime, lang, assistantName, baseline, tokenBudget = CURATOR_TOKEN_BUDGET() }) {
+  let last = null;
+  for (const t of TIERS) {
+    const pools = Object.fromEntries(persons.map((a) => [a, candidatePool(rows, a, K, { context: plan.context, max: t.max, perKey: t.perKey })]));
+    if (!persons.some((a) => pools[a].length)) return null;
+    const system = curatorPrompt({ K, pools, persons, context: plan.context, budget: plan.budget || null, adv, eventTime, parsed, baseline, lang, assistantName, level: t.level, hintMax: t.hintMax, ruleChars: t.ruleChars });
+    last = { system, pools, tier: TIERS.indexOf(t), tokens: estTokens(system) };
+    if (last.tokens <= tokenBudget) return last;
+  }
+  return last;
+}
+
 /** callFn(system, messages) → string|object. بيرجّع async ({plan, rows, parsed, adv, eventTime, K, lang, assistantName}) => plan|null */
 export function makeCurator(callFn, { timeoutMs = 16000 } = {}) {
   return async ({ plan, rows, parsed, adv, eventTime, K, lang = 'ar', assistantName = 'تويلا' }) => {
     const persons = plan.persons || [];
     if (!persons.length || !plan.context && !(parsed.garments || []).length) return null;
-    const pools = Object.fromEntries(persons.map((a) => [a, candidatePool(rows, a, K, { context: plan.context })]));
-    if (!persons.some((a) => pools[a].length)) return null;
     const baseline = (plan.people || []).map((pe) => ({ aud: pe.aud, items: pe.picks.map((p) => ({ type: p.slotKey, productId: p.product.id })) }));
-    const system = curatorPrompt({ K, pools, persons, context: plan.context, budget: plan.budget || null, adv, eventTime, parsed, baseline, lang, assistantName });
+    const req = buildCuratorRequest({ K, rows, persons, plan, parsed, adv, eventTime, lang, assistantName, baseline });
+    if (!req) return null;
+    const { system, pools } = req;
     const raw = await Promise.race([callFn(system, [{ role: 'user', content: 'Curate the outfit now. JSON only.' }]), new Promise((_, rej) => setTimeout(() => rej(new Error('curator timeout')), timeoutMs))]);
     let out = raw;
     if (typeof raw === 'string') { const a = raw.indexOf('{'); const b = raw.lastIndexOf('}'); try { out = a >= 0 && b > a ? JSON.parse(raw.slice(a, b + 1)) : null; } catch { out = null; } }
-    return buildCuratedPlan(out, { plan, pools, persons, budget: plan.budget || null, K });
+    return buildCuratedPlan(out, { plan, pools, persons, budget: plan.budget || null, K, owned: ownedKeysOf(parsed) });
   };
 }
 

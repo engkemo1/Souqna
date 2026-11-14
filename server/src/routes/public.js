@@ -669,7 +669,7 @@ r.get('/marketplace', h((req, res) => {
     const rs = dedupe(rs0, cap);
     return serializeCards(rs).map((c, i) => ({ ...c, store: { slug: rs[i].store_slug, name: bi(rs[i], 'store_name') } }));
   };
-  const newest = railRows("ORDER BY p.is_new DESC, p.created_at DESC LIMIT 30");
+  const newest = railRows("ORDER BY p.created_at DESC, p.id DESC LIMIT 30");
   const deals = railRows('AND p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price ORDER BY (p.compare_at_price - p.price) * 1.0 / p.compare_at_price DESC LIMIT 30');
   const deptCounts = q.all("SELECT p.department AS slug, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL GROUP BY p.department");
   const countBy = new Map();
@@ -696,7 +696,7 @@ r.get('/marketplace', h((req, res) => {
     const name = g.name || hits[0].name; // shelf title (cosmetics is always «مستحضرات تجميل»)
     const sold = railRows(`AND p.sold_count > 0 AND p.department IN (${ph}) ORDER BY p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
     if (sold.length >= BEST_MIN) return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: true, items: sold };
-    return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`AND p.department IN (${ph}) ORDER BY p.is_new DESC, p.created_at DESC LIMIT 40`, sub, BEST_MIN) };
+    return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`AND p.department IN (${ph}) ORDER BY p.created_at DESC, p.id DESC LIMIT 40`, sub, BEST_MIN) };
   }).filter(Boolean);
   cache(res, 60);
   res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });

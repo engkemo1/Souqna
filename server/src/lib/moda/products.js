@@ -93,23 +93,50 @@ export function inferFormality(key, name, desc, K = loadKnowledge()) {
 const KIDS_GIRL = ['بنات', 'بنوته', 'بناتي', 'girls', 'girl'];
 const KIDS_BOY = ['ولادي', 'ولادى', 'اولادي', 'اولادى', 'اولاد', 'ولد', 'boys', 'boy'];
 const KIDS_BOTH = ['اطفال', 'كيدز', 'kids', 'children'];
+const KIDS_STORE = ['بيبي', 'baby', 'babies', 'kid', 'كيد', 'طفل', 'اطفالي'];
 const MEN_WORDS = ['رجالي', 'للرجال', 'men', 'mens', 'man'];
 const WOMEN_WORDS = ['حريمي', 'نسائي', 'للنساء', 'women', 'womens', 'woman', 'ladies'];
 const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
 const MEN_KEYS = new Set(['suit', 'tuxedo', 'tie', 'bow_tie', 'pocket_square', 'waistcoat', 'classic_set']);
 
-/** الفئة اللي المنتج ليها: men | women | boys | girls | kids | unisex */
+/** الفئة اللي المنتج ليها: men | women | boys | girls | kids | unisex
+ *  بنجمع أدلة من كل مكان ونوزنها بدل ما نصدّق مصدر واحد:
+ *  الاسم (4) · القسم المختار (3) · التصنيف (2) · فئة المنتج المحفوظة (2، لأن جزء منها اتملى بالتخمين) · اسم المحل (2) · الوصف (1).
+ *  لو أدلة الأطفال قد أدلة الكبار أو أكتر → أطفال، عشان قطعة أطفال ما تترشحش لكبير. اسم صريح «رجالي/حريمي» بيغلب قسم أو محل غلط. */
+const deptVotes = (slug) => {
+  const d = String(slug || '').toLowerCase();
+  if (!d) return null;
+  if (/(^|_)(kids|baby|newborn)(_|$)/.test(d)) return /girls|dresses/.test(d) ? 'girls' : /boys/.test(d) ? 'boys' : 'kids';
+  if (/(^|_)(women|hijab|abaya|modest|wedding_dress)(_|$)/.test(d)) return 'women';
+  if (/(^|_)(men|wedding_suit)(_|$)/.test(d)) return 'men';
+  return null;
+};
+export function genderEvidence(row, K = loadKnowledge()) {
+  const v = { men: 0, women: 0, kids: 0, boys: 0, girls: 0, strongKids: false };
+  const vote = (g, w, strong = false) => {
+    if (!g || g === 'unisex') return;
+    if (g === 'boys' || g === 'girls') { v[g] += w; v.kids += w; } else v[g] += w;
+    if (strong && (g === 'boys' || g === 'girls' || g === 'kids')) v.strongKids = true;
+  };
+  const fromText = (text) => (hasAny(K, text, KIDS_GIRL) ? 'girls' : hasAny(K, text, KIDS_BOY) ? 'boys' : hasAny(K, text, KIDS_BOTH) ? 'kids'
+    : hasAny(K, text, MEN_WORDS) && !hasAny(K, text, WOMEN_WORDS) ? 'men' : hasAny(K, text, WOMEN_WORDS) && !hasAny(K, text, MEN_WORDS) ? 'women' : null);
+  vote(fromText(`${row.name_ar || ''} ${row.name_en || ''}`), 4, true);
+  vote(deptVotes(row.department), 3, true);
+  vote(fromText(row.cat_text || ''), 2, true);
+  if (['men', 'women', 'boys', 'girls', 'kids'].includes(row.audience)) vote(row.audience, 2);
+  const descText = `${row.description_ar || ''} ${row.description_en || ''}`.slice(0, 600);
+  if (!hasAny(K, descText, ['كبار', 'الكبار', 'للكبار', 'adults', 'adult'])) vote(fromText(descText), 1); // «للكبار والصغار» مش دليل
+  const storeText = `${row.store_name_ar || ''} ${row.store_name_en || ''}`;
+  if (hasAny(K, storeText, KIDS_BOTH) || hasAny(K, storeText, KIDS_STORE)) vote('kids', 2);
+  return v;
+}
 export function inferGender(row, key, K = loadKnowledge()) {
-  if (['men', 'women', 'boys', 'girls', 'kids', 'unisex'].includes(row.audience)) return row.audience; // اختيار صاحب المحل الصريح يغلب التخمين
-  const text = `${row.name_ar || ''} ${row.name_en || ''} ${row.cat_text || ''}`;
-  if (hasAny(K, text, KIDS_GIRL)) return 'girls';
-  if (hasAny(K, text, KIDS_BOY)) return 'boys';
-  if (hasAny(K, text, KIDS_BOTH) || row.department === 'kids') return 'kids';
-  if (hasAny(K, text, MEN_WORDS)) return 'men';
-  if (hasAny(K, text, WOMEN_WORDS)) return 'women';
-  if (['women', 'hijab', 'abaya', 'wedding_dress'].includes(row.department)) return 'women';
-  if (['men', 'wedding_suit'].includes(row.department)) return 'men';
-  if (row.department === 'jalabiya') return key === 'jalabiya' ? 'unisex' : 'unisex';
+  const v = genderEvidence(row, K);
+  const adult = Math.max(v.men, v.women);
+  if (v.kids > 0 && v.kids >= adult) return v.girls > v.boys ? 'girls' : v.boys > v.girls ? 'boys' : 'kids';
+  if (v.men > v.women) return 'men';
+  if (v.women > v.men) return 'women';
+  if (row.department === 'jalabiya') return 'unisex';
   if (WOMEN_KEYS.has(key)) return 'women';
   if (MEN_KEYS.has(key)) return 'men';
   return 'unisex';

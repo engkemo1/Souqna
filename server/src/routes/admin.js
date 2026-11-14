@@ -16,7 +16,7 @@ import ownerRoutes from './owner.js';
 import { purgeMediaFiles, serializeMedia } from '../lib/media.js';
 import { visualStatus, saveVisualSettings, triggerReindex } from '../lib/visual.js';
 import { unmetDemand, demandTotals, demandForOwnersEnabled, setDemandForOwners } from '../lib/visual-demand.js';
-import { testProvider, stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios } from '../lib/stylist.js';
+import { testProvider, stylistStatus, saveStylistSettings, providerReady, stylistTrainingSettings, saveStylistTrainingGuidance, addStylistTrainingExample, deleteStylistTrainingExample, addStylistTrainingLesson, deleteStylistTrainingLesson, approveStylistTrainingLesson, stylistFeedback, deleteStylistFeedback, teachFromStylistFeedback, lookOfDayAdminSettings, saveLookOfDayAdminSettings, searchLookOfDayProducts, generateLookOfDayProposal, approveLookOfDayProposal, discardLookOfDayProposal, modaLabSettings, saveModaLabScenario, deleteModaLabScenario, runModaLabScenario, runAllModaLabScenarios, kbStatus, kbDownload, saveKb, resetKb } from '../lib/stylist.js';
 import { llmChain } from '../lib/stylist.js';
 import { geminiUsage, saveGeminiLimit } from '../lib/ai-usage.js';
 import { adminModaPrompts, saveModaPrompts, resetModaPrompts, suggestPrompts } from '../lib/modaPrompts.js';
@@ -812,7 +812,7 @@ r.put('/whatsapp', h((req, res) => {
 }));
 r.post('/whatsapp/test', h(async (req, res) => {
   const b = z.object({ to: z.string().trim().min(8).max(20) }).parse(req.body || {});
-  try { res.json(await sendWaTest(b.to)); } catch (e) { throw new AppError(502, 'wa_test_failed', String(e.message || e)); }
+  try { res.json(await sendWaTest(b.to)); } catch (e) { throw new AppError(422, 'wa_test_failed', String(e.message || e)); }
 }));
 r.get('/stylist', h((_req, res) => res.json(stylistStatus())));
 r.get('/stylist/test/:provider', h(async (req, res) => {
@@ -841,6 +841,18 @@ const trainingLessonSchema = z.object({
   answer: z.string().trim().min(10).max(1000), tags: z.string().trim().max(160).optional().default(''),
 });
 r.get('/stylist/training', h((_req, res) => res.json(stylistTrainingSettings())));
+r.get('/stylist/kb', h((_req, res) => res.json(kbStatus())));
+r.get('/stylist/kb/:kind/download', h((req, res) => {
+  const text = kbDownload(req.params.kind);
+  if (!text) throw new AppError(404, 'not_found', 'Not found.');
+  res.set('Content-Type', 'application/json; charset=utf-8').set('Content-Disposition', `attachment; filename="${req.params.kind === 'bridge' ? 'kb_bridge' : 'fashion_kb'}.json"`).send(text);
+}));
+r.put('/stylist/kb/:kind', h((req, res) => {
+  const out = saveKb(req.params.kind, req.body?.json);
+  if (!out.ok) throw new AppError(400, 'kb_invalid', out.errors.join(' — '), { errors: out.errors });
+  res.json(out.status);
+}));
+r.delete('/stylist/kb/:kind', h((req, res) => res.json(resetKb(req.params.kind))));
 r.put('/stylist/training', h((req, res) => {
   const body = z.object({ guidance: z.string().trim().max(5000) }).parse(req.body);
   res.json(saveStylistTrainingGuidance(body.guidance));

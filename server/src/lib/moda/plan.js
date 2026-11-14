@@ -51,7 +51,9 @@ const bandOf = (adv) => adv?.band || null;
 function slotsFor(aud, parsed, look, K, ctxF, adv) {
   const mine = parsed.garments.filter((g) => keyFits(aud, g.key));
   const multi = parsed.persons.length > 1;
-  const explicit = multi ? mine.filter((g) => WOMEN_KEYS.has(g.key) || MEN_KEYS.has(g.key)) : mine;
+  let explicit = multi ? mine.filter((g) => WOMEN_KEYS.has(g.key) || MEN_KEYS.has(g.key)) : mine;
+  // أكتر من شخص + قطعة محايدة (كوتشي/جاكيت…) + مفيش لوك: كانت بترجع «مفيش نتيجة» رغم إن كل شخص لوحده بيلاقي. دلوقتي كل شخص ياخد القطعة من منتجات فئته (بتتغير بس الحالات اللي كانت فاضية).
+  if (multi && !explicit.length && !look && mine.length) explicit = mine;
   if (explicit.length) {
     return {
       mode: 'explicit',
@@ -344,9 +346,11 @@ function fitBudget(fills, budget) {
 function altsFor(pk, picks, budget) {
   const used = new Set(picks.map((x) => x.product.id));
   const max = budget ? pk.product.price * 1.25 : Infinity;
+  const kid = (p) => ['boys', 'girls', 'kids'].includes(p.gender);
+  const kidPick = kid(pk.product); // بديل قطعة أطفال يبقى أطفال، وبديل قطعة كبار يبقى كبار
   const seen = new Set();
   const list = [...(pk.ranked || []), ...(pk.pool || [])]
-    .filter((r) => !used.has(r.p.id) && r.p.price <= max && !seen.has(r.p.id) && seen.add(r.p.id))
+    .filter((r) => !used.has(r.p.id) && r.p.price <= max && kid(r.p) === kidPick && !seen.has(r.p.id) && seen.add(r.p.id))
     .sort((a, b) => b.s - a.s);
   const out = [];
   const otherKind = list.find((r) => !r.viaPool && r.p.key && r.p.key !== pk.product.key); // نوع تاني من نفس الخانة بس، مش بديل أرخص من الـpool
@@ -430,7 +434,15 @@ export function planOutfit(parsed, products, env = {}) {
     const herF = fl.find((f) => f.aud === 'women' || f.aud === 'women_hijab');
     const herHero = herF?.picks[0]?.product?.colorKeys?.slice(0, 2);
     if (herHero?.length) fl = fl.map((f) => ((f.aud === 'men' && f.look) ? { ...fillPerson('men', parsed, f.look, products, K, envC, pBudget('men'), herHero), t: f.t } : f));
-    fl = fl.map((f) => ({ ...f, picks: f.picks.map((p) => ({ ...p })) }));
+    fl = fl.map((f) => ({ ...f, picks: f.picks.map((p) => ({ ...p })), missing: [...f.missing] }));
+    // نفس المنتج ما يتحسبش لشخصين (الواجهة بتعرضه مرة واحدة): الشخص التاني ياخد أقرب بديل مش مستخدم، أو يبقى «مش متاح» وإجمالي الطقم يفضل صح.
+    { const used = new Set();
+      for (const f of fl) for (const pk of [...f.picks]) {
+        if (!used.has(pk.product.id)) { used.add(pk.product.id); continue; }
+        const alt = (pk.ranked || []).find((r) => !used.has(r.p.id) && true);
+        if (alt) { pk.product = alt.p; used.add(alt.p.id); }
+        else { f.picks.splice(f.picks.indexOf(pk), 1); if (pk.slot.required) f.missing.push({ keys: pk.slot.keys, base: pk.slot.base, material: pk.slot.material, color: pk.slot.color, label: pk.slot.material ? `${pk.slot.material}_${pk.slot.base}` : pk.slot.base }); }
+      } }
     const fit = fitBudget(fl, audienceOpen && budget ? budget * fl.length : budget);
     const heroSwapped = fl.some((f) => f.picks.some((p) => p.slot.hero && p.relaxedKind === 'budget'));
     return { fills: fl, fit, heroSwapped };
