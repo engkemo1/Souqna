@@ -243,4 +243,34 @@ const G = (r) => (r.parsed?.garments || [])[0] || {};
   { const r = await runS(['عايز هودي اسود', 'مقاساته ايه؟']); ok('R10 «مقاساته ايه؟» → the sizes', /M، L، XL/.test(r.say || ''), (r.say || '').slice(0, 60)); }
   { const r = await runS(['عايز تيشيرت لابني 5 سنين']); ok('R10 child age 5 → age-5 sizes only', /تيشيرت ولادي"/.test(nm(r)) && !/كبير/.test(nm(r)), nm(r)); }
   { const r = await runS(['عايز تيشيرت لابني 13 سنة']); ok('R10 child age 13 → age-13 sizes only', /كبير/.test(nm(r)), nm(r)); } }
+// Item 1 (pre-launch review) — LLM reply guard, both directions: facts must be in the data; styling suggestions are allowed
+{ const PG = [{ id: 71, name_ar: 'بليزر حريمي كحلي', price: 800, compare_at_price: 1000, stock: 5, cat_text: '', description_ar: 'بليزر مبطن خامة كريب', size_list: 'S,M', sold_count: 3, colors_json: [{ name: 'كحلي' }] }];
+  const g = async (rep) => { const r = await runModa([{ role: 'user', content: 'عايزة بليزر' }], { products: PG, brain: async () => ({ reply: rep }), now: new Date('2026-11-14T12:00:00Z') }); return r; };
+  const keep = async (name, rep) => { const r = await g(rep); ok(`I1 keep: ${name}`, r.brainReply === true, JSON.stringify(r.brainRejected)); };
+  const rej = async (name, rep, why) => { const r = await g(rep); ok(`I1 reject: ${name}`, !r.brainReply && (r.brainRejected || []).includes(why), JSON.stringify(r.brainRejected)); };
+  await keep('styling garments in a suggestion', 'البليزر الكحلي تنسقيه مع بنطلون بيج وقميص أبيض.');
+  await keep('true lining + fabric from the description', 'لقيتلك بليزر حريمي كحلي، مبطن وخامته كريب.');
+  await keep('true discount with the right percent', 'عليه خصم 20%، بقى بـ800 بدل 1000.');
+  await keep('truthful «مفيش خصم» is not a discount claim', 'البليزر ده شيك جدًا.');
+  await rej('wrong discount percent', 'عليه خصم 40%.', 'claims_discount');
+  await rej('delivery promise', 'هيوصلك بكرة الصبح.', 'claims_delivery');
+  await rej('branch', 'متاح في فرع المعادي.', 'claims_branch');
+  await rej('fabric not written', 'البليزر ده صوف.', 'claims_fabric');
+  await rej('feature not written', 'البليزر ووتر بروف.', 'claims_feature');
+  await rej('claims a shown item not shown', 'لقيتلك البليزر ومعاه كلاتش هتلاقيه تحت.', 'clutch');
+  { const r = await runModa([{ role: 'user', content: 'عايز هودي' }], { products: [{ id: 72, name_ar: 'هودي رمادي', price: 500, stock: 5, cat_text: '', description_ar: '', sold_count: 3, colors_json: [{ name: 'رمادي' }] }], brain: async () => ({ reply: 'مفيش خصم عليه دلوقتي، بس سعره كويس.' }), now: new Date('2026-11-14T12:00:00Z') });
+    ok('I1 keep: truthful «مفيش خصم» when there is no discount', r.brainReply === true, JSON.stringify(r.brainRejected)); }
+  { const r = await runModa([{ role: 'user', content: 'عايز هودي' }], { products: [{ id: 72, name_ar: 'هودي رمادي', price: 500, stock: 5, cat_text: '', description_ar: '', sold_count: 3, colors_json: [{ name: 'رمادي' }] }], brain: async () => ({ reply: 'جوه بنها التوصيل خلال يوم.' }), now: new Date('2026-11-14T12:00:00Z') });
+    ok('I1 keep: the platform delivery fact', r.brainReply === true, JSON.stringify(r.brainRejected)); }
+}
+// Item 2 (pre-launch review) — going back on earlier choices inside a conversation
+{ const r = await conv(['عايزة بنطلون واسع', 'بيج', 'مقاس M', 'تمام، لا خليه أسود بدل البيج']); ok('I2 «تمام، لا خليه X بدل Y» changes the colour and keeps the size', keys(r).includes('trousers') && (G(r).color === 'black' || r.session?.parsed?.garments?.[0]?.color === 'black') && String(r.session?.parsed?.flags?.size) === 'M', JSON.stringify([r.session?.parsed?.garments?.[0], r.session?.parsed?.flags?.size])); }
+{ const r = await conv(['عايز جينز', 'ماشي بس غيّر اللون لأسود']); ok('I2 «غيّر اللون لـX» keeps the garment', (r.session?.parsed?.garments || []).some((g) => g.key === 'jeans' && g.color === 'black'), JSON.stringify(r.session?.parsed?.garments)); }
+{ const r = await conv(['عايزة فستان سهرة', 'مش محجبة', 'وعايزة كلاتش معاه', 'سيبك من الكلاتش، رجعني للفستان']); ok('I2 «رجعني للفستان» returns to the dress', skeys(r).some((k) => /^dress/.test(k)) && !skeys(r).includes('clutch'), JSON.stringify(skeys(r))); }
+{ const r = await conv(['عايزة جيبة', 'عندك حاجة شبهها بس أرخص؟']); ok('I2 «حاجة شبهها» keeps the skirt', skeys(r).includes('skirt'), JSON.stringify(skeys(r))); }
+{ const r = await conv(['عايز قميص', 'لون زي الجينز كده']); ok('I2 «زي الجينز» is a comparison, the shirt stays', skeys(r).includes('shirt') && !skeys(r).includes('jeans'), JSON.stringify(skeys(r))); }
+{ const r = await conv(['عايزة كوتشي يليق على الجيبة دي']); ok('I2 requested item + owned item in one message: the requested item stays', keys(r).includes('sneakers') || skeys(r).includes('sneakers'), JSON.stringify([keys(r), r.parsed?.ownedPieces])); }
+{ const r = await conv(['عايزة بلوزة', 'خريفي']); ok('I2 a season word alone refines the same garment', skeys(r).includes('blouse') && r.session?.parsed?.season === 'mid', JSON.stringify([skeys(r), r.session?.parsed?.season])); }
+{ const r = await conv(['عايز قميص أبيض', 'عايز قميص تاني']); ok('I2 control: «قميص تاني» is still a new shirt (colour not forced)', skeys(r).includes('shirt'), JSON.stringify(r.session?.parsed?.garments)); }
+{ const r = await conv(['عايز قميص أزرق', 'وعايز جينز معاه']); ok('I2 control: «وعايز جينز معاه» still adds jeans', keys(r).includes('jeans'), keys(r)); }
 console.log(`${pass} PASS / ${fail} FAIL`); process.exit(fail ? 1 : 0);

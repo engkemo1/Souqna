@@ -63,6 +63,7 @@ const ALT_RE = /(البس|ألبس|الاقي|اجيب|اشتري|اختار)( [
 import { cairoParts, resolveEventTime, weatherAdvice } from './time.js';
 import { serviceReply } from './service.js';
 import { sizesLabel } from './sizes.js';
+import { factualText, unsupportedClaims } from './claims.js';
 
 // الموسم: تويلا بتعرفه لوحدها من تاريخ النهارده (القاهرة) من غير ما تسأل. لو العميل قال صيف/شتا بيغلب.
 const MONTH_TEMP = { 1: 14, 2: 15, 3: 19, 4: 23, 5: 28, 6: 31, 7: 34, 8: 34, 9: 30, 10: 25, 11: 20, 12: 16 };
@@ -161,15 +162,22 @@ const mergeFromSession = (cur, prev) => {
 
 /** قطع مذكورة في نص (حسب قاموس المرادفات) وغير موجودة في مجموعة المسموح بيها. بنعتبر البنطلون/الشينو والجزمة/اللوفر مجموعة واحدة. */
 const EQUIV = [['trousers', 'chinos'], ['shirt', 'polo'], ['formal_shoes', 'loafers']];
-export function strayGarments(K, text, allowedKeys) {
+// فستان سهرة/سواريه/حفلات/«فستان» عام: عيلة واحدة. ذكر «الفستان» وإحنا عارضين فستان سواريه مش قطعة زيادة
+const isDressFamily = (key, allowed) => /^dress_/.test(key) && [...allowed].some((k) => /^dress_/.test(k));
+export function strayGarments(K, text, allowedKeys, allowedNames = '') {
   const allowed = new Set(allowedKeys);
   for (const g of EQUIV) if (g.some((k) => allowed.has(k))) g.forEach((k) => allowed.add(k));
   const toks = norm(text).split(' ').filter(Boolean);
   const hay = new Set([` ${toks.join(' ')} `, ` ${toks.map((t) => t.replace(/^[وبلف](?=.{3,})/, '')).join(' ')} `]);
   const found = new Set();
   const extra = { boots: ['بوتس'] };
+  // نفس قاموس القطع اللي المحلل بيستخدمه (فيه «كلاتش»، «كروس»… اللي مش في synonyms.garments)
+  // الكلمة جزء من اسم منتج معروض فعلًا («سويت تيشيرت» من «سويت تيشرت») → مش قطعة زيادة
+  const names = ` ${norm(allowedNames || '')} `;
+  const inNames = (w) => norm(w).split(' ').some((t) => { const n = t.replace(/^(ال|وال|بال|و|ب|ل)/, ''); return n.length >= 3 && names.includes(` ${n}`); });
+  try { for (const m of matchTokens(toks, K)) for (const e of m.entries || []) if (e.group === 'garment' && !allowed.has(e.key) && !isDressFamily(e.key, allowed) && !inNames(m.text)) found.add(e.key); } catch { /* نكمل بالطريقة القديمة */ }
   for (const [key, aliases] of Object.entries(K.synonyms.garments)) {
-    if (allowed.has(key)) continue;
+    if (allowed.has(key) || isDressFamily(key, allowed)) continue;
     for (const a of [...aliases, ...(extra[key] || [])]) {
       const n = norm(a); if (n.length < 3) continue;
       if ([...hay].some((h) => h.includes(` ${n} `))) { found.add(key); break; }
@@ -205,6 +213,7 @@ function cleanSession(s) {
   const out = { ...s, turn: Number.isFinite(Number(s.turn)) ? Number(s.turn) : 0, shown: arr(s.shown).filter((x) => typeof x === 'number' || typeof x === 'string') };
   out.parsed = s.parsed && typeof s.parsed === 'object' && !Array.isArray(s.parsed) ? { ...s.parsed, garments: objs(s.parsed.garments), persons: strs(s.parsed.persons), colors: strs(s.parsed.colors), avoidColors: strs(s.parsed.avoidColors), taste: strs(s.parsed.taste), ownedPieces: objs(s.parsed.ownedPieces), flags: s.parsed.flags && typeof s.parsed.flags === 'object' ? s.parsed.flags : {} } : null;
   out.activeLook = look(s.activeLook);
+  out.garmentHistory = objs(s.garmentHistory).slice(-6);
   out.lookHistory = arr(s.lookHistory).map(look).filter(Boolean);
   return out;
 }
@@ -252,6 +261,8 @@ async function runModaCore(messages, opts = {}) {
     let t = lastUserText(messages);
     // «لازرق / لاسود / لكحلي» = «ازرق…» (حرف اللام لزق في اللون)
     t = t.replace(/(^|\s)ل([اأإ](?:زرق|حمر|سود|بيض|خضر|صفر|سمر)|كحلي|بيج|رمادي|بني|وردي|بنفسجي|برتقالي|ذهبي|فضي|بوردو|زيتي)(?=\s|$)/g, '$1$2');
+    // «تمام، لا خليه سماوي…» / «ماشي بس غيّر اللون…» / «اوكي، نرجع للبنطلون»: كلمة موافقة قبل تصحيح → نشيلها عشان التصحيح يتفهم زي ما هو
+    if (rawSession?.parsed?.garments?.length) t = t.replace(/^\s*(?:تمام|اوكي|أوكي|اوك|ok|okay|ماشي|طيب|طب|حلو|خلاص|ايوه|أيوه|ايوة|أيوة|اه)\s*[،,.!]*\s*(?:بس\s+|و\s*)?(?=(?:لا|لأ|لاء|خلي|خليه|خليها|غير|غيّر|غيري|بدل|بدّل|نرجع|رجع|رجعني|رجعيني|انسى|انسي|سيبك)(?:\s|$|[،,]))/i, '');
     // مقاس لوحده بعد طلب قبل كده («XL» / «لا 43» / «خليه L»)
     const mm = t.trim().replace(/[.!،,؟?]+$/, '').match(/^(?:(?:لا|لأ|لاء|بل)[،,]?\s+)?(?:معلش[،,]?\s+)?(?:(?:خليه|خليها|هاته|هاتها|مقاسي|خليهولي)\s+)?(xxs|xs|s|m|l|xl|xxl|xxxl|[3-5][0-9])$/i);
     if (mm && rawSession?.parsed?.garments?.length) t = `مقاس ${mm[1]}`;
@@ -325,7 +336,16 @@ async function runModaCore(messages, opts = {}) {
   }
   // «نسقلي طقم على القطعة دي / على جاكيت X»: القطعة هي اللي معاه، والمطلوب باقي الطقم
   if (!(answers && Object.keys(answers).length) && parsed.garments.length && !parsed.ownedPieces?.length && /(نسق|نسقلي|اطقم|طقم|لوك|اطلاله|تنسيق)[^؟?]*?(علي|على|حوالين|مع|يليق|يلبس|تليق)|(علي|على|حوالين|مع) (القطع[هة]|الجاكيت|القميص|البنطلون|الفستان|البدل[هة]|الحذاء) (دي|ده|دا)/.test(norm(text)) && !/(عاوز|عايز|محتاج|هاتلي)\s+(?:\S+\s+){0,2}(?:جاكيت|قميص|بنطلون|فستان|بدل[هة]|حذاء|جزم[هة])\s*$/.test(norm(text))) {
-    parsed = { ...parsed, ownedPieces: parsed.garments.map((g) => ({ key: g.key, color: g.color || null, material: g.material || null, text: g.text })), garments: [], fullLook: true };
+    const nt0 = norm(text);
+    const om = nt0.match(/(?:علي|على|حوالين|مع) (?:ال)?([^ ]+) (?:دي|ده|دا)(?: |$)/);
+    const ownedKey = om ? matchTokens([om[1], `ال${om[1]}`], K).flatMap((x) => x.entries || []).find((e) => e.group === 'garment')?.key : null;
+    const asked = ownedKey && /(^| )(عايز|عايزه|عاوز|عاوزه|محتاج|محتاجه|هاتلي|وريني|ورينى|ممكن)( |$)/.test(nt0) ? parsed.garments.filter((g) => g.key !== ownedKey) : [];
+    if (asked.length) {
+      // المطلوب قطعة معينة («طرحة / شنطة») تليق على قطعة معاه: القطعة اللي معاه مالكة، والمطلوب يفضل مطلوب. لمين؟ للمتكلم، مش لصاحب القطعة المملوكة
+      const own = parsed.garments.filter((g) => g.key === ownedKey).map((g) => ({ key: g.key, color: g.color || null, material: g.material || null, text: g.text }));
+      const spk = parsed.genderHint === 'female' ? ['women'] : parsed.genderHint === 'male' ? ['men'] : parsed.persons;
+      parsed = { ...parsed, ownedPieces: own, garments: asked.map((g, position) => ({ ...g, position })), fullLook: false, persons: spk };
+    } else parsed = { ...parsed, ownedPieces: parsed.garments.map((g) => ({ key: g.key, color: g.color || null, material: g.material || null, text: g.text })), garments: [], fullLook: true };
   }
 
   const searchReply = (hits, sayText = null) => {
@@ -595,10 +615,48 @@ async function runModaCore(messages, opts = {}) {
         const it = hit.item;
         parsed = { ...parsed, intent: 'shop', persons: it.aud ? [it.aud] : parsed.persons, avoidColors: [], garments: [{ key: it.key || it.slotKey, color: col, material: null, text: it.name, position: 0 }], flags: { ...parsed.flags, swapId: it.id, colorFlexible: true } };
       } else if (pr.garments?.length && col) {
-        parsed = { ...parsed, intent: 'shop', avoidColors: [], colors: [], garments: pr.garments.map((g) => ({ ...g, color: g.color || col })), persons: parsed.persons };
+        parsed = { ...parsed, intent: 'shop', avoidColors: [], colors: [], garments: pr.garments.map((g) => ({ ...g, color: g.color || col })), persons: parsed.persons };      } else if (!pr.garments?.length && col && session?.parsed?.garments?.length && /^(ال)?لون/.test(rest)) {
+        parsed = { ...session.parsed, intent: 'shop', followup: null, avoidColors: [], colors: [], garments: session.parsed.garments.map((g, i) => (i === 0 ? { ...g, color: col } : g)) };
       }
     } }
-  let anchor = pickedItem ? { item: pickedItem, keyRe: famRe(pickedItem) } : (!hasAnswers ? resolveAnchor(text, session) : null);
+  // ---- «رجعني للفستان / نرجع للبنطلون / خلينا في الجيبة»: رجوع لقطعة اتكلمنا عنها قبل كده بكل تفاصيلها (مش «حاجة للفستان»)
+  let returnTurn = false;
+  if (!hasAnswers && session?.parsed) {
+    const nt = norm(text);
+    const rm = nt.match(/(?:^| )(?:رجعني|رجعيني|رجعنا|نرجع|ارجع|ارجعي|خلينا|خليني|نكمل|كملي|كمل)(?: تاني)? (?:لل|ل|على|علي|في|بال|ب|ع)?(?:ال)?([^ ]{2,})/);
+    if (rm) {
+      const k = (() => { for (const w of [rm[1], `ال${rm[1]}`, rm[1].replace(/^ل/, '')]) { const m = matchTokens([w], K).flatMap((x) => x.entries || []).find((e) => e.group === 'garment'); if (m) return m.key; } return null; })();
+      const fam = (key) => (/^dress/.test(key) ? 'dress' : K.items.get(key)?.family || key);
+      if (k) {
+        const pool = [...(session.parsed.garments || []), ...[...(session.garmentHistory || [])].reverse()];
+        const hit = pool.find((g) => g?.key === k) || pool.find((g) => g?.key && fam(g.key) === fam(k));
+        if (hit) { parsed = { ...session.parsed, intent: 'shop', followup: null, garments: [{ ...hit }], ownedPieces: [], fullLook: false, flags: { ...(session.parsed.flags || {}), swapId: undefined, anchorId: undefined } }; returnTurn = true; }
+      }
+    }
+    // «خريفي متوسط» / «شتوي»: موسم لوحده في نص الطلب = تفصيلة لنفس القطعة
+    if (!returnTurn && !parsed.garments.length && parsed.season && session.parsed.garments?.length && !parsed.context && !parsed.persons?.length && nt.split(' ').length <= 4) {
+      parsed = { ...session.parsed, intent: 'shop', followup: null, season: parsed.season, garments: session.parsed.garments.map((g) => ({ ...g })) };
+      returnTurn = true;
+    }
+    // «عندك حاجة شبهه / زيها؟» (و«أنا محجبة / أرخص» معاها): نفس القطعة اللي بنتكلم عليها، مع أي قيد جديد
+    if (!returnTurn && !parsed.garments.length && session.parsed.garments?.length && /(^| )(شبهه|شبهها|شبههم|زيه|زيها|زيهم|زي ده|زي دي|زي دا|من نوعه|من نوعها|نفس الموديل|نفس الستايل|نفس القصه)( |$|[؟?])/.test(` ${nt} `)) {
+      parsed = { ...session.parsed, ...Object.fromEntries(Object.entries({ persons: parsed.persons?.length ? parsed.persons : null, budget: parsed.budget || null }).filter(([, v]) => v)), intent: 'shop', followup: parsed.followup || null, garments: session.parsed.garments.map((g) => ({ ...g })), flags: { ...(session.parsed.flags || {}), ...(parsed.flags || {}) } };
+      returnTurn = true;
+    }
+    // «حاجة في النص، زي الجينز كده» / «لون قريب من الكحلي»: تشبيه، مش طلب قطعة تانية → نفضل على نفس القطعة
+    if (!returnTurn && session.parsed.garments?.length && parsed.garments.length && !/(^| )(عايز|عايزه|عاوز|عاوزه|وريني|ورينى|هاتلي|هات|محتاج|محتاجه|ضيف|وكمان)( |$)/.test(nt)) {
+      const cm = nt.match(/(?:^| )(?:زي|زى|شبه|قريب من|نفس لون)(?: ال| )?([^ ]+)/);
+      if (cm) {
+        const ck = matchTokens([cm[1], `ال${cm[1]}`], K).flatMap((x) => x.entries || []).find((e) => e.group === 'garment')?.key;
+        const cur = session.parsed.garments.map((g) => g.key);
+        if (ck && !cur.includes(ck)) {
+          const rest = parsed.garments.filter((g) => g.key !== ck);
+          if (!rest.length) { parsed = { ...session.parsed, intent: 'shop', followup: null, garments: session.parsed.garments.map((g, i) => (i === 0 && ck === 'jeans' && !parsed.colors?.length ? { ...g, color: K.colors.has('blue') ? 'blue' : g.color } : g)) }; returnTurn = true; }
+        }
+      }
+    }
+  }
+  let anchor = returnTurn ? null : (pickedItem ? { item: pickedItem, keyRe: famRe(pickedItem) } : (!hasAnswers ? resolveAnchor(text, session) : null));
   let audFilter = null;
   if (answers?.which_person) {
     const w = String(answers.which_person);
@@ -666,11 +724,12 @@ async function runModaCore(messages, opts = {}) {
   // «تمام هات الجاكيت مقاس L» بعد سؤال جانبي: نفس القطعة اتذكرت تاني → نكمل بنفس مواصفاتها (لون/خامة/موسم…) مش طلب جديد من الصفر
   if (!hasAnswers && session?.parsed?.garments?.length && parsed.garments.length && parsed.intent === 'shop'
     && parsed.garments.every((g) => session.parsed.garments.some((p) => p.key === g.key))
-    && !/(^| )(تاني|تانيه|غير|غيره|غيرها|جديد|جديده|خالص|بلاش|مش عاجبني)( |$)/.test(norm(text))) {
+    && !/(^| )(تاني|تانيه|غير|غيره|غيرها|جديد|جديده|خالص|بلاش|مش عاجبني)( |$)/.test(norm(text).replace(/(^| )(ال[^ ]+) (تاني|تانيه)(?= |$)/g, '$1$2'))) { // «وريني القميص تاني» = نفس القميص تاني؛ «قميص تاني» = قميص غيره
     const prevBy = new Map(session.parsed.garments.map((p) => [p.key, p]));
     parsed = { ...parsed, garments: parsed.garments.map((g) => ({ ...g, color: g.color || prevBy.get(g.key)?.color || null, material: g.material || prevBy.get(g.key)?.material || null })) };
     for (const k of ['season', 'context', 'contextEffective', 'budget', 'daypart']) if ((parsed[k] === null || parsed[k] === undefined) && session.parsed[k] != null) parsed[k] = session.parsed[k];
     if (!parsed.persons?.length && session.parsed.persons?.length) parsed.persons = session.parsed.persons;
+    if (!parsed.flags?.size && session.parsed.flags?.size) parsed.flags = { ...parsed.flags, size: session.parsed.flags.size }; // المقاس كمان ميضيعش
   }
   // «ماكسي/ميدي/سواريه/سهره» لوحدها وسط طلب شغال = تفصيلة للقطعة اللي بنتكلم عنها، مش طلب قطعة جديدة
   if (!hasAnswers && session?.parsed?.garments?.length && parsed.garments.length && parsed.garments.every((g) => AMBIG_BARE_GARMENT.has(String(g.text || '').replace(/^(?:وال|بال|لل|ال|و|ل|ب)(?=.{3,})/, '')))) parsed = { ...parsed, garments: [] };
@@ -1057,7 +1116,11 @@ async function runModaCore(messages, opts = {}) {
     const b = await callBrain({ result: plan.state, requested: parsed.garments.map((x) => x.key), occasion: parsed.context || null, missing: (plan.missing || []).map((m) => m.base).filter(Boolean), availableAlternativeTypes: avail, found, stockAlternatives, relaxed: (plan.relaxed || []).map((r) => r.kind || r.base || r.key).filter(Boolean).slice(0, 4), note: NOTE });
     // رد الموديل ما يتقبلش لو بيذكر قطع مش في النتيجة (مثلاً هودي/جينز/بوتس وإحنا عارضين بنطلون وكوتشي).
     const planKeys = new Set([...avail, ...stockAlternatives.map((x) => x.type), ...(plan.missing || []).map((m) => m.base), ...parsed.garments.map((x) => x.key), ...(plan.people || []).flatMap((p) => p.picks.flatMap((x) => String(x.slotKey || '').split('|')))].filter(Boolean));
-    const stray = b?.reply ? [...strayGarments(K, b.reply, planKeys), ...(plan.state === 'full' && avail.length && /(مش موجود|مش موجوده|مش متاح|مش متاحه|ملقتش|مفيش|مش لاقي|مش لاقيه|مش لاقية|مش عندنا|غير متاح|للأسف)/.test(b.reply) ? ['contradicts_found'] : []), ...(!avail.length && /(هتلاقي|هتلاقى|هتلاقو|ستجد|you'll find|you will find).{0,40}(تحت|below)/i.test(b.reply) ? ['claims_items_below'] : [])] : [];
+    // القطع المذكورة في جملة اقتراح تنسيق («يمشي معاه بنطلون أبيض») مش ادعاء إنها معروضة؛ بنفحص بس الجمل اللي بتقرر حقائق
+    // قطعة العميل نفسه («الكوتشي الأبيض بتاعك») مش ادعاء إنها معروضة
+    for (const o of parsed.ownedPieces || []) if (o?.key) planKeys.add(o.key);
+    const shownNames = [...found.map((f) => f.name), ...stockAlternatives.map((x) => x.name)].join(' . ');
+    const stray = b?.reply ? [...strayGarments(K, factualText(b.reply), planKeys, shownNames), ...(plan.state === 'full' && avail.length && /(مش موجود|مش موجوده|مش متاح|مش متاحه|ملقتش|مفيش|مش لاقي|مش لاقيه|مش لاقية|مش عندنا|غير متاح|للأسف)/.test(b.reply.replace(/(مفيش|مش عليه|مش عليها|مافيش|ما فيش)\s+(خصم|خصومات|عرض|عروض|تخفيض)[^.،!؟]*/g, '')) ? ['contradicts_found'] : []), ...(!avail.length && /(هتلاقي|هتلاقى|هتلاقو|ستجد|you'll find|you will find).{0,40}(تحت|below)/i.test(b.reply) ? ['claims_items_below'] : [])] : [];
     // ادعاءات الموديل اللي مش في البيانات: مقاس متاح، ألوان مش موجودة في القطع، أو مناسبة العميل ما قالهاش → نرفض الرد ونرجع لجملة القواعد
     if (b?.reply) {
       const nr = norm(b.reply);
@@ -1068,11 +1131,13 @@ async function runModaCore(messages, opts = {}) {
       const COLOR_W = ['اسود', 'سودا', 'ابيض', 'بيضا', 'كحلي', 'بيج', 'رمادي', 'ازرق', 'زرقا', 'احمر', 'حمرا', 'اخضر', 'خضرا', 'بني', 'نبيتي', 'زيتي', 'بينك', 'وردي', 'اصفر', 'برتقالي', 'موف', 'بنفسجي', 'دهبي', 'ذهبي', 'فضي', 'سماوي', 'لبني', 'كافيه', 'جملي', 'اوف وايت'];
       const stem = (w) => w.replace(/^(ال|وال|بال|و)/, '');
       // بس الألوان اللي بيقول إنها «متوفرة/موجودة/ألوان كتير زي…»؛ تعليق التنسيق («يمشي معاها أبيض») مسموح
-      const segs = (nr.match(/(متوفر|متوفره|موجود|موجوده|متاح|متاحه|الوان كتير|بالوان|في الوان|الوان زي|الوان تانيه|بلون|بالالوان|كل الالوان)[^.،!؟]{0,45}/g) || []).join(' ');
+      const segs = (norm(factualText(b.reply)).match(/(متوفر|متوفره|موجود|موجوده|متاح|متاحه|الوان كتير|بالوان|في الوان|الوان زي|الوان تانيه|بلون|بالالوان|كل الالوان)[^.،!؟]{0,45}/g) || []).join(' ');
       const said = COLOR_W.filter((w) => new RegExp(`(^| )(ال|وال|بال|و)?${w}( |$)`).test(` ${segs} `));
       const fam = { سودا: 'اسود', بيضا: 'ابيض', زرقا: 'ازرق', حمرا: 'احمر', خضرا: 'اخضر', ذهبي: 'دهبي' };
       const has = (w) => allowed.includes(w) || (fam[w] && allowed.includes(fam[w])) || Object.entries(fam).some(([a, b2]) => b2 === w && allowed.includes(a));
       if (said.some((w) => !has(stem(w)))) stray.push('claims_color');
+      // خصم / ميعاد توصيل / فروع / خامة أو مميزات مش مكتوبة عند المحل
+      for (const c of unsupportedClaims(b.reply, { picked: (plan.people || []).flatMap((p) => p.picks.map((x) => x.product)), parsed })) stray.push(c);
     }
     if (b?.reply && !stray.length) { res = { ...res, say: b.reply, brainReply: true }; brainUsed = true; const mentioned = stockAlternatives.find((x) => b.reply.includes(x.name) || b.reply.includes(String(K.items.get(x.type)?.ar || '\u0000').split(' ')[0])); if (mentioned) altOffer = { wanted: mentioned.wanted, type: mentioned.type }; }
     else if (b?.reply) res = { ...res, brainRejected: stray };
@@ -1168,6 +1233,10 @@ async function runModaCore(messages, opts = {}) {
     lastState: plan.state, lastTotal: needsClarificationFirst ? (session?.lastTotal ?? null) : (plan.total ?? null), lastBudgetUsed: needsClarificationFirst ? (session?.lastBudgetUsed ?? null) : (plan.budget ?? plan.total ?? null),
     activeLook,
     lookHistory,
+    // القطع اللي اتكلمنا عنها قبل كده (عشان «رجعني للفستان» يرجع بنفس اللون والخامة)
+    garmentHistory: (() => { const prevG = session?.parsed?.garments || []; const curKeys = (parsed.garments || []).map((g) => g.key).join(','); let h = [...(session?.garmentHistory || [])];
+      if (prevG.length && prevG.map((g) => g.key).join(',') !== curKeys) for (const g of prevG) { h = h.filter((x) => x?.key !== g.key); h.push({ ...g }); }
+      return h.slice(-6); })(),
   };
   const refineNote = refinementTurn && res?.say && ['full', 'alternatives', 'partial', 'over_budget'].includes(res.state) ? (lang === 'en' ? 'Noted that detail, but I cannot filter by it precisely yet; here are the closest options:' : 'خدت بالي من التفصيلة دي، بس لسه مش بقدر أفلتر بيها بالظبط؛ دي أقرب اختيارات للي طلبته:') : null;
   if (purchaseNote && res.blocks) res = { ...res, say: `${res.say} ${purchaseNote}`, serviceAction: 'purchase_help' }; // حقل إضافي اختياري (الواجهة القديمة بتتجاهله)

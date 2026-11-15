@@ -39,6 +39,7 @@
     { "key": "ramadan_iftar",    "ar": "فطار / سحور رمضان",        "formality": [3, 4] },
     { "key": "engagement_guest", "ar": "خطوبة (ضيف)",              "formality": [4, 5] },
     { "key": "engagement_self",  "ar": "خطوبتي أنا",               "formality": [4, 5] },
+    { "key": "evening",          "ar": "سهرة",                     "formality": [4, 5] },
     { "key": "katb_kitab",       "ar": "كتب كتاب",                 "formality": [4, 5] },
     { "key": "wedding_guest",    "ar": "فرح (ضيف)",                "formality": [4, 5] },
     { "key": "wedding_self",     "ar": "فرحي أنا (عروسة / عريس)",  "formality": [5, 5] },

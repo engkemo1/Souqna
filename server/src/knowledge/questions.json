@@ -16,7 +16,8 @@
     "color": "color_preference",
     "size": "size_needed",
     "taste": "taste_quick",
-    "dress_kind": "dress_kind"
+    "dress_kind": "dress_kind",
+    "product_type": "product_type"
   },
   "when_to_ask": {
     "who_is_it_for": "لو مفيش جنس/فئة واضحة من الرسالة ولا من البروفايل",
@@ -643,6 +644,37 @@
           "dress": "A dress",
           "set": "Two-piece / smart casual",
           "any": "Anything stylish"
+        }
+      }
+    },
+    "product_type": {
+      "text": "أكيد ❤️ تحبي فستان سهرة، ولا لانجيري، ولا حاجة كاجوال شيك؟",
+      "type": "single",
+      "options": [
+        {
+          "label": "فستان سهرة",
+          "value": "dress_evening"
+        },
+        {
+          "label": "لانجيري",
+          "value": "lingerie"
+        },
+        {
+          "label": "كاجوال شيك / طقم",
+          "value": "two_piece_set"
+        },
+        {
+          "label": "بلوزة / توب",
+          "value": "blouse"
+        }
+      ],
+      "en": {
+        "text": "Sure ❤️ Would you like an evening dress, lingerie, or something smart casual?",
+        "options": {
+          "dress_evening": "Evening dress",
+          "lingerie": "Lingerie",
+          "two_piece_set": "Smart casual / Set",
+          "blouse": "Blouse / Top"
         }
       }
     }

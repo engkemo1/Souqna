@@ -59,6 +59,7 @@
       ],
       "contexts": [
         "engagement_guest",
+        "evening",
         "katb_kitab",
         "wedding_guest",
         "graduation"
@@ -122,6 +123,7 @@
       ],
       "contexts": [
         "engagement_guest",
+        "evening",
         "katb_kitab",
         "wedding_guest",
         "date_night"
@@ -779,6 +781,7 @@
       ],
       "contexts": [
         "engagement_guest",
+        "evening",
         "katb_kitab",
         "wedding_guest",
         "graduation"
@@ -842,6 +845,7 @@
       ],
       "contexts": [
         "engagement_guest",
+        "evening",
         "katb_kitab",
         "date_night",
         "birthday_party",
@@ -899,6 +903,7 @@
       ],
       "contexts": [
         "engagement_guest",
+        "evening",
         "wedding_guest",
         "date_night"
       ],
@@ -1511,6 +1516,7 @@
       ],
       "contexts": [
         "engagement_guest",
+        "evening",
         "katb_kitab",
         "wedding_guest",
         "graduation"
@@ -1572,6 +1578,7 @@
       ],
       "contexts": [
         "engagement_guest",
+        "evening",
         "katb_kitab",
         "wedding_guest",
         "birthday_party"
@@ -1632,6 +1639,7 @@
       ],
       "contexts": [
         "engagement_guest",
+        "evening",
         "date_night",
         "family_gathering",
         "eid"

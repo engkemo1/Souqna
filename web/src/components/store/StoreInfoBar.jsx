@@ -26,7 +26,7 @@ export default function StoreInfoBar() {
   const { tr, lang } = useI18n();
   const ar = lang === 'ar';
   const [week, setWeek] = useState(false);
-  const [more, setMore] = useState(false);
+  const [more, setMore] = useState(true);
   const hours = store.hours;
   const st = statusInfo(hours);
   const tel = telHref(store.phone);
@@ -97,10 +97,15 @@ export default function StoreInfoBar() {
                 })}
                 {branches.map((b, i) => {
                   const bm = mapHref({ mapUrl: b.map_url }, b.address);
+                  const bw = waNumber(b.phone);
                   return (
                     <div key={`b${i}`} className="flex items-center justify-between gap-3">
-                      <span className="min-w-0 text-[14px]"><span className="block font-semibold">{b.name}</span>{b.address && <span className="block truncate text-[12px] text-muted" dir="auto">{b.address}</span>}</span>
-                      {bm && <a href={bm} target="_blank" rel="noreferrer" aria-label={ar ? 'الموقع' : 'Directions'} className={`${round} shrink-0 bg-fg/[0.07] text-fg hover:bg-fg/[0.12]`}><Navigation className="h-5 w-5" /></a>}
+                      <span className="min-w-0 text-[14px]"><span className="block font-semibold">{b.name}</span>{b.address && <span className="block truncate text-[12px] text-muted" dir="auto">{b.address}</span>}{b.phone && <span dir="ltr" className="block text-[12px] text-muted">{b.phone}</span>}</span>
+                      <span className="flex shrink-0 items-center gap-2">
+                        {bw && <a href={`https://wa.me/${bw}`} target="_blank" rel="noreferrer" aria-label={ar ? 'واتساب' : 'WhatsApp'} className={`${round} bg-[#25D366] text-white`}><WhatsAppIcon className="h-5 w-5" /></a>}
+                        {telHref(b.phone) && <a href={telHref(b.phone)} aria-label={ar ? 'اتصال' : 'Call'} className={`${round} bg-fg/[0.07] text-fg hover:bg-fg/[0.12]`}><Phone className="h-5 w-5" /></a>}
+                        {bm && <a href={bm} target="_blank" rel="noreferrer" aria-label={ar ? 'الموقع' : 'Directions'} className={`${round} shrink-0 bg-fg/[0.07] text-fg hover:bg-fg/[0.12]`}><Navigation className="h-5 w-5" /></a>}
+                      </span>
                     </div>
                   );
                 })}
