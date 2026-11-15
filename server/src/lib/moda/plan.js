@@ -2,6 +2,7 @@
  * مخطط تويلا: من الرسالة المفهومة (parse) + المنتجات المثرّاة + الوقت والجو → خطة لبس.
  * الكود هو اللي يقرر القطع من المخزون. مفيش موديل هنا.
  */
+import { sizeMatch } from './sizes.js';
 import { loadKnowledge } from './knowledge.js';
 
 const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
@@ -367,7 +368,11 @@ export function planOutfit(parsed, products, env = {}) {
   const asks = [];
   // مقاس العميل (لو معروف) بيفلتر المنتجات اللي ليها مقاسات متاحة؛ المنتج من غير بيانات مقاسات بيفضل.
   const wantSize = parsed.flags?.size ? String(parsed.flags.size).toUpperCase() : null;
-  if (wantSize) products = products.filter((p) => !p.size_list || String(p.size_list).toUpperCase().split(',').includes(wantSize));
+  // المطابقة بتفهم «M-XXL»، «38-44»، «لارج»، «فري سايز»، أرقام هندي، وخانة المقاسات أو sizes_json أو الوصف. بنخبي بس المنتج اللي مقاساته معروفة ومفيهاش المقاس.
+  if (wantSize) products = products.filter((p) => sizeMatch(p, wantSize) !== false);
+  // سن الطفل («لابني 8 سنين»): بنخبي منتجات الأطفال اللي مقاساتها بالعمر ومش شاملة السن ده
+  const kidAge = (parsed.ages || []).length === 1 && (parsed.persons || []).some((x) => x === 'boys' || x === 'girls' || x === 'kids') ? Number(parsed.ages[0]) : null;
+  if (kidAge != null && kidAge > 0 && kidAge <= 16) products = products.filter((p) => sizeMatch(p, { age: kidAge }) !== false);
   const base = { parsed, weather: adv, eventTime: env.eventTime || null };
 
   // ---- أسئلة لازم تتسأل قبل أي ترشيح ----

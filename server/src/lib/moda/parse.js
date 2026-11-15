@@ -315,6 +315,21 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     if (/(^| )(ل|ل ال)?(عيالي|اولادي|ولادي|اطفالي|عيلي|ولادى|عيال|اطفالى)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls') && !/(^| )(ترنج|لبس|فستان|بدله|طقم|تيشيرت|هودي|جاكيت|بنطلون|جزمه|كوتشي) ولادي( |$)/.test(nn2)) { result.kidsUnspecified = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
     if (/(^| )(ل)?(رضيع|رضع|بيبي|بيبيه|مواليد|مولود|مولوده|حديث الولاده|طفلي|طفلتي|طفلى|baby|newborn|infant|toddler)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls')) { result.kidsUnspecified = true; result.flags.baby = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
   }
+  /* ---------- «عند أهل جوزي / بيت حماتي / شغل مراتي»: الشريك هنا مكان أو صلة، مش حد هنلبّسه ---------- */
+  {
+    const nn4 = ` ${n} `;
+    const PART4 = '(?:جوزي|جوزى|زوجي|مراتي|مراتى|زوجتي|خطيبي|خطيبتي)';
+    const OWNER = '(?:اهل|عيله|عيلة|ام|ابو|اخت|اخو|بيت|شغل|صحاب|اصحاب|قرايب|عزومه|عزومة|فرح اخت|فرح اخو)';
+    const all = nn4.match(new RegExp(`(?:^| )\\S*${PART4}(?= )`, 'g')) || [];
+    const owned = nn4.match(new RegExp(`(?:^| )(?:عند |في |مع )?${OWNER} ${PART4}(?= )`, 'g')) || [];
+    const asPerson = new RegExp(`(?:^| )(?:ل|و|ول|مع |انا و)${PART4}(?= )|(?:^| )(?:ل|و)(?:${OWNER}) ${PART4}(?= )`).test(nn4.replace(new RegExp(`(?:^| )(?:عند|في|مع) ${OWNER} ${PART4}(?= )`, 'g'), ' '));
+    if (all.length && owned.length >= all.length && !asPerson) {
+      const partnerAud = /(جوزي|جوزى|زوجي|خطيبي)/.test(owned.join(' ')) ? 'men' : 'women';
+      const spk = result.genderHint === 'female' ? 'women' : result.genderHint === 'male' ? 'men' : null;
+      if (spk && spk !== partnerAud) { personSet.delete(partnerAud); if (!personSet.size) personSet.add(spk); }
+      result.flags.partnerAsPlace = true;
+    }
+  }
   /* ---------- حبيبتي / البت بتاعتي / الاكس بتاعي ---------- */
   {
     const nn3 = ` ${n} `;

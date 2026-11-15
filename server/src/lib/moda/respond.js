@@ -35,6 +35,13 @@ function fitRoleQ(q, plan, L) {
   return { ...q, text, options: q.options.map((o) => ({ ...o, label: o.value === 'guest' ? (fem ? 'ضيفة' : 'ضيف') : `${ev[0]} ${ev[2]}` })) };
 }
 
+// الطلب لست تانية («لمراتي / لأختي / لماما / لأخت جوزي») مش للمتكلمة → «هي محجبة؟» بدل «هتلبسي حجاب؟»
+function forAnotherWoman(plan) {
+  const n = ` ${plan?.parsed?.normalized || ''} `;
+  if (/(^| )(انا|ليا|لي|لنفسي|احنا|لينا)( |$)/.test(n)) return false;
+  return /(^| )(لمراتي|لزوجتي|لخطيبتي|لحبيبتي|لاختي|لامي|لماما|لوالدتي|لصاحبتي|لحماتي|لعمتي|لخالتي|لجدتي|لبنت (اختي|اخويا|عمي|خالي)|لاخت \S+|لام \S+|لمرات \S+)( |$)/.test(n);
+}
+
 function tabLabel(aud, persons, P) {
   const hasMan = persons.includes('men'); const hasWoman = persons.includes('women') || persons.includes('women_hijab');
   if (aud === 'men') return P.tab_him; if (aud === 'women' || aud === 'women_hijab') return hasMan ? P.tab_her : P.tab_all;
@@ -100,11 +107,11 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
     const asks = plan.ask || [];
     const first = asks[0];
     const couple = plan.persons?.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
-    const herText = first === 'modest_preference' && (plan.persons?.includes('men') || plan.soloFromCouple === 'women') ? 'هي محجبة ولا لأ؟' : null;
+    const herText = first === 'modest_preference' && (plan.persons?.includes('men') || plan.soloFromCouple === 'women') && plan.parsed?.genderHint !== 'female' || (first === 'modest_preference' && forAnotherWoman(plan)) ? 'هي محجبة ولا لأ؟' : null; // الست اللي بتتكلم عن نفسها وجوزها: نسألها هي
     const text = herText ? herText : first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'budget' ? say(couple ? 'clarify_budget_couple' : 'clarify_budget') : first === 'time_if_dressy' ? say('clarify_time') : first === 'venue_if_dressy' ? say('clarify_venue') : first === 'color_preference' ? say('clarify_color') : first === 'dress_kind' ? say('dress_clarify') : (buildQuestion(K, first, L)?.text || say('clarify_generic'));
     const questions = asks.slice(0, K.questions.limits.max_questions_per_turn).map((a) => {
       const q = fitRoleQ(buildQuestion(K, a, L), plan, L);
-      if (a === 'modest_preference' && q && (plan.persons?.includes('men') || plan.soloFromCouple === 'women')) return { ...q, text: 'هي محجبة ولا لأ؟' };
+      if (a === 'modest_preference' && q && (plan.persons?.includes('men') || plan.soloFromCouple === 'women') && plan.parsed?.genderHint !== 'female' || (a === 'modest_preference' && q && forAnotherWoman(plan))) return { ...q, text: 'هي محجبة ولا لأ؟' };
       return a === 'budget' && couple && q ? { ...q, text: say('clarify_budget_couple') } : q;
     }).filter(Boolean);
     return { state: 'clarify', intent: 'shop', say: first === 'engagement_role' && questions[0]?.id === 'engagement_role' ? questions[0].text : text, questions, blocks: null, ask: asks };

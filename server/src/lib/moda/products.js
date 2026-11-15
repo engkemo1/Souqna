@@ -2,6 +2,7 @@
  * تحليل المنتجات: من اسم المنتج ووصفه وتصنيفه نطلع: نوع القطعة، درجة الرسمية، الفئة (رجال/ست/أطفال)،
  * الألوان، الخامة، والمخزون. كله بقواعد من ملفات المعرفة، بدون موديل.
  */
+import { sizeAudience } from './sizes.js';
 import { norm, tokenize, tokenVariants } from './text.js';
 import { loadKnowledge } from './knowledge.js';
 import { matchTokens } from './parse.js';
@@ -90,12 +91,12 @@ export function inferFormality(key, name, desc, K = loadKnowledge()) {
   return Math.max(lo, Math.min(hi, f));
 }
 
-const KIDS_GIRL = ['بنات', 'بنوته', 'بناتي', 'girls', 'girl'];
+const KIDS_GIRL = ['بنات', 'بنوته', 'بناتي', 'بناتى', 'girls', 'girl'];
 const KIDS_BOY = ['ولادي', 'ولادى', 'اولادي', 'اولادى', 'اولاد', 'ولد', 'boys', 'boy'];
-const KIDS_BOTH = ['اطفال', 'كيدز', 'kids', 'children'];
+const KIDS_BOTH = ['اطفال', 'اطفالي', 'اطفالى', 'للاطفال', 'صغار', 'للصغار', 'رضع', 'رضيع', 'مواليد', 'حديثي الولاده', 'كيدز', 'kids', 'kid', 'children', 'child', 'toddler', 'junior', 'juniors'];
 const KIDS_STORE = ['بيبي', 'baby', 'babies', 'kid', 'كيد', 'طفل', 'اطفالي'];
-const MEN_WORDS = ['رجالي', 'للرجال', 'men', 'mens', 'man'];
-const WOMEN_WORDS = ['حريمي', 'نسائي', 'للنساء', 'women', 'womens', 'woman', 'ladies'];
+const MEN_WORDS = ['رجالي', 'رجاليه', 'للرجال', 'رجال', 'شبابي', 'men', 'mens', 'man', 'male'];
+const WOMEN_WORDS = ['حريمي', 'نسائي', 'للنساء', 'ستاتي', 'سيدات', 'للسيدات', 'هوانم', 'محجبات', 'للمحجبات', 'women', 'womens', 'woman', 'ladies', 'female'];
 const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
 const MEN_KEYS = new Set(['suit', 'tuxedo', 'tie', 'bow_tie', 'pocket_square', 'waistcoat', 'classic_set']);
 
@@ -111,7 +112,7 @@ const deptVotes = (slug) => {
   if (/(^|_)(men|wedding_suit)(_|$)/.test(d)) return 'men';
   return null;
 };
-export function genderEvidence(row, K = loadKnowledge()) {
+export function genderEvidence(row, K = loadKnowledge(), key = '') {
   const v = { men: 0, women: 0, kids: 0, boys: 0, girls: 0, strongKids: false };
   const vote = (g, w, strong = false) => {
     if (!g || g === 'unisex') return;
@@ -121,17 +122,30 @@ export function genderEvidence(row, K = loadKnowledge()) {
   const fromText = (text) => (hasAny(K, text, KIDS_GIRL) ? 'girls' : hasAny(K, text, KIDS_BOY) ? 'boys' : hasAny(K, text, KIDS_BOTH) ? 'kids'
     : hasAny(K, text, MEN_WORDS) && !hasAny(K, text, WOMEN_WORDS) ? 'men' : hasAny(K, text, WOMEN_WORDS) && !hasAny(K, text, MEN_WORDS) ? 'women' : null);
   vote(fromText(`${row.name_ar || ''} ${row.name_en || ''}`), 4, true);
-  vote(deptVotes(row.department), 3, true);
+  // القسم: القسم نفسه، ولو مش واضح منه، القسم الأب/الجد («بدل» تحت «رجالي»، «ولادي» تحت «أطفال»). السيرفر بيبعت dept_parent/dept_grand/dept_name لو متاحين.
+  vote(deptVotes(row.department) || deptVotes(row.dept_parent) || deptVotes(row.dept_grand), 3, true);
+  if (!deptVotes(row.department) && row.dept_name) vote(fromText(row.dept_name), 2, true);
+  // الفئة العمرية المختارة من خصائص المنتج (attrs_json.age): أطفال أكيد
+  { let at = row.attrs_json; if (typeof at === 'string') { try { at = JSON.parse(at); } catch { at = null; } }
+    if (at && ['newborn', 'baby', 'toddler', 'kid', 'kids', 'teen', 'child'].includes(String(at.age || '').toLowerCase())) vote('kids', 4, true); }
   vote(fromText(row.cat_text || ''), 2, true);
   if (['men', 'women', 'boys', 'girls', 'kids'].includes(row.audience)) vote(row.audience, 2);
   const descText = `${row.description_ar || ''} ${row.description_en || ''}`.slice(0, 600);
-  if (!hasAny(K, descText, ['كبار', 'الكبار', 'للكبار', 'adults', 'adult'])) vote(fromText(descText), 1); // «للكبار والصغار» مش دليل
+  if (!hasAny(K, descText, ['كبار', 'الكبار', 'للكبار', 'adults', 'adult'])) { // «للكبار والصغار» مش دليل
+    const dt = fromText(descText);
+    // كلمة أطفال صريحة في الوصف («اطفالي / بناتي / ولادي») دليل قوي: المحلات مبتكتبهاش على لبس كبار، حتى لو القسم مختار غلط
+    vote(dt, dt === 'kids' || dt === 'boys' || dt === 'girls' ? 3 : 1, dt === 'kids' || dt === 'boys' || dt === 'girls');
+  }
+  // أعمار أطفال في الاسم أو الوصف («من 2 ل 8 سنين»، «سن 6 سنوات»، «3-4Y») = قطعة أطفال
+  const ageText = norm(`${row.name_ar || ''} ${row.name_en || ''} ${descText}`);
+  if (/(^| )([1-9]|1[0-4]) ?(-|ل|لـ|الي|الى|to) ?([1-9]|1[0-6]) ?(سنه|سنين|سنوات|years|yrs|y)( |$)|(^| )(سن|عمر) ([1-9]|1[0-4]) (سنه|سنين|سنوات)( |$)|(^| )([1-9]|1[0-4]) ?(-|ل|to) ?([1-9]|1[0-6]) ?y( |$)/.test(ageText)) vote('kids', 3, true);
+  if (sizeAudience(row, key) === 'kids') vote('kids', 3, true); // مقاسات بالعمر («4Y، 0-3M، 6-7 سنين») أو جزم 20–34 = أطفال (من خانة المقاسات أو sizes_json أو الوصف)
   const storeText = `${row.store_name_ar || ''} ${row.store_name_en || ''}`;
   if (hasAny(K, storeText, KIDS_BOTH) || hasAny(K, storeText, KIDS_STORE)) vote('kids', 2);
   return v;
 }
 export function inferGender(row, key, K = loadKnowledge()) {
-  const v = genderEvidence(row, K);
+  const v = genderEvidence(row, K, key);
   const adult = Math.max(v.men, v.women);
   if (v.kids > 0 && v.kids >= adult) return v.girls > v.boys ? 'girls' : v.boys > v.girls ? 'boys' : 'kids';
   if (v.men > v.women) return 'men';

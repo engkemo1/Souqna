@@ -164,4 +164,83 @@ const G = (r) => (r.parsed?.garments || [])[0] || {};
 { const r = await conv(['أنا قصيرة، الفستان الطويل يليق عليا؟']); ok('R7d «الطويل» describes the dress: no tall-height tip', r.intent === 'advice' && !/للطول الفارع/.test(r.say || ''), (r.say || '').slice(0, 50)); }
 { const r = await conv(['عايزة قميص لجوزي']); ok('R7d «لجوزي» → female speaker, recipient men', r.parsed?.genderHint === 'female' && (r.parsed?.persons || []).includes('men'), JSON.stringify([r.parsed?.genderHint, r.parsed?.persons])); }
 { const r = await conv(['عايز هدية لمراتي']); ok('R7d «لمراتي» → male speaker', r.parsed?.genderHint === 'male', r.parsed?.genderHint); }
+// Round 8 — in-laws, gifts, hijab question addressee, interview outfit, women's formal shoes, service questions
+{ const r = await conv(['عزومة عند أهل جوزي، ألبس إيه؟']); ok('R8 «عند أهل جوزي»: husband is not a second person', JSON.stringify(r.parsed?.persons) === '["women"]', JSON.stringify(r.parsed?.persons)); }
+{ const r = await conv(['أنا وجوزي رايحين فرح']); ok('R8 control: «أنا وجوزي» = both', (r.parsed?.persons || []).length === 2, JSON.stringify(r.parsed?.persons)); }
+{ const r = await conv(['أنا وجوزي رايحين فرح']); ok('R8 woman speaking about herself + husband → «هتلبسي حجاب»', !/هي محجبة/.test(r.say || ''), (r.say || '').slice(0, 40)); }
+{ const r = await conv(['عايز فستان لمراتي لفرح']); ok('R8 dress for the wife → «هي محجبة؟», not «هتلبسي»', /هي محجبة/.test(r.say || ''), (r.say || '').slice(0, 40)); }
+{ const r = await conv(['عايزة فستان لفرح']); ok('R8 control: woman for herself → «هتلبسي حجاب»', /هتلبسي/.test(r.say || ''), (r.say || '').slice(0, 40)); }
+{ const r = await conv(['عايز هدية لأختي']); ok('R8 «هدية لأختي» → gift for a woman (not «مش فاهمة «هديه»»)', r.intent === 'shop' && JSON.stringify(r.parsed?.persons) === '["women"]', `${r.intent} ${JSON.stringify(r.parsed?.persons)}`); }
+{ const r = await conv(['عايزة هدية لأبو جوزي']); ok('R8 «لأبو جوزي» → gift for a man', JSON.stringify(r.parsed?.persons) === '["men"]', JSON.stringify(r.parsed?.persons)); }
+{ const r = await conv(['عايز هدية']); ok('R8 control: gift without recipient asks who', /لمين/.test(r.say || ''), (r.say || '').slice(0, 30)); }
+{ const r = await conv(['رايح مقابلة شغل الأسبوع الجاي، ألبس إيه؟']); ok('R8 interview → outfit flow with the interview tip', r.intent === 'shop', r.intent); }
+{ const r = await conv(['مقابلة شغل يعني ايه؟']); ok('R8 control: not an outfit request', r.intent !== 'shop', r.intent); }
+{ const r = await conv(['عايزة حذاء رسمي']); ok('R8 women formal shoes get women alternatives', (r.parsed?.garments || []).some((g) => (g.alts || []).includes('heels_low')), JSON.stringify(r.parsed?.garments)); }
+{ const r = await conv(['عايز حذاء رسمي']); ok('R8 control: men formal shoes unchanged', !(r.parsed?.garments || []).some((g) => (g.alts || []).includes('heels_low')), JSON.stringify(r.parsed?.garments)); }
+{ const r = await conv(['الجاكيت ده ضد المية؟']); ok('R8 product detail question → honest details answer', r.faq === 'product_details' && /المحل/.test(r.say || ''), `${r.intent}/${r.faq}`); }
+{ const r = await conv(['عايز جاكيت ضد المية']); ok('R8 control: a request with the same words stays shopping', r.intent === 'shop', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['إيه الفرق بين الكتان والقطن؟']); ok('R8 comparison → general difference', r.faq === 'compare_general' && /الكتان/.test(r.say || ''), `${r.intent}/${r.faq}`); }
+{ const r = await conv(['عايز قميص أبيض', 'ضيفه للسلة']); ok('R8 «ضيفه للسلة» after a product → honest how-to, names the item', r.faq === 'purchase_help' && /ضيف للسلة/.test(r.say || ''), (r.say || '').slice(0, 60)); }
+{ const r = await conv(['ازاي اطلب؟']); ok('R8 control: «ازاي اطلب» keeps the how-to-order FAQ', r.faq === 'how_order', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['عايز قميص أبيض', 'هاخد الاتنين']); ok('R8 control: «هاخد» is not a purchase request', r.faq !== 'purchase_help', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['الجيبة اللي جبتها منكم حلوة أوي']); ok('R8 praise after purchase → thanks', r.faq === 'feedback_praise', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['القميص اتقطع من أول لبسة']); ok('R8 product defect → complaint guidance', r.faq === 'complaint_product', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['عندي ملاحظة على الموقع']); ok('R8 platform feedback → contact', r.faq === 'contact_all', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['عندي فكره لطقم']); ok('R8 control: «فكره لطقم» is not a platform suggestion', r.faq !== 'contact_all', `${r.intent}/${r.faq}`); }
+// Round 8b — service questions in more phrasings (found on the dataset, new sentences here)
+{ const r = await conv(['البنطلون ده بيتكرمش بسرعة؟']); ok('R8b wrinkle question → details', r.faq === 'product_details', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['الصندل ده بيعور الرجل؟']); ok('R8b comfort question → details', r.faq === 'product_details', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['الجيبة دي طولها كام سم؟']); ok('R8b length in cm → details', r.faq === 'product_details', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['المقاسات عندكم صغيرة ولا مظبوطة؟']); ok('R8b general sizing question → sizing answer', r.faq === 'product_details' && /جدول المقاسات/.test(r.say || ''), `${r.intent}/${r.faq}`); }
+{ const r = await conv(['اللون ده مش عاجبني خالص']); ok('R8b reaction with nothing shown → asks what to change', r.faq === 'feedback_reaction', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['تمام ابعتهولي على عنواني']); ok('R8b «ابعتهولي على عنواني» → how to order, no address in chat', r.faq === 'purchase_help' && /متكتبش عنوانك/.test(r.say || ''), `${r.intent}/${r.faq}`); }
+{ const r = await conv(['ينفع اشتري الجاكيت لوحده؟']); ok('R8b buy one piece alone → yes, add it alone', r.faq === 'purchase_help', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['عايز طقم خروجة لراجل', 'قارنيلي بين الاتنين']); ok('R8b compare shown items', r.faq === 'compare_general', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['عايز كوتشي مريح في المشي']); ok('R8b control: «مريح في المشي» request stays shopping', r.intent === 'shop', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['عايزة فستان طوله ميدي']); ok('R8b control: «طوله ميدي» stays shopping', r.intent === 'shop', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['الجزمة اللي وصلتني مقاسها غلط، عايز أرجعها']); ok('R8b control: return request keeps the returns path', r.faq !== 'complaint_product', `${r.intent}/${r.faq}`); }
+// Round 9 — user report: «بدله» for an adult showed a kids' suit, and «كبيرة» showed it again; LLM reply claimed sizes/colours/occasion
+{ const P9 = [{ id: 91, name_ar: 'بدله بوكس فيت', price: 1100, stock: 5, cat_text: '', description_ar: 'بدله بوكس فيت اطفالي بيج', sold_count: 5, colors_json: [{ name: 'بيج' }] }, { id: 92, name_ar: 'بدلة رجالي كلاسيك كحلي', price: 3500, stock: 5, cat_text: '', description_ar: 'بدلة قطعتين', sold_count: 3, colors_json: [{ name: 'كحلي' }] }, { id: 93, name_ar: 'بدلة بوكس فيت', price: 1200, stock: 5, cat_text: '', description_ar: 'بدلة بوكس فيت', size_list: '4Y,6Y,8Y', sold_count: 3, colors_json: [{ name: 'بيج' }] }, { id: 94, name_ar: 'بدلة سواريه', price: 900, stock: 5, cat_text: '', description_ar: 'من 2 ل 8 سنين', sold_count: 3, colors_json: [{ name: 'أسود' }] }];
+  const run9 = async (turns, extra = {}) => { let s9 = null; let r9; for (const t of turns) { r9 = await runModa([{ role: 'user', content: t }], { products: P9, now: new Date('2026-11-14T12:00:00Z'), session: s9, ...extra }); s9 = r9.session; } return r9; };
+  const names = (r) => (JSON.stringify(r.blocks || null).match(/"name":"[^"]+"/g) || []).join(' ');
+  { const r = await run9(['عايز بدلة']); ok('R9 adult suit never shows kids suits (description «اطفالي», size list «4Y», ages «2 ل 8 سنين»)', /رجالي كلاسيك/.test(names(r)) && !/بوكس فيت|سواريه/.test(names(r)), names(r)); }
+  { const r = await run9(['عايز بدلة لابني']); ok('R9 control: suit for my son shows a kids suit', /بوكس فيت|سواريه/.test(names(r)) && !/رجالي كلاسيك/.test(names(r)), names(r)); }
+  { const r = await run9(['عايز بدلة لابني', 'لا عايز بدلة كبيرة']); ok('R9 «كبيرة» after a kids result → adult suit, kids items excluded', /رجالي كلاسيك/.test(names(r)) && !/بوكس فيت|سواريه/.test(names(r)), names(r)); }
+  { const r = await run9(['عايز بدلة'], { brain: async () => ({ reply: 'لاقيتلك بدلة رجالي كلاسيك كحلي، متوفرة بمقاس XL وألوان كتير زي البيج والأسود. اختيار أنيق للفرح.' }) }); ok('R9 LLM reply with invented size/colours/occasion is rejected', !r.brainReply && (r.brainRejected || []).includes('claims_size') && (r.brainRejected || []).includes('claims_color') && (r.brainRejected || []).includes('claims_occasion'), JSON.stringify(r.brainRejected)); }
+  { const r = await run9(['عايز بدلة'], { brain: async () => ({ reply: 'لقيتلك بدلة رجالي كلاسيك كحلي، شكلها شيك ولونها كحلي هادي.' }) }); ok('R9 control: a truthful LLM reply is kept', r.brainReply === true, JSON.stringify(r.brainRejected)); }
+}
+{ const r = await conv(['الكتان ولا القطن أبرد للصيف؟']); ok('R9 «X ولا Y + أبرد؟» → comparison', r.faq === 'compare_general', `${r.intent}/${r.faq}`); }
+{ const r = await conv(['عايز قميص أبيض ولا أسود']); ok('R9 control: request with «ولا» stays shopping', r.intent === 'shop', `${r.intent}/${r.faq}`); }
+// Round 10 — sizes and audience from every field the store fills (name, description, sizes, department, age attribute)
+{ const S = await import(pathToFileURL(path.join(dir, 'src/lib/moda/sizes.js')).href); const Pm = await import(pathToFileURL(path.join(dir, 'src/lib/moda/products.js')).href);
+  const m = (list, w) => S.sizeMatch({ size_list: list }, w);
+  ok('R10 «M-XXL» includes XL', m('M-XXL', 'XL') === true, m('M-XXL', 'XL'));
+  ok('R10 «38-44» includes 41 (shoes)', m('38-44', '41') === true, m('38-44', '41'));
+  ok('R10 «لارج، اكس لارج» includes L', m('لارج، اكس لارج', 'L') === true, m('لارج، اكس لارج', 'L'));
+  ok('R10 Arabic-Indic «٤٠،٤٢» includes 42', m('٤٠،٤٢', '42') === true, '');
+  ok('R10 «2XL» = XXL', m('2XL,3XL', 'XXL') === true, '');
+  ok('R10 S-L excludes XXL', m('S-L', 'XXL') === false, '');
+  ok('R10 no size data → keep (null)', m('', 'L') === null, '');
+  ok('R10 sizes from description', S.sizeMatch({ description_ar: 'متوفر مقاسات من M ل XXL' }, 'L') === true, '');
+  ok('R10 price in description is not a size', S.productSizes({ description_ar: 'السعر 350 جنيه' }).any === false, '');
+  ok('R10 kids age size 6Y fits a 7-year-old', S.sizeMatch({ size_list: '4Y,6Y,8Y' }, { age: 7 }) === true, '');
+  const g = (r, k = 'suit') => Pm.inferGender(r, k);
+  ok('R10 «اطفالي» in description beats a wrong men department', g({ name_ar: 'بدلة', department: 'men_suits', description_ar: 'بدلة اطفالي' }) === 'kids', g({ name_ar: 'بدلة', department: 'men_suits', description_ar: 'بدلة اطفالي' }));
+  ok('R10 kids sizes (sizes_json 2Y/4Y) → kids', g({ name_ar: 'بلوزة', sizes_json: '["2Y","4Y"]' }, 'blouse') === 'kids', '');
+  ok('R10 kids shoe sizes 26–32 → kids', g({ name_ar: 'كوتشي', size_list: '26,28,30,32' }, 'sneakers') === 'kids', '');
+  ok('R10 adult shoe sizes 40–42 are not kids', g({ name_ar: 'كوتشي', size_list: '40,41,42' }, 'sneakers') !== 'kids', '');
+  ok('R10 parent department «kids_boys» → boys', g({ name_ar: 'بدلة', department: 'boxfit', dept_parent: 'kids_boys' }) === 'boys', '');
+  ok('R10 department name «ملابس أولادي» → boys', g({ name_ar: 'جلابية', dept_name: 'ملابس أولادي' }, 'jalabiya') === 'boys', '');
+  ok('R10 age attribute → kids', g({ name_ar: 'بلوزة', attrs_json: '{"age":"kid"}' }, 'blouse') === 'kids', '');
+  ok('R10 control: «بيبي بلو» colour is not kids', g({ name_ar: 'قميص بيبي بلو' }, 'shirt') !== 'kids', '');
+  ok('R10 control: «للكبار والصغار» is not kids', g({ name_ar: 'تيشيرت', description_ar: 'مناسب للكبار والصغار' }, 'tshirt') !== 'kids', ''); }
+{ const PS = [{ id: 81, name_ar: 'هودي قطن أسود', price: 600, stock: 5, cat_text: '', description_ar: '', size_list: 'M,L,XL', sold_count: 5, colors_json: [{ name: 'أسود' }] }, { id: 82, name_ar: 'تيشيرت ولادي', price: 250, stock: 5, cat_text: '', description_ar: '', size_list: '4Y,6Y', sold_count: 5, colors_json: [{ name: 'أبيض' }] }, { id: 83, name_ar: 'تيشيرت ولادي كبير', price: 260, stock: 5, cat_text: '', description_ar: '', size_list: '12Y,14Y', sold_count: 5, colors_json: [{ name: 'أبيض' }] }];
+  const runS = async (turns) => { let ss = null; let rr; for (const t of turns) { rr = await runModa([{ role: 'user', content: t }], { products: PS, now: new Date('2026-11-14T12:00:00Z'), session: ss }); ss = rr.session; } return rr; };
+  const nm = (r) => (JSON.stringify(r.blocks || null).match(/"name":"[^"]+"/g) || []).join(' ');
+  { const r = await runS(['عايز هودي مقاس XXXL']); ok('R10 «XXXL» is read as XXXL (not XL) and the reply lists available sizes', String(r.parsed?.flags?.size) === 'XXXL' && /المقاسات المتاحة: M، L، XL/.test(r.say || ''), `${r.parsed?.flags?.size} ${(r.say || '').slice(0, 60)}`); }
+  { const r = await runS(['عايز هودي اسود', 'فيه منه XXL؟']); ok('R10 «فيه منه XXL؟» → no, lists what exists', /مش متاح مقاس XXL/.test(r.say || '') && /M، L، XL/.test(r.say || ''), (r.say || '').slice(0, 60)); }
+  { const r = await runS(['عايز هودي اسود', 'فيه منه L؟']); ok('R10 «فيه منه L؟» → yes', /متاح مقاس L/.test(r.say || ''), (r.say || '').slice(0, 60)); }
+  { const r = await runS(['عايز هودي اسود', 'مقاساته ايه؟']); ok('R10 «مقاساته ايه؟» → the sizes', /M، L، XL/.test(r.say || ''), (r.say || '').slice(0, 60)); }
+  { const r = await runS(['عايز تيشيرت لابني 5 سنين']); ok('R10 child age 5 → age-5 sizes only', /تيشيرت ولادي"/.test(nm(r)) && !/كبير/.test(nm(r)), nm(r)); }
+  { const r = await runS(['عايز تيشيرت لابني 13 سنة']); ok('R10 child age 13 → age-13 sizes only', /كبير/.test(nm(r)), nm(r)); } }
 console.log(`${pass} PASS / ${fail} FAIL`); process.exit(fail ? 1 : 0);
