@@ -98,8 +98,8 @@ const HINTS = [
   [['men_jalabiya', 'men'], ['جلابيه', 'جلاليب', 'galabiya', 'jalabiya', 'kaftan']],
   [['women_underwear', 'men_underwear'], ['ملابس داخليه', 'بوكسر', 'سوتيان', 'lingerie', 'underwear', 'boxer', 'bra ']],
   [['kids_girls', 'kids_boys', 'kids_baby', 'kids'], ['اطفال', 'طفل', 'ولادي', 'بناتي', 'كيدز', 'kids', 'toddler', 'baby', 'boys', 'girls']],
-  [['women_sports', 'men_sports'], ['رياضي', 'تراك', 'جيم', 'sport', 'training', 'gym', 'jersey', 'activewear']],
-  [['women_pants', 'men_pants'], ['جينز', 'denim', 'jeans', 'بنطلون', 'بنطال', 'pants']],
+  [['women_sports', 'men_sports', 'sports'], ['رياضي', 'تراك', 'جيم', 'sport', 'training', 'gym', 'jersey', 'activewear']],
+  [['women_pants', 'men_pants', 'denim'], ['جينز', 'denim', 'jeans', 'بنطلون', 'بنطال', 'pants']],
   [['women_dresses', 'women_tops', 'women_skirts', 'women'], ['حريمي', 'نسائي', 'فستان', 'بلوزه', 'تنوره', 'جيبه', 'women', 'ladies', 'dress', 'blouse', 'skirt']],
   [['men_tops', 'men'], ['رجالي', 'شبابي', 'men', 'mens', "men's", 'gents']],
 ];

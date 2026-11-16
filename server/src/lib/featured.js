@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS featured_hourly (
   PRIMARY KEY (day, hour, campaign_id, event)
 ) WITHOUT ROWID;
 `);
-for (const [col, ddl] of [['text_align', "TEXT NOT NULL DEFAULT 'start'"], ['overlay', 'INTEGER NOT NULL DEFAULT 65'], ['image_zoom', 'INTEGER NOT NULL DEFAULT 100'], ['image_x', 'INTEGER NOT NULL DEFAULT 50'], ['image_y', 'INTEGER NOT NULL DEFAULT 50'], ['fg_image', "TEXT NOT NULL DEFAULT ''"], ['fg_size', 'INTEGER NOT NULL DEFAULT 40'], ['fg_pos', "TEXT NOT NULL DEFAULT 'end'"], ['layout_width', "TEXT NOT NULL DEFAULT 'wide'"], ['layout_height', "TEXT NOT NULL DEFAULT 'm'"], ['layout_align', "TEXT NOT NULL DEFAULT 'center'"], ['repeat_json', "TEXT NOT NULL DEFAULT ''"], ['advertiser_id', 'INTEGER']]) {
+for (const [col, ddl] of [['text_align', "TEXT NOT NULL DEFAULT 'start'"], ['overlay', 'INTEGER NOT NULL DEFAULT 65'], ['image_zoom', 'INTEGER NOT NULL DEFAULT 100'], ['image_x', 'INTEGER NOT NULL DEFAULT 50'], ['image_y', 'INTEGER NOT NULL DEFAULT 50'], ['fg_image', "TEXT NOT NULL DEFAULT ''"], ['fg_size', 'INTEGER NOT NULL DEFAULT 40'], ['fg_pos', "TEXT NOT NULL DEFAULT 'end'"], ['fg_shape', "TEXT NOT NULL DEFAULT 'none'"], ['fg_y', 'INTEGER NOT NULL DEFAULT 100'], ['fg_out', 'INTEGER NOT NULL DEFAULT 0'], ['layout_width', "TEXT NOT NULL DEFAULT 'wide'"], ['layout_height', "TEXT NOT NULL DEFAULT 'm'"], ['layout_align', "TEXT NOT NULL DEFAULT 'center'"], ['repeat_json', "TEXT NOT NULL DEFAULT ''"], ['advertiser_id', 'INTEGER']]) {
   if (!q.all('PRAGMA table_info(featured_campaigns)').some((c) => c.name === col)) db.exec(`ALTER TABLE featured_campaigns ADD COLUMN ${col} ${ddl}`);
 }
 
@@ -75,6 +75,7 @@ export const PLACEMENTS = {
 export const PLACEMENT_KEYS = Object.keys(PLACEMENTS);
 const CTA_STYLES = ['solid', 'outline', 'light'];
 const ALIGNS = ['start', 'center', 'end'];
+const FG_SHAPES = ['none', 'rounded', 'circle'];
 const WIDTHS = ['full', 'wide', 'narrow'];
 const HEIGHTS = ['s', 'm', 'l'];
 const AUDIENCES = ['all', 'marketplace', 'store'];
@@ -220,10 +221,12 @@ export function normalizeCampaign(body, { partial = false } = {}) {
   const ov = b.overlay == null || b.overlay === '' ? 65 : Number(b.overlay);
   if (Number.isInteger(ov) && ov >= 0 && ov <= 80) out.overlay = ov; else f.overlay = 'bad_value';
   const num = (k, def, lo, hi) => { const v = b[k] == null || b[k] === '' ? def : Number(b[k]); if (Number.isInteger(v) && v >= lo && v <= hi) out[k] = v; else f[k] = 'bad_value'; };
-  num('image_zoom', 100, 100, 300); num('image_x', 50, 0, 100); num('image_y', 50, 0, 100); num('fg_size', 40, 10, 90);
+  num('image_zoom', 100, 100, 300); num('image_x', 50, 0, 100); num('image_y', 50, 0, 100); num('fg_size', 40, 10, 90); num('fg_y', 100, 0, 100);
   out.fg_pos = ALIGNS.includes(b.fg_pos) ? b.fg_pos : (b.fg_pos == null || b.fg_pos === '' ? 'end' : (f.fg_pos = 'bad_value'));
   { const u = safeImage(b.fg_image); if (u === null) f.fg_image = 'bad_url'; else out.fg_image = u; }
   const pick = (k, list, def) => { if (list.includes(b[k])) out[k] = b[k]; else if (b[k] == null || b[k] === '') out[k] = def; else f[k] = 'bad_value'; };
+  pick('fg_shape', FG_SHAPES, 'none');
+  out.fg_out = b.fg_out ? 1 : 0;
   pick('layout_width', WIDTHS, 'wide'); pick('layout_height', HEIGHTS, 'm'); pick('layout_align', ALIGNS, 'center');
   out.cta_style = CTA_STYLES.includes(b.cta_style) ? b.cta_style : (b.cta_style == null ? 'solid' : (f.cta_style = 'bad_value'));
 
@@ -317,7 +320,7 @@ const toDb = (c) => ({
   type: c.type, title_ar: c.title_ar, title_en: c.title_en, subtitle_ar: c.subtitle_ar, subtitle_en: c.subtitle_en, cta_ar: c.cta_ar, cta_en: c.cta_en,
   badge_ar: c.badge_ar, badge_en: c.badge_en, destination_url: c.destination_url, store_id: c.store_id, promotion_id: c.promotion_id, product_id: c.product_id, category_id: c.category_id,
   desktop_image: c.desktop_image, mobile_image: c.mobile_image, background_color: c.background_color, text_color: c.text_color, cta_style: c.cta_style, text_align: c.text_align, overlay: c.overlay,
-  image_zoom: c.image_zoom, image_x: c.image_x, image_y: c.image_y, fg_image: c.fg_image, fg_size: c.fg_size, fg_pos: c.fg_pos, layout_width: c.layout_width, layout_height: c.layout_height, layout_align: c.layout_align,
+  image_zoom: c.image_zoom, image_x: c.image_x, image_y: c.image_y, fg_image: c.fg_image, fg_size: c.fg_size, fg_pos: c.fg_pos, fg_shape: c.fg_shape, fg_y: c.fg_y, fg_out: c.fg_out, layout_width: c.layout_width, layout_height: c.layout_height, layout_align: c.layout_align,
   placements_json: JSON.stringify(c.placements), targeting_json: JSON.stringify(c.targeting), priority: c.priority, starts_at: c.starts_at, ends_at: c.ends_at, repeat_json: c.repeat ? JSON.stringify(c.repeat) : '', advertiser_id: c.advertiser_id || null,
 });
 
@@ -360,7 +363,7 @@ function publicShape(row, placement, liveByStore, mediaCache) {
     image: { desktop: row.desktop_image || null, mobile: row.mobile_image || null, offer: offer?.image || null },
     bg: row.background_color, color: row.text_color, ctaStyle: row.cta_style, align: row.text_align || 'start', overlay: row.overlay ?? 65,
     layout: { width: row.layout_width || 'wide', height: row.layout_height || 'm', align: row.layout_align || 'center' },
-    fit: { zoom: row.image_zoom ?? 100, x: row.image_x ?? 50, y: row.image_y ?? 50 }, fg: row.fg_image ? { src: row.fg_image, size: row.fg_size ?? 40, pos: row.fg_pos || 'end' } : null, store, offer: offer ? { id: offer.id, headline: offer.headline } : null,
+    fit: { zoom: row.image_zoom ?? 100, x: row.image_x ?? 50, y: row.image_y ?? 50 }, fg: row.fg_image ? { src: row.fg_image, size: row.fg_size ?? 40, pos: row.fg_pos || 'end', shape: row.fg_shape || 'none', y: row.fg_y ?? 100, out: !!row.fg_out } : null, store, offer: offer ? { id: offer.id, headline: offer.headline } : null,
   };
 }
 
@@ -443,7 +446,7 @@ function adminShape(row, stats = {}, now = cairoStamp()) {
     destinationUrl: c.destination_url, href: destinationOf(c), storeId: c.store_id, promotionId: c.promotion_id, productId: c.product_id, categoryId: c.category_id,
     store: store ? { id: store.id, slug: store.slug, name: biOf(store, 'name') } : null,
     desktopImage: c.desktop_image, mobileImage: c.mobile_image, backgroundColor: c.background_color, textColor: c.text_color, ctaStyle: c.cta_style, textAlign: c.text_align || 'start', overlay: c.overlay ?? 65,
-    imageZoom: c.image_zoom ?? 100, imageX: c.image_x ?? 50, imageY: c.image_y ?? 50, fgImage: c.fg_image || '', fgSize: c.fg_size ?? 40, fgPos: c.fg_pos || 'end', layoutWidth: c.layout_width || 'wide', layoutHeight: c.layout_height || 'm', layoutAlign: c.layout_align || 'center',
+    imageZoom: c.image_zoom ?? 100, imageX: c.image_x ?? 50, imageY: c.image_y ?? 50, fgImage: c.fg_image || '', fgSize: c.fg_size ?? 40, fgPos: c.fg_pos || 'end', fgShape: c.fg_shape || 'none', fgY: c.fg_y ?? 100, fgOut: !!c.fg_out, layoutWidth: c.layout_width || 'wide', layoutHeight: c.layout_height || 'm', layoutAlign: c.layout_align || 'center',
     placements: c.placements, targeting: c.targeting, priority: c.priority, startsAt: c.starts_at, endsAt: c.ends_at, advertiserId: c.advertiser_id || null, advertiser: c.advertiser_id ? q.get('SELECT id, slug, name_ar FROM featured_advertisers WHERE id=?', [c.advertiser_id]) || null : null, repeat: parseRepeat(c.repeat_json), repeatNextInMin: state === 'resting' ? repeatNextOpen(parseRepeat(c.repeat_json), (c.starts_at && c.starts_at > now.stamp ? c.starts_at : now.stamp)) : null,
     createdBy: c.created_by, createdAt: c.created_at, updatedAt: c.updated_at, archivedAt: c.archived_at,
     stats: { views, clicks, ctr: views ? Math.round((clicks / views) * 1000) / 10 : null },

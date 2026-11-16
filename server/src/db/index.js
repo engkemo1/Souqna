@@ -123,7 +123,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   // Cashier linking: barcodes (matched together with sku when a cashier file or API call arrives).
   if (!pcols.includes('barcode')) db.exec('ALTER TABLE products ADD COLUMN barcode TEXT');
   // Admin product review (product-moderation / admin-products): status, note, when, and manual flags. Idempotent — skipped where the columns already exist.
-  for (const [col, ddl] of [['admin_review_status', 'TEXT'], ['admin_review_note', 'TEXT'], ['admin_reviewed_at', 'TEXT'], ['admin_flags_json', 'TEXT']]) if (!pcols.includes(col)) db.exec(`ALTER TABLE products ADD COLUMN ${col} ${ddl}`);
+  for (const [col, ddl] of [['material_ar', 'TEXT'], ['care_ar', 'TEXT'], ['admin_review_status', 'TEXT'], ['admin_review_note', 'TEXT'], ['admin_reviewed_at', 'TEXT'], ['admin_flags_json', 'TEXT']]) if (!pcols.includes(col)) db.exec(`ALTER TABLE products ADD COLUMN ${col} ${ddl}`);
   const vcols = db.prepare('PRAGMA table_info(variants)').all().map((c) => c.name);
   if (!vcols.includes('barcode')) db.exec('ALTER TABLE variants ADD COLUMN barcode TEXT');
   const clcols = db.prepare('PRAGMA table_info(store_cashier_links)').all().map((x) => x.name);

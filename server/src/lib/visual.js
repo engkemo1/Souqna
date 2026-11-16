@@ -272,6 +272,10 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
   const settings = visualSettings();
   const model = _model || await activeModel();
   const isClip = model === CLIP_MODEL_NAME;
+  const cat = loadCatalog(model);
+  if (isClip && !_model && !cat.vectors.length && loadCatalog('color-v1').vectors.length) {
+    return searchByImage(buffer, { department, type, limit, _model: 'color-v1' });
+  }
   const floor = floorOf(settings, model);
 
   let regions;
@@ -288,7 +292,6 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
     regions = [{ key: 'full', vec: (await embedImage(buffer, model)).vec, hist: null }];
   }
 
-  const cat = loadCatalog(model);
   const pool = department ? cat.vectors.filter((r) => r.department === department) : cat.vectors;
   const histOf = (key) => regions.find((r) => r.key === key)?.hist || null;
 
