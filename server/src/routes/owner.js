@@ -14,6 +14,7 @@ import { notifyPlatformAlert } from '../lib/whatsapp.js';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { requireOwner } from '../lib/auth.js';
+import { checkRateLimit } from '../lib/rate-limit.js';
 import promotionsRouter from './owner-promotions.js';
 import { orderPromotions } from '../lib/promotions/orders.js';
 import { computeReturn } from '../lib/promotions/returns.js';
@@ -138,7 +139,7 @@ const storeSchema = z.object({
   phone: z.string().trim().max(20).optional(), whatsapp: z.string().trim().max(20).optional(),
   // extra numbers of the SAME store (call + WhatsApp buttons) and extra branches (name + address + map link, no numbers)
   contacts: z.array(z.object({ label: z.string().trim().max(40).optional(), phone: z.string().trim().max(20) })).max(6).optional(),
-  branches: z.array(z.object({ name: z.string().trim().max(60), address: z.string().trim().max(160).optional(), phone: z.string().trim().max(20).optional(), map_url: z.string().trim().max(500).optional() })).max(12).optional(),
+  branches: z.array(z.object({ name: z.string().trim().max(60), address: z.string().trim().max(160).optional(), phone: z.string().trim().max(20).optional(), map_url: z.string().trim().max(500).refine((u) => !u || /^https:\/\//i.test(u), 'map_url_invalid').optional() })).max(12).optional(),
   hero_mode: z.enum(['auto', 'cover', 'slider']).optional(),
   photo_style: z.enum(['white', 'cream', 'original']).optional(),
   logo_initials: z.string().trim().max(2).optional(),
@@ -627,6 +628,7 @@ r.get('/analytics', h((req, res) => {
 /* ---------------------------------------------------------- media */
 
 r.post('/media', upload.array('files', 12), h(async (req, res) => {
+  checkRateLimit(`owner:upload:${req.store.id}`, { max: 60, windowMs: 10 * 60e3, code: 'rate_limited', message: 'Too many uploads. Please wait a minute.' });
   const files = req.files || [];
   if (!files.length) throw badRequest('no_file', 'Please choose at least one image.');
   const kind = ['product', 'banner', 'category', 'logo', 'cover', 'offer'].includes(req.query.kind) ? req.query.kind : 'product';
@@ -639,6 +641,7 @@ r.post('/media', upload.array('files', 12), h(async (req, res) => {
 /** Re-do ONE photo in another look, from its stored original. Creates a fresh photo (new file, so no stale cache); the owner's editor swaps it in. */
 /** Upload sheet preview: the first photo on white / cream, exactly as the server will make it. Nothing is saved. */
 r.post('/media/preview', upload.single('file'), h(async (req, res) => {
+  checkRateLimit(`owner:preview:${req.store.id}`, { max: 40, windowMs: 10 * 60e3, code: 'rate_limited', message: 'Too many previews. Please wait a minute.' });
   if (!req.file) throw badRequest('no_file', 'Please choose an image.');
   try { res.json(await previewStyles(req.file.buffer)); } catch { throw badRequest('invalid_image', 'This file is not a supported image.'); }
 }));
@@ -683,16 +686,15 @@ r.post('/ai/product', h(async (req, res) => {
   const b = z.object({ mediaId: z.coerce.number().int().positive(), hint: z.string().max(120).optional() }).parse(req.body);
   const m = q.get('SELECT * FROM media WHERE id=? AND store_id=?', [b.mediaId, req.store.id]);
   if (!m) throw notFound('Image');
-  const day = new Date().toISOString().slice(0, 10); const key = `${req.store.id}:${day}`;
-  const used = aiHits.get(key) || 0;
-  if (used >= 40) throw new AppError(429, 'rate_limited', 'Daily AI limit reached for this store.');
+  const day = new Date().toISOString().slice(0, 10); const key = `owner:ai:${req.store.id}:${day}`;
+  checkRateLimit(key, { max: 40, windowMs: 24 * 3600e3, record: false, code: 'rate_limited', message: 'Daily AI limit reached for this store.' });
   const examples = q.all('SELECT suggested_json AS suggested, corrected_json AS corrected FROM pos_ai_product_lessons WHERE store_id=? ORDER BY id DESC LIMIT 3', [req.store.id])
     .map((x) => ({ suggested: json(x.suggested, {}), corrected: json(x.corrected, {}) }));
   let src; for (const f of ['md.jpg', 'md.webp', 'sm.jpg', 'sm.webp', 'original.jpg']) { try { src = await readMediaFile(m, f); break; } catch { /* next */ } }
   if (!src) throw notFound('Image');
   try {
     const suggestion = await describeProduct(src, { hint: b.hint, departments: decodeDepartments(req.store.departments), examples });
-    aiHits.set(key, used + 1);
+    checkRateLimit(key, { max: 40, windowMs: 24 * 3600e3, record: true, code: 'rate_limited', message: 'Daily AI limit reached for this store.' });
     res.json({ suggestion });
   } catch (e) {
     if (e.code === 'ai_unavailable') throw new AppError(503, 'ai_unavailable', 'The AI assistant is not set up yet.');
@@ -950,7 +952,11 @@ export function saveProduct(storeId, data, existing) {
         keep.push(v.id);
       } else keep.push(insert('variants', { product_id: id, color: v.color || null, size: v.size || null, stock: v.stock, sku: v.sku || null, barcode: v.barcode || null }));
     }
-    q.run(`DELETE FROM variants WHERE product_id=? ${keep.length ? `AND id NOT IN (${keep.join(',')})` : ''}`, [id]);
+    const validKeep = keep.map(Number).filter((k) => Number.isInteger(k) && k > 0);
+    q.run(
+      `DELETE FROM variants WHERE product_id=? ${validKeep.length ? `AND id NOT IN (${validKeep.map(() => '?').join(',')})` : ''}`,
+      [id, ...validKeep],
+    );
     return id;
   });
 }
@@ -1533,7 +1539,7 @@ const bannerSchema = z.object({
   title_ar: z.string().trim().max(80).optional().default(''), title_en: z.string().trim().max(80).optional().default(''),
   subtitle_ar: z.string().trim().max(160).optional().default(''), subtitle_en: z.string().trim().max(160).optional().default(''),
   cta_ar: z.string().trim().max(30).optional().default(''), cta_en: z.string().trim().max(30).optional().default(''),
-  link: z.string().trim().max(200).optional().default('/shop'),
+  link: z.string().trim().max(200).optional().default('/shop').refine((v) => !v || (v.startsWith('/') && !v.startsWith('//') && !v.includes('\\')) || /^https:\/\//i.test(v), 'bad_url'),
   align: z.enum(['start', 'center', 'end']).default('start'),
   tone: z.enum(['dark', 'light']).default('dark'),
   mirror_rtl: z.boolean().default(false).transform(Number),

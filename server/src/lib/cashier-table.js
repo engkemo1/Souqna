@@ -64,7 +64,16 @@ export function parseCsv(buf) {
   return rows;
 }
 
+export const MAX_TABLE_BYTES = 5 * 1024 * 1024;
+export const MAX_TABLE_ROWS = 10_000;
+export const MAX_TABLE_COLS = 100;
+
 export async function parseXlsx(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 4 || buf[0] !== 0x50 || buf[1] !== 0x4b || buf[2] !== 0x03 || buf[3] !== 0x04) {
+    const e = new Error('Invalid .xlsx archive header.');
+    e.code = 'invalid_xlsx';
+    throw e;
+  }
   let readXlsxFile;
   try { ({ default: readXlsxFile } = await import('read-excel-file/node')); }
   catch { const e = new Error('Excel support is not installed. Run "npm install" in the project, or save the file as CSV.'); e.code = 'xlsx_unavailable'; throw e; }
@@ -73,10 +82,26 @@ export async function parseXlsx(buf) {
 
 /** Buffer + filename -> { headers: string[], rows: string[][] } (all values as trimmed strings). */
 export async function readTable(buf, filename = '') {
-  const isXlsx = /\.xlsx$/i.test(filename) || (buf.length > 3 && buf[0] === 0x50 && buf[1] === 0x4B);
+  if (!Buffer.isBuffer(buf) || buf.length === 0) {
+    const e = new Error('The file has no data rows.');
+    e.code = 'empty_file';
+    throw e;
+  }
+  if (buf.length > MAX_TABLE_BYTES) {
+    const e = new Error('The file is too large (max 5 MB).');
+    e.code = 'file_too_large';
+    throw e;
+  }
+  const hasZipMagic = buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
+  const isXlsx = /\.xlsx$/i.test(filename) || hasZipMagic;
   const raw = isXlsx ? await parseXlsx(buf) : parseCsv(buf);
+  if (raw.length > MAX_TABLE_ROWS + 1) {
+    const e = new Error(`The file has too many rows (max ${MAX_TABLE_ROWS}).`);
+    e.code = 'too_many_rows';
+    throw e;
+  }
   const cleaned = raw
-    .map((r) => r.map((v) => (v === null || v === undefined ? '' : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).trim())))
+    .map((r) => r.slice(0, MAX_TABLE_COLS).map((v) => (v === null || v === undefined ? '' : v instanceof Date ? v.toISOString().slice(0, 10) : String(v).trim().slice(0, 500))))
     .filter((r) => r.some((v) => v !== ''));
   if (cleaned.length < 2) { const e = new Error('The file has no data rows.'); e.code = 'empty_file'; throw e; }
   return { headers: cleaned[0], rows: cleaned.slice(1) };

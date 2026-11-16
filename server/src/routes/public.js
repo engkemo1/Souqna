@@ -11,6 +11,7 @@ import { publicSlug, storedSlug } from '../lib/seo-slugs.js';
 import { randomBytes } from 'node:crypto';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { clampInt, nowIso } from '../lib/util.js';
+import { checkRateLimit, recordRateLimitHit } from '../lib/rate-limit.js';
 import { mediaMap, processImage } from '../lib/media.js';
 import { recordOrderPromotions, promoItemCols, orderPromotions } from '../lib/promotions/orders.js';
 import { storeOffers, productOffers, offerBadges, countView } from '../lib/promotions/public.js';
@@ -921,7 +922,6 @@ r.get('/stores/:slug/products/:pslug/reviews', h((req, res) => {
   res.json({ summary: { avg, count, dist }, items: reviewOut(rows) });
 }));
 
-const reviewHits = new Map();
 r.post('/track/:token/review', reviewPhotos.array('photos', 3), h(async (req, res) => {
   const recent = trackGuard(req);
   const o = /^[A-Za-z0-9_-]{10,40}$/.test(req.params.token) ? q.get('SELECT * FROM orders WHERE track_token=?', [req.params.token]) : null;
@@ -930,9 +930,7 @@ r.post('/track/:token/review', reviewPhotos.array('photos', 3), h(async (req, re
   const b = z.object({ productId: z.coerce.number().int().positive(), rating: z.coerce.number().int().min(1).max(5), comment: z.string().trim().max(600).optional().default('') }).parse(req.body);
   if (!q.get('SELECT 1 AS x FROM order_items WHERE order_id=? AND product_id=?', [o.id, b.productId])) throw notFound('Product');
   if (q.get('SELECT 1 AS x FROM reviews WHERE order_id=? AND product_id=?', [o.id, b.productId])) throw new AppError(409, 'review_exists', 'You already reviewed this product.');
-  const hits = (reviewHits.get(req.ip) || []).filter((t) => Date.now() - t < 3600e3);
-  if (hits.length >= 20) throw new AppError(429, 'rate_limited', 'Too many reviews, try again later.');
-  reviewHits.set(req.ip, [...hits, Date.now()]);
+  checkRateLimit(`public:review:${req.ip}`, { max: 20, windowMs: 3600e3, code: 'rate_limited', message: 'Too many reviews, try again later.' });
   const ids = [];
   for (const f of req.files || []) {
     const m = await processImage(f.buffer, { storeId: o.store_id, kind: 'review', alt: null });
@@ -1063,6 +1061,7 @@ const orderSchema = z.object({
 });
 
 r.post('/stores/:slug/orders', h((req, res) => {
+  checkRateLimit(`public:order:${req.ip}`, { max: 30, windowMs: 10 * 60e3, code: 'rate_limited', message: 'Too many orders placed in a short time. Please wait a few minutes.' });
   const s = loadStore(req.params.slug);
   const body = orderSchema.parse(req.body);
   assertCustomerAllowed(body.phone, req);
@@ -1135,8 +1134,6 @@ function pickupInfo(s, br) {
   return { address: addr ? { ar: addr, en: addr } : bi(s, 'address'), phone: br.phone || s.phone || null, whatsapp: br.phone || s.whatsapp || null,
     mapUrl: br.map_url || (addr ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(/بنها|banha/i.test(addr) ? addr : `${addr} بنها`)}` : null), lat: null, lng: null };
 }
-const reserveHits = new Map();
-
 r.post('/stores/:slug/reserve', h((req, res) => {
   const s = loadStore(req.params.slug);
   const hours = s.reserve_hours ?? 24;
@@ -1145,9 +1142,7 @@ r.post('/stores/:slug/reserve', h((req, res) => {
   assertCustomerAllowed(body.phone, req);
   const branch = branchOf(s, body.branch);
   if (branch) body.notes = `الفرع: ${branch.name}${body.notes ? ` — ${body.notes}` : ''}`; // the shop sees it in the order note
-  const hits = (reserveHits.get(req.ip) || []).filter((t) => Date.now() - t < 3600e3);
-  if (hits.length >= 8) throw new AppError(429, 'rate_limited', 'Too many requests, try again later.');
-  reserveHits.set(req.ip, [...hits, Date.now()]);
+  checkRateLimit(`public:reserve:${req.ip}`, { max: 8, windowMs: 3600e3, code: 'rate_limited', message: 'Too many requests, try again later.' });
   // once WhatsApp sign-in is live, a reservation needs a number proved by a code (no fake numbers)
   if (waAuthReady()) {
     const me = buyerFromReq(req);
@@ -1201,6 +1196,7 @@ const marketplaceOrderSchema = orderSchema.omit({ coupon: true, items: true, gif
 
 // A single marketplace checkout is recorded as one independently managed order per store.
 r.post('/marketplace/orders', h((req, res) => {
+  checkRateLimit(`public:market-order:${req.ip}`, { max: 30, windowMs: 10 * 60e3, code: 'rate_limited', message: 'Too many orders placed in a short time. Please wait a few minutes.' });
   const body = marketplaceOrderSchema.parse(req.body);
   assertCustomerAllowed(body.phone, req);
   if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
@@ -1292,13 +1288,12 @@ r.get('/promo', h((_req, res) => {
  *   - order number + phone (POST /track/lookup) — both must match
  * Only non-sensitive fields are returned (first name, city, masked phone — never the street address).
  */
-const trackFails = new Map();
 function trackGuard(req) {
-  const recent = (trackFails.get(req.ip) || []).filter((t) => Date.now() - t < 10 * 60e3);
-  if (recent.length >= 20) throw new AppError(429, 'too_many_attempts', 'Too many attempts. Please wait a few minutes.');
-  return recent;
+  const bucket = `public:track-fail:${req.ip}`;
+  checkRateLimit(bucket, { max: 20, windowMs: 10 * 60e3, record: false, code: 'too_many_attempts', message: 'Too many attempts. Please wait a few minutes.' });
+  return bucket;
 }
-const trackMiss = (req, recent) => { trackFails.set(req.ip, [...recent, Date.now()]); throw notFound('Order'); };
+const trackMiss = (_req, bucket) => { recordRateLimitHit(bucket); throw notFound('Order'); };
 const normPhone = (v) => { const d = String(v || '').replace(/\D/g, ''); return d.startsWith('20') && d.length === 12 ? `0${d.slice(2)}` : d; };
 
 function trackPayload(o) {
@@ -1354,13 +1349,11 @@ r.post('/track/lookup', h((req, res) => {
 /* ---------------------------------------------------------- "not in Banha? we get it for you" (platform sourcing, inspection before handover) */
 const SOURCING_STATUSES = ['new', 'quoted', 'approved', 'ordered', 'arrived', 'delivered', 'cancelled'];
 const sourcingUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024, files: 1 } });
-const sourcingHits = new Map();
-
 const sourcingOut = (x) => ({ number: x.number, token: x.track_token, title: x.title, details: x.details, status: x.status, quotePrice: x.quote_price, note: x.admin_note, createdAt: x.created_at, updatedAt: x.updated_at, photo: x.photo || null, firstName: String(x.name).split(' ')[0] });
 
 r.post('/sourcing', sourcingUpload.single('photo'), h(async (req, res) => {
-  const hits = (sourcingHits.get(req.ip) || []).filter((t) => Date.now() - t < 3600e3);
-  if (hits.length >= 6) throw new AppError(429, 'rate_limited', 'Too many requests, try again later.');
+  const sourcingBucket = `public:sourcing:${req.ip}`;
+  checkRateLimit(sourcingBucket, { max: 6, windowMs: 3600e3, record: false, code: 'rate_limited', message: 'Too many requests, try again later.' });
   const clean = (v) => (v === undefined || v === '' ? undefined : v);
   const b = z.object({
     title: z.string().trim().min(3).max(120), details: z.string().trim().max(800).optional(), link: z.preprocess(clean, z.string().trim().url().max(400).optional()),
@@ -1374,7 +1367,7 @@ r.post('/sourcing', sourcingUpload.single('photo'), h(async (req, res) => {
     try { photo = `data:image/jpeg;base64,${(await sharp(req.file.buffer).rotate().resize({ width: 900, height: 900, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 72, mozjpeg: true }).toBuffer()).toString('base64')}`; }
     catch { throw new AppError(400, 'invalid_image', 'This file is not a supported image.'); }
   }
-  sourcingHits.set(req.ip, [...hits, Date.now()]);
+  recordRateLimitHit(sourcingBucket);
   const number = `RQ-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${crypto.randomInt(1000, 9999)}`;
   const track = crypto.randomBytes(12).toString('base64url');
   const now = nowIso();

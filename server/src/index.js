@@ -33,28 +33,35 @@ app.disable('x-powered-by');
 app.set('trust proxy', 1);
 // OpenStreetMap tiles are refused without a Referer, so send the origin (helmet's default is no-referrer)
 // Content-Security-Policy: locks framing, base URI, plugins and form targets; resources stay open to https so maps, fonts and media keep working
+const r2Origin = config.r2?.publicUrl ? [config.r2.publicUrl] : [];
 const CSP = {
   useDefaults: false,
+  reportOnly: Boolean(config.cspReportOnly),
   directives: {
     defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'blob:', 'https:'],
-    styleSrc: ["'self'", "'unsafe-inline'", 'https:'],
-    imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
-    fontSrc: ["'self'", 'data:', 'https:'],
-    mediaSrc: ["'self'", 'data:', 'blob:', 'https:'],
-    connectSrc: ["'self'", 'blob:', 'https:', 'wss:'],
+    scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'blob:', 'https://accounts.google.com', 'https://apis.google.com'],
+    styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com'],
+    imgSrc: ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org', 'https://*.r2.dev', 'https://*.cloudflarestorage.com', 'https://*.googleusercontent.com', 'https://twistegy.com', ...r2Origin],
+    fontSrc: ["'self'", 'data:'],
+    mediaSrc: ["'self'", 'data:', 'blob:', ...r2Origin],
+    connectSrc: ["'self'", 'blob:', 'https://accounts.google.com', 'https://nominatim.openstreetmap.org', 'https://*.tile.openstreetmap.org', 'https://*.r2.dev', ...r2Origin],
     workerSrc: ["'self'", 'blob:'],
     manifestSrc: ["'self'"],
-    frameSrc: ["'self'", 'https:'],
+    frameSrc: ["'self'", 'https://accounts.google.com', 'https://www.google.com', 'https://maps.google.com'],
     objectSrc: ["'none'"],
     baseUri: ["'self'"],
-    formAction: ["'self'", 'https:'],
+    formAction: ["'self'"],
     frameAncestors: ["'self'"],
+    reportUri: ['/api/csp-report'],
     upgradeInsecureRequests: [],
   },
 };
 // Google sign-in opens a popup that hands the token back to this page: helmet's default COOP (same-origin) cuts that link and the popup stays blank.
 app.use(helmet({ contentSecurityPolicy: CSP, crossOriginResourcePolicy: { policy: 'cross-origin' }, crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }, referrerPolicy: { policy: 'strict-origin-when-cross-origin' } }));
+app.use((_req, res, next) => {
+  res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=()');
+  next();
+});
 app.use(compression());
 const ALLOWED_ORIGINS = new Set([
   config.siteUrl,
@@ -71,9 +78,19 @@ app.use(cors({
     return cb(null, false);
   },
 }));
-app.use(express.json({ limit: '1mb', verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/wa/')) req.rawBody = buf; } }));
+app.use(express.json({ limit: '1mb', type: ['application/json', 'application/csp-report', 'application/reports+json'], verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/wa/')) req.rawBody = buf; } }));
 
-const SITE_ORIGIN = 'https://twistegy.com';
+app.post('/api/csp-report', (req, res) => {
+  const report = req.body?.['csp-report'] || req.body;
+  if (report && typeof report === 'object') {
+    const blocked = String(report['blocked-uri'] || report.blockedURL || '').slice(0, 200);
+    const directive = String(report['violated-directive'] || report.effectiveDirective || '').slice(0, 80);
+    if (blocked || directive) console.warn(`[csp-report] directive=${directive} blocked=${blocked}`);
+  }
+  res.status(204).end();
+});
+
+const SITE_ORIGIN = config.siteUrl;
 const xml = (value) => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;');
 
 app.get('/robots.txt', (_req, res) => {

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { h, AppError } from '../lib/errors.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { storeFromKey, pushStock, pushSale, refreshCatalogueCache } from '../lib/cashier-sync.js';
+import { checkRateLimit } from '../lib/rate-limit.js';
 
 /**
  * Public API a store's own cashier can call with its private key.
@@ -13,11 +14,8 @@ import { storeFromKey, pushStock, pushSale, refreshCatalogueCache } from '../lib
  */
 const r = Router();
 
-const hits = new Map(); // storeId -> { n, t }  (120 requests/minute per store)
 function rateLimit(storeId) {
-  const now = Date.now(); const e = hits.get(storeId);
-  if (!e || now - e.t > 60_000) { hits.set(storeId, { n: 1, t: now }); return; }
-  if (++e.n > 120) throw new AppError(429, 'rate_limited', 'Too many requests. Try again in a minute.');
+  checkRateLimit(`cashier:${storeId}`, { max: 120, windowMs: 60_000, code: 'rate_limited', message: 'Too many requests. Try again in a minute.' });
 }
 
 r.use(h((req, _res, next) => {

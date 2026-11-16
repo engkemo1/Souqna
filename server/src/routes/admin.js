@@ -2,11 +2,11 @@ import { encodeDepartments, DEPT_SLUG_RE, decodeDepartments, ORDER_STATUSES, PRO
 import { Router } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
-import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { q, tx, insert, update, db } from '../db/index.js';
 import { addAlias } from '../lib/category-aliases.js';
-import { signToken } from '../lib/auth.js';
+import { signToken, hashPassword, readCookie, revokeUserSessions } from '../lib/auth.js';
+import { checkRateLimit, recordRateLimitHit, clearRateLimit } from '../lib/rate-limit.js';
 import { slugify, latinSlug } from '../lib/util.js';
 import { config } from '../config.js';
 import { h, AppError, badRequest } from '../lib/errors.js';
@@ -52,8 +52,7 @@ function makeSetupLink(req, uid) {
 /** Platform-admin API. Every request must carry the x-admin-key header (env ADMIN_KEY). */
 const r = Router();
 
-const failed = new Map();
-const SESSION_MS = 12 * 3600e3;
+const SESSION_MS = 4 * 3600e3;
 const sign = (exp) => crypto.createHmac('sha256', `${config.jwtSecret}|${config.adminKey}|${config.adminTotpSecret}`).update(`admin-session:${exp}`).digest('base64url');
 const makeSession = () => { const exp = Date.now() + SESSION_MS; return `${exp}.${sign(exp)}`; };
 const validSession = (tok) => {
@@ -63,15 +62,44 @@ const validSession = (tok) => {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 };
 const sameKey = (a, b) => { const x = Buffer.from(String(a || '')), y = Buffer.from(String(b)); return x.length === y.length && crypto.timingSafeEqual(x, y); };
+const logAdminAuthEvent = (req, status, note) => {
+  try {
+    db.prepare('INSERT INTO admin_audit (method, path, status, fields) VALUES (?, ?, ?, ?)').run(
+      req.method,
+      String(req.originalUrl || req.path).replace(/^\/api\/admin/, '').split('?')[0].slice(0, 200) || '/',
+      status,
+      note,
+    );
+  } catch { /* ignore audit write errors */ }
+};
+
 r.use((req, _res, next) => {
   if (!config.adminKey) return next(new AppError(503, 'admin_disabled', 'ADMIN_KEY is not set on the server.'));
-  const recent = (failed.get(req.ip) || []).filter((t) => Date.now() - t < 10 * 60e3);
-  if (recent.length >= 15) return next(new AppError(429, 'too_many_attempts', 'Too many wrong keys. Wait a few minutes.'));
+  if (config.env === 'production' && !config.adminTotpSecret) {
+    return next(new AppError(503, 'admin_totp_required', 'ADMIN_TOTP_SECRET is required in production.'));
+  }
+  const allowedIps = (process.env.ADMIN_ALLOWED_IPS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (allowedIps.length > 0 && !allowedIps.includes(req.ip)) {
+    logAdminAuthEvent(req, 403, `ip_blocked:${req.ip}`);
+    return next(new AppError(403, 'ip_not_allowed', 'Access from this IP address is not allowed.'));
+  }
+  const keyBucket = `admin:key:${req.ip}`;
+  try {
+    checkRateLimit(keyBucket, { max: 15, windowMs: 10 * 60e3, record: false, code: 'too_many_attempts', message: 'Too many wrong keys. Wait a few minutes.' });
+  } catch (err) {
+    logAdminAuthEvent(req, 429, 'rate_limited_key');
+    return next(err);
+  }
   if (!sameKey(req.headers['x-admin-key'], config.adminKey)) {
-    failed.set(req.ip, [...recent, Date.now()]);
+    recordRateLimitHit(keyBucket);
+    logAdminAuthEvent(req, 401, 'wrong_admin_key');
     return next(new AppError(401, 'unauthorized', 'Wrong admin key.'));
   }
-  if (config.adminTotpSecret && req.path !== '/login' && !validSession(req.headers['x-admin-session'])) {
+  const sessionToken = req.headers['x-admin-session'] || readCookie(req, 'twist_admin_session');
+  if (config.adminTotpSecret && req.path !== '/login' && !validSession(sessionToken)) {
     return next(new AppError(401, 'totp_required', 'Two-step confirmation required.'));
   }
   next();
@@ -83,21 +111,37 @@ r.use(insightsRoutes);
 r.use(featuredRoutes);
 r.use(adminProductsRoutes);
 
-/** Step 2 of admin sign-in. The key (checked above) + a 6-digit authenticator code → a 12-hour session proof. */
-let lastStep = 0;
+/** Step 2 of admin sign-in. The key (checked above) + a 6-digit authenticator code → a 4-hour session proof. */
 r.post('/login', h((req, res) => {
-  if (!config.adminTotpSecret) return res.json({ session: null, twoStep: false });
+  if (!config.adminTotpSecret) {
+    logAdminAuthEvent(req, 200, 'login_key_only');
+    return res.json({ session: null, twoStep: false });
+  }
   const { code } = z.object({ code: z.string().max(12).optional() }).parse(req.body || {});
   if (!code) throw new AppError(401, 'totp_required', 'Two-step confirmation required.');
-  const recent = (failed.get(`t:${req.ip}`) || []).filter((t) => Date.now() - t < 10 * 60e3);
-  if (recent.length >= 6) throw new AppError(429, 'too_many_attempts', 'Too many wrong codes. Wait a few minutes.');
+  const totpBucket = `admin:totp:${req.ip}`;
+  checkRateLimit(totpBucket, { max: 6, windowMs: 10 * 60e3, record: false, code: 'too_many_attempts', message: 'Too many wrong codes. Wait a few minutes.' });
+  const lastStep = Number(q.val("SELECT value FROM app_settings WHERE key='admin_totp_last_step'") || 0);
   const step = verifyTotp(config.adminTotpSecret, code);
   if (step == null || step <= lastStep) {
-    failed.set(`t:${req.ip}`, [...recent, Date.now()]);
+    recordRateLimitHit(totpBucket);
+    logAdminAuthEvent(req, 401, step == null ? 'totp_wrong_code' : 'totp_replayed_code');
     throw new AppError(401, 'bad_code', step == null ? 'Wrong code.' : 'That code was already used. Wait for the next one.');
   }
-  lastStep = step;
-  res.json({ session: makeSession(), twoStep: true });
+  clearRateLimit(totpBucket);
+  q.run("INSERT INTO app_settings(key,value) VALUES('admin_totp_last_step',?) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [String(step)]);
+  const session = makeSession();
+  const cookieParts = [
+    `twist_admin_session=${encodeURIComponent(session)}`,
+    'HttpOnly',
+    'Path=/api/admin',
+    'SameSite=Strict',
+    `Max-Age=${Math.floor(SESSION_MS / 1000)}`,
+  ];
+  if (config.env === 'production') cookieParts.push('Secure');
+  res.append('Set-Cookie', cookieParts.join('; '));
+  logAdminAuthEvent(req, 200, 'login_totp_ok');
+  res.json({ session, twoStep: true });
 }));
 
 const subscriptionDateParts = (date) => String(date).split('-').map(Number);
@@ -725,8 +769,7 @@ r.patch('/services/:id', h((req, res) => {
 }));
 
 const demoPasswordsUnchanged = () => {
-  const u = q.get("SELECT password_hash FROM users WHERE LOWER(email)='townstyle@banhalook.app'");
-  return !!u && ['TownStyle#2026', 'demo1234'].some((p) => bcrypt.compareSync(p, u.password_hash));
+  return Boolean(q.val("SELECT 1 FROM users WHERE role='owner' AND must_change_password=1 LIMIT 1"));
 };
 
 r.get('/status', h((_req, res) => {
@@ -1254,7 +1297,9 @@ r.patch('/stores/:slug', h((req, res) => {
     q.run('INSERT OR REPLACE INTO store_slug_aliases (old_slug, store_id) VALUES (?, ?)', [req.params.slug, store.id]);
     q.run('DELETE FROM store_slug_aliases WHERE old_slug=?', [patch.slug]);
   }
-  if (body.owner_disabled !== undefined) q.run("UPDATE users SET role=? WHERE id=? AND role<>'demo'", [body.owner_disabled ? 'disabled' : 'owner', store.owner_id]);
+  if (body.owner_disabled !== undefined) {
+    q.run("UPDATE users SET role=?, token_version=COALESCE(token_version,1)+1 WHERE id=? AND role<>'demo'", [body.owner_disabled ? 'disabled' : 'owner', store.owner_id]);
+  }
   res.json({ slug: patch.slug || req.params.slug });
 }));
 
@@ -1287,7 +1332,7 @@ const genPassword = (n = 10) => Array.from({ length: n }, () => PW_CHARS[crypto.
 const origin = (req) => `${req.protocol}://${req.get('host')}`;
 const credentials = (req, slug, email, password) => ({ slug, email, password, storeUrl: `${origin(req)}/s/${slug}`, loginUrl: `${origin(req)}/login` });
 
-r.post('/stores', h((req, res) => {
+r.post('/stores', h(async (req, res) => {
   const d = createSchema.parse(req.body);
   assertDepartments(d.departments);
   // Reject anything that looks like an account that already exists: same email (ignoring case, gmail dots and +tags), same phone, same store name.
@@ -1300,8 +1345,9 @@ r.post('/stores', h((req, res) => {
   if (wantName && q.all('SELECT name_ar, name_en FROM stores').some((st) => normStoreName(st.name_ar) === wantName || normStoreName(st.name_en) === wantName)) dup.store_name = 'name_taken';
   if (Object.keys(dup).length) throw new AppError(422, 'validation_failed', 'This account or store looks like it already exists', dup);
   const password = d.password || genPassword();
+  const passwordHash = await hashPassword(password);
   const out = tx(() => {
-    const uid = insert('users', { name: d.owner_name, email: d.email, password_hash: bcrypt.hashSync(password, 10) });
+    const uid = insert('users', { name: d.owner_name, email: d.email, password_hash: passwordHash, token_version: 1, must_change_password: d.password ? 0 : 1 });
     let slug = latinSlug(d.store_name);
     if (!slug || slug.length < 2) slug = `store-${uid}`;
     let i = 1;
@@ -1750,12 +1796,14 @@ r.patch('/stores/:slug/products/:id', h((req, res) => {
 }));
 
 /** Set a new password for the store owner (typed by the admin, or generated). Returned once so it can be handed over; only a hash is stored. */
-r.post('/stores/:slug/reset-password', h((req, res) => {
+r.post('/stores/:slug/reset-password', h(async (req, res) => {
   const { password } = z.object({ password: z.string().min(8).max(100).optional() }).parse(req.body || {});
   const row = q.get('SELECT u.id, u.email FROM stores s JOIN users u ON u.id=s.owner_id WHERE s.slug=?', [req.params.slug]);
   if (!row) throw new AppError(404, 'not_found', 'Store not found.');
   const pw = password || genPassword();
-  update('users', row.id, { password_hash: bcrypt.hashSync(pw, 10), setup_token_hash: null, setup_expires: null });
+  const passwordHash = await hashPassword(pw);
+  update('users', row.id, { password_hash: passwordHash, setup_token_hash: null, setup_expires: null, must_change_password: password ? 0 : 1 });
+  revokeUserSessions(row.id);
   res.json(credentials(req, req.params.slug, row.email, pw));
 }));
 

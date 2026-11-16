@@ -3,26 +3,34 @@
  * (processed through the production media pipeline), ~90 days of orders,
  * customers, offers, banners and traffic so the dashboard tells a story.
  *
- *   npm run seed
+ *   SEED_DEMO=1 npm run seed
  *
- * Demo logins (password: demo1234)
- *   ahmed@banhalook.app  → Ahmed Fashion
- *   lamar@banhalook.app  → Lamar Boutique
- *   sport@banhalook.app  → Sport Zone
- *   denim@banhalook.app  → Denim House
- *   townstyle@banhalook.app → Town Style (random password, printed at the end of the seed; or set TOWNSTYLE_PASSWORD)
+ * Production safety:
+ *   - Refuses to run unless SEED_DEMO=1 is explicitly set.
+ *   - Refuses to run when NODE_ENV=production unless ALLOW_PROD_SEED=1 is also set.
+ *   - Every seeded account gets a unique random password and must_change_password=1,
+ *     except the single read-only `demo` role account (`config.demoEmail`).
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import bcrypt from 'bcryptjs';
 import crypto from 'node:crypto';
 import { config, ROOT } from '../config.js';
 import { LEGACY_DEPARTMENTS } from '@souqna/shared';
+
+if (process.env.SEED_DEMO !== '1') {
+  console.error('[seed] Refusing to seed demo data: set SEED_DEMO=1 to confirm.');
+  process.exit(1);
+}
+if (config.env === 'production' && process.env.ALLOW_PROD_SEED !== '1') {
+  console.error('[seed] Refusing to seed demo data in production (set ALLOW_PROD_SEED=1 only if intentional).');
+  process.exit(1);
+}
 
 for (const f of [config.dbFile, `${config.dbFile}-wal`, `${config.dbFile}-shm`]) fs.rmSync(f, { force: true });
 fs.rmSync(config.mediaDir, { recursive: true, force: true });
 
 const { q, tx, insert } = await import('./index.js');
+const { hashPassword } = await import('../lib/auth.js');
 const { processImage } = await import('../lib/media.js');
 const { THEME_PRESETS } = await import('@souqna/shared');
 
@@ -138,7 +146,17 @@ console.time('seed');
 
 
 for (const S of STORES) {
-  const uid = insert('users', { name: S.owner, email: S.email, password_hash: bcrypt.hashSync(S.password || 'demo1234', 10) });
+  const isReadonlyDemo = S.email.toLowerCase() === config.demoEmail;
+  const generatedPw = S.password || crypto.randomBytes(12).toString('base64url');
+  S.generatedPassword = generatedPw;
+  const uid = insert('users', {
+    name: S.owner,
+    email: S.email,
+    password_hash: await hashPassword(generatedPw),
+    role: isReadonlyDemo ? 'demo' : 'owner',
+    must_change_password: isReadonlyDemo ? 0 : 1,
+    token_version: 1,
+  });
   const sid = insert('stores', {
     owner_id: uid, slug: S.slug, code: S.code, name_ar: S.name[0], name_en: S.name[1], tagline_ar: S.tagline[0], tagline_en: S.tagline[1],
     description_ar: S.description[0], description_en: S.description[1], address_ar: S.address[0], address_en: S.address[1],
@@ -325,7 +343,8 @@ for (const S of STORES) {
 }
 
 console.timeEnd('seed');
-const ts = STORES.find((x) => x.slug === 'town-style');
-if (ts) console.log(`Town Style login: ${ts.email} / ${ts.password}   (note it now; change anytime with: npm run set-password -w server -- ${ts.email})`);
+for (const s of STORES) {
+  console.log(`Seeded store [${s.slug}] (${s.email === config.demoEmail ? 'demo read-only' : 'owner must_change_password=1'}): ${s.email} / ${s.generatedPassword}`);
+}
 const bytes = q.val('SELECT SUM(bytes) FROM media');
 console.log(`media renditions: ${q.val('SELECT COUNT(*) FROM media')} images, ${(bytes / 1e6).toFixed(1)} MB`);

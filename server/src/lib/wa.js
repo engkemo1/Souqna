@@ -58,9 +58,9 @@ export function sendAuthCode(to, code) {
   });
 }
 
-/** True when the request really comes from Meta (or when no app secret is configured yet). */
+/** True only when WA_APP_SECRET is configured and X-Hub-Signature-256 matches the HMAC-SHA256 of rawBody. */
 export function validSignature(rawBody, header) {
-  if (!config.wa.appSecret) return true;
+  if (!config.wa.appSecret) return false;
   if (!rawBody || !header || !header.startsWith('sha256=')) return false;
   const expected = crypto.createHmac('sha256', config.wa.appSecret).update(rawBody).digest('hex');
   const got = header.slice(7);

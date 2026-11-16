@@ -1,9 +1,10 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { q, insert, tx } from '../db/index.js';
 import { h, AppError, notFound } from '../lib/errors.js';
 import { signBuyer, requireBuyer, buyerFromReq, isPhoneBlocked } from '../lib/buyers.js';
+import { hashPassword, verifyPassword } from '../lib/auth.js';
+import { checkRateLimit, recordRateLimitHit, clearRateLimit } from '../lib/rate-limit.js';
 import { googleReady, verifyGoogleCredential } from '../lib/google.js';
 import { vapidPublicKey } from '../lib/push.js';
 import { mediaMap } from '../lib/media.js';
@@ -16,11 +17,8 @@ import { saveSnapshot, clearSnapshot } from '../lib/abandoned.js';
 const r = Router();
 const normPhone = (v) => { const d = String(v || '').replace(/\D/g, ''); return d.startsWith('20') && d.length === 12 ? `0${d.slice(2)}` : d; };
 
-const attempts = new Map();
 function throttle(key, max = 10) {
-  const now = Date.now(); const a = (attempts.get(key) || []).filter((t) => now - t < 10 * 60e3);
-  if (a.length >= max) throw new AppError(429, 'too_many_attempts', 'Too many attempts. Please wait a few minutes.');
-  attempts.set(key, [...a, now]);
+  checkRateLimit(`buyer:${key}`, { max, windowMs: 10 * 60e3 });
 }
 const blockedErr = () => new AppError(403, 'customer_blocked', 'This account cannot sign in. Please contact Twist support on WhatsApp.');
 const phoneSchema = z.string().trim().transform(normPhone).refine((p) => /^01[0-9]{9}$/.test(p), 'phone_invalid');
@@ -45,22 +43,32 @@ function mergeInto(fromId, toId, google) {
 const out = (b) => ({ id: b.id, name: b.name, phone: noPhone(b.phone) ? '' : b.phone, hasPhone: !noPhone(b.phone), phoneVerified: !!b.phone_verified });
 const unread = (id) => q.val('SELECT COUNT(*) FROM buyer_notifications WHERE buyer_id=? AND read=0', [id]);
 
-r.post('/register', h((req, res) => {
+r.post('/register', h(async (req, res) => {
   const b = z.object({ name: z.string().trim().min(2, 'required').max(60), phone: phoneSchema, password: z.string().min(6, 'password_short').max(100) }).parse(req.body);
   if (isPhoneBlocked(b.phone)) throw blockedErr();
   throttle(`reg:${req.ip}`, 8);
   if (q.get('SELECT 1 AS x FROM buyers WHERE phone=?', [b.phone])) throw new AppError(409, 'phone_taken', 'This number already has an account. Sign in instead.', { phone: 'phone_taken' });
-  const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: bcrypt.hashSync(b.password, 10), signup_via: 'password' });
+  const passwordHash = await hashPassword(b.password);
+  const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: passwordHash, signup_via: 'password', token_version: 1 });
   const buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
   res.status(201).json({ token: signBuyer(buyer), buyer: out(buyer), unread: 0 });
 }));
 
-r.post('/login', h((req, res) => {
+r.post('/login', h(async (req, res) => {
   const b = z.object({ phone: phoneSchema, password: z.string().min(1).max(100) }).parse(req.body);
-  throttle(`login:${req.ip}:${b.phone}`);
+  const bucket = `buyer:login:${req.ip}:${b.phone}`;
+  checkRateLimit(bucket, { max: 10, windowMs: 10 * 60e3, record: false });
   const buyer = q.get('SELECT * FROM buyers WHERE phone=?', [b.phone]);
-  if (!buyer || !bcrypt.compareSync(b.password, buyer.password_hash)) throw new AppError(401, 'invalid_credentials', 'Number or password is incorrect.');
+  const { valid, needsRehash, matched } = buyer ? await verifyPassword(b.password, buyer.password_hash) : { valid: false, needsRehash: false, matched: '' };
+  if (!valid) {
+    recordRateLimitHit(bucket);
+    throw new AppError(401, 'invalid_credentials', 'Number or password is incorrect.');
+  }
   if (buyer.blocked || isPhoneBlocked(buyer.phone)) throw blockedErr();
+  clearRateLimit(bucket);
+  if (needsRehash) {
+    q.run('UPDATE buyers SET password_hash=? WHERE id=?', [await hashPassword(matched), buyer.id]);
+  }
   res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });
 }));
 
@@ -88,7 +96,7 @@ r.post('/otp/send', h(async (req, res) => {
   res.json({ sent: true, isNew: !q.get('SELECT 1 AS x FROM buyers WHERE phone=?', [b.phone]), resendIn: OTP_RESEND / 1000 });
 }));
 
-r.post('/otp/verify', h((req, res) => {
+r.post('/otp/verify', h(async (req, res) => {
   const b = z.object({ phone: phoneSchema, code: z.string().trim().regex(/^\d{6}$/, 'code_invalid'), name: z.string().trim().min(2, 'required').max(60).optional() }).parse(req.body);
   throttle(`otpv:${req.ip}`, 20);
   const row = q.get('SELECT * FROM wa_otps WHERE phone=?', [b.phone]);
@@ -112,7 +120,7 @@ r.post('/otp/verify', h((req, res) => {
   }
   if (!buyer) {
     if (!b.name) return res.status(200).json({ needName: true }); // code stays valid until the name is sent
-    const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10), signup_via: 'whatsapp' });
+    const id = insert('buyers', { phone: b.phone, name: b.name, password_hash: await hashPassword(crypto.randomBytes(24).toString('hex')), signup_via: 'whatsapp', token_version: 1 });
     buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
   }
   if (buyer.blocked || isPhoneBlocked(buyer.phone)) throw blockedErr();
@@ -131,7 +139,7 @@ r.post('/google', h(async (req, res) => {
   if (buyer && (buyer.blocked || isPhoneBlocked(buyer.phone))) throw blockedErr();
   if (!buyer) {
     const name = (g.name || (g.email || '').split('@')[0] || '').slice(0, 60);
-    const id = insert('buyers', { phone: `g_${g.sub}`, name: name.length >= 2 ? name : 'عميل', password_hash: bcrypt.hashSync(crypto.randomBytes(24).toString('hex'), 10), google_sub: g.sub, email: g.email, signup_via: 'google' });
+    const id = insert('buyers', { phone: `g_${g.sub}`, name: name.length >= 2 ? name : 'عميل', password_hash: await hashPassword(crypto.randomBytes(24).toString('hex')), google_sub: g.sub, email: g.email, signup_via: 'google', token_version: 1 });
     buyer = q.get('SELECT * FROM buyers WHERE id=?', [id]);
   }
   res.json({ token: signBuyer(buyer), buyer: out(buyer), unread: unread(buyer.id) });
@@ -207,15 +215,25 @@ r.delete('/chats/:id', h((req, res) => {
   res.json({ ok: true });
 }));
 
-r.put('/me', h((req, res) => {
+r.put('/me', h(async (req, res) => {
   const b = z.object({ name: z.string().trim().min(2).max(60).optional(), password: z.string().min(6).max(100).optional(), current: z.string().max(100).optional() }).parse(req.body);
+  let newToken;
   if (b.password) {
-    const row = q.get('SELECT password_hash FROM buyers WHERE id=?', [req.buyer.id]);
-    if (!bcrypt.compareSync(b.current || '', row.password_hash)) throw new AppError(401, 'invalid_credentials', 'Current password is incorrect.');
-    q.run('UPDATE buyers SET password_hash=? WHERE id=?', [bcrypt.hashSync(b.password, 10), req.buyer.id]);
+    const row = q.get('SELECT password_hash, token_version FROM buyers WHERE id=?', [req.buyer.id]);
+    const { valid } = row ? await verifyPassword(b.current || '', row.password_hash) : { valid: false };
+    if (!valid) throw new AppError(401, 'invalid_credentials', 'Current password is incorrect.');
+    const nextTv = Number(row.token_version ?? 1) + 1;
+    q.run('UPDATE buyers SET password_hash=?, token_version=? WHERE id=?', [await hashPassword(b.password), nextTv, req.buyer.id]);
+    newToken = signBuyer({ id: req.buyer.id, token_version: nextTv });
   }
   if (b.name) q.run('UPDATE buyers SET name=? WHERE id=?', [b.name, req.buyer.id]);
-  res.json({ buyer: out(q.get('SELECT id, name, phone FROM buyers WHERE id=?', [req.buyer.id])) });
+  const updated = q.get('SELECT id, name, phone, phone_verified FROM buyers WHERE id=?', [req.buyer.id]);
+  res.json({ buyer: out(updated), ...(newToken ? { token: newToken } : {}) });
+}));
+
+r.post('/logout-all', h((req, res) => {
+  q.run('UPDATE buyers SET token_version = COALESCE(token_version, 1) + 1 WHERE id=?', [req.buyer.id]);
+  res.json({ ok: true });
 }));
 
 /* ------------------------------------------------ orders (placed while signed in, or claimed with number + phone) */

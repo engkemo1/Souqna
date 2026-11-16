@@ -8,7 +8,11 @@ import { vapidPublicKey } from './push.js';
 import { notifyGuestOrderWhatsApp } from './whatsapp.js';
 
 const SECRET = `${config.jwtSecret}:buyer`;
-export const signBuyer = (b) => { touchSeen(b.id); return jwt.sign({ sub: b.id, k: 'buyer' }, SECRET, { expiresIn: '90d' }); };
+export const signBuyer = (b) => {
+  touchSeen(b.id);
+  const tv = b?.token_version ?? (b?.id ? q.val('SELECT token_version FROM buyers WHERE id=?', [b.id]) : 1) ?? 1;
+  return jwt.sign({ sub: b.id, k: 'buyer', tv: Number(tv) }, SECRET, { algorithm: 'HS256', expiresIn: '30d' });
+};
 function touchSeen(id) { try { q.run("UPDATE buyers SET last_seen_at=datetime('now') WHERE id=?", [id]); } catch { /* never block a sign-in */ } }
 const SEEN_EVERY = 10 * 60e3;
 
@@ -16,7 +20,13 @@ export function buyerFromReq(req) {
   const t = req.headers['x-buyer-token'];
   if (!t || typeof t !== 'string') return null;
   let b = null;
-  try { const p = jwt.verify(t, SECRET, { algorithms: ['HS256'] }); b = p.k === 'buyer' ? q.get('SELECT id, name, phone, phone_verified, last_seen_at, blocked FROM buyers WHERE id=?', [p.sub]) || null : null; } catch { return null; }
+  try {
+    const p = jwt.verify(t, SECRET, { algorithms: ['HS256'] });
+    if (p.k === 'buyer') {
+      const row = q.get('SELECT id, name, phone, phone_verified, last_seen_at, blocked, token_version FROM buyers WHERE id=?', [p.sub]);
+      if (row && (p.tv === undefined || Number(p.tv) === Number(row.token_version ?? 1))) b = row;
+    }
+  } catch { return null; }
   if (b && (b.blocked || isPhoneBlocked(b.phone))) return null; // blocked by the team: signed out everywhere
   if (b && (!b.last_seen_at || Date.parse(`${b.last_seen_at.replace(' ', 'T')}Z`) < Date.now() - SEEN_EVERY)) touchSeen(b.id);
   return b;

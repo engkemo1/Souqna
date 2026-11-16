@@ -111,6 +111,28 @@ export const PHOTO_STYLES = ['white', 'cream', 'original'];
 const STYLE_BG = { white: [255, 255, 255], cream: [245, 239, 230] };
 const hex = (rgb) => '#' + rgb.map((v) => Math.round(v).toString(16).padStart(2, '0')).join('');
 const ACCEPTED = new Set(['jpeg', 'png', 'webp', 'avif', 'heif', 'tiff', 'gif']);
+export const MAX_INPUT_PIXELS = 64_000_000; // 8000x8000 decompression-bomb guard
+
+/**
+ * Verify file signature (magic bytes) before passing untrusted upload buffers to decoders.
+ * Supports JPEG, PNG, GIF, WebP, TIFF, and ISO-BMFF (AVIF/HEIF/HEIC).
+ */
+export function hasValidImageMagicBytes(buf) {
+  if (!Buffer.isBuffer(buf) || buf.length < 12) return false;
+  // JPEG: FF D8 FF
+  if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return true;
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47 && buf[4] === 0x0d && buf[5] === 0x0a && buf[6] === 0x1a && buf[7] === 0x0a) return true;
+  // GIF: GIF87a or GIF89a
+  if (buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38 && (buf[4] === 0x37 || buf[4] === 0x39) && buf[5] === 0x61) return true;
+  // WebP: RIFF....WEBP
+  if (buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 && buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50) return true;
+  // TIFF: II*\0 or MM\0*
+  if ((buf[0] === 0x49 && buf[1] === 0x49 && buf[2] === 0x2a && buf[3] === 0x00) || (buf[0] === 0x4d && buf[1] === 0x4d && buf[2] === 0x00 && buf[3] === 0x2a)) return true;
+  // ISO BMFF (AVIF / HEIF / HEIC): bytes 4..7 === 'ftyp'
+  if (buf[4] === 0x66 && buf[5] === 0x74 && buf[6] === 0x79 && buf[7] === 0x70) return true;
+  return false;
+}
 
 export function mediaDirFor(storeId, key) {
   return path.join(config.mediaDir, String(storeId), key);
@@ -393,7 +415,8 @@ async function productCanvas(data, style = 'original', analysis = null, { noCut 
  * Busy backdrops are cut out once and laid on both colours. { white: null } when the backdrop cannot be changed.
  */
 export async function previewStyles(buffer) {
-  const small = await sharp(buffer, { failOn: 'error' }).rotate().toColourspace('srgb').flatten({ background: '#ffffff' })
+  if (!hasValidImageMagicBytes(buffer)) throw badRequest('invalid_image', 'This file is not a supported image.');
+  const small = await sharp(buffer, { failOn: 'error', limitInputPixels: MAX_INPUT_PIXELS }).rotate().toColourspace('srgb').flatten({ background: '#ffffff' })
     .resize({ width: 900, height: 900, fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer()
     .then(neutralLight);
   const an = await analyzePhoto(small);
@@ -445,13 +468,17 @@ export async function reprocessProductMedia(m) {
 }
 
 export async function processImage(buffer, { storeId, kind = 'product', alt = null, fast = false, style: styleOverride = null, noCut = false, ownerSees = false }) {
+  if (!hasValidImageMagicBytes(buffer)) {
+    throw badRequest('invalid_image', 'This file is not a supported image.');
+  }
   let meta;
   try {
-    meta = await sharp(buffer, { failOn: 'error' }).metadata();
+    meta = await sharp(buffer, { failOn: 'error', limitInputPixels: MAX_INPUT_PIXELS }).metadata();
   } catch {
     throw badRequest('invalid_image', 'This file is not a supported image.');
   }
   if (!ACCEPTED.has(meta.format)) throw badRequest('invalid_image', 'This file is not a supported image.');
+  if ((meta.width || 0) * (meta.height || 0) > MAX_INPUT_PIXELS) throw badRequest('invalid_image', 'This image exceeds the maximum allowed dimensions.');
 
   if (kind === 'product' && Math.min(meta.width || 0, meta.height || 0) < MIN_PRODUCT_SIDE) throw badRequest('image_too_small', 'This image is too small to use.');
 
@@ -461,7 +488,7 @@ export async function processImage(buffer, { storeId, kind = 'product', alt = nu
   await fs.mkdir(dir, { recursive: true });
 
   // Normalise: honour EXIF orientation, sRGB, strip metadata, cap size.
-  const base = sharp(buffer).rotate().toColourspace('srgb');
+  const base = sharp(buffer, { limitInputPixels: MAX_INPUT_PIXELS }).rotate().toColourspace('srgb');
   let normalised, quality = null, sourceJpeg = null;
   const report = {};
   if (kind === 'product') {

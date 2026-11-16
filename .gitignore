@@ -1,6 +1,7 @@
 node_modules/
 web/dist/
 server/data/
+server/_gemini_backup/
 .cache-fonts/
 *.log
 .env
@@ -8,7 +9,15 @@ Claude outputs/
 souqna.zip
 deploy.bat
 tmp/
-
+scratch/
+TM-ad/
+tall
+*.mp4
+*.wav
+docs/ad-video-v2/
+docs/ad-video-v3/
+docs/ad-video-v4/
+docs/video-review/
 
 # secrets / local backups (never commit)
 .env.*
@@ -16,5 +25,7 @@ tmp/
 *.save
 *.sqlite
 *.sqlite-*
+*.db
+*.db-*
 backups/
 rollback-*.json

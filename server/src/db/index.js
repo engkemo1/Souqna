@@ -67,6 +67,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
     if (bc.length && !bc.includes('signup_via')) db.exec('ALTER TABLE buyers ADD COLUMN signup_via TEXT'); // google | whatsapp | password (older accounts: worked out from the other columns)
     if (bc.length && !bc.includes('blocked')) db.exec('ALTER TABLE buyers ADD COLUMN blocked INTEGER NOT NULL DEFAULT 0'); // blocked by the platform admin (accounts without a phone)
     if (bc.length && !bc.includes('last_seen_at')) db.exec('ALTER TABLE buyers ADD COLUMN last_seen_at TEXT'); // last time the account used the site (updated at most every 10 minutes)
+    if (bc.length && !bc.includes('token_version')) db.exec('ALTER TABLE buyers ADD COLUMN token_version INTEGER NOT NULL DEFAULT 1');
     if (bc.length) db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_buyers_google_sub ON buyers(google_sub) WHERE google_sub IS NOT NULL'); }
   // Shoppers the team flagged (by mobile number, so guests count too): a private note, and a block that stops new orders and sign-ins.
   db.exec(`CREATE TABLE IF NOT EXISTS customer_flags (phone TEXT PRIMARY KEY, blocked INTEGER NOT NULL DEFAULT 0, reason TEXT, note TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`);
@@ -209,6 +210,13 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   const ucols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
   if (!ucols.includes('setup_token_hash')) db.exec('ALTER TABLE users ADD COLUMN setup_token_hash TEXT');
   if (!ucols.includes('setup_expires')) db.exec('ALTER TABLE users ADD COLUMN setup_expires TEXT');
+  if (!ucols.includes('token_version')) db.exec('ALTER TABLE users ADD COLUMN token_version INTEGER NOT NULL DEFAULT 1');
+  if (!ucols.includes('must_change_password')) db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+  db.exec(`CREATE TABLE IF NOT EXISTS rate_limits (
+    bucket TEXT NOT NULL,
+    ts INTEGER NOT NULL
+  )`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_rate_limits_bucket_ts ON rate_limits(bucket, ts)');
 }
 
 {
