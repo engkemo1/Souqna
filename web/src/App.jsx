@@ -9,8 +9,8 @@ import { ToastProvider } from './components/ui/Toast.jsx';
 import { BuyerProvider } from './lib/buyer.jsx';
 import CartSync from './components/market/CartSync.jsx';
 import RouteFallback from './components/RouteFallback.jsx';
+import ErrorBoundary from './components/ErrorBoundary.jsx';
 import NotFound from './pages/NotFound.jsx';
-
 const MarketHome = lazy(() => import('./pages/market/MarketHome.jsx'));
 const StoresDirectory = lazy(() => import('./pages/market/StoresDirectory.jsx'));
 const MarketSearch = lazy(() => import('./pages/market/MarketSearch.jsx'));
@@ -239,19 +239,21 @@ function ManageToProducts() { const { slug } = useParams(); return <Navigate to=
 
 export default function App() {
   return (
-    <MotionConfig reducedMotion="user">
-      <I18nProvider>
-        <AuthProvider>
-          <BuyerProvider>
-          <CartProvider>
-            <CartSync />
-            <ToastProvider>
-              <RouterProvider router={router} />
-            </ToastProvider>
-          </CartProvider>
-          </BuyerProvider>
-        </AuthProvider>
-      </I18nProvider>
-    </MotionConfig>
+    <ErrorBoundary>
+      <MotionConfig reducedMotion="user">
+        <I18nProvider>
+          <AuthProvider>
+            <BuyerProvider>
+            <CartProvider>
+              <CartSync />
+              <ToastProvider>
+                <RouterProvider router={router} />
+              </ToastProvider>
+            </CartProvider>
+            </BuyerProvider>
+          </AuthProvider>
+        </I18nProvider>
+      </MotionConfig>
+    </ErrorBoundary>
   );
 }

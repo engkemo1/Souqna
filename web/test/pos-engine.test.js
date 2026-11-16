@@ -147,6 +147,14 @@ test('memory db keeps sales per store only', async () => {
   assert.deepEqual(await db.get('catalog:1'), snap); assert.equal(await db.get('last'), 1);
   await db.deleteSaleWithCatalog('x', 1, { ...snap, products: [{ id: 9, stock: 3 }] });
   assert.equal((await db.sales(1)).length, 0); assert.equal((await db.get('catalog:1')).products[0].stock, 3);
+
+  // Test unsynced sales export
+  await db.putSale({ uuid: 'sale-backup-1', storeId: 1, total: 150 });
+  const exportedRaw = await db.exportUnsyncedSales(1);
+  const exported = JSON.parse(exportedRaw);
+  assert.equal(exported.storeId, 1);
+  assert.equal(exported.count, 1);
+  assert.equal(exported.sales[0].uuid, 'sale-backup-1');
 });
 
 test('receipt escapes names, shows the temporary label until numbered', () => {

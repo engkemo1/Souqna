@@ -4,6 +4,20 @@ All notable changes for the production-readiness hardening of **Twist Store** (`
 
 ## [Unreleased]
 
+### Phase 5 — Frontend Production Quality
+- Added top-level React `ErrorBoundary` (`web/src/components/ErrorBoundary.jsx`) wrapping `App.jsx` with Arabic recovery UI and reload trigger.
+- Verified existing `vite:preloadError` handler in `web/src/main.jsx` to prevent stuck UI after chunk rotation.
+- Added `exportUnsyncedSales` utility to `web/src/lib/pos/db.js` for JSON disaster recovery of unsynced offline POS sales, verified by test in `web/test/pos-engine.test.js`.
+- Verified clean production Vite bundle build (`npm run build`).
+
+### Phase 3 — Infrastructure & Deployment Hardening
+- Multi-stage `Dockerfile`: `deps`, `litestream`, `bgmodel`, `builder`, and `runtime` stages.
+- Production container runs as unprivileged `USER node` with non-root ownership.
+- Added production `docker-compose.yml` with `app` + `caddy` services, healthchecks on `/api/ready`, dropped Linux capabilities, and read-only / tmpfs bounds.
+- Added `Caddyfile` with automated TLS, HSTS, HTTP/3, gzip/zstd, 20MB body size cap, and proxy headers.
+- Marked `render.yaml` clearly as demo/review-only environment.
+- Documented full operational guidelines in `docs/ENV.md` and `docs/RUNBOOK.md`.
+
 ### Phase 2 — P0/P1 Reliability, Data Integrity & Ops
 
 - Added `server/src/lib/logger.js`: structured JSON logging, PII redaction (phones, Bearer tokens), `X-Request-Id` middleware, event-loop lag histogram, Prometheus text formatter.

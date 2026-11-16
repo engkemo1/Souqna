@@ -17,6 +17,10 @@ export function createMemoryDb() {
     async deleteSale(uuid) { sales.delete(uuid); },
     async putSaleWithCatalog(e, snapshot) { sales.set(e.uuid, structuredClone(e)); kv.set(`catalog:${e.storeId}`, structuredClone(snapshot)); kv.set('last', e.storeId); },
     async deleteSaleWithCatalog(uuid, storeId, snapshot) { sales.delete(uuid); kv.set(`catalog:${storeId}`, structuredClone(snapshot)); kv.set('last', storeId); },
+    async exportUnsyncedSales(storeId) {
+      const pending = [...sales.values()].filter((s) => s.storeId === storeId);
+      return JSON.stringify({ storeId, exportedAt: new Date().toISOString(), count: pending.length, sales: pending }, null, 2);
+    },
   };
 }
 
@@ -61,6 +65,10 @@ export async function openPosDb(idb = globalThis.indexedDB) {
           transaction.objectStore('kv').put(storeId, 'last');
           transaction.oncomplete = resolve; transaction.onerror = () => reject(transaction.error); transaction.onabort = () => reject(transaction.error || new Error('transaction aborted'));
         });
+      },
+      async exportUnsyncedSales(storeId) {
+        const pending = await wrap(store('sales').index('storeId').getAll(storeId));
+        return JSON.stringify({ storeId, exportedAt: new Date().toISOString(), count: pending.length, sales: pending }, null, 2);
       },
     };
   } catch {
