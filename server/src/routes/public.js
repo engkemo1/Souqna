@@ -33,6 +33,8 @@ import { matchStore } from '../lib/moda/stores.js';
 import { contactFromEnv } from '../lib/moda/contact.js';
 import { logStylist } from '../lib/stylist-log.js';
 import { runModa } from '../lib/moda/engine.js';
+import { smartLookText, acceptSmartLook } from '../lib/moda/smartlook.js';
+import { activeStories, expireStories, bumpStory } from '../lib/stories.js';
 import { enrichAll as enrichModaRows } from '../lib/moda/products.js';
 import { getModaPrompts } from '../lib/modaPrompts.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
@@ -511,6 +513,17 @@ function modaClientResponse(result) {
   };
 }
 
+// ستوري المحلات للصفحة الرئيسية: اللي لسه ما انتهاش (24 ساعة)، والتنضيف بيتم في الخلفية كل 10 دقايق
+r.get('/stories', h((_req, res) => { res.set('Cache-Control', 'public, max-age=60'); res.json({ items: activeStories() }); }));
+r.post('/stories/:id/:event(view|click)', h((req, res) => {
+  checkRateLimit(`public:story:${req.ip}`, { max: 400, windowMs: 3600e3, code: 'rate_limited', message: 'Too many requests.' });
+  bumpStory(Number(req.params.id), req.params.event === 'click' ? 'clicks' : 'views', `${req.ip}|${req.get('user-agent') || ''}`);
+  res.status(204).end();
+}));
+const sweepStories = () => { expireStories().catch(() => { /* مش حرج */ }); };
+setTimeout(sweepStories, 20000).unref?.();
+setInterval(sweepStories, 10 * 60 * 1000).unref?.();
+
 r.get('/stylist/prompts', h((_req, res) => { res.set('Cache-Control', 'public, max-age=60'); res.json(getModaPrompts()); }));
 
 r.post('/stylist', h(async (req, res) => {
@@ -570,6 +583,36 @@ r.post('/stylist', h(async (req, res) => {
     return res.json(modaClientResponse(result));
   }
   catch (e) { if (e.code === 'stylist_no_vision') throw new AppError(422, 'stylist_no_vision', 'Photos need the Anthropic provider.'); if (e.code === 'stylist_bad_image') throw new AppError(422, 'stylist_bad_image', 'Unsupported image.'); if (e.code === 'stylist_unavailable') throw new AppError(503, 'stylist_unavailable', 'The stylist is unavailable right now.'); throw e; }
+}));
+
+// «طقم كامل يكمّل القطعة دي» (اقتراح اختياري في صفحة المنتج): بنسأل محرك تويلا (قواعد بس، من غير موديل لغة) ونرد بالطقم
+// لو ومعاه بس لو كامل ومتناسق (acceptSmartLook)؛ غير كده ok:false والواجهة تسكت. مفيش إجبار ولا قطعة عشوائية.
+const smartLookCache = new Map();
+const smartLookHits = new Map();
+r.post('/stylist/smart-look', h(async (req, res) => {
+  const st = stylistSettings();
+  if (!st.enabled) return res.json({ ok: false, reason: 'disabled' });
+  const body = z.object({ productId: z.number().int().positive(), budget: z.number().positive().max(1e6).optional() }).parse(req.body);
+  const ip = req.ip || 'x'; const now = Date.now();
+  const recent = (smartLookHits.get(ip) || []).filter((t) => now - t < 3600e3);
+  if (recent.length >= 60) throw new AppError(429, 'rate_limited', 'Too many requests, try again later.');
+  smartLookHits.set(ip, [...recent, now]);
+  const cacheKey = `${body.productId}:${body.budget || 0}`;
+  const hit = smartLookCache.get(cacheKey);
+  if (hit && now - hit.at < 10 * 60e3) return res.json(hit.out);
+  const rows = modaCatalogRows();
+  const enriched = enrichModaRows(rows, loadModaKnowledge());
+  const anchor = enriched.find((x) => x.id === body.productId);
+  const finish = (out) => { if (smartLookCache.size > 500) smartLookCache.clear(); smartLookCache.set(cacheKey, { at: now, out }); return res.json(out); };
+  if (!anchor) return finish({ ok: false, reason: 'not_found' });
+  const text = smartLookText(anchor);
+  if (!text) return finish({ ok: false, reason: 'audience_unknown' });
+  const result = await runModa([{ role: 'user', content: text }], { products: rows, assistantName: st.name, offers: liveOffersForModa, stores: storesForModa, training: stylistTrainingSettings() });
+  const verdict = acceptSmartLook(result, { anchorId: anchor.id, anchorKey: anchor.key, keyOf: (id) => enriched.find((x) => x.id === id)?.key, budget: body.budget || null });
+  if (!verdict.ok) return finish({ ok: false, reason: verdict.reason });
+  const resp = modaClientResponse(result);
+  if (!resp.looks?.length || resp.looks.length !== verdict.ids.length) return finish({ ok: false, reason: 'cards_missing' });
+  return finish({ ok: true, anchorId: anchor.id, total: resp.total, looks: resp.looks, styleTips: resp.styleTips || [], palette: resp.palette || [] });
 }));
 
 r.post('/stylist/feedback', h((req, res) => {

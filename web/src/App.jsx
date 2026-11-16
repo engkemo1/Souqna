@@ -58,6 +58,7 @@ const Offers = lazy(() => import('./pages/dashboard/Offers.jsx'));
 const Promotions = lazy(() => import('./pages/dashboard/Promotions.jsx'));
 const PromotionEditor = lazy(() => import('./pages/dashboard/PromotionEditor.jsx'));
 const Banners = lazy(() => import('./pages/dashboard/Banners.jsx'));
+const Stories = lazy(() => import('./pages/dashboard/Stories.jsx'));
 const DashCategories = lazy(() => import('./pages/dashboard/Categories.jsx'));
 const Customers = lazy(() => import('./pages/dashboard/Customers.jsx'));
 const Analytics = lazy(() => import('./pages/dashboard/Analytics.jsx'));
@@ -89,6 +90,7 @@ const AdminAlerts = lazy(() => import('./pages/admin/Alerts.jsx'));
 const AdminGrowth = lazy(() => import('./pages/admin/Growth.jsx'));
 const AdminInsights = lazy(() => import('./pages/admin/Insights.jsx'));
 const AdminAudit = lazy(() => import('./pages/admin/AuditLog.jsx'));
+const AdminStories = lazy(() => import('./pages/admin/Stories.jsx'));
 const AdminCampaigns = lazy(() => import('./pages/admin/Campaigns.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
 const AdminFeatured = lazy(() => import('./pages/admin/FeaturedAds.jsx'));
@@ -172,6 +174,7 @@ const router = createBrowserRouter([
           { path: 'promotions/new', element: <PromotionEditor /> },
           { path: 'promotions/:id', element: <PromotionEditor /> },
           { path: 'banners', element: <Banners /> },
+          { path: 'stories', element: <Stories /> },
           { path: 'categories', element: <DashCategories /> },
           { path: 'customers', element: <Customers /> },
           { path: 'analytics', element: <Analytics /> },
@@ -213,6 +216,7 @@ const router = createBrowserRouter([
           { path: 'growth', element: <AdminGrowth /> },
           { path: 'insights', element: <AdminInsights /> },
           { path: 'audit', element: <AdminAudit /> },
+          { path: 'stories', element: <AdminStories /> },
           { path: 'campaigns', element: <AdminCampaigns /> },
           { path: 'reports', element: <AdminReports /> },
           { path: 'system', element: <AdminSystem /> },

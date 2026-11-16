@@ -33,6 +33,7 @@ export function useNav() {
       { to: '/dashboard/promotions', icon: Percent, label: isRtl ? 'العروض والخصومات' : 'Offers & Discounts' },
       { to: '/dashboard/offers', icon: TicketPercent, label: t('dash.offers') },
       { to: '/dashboard/banners', icon: Images, label: t('dash.banners') },
+      ...(info?.features?.stories ? [{ to: '/dashboard/stories', icon: Camera, label: isRtl ? 'الستوري' : 'Stories' }] : []),
       { to: '/dashboard/categories', icon: FolderTree, label: t('dash.categories') },
       { to: '/dashboard/services', icon: Camera, label: t('dash.services') },
     ] },

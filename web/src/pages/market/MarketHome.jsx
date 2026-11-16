@@ -10,6 +10,7 @@ import Brand from '../../components/market/Brand.jsx';
 import SocialLinks from '../../components/market/SocialLinks.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import FeaturedSlot from '../../components/featured/FeaturedSlot.jsx';
+import StoriesBar from '../../components/market/StoriesBar.jsx';
 import MobileHomeSearch from '../../components/market/MobileHomeSearch.jsx';
 import StylistChat from '../../components/market/StylistChat.jsx';
 import ModaAvatar from '../../components/market/ModaAvatar.jsx';
@@ -112,6 +113,7 @@ export default function MarketHome() {
     <div className="min-h-dvh bg-[#F6F8FB] ">
       <MarketHeader />
       <FeaturedSlot placement="market_top" />
+      <StoriesBar />
 
       {/* Hero */}
       <section role="main" id="main" className="relative isolate overflow-hidden pt-6 sm:pt-10">

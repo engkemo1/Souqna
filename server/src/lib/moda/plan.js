@@ -7,7 +7,7 @@ import { norm } from './text.js';
 import { loadKnowledge } from './knowledge.js';
 import { occasionFit, APPAREL_FAMILIES, INTIMATE_KEYS } from './intent.js';
 
-const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'hijab_cap', 'lingerie', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
+const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'hijab_cap', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
 const MEN_KEYS = new Set(['suit', 'tuxedo', 'tie', 'bow_tie', 'pocket_square', 'waistcoat', 'classic_set']);
 const HERO_KEYS = new Set(['dress_party', 'dress_evening', 'dress_casual', 'dress_work', 'dress_bridal', 'jumpsuit', 'two_piece_set', 'womens_suit', 'suit', 'classic_set', 'tuxedo', 'abaya', 'hijab_set']);
 const GUEST_CONTEXTS = new Set(['engagement_guest', 'wedding_guest', 'katb_kitab']);
@@ -168,9 +168,21 @@ function scoreProduct(p, slot, ctx) {
 const CASUAL_ONLY = new Set(['sneakers', 'sport_shoes', 'slippers']);
 /** قطع مش بتتركّب في أطقم أبدًا إلا بطلب صريح (ملابس داخلية/نوم وإكسسوارات فرعية). */
 // قطع اللون مش بيفرق فيها: ما نسألش عن اللون
-export const NO_COLOR_ASK = new Set(['perfume', 'watch', 'jewelry', 'sunglasses', 'socks', 'cufflinks', 'underwear', 'sleepwear', 'lingerie', 'robe', 'tie', 'bow_tie', 'pocket_square', 'cap', 'hijab_cap']);
+export const NO_COLOR_ASK = new Set(['perfume', 'watch', 'jewelry', 'sunglasses', 'socks', 'cufflinks', 'underwear', 'sleepwear', 'lingerie', 'robe', 'tie', 'bow_tie', 'pocket_square', 'cap']);
 export const SIZE_ASK_KEYS = new Set(['underwear', 'sleepwear', 'lingerie', 'robe']);
 export const NEVER_UNASKED = new Set(['sleepwear', 'lingerie', 'robe', 'cufflinks', 'underwear']);
+
+// طبقات اللبس: مش أي توب يتلبس تحت جاكيت. بدون أكمام/تانك/كروب أو رياضي تحت أي جاكيت = لأ، والهودي والتيشيرت تحت بليزر/بدلة/جيليه = لأ.
+const OUTER_KEYS = new Set(['jacket', 'coat', 'blazer', 'cardigan', 'long_cardigan', 'waistcoat', 'suit', 'tuxedo', 'womens_suit', 'classic_set']);
+const TAILORED_KEYS = new Set(['blazer', 'suit', 'tuxedo', 'womens_suit', 'classic_set', 'waistcoat']);
+const LAYER_TOPS = new Set(['tshirt', 'polo', 'shirt', 'blouse', 'sweater', 'hoodie', 'tunic', 'top', 'sport_top']);
+export function layerOK(p, outer) {
+  if (!outer?.size || !LAYER_TOPS.has(p.key)) return true;
+  if (p.sleeveless || p.key === 'sport_top') return false;
+  if ([...outer].some((k) => TAILORED_KEYS.has(k)) && (p.key === 'hoodie' || p.key === 'tshirt')) return false;
+  return true;
+}
+export const outerKeysOf = (slots, parsed) => new Set([...(slots || []).flatMap((s) => s.keys || []), ...(parsed?.ownedPieces || []).map((o) => o.key), ...(parsed?.garments || []).map((g) => g.key)].filter((k) => OUTER_KEYS.has(k)));
 
 /** يجيب المرشحين لـ slot عند مستوى تخفيف معين. */
 function candidatesAt(slot, lvl, aud, products, ctx) {
@@ -188,6 +200,7 @@ function candidatesAt(slot, lvl, aud, products, ctx) {
     if (p.key === 'jalabiya' && !slot.explicit) continue;
     if (!genderOK(aud, p.gender)) continue;
     if (aud === 'women_hijab' && p.sleeveless) continue;
+    if (ctx.outer?.size && !ctx.requested?.has(p.key) && !layerOK(p, ctx.outer)) continue; // طبقات: مش أي توب تحت الجاكيت
     const cols = p.colorKeys || [];
     if (userAvoid.length && cols.length && cols.every((c) => userAvoid.includes(c))) continue;
     if (slot.material && p.materials?.size && !p.materials.has(slot.material)) continue; // خامة مش مكتوبة = مش مرفوضة (بنقول للعميل يتأكد)
@@ -262,6 +275,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
   const taste = [...(parsed.taste || []), ...(env.profileTaste || [])];
   const lookAvoidHard = context === 'condolence' && look?.avoid_colors ? look.avoid_colors : null;
   const ordered = [...built.slots].sort((a, b) => Number(b.hero) - Number(a.hero));
+  const outer = outerKeysOf(built.slots, parsed); const requested = new Set((parsed.ownedPieces || []).length ? [] : (parsed.garments || []).map((g) => g.key)); // لو العميل قال «معايا X» فباقي القطع مقترحة (مش مطلوبة بالاسم)
   let scoreSum = 0; let maxLevel = 0;
   for (const slot of ordered) {
     const levels = levelsFor(slot, K);
@@ -269,7 +283,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     for (let li = 0; li < levels.length; li += 1) {
       const lvl = levels[li];
       const fR = slot.hero || built.mode === 'look' ? fRangeLook : fRangeLook;
-      const list = candidatesAt(slot, lvl, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fR, role, context, userAvoid, lookAvoidHard });
+      const list = candidatesAt(slot, lvl, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fR, role, context, userAvoid, lookAvoidHard, outer, requested });
       if (!list.length) continue;
       const cap = personBudget ? (personBudget * slot.share) / 100 * 1.3 : null;
       const sctx = { aud, season: parsed.season, look: built.mode === 'look' ? look : null, K, adv, fTarget: fR ? (fR[0] + fR[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], queryTokens: queryTokensOf(parsed), budgetCap: cap, learnedPreferences: env.learnedPreferences };
@@ -291,7 +305,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     const subs = []; for (const k of slot.keys) for (const x of K.substitutes[k] || []) if (!slot.keys.includes(x) && !subs.includes(x)) subs.push(x);
     let pool = [];
     if (subs.length) {
-      const pl = candidatesAt(slot, { keys: [...slot.keys, ...subs], color: false, fd: 1, rel: null }, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fRangeLook, role, context, userAvoid, lookAvoidHard });
+      const pl = candidatesAt(slot, { keys: [...slot.keys, ...subs], color: false, fd: 1, rel: null }, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fRangeLook, role, context, userAvoid, lookAvoidHard, outer, requested });
       const sctx2 = { aud, season: parsed.season, look: built.mode === 'look' ? look : null, K, adv, fTarget: fRangeLook ? (fRangeLook[0] + fRangeLook[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], queryTokens: queryTokensOf(parsed), budgetCap: null, learnedPreferences: env.learnedPreferences };
       pool = pl.filter((x) => !chosen.ranked.some((r) => r.p.id === x.id)).map((x) => ({ p: x, s: scoreProduct(x, slot, sctx2) - 3, viaPool: true }));
     }

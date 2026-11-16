@@ -40,6 +40,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { isWhatsAppConfigured, notifyPlatformDelivery, saveWaSettings, waSettingsView, sendWaTest } from '../lib/whatsapp.js';
 import { mountCashierAdmin } from './admin-cashier.js';
+import { adminStoryStores, setStoriesAllowed, setAllStoriesAllowed, adminActiveStories, adminRemoveStory } from '../lib/stories.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { CASHIER_SYSTEMS, CASHIER_IDS, CASHIER_LINK_STATUSES } from '../lib/cashier-catalog.js';
 import { getPlatformFreeShipping, savePlatformFreeShipping, deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing, getMultiStoreRule, saveMultiStoreRule, getZonePolicy, saveZonePolicy, zoneKey } from '../lib/deliveryRates.js';
@@ -1828,6 +1829,25 @@ r.post('/stores/:slug/setup-link', h((req, res) => {
   const user = q.get('SELECT u.id FROM stores s JOIN users u ON u.id=s.owner_id WHERE s.slug=?', [req.params.slug]);
   if (!user) throw new AppError(404, 'not_found', 'Store not found.');
   res.json(makeSetupLink(req, user.id));
+}));
+
+/* ---- stories: which stores may post (off by default) + moderation ---- */
+r.get('/stories', h((_req, res) => { res.json({ stores: adminStoryStores(), items: adminActiveStories() }); }));
+r.put('/stories/stores', h((req, res) => {
+  const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
+  setAllStoriesAllowed(enabled);
+  res.json({ stores: adminStoryStores() });
+}));
+r.put('/stories/stores/:slug', h((req, res) => {
+  const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
+  const s = q.get('SELECT id FROM stores WHERE slug=?', [req.params.slug]);
+  if (!s) throw new AppError(404, 'not_found', 'Store not found.');
+  setStoriesAllowed(s.id, enabled);
+  res.json({ stores: adminStoryStores() });
+}));
+r.delete('/stories/:id', h(async (req, res) => {
+  if (!(await adminRemoveStory(Number(req.params.id)))) throw new AppError(404, 'not_found', 'Story not found.');
+  res.json({ items: adminActiveStories() });
 }));
 
 export default r;

@@ -66,8 +66,9 @@ WORKDIR /app
 
 # Production-only system packages.
 RUN apt-get update \
- && apt-get install -y --no-install-recommends ca-certificates \
+ && apt-get install -y --no-install-recommends ca-certificates ffmpeg \
  && rm -rf /var/lib/apt/lists/*
+# ffmpeg: بيحوّل فيديو الستوري لـ H.264 صغير (فيديو الآيفون وغيره). من غيره السيرفر بيقبل MP4/H.264 بس.
 
 # Litestream binary from stage 2.
 COPY --from=litestream /usr/local/bin/litestream /usr/local/bin/litestream

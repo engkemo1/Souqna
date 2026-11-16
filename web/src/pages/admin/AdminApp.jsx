@@ -44,6 +44,7 @@ const NAV_GROUPS = [
     { to: '/admin/stylist-log', icon: Sparkles, label: 'أسئلة تويلا وسرعتها' },
     { to: '/admin/stylist/training', icon: Sparkles, label: 'تدريب تويلا وقواعدها' },
     { to: '/admin/campaigns', icon: Megaphone, label: 'الحملات والإعلانات' },
+    { to: '/admin/stories', icon: Camera, label: 'ستوري المحلات' },
     { to: '/admin/reports', icon: BarChart3, label: 'التقارير' },
     { to: '/admin/audit', icon: History, label: 'سجل الحركات' },
   ] },

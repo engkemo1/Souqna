@@ -15,6 +15,8 @@ import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { requireOwner } from '../lib/auth.js';
 import { checkRateLimit } from '../lib/rate-limit.js';
+import { addStory, ownStories, removeStory, activeCount, storiesAllowed, STORY_MAX_ACTIVE, STORY_TTL_HOURS } from '../lib/stories.js';
+import { saveStoryVideo, deleteStoryVideo, looksLikeVideo, VIDEO_MAX_SECONDS, VIDEO_MAX_BYTES } from '../lib/story-video.js';
 import promotionsRouter from './owner-promotions.js';
 import { orderPromotions } from '../lib/promotions/orders.js';
 import { computeReturn } from '../lib/promotions/returns.js';
@@ -88,7 +90,7 @@ r.get('/notifications', h((req, res) => {
 
 r.get('/store', h((req, res) => {
   const t = buildTheme(json(req.store.theme_json, {}));
-  res.json({ store: serializeStore(req.store), user: req.user, themeReport: t.report, themeChecks: t.checks, features: (() => { const a = cashierAccess(req.store.id); const own = q.val('SELECT cashier_id FROM store_cashier_links WHERE store_id=?', [req.store.id]) === 'twist'; return { cashier: a.allowed, cashierState: a.state, cashierEndsAt: a.endsAt, pos: a.allowed && own }; })() });
+  res.json({ store: serializeStore(req.store), user: req.user, themeReport: t.report, themeChecks: t.checks, features: (() => { const a = cashierAccess(req.store.id); const own = q.val('SELECT cashier_id FROM store_cashier_links WHERE store_id=?', [req.store.id]) === 'twist'; return { cashier: a.allowed, cashierState: a.state, cashierEndsAt: a.endsAt, pos: a.allowed && own, stories: storiesAllowed(req.store.id) }; })() });
 }));
 
 /* ---------------------------------------------------------- same-day delivery: switched on for today, expires by itself */
@@ -1576,6 +1578,52 @@ r.put('/banners-order', h((req, res) => {
 r.delete('/banners/:id', h((req, res) => {
   q.run('DELETE FROM banners WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   res.json({ items: bannersOut(req.store.id) });
+}));
+
+// ---- ستوري المحل (بتظهر في الصفحة الرئيسية وبتختفي بعد 24 ساعة)
+const storyUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 40 * 1024 * 1024, files: 1 } });
+const storyPayload = (storeId) => ({ items: ownStories(storeId), max: STORY_MAX_ACTIVE, ttlHours: STORY_TTL_HOURS, allowed: storiesAllowed(storeId), video: { maxSeconds: VIDEO_MAX_SECONDS, maxMb: Math.round(VIDEO_MAX_BYTES / 1048576) } });
+const needStories = (req) => { if (!storiesAllowed(req.store.id)) throw new AppError(403, 'stories_disabled', 'Stories are not enabled for your store. Contact Twist support.'); };
+
+r.get('/stories', h((req, res) => { res.json(storyPayload(req.store.id)); }));
+
+r.post('/stories', storyUpload.single('file'), h(async (req, res) => {
+  needStories(req);
+  checkRateLimit(`owner:story:${req.store.id}`, { max: 20, windowMs: 60 * 60e3, code: 'rate_limited', message: 'Too many stories. Please wait a while.' });
+  if (activeCount(req.store.id) >= STORY_MAX_ACTIVE) throw badRequest('story_limit', `You can have ${STORY_MAX_ACTIVE} active stories at a time.`);
+  const limitMsg = `You can have ${STORY_MAX_ACTIVE} active stories at a time.`;
+  let productIds = [];
+  try { productIds = JSON.parse(req.body?.productIds || '[]'); } catch { throw badRequest('invalid_product', 'Choose your products from the list.'); }
+  const cta = req.body?.ctaKind ? { kind: String(req.body.ctaKind), slug: req.body.ctaCategory, label: req.body.ctaLabel } : null;
+  const common = { storeId: req.store.id, caption: req.body?.caption, bg: req.body?.bg, productIds, cta };
+  const fail = async (out, cleanup) => {
+    if (cleanup) await cleanup();
+    const map = { product: ['invalid_product', 'Choose your own active products.'], category: ['invalid_category', 'Choose one of your sections.'], empty: ['story_empty', 'Write some text or add a photo or video.'] };
+    const [code, msg] = map[out.error] || ['story_limit', limitMsg];
+    throw badRequest(code, msg);
+  };
+  if (!req.file) { // نص بس (زي ستوري الفيسبوك النصي)
+    const out = addStory(common);
+    if (out.error) await fail(out);
+    return res.status(201).json(storyPayload(req.store.id));
+  }
+  if (looksLikeVideo(req.file.buffer)) {
+    let video;
+    try { video = await saveStoryVideo(req.file.buffer, req.store.id); } catch (e) { throw badRequest(e.code || 'video_failed', e.message); }
+    const out = addStory({ ...common, video });
+    if (out.error) await fail(out, () => deleteStoryVideo({ video_key: video.key, poster_key: video.posterKey, video_remote: video.remote ? 1 : 0 }));
+    return res.status(201).json(storyPayload(req.store.id));
+  }
+  const m = await processImage(req.file.buffer, { storeId: req.store.id, kind: 'banner' });
+  q.run('UPDATE media SET attached=1 WHERE id=?', [m.id]);
+  const out = addStory({ ...common, mediaId: m.id });
+  if (out.error) await fail(out, () => deleteMedia(m));
+  res.status(201).json(storyPayload(req.store.id));
+}));
+
+r.delete('/stories/:id', h(async (req, res) => {
+  if (!(await removeStory(req.store.id, Number(req.params.id)))) throw notFound('Story');
+  res.json(storyPayload(req.store.id));
 }));
 
 export default r;

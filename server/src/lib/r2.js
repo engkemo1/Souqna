@@ -41,7 +41,7 @@ async function request(method, key, body, contentType, acct = { bucket: c.bucket
   return res;
 }
 
-const TYPES = { webp: 'image/webp', jpg: 'image/jpeg', png: 'image/png', avif: 'image/avif', gif: 'image/gif' };
+const TYPES = { webp: 'image/webp', jpg: 'image/jpeg', png: 'image/png', avif: 'image/avif', gif: 'image/gif', mp4: 'video/mp4', webm: 'video/webm' };
 export const r2Put = (key, buf, extra) => request('PUT', key, buf, TYPES[key.split('.').pop()] || 'application/octet-stream', undefined, extra);
 export const r2Delete = (key) => request('DELETE', key);
 export async function r2Get(key) { const r = await request('GET', key); return Buffer.from(await r.arrayBuffer()); }

@@ -16,6 +16,7 @@ import { useAddToCart } from '../../components/store/useAddToCart.js';
 import ProductCard from '../../components/store/ProductCard.jsx';
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
 import SizeAdvisor from '../../components/store/SizeAdvisor.jsx';
+import SmartLookCard from '../../components/market/SmartLookCard.jsx';
 import ReviewsSection from '../../components/store/ReviewsSection.jsx';
 import { useBuyer } from '../../lib/buyer.jsx';
 import { api } from '../../lib/api.js';
@@ -292,7 +293,8 @@ export default function Product() {
               : exchangeLabel(t, store) && <li className="flex items-center gap-3"><RefreshCcw className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{exchangeLabel(t, store)}</li>}
           </ul>
 
-                    {/* Complete the Look with Twyla */}
+                    {/* Complete the Look: اقتراح طقم كامل لو متناسق، وإلا زرار «اسأل تويلا» */}
+          <SmartLookCard productId={p.id} fallback={(
           <div className="mt-6 rounded-2xl border border-brand/20 bg-gradient-to-br from-brand/5 via-canvas to-brand/10 p-4 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
@@ -318,6 +320,7 @@ export default function Product() {
               </button>
             </div>
           </div>
+          )} />
 
           <div className="mt-6 border-t border-line">
             <Accordion title={t('product.description')} defaultOpen><p dir="auto" className="whitespace-pre-line text-start">{tr(p.description)}</p></Accordion>

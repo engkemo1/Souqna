@@ -118,11 +118,11 @@ export function inferFormality(key, name, desc, K = loadKnowledge()) {
 
 const KIDS_GIRL = ['بنات', 'بنوته', 'بناتي', 'بناتى', 'girls', 'girl'];
 const KIDS_BOY = ['ولادي', 'ولادى', 'اولادي', 'اولادى', 'اولاد', 'ولد', 'boys', 'boy'];
-const KIDS_BOTH = ['اطفال', 'اطفالي', 'اطفالى', 'للاطفال', 'صغار', 'للصغار', 'رضع', 'رضيع', 'مواليد', 'حديثي الولاده', 'كيدز', 'بيبي', 'بيبى', 'للبيبي', 'للبيبى', 'kids', 'kid', 'children', 'child', 'toddler', 'junior', 'juniors'];
+const KIDS_BOTH = ['اطفال', 'اطفالي', 'اطفالى', 'للاطفال', 'صغار', 'للصغار', 'رضع', 'رضيع', 'مواليد', 'حديثي الولاده', 'كيدز', 'kids', 'kid', 'children', 'child', 'toddler', 'junior', 'juniors'];
 const KIDS_STORE = ['بيبي', 'baby', 'babies', 'kid', 'كيد', 'طفل', 'اطفالي'];
 const MEN_WORDS = ['رجالي', 'رجاليه', 'للرجال', 'رجال', 'شبابي', 'men', 'mens', 'man', 'male'];
 const WOMEN_WORDS = ['حريمي', 'نسائي', 'للنساء', 'ستاتي', 'سيدات', 'للسيدات', 'هوانم', 'محجبات', 'للمحجبات', 'women', 'womens', 'woman', 'ladies', 'female'];
-const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'hijab_cap', 'lingerie', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
+const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'hijab_cap', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
 const MEN_KEYS = new Set(['suit', 'tuxedo', 'tie', 'bow_tie', 'pocket_square', 'waistcoat', 'classic_set']);
 
 /** الفئة اللي المنتج ليها: men | women | boys | girls | kids | unisex
@@ -144,11 +144,8 @@ export function genderEvidence(row, K = loadKnowledge(), key = '') {
     if (g === 'boys' || g === 'girls') { v[g] += w; v.kids += w; } else v[g] += w;
     if (strong && (g === 'boys' || g === 'girls' || g === 'kids')) v.strongKids = true;
   };
-  const fromText = (text) => {
-    const textNoBaby = String(text || '').replace(/(^|\s)(ل?بيب[يى]|للبيب[يى]|baby)\s*(دول|بلو|بينك|بنك|doll)(\s|$)/gi, ' ');
-    return (hasAny(K, text, KIDS_GIRL) ? 'girls' : hasAny(K, text, KIDS_BOY) ? 'boys' : hasAny(K, textNoBaby, KIDS_BOTH) ? 'kids'
-      : hasAny(K, text, MEN_WORDS) && !hasAny(K, text, WOMEN_WORDS) ? 'men' : hasAny(K, text, WOMEN_WORDS) && !hasAny(K, text, MEN_WORDS) ? 'women' : null);
-  };
+  const fromText = (text) => (hasAny(K, text, KIDS_GIRL) ? 'girls' : hasAny(K, text, KIDS_BOY) ? 'boys' : hasAny(K, text, KIDS_BOTH) ? 'kids'
+    : hasAny(K, text, MEN_WORDS) && !hasAny(K, text, WOMEN_WORDS) ? 'men' : hasAny(K, text, WOMEN_WORDS) && !hasAny(K, text, MEN_WORDS) ? 'women' : null);
   vote(fromText(`${row.name_ar || ''} ${row.name_en || ''}`), 4, true);
   if (/(^|\s)(ل?بيب[يى]|للبيب[يى])(\s|$)/.test(`${row.name_ar || ''}`.replace(/بيب[يى]\s*(بلو|بينك|بنك|دول)/g, '')) && !/(^|\s)(رجالي|حريمي|نسائي)(\s|$)/.test(`${row.name_ar || ''}`)) vote('kids', 4, true); // «سالوبيت بيبي» = أطفال (مش «بيبي بلو» اللون ولا «بيبي دول»)
   if (/\b(baby|babies)\b/i.test(`${row.name_en || ''} ${row.name_ar || ''}`) && !/baby\s?-?doll/i.test(`${row.name_en || ''} ${row.name_ar || ''}`) && !/\b(men|man|mens|women|woman|womens|ladies)\b/i.test(`${row.name_en || ''} ${row.name_ar || ''}`)) vote('kids', 4, true); // «Baby» في عنوان جوميا = أطفال
@@ -278,7 +275,7 @@ export function enrichProduct(row, K = loadKnowledge()) {
   const formality = key && requestedFormality != null ? Math.max(range[0], Math.min(range[1], requestedFormality)) : requestedFormality;
   const inStock = row.track_stock === 0 || row.track_stock === false ? true : Number(row.stock ?? 1) > 0;
   const materials = fabricTokens(K, `${name} ${desc}`);
-  const isSleeveless = hasAny(K, name, ['بدون اكمام', 'sleeveless', 'مكشوف', 'strapless']);
+  const isSleeveless = hasAny(K, name, ['بدون اكمام', 'بدون كم', 'sleeveless', 'مكشوف', 'strapless', 'تانك', 'tank', 'كروب', 'crop top', 'camisole', 'كاميسول', 'حمالات', 'حمالة', 'ستراب']);
   return {
     ...row, key, typeConflict, headKey: (() => { const h = inferKey(String(name).trim().split(/\s+/)[0] || '', K); return h && h !== key && nearKeys(h, key) ? h : null; })(), minimalSneaker: isMinimalSneaker(key, name, colorKeysOf(row, K)), formality, gender: inferGender(row, key, K), colorKeys: colorKeysOf(row, K), materials, inStock,
     sleeveless: isSleeveless, price: Number(row.price) || 0, popularity: Math.min(2.5, Number(row.sold_count || 0) / 24) + (Number(row.rating || 0) >= 4.3 ? 0.5 : 0),
