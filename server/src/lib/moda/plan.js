@@ -37,6 +37,8 @@ function resolveKeys(keys, aud, fRange) {
   const hi = fRange ? fRange[1] : 3; const lo = fRange ? fRange[0] : 2;
   for (const k of keys) {
     if (k === 'dress_any') out.push(...(!fRange ? ['dress_casual', 'dress_work', 'dress_party', 'dress_evening'] : hi >= 4 && lo >= 4 ? ['dress_party', 'dress_evening'] : hi >= 4 ? ['dress_party', 'dress_evening', 'dress_casual', 'dress_work'] : lo >= 3 ? ['dress_casual', 'dress_work', 'dress_party'] : ['dress_casual']));
+    else if (k === 'dress_evening') out.push('dress_evening', 'dress_party', 'dress_casual');
+    else if (k === 'dress_party') out.push('dress_party', 'dress_evening');
     else if (k === 'shoes_any') {
       const dressy = hi >= 4; const smart = hi >= 3;
       if (aud === 'men' || aud === 'boys') out.push(...(dressy ? ['formal_shoes', 'loafers'] : smart ? ['loafers', 'formal_shoes', 'sneakers'] : ['sneakers', 'loafers']));
@@ -98,9 +100,38 @@ function levelsFor(slot, K) {
 const primary = (p) => p.colorKeys?.[0] || null;
 
 function scoreProduct(p, slot, ctx) {
-  const { look, K, adv, fTarget, partnerHero, palette, taste, requestedColors, budgetCap, learnedPreferences } = ctx;
+  const { look, K, adv, fTarget, partnerHero, palette, taste, styles = [], style = null, context = null, requestedColors, budgetCap, learnedPreferences } = ctx;
   let s = 10;
   if (fTarget && p.formality != null) s -= 3 * Math.abs(p.formality - fTarget);
+  if ((context === 'evening' || slot.base === 'dress_evening' || slot.base === 'dress_party') && p.eveningSuitabilityScore) {
+    s += Math.min(4, p.eveningSuitabilityScore);
+  }
+  const activeStyles = styles.length ? styles : (style ? [style] : []);
+  if (activeStyles.length) {
+    const pText = `${p.name_ar || ''} ${p.name_en || ''} ${p.description_ar || ''} ${p.description_en || ''}`;
+    if (activeStyles.includes('modest')) {
+      if (p.modestPositive) s += 3;
+      if (p.modestConflict) s -= 10;
+    }
+    if (activeStyles.includes('casual')) {
+      if (p.formality != null && p.formality <= 3) s += 2;
+      if (/(كاجوال|كاجول|يومي|مريح|خروج|casual|comfy)/i.test(pText)) s += 2;
+    }
+    if (activeStyles.includes('formal')) {
+      if (p.formality != null && p.formality >= 4) s += 2;
+      if (/(فورمال|رسمي|كلاسيك|شغل|مكتب|formal|classic|office)/i.test(pText)) s += 2;
+    }
+    if (activeStyles.includes('elegant')) {
+      if (p.formality != null && p.formality >= 4) s += 1.5;
+      if (p.eveningSuitable) s += 1.5;
+    }
+    if (activeStyles.includes('simple') || activeStyles.includes('understated')) {
+      if (/(ساده|سادة|بسيط|بسيطه|هادي|هاديه|ناعم|ناعمه|سمبل|simple|minimal|plain)/i.test(pText)) s += 2.5;
+    }
+    if (activeStyles.includes('trendy')) {
+      if (/(ترند|تريندي|عصري|مودرن|modern|trendy|stylish)/i.test(pText)) s += 2;
+    }
+  }
   const cols = p.colorKeys || [];
   if (slot.color && cols.includes(slot.color)) s += 6;
   if (requestedColors.length && cols.some((c) => requestedColors.includes(c))) s += 3;
@@ -143,27 +174,39 @@ export const NEVER_UNASKED = new Set(['sleepwear', 'lingerie', 'robe', 'cufflink
 
 /** يجيب المرشحين لـ slot عند مستوى تخفيف معين. */
 function candidatesAt(slot, lvl, aud, products, ctx) {
-  const { K, fTargetRange, role, context, userAvoid, lookAvoidHard } = ctx;
+  const { K, fTargetRange, role, context, userAvoid, lookAvoidHard, rejectedGarments = [], styles = [], style = null } = ctx;
   const keys = new Set(lvl.keys);
   const out = [];
   for (const p of products) {
     if (!p.key || !keys.has(p.key)) continue;
     if (!p.inStock) continue;
     if (p.typeConflict) continue; // الاسم والقسم/النوع مش متفقين → مانرشحوش
+    if (rejectedGarments.length) {
+      const isRej = rejectedGarments.some((rk) => rk === p.key
+        || ((rk.startsWith('dress_') || rk === 'dress') && p.key.startsWith('dress_'))
+        || ((rk === 'set' || rk === 'two_piece_set') && ['two_piece_set', 'classic_set', 'hijab_set', 'tracksuit', 'womens_suit'].includes(p.key))
+        || ((rk === 'pants' || rk === 'trousers') && ['trousers', 'jeans', 'chinos', 'joggers', 'leggings'].includes(p.key))
+        || ((rk === 'homewear' || rk === 'sleepwear') && ['sleepwear', 'robe'].includes(p.key)));
+      if (isRej) continue;
+    }
     if (NEVER_UNASKED.has(p.key) && !slot.keys.includes(p.key)) continue; // لانجري/روب/بيجامة/كفلينج: بطلب صريح بس
     if (p.key === 'slippers' && context !== 'home' && context !== 'sahel_beach' && !slot.explicit && !slot.keys.includes('slippers')) continue;
     // مناسبة رسمية (خطوبة/فرح…): الكوتشي والجزم الرياضي والشبشب مش بدائل مقبولة إلا لو العميل طلبها بنفسه
     if (CASUAL_ONLY.has(p.key) && fTargetRange && fTargetRange[0] >= 4 && !slot.keys.includes(p.key) && !p.minimalSneaker) continue;
     if (p.key === 'jalabiya' && !slot.explicit) continue;
     if (!genderOK(aud, p.gender)) continue;
-    if (aud === 'women_hijab' && p.sleeveless) continue;
+    if ((aud === 'women_hijab' || styles.includes('modest') || style === 'modest') && (p.sleeveless || p.modestConflict)) continue;
+    // مطابقة السهرة المبنية على خصائص الفستان الموثوقة (مش مجرد اسم الفئة أو غياب كلمة سهرة)
+    const isEveningDressSlot = (context === 'evening' || slot.base === 'dress_evening' || slot.base === 'dress_party') && p.key.startsWith('dress_');
+    if (isEveningDressSlot && p.eveningSuitable === false) continue;
     const cols = p.colorKeys || [];
     if (userAvoid.length && cols.length && cols.every((c) => userAvoid.includes(c))) continue;
     if (slot.material && p.materials?.size && !p.materials.has(slot.material)) continue; // خامة مش مكتوبة = مش مرفوضة (بنقول للعميل يتأكد)
     if (slot.color && lvl.color && !cols.includes(slot.color)) continue;
     const hero = HERO_KEYS.has(p.key);
     if (lookAvoidHard && cols.some((c) => lookAvoidHard.includes(c))) continue;
-    if (fTargetRange && p.formality != null) {
+    const skipFormalityForExplicit = (NEVER_UNASKED.has(p.key) && slot.keys.includes(p.key)) || (slot.explicit && (styles.includes('casual') || style === 'casual'));
+    if (!skipFormalityForExplicit && fTargetRange && p.formality != null) {
       const [lo, hi] = fTargetRange; const d = p.formality < lo ? lo - p.formality : p.formality > hi ? p.formality - hi : 0;
       if (d > (p.minimalSneaker ? Math.max(lvl.fd, 3) : lvl.fd)) continue;
     }
@@ -175,6 +218,9 @@ function candidatesAt(slot, lvl, aud, products, ctx) {
 /** يملا look (أو وضع صريح) لشخص ويرجع picks + missing + relaxed + score. */
 function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHero) {
   const { adv, role, context, userAvoid } = env;
+  const rejectedGarments = [...(parsed.flags?.rejectedGarments || []), ...(parsed.rejectedProductTypes || [])];
+  const styles = parsed.styles || [];
+  const style = parsed.style || null;
   const ctxRange = K.contexts.get(context)?.formality || null;
   const picks = []; const missing = []; const relaxed = [];
   let palette = [];
@@ -199,15 +245,15 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     const fRangeLook = [Math.max(1, pinF - 1), Math.min(5, pinF + 1)];
 
     for (const g of unfulfilled) {
-      const keys = resolveKeys([g.key], aud, fRangeLook);
+      const keys = resolveKeys([g.key, ...(g.alts || [])], aud, fRangeLook);
       const slot = { keys, base: g.key, required: true, share: 40, color: g.color || null, material: g.material || null, explicit: true, hero: false };
       const list = candidatesAt(slot, { keys: slot.keys, color: !!slot.color, fd: 1, rel: null }, aud, products, {
-        K, fTargetRange: fRangeLook, role, context, userAvoid, lookAvoidHard: null,
+        K, fTargetRange: fRangeLook, role, context, userAvoid, lookAvoidHard: null, rejectedGarments, styles, style,
       });
 
       if (list.length) {
         const taste = [...(parsed.taste || []), ...(env.profileTaste || [])];
-        const sctx = { look: null, K, adv, fTarget: pinF, partnerHero: palette, palette, taste, requestedColors: parsed.colors || [], budgetCap: personBudget, learnedPreferences: env.learnedPreferences };
+        const sctx = { look: null, K, adv, fTarget: pinF, partnerHero: palette, palette, taste, styles, style, context, requestedColors: parsed.colors || [], budgetCap: personBudget, learnedPreferences: env.learnedPreferences };
         const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => b.s - a.s || a.p.price - b.p.price);
         picks.push({ slot, product: ranked[0].p, ranked, pool: [], relaxedKind: null });
       } else {
@@ -231,10 +277,10 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     for (let li = 0; li < levels.length; li += 1) {
       const lvl = levels[li];
       const fR = slot.hero || built.mode === 'look' ? fRangeLook : fRangeLook;
-      const list = candidatesAt(slot, lvl, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fR, role, context, userAvoid, lookAvoidHard });
+      const list = candidatesAt(slot, lvl, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fR, role, context, userAvoid, lookAvoidHard, rejectedGarments, styles, style });
       if (!list.length) continue;
       const cap = personBudget ? (personBudget * slot.share) / 100 * 1.3 : null;
-      const sctx = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fR ? (fR[0] + fR[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], budgetCap: cap, learnedPreferences: env.learnedPreferences };
+      const sctx = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fR ? (fR[0] + fR[1]) / 2 : null, partnerHero, palette, taste, styles, style, context, requestedColors: parsed.colors || [], budgetCap: cap, learnedPreferences: env.learnedPreferences };
       const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => (parsed.flags?.priciest ? b.p.price - a.p.price || b.s - a.s : parsed.flags?.cheapest ? a.p.price - b.p.price || b.s - a.s : b.s - a.s || a.p.price - b.p.price));
       chosen = { lvl, li, ranked };
       break;
@@ -253,8 +299,8 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     const subs = []; for (const k of slot.keys) for (const x of K.substitutes[k] || []) if (!slot.keys.includes(x) && !subs.includes(x)) subs.push(x);
     let pool = [];
     if (subs.length) {
-      const pl = candidatesAt(slot, { keys: [...slot.keys, ...subs], color: false, fd: 1, rel: null }, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fRangeLook, role, context, userAvoid, lookAvoidHard });
-      const sctx2 = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fRangeLook ? (fRangeLook[0] + fRangeLook[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], budgetCap: null, learnedPreferences: env.learnedPreferences };
+      const pl = candidatesAt(slot, { keys: [...slot.keys, ...subs], color: false, fd: 1, rel: null }, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fRangeLook, role, context, userAvoid, lookAvoidHard, rejectedGarments, styles, style });
+      const sctx2 = { look: built.mode === 'look' ? look : null, K, adv, fTarget: fRangeLook ? (fRangeLook[0] + fRangeLook[1]) / 2 : null, partnerHero, palette, taste, styles, style, context, requestedColors: parsed.colors || [], budgetCap: null, learnedPreferences: env.learnedPreferences };
       pool = pl.filter((x) => !chosen.ranked.some((r) => r.p.id === x.id)).map((x) => ({ p: x, s: scoreProduct(x, slot, sctx2) - 3, viaPool: true }));
     }
     maxLevel = Math.max(maxLevel, chosen.li);
@@ -487,10 +533,11 @@ export function planOutfit(parsed, products, env = {}) {
   const fl = parsed.flags || {};
   const explicitW = parsed.garments.some((g) => WOMEN_KEYS.has(g.key));
   // ست: محجبة ولا لأ؟ (لو مش مذكور) — قبل أي ترشيح كامل أو مناسبة
-  const hijabKnown = fl.hijab || fl.notHijab || fl.hijabAsked || persons.includes('women_hijab');
-  if (okState && hasW && (parsed.persons?.length || explicitW || !parsed.garments.length) && !hijabKnown && (ctxF >= 3 || (!explicitW && !parsed.garments.length && context))) asks.unshift('modest_preference');
+  const hijabKnown = fl.hijab || fl.notHijab || fl.hijabAsked || persons.includes('women_hijab') || parsed.style === 'modest' || parsed.styles?.includes('modest');
+  const explicitEveningProduct = context === 'evening' && parsed.garments.length > 0;
+  if (okState && hasW && !explicitEveningProduct && (parsed.persons?.length || explicitW || !parsed.garments.length) && !hijabKnown && (ctxF >= 3 || (!explicitW && !parsed.garments.length && context))) asks.unshift('modest_preference');
   if (okState && context && /^(engagement_guest|katb_kitab|wedding_guest)$/.test(context) && !fl.roleAsked && parsed.role !== 'self') asks.splice(asks.includes('modest_preference') ? 1 : 0, 0, 'engagement_role');
-  if (okState && hasW && ctxF >= 4 && !explicitW && !fl.womenStyle && !persons.every((a) => a === 'men')) asks.push('women_style');
+  if (okState && hasW && ctxF >= 4 && !explicitW && !parsed.garments.length && !fl.womenStyle && !persons.every((a) => a === 'men')) asks.push('women_style');
   // الوقت (نهار/ليل) مبقاش بيتسأل: مش بيفرق عند العميل
   // لبس داخلي/نوم/لانجري/روب: نسأل عن المقاس (مش المناسبة ولا اللون) عشان يتضاف للسلة بمقاسه
   const SIZE_FIRST = parsed.garments.length >= 1 && parsed.garments.every((g) => SIZE_ASK_KEYS.has(g.key));

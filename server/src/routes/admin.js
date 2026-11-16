@@ -806,7 +806,7 @@ r.put('/ai-usage', h((req, res) => {
 r.get('/whatsapp', h((_req, res) => res.json(waSettingsView())));
 r.put('/whatsapp', h((req, res) => {
   const s = z.string().trim().max(400).optional();
-  const b = z.object({ token: s, phoneId: z.string().trim().regex(/^\d{0,30}$/).optional(), template: s, customerTemplate: s, ownerBtnTemplate: s, customerBtnTemplate: s, platformTemplate: s, serviceTemplate: s, alertTemplate: s, lang: z.string().trim().max(10).optional() }).parse(req.body || {});
+  const b = z.object({ token: s, phoneId: z.string().trim().regex(/^\d{0,30}$/).optional(), template: s, customerTemplate: s, ownerBtnTemplate: s, customerBtnTemplate: s, authTemplate: s, platformTemplate: s, serviceTemplate: s, alertTemplate: s, lang: z.string().trim().max(10).optional() }).parse(req.body || {});
   saveWaSettings(b);
   res.json(waSettingsView());
 }));

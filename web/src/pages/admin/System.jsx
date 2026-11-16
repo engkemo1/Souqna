@@ -193,7 +193,7 @@ function WhatsAppPanel() {
   const [f, setF] = useState(null);
   const [testTo, setTestTo] = useState('');
   const [busy, setBusy] = useState(false);
-  if (data && !f) setF({ token: '', phoneId: data.phoneId || '', template: data.template || '', customerTemplate: data.customerTemplate || '', ownerBtnTemplate: data.ownerBtnTemplate || '', customerBtnTemplate: data.customerBtnTemplate || '', lang: data.lang || 'ar' });
+  if (data && !f) setF({ token: '', phoneId: data.phoneId || '', template: data.template || '', customerTemplate: data.customerTemplate || '', ownerBtnTemplate: data.ownerBtnTemplate || '', customerBtnTemplate: data.customerBtnTemplate || '', authTemplate: data.authTemplate || '', lang: data.lang || 'ar' });
   if (!data || !f) return <Panel title="واتساب (Meta)"><Skeleton className="h-40 w-full" /></Panel>;
   const save = async () => {
     setBusy(true);
@@ -220,6 +220,7 @@ function WhatsAppPanel() {
           {fld('customerTemplate', 'قالب العميل (استلام الطلب وتحديثاته)', '4 متغيرات: الاسم، رقم الطلب، النص، رابط التتبع')}
           {fld('ownerBtnTemplate', 'قالب صاحب المحل بالأزرار (اختياري)', 'لو اتحط، بيتبعت بدل القالب العادي ومعاه أزرار: تأكيد / مش هقدر / إزاي أأكد / افتح الطلب')}
           {fld('customerBtnTemplate', 'قالب العميل بالأسئلة الجاهزة (اختياري)', 'أزرار: فين طلبي / تغيير العنوان / إلغاء / كلّم المحل')}
+          {fld('authTemplate', 'قالب كود الدخول (اختياري)', 'اسم قالب التوثيق (twist_login_code). لما يتحط، الدخول بكود واتساب بيشتغل، والحجز بيتطلب تأكيد الرقم بالكود')}
           {fld('lang', 'لغة القوالب', 'ar')}
         </div>
         <div className="flex flex-wrap items-end gap-3">

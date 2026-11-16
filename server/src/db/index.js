@@ -113,6 +113,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!pcols.includes('department')) db.exec('ALTER TABLE products ADD COLUMN department TEXT');
   if (!pcols.includes('no_return')) db.exec('ALTER TABLE products ADD COLUMN no_return INTEGER NOT NULL DEFAULT 0'); // 1 = this piece is not returnable / exchangeable
   if (!pcols.includes('style_level')) db.exec('ALTER TABLE products ADD COLUMN style_level INTEGER'); // درجة الرسمية 1-5 اللي صاحب المحل حددها لتويلا (فاضي = تلقائي)
+  if (!pcols.includes('sale_ends_at')) db.exec('ALTER TABLE products ADD COLUMN sale_ends_at INTEGER'); // ms: when a timed discount ends (price goes back to compare_at_price)
   if (!pcols.includes('badge_text')) db.exec('ALTER TABLE products ADD COLUMN badge_text TEXT'); // شارة مخصصة على كارت المنتج (مثلاً: قطن مصري 100%)
   if (!pcols.includes('badge_tone')) db.exec('ALTER TABLE products ADD COLUMN badge_tone TEXT');
   if (!pcols.includes('audience')) db.exec('ALTER TABLE products ADD COLUMN audience TEXT'); // الفئة: men|women|boys|girls|kids|unisex (فاضي = مستنتج من الاسم)
@@ -121,6 +122,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!pcols.includes('photo_note')) db.exec('ALTER TABLE products ADD COLUMN photo_note TEXT');
   // Cashier linking: barcodes (matched together with sku when a cashier file or API call arrives).
   if (!pcols.includes('barcode')) db.exec('ALTER TABLE products ADD COLUMN barcode TEXT');
+  // Admin product review (product-moderation / admin-products): status, note, when, and manual flags. Idempotent — skipped where the columns already exist.
+  for (const [col, ddl] of [['admin_review_status', 'TEXT'], ['admin_review_note', 'TEXT'], ['admin_reviewed_at', 'TEXT'], ['admin_flags_json', 'TEXT']]) if (!pcols.includes(col)) db.exec(`ALTER TABLE products ADD COLUMN ${col} ${ddl}`);
   const vcols = db.prepare('PRAGMA table_info(variants)').all().map((c) => c.name);
   if (!vcols.includes('barcode')) db.exec('ALTER TABLE variants ADD COLUMN barcode TEXT');
   const clcols = db.prepare('PRAGMA table_info(store_cashier_links)').all().map((x) => x.name);

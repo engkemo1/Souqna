@@ -23,6 +23,7 @@ import { Bell } from 'lucide-react';
 import { ProductOffersPanel } from '../../components/promo/OfferCards.jsx';
 import { SectionHeader } from './StoreHome.jsx';
 import { Price, QtyStepper } from '../../components/ui/Commerce.jsx';
+import SaleCountdown from '../../components/store/SaleCountdown.jsx';
 import Skeleton, { SkeletonText } from '../../components/ui/Skeleton.jsx';
 import { ErrorState, EmptyState } from '../../components/ui/States.jsx';
 import Button, { IconButton } from '../../components/ui/Button.jsx';
@@ -248,6 +249,7 @@ export default function Product() {
           </div>
 
           <Price value={p.price} compareAt={p.compareAt} size="xl" showSave className="mt-5" />
+          <SaleCountdown ms={p.saleEndsAt} className="mt-3" />
           <ProductOffersPanel slug={store.slug} offers={data.offers || []} />
 
           <div className="mt-7">

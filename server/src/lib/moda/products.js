@@ -67,9 +67,14 @@ export function inferKey(text, K = loadKnowledge()) {
 }
 
 function fabricTokens(K, text) {
-  const set = new Set(tokenize(norm(text)));
+  const toks = tokenize(norm(text));
+  const set = new Set(toks);
   const mats = new Set();
   for (const [m, aliases] of Object.entries(K.synonyms.materials)) if (m !== '_about' && aliases.some((a) => hasToken(set, norm(a)))) mats.add(m);
+  if (toks.some((t) => t === 'ستان' || t === 'الستان')) mats.add('satin');
+  if (toks.some((t) => t === 'تل' || t === 'التل' || t === 'تول' || t === 'التول')) mats.add('tulle');
+  if (toks.some((t) => t === 'جبير' || t === 'الجبير')) mats.add('lace');
+  if (toks.some((t) => t === 'قطيفه' || t === 'القطيفه')) mats.add('velvet');
   return mats;
 }
 
@@ -77,6 +82,13 @@ function hasAny(K, text, words) {
   const n = ` ${norm(text)} `;
   return words.some((w) => n.includes(` ${norm(w)} `) || tokenize(norm(text)).some((t) => tokenVariants(t).includes(norm(w))));
 }
+
+const EVENING_DISQUALIFIER_RE = /(^| )(كاجوال|يومي|يوميه|نهاري|بيتي|للبيت|بحر|شاطئ|مصيف|شغل|للشغل|مكتب|مشاوير|رياضي|سبور|جينز|دنيم|تريكو|خروجات يوميه|الشغل والخروجات|المناسبات البسيطه|casual|daily|day dress|beach|office|work|sport|denim)( |$)/;
+const EVENING_OCCASION_RE = /(^| )(سهره|سهرة|للسهره|للسهرة|للسهرات|والسهرات|سواريه|سوارية|حفله|حفلات|للحفلات|مناسبات خاصه|مناسبات رسميه|للمناسبات والسهرات|للمناسبات والحفلات|خطوبه|للخطوبه|افراح|للافراح|كوكتيل|جاون|evening|soiree|party|cocktail|gown|prom|gala)( |$)/;
+const EVENING_LUXE_FABRIC_RE = /(^| )(ستان|الستان|ساتان|الساتان|قطيفه|القطيفه|مخمل|فيلفت|دانتيل|الدانتيل|جبير|الجبير|تول|التول|تل|التل|ترتر|الترتر|حرير|الحرير|تافتا|التافتا|اورجانزا|الاورجانزا|بروكار|البروكار|لاميه|ميتاليك|satin|velvet|lace|tulle|sequin|sequins|silk|taffeta|organza|brocade|metallic)( |$)/;
+const EVENING_DESIGN_RE = /(^| )(مطرز|مطرزه|تطريز|خرز| بالخرز|لولي|لؤلؤ|استراس|ستراس|كريستال|فصوص|بليسيه|درابيه|كلوش|منفوش|سمكه|ميرميد|كورسيه|كتف واحد|وان شولدر|اوف شولدر|كب|شراشيب|ريش|ملكي|ملكيه|فخم|فخمه|انسيابي|انسيابيه|ذيل|ديل طويل|embroidery|embroidered|beaded|sequined|pleated|draped|mermaid|corset|one shoulder|off shoulder|strapless|ball gown)( |$)/;
+const MODEST_CONFLICT_RE = /(^| )(بدون اكمام|من غير كم|من غير اكمام|مكشوف|عاري|عاريه|كت|حمالات|كب|اوف شولدر|وان شولدر|كتف واحد|ظهر مكشوف|باكليس|قصير جدا|ميني|فتحه عاليه|شفاف|شبيك|sleeveless|strapless|off shoulder|one shoulder|backless|mini dress|sheer)( |$)/;
+const MODEST_POSITIVE_RE = /(^| )(محجبات|للمحجبات|محتشم|محتشمه|محتشمة|اكمام طويله|كم طويل|باكمام طويله|واسع|واسعه|فضفاض|فضفاضه|ماكسي|طويل|مبطن|modest|long sleeve|long sleeves|maxi)( |$)/;
 
 export function inferFormality(key, name, desc, K = loadKnowledge()) {
   const item = K.items.get(key); const [lo, hi] = item?.formality || [2, 3];
@@ -86,9 +98,77 @@ export function inferFormality(key, name, desc, K = loadKnowledge()) {
   for (const g of sig.name_words) if (hasAny(K, nameText, g.words)) { f = f === null ? g.formality : Math.max(f, g.formality); }
   if (f === null) f = key === 'dress_any' ? 3 : Math.ceil((lo + hi) / 2);
   const mats = `${name} ${desc || ''}`;
-  if (hasAny(K, mats, sig.fabrics_up)) f += 1;
+  const nMats = ` ${norm(mats)} `;
+  if (hasAny(K, mats, sig.fabrics_up) || /(^| )(ستان|الستان|جبير|تافتا|اورجانزا|بروكار|ترتر)( |$)/.test(nMats)) f += 1;
   else if (hasAny(K, mats, sig.fabrics_down)) f -= 1;
+  if (key && key.startsWith('dress') && f < 4 && !EVENING_DISQUALIFIER_RE.test(nMats)) {
+    if (EVENING_OCCASION_RE.test(nMats) || (EVENING_LUXE_FABRIC_RE.test(nMats) && EVENING_DESIGN_RE.test(nMats)) || (EVENING_DESIGN_RE.test(nMats) && /(^| )(شيفون|كريب|طويل|ماكسي)( |$)/.test(nMats))) {
+      f = Math.max(f, 4);
+    }
+  }
   return Math.max(lo, Math.min(hi, f));
+}
+
+export function evaluateEveningDressSuitability(row, key, formality, materials, K = loadKnowledge()) {
+  const reasons = [];
+  if (!key || !key.startsWith('dress') || key === 'dress_bridal' || key === 'dress_beach' || key === 'dress_work') {
+    return { suitable: false, score: 0, reasons };
+  }
+  const fullText = ` ${norm(`${row.name_ar || ''} ${row.name_en || ''} ${row.description_ar || ''} ${row.description_en || ''} ${row.cat_text || ''}`)} `;
+  const nameNorm = ` ${norm(`${row.name_ar || ''} ${row.name_en || ''}`)} `;
+  const hasDisqualifier = EVENING_DISQUALIFIER_RE.test(fullText);
+  const hasExplicitOccasion = EVENING_OCCASION_RE.test(fullText);
+  const hasLuxeFabric = EVENING_LUXE_FABRIC_RE.test(fullText) || ['satin', 'velvet', 'lace', 'tulle', 'silk'].some((m) => materials?.has?.(m));
+  const hasEveningDesign = EVENING_DESIGN_RE.test(fullText);
+  const hasSecondaryFabric = /(^| )(شيفون|كريب|جاكار|chiffon|crepe|jacquard)( |$)/.test(fullText) || ['chiffon', 'crepe', 'jacquard'].some((m) => materials?.has?.(m));
+  const isLongOrMaxi = /(^| )(طويل|ماكسي|جاون|maxi|long|gown)( |$)/.test(fullText);
+
+  if (hasDisqualifier && !EVENING_OCCASION_RE.test(nameNorm)) {
+    return { suitable: false, score: 0, reasons };
+  }
+
+  let score = 0;
+  if (key === 'dress_evening' || key === 'dress_party') { score += 2.5; reasons.push(`category:${key}`); }
+  if (hasExplicitOccasion) { score += 2.5; reasons.push('occasion_attribute'); }
+  if (hasLuxeFabric) { score += 2.0; reasons.push('luxe_fabric'); }
+  if (hasEveningDesign) { score += 2.0; reasons.push('evening_design'); }
+  if (hasSecondaryFabric && (hasEveningDesign || hasExplicitOccasion || isLongOrMaxi)) { score += 1.0; reasons.push('evening_structure'); }
+  if (isLongOrMaxi && (hasLuxeFabric || hasEveningDesign || hasExplicitOccasion)) { score += 0.8; reasons.push('evening_length'); }
+  if (Number(row.style_level) >= 4) { score += 1.5; reasons.push('verified_style_level'); }
+
+  const suitable = !hasDisqualifier && (
+    key === 'dress_evening'
+    || key === 'dress_party'
+    || hasExplicitOccasion
+    || (hasLuxeFabric && (hasEveningDesign || isLongOrMaxi || formality >= 4))
+    || (hasEveningDesign && (hasSecondaryFabric || isLongOrMaxi || formality >= 4))
+    || Number(row.style_level) >= 4
+  );
+
+  return { suitable, score: suitable ? Math.max(score, 2.0) : 0, reasons };
+}
+
+export function evaluateOccasionSuitability(product, occasion, style = null, K = loadKnowledge()) {
+  if (!product || !product.key) return { suitable: false, score: 0, reasons: [] };
+  const fullText = ` ${norm(`${product.name_ar || ''} ${product.name_en || ''} ${product.description_ar || ''} ${product.description_en || ''} ${product.cat_text || ''}`)} `;
+  if (style === 'modest' && product.modestConflict) {
+    return { suitable: false, score: 0, reasons: ['modest_conflict'] };
+  }
+  if (occasion === 'evening' || occasion === 'wedding' || occasion === 'engagement') {
+    if (['lingerie', 'sleepwear', 'robe', 'underwear', 'swimwear'].includes(product.key)) {
+      return { suitable: false, score: 0, reasons: ['intimate_or_homewear_not_public_evening'] };
+    }
+    if (product.key.startsWith('dress')) {
+      const ev = product.eveningSuitable !== undefined
+        ? { suitable: product.eveningSuitable, score: product.eveningSuitabilityScore || 0, reasons: product.suitabilityReasons || [] }
+        : evaluateEveningDressSuitability(product, product.key, product.formality, product.materials, K);
+      if (style === 'modest' && ev.suitable && MODEST_POSITIVE_RE.test(fullText)) {
+        return { suitable: true, score: ev.score + 1.5, reasons: [...ev.reasons, 'modest_verified'] };
+      }
+      return ev;
+    }
+  }
+  return { suitable: true, score: 1.0, reasons: product.suitabilityReasons || [] };
 }
 
 const KIDS_GIRL = ['بنات', 'بنوته', 'بناتي', 'بناتى', 'girls', 'girl'];
@@ -227,10 +307,16 @@ export function enrichProduct(row, K = loadKnowledge()) {
   const formality = key && requestedFormality != null ? Math.max(range[0], Math.min(range[1], requestedFormality)) : requestedFormality;
   const inStock = row.track_stock === 0 || row.track_stock === false ? true : Number(row.stock ?? 1) > 0;
   const materials = fabricTokens(K, `${name} ${desc}`);
-  const isSleeveless = hasAny(K, name, ['بدون اكمام', 'sleeveless', 'مكشوف', 'strapless']);
+  const fullNorm = ` ${norm(`${name} ${desc} ${row.description_en || ''}`)} `;
+  const isSleeveless = hasAny(K, name, ['بدون اكمام', 'sleeveless', 'مكشوف', 'strapless']) || /(^| )(بدون اكمام|من غير كم|من غير اكمام|كب|حمالات|اوف شولدر|وان شولدر|كتف واحد|sleeveless|strapless|off shoulder|one shoulder)( |$)/.test(fullNorm);
+  const modestConflict = isSleeveless || MODEST_CONFLICT_RE.test(fullNorm);
+  const modestPositive = MODEST_POSITIVE_RE.test(fullNorm);
+  const evSuit = evaluateEveningDressSuitability(row, key, formality, materials, K);
   return {
     ...row, key, typeConflict, minimalSneaker: isMinimalSneaker(key, name, colorKeysOf(row, K)), formality, gender: inferGender(row, key, K), colorKeys: colorKeysOf(row, K), materials, inStock,
-    sleeveless: isSleeveless, price: Number(row.price) || 0, popularity: Math.min(2.5, Number(row.sold_count || 0) / 24) + (Number(row.rating || 0) >= 4.3 ? 0.5 : 0),
+    sleeveless: isSleeveless, modestConflict, modestPositive,
+    eveningSuitable: evSuit.suitable, eveningSuitabilityScore: evSuit.score, suitabilityReasons: evSuit.reasons,
+    price: Number(row.price) || 0, popularity: Math.min(2.5, Number(row.sold_count || 0) / 24) + (Number(row.rating || 0) >= 4.3 ? 0.5 : 0),
   };
 }
 

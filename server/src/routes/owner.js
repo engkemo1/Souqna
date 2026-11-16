@@ -751,7 +751,7 @@ r.get('/products', h((req, res) => {
   const weak = q.val(`SELECT COUNT(*) FROM products p WHERE p.store_id=? AND p.status<>'archived' AND (COALESCE((SELECT m.quality FROM product_media pm JOIN media m ON m.id=pm.media_id WHERE pm.product_id=p.id AND pm.is_primary=1 LIMIT 1), 100) < 50)`, [sid]);
   res.json({
     items: rows.map((p) => ({
-      id: p.id, slug: p.slug, name: bi(p, 'name'), price: p.price, compareAt: p.compare_at_price, sku: p.sku, status: p.status,
+      id: p.id, slug: p.slug, name: bi(p, 'name'), price: p.price, compareAt: p.compare_at_price, saleEndsAt: p.sale_ends_at || null, sku: p.sku, status: p.status,
       stock: p.stock, stockStatus: stockStatus(p), trackStock: !!p.track_stock, sold: p.sold_count, featured: !!p.featured,
       category: p.cat_en ? { ar: p.cat_ar, en: p.cat_en } : null, variantCount: p.variant_count, image: images.get(p.id) || null, updatedAt: p.updated_at,
       ...serializeOwnerModeration(p),
@@ -784,7 +784,7 @@ r.get('/products/:id', h((req, res) => {
     product: {
       ...serializeProductDetail(p),
       status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, noReturn: !!p.no_return, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '', audience: p.audience || '', badgeText: p.badge_text || '', badgeTone: p.badge_tone || '', ...suggestTypeFor(p),
-      compareAt: p.compare_at_price, sold: p.sold_count, views: p.views,
+      compareAt: p.compare_at_price, saleEndsAt: p.sale_ends_at || null, sold: p.sold_count, views: p.views,
       ...serializeOwnerModeration(p),
     },
   });
@@ -828,6 +828,7 @@ export const productSchema = z.object({
   description_en: z.string().trim().max(4000).optional().default(''),
   price: z.coerce.number().int().min(1, 'price_required').max(1_000_000),
   compare_at_price: z.coerce.number().int().min(0).max(1_000_000).nullable().optional(),
+  sale_ends_at: z.number().int().positive().nullable().optional(), // ms — optional end of a timed discount
   cost: z.coerce.number().int().min(0).max(1_000_000).nullable().optional(),
   sku: z.string().trim().max(60).optional().nullable(),
   barcode: z.string().trim().max(60).optional().nullable(),
@@ -854,7 +855,9 @@ export const productSchema = z.object({
   primary_media_id: z.number().int().nullable().optional(),
   seo_title: z.string().trim().max(70).optional().nullable(),
   seo_description: z.string().trim().max(170).optional().nullable(),
-}).refine((d) => !d.compare_at_price || d.compare_at_price > d.price, { message: 'compare_gt_price', path: ['compare_at_price'] });
+}).refine((d) => !d.compare_at_price || d.compare_at_price > d.price, { message: 'compare_gt_price', path: ['compare_at_price'] })
+  .refine((d) => !d.sale_ends_at || (d.compare_at_price && d.compare_at_price > d.price), { message: 'sale_needs_old_price', path: ['sale_ends_at'] })
+  .refine((d) => !d.sale_ends_at || (d.sale_ends_at > Date.now() && d.sale_ends_at < Date.now() + 400 * 86400e3), { message: 'sale_end_invalid', path: ['sale_ends_at'] });
 
 function uniqueSlug(storeId, base, exceptId = 0) {
   let slug = slugify(base);
@@ -915,7 +918,7 @@ export function saveProduct(storeId, data, existing) {
     const stock = variants.length ? variants.reduce((s, v) => s + v.stock, 0) : data.stock;
     const row = {
       name_ar: data.name_ar, name_en: data.name_en || data.name_ar, description_ar: data.description_ar, description_en: data.description_en,
-      price: data.price, compare_at_price: data.compare_at_price || null, cost: data.cost ?? null, sku: data.sku || null, ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
+      price: data.price, compare_at_price: data.compare_at_price || null, sale_ends_at: data.compare_at_price ? (data.sale_ends_at ?? null) : null, cost: data.cost ?? null, sku: data.sku || null, ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
       category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, wantedDept, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, ...(data.material !== undefined ? { material_ar: (data.material || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.care !== undefined ? { care_ar: (data.care || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
@@ -989,21 +992,23 @@ r.patch('/products/:id', h((req, res) => {
     stock: z.coerce.number().int().min(0).max(100000).optional(),
     status: z.enum(['active', 'draft', 'archived']).optional(),
     featured: z.boolean().optional(),
+    sale_ends_at: z.number().int().positive().nullable().optional(),
   }).parse(req.body);
   const price = body.price ?? p.price;
   const cmp = body.compare_at_price === undefined ? p.compare_at_price : body.compare_at_price;
   if (cmp && cmp <= price) throw new AppError(422, 'validation_failed', 'Compare-at price must be higher than price.', { compare_at_price: 'compare_gt_price' });
+  if (body.sale_ends_at && !(body.sale_ends_at > Date.now() && body.sale_ends_at < Date.now() + 400 * 86400e3)) throw new AppError(422, 'validation_failed', 'Discount end must be in the future.', { sale_ends_at: 'sale_end_invalid' });
   if (!req.adminStore && p.admin_review_status === 'flagged' && body.status === 'active') {
     throw new AppError(403, 'admin_flagged', 'المنتج موقوف من العرض بواسطة إدارة المنصة — افتح تعديل المنتج وعدّل البيانات أو الصور المطلوبة أولاً.');
   }
   const hasVariants = q.val('SELECT COUNT(*) FROM variants WHERE product_id=?', [p.id]) > 0;
   if (body.stock !== undefined && hasVariants) throw badRequest('has_variants', 'Update stock per variant for this product.');
-  update('products', p.id, { price: body.price, compare_at_price: body.compare_at_price === undefined ? undefined : body.compare_at_price || null, stock: body.stock, status: body.status, featured: body.featured === undefined ? undefined : Number(body.featured), updated_at: nowIso() });
+  update('products', p.id, { price: body.price, compare_at_price: body.compare_at_price === undefined ? undefined : body.compare_at_price || null, sale_ends_at: !cmp ? null : body.sale_ends_at === undefined ? undefined : body.sale_ends_at, stock: body.stock, status: body.status, featured: body.featured === undefined ? undefined : Number(body.featured), updated_at: nowIso() });
   if (body.price !== undefined) notifyPriceDrop(p.id, p.price, body.price);
   const np = q.get('SELECT * FROM products WHERE id=?', [p.id]);
   if (p.track_stock && p.stock <= 0 && np.stock > 0) notifyBackInStock(p.id);
   invalidateModaCatalogue();
-  res.json({ product: { id: np.id, price: np.price, compareAt: np.compare_at_price, stock: np.stock, status: np.status, stockStatus: stockStatus(np), featured: !!np.featured } });
+  res.json({ product: { id: np.id, price: np.price, compareAt: np.compare_at_price, saleEndsAt: np.sale_ends_at || null, stock: np.stock, status: np.status, stockStatus: stockStatus(np), featured: !!np.featured } });
 }));
 
 r.patch('/variants/:id', h((req, res) => {

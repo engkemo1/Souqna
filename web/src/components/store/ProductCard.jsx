@@ -1,4 +1,5 @@
 import { memo, useState } from 'react';
+import SaleCountdown from './SaleCountdown.jsx';
 import { Link } from 'react-router-dom';
 import { Heart, ShoppingBag, Plus } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -125,6 +126,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
           )}
         </div>
         <Price value={p.price} compareAt={p.compareAt} size="sm" className={cx('mt-1.5 sm:[&>span:first-child]:text-base', bubble && '[&>span:first-child]:font-extrabold')} />
+        <SaleCountdown ms={p.saleEndsAt} variant="chip" className="mt-1.5" />
         <ColorDots colors={p.colors} className="mt-2" />
       </div>
     </motion.article>

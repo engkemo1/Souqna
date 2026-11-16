@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate, useLocation } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate, useLocation, useParams } from 'react-router-dom';
 import { trackSiteVisit, trackPageEvents } from './lib/siteTracker.js';
 import { MotionConfig } from 'framer-motion';
 import { I18nProvider } from './lib/i18n.jsx';
@@ -69,7 +69,6 @@ const StoreDesigner = lazy(() => import('./pages/dashboard/StoreDesigner.jsx'));
 const AdminApp = lazy(() => import('./pages/admin/AdminApp.jsx'));
 const AdminOverview = lazy(() => import('./pages/admin/Overview.jsx'));
 const AdminStores = lazy(() => import('./pages/admin/Stores.jsx'));
-const AdminProducts = lazy(() => import('./pages/admin/AdminProducts.jsx'));
 const AdminDepartments = lazy(() => import('./pages/admin/Departments.jsx'));
 const AdminImageLibrary = lazy(() => import('./pages/admin/ImageLibrary.jsx'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
@@ -88,8 +87,6 @@ const AdminCouriers = lazy(() => import('./pages/admin/Couriers.jsx'));
 const AdminAlerts = lazy(() => import('./pages/admin/Alerts.jsx'));
 const AdminGrowth = lazy(() => import('./pages/admin/Growth.jsx'));
 const AdminInsights = lazy(() => import('./pages/admin/Insights.jsx'));
-const AdminStylistLog = lazy(() => import('./pages/admin/StylistLog.jsx'));
-const AdminStylistTraining = lazy(() => import('./pages/admin/StylistTraining.jsx'));
 const AdminAudit = lazy(() => import('./pages/admin/AuditLog.jsx'));
 const AdminCampaigns = lazy(() => import('./pages/admin/Campaigns.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
@@ -192,7 +189,6 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminOverview /> },
           { path: 'stores', element: <AdminStores /> },
-          { path: 'products', element: <AdminProducts /> },
           { path: 'departments', element: <AdminDepartments /> },
           { path: 'image-library', element: <AdminImageLibrary /> },
           { path: 'orders', element: <AdminOrders /> },
@@ -214,9 +210,6 @@ const router = createBrowserRouter([
           { path: 'alerts', element: <AdminAlerts /> },
           { path: 'growth', element: <AdminGrowth /> },
           { path: 'insights', element: <AdminInsights /> },
-          { path: 'stylist-log', element: <AdminStylistLog /> },
-          { path: 'stylist/training', element: <AdminStylistTraining /> },
-          { path: 'stylist-training', element: <AdminStylistTraining /> },
           { path: 'audit', element: <AdminAudit /> },
           { path: 'campaigns', element: <AdminCampaigns /> },
           { path: 'reports', element: <AdminReports /> },
@@ -228,7 +221,7 @@ const router = createBrowserRouter([
               { path: 'products', element: <Products /> },
               { path: 'products/new', element: <ProductEditor /> },
               { path: 'products/:id', element: <ProductEditor /> },
-              { path: '*', element: <Navigate to="products" replace /> },
+              { path: '*', element: <ManageToProducts /> },
             ],
           },
           { path: '*', element: <Navigate to="/admin" replace /> },
@@ -238,6 +231,9 @@ const router = createBrowserRouter([
     ],
   },
 ]);
+
+/** Unknown page under /admin/manage/:slug → that store's products (absolute, so it can never loop). */
+function ManageToProducts() { const { slug } = useParams(); return <Navigate to={`/admin/manage/${slug}/products`} replace />; }
 
 export default function App() {
   return (

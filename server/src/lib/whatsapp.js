@@ -18,7 +18,7 @@ export function toWaNumber(raw) {
 }
 
 /** Runtime overrides saved from the admin screen (app_settings wa_*) win over the .env values. */
-const WA_KEYS = { wa_token: 'token', wa_phone_id: 'phoneId', wa_template: 'template', wa_customer_template: 'customerTemplate', wa_platform_template: 'platformTemplate', wa_service_template: 'serviceTemplate', wa_alert_template: 'alertTemplate', wa_owner_btn_template: 'ownerBtnTemplate', wa_customer_btn_template: 'customerBtnTemplate', wa_lang: 'lang' };
+const WA_KEYS = { wa_token: 'token', wa_phone_id: 'phoneId', wa_template: 'template', wa_customer_template: 'customerTemplate', wa_platform_template: 'platformTemplate', wa_service_template: 'serviceTemplate', wa_alert_template: 'alertTemplate', wa_owner_btn_template: 'ownerBtnTemplate', wa_customer_btn_template: 'customerBtnTemplate', wa_auth_template: 'authTemplate', wa_lang: 'lang' };
 export function applyWaSettings() {
   try {
     for (const r of q.all("SELECT key, value FROM app_settings WHERE key LIKE 'wa\\_%' ESCAPE '\\'")) {
@@ -29,13 +29,13 @@ export function applyWaSettings() {
 applyWaSettings();
 export function saveWaSettings(b) {
   const put = (k, v) => q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', [k, String(v).trim()]);
-  const map = { token: 'wa_token', phoneId: 'wa_phone_id', template: 'wa_template', customerTemplate: 'wa_customer_template', platformTemplate: 'wa_platform_template', serviceTemplate: 'wa_service_template', alertTemplate: 'wa_alert_template', ownerBtnTemplate: 'wa_owner_btn_template', customerBtnTemplate: 'wa_customer_btn_template', lang: 'wa_lang' };
+  const map = { token: 'wa_token', phoneId: 'wa_phone_id', template: 'wa_template', customerTemplate: 'wa_customer_template', platformTemplate: 'wa_platform_template', serviceTemplate: 'wa_service_template', alertTemplate: 'wa_alert_template', ownerBtnTemplate: 'wa_owner_btn_template', customerBtnTemplate: 'wa_customer_btn_template', authTemplate: 'wa_auth_template', lang: 'wa_lang' };
   for (const [k, key] of Object.entries(map)) if (typeof b[k] === 'string' && (k !== 'token' || b[k].trim())) put(key, b[k]);
   applyWaSettings();
 }
 export function waSettingsView() {
   const w = config.wa;
-  return { configured: isWhatsAppConfigured(), tokenSet: !!w.token, tokenHint: w.token ? `…${w.token.slice(-4)}` : '', phoneId: w.phoneId, template: w.template, customerTemplate: w.customerTemplate, platformTemplate: w.platformTemplate, serviceTemplate: w.serviceTemplate, alertTemplate: w.alertTemplate, ownerBtnTemplate: w.ownerBtnTemplate || '', customerBtnTemplate: w.customerBtnTemplate || '', lang: w.lang, platformWa: config.platformWa };
+  return { configured: isWhatsAppConfigured(), tokenSet: !!w.token, tokenHint: w.token ? `…${w.token.slice(-4)}` : '', phoneId: w.phoneId, template: w.template, customerTemplate: w.customerTemplate, platformTemplate: w.platformTemplate, serviceTemplate: w.serviceTemplate, alertTemplate: w.alertTemplate, ownerBtnTemplate: w.ownerBtnTemplate || '', customerBtnTemplate: w.customerBtnTemplate || '', authTemplate: w.authTemplate || '', lang: w.lang, platformWa: config.platformWa };
 }
 /** Sends Meta's built-in hello_world template to a number, to prove token + phone id work. */
 export async function sendWaTest(rawTo) {

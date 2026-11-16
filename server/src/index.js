@@ -23,6 +23,7 @@ import { prefetchCutoutModel } from './lib/cutout.js';
 import { startReservationSweeper } from './lib/reserve.js';
 import './lib/wa-products.js'; // registers the WhatsApp → product handler (dormant unless WA_ENABLED=1)
 import { startDailySummary } from './lib/daily-summary.js';
+import { startSaleExpiry } from './lib/sale-expiry.js';
 import { startLateOrderAlerts } from './lib/insights.js';
 import { registerDefaultProviders } from './lib/image-providers.js';
 import { startIndexNow, indexNowKey } from './lib/indexnow.js';
@@ -159,6 +160,7 @@ app.use('/api/cashier/v1', cashierRoutes);
 app.use('/api/pos-remote', posRemoteRoutes); // phone used as a barcode scanner for the cashier on a computer
 app.use('/api/pos', posRoutes);
 prefetchCutoutModel(); // background-removal model, fetched once per container
+startSaleExpiry(); // ends timed discounts on time (price goes back to the old price)
 startReservationSweeper(); // releases in-store reservations nobody collected
 app.use('/api/wa', waRoutes);
 app.use('/api/buyer', buyerRoutes);

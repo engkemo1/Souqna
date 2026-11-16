@@ -108,6 +108,7 @@ export function serializeCards(rows) {
       price: p.price,
       compareAt: p.compare_at_price && p.compare_at_price > p.price ? p.compare_at_price : null,
       discount: p.compare_at_price > p.price ? Math.round((1 - p.price / p.compare_at_price) * 100) : 0,
+      saleEndsAt: p.compare_at_price > p.price && p.sale_ends_at > Date.now() ? p.sale_ends_at : null, // a timed discount: when it ends (ms)
       image: images[0] || null,
       hoverImage: images[1] || null,
       colors: json(p.colors_json, []),

@@ -4,7 +4,7 @@
  * بيرجع { ...response, session, parsed } — session بيتخزن عند العميل/السيرفر ويتبعت في الطلب الجاي.
  */
 import { loadKnowledge } from './knowledge.js';
-import { parseMessage, matchTokens } from './parse.js';
+import { parseMessage, matchTokens, canonicalProductType, syncIntentConcepts } from './parse.js';
 import { applyUnderstanding, rulesConfident } from './understand.js';
 import { enrichAll } from './products.js';
 import { planOutfit } from './plan.js';
@@ -117,6 +117,18 @@ function applyAnswers(parsed, answers = {}, K) {
       if (v && v !== 'unknown') out.flags = { ...out.flags, size: String(v).toUpperCase() };
       else out.flags = { ...out.flags, sizeSkipped: true };
     } else if (id === 'dress_kind') out.garments = [{ key: v, color: null, material: null, text: v, position: 0 }];
+    else if (id === 'product_type') {
+      out.flags = { ...out.flags, productTypeAsked: true };
+      if (v === 'casual_chic' || v === 'casual') {
+        out.garments = [{ key: 'blouse', alts: ['top', 'two_piece_set', 'jumpsuit'], color: null, material: null, text: 'كاجوال شيك', position: 0 }];
+        out.styles = [...new Set([...(out.styles || []), 'casual', 'elegant'])];
+        out.style = 'casual';
+      } else if (v === 'blouse_skirt') {
+        out.garments = [{ key: 'blouse', color: null, material: null, text: 'بلوزة', position: 0 }, { key: 'skirt', color: null, material: null, text: 'جيبة', position: 1 }];
+      } else if (K.items.has(v)) {
+        out.garments = [{ key: v, color: null, material: null, text: v, position: 0 }];
+      }
+    }
     else if (id === 'taste_style') out.taste = [].concat(v);
     else if (id === 'modest_preference') {
       out.flags = { ...out.flags, hijabAsked: true, notHijab: v === 'regular' };
@@ -124,7 +136,7 @@ function applyAnswers(parsed, answers = {}, K) {
     } else if (id === 'women_style') out.flags = { ...out.flags, womenStyle: v === 'dress' || v === 'set' ? v : 'any' };
     else if (id === 'engagement_role') { out.flags = { ...out.flags, roleAsked: true }; out.role = v === 'self' ? 'self' : 'guest'; if (v === 'self' && out.context === 'engagement_guest') out.contextEffective = 'engagement_self'; }
   }
-  return out;
+  return syncIntentConcepts(out);
 }
 
 // طلب ترشيح من غير اسم قطعة («رشحيلي/اقترحيلي/نقيلي/اختارلي حاجة») = تسوق عام، مش اسم منتج
@@ -149,15 +161,26 @@ const mergeFromSession = (cur, prev) => {
   if (!prev) return cur;
   const m = { ...cur };
   m.flags = { ...(prev.flags || {}), ...(cur.flags || {}) };
-  for (const k of ['persons', 'garments', 'colors', 'avoidColors', 'taste', 'ownedPieces']) if (!m[k]?.length && prev[k]?.length) m[k] = prev[k];
-  for (const k of ['context', 'contextEffective', 'budget', 'daypart', 'dateOffsetDays', 'season']) if ((m[k] === null || m[k] === undefined) && prev[k] != null) m[k] = prev[k];
+  if (prev.flags?.rejectedGarments?.length || cur.flags?.rejectedGarments?.length) {
+    m.flags.rejectedGarments = [...new Set([...(prev.flags?.rejectedGarments || []), ...(cur.flags?.rejectedGarments || [])])];
+  }
+  for (const k of ['persons', 'garments', 'colors', 'avoidColors', 'taste', 'styles', 'ownedPieces']) if (!m[k]?.length && prev[k]?.length) m[k] = prev[k];
+  for (const k of ['context', 'contextEffective', 'budget', 'daypart', 'dateOffsetDays', 'season', 'style']) if ((m[k] === null || m[k] === undefined) && prev[k] != null) m[k] = prev[k];
   if (prev.genderHint && (!m.genderHint || (m.genderHint !== prev.genderHint && cur.flags?.genderWeak))) m.genderHint = prev.genderHint; // جنس المتكلم ثابت طول المحادثة
   if (!cur.context && prev.role) m.role = prev.role;
   if (cur.avoidContexts?.length && m.context && cur.avoidContexts.includes(m.context)) { m.context = null; m.contextEffective = null; }
+  if (cur.garments?.length && m.flags.rejectedGarments?.length) {
+    const newTypes = new Set(cur.garments.map((g) => canonicalProductType(g.key)).filter(Boolean));
+    const newKeys = new Set(cur.garments.map((g) => g.key).filter(Boolean));
+    m.flags.rejectedGarments = m.flags.rejectedGarments.filter((rk) => !newKeys.has(rk) && !newTypes.has(canonicalProductType(rk)));
+  }
+  if (cur.context === 'evening' && Array.isArray(m.garments)) {
+    m.garments = m.garments.map((g) => (g.key === 'dress_any' || g.key === 'dress_casual' || g.key === 'dress_work' ? { ...g, key: 'dress_evening', alts: ['dress_party'] } : g));
+  }
   // «لا اسود» / «خليه كحلي»: لون جديد في الرسالة بيغيّر لون القطعة الوحيدة المطلوبة قبل كده
   if (!cur.garments?.length && cur.colors?.length === 1 && prev.garments?.length === 1) { const pc = prev.garments[0].color; m.garments = [{ ...prev.garments[0], color: cur.colors[0] }]; m.colors = []; if (pc && pc !== cur.colors[0]) { const ph = prev.flags?.colorHistory?.key === prev.garments[0].key ? prev.flags.colorHistory.colors : []; m.flags = { ...m.flags, colorHistory: { key: prev.garments[0].key, colors: [...new Set([...ph, pc])].slice(-3) } }; } }
   if (cur.avoidColors?.length && Array.isArray(m.garments)) m.garments = m.garments.map((g) => (g.color && cur.avoidColors.includes(g.color) ? { ...g, color: null } : g));
-  return m;
+  return syncIntentConcepts(m);
 };
 
 /** قطع مذكورة في نص (حسب قاموس المرادفات) وغير موجودة في مجموعة المسموح بيها. بنعتبر البنطلون/الشينو والجزمة/اللوفر مجموعة واحدة. */
@@ -604,19 +627,21 @@ async function runModaCore(messages, opts = {}) {
   const itemLabel = (it) => `${it.name}${it.aud === 'men' ? ' (ليه)' : it.aud === 'women' || it.aud === 'women_hijab' ? ' (ليها)' : ''}`;
   const famRe = (it) => new RegExp(String(it.key || it.slotKey || 'zzz').replace(/[^a-z_]/gi, '') || 'zzz', 'i');
   const pickedItem = answers?.which_piece != null ? lookItems.find((i) => String(i.id) === String(answers.which_piece)) : null;
-  // «غيّر الجزمة / بدّل القميص لأزرق»: استبدال قطعة من اللوك الحالي (أو طلب قطعة بلون جديد لو مفيش لوك)
+  // «غيّر الجزمة / بدّل القميص لأزرق / خلي اللون أسود بدل الأبيض»: استبدال قطعة من اللوك الحالي (أو طلب قطعة بلون جديد لو مفيش لوك)
   { const sw = !hasAnswers ? norm(text).match(/^(?:عاوز |عايز |ممكن |لو سمحت )?(?:اغير|غير|غيري|بدل|ابدل|بدلي|خلي|خليه|خليها)\s+(.+)$/) : null;
     if (sw && !/^(ده|دي|دا|الطقم|اللبس|كله|كل حاجه)$/.test(sw[1])) {
       const rest = sw[1];
       const pr = parseMessage(rest, { profile, imageText: '', now, cairoDow: dow });
-      const col = pr.colors?.[0] || pr.garments?.[0]?.color || null;
+      const col = pr.colors?.[0] || pr.garments?.[0]?.color || parsed.colors?.[0] || null;
+      const mergedAvoid = [...new Set([...(session?.parsed?.avoidColors || []), ...(pr.avoidColors || []), ...(parsed.avoidColors || [])])].filter((c) => c !== col);
       const hit = lookItems.length ? resolveAnchor(rest, session) : null;
       if (hit?.item) {
         const it = hit.item;
-        parsed = { ...parsed, intent: 'shop', persons: it.aud ? [it.aud] : parsed.persons, avoidColors: [], garments: [{ key: it.key || it.slotKey, color: col, material: null, text: it.name, position: 0 }], flags: { ...parsed.flags, swapId: it.id, colorFlexible: true } };
+        parsed = syncIntentConcepts({ ...parsed, intent: 'shop', persons: it.aud ? [it.aud] : parsed.persons, avoidColors: mergedAvoid, garments: [{ key: it.key || it.slotKey, color: col, material: null, text: it.name, position: 0 }], flags: { ...parsed.flags, swapId: it.id, colorFlexible: true } });
       } else if (pr.garments?.length && col) {
-        parsed = { ...parsed, intent: 'shop', avoidColors: [], colors: [], garments: pr.garments.map((g) => ({ ...g, color: g.color || col })), persons: parsed.persons };      } else if (!pr.garments?.length && col && session?.parsed?.garments?.length && /^(ال)?لون/.test(rest)) {
-        parsed = { ...session.parsed, intent: 'shop', followup: null, avoidColors: [], colors: [], garments: session.parsed.garments.map((g, i) => (i === 0 ? { ...g, color: col } : g)) };
+        parsed = syncIntentConcepts({ ...(session?.parsed || {}), ...parsed, intent: 'shop', avoidColors: mergedAvoid, colors: [], garments: pr.garments.map((g) => ({ ...g, color: g.color || col })), persons: parsed.persons?.length ? parsed.persons : (session?.parsed?.persons || []) });
+      } else if (!pr.garments?.length && col && session?.parsed?.garments?.length && (/^(ال)?لون/.test(rest) || pr.avoidColors?.length || parsed.avoidColors?.length)) {
+        parsed = syncIntentConcepts({ ...session.parsed, intent: 'shop', followup: null, avoidColors: mergedAvoid, colors: [], garments: session.parsed.garments.map((g, i) => (i === 0 ? { ...g, color: col } : g)) });
       }
     } }
   // ---- «رجعني للفستان / نرجع للبنطلون / خلينا في الجيبة»: رجوع لقطعة اتكلمنا عنها قبل كده بكل تفاصيلها (مش «حاجة للفستان»)
@@ -628,19 +653,105 @@ async function runModaCore(messages, opts = {}) {
       const k = (() => { for (const w of [rm[1], `ال${rm[1]}`, rm[1].replace(/^ل/, '')]) { const m = matchTokens([w], K).flatMap((x) => x.entries || []).find((e) => e.group === 'garment'); if (m) return m.key; } return null; })();
       const fam = (key) => (/^dress/.test(key) ? 'dress' : K.items.get(key)?.family || key);
       if (k) {
-        const pool = [...(session.parsed.garments || []), ...[...(session.garmentHistory || [])].reverse()];
-        const hit = pool.find((g) => g?.key === k) || pool.find((g) => g?.key && fam(g.key) === fam(k));
-        if (hit) { parsed = { ...session.parsed, intent: 'shop', followup: null, garments: [{ ...hit }], ownedPieces: [], fullLook: false, flags: { ...(session.parsed.flags || {}), swapId: undefined, anchorId: undefined } }; returnTurn = true; }
+        const histItems = (session.lookHistory || []).flatMap((l) => l?.items || []).map((it) => ({ key: it.key || it.slotKey, color: it.colorKeys?.[0] || null, material: null, text: it.name, position: 0 }));
+        const pool = [...(session.parsed.garments || []), ...[...(session.garmentHistory || [])].reverse(), ...histItems.reverse()];
+        const hit = pool.find((g) => g?.key === k) || pool.find((g) => g?.key && fam(g.key) === fam(k)) || { key: session.parsed.context === 'evening' && k === 'dress_any' ? 'dress_evening' : k, color: null, material: null, text: rm[1], position: 0 };
+        if (hit) {
+          const prevRej = (session.parsed.flags?.rejectedGarments || []).filter((rk) => rk !== hit.key && fam(rk) !== fam(hit.key));
+          parsed = syncIntentConcepts({ ...session.parsed, intent: 'shop', followup: null, garments: [{ ...hit }], ownedPieces: [], fullLook: false, rejectedProductTypes: (session.parsed.rejectedProductTypes || []).filter((rt) => rt !== canonicalProductType(hit.key)), flags: { ...(session.parsed.flags || {}), rejectedGarments: prevRej, swapId: undefined, anchorId: undefined } });
+          returnTurn = true;
+        }
       }
+    }
+    // «هات معاه حاجة تانية» / «عايزة معاه حاجة تانية»: استكمال وتنسيق قطعة مكملة مع القطعة الحالية
+    if (!returnTurn && parsed.flags?.complementaryRequest && (session.parsed.garments?.length || lookItems.length)) {
+      const heroItem = lookItems[0] || null;
+      const heroG = session.parsed.garments?.[0] || null;
+      const heroKey = heroItem?.key || heroItem?.slotKey || heroG?.key || null;
+      const heroCol = heroItem?.colorKeys?.[0] || heroG?.color || null;
+      if (heroKey) {
+        const isMen = (session.parsed.persons || []).includes('men') && !(session.parsed.persons || []).some((p) => p === 'women' || p === 'women_hijab');
+        const COMP_MAP = {
+          dress: ['heels_high', 'clutch'],
+          jumpsuit: ['heels_high', 'clutch'],
+          abaya: ['heels_low', 'handbag'],
+          blouse: ['trousers', 'skirt'],
+          top: ['trousers', 'skirt'],
+          shirt: isMen ? ['trousers', 'loafers'] : ['trousers', 'skirt'],
+          tshirt: isMen ? ['jeans', 'sneakers'] : ['jeans', 'skirt'],
+          trousers: isMen ? ['shirt', 'loafers'] : ['blouse', 'heels_low'],
+          jeans: isMen ? ['tshirt', 'sneakers'] : ['blouse', 'sneakers'],
+          skirt: ['blouse', 'heels_low'],
+          blazer: isMen ? ['shirt', 'trousers'] : ['blouse', 'trousers'],
+          jacket: isMen ? ['tshirt', 'jeans'] : ['top', 'jeans'],
+          suit: ['shirt', 'formal_shoes'],
+        };
+        const cType = canonicalProductType(heroKey);
+        const compKeys = COMP_MAP[heroKey] || COMP_MAP[cType] || (isMen ? ['shirt', 'trousers'] : ['heels_high', 'clutch']);
+        parsed = syncIntentConcepts({
+          ...session.parsed,
+          intent: 'shop',
+          followup: null,
+          ownedPieces: [{ key: heroKey, color: heroCol, text: heroItem?.name || heroG?.text || heroKey }],
+          garments: compKeys.map((key, idx) => ({ key, color: null, material: null, text: key, position: idx })),
+          flags: { ...(session.parsed.flags || {}), ...parsed.flags, complementaryResolved: heroKey },
+        });
+        returnTurn = true;
+      }
+    }
+    // «لا، مش فستان، عايزة لانجيري» / «مش عايزة لانجيري، عايزة فستان»: استبدال نوع المنتج مع الحفاظ على سياق المحادثة
+    const sameTypeAsSession = parsed.garments.length > 0 && session.parsed.garments?.length > 0
+      && parsed.garments.every((g) => session.parsed.garments.some((p) => canonicalProductType(p.key) === canonicalProductType(g.key)));
+    if (!returnTurn && !sameTypeAsSession && (parsed.flags?.rejectedGarments?.length || (parsed.garments.length && /^(?:لا|لأ|لاء|مش|بلاش|سيبك)(?:[،,\s]|$)/.test(nt)))) {
+      const mergedRej = [...new Set([...(session.parsed.flags?.rejectedGarments || []), ...(parsed.flags?.rejectedGarments || [])])];
+      const newTypes = new Set(parsed.garments.map((g) => canonicalProductType(g.key)).filter(Boolean));
+      const newKeys = new Set(parsed.garments.map((g) => g.key).filter(Boolean));
+      const cleanRej = mergedRej.filter((rk) => !newKeys.has(rk) && !newTypes.has(canonicalProductType(rk)));
+      const ctxKeep = parsed.context || session.parsed.context || null;
+      const ctxEffKeep = parsed.contextEffective || session.parsed.contextEffective || ctxKeep;
+      const nextGarments = (parsed.garments.length ? parsed.garments : []).map((g) => (ctxKeep === 'evening' && g.key === 'dress_any' ? { ...g, key: 'dress_evening', alts: ['dress_party'] } : g));
+      parsed = syncIntentConcepts({
+        ...session.parsed,
+        ...parsed,
+        intent: 'shop',
+        followup: null,
+        context: ctxKeep,
+        contextEffective: ctxEffKeep,
+        persons: parsed.persons?.length ? parsed.persons : (session.parsed.persons || []),
+        budget: parsed.budget || session.parsed.budget || null,
+        style: parsed.style || session.parsed.style || null,
+        styles: [...new Set([...(parsed.styles || []), ...(session.parsed.styles || [])])],
+        taste: [...new Set([...(parsed.taste || []), ...(session.parsed.taste || [])])],
+        garments: nextGarments,
+        flags: { ...(session.parsed.flags || {}), ...(parsed.flags || {}), rejectedGarments: cleanRej, productTypeAsked: true },
+      });
+      returnTurn = true;
     }
     // «خريفي متوسط» / «شتوي»: موسم لوحده في نص الطلب = تفصيلة لنفس القطعة
     if (!returnTurn && !parsed.garments.length && parsed.season && session.parsed.garments?.length && !parsed.context && !parsed.persons?.length && nt.split(' ').length <= 4) {
-      parsed = { ...session.parsed, intent: 'shop', followup: null, season: parsed.season, garments: session.parsed.garments.map((g) => ({ ...g })) };
+      parsed = syncIntentConcepts({ ...session.parsed, intent: 'shop', followup: null, season: parsed.season, garments: session.parsed.garments.map((g) => ({ ...g })) });
       returnTurn = true;
     }
-    // «عندك حاجة شبهه / زيها؟» (و«أنا محجبة / أرخص» معاها): نفس القطعة اللي بنتكلم عليها، مع أي قيد جديد
-    if (!returnTurn && !parsed.garments.length && session.parsed.garments?.length && /(^| )(شبهه|شبهها|شبههم|زيه|زيها|زيهم|زي ده|زي دي|زي دا|من نوعه|من نوعها|نفس الموديل|نفس الستايل|نفس القصه)( |$|[؟?])/.test(` ${nt} `)) {
-      parsed = { ...session.parsed, ...Object.fromEntries(Object.entries({ persons: parsed.persons?.length ? parsed.persons : null, budget: parsed.budget || null }).filter(([, v]) => v)), intent: 'shop', followup: parsed.followup || null, garments: session.parsed.garments.map((g) => ({ ...g })), flags: { ...(session.parsed.flags || {}), ...(parsed.flags || {}) } };
+    // «عندك حاجة شبهه / زيها؟» / «طب نفس الستايل بس للسهرة»: نفس القطعة والستايل اللي بنتكلم عليهم، مع تحديث المناسبة أو القيد الجديد
+    if (!returnTurn && !parsed.garments.length && session.parsed.garments?.length && (/(^| )(شبهه|شبهها|شبههم|زيه|زيها|زيهم|زي ده|زي دي|زي دا|من نوعه|من نوعها|نفس الموديل|نفس الستايل|نفس الاستايل|نفس الذوق|نفس القصه)( |$|[؟?])/.test(` ${nt} `) || (parsed.context && /(^| )(بس|طب|طيب|خليها|خليه|لو) (ل|لل|في )?(سهره|سهرة|فرح|خطوبه|شغل|خروجه|خروجة|جامعه|جامعة|سفر)( |$)/.test(` ${nt} `)))) {
+      const nextCtx = parsed.context || session.parsed.context || null;
+      const nextCtxEff = parsed.contextEffective || nextCtx || session.parsed.contextEffective || null;
+      const nextGarments = session.parsed.garments.map((g) => (nextCtx === 'evening' && g.key.startsWith('dress_') && g.key !== 'dress_bridal' ? { ...g, key: 'dress_evening', alts: ['dress_party'] } : { ...g }));
+      parsed = syncIntentConcepts({
+        ...session.parsed,
+        ...Object.fromEntries(Object.entries({
+          persons: parsed.persons?.length ? parsed.persons : null,
+          budget: parsed.budget || null,
+          context: nextCtx,
+          contextEffective: nextCtxEff,
+        }).filter(([, v]) => v)),
+        intent: 'shop',
+        followup: parsed.followup || null,
+        garments: nextGarments,
+        styles: [...new Set([...(session.parsed.styles || []), ...(parsed.styles || [])])],
+        style: session.parsed.style || parsed.style || null,
+        flags: { ...(session.parsed.flags || {}), ...(parsed.flags || {}) },
+      });
       returnTurn = true;
     }
     // «حاجة في النص، زي الجينز كده» / «لون قريب من الكحلي»: تشبيه، مش طلب قطعة تانية → نفضل على نفس القطعة
@@ -651,7 +762,7 @@ async function runModaCore(messages, opts = {}) {
         const cur = session.parsed.garments.map((g) => g.key);
         if (ck && !cur.includes(ck)) {
           const rest = parsed.garments.filter((g) => g.key !== ck);
-          if (!rest.length) { parsed = { ...session.parsed, intent: 'shop', followup: null, garments: session.parsed.garments.map((g, i) => (i === 0 && ck === 'jeans' && !parsed.colors?.length ? { ...g, color: K.colors.has('blue') ? 'blue' : g.color } : g)) }; returnTurn = true; }
+          if (!rest.length) { parsed = syncIntentConcepts({ ...session.parsed, intent: 'shop', followup: null, garments: session.parsed.garments.map((g, i) => (i === 0 && ck === 'jeans' && !parsed.colors?.length ? { ...g, color: K.colors.has('blue') ? 'blue' : g.color } : g)) }); returnTurn = true; }
         }
       }
     }
@@ -723,11 +834,21 @@ async function runModaCore(messages, opts = {}) {
   }
   // «تمام هات الجاكيت مقاس L» بعد سؤال جانبي: نفس القطعة اتذكرت تاني → نكمل بنفس مواصفاتها (لون/خامة/موسم…) مش طلب جديد من الصفر
   if (!hasAnswers && session?.parsed?.garments?.length && parsed.garments.length && parsed.intent === 'shop'
-    && parsed.garments.every((g) => session.parsed.garments.some((p) => p.key === g.key))
+    && parsed.garments.every((g) => session.parsed.garments.some((p) => p.key === g.key || canonicalProductType(p.key) === canonicalProductType(g.key)))
     && !/(^| )(تاني|تانيه|غير|غيره|غيرها|جديد|جديده|خالص|بلاش|مش عاجبني)( |$)/.test(norm(text).replace(/(^| )(ال[^ ]+) (تاني|تانيه)(?= |$)/g, '$1$2'))) { // «وريني القميص تاني» = نفس القميص تاني؛ «قميص تاني» = قميص غيره
     const prevBy = new Map(session.parsed.garments.map((p) => [p.key, p]));
-    parsed = { ...parsed, garments: parsed.garments.map((g) => ({ ...g, color: g.color || prevBy.get(g.key)?.color || null, material: g.material || prevBy.get(g.key)?.material || null })) };
-    for (const k of ['season', 'context', 'contextEffective', 'budget', 'daypart']) if ((parsed[k] === null || parsed[k] === undefined) && session.parsed[k] != null) parsed[k] = session.parsed[k];
+    const prevByType = new Map(session.parsed.garments.map((p) => [canonicalProductType(p.key), p]));
+    parsed = {
+      ...parsed,
+      garments: parsed.garments.map((g) => {
+        const pv = prevBy.get(g.key) || prevByType.get(canonicalProductType(g.key));
+        const keepKey = (g.key === 'dress_any' && pv?.key?.startsWith('dress_')) ? pv.key : g.key;
+        return { ...g, key: keepKey, color: g.color || pv?.color || null, material: g.material || pv?.material || null };
+      }),
+    };
+    for (const k of ['season', 'context', 'contextEffective', 'occasion', 'style', 'styles', 'taste', 'budget', 'daypart']) if ((parsed[k] === null || parsed[k] === undefined || (Array.isArray(parsed[k]) && !parsed[k].length)) && session.parsed[k] != null) parsed[k] = session.parsed[k];
+    if (!parsed.avoidColors?.length && session.parsed.avoidColors?.length) parsed.avoidColors = session.parsed.avoidColors;
+    if (!parsed.rejectedProductTypes?.length && session.parsed.rejectedProductTypes?.length) parsed.rejectedProductTypes = session.parsed.rejectedProductTypes;
     if (!parsed.persons?.length && session.parsed.persons?.length) parsed.persons = session.parsed.persons;
     if (!parsed.flags?.size && session.parsed.flags?.size) parsed.flags = { ...parsed.flags, size: session.parsed.flags.size }; // المقاس كمان ميضيعش
   }
@@ -895,6 +1016,16 @@ async function runModaCore(messages, opts = {}) {
     else if (pq === 'women_style') f.womenStyle = f.womenStyle || 'any';
     else if (pq === 'engagement_role') f.roleAsked = true;
     else if (pq === 'color_preference' && !parsed.colors?.length) f.colorFlexible = true;
+    else if (pq === 'product_type') {
+      f.productTypeAsked = true;
+      // العميل رد بجملة حرة زي «حاجة كاجوال شيك» على سؤال نوع القطعة
+      if (!parsed.garments.length && /(كاجوال|شيك|بسيط|سمبل|هادي|casual|chic)/.test(norm(text))) {
+        parsed = {
+          ...parsed,
+          garments: [{ key: 'blouse', alts: ['top', 'two_piece_set', 'jumpsuit'], color: null, material: null, text: 'كاجوال شيك', position: 0 }],
+        };
+      }
+    }
     parsed = { ...parsed, flags: f };
   }
   // «أنا العروسة / أنا العريس»
@@ -966,8 +1097,19 @@ async function runModaCore(messages, opts = {}) {
     const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang, profile, assistantName });
     return { ...res0, say: 'مش لاقية لبس رقص مخصوص في المحلات دلوقتي. لو تقصدي فستان أو طقم سهرة لفرح أو حفلة قوليلي لمين وأرشحلك من المتاح.', intent: 'chat', tips: [], styleTips: [], questions: [], blocks: null, session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
   }
+  parsed = syncIntentConcepts(parsed);
+  // محرك التوضيح الذكي قبل البحث: لو العميل حدد مناسبة سهرة أو ستايل/مناسبة عامة بس محددش نوع القطعة («رشحيلي حاجة حلوة للسهره» / «عايزة حاجة شيك» / «عايزة حاجة كاجوال للخروجة» / «عايزة حاجة فورمال للشغل» / «عايزة حاجة محتشمة للسهرة»)
+  const needsProductTypeClarification = !hasAnswers && parsed.intent === 'shop' && !parsed.garments.length && !parsed.ownedPieces?.length
+    && !parsed.flags?.productTypeAsked && !parsed.flags?.womenStyle && !parsed.flags?.altRequest
+    && (parsed.persons?.length || 0) <= 1 && !parsed.kidsUnspecified
+    && (
+      (parsed.context === 'evening' || parsed.occasion === 'evening')
+      || (!parsed.fullLook && !parsed.budget && (parsed.styles?.length > 0 || ['work', 'casual_outing', 'daily'].includes(parsed.occasion))
+        && /(^| )(حاجه|حاجة|حاجات|قطعه|قطعة|لبس|هدوم|رشحيلي|رشحلي|اقترحي|اقترحيلي|نقيلي|اختاريلي|شوفيلي|وريني|عايزه البس|عايز البس|7aga|haga|lebs)( |$)/.test(parsed.normalized || norm(text)))
+    );
+
   // بحث بالكلمات في المنتجات الحقيقية: لأي حاجة برا قاموس اللبس (مكياج، نظارات، بيجامات…)
-  if (!hasAnswers && !session?.pending && (parsed.intent === 'unknown' || (parsed.intent === 'shop' && !parsed.ownedPieces?.length && !parsed.garments.length && !parsed.context && !parsed.persons.length)) && text.trim().length >= 3) {
+  if (!needsProductTypeClarification && !hasAnswers && !session?.pending && (parsed.intent === 'unknown' || (parsed.intent === 'shop' && !parsed.ownedPieces?.length && !parsed.garments.length && !parsed.context && !parsed.persons.length)) && text.trim().length >= 3) {
     const hits = keywordSearch(text, ensureEnriched(products, K), { limit: 6 });
     if (hits.length) return searchReply(hits);
     if (parsed.intent === 'unknown' && !/(^| )(حاجه|حاجات|حلوه|حلو|شيك|لقطه|حاجه حلوه|عندي|انا|ممكن|ليه|ازاي|فين|امتي|امتى|اقتراح|شكوي|شكوى|سؤال|للمحل|المحل|عندكم|عندك)( |$)/.test(` ${norm(text)} `) && text.trim().split(/\s+/).length <= 3 && /^[\u0600-\u06FFa-zA-Z ]+$/.test(text.trim()) && !session?.parsed && !/^(ايه|ايوه|ايوا|اه|لا|تمام|طب|طيب|هو|هي|بس|كمل|كمان|تاني|وبعدين|ممكن|ازاي|ليه|مين|فين|امتي|انتي|انت|انا|خلاص|ماشي|اوكي|يعني|هاتلي|ورينا|ورني|مش|ده|دي|دا|كده|كدا|حلو|وحش|غبي|غبيه|سيئ|سيء|مدير|خدمه)( |$)/.test(norm(text).trim()) && !/(غبي|غبيه|وحش|سيئ|سيء|بتفهمي|بتفهم|مدير|شكوي|شكوى)/.test(norm(text))) {
@@ -976,7 +1118,7 @@ async function runModaCore(messages, opts = {}) {
     }
   }
   // طلب مبهم («حاجة شيك»): قبل ما نسأل سؤال جاهز، الموديل يحاول يفهم؛ لو فهم نكمّل بحث في المنتجات
-  const vague = !wasUnknown && !hasAnswers && !session?.pending && parsed.intent === 'shop' && !parsed.garments.length && !parsed.context && !parsed.ownedPieces?.length && text.trim().length >= 3;
+  const vague = !needsProductTypeClarification && !wasUnknown && !hasAnswers && !session?.pending && parsed.intent === 'shop' && !parsed.garments.length && !parsed.context && !parsed.ownedPieces?.length && text.trim().length >= 3;
   if ((wasUnknown || vague) && !altRequest && typeof brain === 'function') {
     const b = await callBrain();
     if (b) {
@@ -1041,13 +1183,26 @@ async function runModaCore(messages, opts = {}) {
   // ---------- تخطيط ----------
   let rows = ensureEnriched(products, K);
   const pinnedItems = isContinuation ? resolvePinnedItems(text, session, parsed.garments, rows, anchor && parsed.flags?.anchorId ? anchor : null, audFilter) : [];
-  let plan = planOutfit(parsed, excludeIds.length ? rows.filter((p) => !excludeIds.includes(p.id)) : rows, { adv, eventTime, profile, K, pinnedItems });
-  const OPTIONAL_ASKS = new Set(['budget', 'modest_preference', 'women_style', 'color_preference', 'engagement_role']);
-  const askedBefore = new Set(session?.askedIds || []);
-  const dropAsked = (p) => (p?.ask?.length ? { ...p, ask: p.ask.filter((id) => !(OPTIONAL_ASKS.has(id) && askedBefore.has(id))) } : p);
-  plan = dropAsked(plan);
-  if (excludeIds.length && plan.state === 'none' && !parsed.flags?.swapId) plan = dropAsked(planOutfit(parsed, rows, { adv, eventTime, profile, K, pinnedItems }));
-  plan = auditPlanPicks(plan, K);
+  let plan;
+  if (needsProductTypeClarification) {
+    plan = {
+      parsed,
+      state: 'clarify',
+      ask: ['product_type'],
+      persons: parsed.persons.length ? parsed.persons : (parsed.genderHint === 'male' ? ['men'] : ['women']),
+      context: parsed.contextEffective || parsed.context,
+      occasion: parsed.occasion,
+      style: parsed.style,
+    };
+  } else {
+    plan = planOutfit(parsed, excludeIds.length ? rows.filter((p) => !excludeIds.includes(p.id)) : rows, { adv, eventTime, profile, K, pinnedItems });
+    const OPTIONAL_ASKS = new Set(['budget', 'modest_preference', 'women_style', 'color_preference', 'engagement_role']);
+    const askedBefore = new Set(session?.askedIds || []);
+    const dropAsked = (p) => (p?.ask?.length ? { ...p, ask: p.ask.filter((id) => !(OPTIONAL_ASKS.has(id) && askedBefore.has(id))) } : p);
+    plan = dropAsked(plan);
+    if (excludeIds.length && plan.state === 'none' && !parsed.flags?.swapId) plan = dropAsked(planOutfit(parsed, rows, { adv, eventTime, profile, K, pinnedItems }));
+    plan = auditPlanPicks(plan, K);
+  }
   let sizeMiss = null;
   if (plan.state === 'none' && parsed.flags?.size) { const alt = planOutfit({ ...parsed, flags: { ...parsed.flags, size: undefined } }, rows, { adv, eventTime, profile, K, pinnedItems }); if (alt.people?.some((pe) => pe.picks.length)) { sizeMiss = parsed.flags.size; plan = auditPlanPicks(alt, K); } }
 
@@ -1227,8 +1382,9 @@ async function runModaCore(messages, opts = {}) {
     ...(session?.lookHistory || []),
     ...(session?.activeLook ? [session.activeLook] : [])
   ].filter(Boolean).slice(-6);
+  parsed = syncIntentConcepts(parsed);
   const nextSession = {
-    turn: (session?.turn || 0) + 1, parsed: { ...parsed, advice: null, ...(derivedBudget ? { budget: session?.parsed?.budget ?? null } : {}), ...speakerCarry(parsed, session) }, pending: plan.state === 'clarify' || Boolean(plan.ask?.length), pendingQuestion: plan.ask?.[0] || null, askedIds: [...new Set([...(session?.askedIds || []), ...(plan.ask || [])])].slice(-12), shown: [...new Set([...(session?.shown || []), ...shown])].slice(-60),
+    turn: (session?.turn || 0) + 1, parsed: syncIntentConcepts({ ...parsed, advice: null, ...(derivedBudget ? { budget: session?.parsed?.budget ?? null } : {}), ...speakerCarry(parsed, session) }), pending: plan.state === 'clarify' || Boolean(plan.ask?.length), pendingQuestion: plan.ask?.[0] || null, askedIds: [...new Set([...(session?.askedIds || []), ...(plan.ask || [])])].slice(-12), shown: [...new Set([...(session?.shown || []), ...shown])].slice(-60),
     altOffer,
     lastState: plan.state, lastTotal: needsClarificationFirst ? (session?.lastTotal ?? null) : (plan.total ?? null), lastBudgetUsed: needsClarificationFirst ? (session?.lastBudgetUsed ?? null) : (plan.budget ?? plan.total ?? null),
     activeLook,

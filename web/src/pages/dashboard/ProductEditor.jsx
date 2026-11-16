@@ -10,7 +10,7 @@ import { useAuth } from '../../lib/auth.jsx';
 import { useDashBase } from '../../lib/dashBase.js';
 import { formatMoney } from '../../lib/format.js';
 import { PageHeader } from '../../components/dash/Kit.jsx';
-import ProductOffers from '../../components/promo/ProductOffers.jsx';
+import ProductOffers, { createQuickOffer } from '../../components/promo/ProductOffers.jsx';
 import MediaUploader from '../../components/dash/MediaUploader.jsx';
 import { Field, Input, Textarea, Select, Switch, Segmented } from '../../components/ui/Field.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -30,7 +30,7 @@ const PRESET_COLORS = [
 
 
 const EMPTY = {
-  name_ar: '', name_en: '', description_ar: '', description_en: '', care: '', material: '', price: '', compare_at_price: '', cost: '', sku: '', barcode: '', variantCodes: {},
+  name_ar: '', name_en: '', description_ar: '', description_en: '', care: '', material: '', price: '', compare_at_price: '', sale_ends_at: null, cost: '', sku: '', barcode: '', variantCodes: {},
   category_id: '', department: '', attrs: {}, audience: '', moda_key: '', style_level: '', badge_text: '', badge_tone: 'brand', status: 'active', featured: false, is_new: false, no_return: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
   media: [], seo_title: '', seo_description: '',
 };
@@ -70,7 +70,7 @@ function fromProduct(p) {
   return {
     ...EMPTY,
     name_ar: p.name.ar, name_en: p.name.en && p.name.en !== p.name.ar ? p.name.en : '', description_ar: p.description.ar || '', description_en: p.description.en || '', care: p.care || '', material: p.material || '',
-    price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '', barcode: p.barcode || '', variantCodes: codes,
+    price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', sale_ends_at: p.saleEndsAt || null, cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '', barcode: p.barcode || '', variantCodes: codes,
     category_id: p.categoryId ? String(p.categoryId) : '', department: p.department || '', attrs: p.attrs || {}, audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', badge_text: p.badgeText || '', badge_tone: p.badgeTone || 'brand', status: p.status, featured: p.featured, is_new: p.isNewFlag, no_return: !!p.noReturn,
     colors: p.colors, sizes: p.sizes, matrix, variantIds: ids, track_stock: p.trackStock, stock: p.stockCount, low_stock_at: p.lowStockAt,
     media: p.media, seo_title: p.seo.title || '', seo_description: p.seo.description || '',
@@ -85,11 +85,44 @@ function toPayload(f) {
     : [];
   return {
     name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en, care: f.care.trim() || null, material: f.material.trim() || null,
-    price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, cost: f.cost ? Number(f.cost) : null,
+    price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, sale_ends_at: f.compare_at_price && f.sale_ends_at ? Number(f.sale_ends_at) : null, cost: f.cost ? Number(f.cost) : null,
     sku: f.sku || null, barcode: f.barcode || null, category_id: f.category_id ? Number(f.category_id) : null, ...(f.department && f.deptTouched ? { department: f.department } : {}), attrs: Object.fromEntries(Object.entries(f.attrs || {}).filter(([, v]) => v !== '' && v != null)), audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, badge_text: f.badge_text.trim() || null, badge_tone: f.badge_text.trim() ? f.badge_tone : null, status: f.status, featured: f.featured, is_new: f.is_new, no_return: f.no_return,
     colors: f.colors, sizes: f.sizes, variants, track_stock: f.track_stock, stock: Number(f.stock || 0), low_stock_at: Number(f.low_stock_at || 0),
     media: f.media.map((m) => m.id), primary_media_id: f.media[0]?.id ?? null, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
   };
+}
+
+
+/* optional timed discount: presets + custom date; after it ends the price returns to the old one by itself */
+function SaleEnd({ value, onChange, error, L, lang }) {
+  const [custom, setCustom] = useState(false);
+  const presets = [[1, L('يوم', '1 day')], [3, L('٣ أيام', '3 days')], [7, L('أسبوع', '1 week')], [14, L('أسبوعين', '2 weeks')], [30, L('شهر', '1 month')]];
+  const toLocal = (ms) => { const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60000); return d.toISOString().slice(0, 16); };
+  const on = !!value;
+  return (
+    <div className="rounded-2xl border border-line bg-surface p-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold">{L('خصم لفترة محدودة', 'Limited-time discount')} <span className="text-xs font-normal text-muted">({L('اختياري', 'optional')})</span></p>
+          <p className="mt-0.5 text-xs text-muted">{L('هيظهر للعميل عدّاد تنازلي، وبعد الانتهاء السعر يرجع للسعر قبل الخصم تلقائيًا.', 'Shoppers see a countdown, then the price returns to the old one automatically.')}</p>
+        </div>
+        <Switch checked={on} onChange={(v) => { if (v) onChange(Date.now() + 3 * 86400e3); else { onChange(null); setCustom(false); } }} aria-label={L('خصم لفترة محدودة', 'Limited-time discount')} />
+      </div>
+      {on && (
+        <div className="mt-3 space-y-2.5">
+          <div className="flex flex-wrap gap-2">
+            {presets.map(([d, label]) => (
+              <button key={d} type="button" onClick={() => { setCustom(false); onChange(Date.now() + d * 86400e3); }} className="rounded-full border border-line px-3 py-1.5 text-sm hover:border-brand hover:text-brand">{label}</button>
+            ))}
+            <button type="button" onClick={() => setCustom(true)} className={cx('rounded-full border px-3 py-1.5 text-sm', custom ? 'border-brand text-brand' : 'border-line hover:border-brand hover:text-brand')}>{L('تاريخ محدد', 'Pick a date')}</button>
+          </div>
+          {custom && <input type="datetime-local" min={toLocal(Date.now())} value={toLocal(value)} onChange={(e) => { const ms = new Date(e.target.value).getTime(); if (ms) onChange(ms); }} className="h-11 w-full rounded-xl border border-line bg-canvas px-3 text-sm" />}
+          <p className="text-xs font-medium text-sale">{L('ينتهي: ', 'Ends: ')}{new Date(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+          {error && <p className="text-xs text-sale">{error}</p>}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /* --------------------------------------------------------------- building blocks */
@@ -460,6 +493,7 @@ export default function ProductEditor() {
   const [showEn, setShowEn] = useState(false);
   const [adv, setAdv] = useState(false);
   const [offerIds, setOfferIds] = useState([]);
+  const [quickOffers, setQuickOffers] = useState([]);
   const [published, setPublished] = useState(null);
   const nameRef = useRef(null);
   const [step, setStep] = useState(0);
@@ -569,6 +603,7 @@ export default function ProductEditor() {
     if (f.name_ar.trim().length < 2) e.name_ar = t('field.required');
     if (!Number(f.price)) e.price = t('field.price_required');
     if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
+    if (f.compare_at_price && f.sale_ends_at && Number(f.sale_ends_at) <= Date.now()) e.sale_ends_at = L('وقت انتهاء الخصم لازم يكون في المستقبل', 'The end time must be in the future');
     if (status === 'active' && !(f.moda_key || customType || f.department)) e.type = L('اختار قسم المنتج', 'Pick the product section');
     if (!f.media.length && status === 'active') e.media = t('editor.needImage');
     if (isNew && status === 'active' && f.track_stock && totalStock === 0) e.stock = L('لازم تكتب الكمية المتاحة (المخزون) قبل ما تكمّل. لو المنتج ليه ألوان أو مقاسات اكتب كمية لكل واحد.', 'Enter the quantity in stock before continuing. If it has colours or sizes, set a quantity for each.');
@@ -594,6 +629,9 @@ export default function ProductEditor() {
       invalidate(`/stores/${store.slug}`);
       setInitial({ ...f, status });
       toast({ title: isNew ? (status === 'draft' ? L('اتحفظ كمسودة', 'Saved as draft') : t('editor.created')) : t('editor.saved'), image: r.product.media?.[0] ? `${r.product.media[0].base}/thumb.webp` : undefined });
+      if (isNew && quickOffers.length) {
+        try { for (const sp of quickOffers) await createQuickOffer(sp, r.product.id, f.name_ar); invalidate('/owner/promotions'); } catch { toast({ tone: 'error', title: L('اتحفظ المنتج لكن تعذر إنشاء العرض السريع', 'Product saved, but the quick offer failed') }); }
+      }
       if (isNew && offerIds.length) {
         try { await api(`/owner/promotions/for-product/${r.product.id}`, { method: 'PUT', body: { add: offerIds } }); invalidate('/owner/promotions'); } catch { toast({ tone: 'error', title: L('اتحفظ المنتج لكن تعذرت إضافته للعروض', 'Product saved, but adding it to offers failed') }); }
       }
@@ -646,6 +684,7 @@ export default function ProductEditor() {
     if (i === 3) {
       if (!Number(f.price)) e.price = t('field.price_required');
       else if (f.compare_at_price && Number(f.compare_at_price) <= Number(f.price)) e.compare_at_price = t('field.compare_gt_price');
+      else if (f.compare_at_price && f.sale_ends_at && Number(f.sale_ends_at) <= Date.now()) e.sale_ends_at = L('وقت انتهاء الخصم لازم يكون في المستقبل', 'The end time must be in the future');
     }
     if (i === 4 && isNew && f.track_stock && totalStock === 0) e.stock = L('لازم تكتب الكمية المتاحة (المخزون) قبل ما تكمّل. لو المنتج ليه ألوان أو مقاسات اكتب كمية لكل واحد.', 'Enter the quantity in stock before continuing. If it has colours or sizes, set a quantity for each.');
     return e;
@@ -768,7 +807,7 @@ export default function ProductEditor() {
         <Switch label={t('editor.featured')} description={t('editor.featuredHint')} checked={f.featured} onChange={(v) => set({ featured: v })} />
         <Switch label={t('editor.markNew')} description={t('editor.markNewHint')} checked={f.is_new} onChange={(v) => set({ is_new: v })} />
         <Switch label={t('editor.noReturn')} description={t('editor.noReturnHint')} checked={f.no_return} onChange={(v) => set({ no_return: v })} />
-        <ProductOffers productId={isNew ? null : Number(id)} pending={offerIds} onPending={setOfferIds} />
+        <ProductOffers productId={isNew ? null : Number(id)} pending={offerIds} onPending={setOfferIds} quick={quickOffers} onQuick={setQuickOffers} price={Number(f.price) || 0} hasSale={!!f.compare_at_price && Number(f.compare_at_price) > Number(f.price)} nameHint={f.name_ar} />
       </div>
     </Card>
   );
@@ -834,6 +873,7 @@ export default function ProductEditor() {
           <Field label={t('editor.price')} error={errors.price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.price} onChange={(e) => set({ price: e.target.value.replace(/\D/g, '') })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} /></Field>
           <Field label={t('editor.compareAt')} optional={t('common.optional')} hint={!errors.compare_at_price ? t('editor.compareHint') : undefined} error={errors.compare_at_price}><Input inputMode="numeric" suffix={t('common.currency')} value={f.compare_at_price} onChange={(e) => set({ compare_at_price: e.target.value.replace(/\D/g, '') })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} /></Field>
           {f.compare_at_price && Number(f.compare_at_price) > Number(f.price) && <div className="sm:col-span-2"><span className="rounded-full bg-sale/10 px-3 py-1.5 text-sm font-semibold text-sale">-{Math.round((1 - f.price / f.compare_at_price) * 100)}%</span></div>}
+          {f.compare_at_price && Number(f.compare_at_price) > Number(f.price) && <div className="sm:col-span-2"><SaleEnd value={f.sale_ends_at} onChange={(v) => set({ sale_ends_at: v })} error={errors.sale_ends_at} L={L} lang={lang} /></div>}
           <Field label={L('سعر التكلفة عليك', 'Cost price')} optional={t('common.optional')} hint={L('خاص بيك فقط لحساب أرباحك — مش هيظهر للعميل نهائيًا.', 'For your eyes only — shoppers will never see this.')}>
             <Input inputMode="numeric" suffix={t('common.currency')} value={f.cost} onChange={(e) => set({ cost: e.target.value.replace(/\D/g, '') })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); nextStep(); } }} />
           </Field>

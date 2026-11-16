@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink, ShoppingBag, QrCode, Camera, MoreHorizontal, MessageCircle, AlertTriangle } from 'lucide-react';
+import { Plus, Package, LayoutGrid, List, Pencil, Zap, Trash2, ExternalLink, ShoppingBag, QrCode, Camera, Hourglass } from 'lucide-react';
 import { useApi, useDebounced, useIsDesktop, invalidate } from '../../lib/hooks.js';
 import { api } from '../../lib/api.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -10,7 +10,7 @@ import { formatMoney, formatNumber } from '../../lib/format.js';
 import { PageHeader, FilterTabs, Pagination, SearchInput, ListSkeleton } from '../../components/dash/Kit.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Badge from '../../components/ui/Badge.jsx';
-import Button from '../../components/ui/Button.jsx';
+import Button, { IconButton } from '../../components/ui/Button.jsx';
 import Sheet, { ConfirmDialog } from '../../components/ui/Sheet.jsx';
 import { Field, Input, Select, Segmented } from '../../components/ui/Field.jsx';
 import { QtyStepper } from '../../components/ui/Commerce.jsx';
@@ -18,6 +18,7 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import { EmptyState, ErrorState, errorMessage, fieldErrors } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import QrShare from '../../components/dash/QrShare.jsx';
+import SaleEnd from '../../components/dash/SaleEnd.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
 
@@ -47,7 +48,7 @@ function QuickEdit({ product, onClose, onSaved, onDelete }) {
 
   useEffect(() => {
     if (!product) return;
-    setForm({ price: product.price, compare_at_price: product.compareAt || '', status: product.status, stock: product.stock });
+    setForm({ price: product.price, compare_at_price: product.compareAt || '', sale_ends_at: product.saleEndsAt || null, status: product.status, stock: product.stock });
     setErrors({});
   }, [product]);
   useEffect(() => { if (full) setStocks(Object.fromEntries(full.variants.map((v) => [v.id, v.stock]))); }, [full]);
@@ -60,6 +61,7 @@ function QuickEdit({ product, onClose, onSaved, onDelete }) {
     setErrors({});
     try {
       const body = { price: Number(form.price), compare_at_price: form.compare_at_price ? Number(form.compare_at_price) : null, status: form.status };
+      if (form.compare_at_price && Number(form.compare_at_price) > Number(form.price)) body.sale_ends_at = form.sale_ends_at ? Number(form.sale_ends_at) : null;
       if (!hasVariants && full) body.stock = Number(form.stock);
       let r = await api(`/owner/products/${product.id}`, { method: 'PATCH', body });
       if (hasVariants) {
@@ -92,11 +94,11 @@ function QuickEdit({ product, onClose, onSaved, onDelete }) {
           <SmartImage media={product.image} ratio="1 / 1" sizes="56px" className="h-14 w-14 shrink-0 rounded-xl" />
           <div className="min-w-0"><p className="truncate font-semibold">{tr(product.name)}</p><p className="text-sm text-muted" dir="ltr">{product.sku}</p></div>
         </div>
-        <AdminNoteBox p={full || product} lang={lang} />
         <div className="grid grid-cols-2 gap-3">
           <Field label={t('editor.price')} error={errors.price}><Input inputMode="numeric" suffix={t('common.currency')} value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value.replace(/\D/g, '') })} /></Field>
           <Field label={t('editor.compareAt')} error={errors.compare_at_price}><Input inputMode="numeric" suffix={t('common.currency')} value={form.compare_at_price} onChange={(e) => setForm({ ...form, compare_at_price: e.target.value.replace(/\D/g, '') })} /></Field>
         </div>
+        {form.compare_at_price && Number(form.compare_at_price) > Number(form.price) && <SaleEnd value={form.sale_ends_at} onChange={(v) => setForm({ ...form, sale_ends_at: v })} error={errors.sale_ends_at} L={(a, e) => (lang === 'ar' ? a : e)} lang={lang} />}
         <Field label={t('editor.status')}>
           <Segmented value={form.status} onChange={(s) => setForm({ ...form, status: s })} className="w-full [&>button]:flex-1"
             options={['active', 'draft'].map((s) => ({ value: s, label: t(`products.status.${s}`) }))} />
@@ -188,70 +190,39 @@ function SellSheet({ product, onClose, onSold }) {
   );
 }
 
-function AdminNoteBox({ p, lang, compact = false }) {
-  const hasNote = Boolean(p.adminReviewNote);
-  const hasFlags = p.adminFlags?.length > 0;
-  if (!hasNote && !hasFlags && p.adminReviewStatus !== 'flagged') return null;
+const weakQ = (p) => typeof p.image?.q === 'number' && p.image.q < 50;
+function SaleTag({ p, onSaved }) {
+  const { lang } = useI18n();
+  const toast = useToast();
+  const [busy, setBusy] = useState(false);
   const ar = lang === 'ar';
+  if (!p.saleEndsAt || !p.compareAt) return null;
+  const left = p.saleEndsAt - Date.now();
+  if (left <= 0) return null;
+  const d = Math.floor(left / 86400e3), h = Math.floor((left % 86400e3) / 3600e3);
+  const txt = d > 0 ? (ar ? `${formatNumber(d, lang)} يوم` : `${d}d`) : (ar ? `${formatNumber(Math.max(1, h), lang)} ساعة` : `${Math.max(1, h)}h`);
+  const extend = async (e) => {
+    e.preventDefault(); e.stopPropagation(); setBusy(true);
+    try {
+      const r = await api(`/owner/products/${p.id}`, { method: 'PATCH', body: { sale_ends_at: Math.max(p.saleEndsAt, Date.now()) + 3 * 86400e3 } });
+      onSaved(p.id, r.product);
+      toast({ title: ar ? 'تم تمديد الخصم ٣ أيام' : 'Discount extended by 3 days' });
+    } catch (err) { toast({ tone: 'error', title: ar ? 'تعذّر تمديد الخصم' : 'Could not extend' }); }
+    setBusy(false);
+  };
   return (
-    <div className={cx('rounded-xl border border-red-300 bg-red-50 text-start text-red-950', compact ? 'mt-1.5 px-2.5 py-1.5 text-xs' : 'p-3 text-sm')}>
-      <div className="flex flex-wrap items-center gap-1.5 font-bold">
-        <MessageCircle className="h-3.5 w-3.5 shrink-0 text-red-600" />
-        <span>{ar ? 'ملاحظة من إدارة Twist لتعديل المنتج:' : 'Note from Twist team:'}</span>
-        {p.adminFlags?.map((f) => (
-          <span key={f} className="rounded-full border border-red-300 bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-950">
-            {f}
-          </span>
-        ))}
-      </div>
-      {hasNote && <p className="mt-1 font-semibold leading-relaxed text-red-950">{p.adminReviewNote}</p>}
-    </div>
+    <span className="mt-1 inline-flex items-center gap-1.5 text-xs">
+      <span className={cx('inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium', left < 86400e3 ? 'bg-sale text-white' : 'bg-sale/10 text-sale')}><Hourglass className="h-3 w-3" aria-hidden="true" />{ar ? `الخصم ينتهي بعد ${txt}` : `Ends in ${txt}`}</span>
+      <button type="button" onClick={extend} disabled={busy} className="rounded-full border border-line px-2 py-0.5 font-medium text-brand hover:border-brand disabled:opacity-50">{ar ? '+٣ أيام' : '+3 days'}</button>
+    </span>
   );
 }
 
-const weakQ = (p) => typeof p.image?.q === 'number' && p.image.q < 50;
 function WeakDot({ t }) {
   return <span title={t('products.weakPhoto')} className="absolute bottom-2.5 start-2.5 inline-flex items-center gap-1 rounded-full bg-amber-500/95 px-2 py-0.5 text-[11px] font-medium text-white"><Camera className="h-3 w-3" />{t('products.weakPhoto')}</span>;
 }
 function WeakTag({ p, t }) {
-  return weakQ(p) ? <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-950"><Camera className="h-3 w-3" />{t('products.weakPhoto')}</span> : null;
-}
-
-function ProductActionsMenu({ product, t, onSell, onQr, onQuick, onDelete }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = (e) => { if (!ref.current?.contains(e.target)) setOpen(false); };
-    const escape = (e) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('pointerdown', close);
-    document.addEventListener('keydown', escape);
-    return () => { document.removeEventListener('pointerdown', close); document.removeEventListener('keydown', escape); };
-  }, [open]);
-  const action = (fn) => { setOpen(false); fn(product); };
-  return (
-    <div ref={ref} className="relative shrink-0">
-      <button type="button" onClick={() => setOpen((v) => !v)} aria-label={t('common.more')} aria-haspopup="menu" aria-expanded={open}
-        className="grid h-10 w-10 place-items-center rounded-xl bg-secondary text-fg transition hover:bg-fg/[0.08] active:scale-95">
-        <MoreHorizontal className="h-5 w-5" />
-      </button>
-      {open && (
-        <div role="menu" className="absolute end-0 top-11 z-30 min-w-44 rounded-xl border border-line bg-elevated p-1.5 shadow-lift">
-          <button type="button" role="menuitem" onClick={() => action(onSell)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-start text-sm hover:bg-fg/[0.06]"><ShoppingBag className="h-4 w-4 text-brand" />{t('products.sell')}</button>
-          <button type="button" role="menuitem" onClick={() => action(onQuick)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-start text-sm hover:bg-fg/[0.06]"><Zap className="h-4 w-4" />{t('products.quickEdit')}</button>
-          <button type="button" role="menuitem" onClick={() => action(onQr)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-start text-sm hover:bg-fg/[0.06]"><QrCode className="h-4 w-4" />{t('qr.productTitle')}</button>
-          <button type="button" role="menuitem" onClick={() => action(onDelete)} className="flex min-h-10 w-full items-center gap-2 rounded-lg px-3 text-start text-sm text-sale hover:bg-sale/10"><Trash2 className="h-4 w-4" />{t('common.delete')}</button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function sizeLabel(p, lang) {
-  const n = Number(p.variantCount || 0);
-  if (!n) return '';
-  if (lang === 'ar') return n === 1 ? 'مقاس واحد' : `${formatNumber(n, lang)} مقاسات`;
-  return n === 1 ? 'One size' : `${n} sizes`;
+  return weakQ(p) ? <span className="ms-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800 dark:bg-amber-400/15 dark:text-amber-200"><Camera className="h-3 w-3" />{t('products.weakPhoto')}</span> : null;
 }
 
 export default function Products() {
@@ -270,13 +241,12 @@ export default function Products() {
   const [page, setPage] = useState(1);
   const [view, setView] = useState('list');
   const [weakOnly, setWeakOnly] = useState(false);
-  const [adminOnly, setAdminOnly] = useState(false);
   const [quick, setQuick] = useState(null);
   const [sellP, setSellP] = useState(null);
   const [del, setDel] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const q = useDebounced(term.trim(), 300);
-  useEffect(() => setPage(1), [tab, q, category, sort, weakOnly, adminOnly]);
+  useEffect(() => setPage(1), [tab, q, category, sort, weakOnly]);
 
   const query = useMemo(() => {
     const p = { q, sort, page, limit: 24 };
@@ -284,14 +254,13 @@ export default function Products() {
     if (['low', 'out'].includes(tab)) p.stock = tab;
     if (category) p.category = category;
     if (weakOnly) p.photo = 'weak';
-    if (adminOnly) p.admin = 'flagged';
     return `/owner/products?${new URLSearchParams(p)}`;
-  }, [q, sort, page, tab, category, weakOnly, adminOnly]);
+  }, [q, sort, page, tab, category, weakOnly]);
   const { data, error, loading, reload, mutate } = useApi(query);
   const { data: cats } = useApi('/owner/categories');
 
   const setTab = (v) => setParams(v === 'all' ? {} : ['low', 'out'].includes(v) ? { stock: v } : { status: v }, { replace: true });
-  const onSaved = (id, patch) => mutate((d) => ({ ...d, items: d.items.map((p) => (p.id === id ? { ...p, ...patch, compareAt: patch.compareAt ?? p.compareAt } : p)) }));
+  const onSaved = (id, patch) => mutate((d) => ({ ...d, items: d.items.map((p) => (p.id === id ? { ...p, ...patch, compareAt: 'compareAt' in patch ? patch.compareAt : p.compareAt } : p)) }));
 
   const doDelete = async () => {
     setDeleting(true);
@@ -317,26 +286,9 @@ export default function Products() {
         <EmptyState icon={Package} title={t('products.empty')} body={t('products.emptyBody')} action={<Button size="lg" icon={Plus} to={`${base}/products/new`}>{t('products.add')}</Button>} />
       ) : (
         <>
-          {(c?.adminFlagged > 0 || adminOnly) && (
-            <button
-              type="button"
-              onClick={() => setAdminOnly((v) => !v)}
-              className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-red-300 bg-red-50 px-4 py-3 text-start text-sm font-semibold text-red-950"
-            >
-              <MessageCircle className="h-4 w-4 shrink-0 text-red-600" />
-              <span className="flex-1">
-                {adminOnly
-                  ? (lang === 'ar' ? 'عرض المنتجات اللي عليها ملاحظات من إدارة Twist فقط' : 'Showing products with notes from Twist team')
-                  : (lang === 'ar' ? `يوجد ${formatNumber(c?.adminFlagged || 0, lang)} منتج عليه ملاحظة أو كومنت من إدارة Twist ويحتاج تعديل` : `${c?.adminFlagged || 0} product(s) have notes from Twist team`)}
-              </span>
-              <span className="shrink-0 font-bold underline">
-                {adminOnly ? t('common.all') : (lang === 'ar' ? 'عرض المنتجات المطلوب تعديلها' : 'Review now')}
-              </span>
-            </button>
-          )}
           {(c?.weak > 0 || weakOnly) && (
-            <button type="button" onClick={() => setWeakOnly((v) => !v)} className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-amber-300 bg-amber-50 px-4 py-3 text-start text-sm font-medium text-amber-950">
-              <Camera className="h-4 w-4 shrink-0 text-amber-700" />
+            <button type="button" onClick={() => setWeakOnly((v) => !v)} className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-amber-300/60 bg-amber-50 px-4 py-3 text-start text-sm text-amber-900 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+              <Camera className="h-4 w-4 shrink-0" />
               <span className="flex-1">{weakOnly ? t('products.weakShowAll') : t('products.weakBanner', { n: formatNumber(c?.weak || 0, lang) })}</span>
               <span className="shrink-0 font-semibold underline-offset-2 hover:underline">{weakOnly ? t('common.all') : t('products.weakReview')}</span>
             </button>
@@ -382,23 +334,23 @@ export default function Products() {
                       {data.items.map((p) => (
                         <tr key={p.id} className="group transition hover:bg-fg/[0.02]">
                           <td className="py-3 ps-5">
-                            <Link to={`${base}/products/${p.id}`} className="flex items-start gap-3.5">
+                            <Link to={`${base}/products/${p.id}`} className="flex items-center gap-3.5">
                               <SmartImage media={p.image} ratio="4 / 5" sizes="56px" className="w-12 shrink-0 rounded-lg" />
-                              <span className="min-w-0 flex-1">
-                                <span className="block max-w-[320px] truncate font-medium group-hover:text-brand">{tr(p.name)}</span>
-                                <span className="block text-[13px] text-muted">{p.category ? tr(p.category) : '—'}{sizeLabel(p, lang) ? ` · ${sizeLabel(p, lang)}` : ''}<WeakTag p={p} t={t} /></span>
-                                <AdminNoteBox p={p} lang={lang} compact />
-                              </span>
+                              <span className="min-w-0"><span className="block max-w-[320px] truncate font-medium group-hover:text-brand">{tr(p.name)}</span>
+                                <span className="block text-[13px] text-muted">{p.category ? tr(p.category) : '—'}{p.variantCount ? ` · ${t('products.variants', { n: p.variantCount })}` : ''}<WeakTag p={p} t={t} /></span></span>
                             </Link>
                           </td>
                           <td className="py-3"><StatusPill status={p.status} t={t} /></td>
                           <td className="py-3"><StockPill p={p} t={t} lang={lang} /></td>
-                          <td className="py-3"><span className="font-semibold tabular">{formatMoney(p.price, lang)}</span>{p.compareAt && <span className="ms-2 text-xs text-muted line-through tabular">{formatMoney(p.compareAt, lang)}</span>}</td>
+                          <td className="py-3"><span className="font-semibold tabular">{formatMoney(p.price, lang)}</span>{p.compareAt && <span className="ms-2 text-xs text-muted line-through tabular">{formatMoney(p.compareAt, lang)}</span>}<span className="block"><SaleTag p={p} onSaved={onSaved} /></span></td>
                           <td className="py-3 text-sm tabular text-muted">{formatNumber(p.sold, lang)}</td>
                           <td className="py-3 pe-5">
-                            <div className="flex justify-end gap-2">
-                              <Button size="xs" variant="secondary" icon={Pencil} to={`${base}/products/${p.id}`}>{t('common.edit')}</Button>
-                              <ProductActionsMenu product={p} t={t} onSell={setSellP} onQr={setQrP} onQuick={setQuick} onDelete={setDel} />
+                            <div className="flex justify-end gap-1 opacity-60 transition group-hover:opacity-100">
+                              <IconButton size="sm" label={t('products.sell')} icon={ShoppingBag} onClick={() => setSellP(p)} iconClass="h-[18px] w-[18px] text-brand" />
+                              <IconButton size="sm" label={t('qr.productTitle')} icon={QrCode} onClick={() => setQrP(p)} iconClass="h-[18px] w-[18px]" />
+                              <IconButton size="sm" label={t('products.quickEdit')} icon={Zap} onClick={() => setQuick(p)} iconClass="h-[18px] w-[18px]" />
+                              <IconButton size="sm" label={t('common.edit')} icon={Pencil} to={`${base}/products/${p.id}`} iconClass="h-[18px] w-[18px]" />
+                              <IconButton size="sm" label={t('common.delete')} icon={Trash2} onClick={() => setDel(p)} iconClass="h-[18px] w-[18px] text-sale" />
                             </div>
                           </td>
                         </tr>
@@ -415,22 +367,22 @@ export default function Products() {
                       <div className="p-3.5">
                         <p className="truncate font-medium">{tr(p.name)}</p>
                         <div className="mt-1.5 flex items-center justify-between"><span className="font-semibold tabular">{formatMoney(p.price, lang)}</span><StockPill p={p} t={t} lang={lang} /></div>
-                        <AdminNoteBox p={p} lang={lang} compact />
-                        <div className="mt-3 flex items-center gap-2"><Button size="xs" full variant="secondary" icon={Pencil} to={`${base}/products/${p.id}`}>{t('common.edit')}</Button><ProductActionsMenu product={p} t={t} onSell={setSellP} onQr={setQrP} onQuick={setQuick} onDelete={setDel} /></div>
+                        <div className="mt-3 flex gap-2"><Button size="xs" full icon={ShoppingBag} onClick={() => setSellP(p)}>{t('products.sell')}</Button><Button size="xs" variant="secondary" full icon={Zap} onClick={() => setQuick(p)}>{t('products.quickEdit')}</Button><Button size="xs" variant="secondary" icon={QrCode} aria-label={t('qr.productTitle')} onClick={() => setQrP(p)} /></div>
                       </div>
                     </div>
                   ) : (
-                    <div key={p.id} className="flex items-start gap-3.5 rounded-2xl border border-line bg-elevated p-3">
+                    <div key={p.id} className="flex items-center gap-3.5 rounded-2xl border border-line bg-elevated p-3">
                       <Link to={`${base}/products/${p.id}`} className="shrink-0"><SmartImage media={p.image} ratio="4 / 5" sizes="80px" className="w-[68px] rounded-xl" /></Link>
                       <Link to={`${base}/products/${p.id}`} className="min-w-0 flex-1">
                         <p className="truncate font-medium">{tr(p.name)}</p>
                         <p className="mt-0.5 font-semibold tabular">{formatMoney(p.price, lang)}{p.compareAt && <span className="ms-2 text-xs font-normal text-muted line-through">{formatMoney(p.compareAt, lang)}</span>}</p>
+                        <SaleTag p={p} onSaved={onSaved} />
                         {weakQ(p) && <p className="mt-1"><WeakTag p={p} t={t} /></p>}
                         <div className="mt-1.5 flex flex-wrap items-center gap-2">{p.status !== 'active' && <StatusPill status={p.status} t={t} />}<StockPill p={p} t={t} lang={lang} /></div>
-                        <AdminNoteBox p={p} lang={lang} compact />
                       </Link>
-                      <Button size="sm" variant="secondary" icon={Pencil} to={`${base}/products/${p.id}`}>{t('common.edit')}</Button>
-                      <ProductActionsMenu product={p} t={t} onSell={setSellP} onQr={setQrP} onQuick={setQuick} onDelete={setDel} />
+                      <button type="button" onClick={() => setSellP(p)} aria-label={t('products.sell')} className="grid h-11 shrink-0 place-items-center gap-0.5 rounded-xl bg-btn px-3 text-[11px] font-semibold text-white transition active:scale-90"><ShoppingBag className="h-4 w-4" />{t('products.sell')}</button>
+                      <button type="button" onClick={() => setQuick(p)} aria-label={t('products.quickEdit')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><Zap className="h-5 w-5" /></button>
+                      <button type="button" onClick={() => setQrP(p)} aria-label={t('qr.productTitle')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><QrCode className="h-5 w-5" /></button>
                     </div>
                   ))}
                 </div>
