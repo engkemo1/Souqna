@@ -5,13 +5,13 @@
 // المفاتيح من متغيرات البيئة: GEMINI_API_KEY و GROQ_API_KEY (مش بتتكتب في أي ملف). اختياري: GEMINI_MODEL / GROQ_MODEL.
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { runModa } = await import(path.resolve(here, '../../src/lib/moda/engine.js'));
-const { makeCurator, estTokens } = await import(path.resolve(here, '../../src/lib/moda/curate.js'));
+const { runModa } = await import(pathToFileURL(path.resolve(here, '../../src/lib/moda/engine.js')).href);
+const { makeCurator, estTokens } = await import(pathToFileURL(path.resolve(here, '../../src/lib/moda/curate.js')).href);
 const rows = fs.readFileSync(path.join(here, 'cat1.txt'), 'utf8').trim().split('\n').map((l) => { const [id, name, price, cols] = l.split('|'); return { id: +id, name_ar: name, name_en: '', price: +price, stock: 5, cat_text: '', description_ar: '', sold_count: 5, colors_json: cols ? cols.split('/').map((n) => ({ name_ar: n })) : [] }; });
 const byId = new Map(rows.map((r) => [r.id, r]));
-const { loadKnowledge } = await import(path.resolve(here, '../../src/lib/moda/knowledge.js'));
+const { loadKnowledge } = await import(pathToFileURL(path.resolve(here, '../../src/lib/moda/knowledge.js')).href);
 const K_has = (t) => typeof t === 'string' && loadKnowledge().items.has(t);
 // [label, طلب, تاريخ, ميزانية, نوع مملوك (لو فيه), رسمي؟ (ممنوع كوتشي/هودي/شورت/رياضي), عدد الأشخاص المتوقع]
 const SC = [

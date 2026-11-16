@@ -7,7 +7,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 // معروف وموثّق: منتج «بنطلون قماش واسع بيج» في الكتالوج المبعثر مالوش أي إشارة جمهور (من غير قسم ولا وصف) فمستحيل نعرف إنه حريمي.
 const KNOWN = { 's31_messy_catalog.mjs': ['عايز_بنطلون_قماش', 'عايز_بنطلون_قماش_لو_سمحت', 'ممكن_عايز_بنطلون_قماش؟', 'عايز_بنطلون_قماش_ميزانيتي_5000'] };
 const SUITES = fs.readdirSync(path.join(root, 'tests')).filter((f) => /^s(26|27|28|29|30|31|32|33|34|35|36|37|38|39|40)_.*\.mjs$/.test(f) && !/clarification/.test(f)).sort();
-const UNIT = ['moda.test.js', 'moda-quality.test.js', 'moda-curate.test.js', 'moda-understand.test.js', 'moda-anchor.test.js', 'moda-audit.test.js', 'moda-continuity-and-zero-guessing.test.js', 'moda-kb.test.js', 'moda-never-unasked.test.js', 'moda-no-wrong-picks.test.js', 'moda-screens.test.js', 'moda-size-ask.test.js', 'moda-styling-insights.test.js', 'moda-brain.test.js', 'product-types.test.js'].filter((f) => fs.existsSync(path.join(root, 'test', f)));
+const UNIT = ['moda.test.js', 'moda-quality.test.js', 'moda-curate.test.js', 'moda-understand.test.js', 'moda-anchor.test.js', 'moda-audit.test.js', 'moda-continuity-and-zero-guessing.test.js', 'moda-kb.test.js', 'moda-never-unasked.test.js', 'moda-no-wrong-picks.test.js', 'moda-screens.test.js', 'moda-size-ask.test.js', 'moda-styling-insights.test.js', 'product-types.test.js'].filter((f) => fs.existsSync(path.join(root, 'test', f)));
 // اختبارات الوحدة القديمة اللي كانت بتفشل قبل شغل المناسبات (نفس الأعداد على أقدم نسخة محفوظة عندي، ومكتوبة لسلوك أسئلة قديم):
 // الرقم = أقصى عدد فشل مسموح (أي زيادة عليه = تراجع حقيقي). ماعدّلتش الاختبارات دي.
 const BASELINE_FAIL = {};

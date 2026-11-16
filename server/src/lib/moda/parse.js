@@ -17,7 +17,7 @@ const GENDER_BY_KEY = {
   suit: 'men', tuxedo: 'men', tie: 'men', bow_tie: 'men', pocket_square: 'men', waistcoat: 'men', classic_set: 'men',
   dress_any: 'women', dress_casual: 'women', dress_work: 'women', dress_party: 'women', dress_evening: 'women', dress_bridal: 'women', dress_beach: 'women',
   jumpsuit: 'women', skirt: 'women', blouse: 'women', abaya: 'women', heels_low: 'women', heels_high: 'women', clutch: 'women', shawl: 'women',
-  two_piece_set: 'women', womens_suit: 'women', hijab_set: 'women_hijab', tarha: 'women_hijab', hijab_cap: 'women_hijab', long_cardigan: 'women', flats: 'women', tunic: 'women',
+  two_piece_set: 'women', womens_suit: 'women', hijab_set: 'women_hijab', tarha: 'women_hijab', hijab_cap: 'women_hijab', long_cardigan: 'women', flats: 'women', tunic: 'women', lingerie: 'women',
 };
 
 const PLAIN_ENGLISH = new Set(['long', 'longer', 'line', 'lane', 'lung', 'king', 'ring', 'wing', 'thin', 'then', 'than', 'name', 'main', 'mine', 'moon', 'hem', 'ham', 'him']);
@@ -319,7 +319,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     if (smallG) { personSet.delete('women'); personSet.add('girls'); }
     if (/(^| )(لولادي|لاولادي|لعيالي|لاطفالي|لعيلي|لولادى)( |$)/.test(nn2)) { personSet.delete('boys'); personSet.delete('men'); result.kidsUnspecified = true; }
     if (/(^| )(ل|ل ال)?(عيالي|اولادي|ولادي|اطفالي|عيلي|ولادى|عيال|اطفالى)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls') && !/(^| )(ترنج|لبس|فستان|بدله|طقم|تيشيرت|هودي|جاكيت|بنطلون|جزمه|كوتشي) ولادي( |$)/.test(nn2)) { result.kidsUnspecified = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
-    if (!/(^| )بيبي ?دول( |$)|baby ?doll/.test(nn2) && /(^| )(ل)?(رضيع|رضع|بيبي|بيبيه|مواليد|مولود|مولوده|حديث الولاده|طفلي|طفلتي|طفلى|baby|newborn|infant|toddler)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls')) { result.kidsUnspecified = true; result.flags.baby = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
+    if (!/(^| )بيب[يى] ?دول( |$)|baby ?doll/i.test(nn2) && /(^| )(لل?|ال)?(رضيع|رضع|بيب[يى]|بيب[يى]ه|مواليد|مولود|مولوده|حديث الولاده|طفل[يى]|طفلت[يى]|baby|newborn|infant|toddler)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls')) { result.kidsUnspecified = true; result.flags.baby = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
   }
   /* ---------- «عند أهل جوزي / بيت حماتي / شغل مراتي»: الشريك هنا مكان أو صلة، مش حد هنلبّسه ---------- */
   {

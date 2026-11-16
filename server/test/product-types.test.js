@@ -37,3 +37,17 @@ test('explicit audience beats name guessing; wedding departments map to the righ
   assert.equal(inferGender({ name_ar: 'حاجة', department: 'wedding_dress' }, null, K), 'women');
   assert.equal(inferGender({ name_ar: 'حاجة', department: 'wedding_suit' }, null, K), 'men');
 });
+
+test('WOMEN_KEYS and kids-both words (baby vs babydoll/baby-blue)', () => {
+  // WOMEN_KEYS
+  assert.equal(inferGender({ name_ar: 'بونيه' }, 'hijab_cap', K), 'women');
+  assert.equal(inferGender({ name_ar: 'بيبي دول' }, 'lingerie', K), 'women');
+
+  // KIDS_BOTH & protection
+  assert.equal(inferGender({ name_ar: 'سالوبيت بيبي' }, 'jumpsuit', K), 'kids');
+  assert.equal(inferGender({ name_ar: 'سالوبيت بيبى' }, 'jumpsuit', K), 'kids');
+  assert.equal(inferGender({ name_ar: 'لبس للبيبي' }, null, K), 'kids');
+  assert.equal(inferGender({ name_ar: 'لبس للبيبى' }, null, K), 'kids');
+  assert.equal(inferGender({ name_ar: 'قميص نوم بيبي دول' }, 'lingerie', K), 'women');
+  assert.equal(inferGender({ name_ar: 'سويت شيرت بيبي بلو' }, 'sweatshirt', K), 'unisex');
+});

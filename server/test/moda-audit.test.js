@@ -11,6 +11,7 @@ const products = [
   P('قميص أبيض كلاسيك', 'قمصان', 450), P('بنطلون كلاسيك رمادي', 'بناطيل', 520), P('بدلة سوداء فورمال', 'بدل', 2200), P('بدلة كحلي سليم', 'بدل', 2500),
   P('فستان سواريه أحمر طويل', 'فساتين', 2800), P('فستان أسود قصير', 'فساتين', 1100), P('أحمر شفاه', 'مكياج', 150), P('نظارة شمس', 'إكسسوارات', 350),
   P('كوتشي أبيض', 'كوتشي', 650), P('عطر رجالي', 'عطور', 800), P('شنطة كلتش ذهبي', 'شنط', 600), P('طرحة شيفون بيج', 'طرح وحجاب', 150),
+  P('بونيه قطن سادة', 'طرح وحجاب', 60),
 ];
 const run = (t, o = {}) => runModa([{ role: 'user', content: t }], { products, K, ...o });
 const ids = (r) => (r.blocks?.tabs || []).flatMap((t) => t.items.map((i) => i.id));
@@ -38,9 +39,13 @@ test('مقاس مش متاح → تقول المتاح بدل «مفيش حاج�
   assert.ok(r.say.includes('42') && r.say.includes('M'), r.say);
   assert.deepEqual(ids(r), [idOf('كوتشي أبيض')]);
 });
-test('عطر مايسألش عن اللون', async () => {
-  const r = await run('عاوز عطر');
-  assert.ok(!(r.questions || []).some((q) => q.id === 'color_preference'));
+test('عطر ونظارة وبونيه مايسألوش عن اللون', async () => {
+  const r1 = await run('عاوز عطر');
+  assert.ok(!(r1.questions || []).some((q) => q.id === 'color_preference'));
+  const r2 = await run('عاوز نظارة شمس');
+  assert.ok(!(r2.questions || []).some((q) => q.id === 'color_preference'));
+  const r3 = await run('عاوزة بونيه');
+  assert.ok(!(r3.questions || []).some((q) => q.id === 'color_preference'));
 });
 test('هدية لمراتي = للسيدة بس (مش كوبل)', async () => {
   const r = await run('عاوز هدية لمراتي');
