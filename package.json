@@ -9,11 +9,14 @@
     "shared"
   ],
   "scripts": {
-    "setup": "npm install && npm run seed && npm run build",
+    "setup": "npm ci && npm run build",
     "dev": "concurrently -n api,web -c blue,magenta \"npm run dev -w server\" \"npm run dev -w web\"",
     "seed": "npm run seed -w server",
     "build": "npm run build -w web",
-    "start": "npm run start -w server"
+    "start": "npm run start -w server",
+    "test": "npm test -w server && npm test -w web",
+    "lint": "node server/src/scripts/lint.js",
+    "format:check": "node server/src/scripts/format-check.js"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
@@ -22,6 +25,6 @@
     "sharp": "^0.35.5"
   },
   "engines": {
-    "node": ">=22.9"
+    "node": ">=22.9.0"
   }
 }

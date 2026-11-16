@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node --no-warnings --env-file-if-exists=../.env src/index.js",
     "start": "node --no-warnings --env-file-if-exists=../.env src/index.js",
+    "test": "npm run test:stylist && npm run test:promotions && npm run test:cashier && npm run test:ci && npm run test:search && npm run test:comments && npm run test:media && npm run test:buyer-chats && npm run test:market-cart && npm run test:images && npm run test:moda-core && npm run test:visual",
     "test:stylist": "node --test src/lib/stylist-ranking.test.js",
     "test:images": "node --test --no-warnings test/image-library.test.js test/image-generation.test.js test/catalog.test.js",
     "test:comments": "node --test --no-warnings test/order-comments.test.js",
@@ -36,7 +37,9 @@
     "testset:visual": "node --no-warnings src/scripts/fetch-test-set.js",
     "compare:visual": "node --no-warnings --env-file-if-exists=../.env src/scripts/compare-visual-models.js",
     "model:prefetch": "node --no-warnings --env-file-if-exists=../.env src/scripts/download-clip-model.js",
-    "catalog": "node --no-warnings --env-file-if-exists=../.env src/scripts/catalog-migrate.js"
+    "catalog": "node --no-warnings --env-file-if-exists=../.env src/scripts/catalog-migrate.js",
+    "test:twila": "node --no-warnings tests/run_all.mjs",
+    "learn:lost": "node --no-warnings --env-file-if-exists=../.env src/scripts/mine-lost-queries.js"
   },
   "dependencies": {
     "@souqna/shared": "1.0.0",
@@ -54,5 +57,8 @@
   },
   "optionalDependencies": {
     "@huggingface/transformers": "^3.8.1"
+  },
+  "engines": {
+    "node": ">=22.9.0"
   }
 }

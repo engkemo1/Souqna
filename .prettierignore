@@ -1,0 +1,9 @@
+node_modules/
+web/dist/
+server/data/
+server/_gemini_backup/
+docs/
+scratch/
+TM-ad/
+*.min.js
+package-lock.json
