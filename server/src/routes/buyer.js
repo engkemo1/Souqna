@@ -236,6 +236,40 @@ r.post('/logout-all', h((req, res) => {
   res.json({ ok: true });
 }));
 
+/* GDPR/Compliance: Data export and Account deletion for shoppers */
+r.get('/export-data', h((req, res) => {
+  const buyer = q.get('SELECT id, name, phone, email, google_sub, created_at, phone_verified FROM buyers WHERE id=?', [req.buyer.id]);
+  const chats = q.all('SELECT id, title, updated_at, messages_json FROM buyer_stylist_chats WHERE buyer_id=?', [req.buyer.id]).map((c) => ({
+    ...c,
+    messages: JSON.parse(c.messages_json || '[]'),
+  }));
+  const orders = q.all('SELECT id, number, store_id, total, status, created_at, address, city FROM orders WHERE buyer_id=?', [req.buyer.id]);
+  const watches = q.all('SELECT product_id FROM buyer_watches WHERE buyer_id=?', [req.buyer.id]);
+  const follows = q.all('SELECT store_id FROM buyer_follows WHERE buyer_id=?', [req.buyer.id]);
+  res.json({
+    exportDate: new Date().toISOString(),
+    account: buyer,
+    orders,
+    savedChats: chats,
+    watches,
+    follows,
+  });
+}));
+
+r.post('/delete-account', h((req, res) => {
+  tx(() => {
+    // Unlink orders rather than deleting them for financial & legal retention
+    q.run('UPDATE orders SET buyer_id=NULL WHERE buyer_id=?', [req.buyer.id]);
+    q.run('DELETE FROM buyer_notifications WHERE buyer_id=?', [req.buyer.id]);
+    q.run('DELETE FROM buyer_push WHERE buyer_id=?', [req.buyer.id]);
+    q.run('DELETE FROM buyer_stylist_chats WHERE buyer_id=?', [req.buyer.id]);
+    q.run('DELETE FROM buyer_watches WHERE buyer_id=?', [req.buyer.id]);
+    q.run('DELETE FROM buyer_follows WHERE buyer_id=?', [req.buyer.id]);
+    q.run('DELETE FROM buyers WHERE id=?', [req.buyer.id]);
+  });
+  res.json({ ok: true, message: 'Account and associated data deleted.' });
+}));
+
 /* ------------------------------------------------ orders (placed while signed in, or claimed with number + phone) */
 const orderRows = (buyerId) => {
   const rows = q.all(`SELECT o.*, s.name_ar AS s_ar, s.name_en AS s_en, s.slug AS s_slug,
