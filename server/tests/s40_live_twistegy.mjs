@@ -1,7 +1,7 @@
 // s40: كتالوج twistegy.com الحقيقي (199 اسم) — فهم عربي/إنجليزي لنفس القطعة + ماركات + رد «ست» + long≠lounge
-import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
+import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath, pathToFileURL } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
-const { runModa } = await import(path.join(here, '../src/lib/moda/engine.js'));
+const { runModa } = await import(pathToFileURL(path.join(here, '../src/lib/moda/engine.js')).href);
 const lines = fs.readFileSync(path.join(here, 'fixtures/twistegy_live_names.txt'), 'utf8').trim().split('\n');
 const rows = lines.map((l, i) => { const [n, s, , p] = l.split('|'); return { id: i + 1, store_id: 1, slug: 'l' + i, name_ar: n, name_en: n, description_ar: '', price: +p, category_id: 1, status: 'active', colors_json: '[]', sizes_json: '[]', track_stock: 0, stock: 10, moda_key: null, department: null, audience: null, cat_text: '', store_name_ar: s, rating: 4, rating_count: 5, sold_count: 3 }; });
 const by = new Map(rows.map((r) => [r.id, r]));
