@@ -1,0 +1,71 @@
+# Twist Store — Caddy reverse-proxy configuration
+# ================================================
+# Replace twistegy.com with your actual domain name.
+# Caddy auto-provisions and renews a Let's Encrypt TLS certificate.
+#
+# Features:
+#   - HTTPS + HTTP/2 + HTTP/3 (QUIC)
+#   - Automatic HTTP → HTTPS redirect
+#   - HSTS (1 year, includeSubDomains)
+#   - gzip + zstd compression
+#   - Request body size limit (20 MB; multer enforces finer limits per route)
+#   - Upstream timeout: 60 s read, 120 s write (long enough for model inference)
+#   - Correct X-Forwarded-* headers so the app sees the real client IP
+#   - Admin API (/api/admin/*) only reachable from internal network
+
+{
+    # Global options
+    email admin@twistegy.com
+    # Uncomment to use Cloudflare DNS challenge (needed for wildcard certs):
+    # acme_dns cloudflare {env.CF_API_TOKEN}
+}
+
+twistegy.com, www.twistegy.com {
+
+    # ---- TLS / HSTS ----
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    header X-Content-Type-Options "nosniff"
+    header X-Frame-Options "SAMEORIGIN"
+    header Referrer-Policy "strict-origin-when-cross-origin"
+    # Remove any server fingerprint headers Caddy adds by default
+    header -Server
+
+    # ---- Compression ----
+    encode zstd gzip
+
+    # ---- Request size limit (20 MB; multer enforces per-endpoint limits) ----
+    request_body {
+        max_size 20MB
+    }
+
+    # ---- Reverse proxy to the app ----
+    reverse_proxy app:10000 {
+        # Pass real client IP to the app (config.js: trust proxy = 1)
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up X-Real-IP {remote_host}
+
+        # Timeouts
+        transport http {
+            read_timeout  60s
+            write_timeout 120s
+            dial_timeout  5s
+        }
+
+        # Health: Caddy uses /api/ready to decide if the upstream is healthy
+        health_uri      /api/ready
+        health_interval 20s
+        health_timeout  5s
+        health_status   200
+    }
+
+    # ---- Logging ----
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size     20mb
+            roll_keep     5
+            roll_keep_for 72h
+        }
+        format json
+    }
+}

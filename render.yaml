@@ -1,9 +1,35 @@
+# ⚠️  DEMO / REVIEW ENVIRONMENT ONLY — do NOT use as a production deployment spec.
+# For production, use docker-compose.yml + Caddyfile with a proper server.
+# See docs/RUNBOOK.md for the production deployment procedure.
+#
+# This Render config runs the full stack on a single free-tier web service for
+# demo purposes. It does NOT configure:
+#   - Litestream R2 database replication (data is lost on each deploy!)
+#   - BACKUP_R2_BUCKET (no off-site backup)
+#   - ADMIN_TOTP_SECRET (admin 2FA is disabled)
+#   - Persistent media storage (uploaded photos are ephemeral)
+#
+# Required env vars to set manually in the Render dashboard:
+#   JWT_SECRET     (32+ random chars)
+#   ADMIN_KEY      (16+ random chars)
+#   SEED_DEMO=1    (seed demo stores on first empty-DB boot)
+#   ALLOW_EMPTY_DB=1
+#   NODE_ENV=production
+
 services:
   - type: web
-    name: souqna
+    name: twist-store-demo
     runtime: docker
     plan: free
-    healthCheckPath: /api/health
+    healthCheckPath: /api/ready
     envVars:
       - key: JWT_SECRET
         generateValue: true
+      - key: ADMIN_KEY
+        generateValue: true
+      - key: NODE_ENV
+        value: production
+      - key: ALLOW_EMPTY_DB
+        value: "1"
+      - key: SEED_DEMO
+        value: "1"

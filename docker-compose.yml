@@ -1,0 +1,96 @@
+# Twist Store — Production docker-compose
+# =========================================
+# Usage:
+#   cp .env.example .env   # then fill all required values
+#   docker compose up -d
+#
+# Data layout:
+#   ./data/db/     → SQLite database (backed up to R2 via Litestream)
+#   ./data/media/  → uploaded product photos (back up separately to object storage)
+#   ./data/backups/→ local daily backups (SQL dumps)
+#
+# TLS is handled by Caddy (caddy service); the app never does TLS itself.
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    image: twist-store:latest
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      PORT: "10000"
+      DB_FILE: /app/server/data/souqna.db
+      MEDIA_DIR: /app/server/data/media
+      BACKUP_DIR: /app/server/data/backups
+    volumes:
+      - db_data:/app/server/data/db
+      - media_data:/app/server/data/media
+      - backup_data:/app/server/data/backups
+    networks:
+      - internal
+    # Only expose internally to Caddy — do NOT bind a host port.
+    expose:
+      - "10000"
+    healthcheck:
+      test: ["CMD", "node", "-e",
+        "fetch('http://localhost:10000/api/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+    # Drop all capabilities; add only what the app needs (none).
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    read_only: false       # Node needs to write temp files
+    tmpfs:
+      - /tmp:size=128m
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3 / QUIC
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - internal
+    depends_on:
+      app:
+        condition: service_healthy
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE   # bind ports 80/443
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  internal:
+    driver: bridge
+
+volumes:
+  db_data:
+  media_data:
+  backup_data:
+  caddy_data:
+  caddy_config:
