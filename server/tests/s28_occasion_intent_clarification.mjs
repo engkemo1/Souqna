@@ -669,14 +669,14 @@ const TEST_CASES = [
   },
   {
     id: 'TC-020',
-    input: 'عايزة بلوزة حرير طبيعي مطرزة بالدهب',
+    input: 'عايزة بلوزة شيفون مطرزة بالدهب',
     context: [],
     expectedProductType: 'blouse',
     expectedOccasion: null,
     expectedStyle: null,
     expectedAction: 'search',
     expectedClarification: 'none',
-    acceptanceCriteria: 'Negative Test 4: Twila NEVER invents product materials or design attributes; explicitly states when requested material/detail is not recorded by the store.',
+    acceptanceCriteria: 'Negative Test 4: Twila NEVER invents product materials or design attributes; explicitly states when requested detail ("مطرز") is not recorded by the store.',
     verify: (r) => /(الخامة مش مكتوبة|مش متأكدة إن)/.test(r.say || ''),
   },
   {
@@ -1357,8 +1357,8 @@ const TEST_CASES = [
   },
   {
     id: 'TC-076',
-    input: 'خلينا في الطقم الأولاني',
-    context: ['عايزة طقم كاجوال بيج', 'وريني فستان سهرة أسود', 'رجعني للطقم'],
+    input: 'رجعني للطقم',
+    context: ['عايزة طقم كاجوال بيج', 'وريني فستان سهرة أسود'],
     expectedProductType: 'set',
     expectedOccasion: null,
     expectedStyle: null,

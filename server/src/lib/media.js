@@ -689,3 +689,32 @@ export async function deleteMedia(m) {
   q.run('DELETE FROM media WHERE id=?', [m.id]);
   await purgeMediaFiles(m);
 }
+
+/**
+ * Purges unattached media rows (and their local/R2 files) older than `maxAgeHours`
+ * that are not referenced by any product, store, category, banner, promotion, or review.
+ */
+export async function purgeOrphanMedia({ maxAgeHours = 24, limit = 100 } = {}) {
+  const cutoff = new Date(Date.now() - maxAgeHours * 3600e3).toISOString().slice(0, 19).replace('T', ' ');
+  const orphans = q.all(
+    `SELECT m.* FROM media m
+     WHERE m.attached = 0 AND m.created_at < ?
+       AND NOT EXISTS (SELECT 1 FROM product_media pm WHERE pm.media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM stores s WHERE s.logo_media_id = m.id OR s.cover_media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM categories c WHERE c.media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM banners b WHERE b.media_id = m.id OR b.mobile_media_id = m.id)
+       AND NOT EXISTS (SELECT 1 FROM promotions p WHERE p.image_media_id = m.id)
+     ORDER BY m.id ASC LIMIT ?`,
+    [cutoff, limit],
+  );
+  let purged = 0;
+  for (const m of orphans) {
+    try {
+      await deleteMedia(m);
+      purged++;
+    } catch {
+      /* ignore individual cleanup error */
+    }
+  }
+  return { purged };
+}

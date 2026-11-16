@@ -67,6 +67,7 @@ export function quote(store, items = [], couponCode, { phone, giftChoices } = {}
       size: variant?.size ?? null,
       qty,
       available,
+      trackStock: !!p.track_stock,
       mediaId,
       categoryId: p.category_id ?? null,
       excludedFromPromos: !!p.exclude_from_promotions,
@@ -179,7 +180,7 @@ function applyPromotions(store, lines, paid, { phone, giftChoices } = {}) {
       const qty = Math.min(g.qty, gi.avail); if (qty <= 0) continue;
       gi.avail -= qty;
       const mediaId = q.val('SELECT media_id FROM product_media WHERE product_id=? ORDER BY is_primary DESC, position LIMIT 1', [gi.p.id]);
-      out.push({ productId: gi.p.id, variantId: gi.variant?.id ?? null, name: bi(gi.p, 'name'), price: 0, listPrice: gi.p.price, color: gi.variant?.color ?? null, size: gi.variant?.size ?? null, qty, available: gi.avail + qty, mediaId, error: null, gift: true, promotionId: p.id, promoDiscount: 0, lineTotal: 0, giftOptions: g.options });
+      out.push({ productId: gi.p.id, variantId: gi.variant?.id ?? null, name: bi(gi.p, 'name'), price: 0, listPrice: gi.p.price, color: gi.variant?.color ?? null, size: gi.variant?.size ?? null, qty, available: gi.avail + qty, trackStock: !!gi.p.track_stock, mediaId, error: null, gift: true, promotionId: p.id, promoDiscount: 0, lineTotal: 0, giftOptions: g.options });
       gifts.push({ productId: gi.p.id, qty, name: bi(gi.p, 'name') });
     }
     if (!a.discount && !gifts.length) continue;

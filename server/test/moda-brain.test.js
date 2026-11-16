@@ -44,7 +44,7 @@ test('timeout and bad output fall back (null) instead of throwing', async () => 
 
 test('unknown question: brain answers and asks one question, session stays open', async () => {
   const brain = fake({ reply: 'القطن أخف في الصيف. لمين الهدوم؟', ready: false });
-  const res = await runModa('ايه الفرق بين الكتان والقطن', { ...base, brain });
+  const res = await runModa('الكتان بيتنفس ولا لأ', { ...base, brain });
   assert.equal(res.blocks, null); assert.match(res.say, /لمين/);
 });
 
@@ -74,7 +74,7 @@ test('POST /stylist with a Workers-AI-compatible endpoint: free-form question an
   const app = express(); app.use(express.json()); app.use('/api', routes); app.use(errorHandler);
   const srv = createServer(app); await new Promise((r) => srv.listen(0, r));
   const post = async (content) => (await fetch(`http://127.0.0.1:${srv.address().port}/api/stylist`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'user', content }] }) })).json();
-  const a = await post('ايه الفرق بين الكتان والقطن'); assert.match(a.say, /الكتان/); assert.equal(a.intent, 'chat'); assert.equal(calls, 1);
+  const a = await post('الكتان بيتنفس ولا لأ'); assert.match(a.say, /الكتان/); assert.equal(a.intent, 'chat'); assert.equal(calls, 1);
   const b = await post('ايه الفرق بين الحرير والبوليستر'); assert.equal(calls, 1); assert.ok(b.say.length > 5);
   srv.close(); ai.close();
 });

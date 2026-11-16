@@ -59,7 +59,6 @@
       ],
       "contexts": [
         "engagement_guest",
-        "evening",
         "katb_kitab",
         "wedding_guest",
         "graduation"
@@ -123,10 +122,10 @@
       ],
       "contexts": [
         "engagement_guest",
-        "evening",
         "katb_kitab",
         "wedding_guest",
-        "date_night"
+        "date_night",
+        "evening_out"
       ],
       "name_ar": "طقم كلاسيك (جاكيت وبنطلون منفصلين)",
       "formality": 4,
@@ -187,7 +186,8 @@
         "date_night",
         "engagement_guest",
         "work_casual",
-        "work_formal"
+        "work_formal",
+        "evening_out"
       ],
       "name_ar": "تنسيق بليزر موجود",
       "formality": 3,
@@ -233,7 +233,8 @@
         "engagement_guest",
         "family_gathering",
         "date_night",
-        "ramadan_iftar"
+        "ramadan_iftar",
+        "evening_out"
       ],
       "name_ar": "قميص وبنطلون شيك",
       "formality": 3,
@@ -781,7 +782,6 @@
       ],
       "contexts": [
         "engagement_guest",
-        "evening",
         "katb_kitab",
         "wedding_guest",
         "graduation"
@@ -845,11 +845,11 @@
       ],
       "contexts": [
         "engagement_guest",
-        "evening",
         "katb_kitab",
         "date_night",
         "birthday_party",
-        "ramadan_iftar"
+        "ramadan_iftar",
+        "evening_out"
       ],
       "name_ar": "دريس ميدي شيك",
       "formality": 4,
@@ -903,9 +903,9 @@
       ],
       "contexts": [
         "engagement_guest",
-        "evening",
         "wedding_guest",
-        "date_night"
+        "date_night",
+        "evening_out"
       ],
       "name_ar": "طقم قطعتين أو جمبسوت",
       "formality": 4,
@@ -1516,7 +1516,6 @@
       ],
       "contexts": [
         "engagement_guest",
-        "evening",
         "katb_kitab",
         "wedding_guest",
         "graduation"
@@ -1578,10 +1577,10 @@
       ],
       "contexts": [
         "engagement_guest",
-        "evening",
         "katb_kitab",
         "wedding_guest",
-        "birthday_party"
+        "birthday_party",
+        "evening_out"
       ],
       "name_ar": "فستان سواريه محتشم + طرحة",
       "formality": 5,
@@ -1639,10 +1638,10 @@
       ],
       "contexts": [
         "engagement_guest",
-        "evening",
         "date_night",
         "family_gathering",
-        "eid"
+        "eid",
+        "evening_out"
       ],
       "name_ar": "طقم محجبات شيك",
       "formality": 4,

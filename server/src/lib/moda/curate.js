@@ -75,6 +75,37 @@ export function curatorPrompt({ K, pools, persons, context, budget, adv, eventTi
 }
 
 /** يفحص رد الموديل ويبني plan بنفس شكل planOutfit. يرجّع null لو غير سليم. */
+/**
+ * يصلّح خطة عدّت الميزانية: كل مرة يبدّل القطعة الأغلى اللي ليها بديل أرخص (نفس النوع، نفس الفئة، من نفس قايمة الكود) بأقرب بديل
+ * لسعرها، لحد ما الإجمالي يدخل في الميزانية. مفيش حذف قطع ولا نوع جديد. لو مفيش تبديل ممكن والإجمالي لسه فوق → null.
+ * بيعدّل people في مكانها ويرجّع الإجمالي الجديد.
+ */
+export function repairToBudget(people, pools, budget) {
+  const sum = () => people.reduce((t, pe) => t + pe.picks.reduce((x, pk) => x + pk.product.price, 0), 0);
+  let total = sum();
+  const used = new Set(people.flatMap((pe) => pe.picks.map((pk) => String(pk.product.id))));
+  for (let guard = 0; total > budget && guard < 40; guard++) {
+    let best = null;
+    for (const pe of people) {
+      const pool = pools[pe.aud] || [];
+      for (const pk of pe.picks) {
+        const alt = pool.filter((c) => c.key === pk.product.key && c.price < pk.product.price && !used.has(String(c.id)) && !(pe.picks.some((o) => o !== pk && o.product.key === c.key)))
+          .sort((a, b) => b.price - a.price)[0]; // أقرب بديل أرخص (أقل خسارة جودة)
+        if (!alt) continue;
+        const cand = { pe, pk, alt, saving: pk.product.price - alt.price, price: pk.product.price };
+        if (!best || cand.price > best.price) best = cand; // نبدأ بأغلى قطعة ليها بديل
+      }
+    }
+    if (!best) return null;
+    used.delete(String(best.pk.product.id)); used.add(String(best.alt.id));
+    best.pk.product = best.alt; best.pk.why = null; best.pk.repaired = true;
+    total = sum();
+  }
+  if (total > budget) return null;
+  for (const pe of people) { pe.subtotal = pe.picks.reduce((t, p) => t + p.product.price, 0); if (pe.look?.tip_ar) pe.look = { ...pe.look, tip_ar: null }; }
+  return total;
+}
+
 export function buildCuratedPlan(out, { plan, pools, persons, budget, K, owned = new Set() }) {
   if (!out || !Array.isArray(out.people)) return null;
   const people = []; const missing = []; let total = 0;
@@ -109,7 +140,12 @@ export function buildCuratedPlan(out, { plan, pools, persons, budget, K, owned =
     missing.push(...miss);
   }
   if (!people.some((p) => p.picks.length)) return null;
-  if (budget && total > budget) return null; // نرجع لترشيح القواعد اللي بيحترم الميزانية
+  if (budget && total > budget) {
+    // الموديل عدّى الميزانية: الكود يصلّح بالمنتجات نفسها (نفس النوع ونفس الفئة، أرخص) بدل ما نرمي الخطة كلها
+    const fixed = repairToBudget(people, pools, budget);
+    if (!fixed) return null; // مفيش بدائل كافية: نرجع لترشيح القواعد اللي بيحترم الميزانية
+    total = fixed;
+  }
   const state = missing.length ? 'partial' : 'full';
   const palette = []; for (const pe of people) for (const pk of pe.picks) { const c = pk.product.colorKeys?.[0]; if (c && !palette.includes(c)) palette.push(c); }
   return { ...plan, state, people, missing, relaxed: [], dropped: [], total, over: 0, ask: plan.ask || [], palette: palette.slice(0, 3), curated: true, tone: plan.tone };
@@ -139,7 +175,7 @@ export function buildCuratorRequest({ K, rows, persons, plan, parsed, adv, event
 }
 
 /** callFn(system, messages) → string|object. بيرجّع async ({plan, rows, parsed, adv, eventTime, K, lang, assistantName}) => plan|null */
-export function makeCurator(callFn, { timeoutMs = 16000 } = {}) {
+export function makeCurator(callFn, { timeoutMs = Math.max(4000, Number(process.env.CURATOR_TIMEOUT_MS) || 16000) } = {}) { // الموديلات اللي بتفكّر (Gemini 3.x) ممكن تعدّي 16 ثانية: قابلة للضبط من البيئة
   return async ({ plan, rows, parsed, adv, eventTime, K, lang = 'ar', assistantName = 'تويلا' }) => {
     const persons = plan.persons || [];
     if (!persons.length || !plan.context && !(parsed.garments || []).length) return null;

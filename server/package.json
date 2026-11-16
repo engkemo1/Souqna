@@ -5,8 +5,10 @@
   "scripts": {
     "dev": "node --no-warnings --env-file-if-exists=../.env src/index.js",
     "start": "node --no-warnings --env-file-if-exists=../.env src/index.js",
-    "test": "npm run test:security && npm run test:stylist && npm run test:promotions && npm run test:cashier && npm run test:ci && npm run test:search && npm run test:comments && npm run test:media && npm run test:buyer-chats && npm run test:market-cart && npm run test:images && npm run test:moda-core && npm run test:visual",
+    "test": "npm run test:security && npm run test:reliability && npm run test:stylist && npm run test:promotions && npm run test:cashier && npm run test:ci && npm run test:search && npm run test:comments && npm run test:media && npm run test:buyer-chats && npm run test:market-cart && npm run test:images && npm run test:moda-core && npm run test:visual",
     "test:security": "node --test --no-warnings test/security-p0.test.js test/store-isolation.test.js",
+    "test:reliability": "node --test --no-warnings test/reliability-p2.test.js",
+    "restore:drill": "node --no-warnings --env-file-if-exists=../.env src/scripts/restore-drill.js",
     "test:stylist": "node --test src/lib/stylist-ranking.test.js",
     "test:images": "node --test --no-warnings test/image-library.test.js test/image-generation.test.js test/catalog.test.js",
     "test:comments": "node --test --no-warnings test/order-comments.test.js",

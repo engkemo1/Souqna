@@ -15,117 +15,13 @@ const joinAr = (input) => { const arr = [...new Set(input)]; return arr.length <
 const dedupeSay = (t) => { const seen = new Set(); return String(t || '').split(/(?<=[.!؟?])\s+/).filter((x) => { const k = x.trim(); if (!k || seen.has(k)) return false; seen.add(k); return true; }).join(' '); };
 const nf = (n) => Number(n).toLocaleString('en-US');
 
-const QUESTION_FOR = { audience: 'who_is_it_for', occasion: 'what_occasion', budget: 'budget', dress_kind: 'dress_kind', product_type: 'product_type' };
+const QUESTION_FOR = { audience: 'who_is_it_for', occasion: 'what_occasion', budget: 'budget', dress_kind: 'dress_kind' };
 
 export function buildQuestion(K, askKey, lang = 'ar') {
   const id = QUESTION_FOR[askKey] || askKey; const q = K.questions.questions[id];
   if (!q) return null;
   if (lang === 'en' && q.en) return { id, text: q.en.text, type: q.type, options: q.options.map((o) => ({ ...o, label: q.en.options[typeof o.value === 'string' ? o.value : JSON.stringify(o.value)] || o.label })) };
   return { id, text: q.text, type: q.type, options: q.options };
-}
-
-function fitProductTypeQ(q, plan, L) {
-  if (!q || q.id !== 'product_type' || L === 'en') return q;
-  const parsed = plan?.parsed || {};
-  const occ = parsed.occasion || plan?.occasion || parsed.context || plan?.context || null;
-  const styles = parsed.styles || (parsed.style ? [parsed.style] : []);
-  const isModest = styles.includes('modest') || parsed.flags?.hijab || (plan?.persons || parsed.persons || []).includes('women_hijab');
-  const isMale = parsed.genderHint === 'male' || ((plan?.persons || parsed.persons || []).includes('men') && !(plan?.persons || parsed.persons || []).some((p) => p === 'women' || p === 'women_hijab'));
-
-  if (isMale) {
-    if (occ === 'evening' || occ === 'wedding' || occ === 'engagement') {
-      return {
-        ...q,
-        text: 'أكيد! تحب بدلة سهرة، ولا بليزر وبنطلون، ولا قميص شيك؟',
-        options: [
-          { label: 'بدلة سهرة', value: 'suit' },
-          { label: 'بليزر وبنطلون', value: 'blazer' },
-          { label: 'قميص شيك', value: 'shirt' },
-        ],
-      };
-    }
-    if (occ === 'work' || styles.includes('formal')) {
-      return {
-        ...q,
-        text: 'أكيد! تحب بدلة رسمية، ولا بليزر وبنطلون، ولا قميص وبنطلون قماش؟',
-        options: [
-          { label: 'بدلة رسمية', value: 'suit' },
-          { label: 'بليزر وبنطلون', value: 'blazer' },
-          { label: 'قميص وبنطلون', value: 'shirt' },
-        ],
-      };
-    }
-    return {
-      ...q,
-      text: 'أكيد! تحب تيشيرت وجينز، ولا قميص كاجوال، ولا بليزر شيك؟',
-      options: [
-        { label: 'تيشيرت وجينز', value: 'tshirt' },
-        { label: 'قميص كاجوال', value: 'shirt' },
-        { label: 'بليزر شيك', value: 'blazer' },
-      ],
-    };
-  }
-
-  if (occ === 'evening') {
-    if (isModest) {
-      return {
-        ...q,
-        text: 'أكيد ❤️ تحبي فستان سهرة محتشم، ولا عباية شيك، ولا طقم قطعتين؟',
-        options: [
-          { label: 'فستان سهرة محتشم', value: 'dress_evening' },
-          { label: 'عباية شيك', value: 'abaya' },
-          { label: 'طقم قطعتين', value: 'two_piece_set' },
-          { label: 'بلوزة وجيبة', value: 'blouse' },
-        ],
-      };
-    }
-    return {
-      ...q,
-      text: 'أكيد ❤️ تحبي فستان سهرة، ولا لانجيري، ولا حاجة كاجوال شيك؟',
-      options: [
-        { label: 'فستان سهرة', value: 'dress_evening' },
-        { label: 'لانجيري', value: 'lingerie' },
-        { label: 'حاجة كاجوال شيك', value: 'casual_chic' },
-        { label: 'طقم قطعتين', value: 'two_piece_set' },
-      ],
-    };
-  }
-
-  if (occ === 'work' || styles.includes('formal')) {
-    return {
-      ...q,
-      text: 'أكيد ❤️ تحبي بليزر وبنطلون، ولا فستان شغل، ولا بلوزة رسمية؟',
-      options: [
-        { label: 'بليزر وبنطلون', value: 'blazer' },
-        { label: 'فستان شغل', value: 'dress_work' },
-        { label: 'بلوزة رسمية', value: 'blouse' },
-        { label: 'طقم فورمال', value: 'womens_suit' },
-      ],
-    };
-  }
-
-  if (occ === 'casual_outing' || occ === 'daily' || styles.includes('casual')) {
-    return {
-      ...q,
-      text: 'أكيد ❤️ تحبي دريس كاجوال، ولا طقم كاجوال، ولا بلوزة وبنطلون؟',
-      options: [
-        { label: 'دريس كاجوال', value: 'dress_casual' },
-        { label: 'طقم كاجوال', value: 'two_piece_set' },
-        { label: 'بلوزة وبنطلون', value: 'blouse' },
-      ],
-    };
-  }
-
-  return {
-    ...q,
-    text: 'أكيد ❤️ تحبي فستان شيك، ولا طقم قطعتين، ولا بلوزة وبنطلون؟',
-    options: [
-      { label: 'فستان شيك', value: 'dress_party' },
-      { label: 'طقم قطعتين', value: 'two_piece_set' },
-      { label: 'بلوزة وبنطلون', value: 'blouse' },
-      { label: 'جمبسوت', value: 'jumpsuit' },
-    ],
-  };
 }
 
 // سؤال «ضيف ولا صاحب المناسبة»: اسم المناسبة الصح (فرح/كتب كتاب/خطوبة) ومخاطبة الست بالمؤنث، بدل «إنت ضيف ولا الخطوبة بتاعتك؟» لكل الحالات
@@ -212,13 +108,13 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
     const first = asks[0];
     const couple = plan.persons?.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
     const herText = first === 'modest_preference' && (plan.persons?.includes('men') || plan.soloFromCouple === 'women') && plan.parsed?.genderHint !== 'female' || (first === 'modest_preference' && forAnotherWoman(plan)) ? 'هي محجبة ولا لأ؟' : null; // الست اللي بتتكلم عن نفسها وجوزها: نسألها هي
-    const text = herText ? herText : first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'budget' ? say(couple ? 'clarify_budget_couple' : 'clarify_budget') : first === 'time_if_dressy' ? say('clarify_time') : first === 'venue_if_dressy' ? say('clarify_venue') : first === 'color_preference' ? say('clarify_color') : first === 'dress_kind' ? say('dress_clarify') : (fitProductTypeQ(buildQuestion(K, first, L), plan, L)?.text || say('clarify_generic'));
+    const text = herText ? herText : first === 'audience' ? say('clarify_audience') : first === 'occasion' ? say('clarify_occasion') : first === 'budget' ? say(couple ? 'clarify_budget_couple' : 'clarify_budget') : first === 'time_if_dressy' ? say('clarify_time') : first === 'venue_if_dressy' ? say('clarify_venue') : first === 'color_preference' ? say('clarify_color') : first === 'dress_kind' ? say('dress_clarify') : (buildQuestion(K, first, L)?.text || say('clarify_generic'));
     const questions = asks.slice(0, K.questions.limits.max_questions_per_turn).map((a) => {
-      const q = fitProductTypeQ(fitRoleQ(buildQuestion(K, a, L), plan, L), plan, L);
+      const q = fitRoleQ(buildQuestion(K, a, L), plan, L);
       if (a === 'modest_preference' && q && (plan.persons?.includes('men') || plan.soloFromCouple === 'women') && plan.parsed?.genderHint !== 'female' || (a === 'modest_preference' && q && forAnotherWoman(plan))) return { ...q, text: 'هي محجبة ولا لأ؟' };
       return a === 'budget' && couple && q ? { ...q, text: say('clarify_budget_couple') } : q;
     }).filter(Boolean);
-    return { state: 'clarify', intent: 'shop', say: (first === 'engagement_role' || first === 'product_type') && questions[0]?.text ? questions[0].text : text, questions, blocks: null, ask: asks };
+    return { state: 'clarify', intent: 'shop', say: first === 'engagement_role' && questions[0]?.id === 'engagement_role' ? questions[0].text : text, questions, blocks: null, ask: asks };
   }
 
   if (plan.state === 'no_look') {
@@ -228,7 +124,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
 
   const ctxAr = plan.context ? (K.contexts.get(plan.context)?.ar || '') : '';
   const occasion = String(ctxAr).replace(/\s*\(.*?\)\s*/g, ' ').split('/')[0].trim() || 'المناسبة';
-  const occasionForAr = { evening: 'للسهرة', engagement_guest: 'للخطوبة', engagement_self: 'لخطوبتك', katb_kitab: 'لكتب الكتاب', wedding_guest: 'للفرح', wedding_self: 'لفرحك', graduation: 'للتخرج', family_gathering: 'للمة العيلة', birthday_party: 'لعيد الميلاد', date_night: 'لخروجة أو عشا', work_formal: 'للشغل', work_casual: 'للشغل', university: 'للجامعة', sport: 'للرياضة', casual_outing: 'للخروجة', travel: 'للسفر', eid: 'للعيد', ramadan_iftar: 'لإفطار رمضان', sahel_beach: 'للساحل' };
+  const occasionForAr = { home: 'للبيت', engagement_guest: 'للخطوبة', engagement_self: 'لخطوبتك', katb_kitab: 'لكتب الكتاب', wedding_guest: 'للفرح', wedding_self: 'لفرحك', graduation: 'للتخرج', family_gathering: 'للمة العيلة', birthday_party: 'لعيد الميلاد', date_night: 'لخروجة أو عشا', work_formal: 'للشغل', work_casual: 'للشغل', university: 'للجامعة', sport: 'للرياضة', casual_outing: 'للخروجة', travel: 'للسفر', eid: 'للعيد', ramadan_iftar: 'لإفطار رمضان', sahel_beach: 'للساحل', evening_out: 'للسهرة' };
   const occasionFor = L === 'en' ? occasion : (occasionForAr[plan.context] || `لـ${occasion}`);
   const paletteAr = joinAr((plan.palette || []).map((c) => colorAr(K, c)));
   const couple = !plan.audienceOpen && plan.people.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
@@ -250,7 +146,8 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   else if (plan.state === 'partial') intro = say(couple ? 'intro_partial_couple' : plan.context ? 'intro_partial' : 'intro_partial_item', { occasion, occasionFor, missing: joinAr((plan.missing || []).map((m) => `${itemAr(K, m.base)}${m.material ? ` ${K.synonyms.materials[m.material]?.[0] || m.material}` : ''}`)) });
   else if (plan.state === 'alternatives') intro = `${say('intro_alternatives')} ${relaxedTexts.join(' ')}`.trim();
   else if (plan.state === 'over_budget') intro = say(single ? 'over_budget_item' : 'over_budget', { total: nf(plan.total), budget: nf(plan.budget), over: nf(plan.over) });
-  else intro = say(couple ? 'intro_full_couple' : plan.context ? 'intro_full' : 'intro_item', { occasion, occasionFor, palette: paletteAr });
+  // قطعة صريحة للسهرة (فستان/جمبسوت/بلوزة…) مش «طقم كامل»
+  else intro = say(couple ? 'intro_full_couple' : plan.context && !(plan.context === 'evening_out' && plan.parsed?.garments?.length) ? 'intro_full' : 'intro_item', { occasion, occasionFor, palette: paletteAr });
   if (!paletteAr && L !== 'en') intro = intro.replace(/\s*[:،]?\s*(بألوان|ألوان)\s*(متناسقة مع بعض)?\s*(?=[.،])/g, '');
   parts.push(intro);
 

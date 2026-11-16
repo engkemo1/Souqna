@@ -1058,7 +1058,44 @@ const orderSchema = z.object({
   items: cartItems,
   gifts: giftChoices,
   expectedTotal: z.number().int().min(0).max(10000000).optional(),
+  idempotencyKey: z.string().trim().min(8).max(80).optional(),
 });
+
+function nextOrderNumber(storeId, storeCode) {
+  const prefix = `${storeCode}-`;
+  const maxSeq = Number(
+    q.val(
+      'SELECT MAX(CAST(SUBSTR(number, ?) AS INTEGER)) FROM orders WHERE store_id=? AND number LIKE ?',
+      [prefix.length + 1, storeId, `${prefix}%`],
+    ) || 10000,
+  );
+  const countSeq = Number(q.val('SELECT COUNT(*) FROM orders WHERE store_id=?', [storeId]) || 0) + 10000;
+  return `${prefix}${Math.max(maxSeq, countSeq) + 1}`;
+}
+
+function deductOrderLineStock(l) {
+  const tracked = l.trackStock ?? Boolean(q.val('SELECT track_stock FROM products WHERE id=?', [l.productId]));
+  if (l.variantId && tracked) {
+    const ch = q.run('UPDATE variants SET stock=stock-? WHERE id=? AND stock>=?', [l.qty, l.variantId, l.qty]).changes;
+    if (!ch) throw new AppError(409, 'cart_changed', 'Some items in your cart are no longer available.');
+  }
+  if (tracked) {
+    const ch = q.run('UPDATE products SET stock=stock-?, sold_count=sold_count+? WHERE id=? AND stock>=?', [l.qty, l.qty, l.productId, l.qty]).changes;
+    if (!ch) throw new AppError(409, 'cart_changed', 'Some items in your cart are no longer available.');
+  } else {
+    q.run('UPDATE products SET sold_count=sold_count+? WHERE id=?', [l.qty, l.productId]);
+  }
+}
+
+function consumeCouponAtomically(coupon) {
+  if (!coupon) return;
+  const tbl = coupon.source === 'platform' ? 'platform_coupons' : 'offers';
+  const ch = q.run(
+    `UPDATE ${tbl} SET usage_count=usage_count+1 WHERE id=? AND (usage_limit IS NULL OR usage_count < usage_limit)`,
+    [coupon.id],
+  ).changes;
+  if (!ch) throw new AppError(409, 'coupon_used_up', 'This coupon can no longer be applied.');
+}
 
 r.post('/stores/:slug/orders', h((req, res) => {
   checkRateLimit(`public:order:${req.ip}`, { max: 30, windowMs: 10 * 60e3, code: 'rate_limited', message: 'Too many orders placed in a short time. Please wait a few minutes.' });
@@ -1066,6 +1103,10 @@ r.post('/stores/:slug/orders', h((req, res) => {
   const body = orderSchema.parse(req.body);
   assertCustomerAllowed(body.phone, req);
   const result = tx(() => {
+    if (body.idempotencyKey) {
+      const existing = q.get('SELECT id, number, total, track_token FROM orders WHERE store_id=? AND idempotency_key=?', [s.id, body.idempotencyKey]);
+      if (existing) return { number: existing.number, total: existing.total, trackToken: existing.track_token, orderId: existing.id, duplicate: true };
+    }
     const qt = quote(s, body.items, body.coupon, { phone: body.phone, giftChoices: body.gifts });
     if (body.coupon && qt.couponError) throw new AppError(409, qt.couponError, 'This coupon can no longer be applied.'); // never charge more than the customer was shown
     if (qt.hasErrors) throw new AppError(409, 'cart_changed', 'Some items in your cart are no longer available.', { lines: qt.lines });
@@ -1078,26 +1119,28 @@ r.post('/stores/:slug/orders', h((req, res) => {
     }
     q.run('UPDATE customers SET name=?, governorate=?, city=?, address=?, orders_count=orders_count+1, total_spent=total_spent+?, last_order_at=? WHERE id=?',
       [body.name, body.governorate, body.city, body.address, qt.total, now, customer.id]);
-    const seq = q.val('SELECT COUNT(*) FROM orders WHERE store_id=?', [s.id]) + 10001;
-    const number = `${s.code}-${seq}`;
+    const number = nextOrderNumber(s.id, s.code);
     const trackToken = crypto.randomBytes(12).toString('base64url');
     const orderId = insert('orders', {
       store_id: s.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
       governorate: body.governorate, city: body.city, address: body.address, notes: body.notes, store_note: body.storeNote || null,
       status: 'pending', delivery_by: 'platform', subtotal: qt.subtotal, discount: qt.discount, promo_discount: qt.promoDiscount || 0, shipping: qt.shipping, total: qt.total,
       shipping_free: qt.shipping === 0 ? 1 : 0,
-      coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
+      coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, idempotency_key: body.idempotencyKey || null, created_at: now, updated_at: now,
     });
     recordOrderPromotions(orderId, s.id, qt, now);
     for (const l of qt.lines) {
       insert('order_items', { order_id: orderId, product_id: l.productId, variant_id: l.variantId, name_ar: l.name.ar, name_en: l.name.en, media_id: l.mediaId, color: l.color, size: l.size, price: l.price, qty: l.qty, ...promoItemCols(l) });
-      if (l.variantId) q.run('UPDATE variants SET stock=MAX(0, stock-?) WHERE id=?', [l.qty, l.variantId]);
-      q.run('UPDATE products SET stock=MAX(0, stock-?), sold_count=sold_count+? WHERE id=?', [l.qty, l.qty, l.productId]);
+      deductOrderLineStock(l);
     }
     insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
-    if (qt.coupon) q.run(`UPDATE ${qt.coupon.source === 'platform' ? 'platform_coupons' : 'offers'} SET usage_count=usage_count+1 WHERE id=?`, [qt.coupon.id]);
+    consumeCouponAtomically(qt.coupon);
     return { number, total: qt.total, trackToken, orderId };
   });
+  if (result.duplicate) {
+    delete result.orderId;
+    return res.status(200).json({ order: result });
+  }
   if (s.auto_whatsapp) {
     sendNewOrderAlert(s, result.orderId)
       .then((r) => { if (r.sent) console.log(`[whatsapp] ${result.number} → ${r.to}`); else console.log(`[whatsapp] ${result.number} skipped: ${r.skipped}`); })
@@ -1160,8 +1203,7 @@ r.post('/stores/:slug/reserve', h((req, res) => {
     let customer = q.get('SELECT * FROM customers WHERE store_id=? AND phone=?', [s.id, body.phone]);
     if (!customer) customer = { id: insert('customers', { store_id: s.id, name: body.name, phone: body.phone, created_at: now }) };
     q.run('UPDATE customers SET name=?, orders_count=orders_count+1, total_spent=total_spent+?, last_order_at=? WHERE id=?', [body.name, qt.subtotal - (qt.promoDiscount || 0), now, customer.id]);
-    const seq = q.val('SELECT COUNT(*) FROM orders WHERE store_id=?', [s.id]) + 10001;
-    const number = `${s.code}-${seq}`;
+    const number = nextOrderNumber(s.id, s.code);
     const trackToken = crypto.randomBytes(12).toString('base64url');
     const orderId = insert('orders', {
       store_id: s.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone, notes: body.notes,
@@ -1171,8 +1213,7 @@ r.post('/stores/:slug/reserve', h((req, res) => {
     });
     for (const l of qt.lines) {
       insert('order_items', { order_id: orderId, product_id: l.productId, variant_id: l.variantId, name_ar: l.name.ar, name_en: l.name.en, media_id: l.mediaId, color: l.color, size: l.size, price: l.price, qty: l.qty, ...promoItemCols(l) });
-      if (l.variantId) q.run('UPDATE variants SET stock=MAX(0, stock-?) WHERE id=?', [l.qty, l.variantId]);
-      q.run('UPDATE products SET stock=MAX(0, stock-?), sold_count=sold_count+? WHERE id=?', [l.qty, l.qty, l.productId]);
+      deductOrderLineStock(l);
     }
     recordOrderPromotions(orderId, s.id, qt, now);
     insert('order_events', { order_id: orderId, status: 'pending', note: 'reserve', created_at: now });
@@ -1239,22 +1280,20 @@ r.post('/marketplace/orders', h((req, res) => {
       }
       q.run('UPDATE customers SET name=?, governorate=?, city=?, address=?, orders_count=orders_count+1, total_spent=total_spent+?, last_order_at=? WHERE id=?',
         [body.name, body.governorate, body.city, body.address, qt.subtotal, now, customer.id]);
-      const seq = q.val('SELECT COUNT(*) FROM orders WHERE store_id=?', [store.id]) + 10001;
-      const number = `${store.code}-${seq}`;
+      const number = nextOrderNumber(store.id, store.code);
       const trackToken = crypto.randomBytes(12).toString('base64url');
       const orderId = insert('orders', {
         store_id: store.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone,
         governorate: body.governorate, city: body.city, address: body.address, notes: body.notes, store_note: storeNote || null,
         status: 'pending', delivery_fee_status: pendingFee ? 'pending' : 'confirmed', delivery_fee_quote: null, delivery_by: 'platform', delivery_group: deliveryGroup, delivery_route_id: deliveryGroup, delivery_mode: 'pooled', subtotal: qt.subtotal, discount: qt.discount, promo_discount: qt.promoDiscount || 0, shipping, total: qt.subtotal - qt.discount + shipping,
         shipping_free: qt.shipping === 0 ? 1 : 0,
-        coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
+        coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, idempotency_key: body.idempotencyKey ? `${body.idempotencyKey}:${store.id}` : null, created_at: now, updated_at: now,
       });
-      if (qt.coupon) q.run(`UPDATE ${qt.coupon.source === 'platform' ? 'platform_coupons' : 'offers'} SET usage_count=usage_count+1 WHERE id=?`, [qt.coupon.id]);
+      consumeCouponAtomically(qt.coupon);
       recordOrderPromotions(orderId, store.id, qt, now);
       for (const line of qt.lines) {
         insert('order_items', { order_id: orderId, product_id: line.productId, variant_id: line.variantId, name_ar: line.name.ar, name_en: line.name.en, media_id: line.mediaId, color: line.color, size: line.size, price: line.price, qty: line.qty, ...promoItemCols(line) });
-        if (line.variantId) q.run('UPDATE variants SET stock=MAX(0, stock-?) WHERE id=?', [line.qty, line.variantId]);
-        q.run('UPDATE products SET stock=MAX(0, stock-?), sold_count=sold_count+? WHERE id=?', [line.qty, line.qty, line.productId]);
+        deductOrderLineStock(line);
       }
       insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
       return { orderId, number, trackToken, total: qt.subtotal - qt.discount + shipping, subtotal: qt.subtotal, discount: qt.discount, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, storeWhatsapp: store.whatsapp || store.phone || null, store: { ar: store.name_ar, en: store.name_en } };

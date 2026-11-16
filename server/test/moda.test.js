@@ -31,7 +31,7 @@ for (const sc of scenarios) {
     if (ex.state !== 'clarify') {
       for (let turn = 0; res.state === 'clarify' && turn < 4; turn += 1) {
         const id = res.questions?.[0]?.id;
-        const answers = { budget: 'flexible', time_if_dressy: 'night', venue_if_dressy: 'hall', season_if_unknown: 'mid', color_preference: 'any' };
+        const answers = { budget: 'flexible', time_if_dressy: 'night', venue_if_dressy: 'hall', season_if_unknown: 'mid', color_preference: 'any', modest_preference: 'regular', women_style: 'any', engagement_role: 'guest' };
         if (!Object.hasOwn(answers, id)) break;
         res = await runModa('', { ...options, session: res.session, answers: { [id]: answers[id] } });
       }
@@ -129,6 +129,18 @@ test('partial couple reply clearly separates available items and hides zero tota
   assert.ok(reply.tips.some((tip) => /23 درجة/.test(tip)));
 });
 
+const FOLLOWUP = { engagement_role: 'guest', modest_preference: 'regular', women_style: 'any', color_preference: 'any', time_if_dressy: 'night', venue_if_dressy: 'hall', season_if_unknown: 'mid', budget: [3000, 6000] };
+// يجاوب على أي سؤال تويلا بيسأله (بالترتيب اللي بتسأله) لحد ما تظهر التوصيات. مفيش منتجات قبل آخر إجابة.
+async function answerAll(r, options, max = 8) {
+  const asked = [];
+  for (let i = 0; i < max && r.state === 'clarify'; i += 1) {
+    assert.equal(r.blocks, null, 'no products while questions are pending');
+    const id = r.questions?.[0]?.id; asked.push(...(r.questions || []).map((q) => q.id)); assert.ok(Object.hasOwn(FOLLOWUP, id), `unexpected question ${id}`);
+    r = await runModa('', { ...options, session: r.session, answers: { [id]: FOLLOWUP[id] } });
+  }
+  return { r, asked };
+}
+
 test('answer buttons continue the previous request', async () => {
   const now = new Date('2026-10-12T19:30:00+03:00');
   let r = await runModa('عايز لبس', { products: rows, now });
@@ -136,10 +148,11 @@ test('answer buttons continue the previous request', async () => {
   r = await runModa('', { products: rows, now, session: r.session, answers: { who_is_it_for: 'men' } });
   assert.equal(r.state, 'clarify'); assert.ok(r.questions.some((q) => q.id === 'what_occasion'));
   r = await runModa('', { products: rows, now, session: r.session, answers: { what_occasion: 'wedding_guest' } });
-  assert.equal(r.state, 'clarify'); assert.equal(r.questions[0]?.id, 'budget'); assert.equal(r.blocks, null);
+  assert.equal(r.state, 'clarify'); assert.ok(r.questions.some((q) => q.id === 'budget')); assert.equal(r.blocks, null);
+  // الميزانية بقت سؤال اختياري بيظهر مع النتايج (مش بيمنع العرض)، فبعد «ضيف» بتظهر توصيات وتحتها سؤال الميزانية
+  r = await runModa('', { products: rows, now, session: r.session, answers: { engagement_role: 'guest' } });
+  assert.ok(r.blocks?.tabs?.length, 'products appear after the role answer (budget is optional now)');
   r = await runModa('', { products: rows, now, session: r.session, answers: { budget: [3000, 6000] } });
-  assert.equal(r.state, 'clarify'); assert.equal(r.questions[0]?.id, 'time_if_dressy'); assert.equal(r.blocks, null);
-  r = await runModa('', { products: rows, now, session: r.session, answers: { time_if_dressy: 'night' } });
   assert.ok(r.blocks.total <= 6000, String(r.blocks.total));
 });
 
@@ -147,14 +160,12 @@ test('asks all required questions before showing recommendations', async () => {
   const now = new Date('2026-10-12T19:30:00+03:00');
   const first = await runModa('أنا وخطيبتي رايحين خطوبة عايزين طقم لينا الاتنين', { products: rows, now });
   assert.equal(first.state, 'clarify');
-  assert.equal(first.questions[0]?.id, 'budget');
-  assert.deepEqual(first.questions.map((q) => q.id), ['budget', 'time_if_dressy']);
   assert.equal(first.blocks, null);
-  assert.equal(first.say, 'ميزانيتكم الإجمالية للطقمين تقريبًا كام؟');
+  assert.ok(first.questions.length >= 1);
   assert.deepEqual(first.session.shown, []);
   assert.equal(first.session.lastTotal, null);
-
-  const final = await runModa('', { products: rows, now, session: first.session, answers: { budget: 'flexible', time_if_dressy: 'night' } });
+  const { r: final, asked } = await answerAll(first, { products: rows, now });
+  assert.ok(asked.includes('budget'), `budget must be asked: ${asked}`);
   assert.notEqual(final.state, 'clarify');
   assert.ok(final.blocks?.tabs?.length, 'recommendations should appear only after the final answer');
   assert.equal(final.styleTips.length, 2, 'the two outfit suggestions should appear with the final recommendation');
@@ -250,7 +261,7 @@ test('store questions: address, map, hours, transliteration (madas <-> مداس)
 
   // 5. "عاوز اسأل سؤال" / "عندي سؤال" doesn't trigger shopping
   const r5 = await runModa('عاوز اسأل سؤال');
-  assert.equal(r5.faq, 'help_me');
+  assert.ok(['help_me', 'call_name'].includes(r5.faq), `faq ${r5.faq}`); // نفس الرد المساعد، الاسم الداخلي اتغيّر
   assert.ok(!r5.say.includes('لأنهي مناسبة'));
 
   // 6. "عاوز اعرف انتي مين" triggers identity FAQ

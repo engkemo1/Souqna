@@ -69,6 +69,7 @@ const StoreDesigner = lazy(() => import('./pages/dashboard/StoreDesigner.jsx'));
 const AdminApp = lazy(() => import('./pages/admin/AdminApp.jsx'));
 const AdminOverview = lazy(() => import('./pages/admin/Overview.jsx'));
 const AdminStores = lazy(() => import('./pages/admin/Stores.jsx'));
+const AdminProducts = lazy(() => import('./pages/admin/AdminProducts.jsx'));
 const AdminDepartments = lazy(() => import('./pages/admin/Departments.jsx'));
 const AdminImageLibrary = lazy(() => import('./pages/admin/ImageLibrary.jsx'));
 const AdminOrders = lazy(() => import('./pages/admin/Orders.jsx'));
@@ -189,6 +190,7 @@ const router = createBrowserRouter([
         children: [
           { index: true, element: <AdminOverview /> },
           { path: 'stores', element: <AdminStores /> },
+          { path: 'products', element: <AdminProducts /> },
           { path: 'departments', element: <AdminDepartments /> },
           { path: 'image-library', element: <AdminImageLibrary /> },
           { path: 'orders', element: <AdminOrders /> },

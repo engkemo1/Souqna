@@ -682,7 +682,16 @@ export const llmChain = () => modaChainCall();
 export function modaCurator() {
   if (process.env.MODA_CURATOR === '0') return null;
   const callFn = modaChainCall();
-  return callFn ? makeCurator(callFn) : null;
+  if (!callFn) return null;
+  const cur = makeCurator(callFn);
+  // عدّاد بسيط (جدول ai_usage الموجود): curator/ok = الخطة اتقبلت، curator/failed = رجعنا للقواعد (رفض أو خطأ أو مهلة)، curator_repaired/ok = اتقبلت بعد تصليح الميزانية
+  return async (args) => {
+    let out;
+    try { out = await cur(args); } catch (e) { recordAi('curator', 'moda', 'failed', `error: ${String(e?.message || e).slice(0, 120)}`); throw e; }
+    recordAi('curator', 'moda', out ? 'ok' : 'failed', out ? '' : 'rejected_or_empty');
+    if (out?.people?.some((pe) => pe.picks?.some((pk) => pk.repaired))) recordAi('curator_repaired', 'moda', 'ok');
+    return out;
+  };
 }
 
 export function modaVerifier() {

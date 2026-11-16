@@ -1,0 +1,2894 @@
+{
+ "version": "1.0",
+ "note": "written before any code change; do not edit to make a case pass",
+ "cases": [
+  {
+   "id": "OCC-001",
+   "category": "A_generic_evening",
+   "input": "رشحيلي حاجة حلوة للسهره",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-002",
+   "category": "A_generic_evening",
+   "input": "رشحيلي حاجة حلوة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-003",
+   "category": "A_generic_evening",
+   "input": "عايزة حاجة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-004",
+   "category": "A_generic_evening",
+   "input": "عاوزه حاجه حلوه للسهره",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-005",
+   "category": "A_generic_evening",
+   "input": "فيه حاجة حلوة للسهرة؟",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-006",
+   "category": "A_generic_evening",
+   "input": "محتاجة حاجة للسهرة النهارده",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-007",
+   "category": "A_generic_evening",
+   "input": "اقترحي عليا حاجة للسهره",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-008",
+   "category": "A_generic_evening",
+   "input": "عايزة لبس للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-009",
+   "category": "A_generic_evening",
+   "input": "رشحيلي حاجه للسهرات",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-010",
+   "category": "A_generic_evening",
+   "input": "عايزه اطلع سهره وعايزة حاجة حلوة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion"
+    ],
+    "optionsInclude": [
+     "dress_any"
+    ]
+   },
+   "acceptance": "سؤال نوع المنتج، المناسبة سهرة محفوظة، مفيش منتجات لانجيري معروضة",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-011",
+   "category": "A_generic_evening_latin",
+   "input": "3ayza 7aga 7elwa lel sahra",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "فرانكو/إنجليزي: سؤال نوع المنتج من غير لانجيري",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-012",
+   "category": "A_generic_evening_latin",
+   "input": "rasha7ili 7aga lel sahra",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "فرانكو/إنجليزي: سؤال نوع المنتج من غير لانجيري",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-013",
+   "category": "A_generic_evening_latin",
+   "input": "something nice for an evening out",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "فرانكو/إنجليزي: سؤال نوع المنتج من غير لانجيري",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-014",
+   "category": "A_generic_evening_llm",
+   "input": "رشحيلي حاجة حلوة للسهره",
+   "context": [],
+   "llm": {
+    "persons": [
+     "women"
+    ],
+    "garments": [
+     {
+      "type": "lingerie"
+     }
+    ]
+   },
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "حتى لو الموديل خمّن لانجيري: نسأل",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-015",
+   "category": "A_generic_evening_llm",
+   "input": "عايزة حاجة حلوة للسهرة",
+   "context": [],
+   "llm": {
+    "persons": [
+     "women"
+    ],
+    "context": "date_night",
+    "garments": [
+     {
+      "type": "lingerie"
+     },
+     {
+      "type": "robe"
+     }
+    ]
+   },
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "تخمين الموديل للانجيري/روب مرفوض في طلب عام",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-016",
+   "category": "A_generic_evening_llm",
+   "input": "رشحيلي حاجة للسهره",
+   "context": [],
+   "llm": {
+    "garments": [
+     {
+      "type": "dress_evening"
+     }
+    ]
+   },
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الموديل مايقررش النوع في طلب عام",
+   "negative": [
+    1,
+    8
+   ]
+  },
+  {
+   "id": "OCC-017",
+   "category": "A_generic_evening_llm",
+   "input": "عايزة حاجة شيك للسهرة",
+   "context": [],
+   "llm": {
+    "persons": [
+     "women"
+    ],
+    "garments": [
+     {
+      "type": "sleepwear"
+     }
+    ]
+   },
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [
+     "elegant"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-018",
+   "category": "B_explicit_dress_evening",
+   "input": "عايزة فستان للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-019",
+   "category": "B_explicit_dress_evening",
+   "input": "وريني فساتين تنفع لسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-020",
+   "category": "B_explicit_dress_evening",
+   "input": "عايزة فستان سهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-021",
+   "category": "B_explicit_dress_evening",
+   "input": "عايزة فستان سهرة حتى لو مش مكتوب عليه سهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-022",
+   "category": "B_explicit_dress_evening",
+   "input": "فستان للسهره",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-023",
+   "category": "B_explicit_dress_evening",
+   "input": "عندك فساتين سهرة؟",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-024",
+   "category": "B_explicit_dress_evening",
+   "input": "عايزه فستان حلو للسهره",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-025",
+   "category": "B_explicit_dress_evening",
+   "input": "dress for an evening out",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-026",
+   "category": "B_explicit_dress_evening",
+   "input": "fostan sahra",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-027",
+   "category": "B_explicit_dress_evening",
+   "input": "عايزة فستان شيك للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "فساتين مناسبة (ستان/شيفون مطرز/قطيفة) من غير «سهرة» في الاسم؛ الفستان البيتي اللي اسمه «سهرة» مستبعد",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-028",
+   "category": "C_explicit_lingerie",
+   "input": "عندك لانجيري للسهره؟",
+   "context": [],
+   "expected": {
+    "product_type": "lingerie",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     502
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "الطلب الصريح للانجيري/قميص نوم/روب بيفضل شغال"
+  },
+  {
+   "id": "OCC-029",
+   "category": "C_explicit_lingerie",
+   "input": "لانجيري سهرة",
+   "context": [],
+   "expected": {
+    "product_type": "lingerie",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     502
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "الطلب الصريح للانجيري/قميص نوم/روب بيفضل شغال"
+  },
+  {
+   "id": "OCC-030",
+   "category": "C_explicit_lingerie",
+   "input": "عايزة لانجيري",
+   "context": [],
+   "expected": {
+    "product_type": "lingerie",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     502
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "الطلب الصريح للانجيري/قميص نوم/روب بيفضل شغال"
+  },
+  {
+   "id": "OCC-031",
+   "category": "C_explicit_lingerie",
+   "input": "قميص نوم للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "sleepwear",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     501
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "الطلب الصريح للانجيري/قميص نوم/روب بيفضل شغال"
+  },
+  {
+   "id": "OCC-032",
+   "category": "C_explicit_lingerie",
+   "input": "عايزة بيبي دول",
+   "context": [],
+   "expected": {
+    "product_type": "lingerie",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     502
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "الطلب الصريح للانجيري/قميص نوم/روب بيفضل شغال"
+  },
+  {
+   "id": "OCC-033",
+   "category": "C_explicit_lingerie",
+   "input": "عندكم روب سهرة؟",
+   "context": [],
+   "expected": {
+    "product_type": "sleepwear",
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     503
+    ],
+    "noAsk": [
+     "product_type"
+    ]
+   },
+   "acceptance": "الطلب الصريح للانجيري/قميص نوم/روب بيفضل شغال"
+  },
+  {
+   "id": "OCC-034",
+   "category": "D_style_only",
+   "input": "عايزة حاجة شيك",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "elegant"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-035",
+   "category": "D_style_only",
+   "input": "عايزة حاجة كاجوال",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "casual"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-036",
+   "category": "D_style_only",
+   "input": "عايزة حاجة بسيطة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "simple"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-037",
+   "category": "D_style_only",
+   "input": "عايزة حاجة ترند",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "trendy"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-038",
+   "category": "D_style_only",
+   "input": "عايزة حاجة محتشمة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "modest"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-039",
+   "category": "D_style_only",
+   "input": "عايزة حاجة هادية مش ملفتة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "understated"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-040",
+   "category": "D_style_only",
+   "input": "عايز حاجة شيك",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "elegant"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-041",
+   "category": "D_style_only",
+   "input": "عايزة حاجة شيك بالليل",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "elegant"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-042",
+   "category": "D_style_only",
+   "input": "3ayza 7aga sheek",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "elegant"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-043",
+   "category": "D_style_only",
+   "input": "عايزة حاجة فورمال",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "style": [
+     "formal"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "الستايل مش نوع منتج: نسأل عن النوع ونحفظ الستايل"
+  },
+  {
+   "id": "OCC-044",
+   "category": "E_style_type",
+   "input": "عايزة طقم كاجوال",
+   "context": [],
+   "expected": {
+    "product_type": "set",
+    "style": [
+     "casual"
+    ],
+    "action": "search",
+    "clarification": "none"
+   },
+   "checks": {
+    "shownAny": [
+     522
+    ],
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "أطقم بستايل كاجوال"
+  },
+  {
+   "id": "OCC-045",
+   "category": "E_style_type",
+   "input": "عايزة بلوزة شيك",
+   "context": [],
+   "expected": {
+    "product_type": "top",
+    "style": [
+     "elegant"
+    ],
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     541,
+     583
+    ],
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-046",
+   "category": "E_style_type",
+   "input": "عايزة فستان كاجوال",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "style": [
+     "casual"
+    ],
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     515,
+     516
+    ],
+    "shownNone": [
+     511,
+     512,
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "فستان كاجوال مش سواريه"
+  },
+  {
+   "id": "OCC-047",
+   "category": "E_style_type",
+   "input": "عايزة جيبة شيك للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "skirt",
+    "occasion": "evening",
+    "style": [
+     "elegant"
+    ],
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     552
+    ],
+    "shownNone": [
+     553,
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-048",
+   "category": "E_style_type",
+   "input": "جمبسوت للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "jumpsuit",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     531
+    ]
+   },
+   "acceptance": "جمبسوت كريب يطلع للسهرة من غير «سهرة» في اسمه",
+   "negative": [
+    2
+   ]
+  },
+  {
+   "id": "OCC-049",
+   "category": "E_style_type",
+   "input": "عايزة بنطلون فورمال",
+   "context": [],
+   "expected": {
+    "product_type": "bottoms",
+    "style": [
+     "formal"
+    ],
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     551
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-050",
+   "category": "E_style_type",
+   "input": "عايزة بلوزة محتشمة",
+   "context": [],
+   "expected": {
+    "product_type": "top",
+    "style": [
+     "modest"
+    ],
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     583
+    ],
+    "shownNone": [
+     543
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-051",
+   "category": "E_style_type",
+   "input": "عايزة بلوزة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "top",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     541
+    ],
+    "firstNot": [
+     542
+    ]
+   },
+   "acceptance": "بلوزة الستان قبل بلوزة القطن اليومي",
+   "negative": [
+    2
+   ]
+  },
+  {
+   "id": "OCC-052",
+   "category": "F_occ_style",
+   "input": "عايزة حاجة محتشمة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [
+     "modest"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "optionsExclude": [
+     "lingerie"
+    ],
+    "noAsk": [
+     "occasion"
+    ]
+   },
+   "acceptance": "سهرة + محتشم محفوظين، والاختيارات من غير لانجيري"
+  },
+  {
+   "id": "OCC-053",
+   "category": "F_occ_style",
+   "input": "عايزة حاجة كاجوال للخروجة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "casual_outing",
+    "style": [
+     "casual"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-054",
+   "category": "F_occ_style",
+   "input": "عايزة حاجة فورمال للشغل",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "work",
+    "style": [
+     "formal"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-055",
+   "category": "F_occ_style",
+   "input": "عايزة حاجة شيك للجامعة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "university",
+    "style": [
+     "elegant"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-056",
+   "category": "F_occ_style",
+   "input": "عايزة حاجة بسيطة للسفر",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "travel",
+    "style": [
+     "simple"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-057",
+   "category": "F_occ_style",
+   "input": "عايزة حاجة شيك ومحتشمة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [
+     "elegant",
+     "modest"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "optionsExclude": [
+     "lingerie"
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-058",
+   "category": "F_occ_style",
+   "input": "wana 3ayza haga sheek lel sahra",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [
+     "elegant"
+    ],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "«sahra» = سهرة (مش رمضان)"
+  },
+  {
+   "id": "OCC-059",
+   "category": "G_context",
+   "input": "خليه أسود",
+   "context": [
+    "عايزة فستان للسهرة"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "color": "black",
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "اللون بس اتغير",
+   "negative": [
+    5,
+    8
+   ]
+  },
+  {
+   "id": "OCC-060",
+   "category": "G_context",
+   "input": "لا، مش فستان، عايزة لانجيري",
+   "context": [
+    "عايزة فستان للسهرة",
+    "خليه أسود"
+   ],
+   "expected": {
+    "product_type": "lingerie",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     502
+    ],
+    "excluded": [
+     "dress"
+    ]
+   },
+   "acceptance": "النوع اتبدل والمناسبة فضلت"
+  },
+  {
+   "id": "OCC-061",
+   "category": "G_context",
+   "input": "طب نفس الستايل بس للسهرة",
+   "context": [
+    "عايزة فستان للسهرة",
+    "خليه أسود",
+    "لا، مش فستان، عايزة لانجيري"
+   ],
+   "expected": {
+    "product_type": "lingerie",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     502
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    8
+   ]
+  },
+  {
+   "id": "OCC-062",
+   "category": "G_context",
+   "input": "رجعني للفستان اللي كنا بنتكلم عليه",
+   "context": [
+    "عايزة فستان للسهرة",
+    "خليه أسود",
+    "لا، مش فستان، عايزة لانجيري",
+    "طب نفس الستايل بس للسهرة"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "color": "black",
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "نرجع للفستان الأسود اللي اتكلمنا عليه"
+  },
+  {
+   "id": "OCC-063",
+   "category": "G_context",
+   "input": "فستان",
+   "context": [
+    "رشحيلي حاجة حلوة للسهره"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAsk": [
+     "occasion",
+     "product_type"
+    ]
+   },
+   "acceptance": "إجابة حرة على سؤال النوع؛ مفيش سؤال عن المناسبة تاني",
+   "negative": [
+    7
+   ]
+  },
+  {
+   "id": "OCC-064",
+   "category": "G_context",
+   "input": "لانجيري",
+   "context": [
+    "رشحيلي حاجة حلوة للسهره"
+   ],
+   "expected": {
+    "product_type": "lingerie",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     502
+    ]
+   },
+   "acceptance": "لو اختارت لانجيري بنفسها: يتعرض"
+  },
+  {
+   "id": "OCC-065",
+   "category": "G_context",
+   "input": "",
+   "context": [
+    "رشحيلي حاجة حلوة للسهره"
+   ],
+   "answers": {
+    "product_type": "dress_any"
+   },
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     515,
+     517,
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "اختيار من الأزرار"
+  },
+  {
+   "id": "OCC-066",
+   "category": "G_context",
+   "input": "بلوزة",
+   "context": [
+    "عايزة حاجة محتشمة للسهرة"
+   ],
+   "expected": {
+    "product_type": "top",
+    "occasion": "evening",
+    "style": [
+     "modest"
+    ],
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     583
+    ],
+    "shownNone": [
+     543,
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "المناسبة والستايل اتحفظوا بعد ما قالت النوع",
+   "negative": [
+    7
+   ]
+  },
+  {
+   "id": "OCC-067",
+   "category": "G_context",
+   "input": "خليه أسود",
+   "context": [
+    "عايزة فستان للسهرة مقاس M"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "size": "M",
+    "color": "black"
+   },
+   "acceptance": "",
+   "negative": [
+    5,
+    6
+   ]
+  },
+  {
+   "id": "OCC-068",
+   "category": "G_context",
+   "input": "خليه أسود",
+   "context": [
+    "عايزة فستان للسهرة مقاس M",
+    "التوصيل بكام؟"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "size": "M",
+    "color": "black"
+   },
+   "acceptance": "سؤال جانبي ما ضيّعش المقاس ولا النوع",
+   "negative": [
+    6
+   ]
+  },
+  {
+   "id": "OCC-069",
+   "category": "G_context",
+   "input": "رشحيلي حاجة تانية للسهرة",
+   "context": [
+    "مش عايزة لانجيري، عايزة فستان"
+   ],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "optionsExclude": [
+     "lingerie"
+    ],
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "excluded": [
+     "lingerie"
+    ]
+   },
+   "acceptance": "النوع المرفوض مايرجعش في الاختيارات"
+  },
+  {
+   "id": "OCC-070",
+   "category": "G_context",
+   "input": "خليه نبيتي",
+   "context": [
+    "عايزة حاجة للسهرة",
+    "فستان"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "color": "burgundy",
+    "noAsk": [
+     "product_type",
+     "occasion"
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    7
+   ]
+  },
+  {
+   "id": "OCC-071",
+   "category": "G_context",
+   "input": "حاجة كاجوال شيك",
+   "context": [
+    "رشحيلي حاجة حلوة للسهره"
+   ],
+   "expected": {
+    "occasion": "evening",
+    "style": [
+     "casual",
+     "elegant"
+    ],
+    "action": "search"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "اختيار «حاجة كاجوال شيك» بيعرض لبس مش لانجيري"
+  },
+  {
+   "id": "OCC-072",
+   "category": "G_context",
+   "input": "خلي اللون أسود بدل الأبيض",
+   "context": [
+    "عايزة فستان أبيض للسهرة"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "color": "black"
+   },
+   "acceptance": "",
+   "negative": [
+    5
+   ]
+  },
+  {
+   "id": "OCC-073",
+   "category": "G_context",
+   "input": "طب وريني فستان",
+   "context": [
+    "عايزة لانجيري"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "action": "search"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "تغيير النوع بطلب صريح"
+  },
+  {
+   "id": "OCC-074",
+   "category": "G_context",
+   "input": "تمام",
+   "context": [
+    "عايزة فستان للسهرة"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "any"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "كلمة موافقة ما تغيرش النوع",
+   "negative": [
+    8
+   ]
+  },
+  {
+   "id": "OCC-075",
+   "category": "G_context",
+   "input": "مقاسي L",
+   "context": [
+    "عايزة فستان للسهرة"
+   ],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "any"
+   },
+   "checks": {
+    "size": "L"
+   },
+   "acceptance": "",
+   "negative": [
+    5
+   ]
+  },
+  {
+   "id": "OCC-076",
+   "category": "G_context",
+   "input": "مش عايزة لانجيري، عايزة فستان",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "action": "search"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "excluded": [
+     "lingerie"
+    ]
+   },
+   "acceptance": "دور على فساتين بس وسجّل إن اللانجيري مرفوض"
+  },
+  {
+   "id": "OCC-077",
+   "category": "G_context",
+   "input": "لا مش ده، عايزة طقم",
+   "context": [
+    "عايزة فستان للسهرة"
+   ],
+   "expected": {
+    "product_type": "set",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "تبديل النوع مع الحفاظ على السهرة"
+  },
+  {
+   "id": "OCC-078",
+   "category": "G_context",
+   "input": "وريني جيبة",
+   "context": [
+    "رشحيلي حاجة حلوة للسهره"
+   ],
+   "expected": {
+    "product_type": "skirt",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     552
+    ],
+    "shownNone": [
+     553
+    ]
+   },
+   "acceptance": "إجابة بنوع مش في الأزرار"
+  },
+  {
+   "id": "OCC-079",
+   "category": "G_context",
+   "input": "عباية",
+   "context": [
+    "عايزة حاجة محتشمة للسهرة"
+   ],
+   "expected": {
+    "product_type": "abaya",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     562
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-080",
+   "category": "H_no_invent",
+   "input": "عايزة فستان للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "noInventedMaterial": true
+   },
+   "acceptance": "أي خامة في الرد لازم تكون مكتوبة في المنتجات المعروضة",
+   "negative": [
+    4
+   ]
+  },
+  {
+   "id": "OCC-081",
+   "category": "H_no_invent",
+   "input": "عايزة فستان أسود للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "noInventedMaterial": true,
+    "uncertainIf": [
+     516
+    ]
+   },
+   "acceptance": "لو «فستان أسود» (من غير وصف) اتعرض: نقول إننا مش متأكدين إنه مناسب للسهرة",
+   "negative": [
+    4
+   ]
+  },
+  {
+   "id": "OCC-082",
+   "category": "H_no_invent",
+   "input": "جمبسوت للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "jumpsuit",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "noInventedMaterial": true
+   },
+   "acceptance": "",
+   "negative": [
+    4
+   ]
+  },
+  {
+   "id": "OCC-083",
+   "category": "H_no_invent",
+   "input": "عايزة بلوزة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "top",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "noInventedMaterial": true
+   },
+   "acceptance": "",
+   "negative": [
+    4
+   ]
+  },
+  {
+   "id": "OCC-084",
+   "category": "I_control",
+   "input": "عايز بدلة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "suit",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     571
+    ],
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-085",
+   "category": "I_control",
+   "input": "عايزة كعب للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "shoes",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     581
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-086",
+   "category": "I_control",
+   "input": "عايزة شنطة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "bag",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     582
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-087",
+   "category": "I_control",
+   "input": "عايزة بيجامة",
+   "context": [],
+   "expected": {
+    "product_type": "sleepwear",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     561
+    ]
+   },
+   "acceptance": "لبس البيت بطلب صريح بيفضل شغال"
+  },
+  {
+   "id": "OCC-088",
+   "category": "I_control",
+   "input": "عايزة روب",
+   "context": [],
+   "expected": {
+    "product_type": "sleepwear",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     503
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-089",
+   "category": "I_control",
+   "input": "عايز قميص رجالي أبيض",
+   "context": [],
+   "expected": {
+    "product_type": "top",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     572
+    ],
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "«قميص» مش «قميص نوم»"
+  },
+  {
+   "id": "OCC-090",
+   "category": "I_control",
+   "input": "عايزة فستان",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "action": "search"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-091",
+   "category": "I_control",
+   "input": "عايزة حاجة حلوة للفرح",
+   "context": [],
+   "expected": {
+    "action": "any",
+    "occasion": "wedding"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAskId": "product_type"
+   },
+   "acceptance": "الفرح بيفضل على سلوكه القديم (لوك/أسئلة اللوك) ومن غير لانجيري"
+  },
+  {
+   "id": "OCC-092",
+   "category": "I_control",
+   "input": "عايز طقم للخطوبة",
+   "context": [],
+   "expected": {
+    "action": "any",
+    "occasion": "engagement"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ],
+    "noAskId": "product_type"
+   },
+   "acceptance": "«طقم للخطوبة» = لوك، مش سؤال نوع"
+  },
+  {
+   "id": "OCC-093",
+   "category": "I_control",
+   "input": "سهرة مع صحابي",
+   "context": [],
+   "expected": {
+    "occasion": "casual_outing",
+    "action": "any"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "العبارة الأطول بتكسب: خروجة مع الصحاب"
+  },
+  {
+   "id": "OCC-094",
+   "category": "I_control",
+   "input": "عايزة فستان للبيت",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "home",
+    "action": "search"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503
+    ]
+   },
+   "acceptance": "فستان البيت مسموح لما المناسبة بيت"
+  },
+  {
+   "id": "OCC-095",
+   "category": "I_control",
+   "input": "عايزة فستان أسود",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "action": "search"
+   },
+   "checks": {
+    "color": "black"
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-096",
+   "category": "I_control",
+   "input": "عايزة جزمة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "shoes",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     581
+    ],
+    "shownNone": [
+     574
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-097",
+   "category": "I_control",
+   "input": "عايزة توب",
+   "context": [],
+   "expected": {
+    "product_type": "top",
+    "action": "search"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-098",
+   "category": "I_control",
+   "input": "لانجيري احمر",
+   "context": [],
+   "expected": {
+    "product_type": "lingerie",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     502
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-099",
+   "category": "I_control",
+   "input": "عايزة فستان قطن",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     515
+    ]
+   },
+   "acceptance": "الخامة الصريحة بتتحترم"
+  },
+  {
+   "id": "OCC-100",
+   "category": "J_no_keyword",
+   "input": "وريني فستان يليق على سهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     511
+    ],
+    "shownNone": [
+     514
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-101",
+   "category": "J_no_keyword",
+   "input": "عايزة دريس للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     513,
+     511,
+     512
+    ],
+    "shownNone": [
+     514,
+     515
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    2
+   ]
+  },
+  {
+   "id": "OCC-102",
+   "category": "J_no_keyword",
+   "input": "عايزة فستان طويل للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     511
+    ],
+    "shownNone": [
+     514
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-103",
+   "category": "J_no_keyword",
+   "input": "فستان سهرة كحلي",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     512
+    ],
+    "color": "navy"
+   },
+   "acceptance": "",
+   "negative": [
+    2
+   ]
+  },
+  {
+   "id": "OCC-104",
+   "category": "J_no_keyword",
+   "input": "فستان سهرة أخضر",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     513
+    ],
+    "color": "green"
+   },
+   "acceptance": "",
+   "negative": [
+    2
+   ]
+  },
+  {
+   "id": "OCC-105",
+   "category": "K_styling",
+   "input": "عايزة حاجة تحت البليزر",
+   "context": [],
+   "expected": {
+    "product_type": "top",
+    "action": "search"
+   },
+   "checks": {
+    "shownNone": [
+     521,
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "قطعة تتلبس تحت البليزر (بلوزة/توب)، مش بليزر"
+  },
+  {
+   "id": "OCC-106",
+   "category": "K_styling",
+   "input": "هات معاه حاجة تانية",
+   "context": [
+    "عايزة فستان أسود"
+   ],
+   "expected": {
+    "action": "search"
+   },
+   "checks": {
+    "shownNone": [
+     511,
+     512,
+     513,
+     514,
+     515,
+     516,
+     501,
+     502,
+     503,
+     561
+    ],
+    "notFamily": "dress"
+   },
+   "acceptance": "قطعة مكمّلة للفستان (جزمة/شنطة)، مش فستان تاني"
+  },
+  {
+   "id": "OCC-107",
+   "category": "K_styling",
+   "input": "وهات معاه شنطة",
+   "context": [
+    "عايزة فستان للسهرة"
+   ],
+   "expected": {
+    "product_type": "bag",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     582
+    ]
+   },
+   "acceptance": ""
+  },
+  {
+   "id": "OCC-108",
+   "category": "L_dialect",
+   "input": "ممكن ترشحيلي حاجة للسهره؟",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-109",
+   "category": "L_dialect",
+   "input": "عاوزة حاجة حلوة اسهر بيها",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-110",
+   "category": "L_dialect",
+   "input": "محتاجه حاجة شيك للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-111",
+   "category": "L_dialect",
+   "input": "عايزه حاجة للسهرة بكره",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-112",
+   "category": "L_dialect",
+   "input": "رشحي لي حاجة حلوة للسهرة",
+   "context": [],
+   "expected": {
+    "product_type": null,
+    "occasion": "evening",
+    "style": [],
+    "action": "ask_product_type",
+    "clarification": "ask product type"
+   },
+   "checks": {
+    "shownNone": [
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    1
+   ]
+  },
+  {
+   "id": "OCC-113",
+   "category": "L_dialect",
+   "input": "عاوزه فستان سهره",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-114",
+   "category": "L_dialect",
+   "input": "عايزه فستان للسهره بليز",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    2,
+    3
+   ]
+  },
+  {
+   "id": "OCC-115",
+   "category": "L_dialect",
+   "input": "فساتين سهره",
+   "context": [],
+   "expected": {
+    "product_type": "dress",
+    "occasion": "evening",
+    "action": "search"
+   },
+   "checks": {
+    "shownAny": [
+     511,
+     512,
+     513
+    ],
+    "shownNone": [
+     514,
+     501,
+     502,
+     503,
+     561
+    ]
+   },
+   "acceptance": "",
+   "negative": [
+    2,
+    3
+   ]
+  }
+ ]
+}

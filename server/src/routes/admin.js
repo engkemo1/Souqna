@@ -31,6 +31,8 @@ import insightsRoutes from './admin-insights.js';
 import featuredRoutes from './admin-featured.js';
 import adminProductsRoutes, { countProductsWithIssues } from './admin-products.js';
 import { verifyTotp } from '../lib/totp.js';
+import { getObservabilityMetrics, formatPrometheusMetrics } from '../lib/logger.js';
+import { listJobStatuses } from '../lib/job-runner.js';
 import { snapshotDb, runBackup, lastBackup, runOffsiteBackup, lastOffsite } from '../lib/backup.js';
 import { offsiteEnabled, r2Enabled } from '../lib/r2.js';
 import fs from 'node:fs';
@@ -773,11 +775,13 @@ const demoPasswordsUnchanged = () => {
 };
 
 r.get('/status', h((_req, res) => {
-  const insecureJwt = Boolean(config.jwtSecretInsecure || config.jwtSecret.startsWith('dev-only') || config.jwtSecret.length < 24);
+  const insecureJwt = Boolean(config.jwtSecretInsecure || config.jwtSecret.startsWith('dev-only') || config.jwtSecret.length < 32);
   res.json({
     backup: lastBackup(), backupDir: !!config.backupDir, offsite: { enabled: offsiteEnabled, last: lastOffsite() }, mediaR2Enabled: r2Enabled,
     whatsappConfigured: isWhatsAppConfigured(), template: config.wa.template, registrationOpen: config.allowRegister,
     env: config.env, node: process.version, uptimeSec: Math.round(process.uptime()),
+    observability: getObservabilityMetrics(),
+    jobs: listJobStatuses(),
     checks: [
       { id: 'jwt', ok: !insecureJwt, label: 'JWT_SECRET قوي ومتغيّر', fix: 'اضبط JWT_SECRET بقيمة عشوائية طويلة (32+ حرف).' },
       { id: 'admin', ok: config.adminKey.length >= 16, label: 'ADMIN_KEY قوي (16+ حرف)', fix: 'اضبط ADMIN_KEY بقيمة طويلة.' },
@@ -790,6 +794,19 @@ r.get('/status', h((_req, res) => {
       { id: 'prod', ok: config.env === 'production', label: 'NODE_ENV=production', fix: 'اضبط NODE_ENV=production.' },
       { id: 'wa', ok: isWhatsAppConfigured(), label: 'واتساب API متوصل (اختياري)', optional: true, fix: 'اضبط WA_TOKEN و WA_PHONE_ID.' },
     ],
+  });
+}));
+
+r.get('/metrics', h((req, res) => {
+  let dbBytes = null;
+  try { dbBytes = fs.statSync(config.dbFile).size; } catch { dbBytes = null; }
+  if (req.query.format === 'prometheus' || (req.headers.accept || '').includes('text/plain')) {
+    return res.type('text/plain; version=0.0.4').send(formatPrometheusMetrics({ dbBytes }));
+  }
+  res.json({
+    ...getObservabilityMetrics(),
+    dbBytes,
+    jobs: listJobStatuses(),
   });
 }));
 

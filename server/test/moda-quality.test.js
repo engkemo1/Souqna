@@ -42,11 +42,10 @@ test('"أقل سعر تيشرت" is a product request (cheapest first), not a "c
 });
 
 test('a single piece does not trigger an "occasion" question and the reply never says "for the occasion"', async () => {
-  // مفيش سؤال «لمين؟» لقطعة للجنسين: النتايج بتظهر على طول (رجالي/حريمي) من غير أي سؤال إجباري.
+  // تحديث موثّق: لو الكوتشي الأبيض متاح رجالي وحريمي بنتايج مختلفة، السؤال الوحيد المسموح «لمين؟» (مش مناسبة)، عشان ماتتعرضش قطعة لجمهور غلط.
   const first = await runModa('رشحلي كوتشي ابيض', opts);
-  assert.notEqual(first.state, 'clarify');
-  assert.ok(first.blocks?.tabs?.length, 'results appear immediately');
-  assert.ok(!(first.questions || []).some((q) => q.id === 'who_is_it_for'));
+  assert.ok(!(first.questions || []).some((q) => q.id === 'what_occasion'));
+  assert.ok(first.state === 'clarify' ? (first.questions || []).every((q) => q.id === 'who_is_it_for') : first.blocks?.tabs?.length);
   assert.doesNotMatch(first.say, /لـالمناسبة|طقم/);
   const res = await runModa('رشحلي كوتشي ابيض', { ...opts, answers: { who_is_it_for: 'men' } });
   assert.doesNotMatch(res.say, /لـالمناسبة|طقم/);
@@ -138,7 +137,9 @@ test('طلب قطعة (شوز/شنطة/كوتشي) بيعرض نتايج على 
   assert.ok(shoes.blocks?.tabs?.[0]?.items?.length, 'shoes request shows items');
   assert.ok(!(shoes.questions || []).some((q) => ['what_occasion', 'who_is_it_for'].includes(q.id)));
   for (const msg of ['شنطة', 'جزمه', 'رشحلي كوتشي ابيض']) {
-    const r = await runModa(msg, opts);
+    let r = await runModa(msg, opts);
+    // تحديث موثّق: «لمين؟» هو السؤال الوحيد المسموح قبل العرض، وبعد الجواب النتايج بتظهر على طول.
+    if (r.state === 'clarify') { assert.ok((r.questions || []).every((q) => q.id === 'who_is_it_for'), msg); r = await runModa(msg, { ...opts, answers: { who_is_it_for: 'men' } }); }
     assert.notEqual(r.state, 'clarify', msg);
     for (const tab of r.blocks?.tabs || []) assert.ok(tab.items.length || tab.missing.length, `${msg}: empty tab ${tab.label}`);
     // اللون سؤال اختياري تحت النتايج، مش شرط قبلها
@@ -154,7 +155,9 @@ test('لوك مناسبة (خطوبة/فرح) لسه بيخلّص أسئلته �
 
 test('طلب بحروف لاتينية (shoes / hoodie aswad) بيرد بنص عربي سليم ومعاه النتايج، مش رسالة «مقدرتش أجهز»', async () => {
   for (const msg of ['shoes', 'hoodie aswad', 'i need a black hoodie', 'white shirt under 500']) {
-    const r = await runModa(msg, opts);
+    let r = await runModa(msg, opts);
+    // تحديث موثّق: الرد بلغة العميل (إنجليزي لو كتب إنجليزي)، ولو الجمهور مش محدد بيسأل «لمين؟» الأول.
+    if (r.state === 'clarify') { assert.ok((r.questions || []).every((q) => q.id === 'who_is_it_for'), msg); r = await runModa(msg, { ...opts, answers: { who_is_it_for: 'men' } }); }
     assert.ok(r.blocks?.tabs?.some((t) => t.items.length), msg);
     assert.doesNotMatch(r.say, /مقدرتش أجهز/, msg);
     assert.equal(r.guard, undefined, msg);

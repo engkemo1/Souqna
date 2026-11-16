@@ -4,92 +4,14 @@
  */
 import { norm, tokenize, tokenVariants, skeleton, isLatinToken, extractNumbers, detectLanguage } from './text.js';
 import { loadKnowledge } from './knowledge.js';
+import { parseStyles, contextFromStyleOnly } from './intent.js';
 
 /* كلمات بتشبه قطعة لكنها في الحقيقة إشارة مناسبة/وقت: ماتتحسبش كقطعة مطلوبة */
-const BARE_NOT_GARMENT = new Set(['سهره', 'سهرة', 'سهرات', 'party', 'حفله', 'حفلات', 'مناسبات', 'كوكتيل', 'cocktail', 'مناسبه', 'sahra', 'sahrh', 'sahret', 'evening']);
+const BARE_NOT_GARMENT = new Set(['سهره', 'party', 'حفله', 'حفلات', 'مناسبات', 'كوكتيل', 'cocktail', 'مناسبه']);
 
 const CONTEXT_PRIORITY = ['condolence', 'engagement_self', 'wedding_self', 'katb_kitab', 'engagement_guest', 'wedding_guest', 'graduation',
-  'evening', 'eid', 'ramadan_iftar', 'sahel_beach', 'travel', 'date_night', 'birthday_party', 'work_formal', 'work_casual', 'university',
+  'eid', 'ramadan_iftar', 'sahel_beach', 'travel', 'date_night', 'birthday_party', 'evening_out', 'work_formal', 'work_casual', 'university',
   'family_gathering', 'sport', 'casual_outing', 'home'];
-
-export function canonicalProductType(key) {
-  if (!key) return null;
-  if (key.startsWith('dress_')) return 'dress';
-  if (['two_piece_set', 'classic_set', 'hijab_set', 'tracksuit', 'womens_suit'].includes(key)) return 'set';
-  if (['trousers', 'jeans', 'chinos', 'joggers', 'leggings'].includes(key)) return 'pants';
-  if (['sleepwear', 'robe'].includes(key)) return 'homewear';
-  if (['sneakers', 'formal_shoes', 'loafers', 'heels_low', 'heels_high', 'flats', 'sandals', 'boots', 'slippers', 'sport_shoes', 'shoes_any'].includes(key)) return 'shoes';
-  if (['handbag', 'clutch', 'crossbody', 'backpack', 'tote'].includes(key)) return 'bag';
-  return key;
-}
-
-export function canonicalOccasion(parsed) {
-  if (!parsed) return null;
-  if (parsed.flags?.dailyOccasion && (!parsed.context || parsed.context === 'casual_outing')) return 'daily';
-  const ctx = parsed.contextEffective || parsed.context;
-  if (!ctx) return null;
-  if (ctx === 'evening') return 'evening';
-  if (ctx.startsWith('wedding_')) return 'wedding';
-  if (ctx.startsWith('engagement_') || ctx === 'katb_kitab') return 'engagement';
-  if (ctx.startsWith('work_')) return 'work';
-  if (ctx === 'casual_outing') {
-    if (parsed.flags?.dailyOccasion) return 'daily';
-    if (parsed.flags?.styleOnlyCasualContext) return null;
-    return 'casual_outing';
-  }
-  if (ctx === 'sahel_beach') return 'beach';
-  if (ctx === 'birthday_party') return 'party';
-  if (ctx === 'ramadan_iftar') return 'ramadan';
-  return ctx;
-}
-
-export function extractStyles(n, taste = [], flags = {}) {
-  const s = ` ${String(n || '')} `;
-  const out = [];
-  const push = (k) => { if (k && !out.includes(k)) out.push(k); };
-  const isUnderstated = /(^| )(مش اوفر|مش أوفر|من غير افوره|من غير بهرجه|مش مبهرج|مش مبهرجه|هادي مش اوفر|بسيط مش اوفر|understated|not over|msh over|mesh over)( |$)/.test(s);
-  const isModest = Boolean(flags?.modest || flags?.hijab) || /(^| )(محتشم|محتشمه|محتشمة|واسع|واسعه|واسعة|فضفاض|فضفاضه|فضفاضة|مستور|مستوره|مستورة|محجبات|للمحجبات|حجاب|محجبه|محجبة|modest|mo7tasham|mohtasham)( |$)/.test(s);
-  const isFormal = /(^| )(فورمال|رسمي|رسميه|رسمية|كلاسيك|formal|official|classic|foraml|formel)( |$)/.test(s);
-  const isCasual = /(^| )(كاجوال|كاجول|كازوال|سبور|عملي|عمليه|مريح|مريحه|casual|sporty|kajoal|kajwal|cajual|kazwal)( |$)/.test(s);
-  const isTrendy = /(^| )(تريندي|ترندي|ترند|موضه|موضة|عصري|عصريه|عصرية|مودرن|علي الموضه|ع الموضه|ستايلش|روشه|روشة|trendy|modern|fashionable|stylish)( |$)/.test(s);
-  const isSimple = /(^| )(بسيط|بسيطه|بسيطة|سمبل|هادي|هاديه|هادية|ناعم|ناعمه|ناعمة|رقيق|رقيقه|رقيقة|ساده|سادة|simple|minimal|soft|simpel)( |$)/.test(s);
-  const isElegant = /(^| )(شيك|انيق|أنيق|انيقه|أنيقة|فخم|فخمه|فخمة|راقي|راقيه|راقية|سواريه|سوارية|شياكه|شياكة|كلاسي|chic|elegant|classy|shik|sheek|chik|soiree)( |$)/.test(s);
-
-  if (isModest) push('modest');
-  if (isUnderstated) push('understated');
-  if (isFormal) push('formal');
-  if (isCasual) push('casual');
-  if (isTrendy) push('trendy');
-  if (isSimple) push('simple');
-  if (isElegant) push('elegant');
-
-  for (const t of (taste || [])) {
-    if (t === 'modest') push('modest');
-    else if (t === 'casual' || t === 'relaxed') push('casual');
-    else if (t === 'elegant') push('elegant');
-    else if (t === 'classic') push(isFormal ? 'formal' : 'classic');
-    else if (t === 'simple' || t === 'minimal') push(isUnderstated ? 'understated' : 'simple');
-    else if (t === 'modern' || t === 'trendy') push('trendy');
-    else if (t === 'bold') push(isTrendy ? 'trendy' : 'bold');
-  }
-  return out;
-}
-
-export function syncIntentConcepts(parsed) {
-  if (!parsed || typeof parsed !== 'object') return parsed;
-  const gKeys = (parsed.garments || []).map((g) => g?.key).filter(Boolean);
-  const pTypes = [...new Set(gKeys.map(canonicalProductType).filter(Boolean))];
-  parsed.productTypes = pTypes;
-  parsed.productType = pTypes[0] || null;
-  parsed.occasion = canonicalOccasion(parsed);
-  const extracted = extractStyles(parsed.normalized || '', parsed.taste || [], parsed.flags || {});
-  const mergedStyles = [...new Set([...extracted, ...(parsed.styles || [])])];
-  parsed.styles = mergedStyles;
-  parsed.style = parsed.style && mergedStyles.includes(parsed.style) ? parsed.style : (mergedStyles[0] || parsed.style || null);
-  const rejG = parsed.flags?.rejectedGarments || [];
-  parsed.rejectedProductTypes = [...new Set([...(parsed.rejectedProductTypes || []), ...rejG.map(canonicalProductType).filter(Boolean)])];
-  return parsed;
-}
 
 const GENDER_BY_KEY = {
   suit: 'men', tuxedo: 'men', tie: 'men', bow_tie: 'men', pocket_square: 'men', waistcoat: 'men', classic_set: 'men',
@@ -97,6 +19,8 @@ const GENDER_BY_KEY = {
   jumpsuit: 'women', skirt: 'women', blouse: 'women', abaya: 'women', heels_low: 'women', heels_high: 'women', clutch: 'women', shawl: 'women',
   two_piece_set: 'women', womens_suit: 'women', hijab_set: 'women_hijab', tarha: 'women_hijab', long_cardigan: 'women', flats: 'women', tunic: 'women',
 };
+
+const PLAIN_ENGLISH = new Set(['long', 'longer', 'line', 'lane', 'lung', 'king', 'ring', 'wing', 'thin', 'then', 'than', 'name', 'main', 'mine', 'moon', 'hem', 'ham', 'him']);
 
 /** مطابقة العبارات على التوكنز: الأطول أولًا، مع تجريد بادئات الجر وتهجئة الفرانكو المتغيرة. */
 export function matchTokens(tokens, K = loadKnowledge()) {
@@ -112,7 +36,7 @@ export function matchTokens(tokens, K = loadKnowledge()) {
         const phrase = [v, ...rest].join(' ');
         if (exact.has(phrase)) { hit = exact.get(phrase); break; }
       }
-      if (!hit && tokens.slice(i, i + len).every(isLatinToken)) {
+      if (!hit && tokens.slice(i, i + len).every(isLatinToken) && !tokens.slice(i, i + len).some((t) => PLAIN_ENGLISH.has(t))) { // كلمات إنجليزي عادية (long≠lounge) متتطابقش بالهيكل الصوتي
         const sk = tokens.slice(i, i + len).map(skeleton).join(' ');
         if (sk.replace(/ /g, '').length >= 3 && tokens.slice(i, i + len).join('').length >= 4 && skel.has(sk)) hit = skel.get(sk);
       }
@@ -151,8 +75,6 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     persons: [], kidsUnspecified: false, context: null, contextEffective: null, role: 'guest',
     garments: [], colors: [], avoidColors: [], budget: null, daypart: null, dateOffsetDays: null, season: null,
     taste: [], fullLook: false, advice: null, followup: null, flags: {}, ownedPieces: [], genderHint: null,
-    productType: null, productTypes: [], occasion: null, style: null, styles: [],
-    rejectedProductTypes: [], stylingRelationship: null,
   };
 
   /* ---------- نوايا بسيطة ---------- */
@@ -229,13 +151,11 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   result.avoidContexts = ctxEntries.filter(ctxNeg).map((e) => e.key);
   const ctxKeys = new Set(ctxEntries.filter((e) => !ctxNeg(e)).map((e) => e.key));
   for (const c of CONTEXT_PRIORITY) if (ctxKeys.has(c)) { result.context = c; break; }
-  if (!result.context && /(^| )(سهره|للسهره|لسهره|بالسهره|في السهره|سهرات|السهرات|sahra|sahrh|sahret|lelsahra|evening|soiree)( |$)/.test(n)) result.context = 'evening';
-  if (/(^| )(يومي|يوميه|يومية|كل يوم|لليوم|استخدام يومي|للاستخدام اليومي|daily|everyday)( |$)/.test(n)) {
-    result.flags.dailyOccasion = true;
-    if (!result.context) result.context = 'casual_outing';
-  }
   if (/كتابي|ketabi|ketbi/.test(n)) { result.role = 'self'; if (!result.context) result.context = 'katb_kitab'; }
   if (result.context?.endsWith('_self')) result.role = 'self';
+  /* الستايل منفصل عن المناسبة ونوع المنتج: «كاجوال شيك» = casual + elegant. «كاجوال» لوحدها = ستايل، مش مناسبة (المفتاح الداخلي بيفضل للرسمية بس) */
+  result.style = parseStyles(n);
+  if (contextFromStyleOnly(n, result.context)) result.flags = { ...(result.flags || {}), ctxFromStyle: true };
   if (result.role === 'self') {
     const map = { engagement_guest: 'engagement_self', katb_kitab: 'engagement_self', wedding_guest: 'wedding_self', engagement_self: 'engagement_self', wedding_self: 'wedding_self' };
     result.contextEffective = map[result.context] || result.context;
@@ -251,11 +171,6 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     if (!g.length) continue;
     const bareText = m.len === 1 ? String(m.text).replace(/^(?:وال|بال|لل|ال|و|ل|ب)(?=.{3,})/, '') : m.text; // «لسهره/والسهره» = «سهره»
     const onlyBare = m.len === 1 && (BARE_NOT_GARMENT.has(m.text) || BARE_NOT_GARMENT.has(bareText));
-    // «حاجه سواريه / لبس سواريه»: سواريه هنا وصف مناسبة/ستايل مش فستان تلقائيًا
-    if (m.len === 1 && /^(سواريه|سوارية|swaree|soiree|swarih|sawareeh)$/.test(m.text) && /^(حاجه|حاجة|لبس|هدوم|ملابس|ستيل|ستايل|استايل|حاجات|طله|اطلاله|لوك|7aga|haga|lebs)$/.test(tokens[m.start - 1] || '')) {
-      if (!result.context) { result.context = 'evening'; result.contextEffective = 'evening'; }
-      continue;
-    }
     // «خليه كحلي بدل أسود»: «بدل» هنا = عوضًا عن، مش بدلة. بنعرفها لما تيجي بعد لون
     if (m.len === 1 && m.text === 'بدل' && matches.some((x) => x.end === m.start && x.entries.some((e) => e.group === 'color'))) continue;
     const hasCtx = m.entries.some((e) => e.group === 'context' || e.group === 'time');
@@ -308,60 +223,11 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     const host = result.garments.find((h) => h !== g && h.key !== 'jeans' && h.position === g.position - 1);
     if (host) { if (!host.material) host.material = 'denim'; result.garments.splice(i, 1); }
   }
-  // «سيبك من الفستان، وريني جاكيت» / «مش عايزة لانجيري، عايزة فستان» / «لا مش فستان»: القطعة المرفوضة تتسجل وتتفلتر
-  { const NEG_G = /^(سيبك|بلاش|انسي|انسى|شيل|مش|مو|لا|ما)$/;
-    const negated = (g) => {
-      const a = tokens[g.position - 1] || ''; const b = tokens[g.position - 2] || ''; const c = tokens[g.position - 3] || '';
-      return NEG_G.test(a)
-        || (a === 'من' && /^(سيبك|سيبيك|بلاش|شيل|انسي|انسى)$/.test(b))
-        || (/^(عايز|عايزه|عاوز|عاوزه|محتاج|محتاجه|احب|بحب|بفضل)$/.test(a) && /^(مش|ما|مب)$/.test(b))
-        || (/^(من|في)$/.test(a) && /^(مش|غير)$/.test(b))
-        || (a === 'غير' && b === 'من')
-        || (b === 'مش' && /^(لا|طب)$/.test(c));
-    };
-    const rej = result.garments.filter(negated).map((g) => g.key);
-    if (rej.length) {
-      result.flags.rejectedGarments = [...new Set([...(result.flags.rejectedGarments || []), ...rej])];
-      result.garments = result.garments.filter((g) => !negated(g));
-    }
-  }
-  if (!result.context && result.garments.some((g) => g.key === 'dress_evening' && /(سهر|سواري|soiree|sahra|evening|gown)/i.test(g.text || ''))) {
-    result.context = 'evening';
-    result.contextEffective = 'evening';
-  }
-  if (result.context === 'evening') {
-    for (const g of result.garments) {
-      if (g.key === 'dress_any') { g.key = 'dress_evening'; g.alts = ['dress_party']; }
-    }
-  }
-  // علاقات التنسيق: «عايزة حاجة تحت البليزر» / «ألبس إيه تحت الجاكيت» / «عايزة حاجة فوق الفستان»
-  {
-    const OUTER_ANCHORS = new Set(['blazer', 'jacket', 'cardigan', 'long_cardigan', 'coat', 'suit', 'womens_suit', 'abaya', 'open_abaya', 'hoodie', 'sweater', 'waistcoat']);
-    const INNER_ANCHORS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'jumpsuit', 'top', 'blouse', 'shirt', 'tshirt']);
-    for (let i = result.garments.length - 1; i >= 0; i -= 1) {
-      const g = result.garments[i];
-      const prev1 = tokens[g.position - 1] || '';
-      const prev2 = tokens[g.position - 2] || '';
-      const isUnderPrep = /^(تحت|تحتيه|تحتيها|تحته|تحتها|under|beneath)$/.test(prev1) || (/^(ال|و)?(تحت)$/.test(prev2) && prev1 === 'ال');
-      const isOverPrep = /^(فوق|فوقيه|فوقيها|فوقه|فوقها|over|above)$/.test(prev1);
-      if (isUnderPrep && OUTER_ANCHORS.has(g.key) && result.garments.length === 1) {
-        result.ownedPieces.push({ key: g.key, color: g.color || null, material: g.material || null, text: g.text, relation: 'under' });
-        result.garments.splice(i, 1);
-        const isMale = speaker === 'male' || (personSet.has('men') && !personSet.has('women'));
-        const innerKey = isMale ? 'shirt' : 'blouse';
-        const innerAlts = isMale ? ['tshirt', 'polo', 'top'] : ['top', 'shirt', 'tshirt'];
-        result.garments.push({ key: innerKey, alts: innerAlts, color: null, material: null, text: `تحت ${g.text}`, position: g.position, fromRelation: 'under' });
-        result.stylingRelationship = { type: 'under', anchor: g.key, targetKeys: [innerKey, ...innerAlts] };
-      } else if (isOverPrep && INNER_ANCHORS.has(g.key) && result.garments.length === 1) {
-        result.ownedPieces.push({ key: g.key, color: g.color || null, material: g.material || null, text: g.text, relation: 'over' });
-        result.garments.splice(i, 1);
-        const outerKey = 'blazer';
-        const outerAlts = ['cardigan', 'long_cardigan', 'jacket', 'shawl'];
-        result.garments.push({ key: outerKey, alts: outerAlts, color: null, material: null, text: `فوق ${g.text}`, position: g.position, fromRelation: 'over' });
-        result.stylingRelationship = { type: 'over', anchor: g.key, targetKeys: [outerKey, ...outerAlts] };
-      }
-    }
-  }
+  // «سيبك من الفستان، وريني جاكيت» / «بلاش جينز، خليه قماش»: القطعة المرفوضة مش مطلوبة (لو فيه قطعة تانية مطلوبة)
+  { const NEG_G = /^(سيبك|بلاش|انسي|انسى|شيل|مش|مو)$/;
+    const negated = (g) => { const a = tokens[g.position - 1] || ''; const b = tokens[g.position - 2] || ''; return NEG_G.test(a) || (a === 'من' && /^(سيبك|سيبيك|بلاش)$/.test(b)) || (/^(عايز|عايزه|عاوز|عاوزه)$/.test(a) && b === 'مش'); };
+    const keep = result.garments.filter((g) => !negated(g));
+    if (keep.length && keep.length < result.garments.length) { result.flags.rejectedGarments = result.garments.filter(negated).map((g) => g.key); result.garments = keep; } }
   // «هودي أوفر سايز»: أوفر سايز وصف للقطعة، مش سويتر تاني
   if (result.garments.length > 1) { const os = result.garments.filter((g) => /^(اوفر سايز|اوفرسايز)$/.test(norm(g.text))); if (os.length && os.length < result.garments.length) { const rest = result.garments.filter((g) => !os.includes(g)); for (const o of os) { const host = rest.reduce((a, g) => (Math.abs(g.position - o.position) < Math.abs((a?.position ?? 1e9) - o.position) ? g : a), null); if (host) { if (!host.color && o.color) host.color = o.color; if (!host.material && o.material) host.material = o.material; } } result.garments = rest; } }
   // «شنطة كلاتش / شنطة كروس / شنطة ضهر»: نوع الشنطة المحدد يكفي، مش شنطة + نوع
@@ -380,7 +246,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   // ألوان عامة مش ملتصقة بقطعة
   for (const c of colorEntries) {
     if (c.used) continue;
-    const insteadOf = c.start >= 1 && (/^(بدل|بدال)$/.test(tokens[c.start - 1] || '') || (c.start >= 2 && /^(بدل|بدال)$/.test(tokens[c.start - 2] || '') && /^(اللون|لون|ال)$/.test(tokens[c.start - 1] || ''))) && colorEntries.length > 1; // «خلي اللون أسود بدل الأبيض» أو «بيج بدل الأسود»
+    const insteadOf = c.start > 1 && /^(بدل|بدال)$/.test(tokens[c.start - 1] || '') && colorEntries.some((x) => x !== c && x.end === c.start - 1); // «بيج بدل الأسود» (لون بدل لون): الأسود مرفوض — لكن «بدل رمادي» = بدل لونها رمادي
     if (isNegated(c) || insteadOf) result.avoidColors.push(c.key); else result.colors.push(c.key);
   }
   // لو قطعة واحدة وفي لون عام قريب منها (مثلاً "ابيض" بعد القطعة بمسافة)
@@ -397,7 +263,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   }
   // «ليها / لها» لوحدها (من غير شخص تاني متحدد) = ست، مش المتكلم. «ليه/له» سايبينها لأنها بتتقرا «ليه؟» (why).
   if (personSet.size === 0 && !result.kidsUnspecified && /(^| )(ليها|لها)( |$)/.test(` ${n} `) && !/[؟?]/.test(String(raw))) personSet.add('women');
-  if (personSet.size === 0 && speaker && !result.kidsUnspecified) personSet.add(speaker === 'female' ? 'women' : 'men');
+  if (personSet.size === 0 && speaker && !result.kidsUnspecified) { personSet.add(speaker === 'female' ? 'women' : 'men'); result.flags.personFromSpeaker = true; }
   // محجبة
   /* ---------- رفقة: «انا واختي / انا وصحبي / انا وعيلتي / لاخويا» ---------- */
   {
@@ -453,7 +319,7 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     if (smallG) { personSet.delete('women'); personSet.add('girls'); }
     if (/(^| )(لولادي|لاولادي|لعيالي|لاطفالي|لعيلي|لولادى)( |$)/.test(nn2)) { personSet.delete('boys'); personSet.delete('men'); result.kidsUnspecified = true; }
     if (/(^| )(ل|ل ال)?(عيالي|اولادي|ولادي|اطفالي|عيلي|ولادى|عيال|اطفالى)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls') && !/(^| )(ترنج|لبس|فستان|بدله|طقم|تيشيرت|هودي|جاكيت|بنطلون|جزمه|كوتشي) ولادي( |$)/.test(nn2)) { result.kidsUnspecified = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
-    if (/(^| )(ل)?(رضيع|رضع|بيبي|بيبيه|مواليد|مولود|مولوده|حديث الولاده|طفلي|طفلتي|طفلى|baby|newborn|infant|toddler)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls')) { result.kidsUnspecified = true; result.flags.baby = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
+    if (!/(^| )بيبي ?دول( |$)|baby ?doll/.test(nn2) && /(^| )(ل)?(رضيع|رضع|بيبي|بيبيه|مواليد|مولود|مولوده|حديث الولاده|طفلي|طفلتي|طفلى|baby|newborn|infant|toddler)( |$)/.test(nn2) && !personSet.has('boys') && !personSet.has('girls')) { result.kidsUnspecified = true; result.flags.baby = true; if (!aud.length) { personSet.delete('men'); personSet.delete('women'); } }
   }
   /* ---------- «عند أهل جوزي / بيت حماتي / شغل مراتي»: الشريك هنا مكان أو صلة، مش حد هنلبّسه ---------- */
   {
@@ -568,63 +434,14 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
     for (const g of result.garments) for (const t of norm(g.text).split(' ')) for (const [sk, ws] of Object.entries(sw)) if (!result.season && sk !== 'mid' && Array.isArray(ws) && ws.some((w) => norm(w) === t)) result.season = sk;
   }
   result.taste = [...new Set(entriesOf(matches, 'taste').map((e) => e.key))];
-  if (result.context === 'casual_outing' && !result.flags.dailyOccasion) {
-    const casualCtxEntries = ctxEntries.filter((e) => !ctxNeg(e) && e.key === 'casual_outing');
-    const STYLE_ONLY_WORDS = new Set(['كاجوال', 'كاجول', 'كازوال', 'casual', 'cajual', 'kajoal', 'kajwal', 'kazwal']);
-    const hasOutingWord = /(^| )(خروجه|خروجة|خروج|للخروجه|للخروجة|لخروجه|لخروجة|مشوار|مشاوير|كافيه|مول|outing|going out|hangout|kharga|5roga|5arga|5orog|mashwar|cafe|سيشن|تصوير)( |$)/.test(n);
-    if (casualCtxEntries.length && casualCtxEntries.every((e) => STYLE_ONLY_WORDS.has(norm(e.text))) && !hasOutingWord) {
-      result.flags.styleOnlyCasualContext = true;
-    }
-  }
-  if (!result.context && /(^| )(عمل|العمل|للعمل|دوام|الدوام|للدوام)( |$)/.test(n)) {
-    result.context = /(^| )(فورمال|رسمي|رسميه|رسمية|formal)( |$)/.test(n) ? 'work_formal' : 'work_casual';
-    result.contextEffective = result.context;
-  }
-  if (result.context === 'work_casual' && /(^| )(فورمال|رسمي|رسميه|رسمية|formal|official)( |$)/.test(n)) {
-    result.context = 'work_formal';
-    result.contextEffective = 'work_formal';
-  }
-  if (!result.context && result.daypart === 'night' && (result.taste.includes('elegant') || /(^| )(سهره|حفله|مناسبه|شيك|انيق|فخم|سواريه|فستان|لانجيري|لانجري)( |$)/.test(n))) {
-    result.context = 'evening';
-    result.contextEffective = 'evening';
-    for (const g of result.garments) {
-      if (g.key === 'dress_any') { g.key = 'dress_evening'; g.alts = ['dress_party']; }
-    }
-  }
   if (intents.includes('cheaper') && result.garments.length) result.flags.cheapest = true;
   if (result.garments.length && /(^| )(الاغلي|الاغلى|اغلي|اغلى|اعلي سعر|اعلى سعر|افخم|الافخم|most expensive|priciest|highest price)( |$)/.test(n)) { result.flags.priciest = true; delete result.flags.cheapest; }
   const fl = entriesOf(matches, 'advice').some((e) => e.key === 'full_look');
   result.fullLook = fl;
-  syncIntentConcepts(result);
-
-  // «عايزة طقم كاجوال» / «عايزة طقم شيك» / «عايزة طقم للسهرة»: لما المستخدمة تطلب «طقم» كقطعة محددة مع ستايل أو سهرة (مش طقم كامل لمناسبة متعددة الأشخاص)
-  if (!result.garments.length && !result.ownedPieces.length && /(^| )(طقم|اطقم|طقمين|سيت|set|sets)( |$)/.test(n)
-    && !/(طقم كامل|لوك كامل|اطلاله كامله|طقم علي بعضه)/.test(n)
-    && result.persons.length <= 1 && !result.kidsUnspecified && !partnerFemale && !partnerMale) {
-    const isFemaleTarget = speaker === 'female' || result.persons.includes('women') || result.persons.includes('women_hijab');
-    const hasSetModifier = result.styles.length > 0 || result.context === 'evening' || /(^| )(طقم|اطقم|سيت|set) (كاجوال|كاجول|شيك|سهره|سهرة|سواريه|فورمال|محتشم|محتشمه|محتشمة|سمبل|بسيط|تريندي|ترندي|خروج|صيفي|شتوي|قطعتين|بناتي|حريمي|نسائي|casual|chic|formal|modest|evening)( |$)/.test(n);
-    if (isFemaleTarget && hasSetModifier) {
-      const col = result.colors.length === 1 ? result.colors[0] : null;
-      if (col) result.colors = [];
-      result.garments.push({ key: 'two_piece_set', alts: ['hijab_set', 'jumpsuit', 'womens_suit', 'tracksuit'], color: col, material: null, text: 'طقم', position: 0 });
-      result.fullLook = false;
-      if (!result.persons.length) result.persons = [hijab ? 'women_hijab' : 'women'];
-    }
-  }
-
-  if (/(^| )(رجعني|رجعيني|ارجعي|نرجع|خلينا في|هات تاني|هاتي تاني|اللي كنا بنتكلم عليه|اللي كنا بنتكلم عليها|اللي شوفناه الاول|الاولاني|الاولانيه)( |$)/.test(n)) {
-    result.flags.revertGarment = true;
-  }
-  if (!result.garments.length && /(^| )(هات|هاتي|وريني|شوفيلي|رشحيلي|اقترحي|عايز|عايزه|عاوز|عاوزه|ممكن)? *(معاه|معاها|جنبه|جنبها|عليه|عليها) (حاجه|حاجة|قطعه|قطعة)( تانيه| تانية| كمان| تاني)?( |$)/.test(n)) {
-    result.flags.complementaryRequest = true;
-  }
-  if (/(^| )(نفس الستايل|نفس الاستايل|نفس الذوق|نفس الموديل|نفس الحاجه|نفس الحاجة|نفس القطعه|نفس القطعة|same style)( |$)/.test(n)) {
-    result.flags.keepStyle = true;
-  }
 
   /* ---------- نصيحة ---------- */
   const availAsk = result.garments.length > 0 && /^(عندكم|عندكو|عندك|فيه|في|موجود|متاح)( |$)/.test(n);
-  if (hasQuestion && !result.stylingRelationship && !result.flags.complementaryRequest && !result.flags.revertGarment) {
+  if (hasQuestion) {
     let best = null;
     for (const item of K.phrases.advice.items) {
       if ((hasShopping || availAsk) && !item.care) continue; // سؤال غسيل/عنايه عن قطعه («ازاي انضف الجاكيت الجلد») مش طلب شراء — و«عندكم هودي اوفر سايز؟» سؤال توفر مش شرح
@@ -640,13 +457,12 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   /* ---------- متابعة وتحية ---------- */
   const has = (k) => intents.includes(k);
   const explicitAudience = aud.length > 0 || result.kidsUnspecified || partnerFemale || partnerMale;
-  const hasExplicitShopping = /(^| )(لبس|هدوم|ملابس|طقم|بدله|فستان|شوز|كوتشي|اشتري|اتسوق|شراء|تسوق|موديلات|ازياء|فاشون|كولكشن|حاجه|حاجة|قطعه|قطعة|لوك|ستايل|استايل|اتشيك|انقي|اجيب|شياكه|شياكة|سمبل|روشه|روشة|7aga|haga|lebs|outfits?)( |$)/.test(n);
-  const hasEgyptianShopping = hasShopping && (hasExplicitShopping || result.taste.length > 0 || result.styles.length > 0 || /(على قد|علي قد|حنين|لقطة|لقطه|في المعقول|سمبل|روق عليا|نقيلي|شوفيلي|ظبطني|اتشيك)/.test(n));
-  const hasGarmentsOrOccasion = result.garments.length > 0 || Boolean(result.context) || Boolean(result.budget) || result.fullLook
-    || Boolean(result.flags.complementaryRequest) || Boolean(result.flags.revertGarment) || Boolean(result.flags.keepStyle) || Boolean(result.flags.rejectedGarments?.length);
-  const hasContent = hasGarmentsOrOccasion || explicitAudience || (hasExplicitShopping && (hasShopping || result.persons.length > 0 || result.styles.length > 0)) || hasEgyptianShopping || (result.avoidContexts || []).length > 0 || (result.colors.length > 0 && result.tokens.length <= 6 && (!hasQuestion || tokens.length <= 2 || /^(?:لبس|ملابس|هدوم|حاجه) /.test(n)) && !/[?؟]/.test(String(raw)));
+  const hasExplicitShopping = /(^| )(لبس|هدوم|ملابس|طقم|بدله|فستان|شوز|كوتشي|اشتري|اتسوق|شراء|تسوق|موديلات|ازياء|فاشون|كولكشن|حاجه|حاجة|قطعه|قطعة|لوك|ستايل|استايل|اتشيك|انقي|اجيب|شياكه|شياكة|سمبل|روشه|روشة)( |$)/.test(n);
+  const hasEgyptianShopping = hasShopping && (hasExplicitShopping || result.taste.length > 0 || /(على قد|علي قد|حنين|لقطة|لقطه|في المعقول|سمبل|روق عليا|نقيلي|شوفيلي|ظبطني|اتشيك)/.test(n));
+  const hasGarmentsOrOccasion = result.garments.length > 0 || Boolean(result.context) || Boolean(result.budget) || result.fullLook;
+  const hasContent = hasGarmentsOrOccasion || explicitAudience || (hasExplicitShopping && (hasShopping || result.persons.length > 0)) || hasEgyptianShopping || (result.avoidContexts || []).length > 0 || (result.colors.length > 0 && result.tokens.length <= 4 && (!hasQuestion || tokens.length <= 2 || /^(?:لبس|ملابس|هدوم|حاجه) /.test(n)) && !/[?؟]/.test(String(raw)));
   if (has('reset')) result.followup = 'reset';
-  else if (has('show_more') && !result.garments.length && !result.flags.complementaryRequest) result.followup = 'show_more';
+  else if (has('show_more') && !result.garments.length) result.followup = 'show_more';
   if (has('show_more') && result.garments.length && !result.followup) result.flags.showOther = true;
   else if (has('cheaper') && !result.garments.length && !result.context) result.followup = 'cheaper'; // "أقل سعر تيشيرت" is a product request, not "cheaper than before"
   else if (!hasContent && has('yes') && tokens.length <= 3) result.followup = 'yes';
@@ -675,7 +491,8 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
 
   // الجنس لقطعة 'دريس' العامة: ست
   result.persons = [...new Set(result.persons)];
-  syncIntentConcepts(result);
+  // نفس الجملة طلعت كوتشي + حذاء جري (alias متكرر): طلب واحد بس، مش حاجتين
+  if (result.garments.some((g) => g.key === 'sneakers') && result.garments.some((g) => g.key === 'sport_shoes')) result.garments = result.garments.filter((g, _i, a) => !(g.key === 'sport_shoes' && a.some((x) => x.key === 'sneakers' && x.text === g.text)));
   return result;
 }
 

@@ -59,7 +59,9 @@ export function loadKnowledge({ force = false } = {}) {
   const contexts = new Map(taxonomy.contexts.map((c) => [c.key, c]));
 
   const entries = [];
-  for (const [key, aliases] of Object.entries(synonyms.garments)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'garment', key, aliases });
+  // جمع سالم تلقائي لأسماء القطع (سترة→سترات، بنطلون→بنطلونات): الكتالوجات والعملاء بيكتبوا الجمع كتير ومش لازم نكتب كل صيغة بإيدينا
+  const plurals = (aliases) => { const out = []; const have = new Set(aliases); for (const al of aliases) { if (typeof al !== 'string' || !/^[\u0621-\u064A]{3,}$/.test(al)) continue; const base = /[ةه]$/.test(al) ? al.slice(0, -1) : al; const p = `${base}ات`; if (!have.has(p)) { have.add(p); out.push(p); } } return out; };
+  for (const [key, aliases] of Object.entries(synonyms.garments)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'garment', key, aliases: key === 'watch' ? aliases : [...aliases, ...plurals(aliases)] }); // ساعات = ساعات زمن مش ساعات يد («سفر 8 ساعات»)
   for (const [key, aliases] of Object.entries(synonyms.contexts)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'context', key, aliases });
   for (const [key, aliases] of Object.entries(synonyms.audiences)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'audience', key, aliases });
   for (const [key, aliases] of Object.entries(synonyms.colors)) if (Array.isArray(aliases) && !key.startsWith('_')) entries.push({ group: 'color', key, aliases });
@@ -87,6 +89,20 @@ export function loadKnowledge({ force = false } = {}) {
   } catch (e) { kb = buildKb(null); kb.report.warnings.push(`قاعدة المعرفة فيها خطأ: ${e.message}`); }
   kb.custom = !!kbOverride; kb.bridgeCustom = !!bridgeOverride;
   entries.push(...kb.aliasEntries);
+  // كلمات اتعلّمتها تويلا من أسئلة العملاء وانت وافقت عليها (learned_aliases.json): بتتضاف كمرادفات لقطعة موجودة بس،
+  // ومابتغيّرش معنى أي كلمة موجودة (لو الكلمة ليها معنى تاني بتتجاهل). status لازم يكون approved.
+  try {
+    const learned = loadOpt('learned_aliases.json');
+    if (learned && Array.isArray(learned.entries)) {
+      const taken = new Set(); for (const e of entries) for (const a of e.aliases || []) taken.add(norm(a));
+      for (const it of learned.entries) {
+        if (it?.status !== 'approved' || !items.has(it.key) || typeof it.alias !== 'string') continue;
+        const a = norm(it.alias); if (!a || taken.has(a)) continue;
+        taken.add(a); entries.push({ group: 'garment', key: it.key, aliases: [it.alias] });
+        if (Array.isArray(synonyms.garments[it.key])) synonyms.garments[it.key].push(it.alias); // جدول أسماء المنتجات (inferKey) بيقرا من هنا
+      }
+    }
+  } catch { /* ملف الكلمات المتعلّمة اختياري: لو بايظ بنتجاهله */ }
   entries.push({ group: 'negation', key: 'neg', aliases: synonyms.negation_markers });
   entries.push({ group: 'advice', key: 'question', aliases: synonyms.advice_markers.question });
   entries.push({ group: 'advice', key: 'shopping', aliases: synonyms.advice_markers.shopping_verbs });

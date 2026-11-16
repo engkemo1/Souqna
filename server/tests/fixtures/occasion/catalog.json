@@ -1,0 +1,470 @@
+[
+ {
+  "id": 501,
+  "name_ar": "قميص نوم سهرة ستان",
+  "price": 450,
+  "stock": 5,
+  "description_ar": "قميص نوم ستان بدانتيل",
+  "department": "women_lingerie",
+  "dept_parent": "women_underwear",
+  "sold_count": 40,
+  "colors_json": [
+   {
+    "name_ar": "أسود"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 502,
+  "name_ar": "لانجيري سهرة دانتيل",
+  "price": 380,
+  "stock": 5,
+  "description_ar": "طقم لانجيري دانتيل",
+  "department": "women_lingerie",
+  "dept_parent": "women_underwear",
+  "sold_count": 35,
+  "colors_json": [
+   {
+    "name_ar": "أحمر"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 503,
+  "name_ar": "روب سهرة حريمي",
+  "price": 520,
+  "stock": 5,
+  "description_ar": "روب ستان طويل",
+  "department": "women_sleepwear",
+  "dept_parent": "women_underwear",
+  "sold_count": 30,
+  "colors_json": [
+   {
+    "name_ar": "نبيتي"
+   }
+  ],
+  "size_list": "M,L"
+ },
+ {
+  "id": 511,
+  "name_ar": "فستان ستان طويل",
+  "price": 1600,
+  "stock": 5,
+  "description_ar": "فستان ستان طويل بقصة ضيقة من فوق",
+  "department": "women_long_dresses",
+  "dept_parent": "women_dresses",
+  "dept_grand": "women",
+  "sold_count": 12,
+  "colors_json": [
+   {
+    "name_ar": "أسود"
+   },
+   {
+    "name_ar": "نبيتي"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 512,
+  "name_ar": "فستان شيفون مطرز",
+  "price": 1900,
+  "stock": 5,
+  "description_ar": "فستان شيفون مطرز بالخرز",
+  "department": "women_dresses",
+  "dept_parent": "women",
+  "sold_count": 9,
+  "colors_json": [
+   {
+    "name_ar": "كحلي"
+   }
+  ],
+  "size_list": "M,L,XL"
+ },
+ {
+  "id": 513,
+  "name_ar": "دريس قطيفة",
+  "price": 1450,
+  "stock": 5,
+  "description_ar": "فستان قطيفة ميدي",
+  "department": "women_dresses",
+  "dept_parent": "women",
+  "sold_count": 7,
+  "colors_json": [
+   {
+    "name_ar": "أخضر"
+   }
+  ],
+  "size_list": "S,M"
+ },
+ {
+  "id": 514,
+  "name_ar": "فستان سهرة قطن بيتي",
+  "price": 350,
+  "stock": 5,
+  "description_ar": "فستان قطن بيتي خفيف للبيت",
+  "department": "women_homewear",
+  "dept_parent": "women",
+  "sold_count": 50,
+  "colors_json": [
+   {
+    "name_ar": "بينك"
+   }
+  ],
+  "size_list": "M,L"
+ },
+ {
+  "id": 515,
+  "name_ar": "فستان قطن كاجوال",
+  "price": 500,
+  "stock": 5,
+  "description_ar": "فستان قطن يومي مريح",
+  "department": "women_dresses",
+  "dept_parent": "women",
+  "sold_count": 60,
+  "colors_json": [
+   {
+    "name_ar": "أبيض"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 516,
+  "name_ar": "فستان أسود",
+  "price": 900,
+  "stock": 5,
+  "description_ar": "",
+  "department": "women_dresses",
+  "dept_parent": "women",
+  "sold_count": 20,
+  "colors_json": [
+   {
+    "name_ar": "أسود"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 517,
+  "name_ar": "فستان جينز",
+  "price": 700,
+  "stock": 5,
+  "description_ar": "فستان جينز كاجوال للخروج",
+  "department": "women_dresses",
+  "dept_parent": "women",
+  "sold_count": 25,
+  "colors_json": [
+   {
+    "name_ar": "أزرق"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 521,
+  "name_ar": "طقم بليزر وبنطلون حريمي",
+  "price": 1700,
+  "stock": 5,
+  "description_ar": "طقم كريب رسمي قطعتين",
+  "department": "women_sets",
+  "dept_parent": "women",
+  "sold_count": 10,
+  "colors_json": [
+   {
+    "name_ar": "بيج"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 522,
+  "name_ar": "طقم كاجوال قطعتين",
+  "price": 800,
+  "stock": 5,
+  "description_ar": "طقم قطن تيشيرت وبنطلون واسع",
+  "department": "women_sets",
+  "dept_parent": "women",
+  "sold_count": 30,
+  "colors_json": [
+   {
+    "name_ar": "رمادي"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 523,
+  "name_ar": "طقم ستان سهرة",
+  "price": 1500,
+  "stock": 5,
+  "description_ar": "طقم ستان قطعتين لامع",
+  "department": "women_sets",
+  "dept_parent": "women",
+  "sold_count": 8,
+  "colors_json": [
+   {
+    "name_ar": "دهبي"
+   }
+  ],
+  "size_list": "S,M"
+ },
+ {
+  "id": 531,
+  "name_ar": "جمبسوت كريب",
+  "price": 1200,
+  "stock": 5,
+  "description_ar": "جمبسوت كريب واسع",
+  "department": "women_occasion",
+  "dept_parent": "women",
+  "sold_count": 6,
+  "colors_json": [
+   {
+    "name_ar": "أسود"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 541,
+  "name_ar": "بلوزة ستان",
+  "price": 600,
+  "stock": 5,
+  "description_ar": "بلوزة ستان لامعة",
+  "department": "women_blouses",
+  "dept_parent": "women_tops",
+  "sold_count": 15,
+  "colors_json": [
+   {
+    "name_ar": "أوف وايت"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 542,
+  "name_ar": "بلوزة قطن بسيطة",
+  "price": 300,
+  "stock": 5,
+  "description_ar": "بلوزة قطن يومي",
+  "department": "women_blouses",
+  "dept_parent": "women_tops",
+  "sold_count": 40,
+  "colors_json": [
+   {
+    "name_ar": "أبيض"
+   }
+  ],
+  "size_list": "S,M,L,XL"
+ },
+ {
+  "id": 543,
+  "name_ar": "توب حريمي بدون أكمام",
+  "price": 280,
+  "stock": 5,
+  "description_ar": "توب ليكرا",
+  "department": "women_toplets",
+  "dept_parent": "women_tops",
+  "sold_count": 22,
+  "colors_json": [
+   {
+    "name_ar": "أسود"
+   }
+  ],
+  "size_list": "S,M"
+ },
+ {
+  "id": 551,
+  "name_ar": "بنطلون قماش واسع حريمي",
+  "price": 650,
+  "stock": 5,
+  "description_ar": "بنطلون كريب واسع",
+  "department": "women_trousers",
+  "dept_parent": "women_pants",
+  "sold_count": 18,
+  "colors_json": [
+   {
+    "name_ar": "أسود"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 552,
+  "name_ar": "جيبة ستان ميدي",
+  "price": 700,
+  "stock": 5,
+  "description_ar": "جيبة ستان ميدي لامعة",
+  "department": "women_skirts",
+  "dept_parent": "women",
+  "sold_count": 11,
+  "colors_json": [
+   {
+    "name_ar": "شامبين"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 553,
+  "name_ar": "جيبة جينز",
+  "price": 450,
+  "stock": 5,
+  "description_ar": "جيبة جينز كاجوال",
+  "department": "women_skirts",
+  "dept_parent": "women",
+  "sold_count": 28,
+  "colors_json": [
+   {
+    "name_ar": "أزرق"
+   }
+  ],
+  "size_list": "S,M,L"
+ },
+ {
+  "id": 561,
+  "name_ar": "بيجامة قطن حريمي",
+  "price": 400,
+  "stock": 5,
+  "description_ar": "بيجامة قطن للبيت",
+  "department": "women_sleepwear",
+  "dept_parent": "women_underwear",
+  "sold_count": 45,
+  "colors_json": [
+   {
+    "name_ar": "لبني"
+   }
+  ],
+  "size_list": "M,L,XL"
+ },
+ {
+  "id": 562,
+  "name_ar": "عباية سوداء مطرزة",
+  "price": 1100,
+  "stock": 5,
+  "description_ar": "عباية كريب مطرزة واسعة",
+  "department": "modest_embroidered_abayas",
+  "dept_parent": "women_abaya",
+  "dept_grand": "modest",
+  "sold_count": 14,
+  "colors_json": [
+   {
+    "name_ar": "أسود"
+   }
+  ],
+  "size_list": "M,L,XL"
+ },
+ {
+  "id": 571,
+  "name_ar": "بدلة رجالي كحلي",
+  "price": 3500,
+  "stock": 5,
+  "description_ar": "بدلة قطعتين",
+  "department": "men_suits",
+  "dept_parent": "men",
+  "sold_count": 10,
+  "colors_json": [
+   {
+    "name_ar": "كحلي"
+   }
+  ],
+  "size_list": "48,50,52"
+ },
+ {
+  "id": 572,
+  "name_ar": "قميص رجالي أبيض",
+  "price": 450,
+  "stock": 5,
+  "description_ar": "قميص قطن",
+  "department": "men_shirts",
+  "dept_parent": "men_tops",
+  "sold_count": 30,
+  "colors_json": [
+   {
+    "name_ar": "أبيض"
+   }
+  ],
+  "size_list": "M,L,XL"
+ },
+ {
+  "id": 573,
+  "name_ar": "بنطلون قماش رجالي",
+  "price": 600,
+  "stock": 5,
+  "description_ar": "بنطلون قماش",
+  "department": "men_trousers",
+  "dept_parent": "men_pants",
+  "sold_count": 20,
+  "colors_json": [
+   {
+    "name_ar": "رمادي"
+   }
+  ],
+  "size_list": "32,34,36"
+ },
+ {
+  "id": 574,
+  "name_ar": "كوتشي أبيض رجالي",
+  "price": 900,
+  "stock": 5,
+  "description_ar": "",
+  "department": "shoes_men",
+  "dept_parent": "shoes",
+  "sold_count": 30,
+  "colors_json": [
+   {
+    "name_ar": "أبيض"
+   }
+  ],
+  "size_list": "41,42,43"
+ },
+ {
+  "id": 581,
+  "name_ar": "كعب حريمي سهرة",
+  "price": 800,
+  "stock": 5,
+  "description_ar": "صندل كعب عالي لامع",
+  "department": "shoes_heels",
+  "dept_parent": "shoes",
+  "sold_count": 12,
+  "colors_json": [
+   {
+    "name_ar": "فضي"
+   }
+  ],
+  "size_list": "37,38,39"
+ },
+ {
+  "id": 582,
+  "name_ar": "شنطة كلاتش دهبي",
+  "price": 450,
+  "stock": 5,
+  "description_ar": "كلاتش سهرة",
+  "department": "accessories_bags",
+  "dept_parent": "accessories",
+  "sold_count": 9,
+  "colors_json": [
+   {
+    "name_ar": "دهبي"
+   }
+  ]
+ },
+ {
+  "id": 583,
+  "name_ar": "بلوزة شيفون محتشمة بكم",
+  "price": 550,
+  "stock": 5,
+  "description_ar": "بلوزة شيفون واسعة بكم طويل",
+  "department": "modest_sets",
+  "dept_parent": "modest",
+  "sold_count": 10,
+  "colors_json": [
+   {
+    "name_ar": "بيج"
+   }
+  ],
+  "size_list": "M,L,XL"
+ }
+]

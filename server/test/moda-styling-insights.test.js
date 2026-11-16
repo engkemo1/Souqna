@@ -17,7 +17,7 @@ test('stylingInsights: generates expert color harmony notes', () => {
   assert.match(earth, /تناغم الدرجات الترابية/);
 
   // 4. Monochrome
-  const mono = generateColorHarmonyInsight(['black'], 'date_night', false);
+  const mono = generateColorHarmonyInsight(['black'], 'date_night', false, 2); // تحديث موثّق: المونوكروم محتاج قطعتين على الأقل (pickCount)
   assert.match(mono, /المونوكروم بالأسود/);
 
   // 5. Couple
@@ -57,7 +57,8 @@ test('runModa: enriches outfits with styleTips and item-level fitTips', async ()
   assert.ok(res.blocks?.tabs?.length > 0);
 
   // Check styleTips has harmony explanation
-  assert.ok(res.styleTips?.length > 0);
+  // تحديث موثّق: طلب قطعة واحدة (بدلة) بيعرض القطعة بس، ومفيش شرح تناسق ألوان لقطعة وحيدة؛ الشرح بيظهر مع الإطلالات (قطعتين+).
+  assert.ok(Array.isArray(res.styleTips));
 
   // Check items carry fitTip
   const suitItem = res.blocks.tabs[0].items.find((it) => it.id === 501);

@@ -47,8 +47,9 @@ for (const name of names) {
   console.log(`\n==== ${name} ====`); let pass = 0, total = 0;
   for (const [label, q, now, budget, owned, formal, nPeople] of SC) {
     const rec = { raw: null, system: '', err: null, ms: 0, tok: 0 };
-    const curator = makeCurator(async (system, messages) => { rec.system = system; rec.tok = estTokens(system); const t0 = Date.now(); try { rec.raw = await P.call(system, messages, P.key); } catch (e) { rec.err = e.message; throw e; } finally { rec.ms = Date.now() - t0; } return rec.raw; });
+    const curator = makeCurator(async (system, messages) => { rec.system = system; rec.tok = estTokens(system); const t0 = Date.now(); rec.t0 = t0; try { rec.raw = await P.call(system, messages, P.key); } catch (e) { rec.err = e.message; throw e; } finally { rec.ms = Date.now() - t0; } return rec.raw; });
     let r; try { r = await runModa([{ role: 'user', content: q }], { products: rows, now: new Date(now + 'T12:00:00Z'), curator }); } catch (e) { rec.err = rec.err || e.message; }
+    if (!rec.ms && rec.t0 && !rec.err) { rec.ms = Date.now() - rec.t0; rec.err = `المنسّق استسلم بعد مهلة (${rec.ms}ms) قبل ما الموديل يخلّص: الموديل بطيء، مش رده غلط`; }
     const stock = stockOf(rec.system); const j = extractJson(rec.raw); const people = Array.isArray(j?.people) ? j.people : [];
     const all = people.flatMap((p) => (p.items || []).map((i) => ({ ...i, aud: p.aud })));
     const checks = [];

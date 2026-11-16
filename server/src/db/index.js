@@ -6,11 +6,12 @@ import { DatabaseSync } from 'node:sqlite';
 import { DEFAULT_DEPARTMENTS, LEGACY_DEPARTMENTS } from '@souqna/shared';
 import { config } from '../config.js';
 import { importPaperRates, importPaperCoords } from '../lib/banhaRates.js';
+import { runMigrations } from './migrations.js';
 
 fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
 
 export const db = new DatabaseSync(config.dbFile);
-db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
+db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA wal_autocheckpoint = 1000;');
 db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
 {
   const cols = db.prepare('PRAGMA table_info(pos_sale_items)').all().map((c) => c.name);
@@ -274,15 +275,22 @@ export function update(table, id, obj, where = '') {
   return q.run(sql, [...keys.map((k) => obj[k]), id]).changes;
 }
 
+let txDepth = 0;
 export function tx(fn) {
-  db.exec('BEGIN');
+  const depth = txDepth++;
+  const sp = `sp_${depth}`;
+  db.exec(depth === 0 ? 'BEGIN IMMEDIATE' : `SAVEPOINT ${sp}`);
   try {
     const r = fn();
-    db.exec('COMMIT');
+    db.exec(depth === 0 ? 'COMMIT' : `RELEASE SAVEPOINT ${sp}`);
     return r;
   } catch (e) {
-    db.exec('ROLLBACK');
+    try {
+      db.exec(depth === 0 ? 'ROLLBACK' : `ROLLBACK TO SAVEPOINT ${sp}; RELEASE SAVEPOINT ${sp}`);
+    } catch { /* ignore rollback error */ }
     throw e;
+  } finally {
+    txDepth--;
   }
 }
 
@@ -399,4 +407,5 @@ export const json = (s, fallback) => {
   for (const [col, ddl] of [['width', 'INTEGER'], ['height', 'INTEGER'], ['phash', 'TEXT'], ['near_json', "TEXT NOT NULL DEFAULT '[]'"]]) if (ic.length && !ic.includes(col)) db.exec(`ALTER TABLE image_candidates ADD COLUMN ${col} ${ddl}`);
   const pc3 = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!pc3.includes('attrs_json')) db.exec('ALTER TABLE products ADD COLUMN attrs_json TEXT');
+  runMigrations(db);
 }

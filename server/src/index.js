@@ -7,8 +7,10 @@ import { publicSlug, storedSlug } from './lib/seo-slugs.js';
 import compression from 'compression';
 import cors from 'cors';
 import { config } from './config.js';
-import { q } from './db/index.js';
-import { mediaMap } from './lib/media.js';
+import { q, db } from './db/index.js';
+import { mediaMap, purgeOrphanMedia } from './lib/media.js';
+import { requestObservabilityMiddleware, logger } from './lib/logger.js';
+import { stopAllJobs, scheduleManagedInterval } from './lib/job-runner.js';
 import publicRoutes, { loadSharedLook } from './routes/public.js';
 import ownerRoutes from './routes/owner.js';
 import authRoutes from './routes/auth.js';
@@ -78,6 +80,7 @@ app.use(cors({
     return cb(null, false);
   },
 }));
+app.use(requestObservabilityMiddleware);
 app.use(express.json({ limit: '1mb', type: ['application/json', 'application/csp-report', 'application/reports+json'], verify: (req, _res, buf) => { if (req.originalUrl.startsWith('/api/wa/')) req.rawBody = buf; } }));
 
 app.post('/api/csp-report', (req, res) => {
@@ -170,7 +173,33 @@ app.use((req, res, next) => {
 // Media renditions are content-addressed → cache forever (CDN friendly).
 app.use('/media', express.static(config.mediaDir, { immutable: true, maxAge: '365d', fallthrough: false }));
 
-app.get('/api/health', (_req, res) => res.json({ ok: true }));
+app.get('/api/health', (_req, res) => res.json({ ok: true, status: 'alive', uptimeSec: Math.round(process.uptime()) }));
+app.get('/api/ready', (_req, res) => {
+  try {
+    const dbCheck = q.val('SELECT 1');
+    const migrationsCount = q.val('SELECT COUNT(*) FROM schema_migrations');
+    if (dbCheck !== 1) throw new Error('db check failed');
+    res.json({
+      ok: true,
+      status: 'ready',
+      db: true,
+      migrations: Number(migrationsCount || 0),
+      workerRole: config.workerRole,
+      r2Configured: Boolean(config.r2?.bucket && config.r2?.accessKeyId),
+    });
+  } catch (err) {
+    res.status(503).json({ ok: false, status: 'not_ready', error: err.message });
+  }
+});
+app.get('/api/version', (_req, res) => {
+  res.json({
+    name: 'twist-store',
+    version: process.env.APP_VERSION || '1.0.0',
+    commit: process.env.GIT_SHA || 'dev',
+    env: config.env,
+    node: process.version,
+  });
+});
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/cashier/v1', cashierRoutes);
@@ -187,6 +216,21 @@ app.use('/api', (_req, res) => res.status(404).json({ error: { code: 'not_found'
 
 // Serve the built web app (single-origin deployment).
 if (fs.existsSync(config.webDist)) {
+  const indexHtmlPath = path.join(config.webDist, 'index.html');
+  let cachedIndexHtml = null;
+  let cachedIndexMtime = 0;
+  const readIndexHtml = () => {
+    try {
+      const stat = fs.statSync(indexHtmlPath);
+      if (!cachedIndexHtml || stat.mtimeMs !== cachedIndexMtime) {
+        cachedIndexHtml = fs.readFileSync(indexHtmlPath, 'utf8');
+        cachedIndexMtime = stat.mtimeMs;
+      }
+      return cachedIndexHtml;
+    } catch {
+      return cachedIndexHtml || '';
+    }
+  };
   app.use(express.static(config.webDist, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); if (/\/(sw\.js|offline\.html)$|\.webmanifest$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
   const esc = (x) => String(x).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
   const withSeo = (html, { title, description, url, image, h1, intro }) => html
@@ -202,7 +246,7 @@ if (fs.existsSync(config.webDist)) {
     .replace(/<meta name="twitter:description" content="[^"]*"\s*\/>/, `<meta name="twitter:description" content="${esc(description)}" />`)
     .replace(/<meta name="twitter:image" content="[^"]*"\s*\/>/, `<meta name="twitter:image" content="${esc(image)}" />`);
   // A URL that does not exist must answer 404 (not 200) so search engines drop it; the page body is still the app so shoppers see the friendly "not found" screen.
-  const notFoundPage = (res) => res.status(404).set('X-Robots-Tag', 'noindex').set('Cache-Control', 'no-cache').type('html').send(fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8'));
+  const notFoundPage = (res) => res.status(404).set('X-Robots-Tag', 'noindex').set('Cache-Control', 'no-cache').type('html').send(readIndexHtml());
   const ldTag = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
   const withLd = (html, objs) => html.replace('</head>', `${objs.map(ldTag).join('')}</head>`);
   const trunc = (x, n = 155) => { const t = String(x || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t; };
@@ -227,7 +271,7 @@ if (fs.existsSync(config.webDist)) {
     const autoDesc = `${item.name_ar}${model} من ${item.store_name_ar} في بنها بسعر ${item.price} ج.م. قارن الأسعار واطلب أونلاين من Twist.`;
     const description = trunc(baseDesc.length >= 70 ? baseDesc : (baseDesc ? `${baseDesc.replace(/[.،]+$/, '')}. ${autoDesc}` : autoDesc));
     const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/twist-share.png`;
-    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    const html = readIndexHtml();
     const inStock = !item.track_stock || item.stock > 0;
     const product = {
       '@context': 'https://schema.org', '@type': 'Product', name: item.name_ar, image: [image], description,
@@ -248,7 +292,7 @@ if (fs.existsSync(config.webDist)) {
     if (pub !== req.params.slug) return res.redirect(301, `/c/${encodeURIComponent(pub)}`); // an old opaque URL (/c/c18_mvtnfs0s) moves permanently to its readable one
     const all = customerDepartments(); const by = new Map(all.map((d) => [d.slug, d]));
     const d = by.get(storedSlug(req.params.slug));
-    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    const html = readIndexHtml();
     if (!d) return res.status(404).set('X-Robots-Tag', 'noindex').type('html').send(html);
     const trail = []; for (let c = d, i = 0; c && i < 10; c = by.get(c.parent), i++) trail.unshift(c);
     const url = `${SITE_ORIGIN}/c/${encodeURIComponent(publicSlug(d.slug))}`;
@@ -270,7 +314,7 @@ if (fs.existsSync(config.webDist)) {
     const title = `${store.name_ar} | ملابس وأزياء في بنها على Twist`;
     const description = trunc(store.description_ar || `تسوق ملابس وأزياء من ${store.name_ar} في بنها. تصفّح المنتجات واطلب أونلاين عبر Twist.`);
     const image = imageBase ? `${imageBase.startsWith('http') ? '' : SITE_ORIGIN}${imageBase}/original.jpg` : `${SITE_ORIGIN}/brand/twist-share.png`;
-    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    const html = readIndexHtml();
     const storeLd = { '@context': 'https://schema.org', '@type': 'ClothingStore', name: store.name_ar, url, image, description,
       address: { '@type': 'PostalAddress', addressLocality: 'Banha', addressRegion: 'Qalyubia', addressCountry: 'EG' } };
     const crumbs = { '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
@@ -289,7 +333,7 @@ if (fs.existsSync(config.webDist)) {
       const description = trunc(e.description || e.say || `${name}: لوك متكامل من محلات بنها، شوف كل قطعة وسعرها وضيف اللوك كله للسلة على Twist.`);
       const cover = e.coverImage || e.images?.[0];
       const image = cover ? `${String(cover).startsWith('http') ? '' : SITE_ORIGIN}${cover}` : `${SITE_ORIGIN}/brand/twist-share.png`;
-      const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+      const html = readIndexHtml();
       res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html')
         .send(withSeo(html, { title, description, url: `${SITE_ORIGIN}${req.path}`, image, h1: name, intro: description }));
     } catch { next(); }
@@ -297,13 +341,13 @@ if (fs.existsSync(config.webDist)) {
   app.get('/stores', (_req, res) => {
     const title = 'كل محلات الملابس في بنها | Twist';
     const description = 'تصفّح كل محلات الملابس والأزياء في بنها على Twist: رجالي وحريمي وأطفال ورياضي. اختار محلك واطلب أونلاين.';
-    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    const html = readIndexHtml();
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, { title, description, url: `${SITE_ORIGIN}/stores`, image: `${SITE_ORIGIN}/brand/twist-share.png`, h1: 'كل محلات الملابس في بنها', intro: description }));
   });
   app.get('/join', (_req, res) => {
     const title = 'Twist بنها | افتح متجرك الإلكتروني لمحلك';
     const description = 'Twist منصة بنها للتسوق المحلي. نجهز لمحلات الملابس متجرًا إلكترونيًا باسمها، مع متابعة الطلبات واشتراك شهري بسيط.';
-    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8');
+    const html = readIndexHtml();
     res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(withSeo(html, {
       title, description, url: `${SITE_ORIGIN}/join`, image: `${SITE_ORIGIN}/brand/twist-share.png`, h1: 'افتح متجرك الإلكتروني لمحلك على Twist', intro: description,
     }));
@@ -341,16 +385,16 @@ if (fs.existsSync(config.webDist)) {
     if (/\.[a-z0-9]{2,5}$/i.test(req.path) && !/^\/(s|c|a|look|track)\//.test(req.path)) return res.status(404).type('text/plain').send('Not found'); // a missing file (image, script...) is not an HTML page
     if (!hit && req.path !== '/' && !KNOWN_APP_ROUTES.test(req.path)) return notFoundPage(res); // unknown URL: real 404 + noindex
     if (!hit && req.path === '/') {
-      const homeHtml = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8').replace('<div id="root"></div>', '<div id="root"><div style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"><h1>كل محلات الملابس في بنها في مكان واحد</h1><p>تويست (Twist) بنها: اكتشف الموضة، قارن الأسعار واطلب أونلاين من محلات الملابس.</p><nav><a href="/stores">محلات الملابس في بنها</a></nav></div></div>');
+      const homeHtml = readIndexHtml().replace('<div id="root"></div>', '<div id="root"><div style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"><h1>كل محلات الملابس في بنها في مكان واحد</h1><p>تويست (Twist) بنها: اكتشف الموضة، قارن الأسعار واطلب أونلاين من محلات الملابس.</p><nav><a href="/stores">محلات الملابس في بنها</a></nav></div></div>');
       return res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(homeHtml);
     }
     if (!hit) {
       // any other app page must not claim the home page as its canonical (index.html's default): point it at itself, query stripped
       const self = `${SITE_ORIGIN}${req.path === '/' ? '/' : req.path.replace(/\/+$/, '')}`;
-      const generic = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8').replace(/<link rel="canonical" href="[^"]*"\s*\/>/, `<link rel="canonical" href="${esc(self)}" />`).replace(/<meta property="og:url" content="[^"]*"\s*\/>/, `<meta property="og:url" content="${esc(self)}" />`);
+      const generic = readIndexHtml().replace(/<link rel="canonical" href="[^"]*"\s*\/>/, `<link rel="canonical" href="${esc(self)}" />`).replace(/<meta property="og:url" content="[^"]*"\s*\/>/, `<meta property="og:url" content="${esc(self)}" />`);
       return res.set('Cache-Control', 'no-cache').type('html').send(generic);
     }
-    const html = fs.readFileSync(path.join(config.webDist, 'index.html'), 'utf8')
+    const html = readIndexHtml()
       .replace('<link rel="manifest" href="/manifest.webmanifest" />', `<link rel="manifest" href="${hit[1]}" />`)
       .replace('<meta name="apple-mobile-web-app-title" content="Twist Store" />', `<meta name="apple-mobile-web-app-title" content="${hit[2]}" />`);
     res.set('Cache-Control', 'no-cache').type('html').send(html);
@@ -359,28 +403,69 @@ if (fs.existsSync(config.webDist)) {
 
 app.use(errorHandler);
 
-import('./db/index.js').then(({ q }) => q.run("UPDATE users SET role='demo' WHERE email=? AND role='owner'", [config.demoEmail]));
-import('./lib/backup.js').then((m) => m.startBackupSchedule());
-import('./lib/departments.js').then(async (m) => { const n = m.backfillDepartments(); if (n) console.log(`[departments] filled ${n} product(s) without a department`); const t = await m.backfillProductTypes(); if (t) console.log(`[types] inferred type/audience for ${t} product(s)`); });
-import('./lib/visual.js').then((m) => m.startVisualIndexer());
+if (config.workerRole !== 'web') {
+  import('./db/index.js').then(({ q: qDb }) => qDb.run("UPDATE users SET role='demo' WHERE email=? AND role='owner'", [config.demoEmail]));
+  import('./lib/backup.js').then((m) => m.startBackupSchedule());
+  import('./lib/departments.js').then(async (m) => { const n = m.backfillDepartments(); if (n) console.log(`[departments] filled ${n} product(s) without a department`); const t = await m.backfillProductTypes(); if (t) console.log(`[types] inferred type/audience for ${t} product(s)`); });
+  import('./lib/visual.js').then((m) => m.startVisualIndexer());
+}
 export { app };
+
+let activeHttpServer = null;
+let shuttingDown = false;
+
+export async function gracefulShutdown(signal = 'SIGTERM', { exitProcess = false } = {}) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info('graceful_shutdown_start', { signal });
+  stopAllJobs();
+  if (activeHttpServer) {
+    await new Promise((resolve) => {
+      const t = setTimeout(resolve, 5000);
+      t.unref?.();
+      activeHttpServer.close(() => {
+        clearTimeout(t);
+        resolve();
+      });
+    });
+    activeHttpServer = null;
+  }
+  try {
+    db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
+  } catch (err) {
+    logger.warn('wal_checkpoint_failed', { error: err.message });
+  }
+  shuttingDown = false;
+  if (exitProcess) process.exit(0);
+}
 
 // Allow boot.js to hand us an already-listening server (so the health-check
 // listener stays alive during the slow first-boot DB setup).
 export function startServer(existingServer) {
-  startDailySummary();
-  startLateOrderAlerts(); // nudges stores (push) and the admin (WhatsApp) about orders nobody answered; LATE_ALERTS=0 turns it off
-  startIndexNow(SITE_ORIGIN, newUrlsSince);
+  if (config.workerRole !== 'web') {
+    startDailySummary();
+    startLateOrderAlerts(); // nudges stores (push) and the admin (WhatsApp) about orders nobody answered; LATE_ALERTS=0 turns it off
+    startIndexNow(SITE_ORIGIN, newUrlsSince);
+    scheduleManagedInterval('orphan_media_cleanup', () => purgeOrphanMedia({ maxAgeHours: 24 }), 6 * 3600_000, { ttlMs: 300_000 });
+  }
   registerDefaultProviders(); // registration only — no provider call is made at startup
   if (existingServer) {
     // Reuse the existing bound socket — no new port needed.
     // the warm-up handler answers {status:'starting'} to every request — drop it, or it would keep answering first
     existingServer.removeAllListeners('request');
     existingServer.on('request', app);
+    activeHttpServer = existingServer;
     console.log(`Twist API ready on http://localhost:${config.port}`);
   } else {
-    app.listen(config.port, () => console.log(`Twist API ready on http://localhost:${config.port}`));
+    activeHttpServer = app.listen(config.port, () => console.log(`Twist API ready on http://localhost:${config.port}`));
   }
+
+  const onSignal = (sig) => {
+    gracefulShutdown(sig, { exitProcess: true }).catch(() => process.exit(1));
+  };
+  process.once('SIGTERM', onSignal);
+  process.once('SIGINT', onSignal);
+  return activeHttpServer;
 }
 
 // When executed directly (not imported by boot.js) start normally.
