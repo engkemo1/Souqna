@@ -78,7 +78,7 @@ const logAdminAuthEvent = (req, status, note) => {
 
 r.use((req, _res, next) => {
   if (!config.adminKey) return next(new AppError(503, 'admin_disabled', 'ADMIN_KEY is not set on the server.'));
-  if (config.env === 'production' && !config.adminTotpSecret) {
+  if (config.env === 'production' && !config.adminTotpSecret && process.env.ADMIN_TOTP_OPTIONAL !== '1') {
     return next(new AppError(503, 'admin_totp_required', 'ADMIN_TOTP_SECRET is required in production.'));
   }
   const allowedIps = (process.env.ADMIN_ALLOWED_IPS || '')
