@@ -4,6 +4,26 @@ All notable changes for the production-readiness hardening of **Twist Store** (`
 
 ## [Unreleased]
 
+### Phase 7 — Product, Compliance & Payment Readiness
+- Added Egyptian compliance endpoints for buyers (`/api/buyer/export-data` and `/api/buyer/delete-account`):
+  - Safely unlinks past orders to retain accounting & tax records while wiping customer profile, notifications, push subscriptions, watches, and stylist chats.
+- Created `server/src/lib/payments.js`:
+  - Pluggable payment gateway abstraction (`PaymentGateway`).
+  - `PaymobGateway` supporting SHA512 HMAC webhook signature verification against ordered payload values.
+  - `FawryGateway` supporting SHA256 webhook signature verification.
+  - Added unit test suite in `server/test/compliance.test.js`.
+
+### Phase 6 — E2E Smoke & Load Testing
+- Added `server/test/e2e-smoke.test.js` validating:
+  1. Health, readiness, and version probes.
+  2. Public storefront browsing and catalog listing.
+  3. Checkout with stock deduction and idempotency key deduplication.
+  4. Admin authentication with key + TOTP validation and audit log generation.
+  5. Buyer registration, token issuance, and instant session revocation via `token_version`.
+- Added `server/test/load.test.js` exercising 100 concurrent requests against `/api/health` with assertion on 0% error rate and p99 latency < 500ms (achieved p99 ~96ms).
+- Upgraded `multer` to `^2.5.0` in `server/package.json` to eliminate deprecated package warnings.
+- Cleaned up backup directory `server/_gemini_backup` and secured deployment scripts.
+
 ### Phase 5 — Frontend Production Quality
 - Added top-level React `ErrorBoundary` (`web/src/components/ErrorBoundary.jsx`) wrapping `App.jsx` with Arabic recovery UI and reload trigger.
 - Verified existing `vite:preloadError` handler in `web/src/main.jsx` to prevent stuck UI after chunk rotation.
