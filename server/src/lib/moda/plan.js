@@ -7,7 +7,7 @@ import { norm } from './text.js';
 import { loadKnowledge } from './knowledge.js';
 import { occasionFit, APPAREL_FAMILIES, INTIMATE_KEYS } from './intent.js';
 
-const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
+const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'hijab_cap', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
 const MEN_KEYS = new Set(['suit', 'tuxedo', 'tie', 'bow_tie', 'pocket_square', 'waistcoat', 'classic_set']);
 const HERO_KEYS = new Set(['dress_party', 'dress_evening', 'dress_casual', 'dress_work', 'dress_bridal', 'jumpsuit', 'two_piece_set', 'womens_suit', 'suit', 'classic_set', 'tuxedo', 'abaya', 'hijab_set']);
 const GUEST_CONTEXTS = new Set(['engagement_guest', 'wedding_guest', 'katb_kitab']);
@@ -168,7 +168,7 @@ function scoreProduct(p, slot, ctx) {
 const CASUAL_ONLY = new Set(['sneakers', 'sport_shoes', 'slippers']);
 /** قطع مش بتتركّب في أطقم أبدًا إلا بطلب صريح (ملابس داخلية/نوم وإكسسوارات فرعية). */
 // قطع اللون مش بيفرق فيها: ما نسألش عن اللون
-export const NO_COLOR_ASK = new Set(['perfume', 'watch', 'jewelry', 'socks', 'cufflinks', 'underwear', 'sleepwear', 'lingerie', 'robe', 'tie', 'bow_tie', 'pocket_square', 'cap']);
+export const NO_COLOR_ASK = new Set(['perfume', 'watch', 'jewelry', 'sunglasses', 'socks', 'cufflinks', 'underwear', 'sleepwear', 'lingerie', 'robe', 'tie', 'bow_tie', 'pocket_square', 'cap']);
 export const SIZE_ASK_KEYS = new Set(['underwear', 'sleepwear', 'lingerie', 'robe']);
 export const NEVER_UNASKED = new Set(['sleepwear', 'lingerie', 'robe', 'cufflinks', 'underwear']);
 

@@ -70,6 +70,8 @@ export function inferKey(text, K = loadKnowledge()) {
   if (!best) { // أسماء بتكتبها المحلات بطريقتها (من كتالوج موقع حقيقي): نوع القطعة مش في القاموس بالشكل ده
     for (const [key, re] of NAME_FALLBACKS) if (K.items.has(key) && re.test(cleaned)) return key;
   }
+  if (best?.key === 'trousers' && K.items.has('jeans') && /(^|\s)باجي(\s|$)/.test(cleaned)) return 'jeans'; // بنطلون باجي وايد ليج = جينز واسع (من صورة المنتج)
+  if (!best && K.items.has('jeans') && /abalone/i.test(cleaned)) return 'jeans'; // abalone fit = جينز (من صورة المنتج)
   return best?.key || null;
 }
 
@@ -120,7 +122,7 @@ const KIDS_BOTH = ['اطفال', 'اطفالي', 'اطفالى', 'للاطفال
 const KIDS_STORE = ['بيبي', 'baby', 'babies', 'kid', 'كيد', 'طفل', 'اطفالي'];
 const MEN_WORDS = ['رجالي', 'رجاليه', 'للرجال', 'رجال', 'شبابي', 'men', 'mens', 'man', 'male'];
 const WOMEN_WORDS = ['حريمي', 'نسائي', 'للنساء', 'ستاتي', 'سيدات', 'للسيدات', 'هوانم', 'محجبات', 'للمحجبات', 'women', 'womens', 'woman', 'ladies', 'female'];
-const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
+const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'hijab_cap', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
 const MEN_KEYS = new Set(['suit', 'tuxedo', 'tie', 'bow_tie', 'pocket_square', 'waistcoat', 'classic_set']);
 
 /** الفئة اللي المنتج ليها: men | women | boys | girls | kids | unisex
@@ -145,6 +147,7 @@ export function genderEvidence(row, K = loadKnowledge(), key = '') {
   const fromText = (text) => (hasAny(K, text, KIDS_GIRL) ? 'girls' : hasAny(K, text, KIDS_BOY) ? 'boys' : hasAny(K, text, KIDS_BOTH) ? 'kids'
     : hasAny(K, text, MEN_WORDS) && !hasAny(K, text, WOMEN_WORDS) ? 'men' : hasAny(K, text, WOMEN_WORDS) && !hasAny(K, text, MEN_WORDS) ? 'women' : null);
   vote(fromText(`${row.name_ar || ''} ${row.name_en || ''}`), 4, true);
+  if (/(^|\s)(ل?بيب[يى]|للبيب[يى])(\s|$)/.test(`${row.name_ar || ''}`.replace(/بيب[يى]\s*(بلو|بينك|بنك|دول)/g, '')) && !/(^|\s)(رجالي|حريمي|نسائي)(\s|$)/.test(`${row.name_ar || ''}`)) vote('kids', 4, true); // «سالوبيت بيبي» = أطفال (مش «بيبي بلو» اللون ولا «بيبي دول»)
   if (/\b(baby|babies)\b/i.test(`${row.name_en || ''} ${row.name_ar || ''}`) && !/baby\s?-?doll/i.test(`${row.name_en || ''} ${row.name_ar || ''}`) && !/\b(men|man|mens|women|woman|womens|ladies)\b/i.test(`${row.name_en || ''} ${row.name_ar || ''}`)) vote('kids', 4, true); // «Baby» في عنوان جوميا = أطفال
   // القسم: القسم نفسه، ولو مش واضح منه، القسم الأب/الجد («بدل» تحت «رجالي»، «ولادي» تحت «أطفال»). السيرفر بيبعت dept_parent/dept_grand/dept_name لو متاحين.
   { const dv = deptVotes(row.department) || deptVotes(row.dept_parent) || deptVotes(row.dept_grand);

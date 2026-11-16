@@ -21,16 +21,11 @@ During development (hot reload on both sides):
 npm run dev       # API on :4000, web on :5173 (proxied)
 ```
 
-### Demo accounts (password `demo1234`)
+### Demo accounts (Development & Evaluation)
 
-| Store | Login | Storefront |
-|---|---|---|
-| أحمد فاشون · Ahmed Fashion (menswear) | `ahmed@banhalook.app` | `/s/ahmed-fashion` |
-| لمار بوتيك · Lamar Boutique (womenswear) | `lamar@banhalook.app` | `/s/lamar-boutique` |
-| سبورت زون · Sport Zone (sportswear) | `sport@banhalook.app` | `/s/sport-zone` |
-| دنيم هاوس · Denim House (denim & tees) | `denim@banhalook.app` | `/s/denim-house` |
-
-The login page has a one-tap **“Use demo account”** button, and `/login?demo=1` signs straight into Ahmed Fashion — handy when showing the dashboard to a store owner.
+In local development, the demo account is accessible via the **“Use demo account”** button on `/login` or `/login?demo=1`.
+> [!NOTE]
+> In production environments (`NODE_ENV=production`), hardcoded passwords and automatic demo database seeding are permanently disabled for security. Seeding is opt-in via `SEED_DEMO=1 ALLOW_PROD_SEED=1`, and newly seeded accounts enforce `must_change_password=1` upon first sign-in. Refer to [docs/ENV.md](file:///e:/flutterProjects/souqna/docs/ENV.md) and [docs/RUNBOOK.md](file:///e:/flutterProjects/souqna/docs/RUNBOOK.md).
 
 ---
 

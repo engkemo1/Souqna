@@ -15,6 +15,8 @@ const two = async (a, b) => { const m = [{ role: 'user', content: a }]; let r = 
 for (const q of ['فستان سواريه', 'soiree dress', 'evening dress', 'فستان سهرة', 'party dress', 'i need a long evening dress', 'long evening dress']) { const n = names(await one(q)); ok(n.some((x) => /سواريه|سهرة|Evening|Soire/i.test(x)), `${q} => ${n}`); }
 for (const [q, re] of [['فستان كاجوال', /كاش|دريس/], ['casual dress', /كاش|دريس/], ['sunglasses', /نضار/], ['shades', /نضار/], ['tie', /كرافت/], ['bow tie', /ببيون|فيونك/]]) { const n = names(await one(q)); if (n.length) ok(n.some((x) => re.test(x)), `${q} => ${n}`); }
 for (const [a, b, re] of [['nike shoes', 'for men', /كوتش/], ['حذاء نايك', 'ست', /كوتش/], ['كوتشي', 'راجل', /كوتش/], ['جاكيت جينز', 'ست', /جينز/], ['denim jacket', 'men', /جينز|جاك/], ['فستان البسه في فرح صحبتي', 'محجبة', /سواريه|سهرة/]]) { const n = names(await two(a, b)); ok(n.length && re.test(n[0] + ' ' + n.join(' ')), `${a}+${b} => ${n}`); }
+for (const [q, re] of [['بونيه', /بوني|رقبي/], ['رقبيه نينجا', /رقبي/], ['bonnet', /بوني|رقبي/], ['hijab cap', /بوني|رقبي/]]) { const n = names(await one(q)); ok(n.length && re.test(n.join(' ')), `${q} => ${n}`); }
+for (const [a, b] of [['نضاره', 'راجل'], ['sunglasses', 'for men'], ['نضارة حريمي', 'ست']]) { const n = names(await two(a, b)); ok(n.some((x) => /نضار/.test(x)), `${a}+${b} => ${n}`); }
 const n1 = names(await two('nike shoes', 'for men')); ok(!/كلاسيك|قرنيه/.test(n1[0] || ''), `nike first=${n1[0]}`);
 console.log(JSON.stringify({ total: pass + fail, pass, fail, bad }));
 process.exit(fail ? 1 : 0);

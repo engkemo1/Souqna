@@ -8,6 +8,21 @@ export const IMAGE_SIZES = { thumb: 160, sm: 400, md: 800, lg: 1400 };
 export const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 export const GOVERNORATES = ['Qalyubia', 'Cairo', 'Giza', 'Alexandria', 'Gharbia', 'Monufia', 'Sharqia', 'Dakahlia'];
 
+/** Canonical brand metadata */
+export const BRAND = {
+  name: 'Twist',
+  nameAr: 'تويست',
+  legalName: 'Twist Store LLC',
+  domain: 'twistegy.com',
+  siteUrl: 'https://twistegy.com',
+  currency: 'EGP',
+  currencyAr: 'ج.م',
+  primaryCity: 'Banha',
+  primaryCityAr: 'بنها',
+  supportPhone: '01011112222',
+  supportEmail: 'support@twistegy.com',
+};
+
 /**
  * Store departments are managed from the admin panel (DB table `departments`).
  * This list only seeds a fresh database. A store keeps its departments as a ",slug,slug," string.

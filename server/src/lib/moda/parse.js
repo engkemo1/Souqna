@@ -17,7 +17,7 @@ const GENDER_BY_KEY = {
   suit: 'men', tuxedo: 'men', tie: 'men', bow_tie: 'men', pocket_square: 'men', waistcoat: 'men', classic_set: 'men',
   dress_any: 'women', dress_casual: 'women', dress_work: 'women', dress_party: 'women', dress_evening: 'women', dress_bridal: 'women', dress_beach: 'women',
   jumpsuit: 'women', skirt: 'women', blouse: 'women', abaya: 'women', heels_low: 'women', heels_high: 'women', clutch: 'women', shawl: 'women',
-  two_piece_set: 'women', womens_suit: 'women', hijab_set: 'women_hijab', tarha: 'women_hijab', long_cardigan: 'women', flats: 'women', tunic: 'women',
+  two_piece_set: 'women', womens_suit: 'women', hijab_set: 'women_hijab', tarha: 'women_hijab', hijab_cap: 'women_hijab', long_cardigan: 'women', flats: 'women', tunic: 'women',
 };
 
 const PLAIN_ENGLISH = new Set(['long', 'longer', 'line', 'lane', 'lung', 'king', 'ring', 'wing', 'thin', 'then', 'than', 'name', 'main', 'mine', 'moon', 'hem', 'ham', 'him']);
