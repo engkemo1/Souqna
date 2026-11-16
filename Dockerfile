@@ -4,7 +4,7 @@
 #   • Uses npm ci (not npm install) for deterministic, audit-friendly installs.
 #   • The result is kept separate so the runtime stage inherits nothing else.
 # =============================================================================
-FROM node:22.9-slim AS deps
+FROM node:22-slim AS deps
 WORKDIR /app
 
 # System packages needed only to build native addons (sharp, bcryptjs).
@@ -34,7 +34,7 @@ FROM litestream/litestream:0.3.13 AS litestream
 #   If GitHub is unreachable the build still succeeds; the server downloads it
 #   on first use instead.
 # =============================================================================
-FROM node:22.9-slim AS bgmodel
+FROM node:22-slim AS bgmodel
 ENV BG_MODEL_FILE=/app/models/isnet-general-use.onnx
 RUN mkdir -p /app/models && node -e " \
   const fs=require('fs'),c=require('crypto'); \
@@ -61,7 +61,7 @@ RUN npm run build --workspace=web
 # =============================================================================
 # Stage 5 — production runtime (lean, non-root)
 # =============================================================================
-FROM node:22.9-slim AS runtime
+FROM node:22-slim AS runtime
 WORKDIR /app
 
 # Production-only system packages.
