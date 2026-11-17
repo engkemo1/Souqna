@@ -6,11 +6,15 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFile } from 'node:child_process';
+import sharp from 'sharp';
 import { config } from '../config.js';
 import { r2Enabled, r2Put, r2Delete } from './r2.js';
 
 export const VIDEO_MAX_SECONDS = 30;
 export const VIDEO_MAX_BYTES = 30 * 1024 * 1024;
+// ستوري تويست الرسمي: جودة أعلى (1080p) ومدة وحجم أكبر
+export const HQ_VIDEO_MAX_SECONDS = 60;
+export const HQ_VIDEO_MAX_BYTES = 100 * 1024 * 1024;
 
 // تحويل الفيديو تقيل على المعالج: واحد بس في نفس الوقت، والباقي يستنى دوره
 let chain = Promise.resolve();
@@ -62,7 +66,10 @@ async function put(key, buf) {
  * بيجهّز الفيديو ويخزنه. بيرجع { key, posterKey, remote, seconds } أو يرمي Error بـ code:
  * video_unsupported | video_codec | video_too_long | video_too_big | video_failed
  */
-export async function saveStoryVideo(buf, storeId) {
+export async function saveStoryVideo(buf, storeId, { hq = false } = {}) {
+  const maxSec = hq ? HQ_VIDEO_MAX_SECONDS : VIDEO_MAX_SECONDS;
+  const maxBytes = hq ? HQ_VIDEO_MAX_BYTES : VIDEO_MAX_BYTES;
+  const width = hq ? 1080 : 720;
   const fail = (code, message) => Object.assign(new Error(message), { code });
   if (!looksLikeVideo(buf)) throw fail('video_unsupported', 'Use an MP4 or WebM video.');
   const id = crypto.randomBytes(8).toString('hex');
@@ -76,8 +83,8 @@ export async function saveStoryVideo(buf, storeId) {
       const inp = path.join(dir, 'in.bin'); const mp4 = path.join(dir, 'out.mp4'); const jpg = path.join(dir, 'poster.jpg');
       await fs.writeFile(inp, buf);
       try {
-        await exclusive(() => run('ffmpeg', ['-y', '-protocol_whitelist', 'file', '-threads', '2', '-i', inp, '-t', String(VIDEO_MAX_SECONDS), '-vf', "scale='min(720,iw)':-2,format=yuv420p", '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '28', '-c:a', 'aac', '-b:a', '96k', '-movflags', '+faststart', '-max_muxing_queue_size', '1024', mp4], 120000));
-        await run('ffmpeg', ['-y', '-protocol_whitelist', 'file', '-i', mp4, '-frames:v', '1', '-vf', "scale='min(720,iw)':-2", '-q:v', '4', jpg], 30000).catch(() => {});
+        await exclusive(() => run('ffmpeg', ['-y', '-protocol_whitelist', 'file', '-threads', '2', '-i', inp, '-t', String(maxSec), '-vf', `scale='min(${width},iw)':-2,format=yuv420p`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', hq ? '22' : '28', '-c:a', 'aac', '-b:a', hq ? '128k' : '96k', '-movflags', '+faststart', '-max_muxing_queue_size', '1024', mp4], hq ? 300000 : 120000));
+        await run('ffmpeg', ['-y', '-protocol_whitelist', 'file', '-i', mp4, '-frames:v', '1', '-vf', `scale='min(${width},iw)':-2`, '-q:v', hq ? '2' : '4', jpg], 30000).catch(() => {});
       } catch (e) { throw fail('video_failed', 'Could not process this video.'); }
       out = await fs.readFile(mp4);
       poster = await fs.readFile(jpg).catch(() => null);
@@ -86,15 +93,32 @@ export async function saveStoryVideo(buf, storeId) {
     } finally { await fs.rm(dir, { recursive: true, force: true }); }
   } else {
     if (!isMp4(buf)) throw fail('video_unsupported', 'Use an MP4 video.');
-    if (buf.length > VIDEO_MAX_BYTES) throw fail('video_too_big', 'Video is too large.');
+    if (buf.length > maxBytes) throw fail('video_too_big', 'Video is too large.');
     if (mp4Codec(buf) !== 'h264') throw fail('video_codec', 'This video format is not supported. Record it as H.264 (most compatible) or use a different video.');
-    if (seconds != null && seconds > VIDEO_MAX_SECONDS + 1) throw fail('video_too_long', `Video must be ${VIDEO_MAX_SECONDS} seconds or less.`);
+    if (seconds != null && seconds > maxSec + 1) throw fail('video_too_long', `Video must be ${maxSec} seconds or less.`);
   }
-  if (out.length > VIDEO_MAX_BYTES) throw fail('video_too_big', 'Video is too large.');
+  if (out.length > maxBytes) throw fail('video_too_big', 'Video is too large.');
 
   const remote = await put(key, out);
   if (poster) await put(posterKey, poster).catch(() => { poster = null; });
   return { key, posterKey: poster ? posterKey : null, remote, seconds: seconds ? Math.round(seconds * 10) / 10 : null };
+}
+
+/**
+ * صورة ستوري تويست: من غير قص ولا تحويل لعرض صغير — لحد 1440×2560 بجودة WebP 90. بتتخزن زي الفيديو (R2 أو الديسك).
+ * بيرجع { key, remote } أو يرمي Error بـ code: invalid_image | image_too_small
+ */
+export async function saveStoryImage(buf, storeId) {
+  const fail = (code, message) => Object.assign(new Error(message), { code });
+  let meta;
+  try { meta = await sharp(buf, { failOn: 'error', limitInputPixels: 80e6 }).metadata(); } catch { throw fail('invalid_image', 'This file is not a supported image.'); }
+  if (!['jpeg', 'png', 'webp', 'avif', 'heif'].includes(meta.format)) throw fail('invalid_image', 'This file is not a supported image.');
+  if (Math.min(meta.width || 0, meta.height || 0) < 480) throw fail('image_too_small', 'This image is too small (at least 480 px).');
+  const out = await sharp(buf, { limitInputPixels: 80e6 }).rotate().resize({ width: 1440, height: 2560, fit: 'inside', withoutEnlargement: true })
+    .webp({ quality: 90, effort: 5, smartSubsample: true }).toBuffer({ resolveWithObject: true });
+  const key = `stories/${storeId}/${crypto.randomBytes(8).toString('hex')}.webp`;
+  const remote = await put(key, out.data);
+  return { key, remote, w: out.info.width, h: out.info.height };
 }
 
 export const videoUrls = (row) => ({

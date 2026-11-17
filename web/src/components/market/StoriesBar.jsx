@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { X, ShoppingBag, Store, Volume2, VolumeX, ChevronLeft, Play } from 'lucide-react';
+import { X, ShoppingBag, Store, Volume2, VolumeX, ChevronLeft, Play, BadgeCheck } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
@@ -98,7 +98,8 @@ function Viewer({ groups, start, startItem = 0, onClose, onSeen }) {
         {/* header */}
         <div className="absolute inset-x-0 top-3 z-20 flex items-center gap-2 bg-gradient-to-b from-black/60 to-transparent px-3 pb-6 pt-3" dir={ar ? 'rtl' : 'ltr'}>
           <StoreLogo store={group.store} size={36} className="h-9 w-9" />
-          <Link to={`/s/${group.store.slug}`} onClick={onClose} className="truncate text-sm font-semibold text-white">{storeName}</Link>
+          <Link to={group.platform ? '/' : `/s/${group.store.slug}`} onClick={onClose} className="truncate text-sm font-semibold text-white">{storeName}</Link>
+          {group.platform && <BadgeCheck className="h-4 w-4 shrink-0 text-sky-400" aria-label={ar ? 'رسمي' : 'Official'} />}
           <span className="text-xs text-white/70">{ago(item.createdAt, ar)}</span>
           <span className="ms-auto" />
           {isVideo && <button type="button" onClick={() => setMuted((m) => !m)} aria-label={ar ? 'الصوت' : 'Sound'} className="relative z-30 grid h-9 w-9 place-items-center rounded-full text-white hover:bg-white/10">{muted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}</button>}
@@ -163,7 +164,7 @@ function Card({ grp, done, onOpen, ar }) {
       <span className={`absolute start-2 top-2 rounded-full p-[2.5px] ${done ? 'bg-neutral-300' : 'bg-gradient-to-tr from-sky-400 via-blue-500 to-blue-700'}`}>
         <span className="block rounded-full bg-white p-[1.5px]"><StoreLogo store={grp.store} size={34} className="h-[34px] w-[34px]" /></span>
       </span>
-      <span className="absolute inset-x-2 bottom-2 line-clamp-2 text-[12px] font-bold leading-tight text-white drop-shadow">{name}</span>
+      <span className="absolute inset-x-2 bottom-2 line-clamp-2 flex items-center gap-1 text-[12px] font-bold leading-tight text-white drop-shadow">{name}{grp.platform && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-sky-300" />}</span>
     </button>
   );
 }
@@ -184,7 +185,7 @@ export default function StoriesBar() {
     const n = new Set(prev); n.add(id); writeSeen(n); return n;
   });
   const allSeen = (grp) => grp.items.every((it) => seen.has(it.id));
-  const ordered = [...groups].sort((a, b) => Number(allSeen(a)) - Number(allSeen(b))); // الجديد الأول
+  const ordered = [...groups].sort((a, b) => Number(!!b.platform) - Number(!!a.platform) || Number(allSeen(a)) - Number(allSeen(b))); // تويست الرسمي الأول، وبعدها الجديد
 
   return (
     <section aria-label={ar ? 'ستوري المحلات' : 'Store stories'} className="mx-auto w-full max-w-7xl px-3 pt-3 sm:px-4">

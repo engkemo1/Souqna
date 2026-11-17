@@ -1,6 +1,7 @@
 // ستوري المحلات في الصفحة الرئيسية (زي الإنستجرام): صورة + كلمة اختيارية + زرار لمنتج، وبتختفي بعد 24 ساعة.
 // الرؤية بتتحكم فيها expires_at (الطلبات بتفلتر بيها)، والتنضيف (مسح الصورة والصف) بيتم كل شوية في الخلفية.
 import crypto from 'node:crypto';
+import { config } from '../config.js';
 import { q, insert } from '../db/index.js';
 import { mediaMap, getMedia, deleteMedia } from './media.js';
 import { videoUrls, deleteStoryVideo } from './story-video.js';
@@ -10,6 +11,8 @@ export const STORY_MAX_ACTIVE = 8; // لكل محل في نفس الوقت
 export const STORY_MAX_CAPTION = 140;
 export const STORY_MAX_PRODUCTS = 4;
 export const STORY_MAX_LABEL = 24;
+export const PLATFORM_MAX_ACTIVE = 20; // ستوري تويست الرسمي
+export const PLATFORM_HOURS = [24, 48, 72, 168]; // يوم | يومين | 3 أيام | أسبوع
 export const CTA_KINDS = ['store', 'new', 'sale', 'category'];
 export const TEXT_BGS = ['#1B1B1B', '#7C3AED', '#DB2777', '#EA580C', '#059669', '#2563EB'];
 
@@ -23,7 +26,7 @@ function ensure() {
   )`);
   const cols = q.all('PRAGMA table_info(store_stories)').map((c) => c.name);
   for (const [c, d] of [['kind', "TEXT NOT NULL DEFAULT 'image'"], ['video_key', 'TEXT'], ['poster_key', 'TEXT'], ['video_remote', 'INTEGER NOT NULL DEFAULT 0'], ['video_seconds', 'REAL'],
-    ['product_ids', 'TEXT'], ['cta_kind', 'TEXT'], ['cta_slug', 'TEXT'], ['cta_label', "TEXT NOT NULL DEFAULT ''"], ['bg', 'TEXT'], ['views', 'INTEGER NOT NULL DEFAULT 0'], ['clicks', 'INTEGER NOT NULL DEFAULT 0']]) {
+    ['product_ids', 'TEXT'], ['cta_kind', 'TEXT'], ['cta_slug', 'TEXT'], ['cta_label', "TEXT NOT NULL DEFAULT ''"], ['bg', 'TEXT'], ['platform', 'INTEGER NOT NULL DEFAULT 0'], ['views', 'INTEGER NOT NULL DEFAULT 0'], ['clicks', 'INTEGER NOT NULL DEFAULT 0']]) {
     if (!cols.includes(c)) q.run(`ALTER TABLE store_stories ADD COLUMN ${c} ${d}`);
   }
   // كل جهاز بيتحسب مرة واحدة بس لكل ستوري (مشاهدة ومرة ضغطة) — بنخزن هاش مش IP، وبيتمسح مع الستوري
@@ -115,7 +118,7 @@ const productOf = (rows) => {
   const ids = [...new Set(rows.flatMap(idsOf))];
   if (!ids.length) return new Map();
   const ph = ids.map(() => '?').join(',');
-  const prods = q.all(`SELECT id, slug, name_ar, name_en, price FROM products WHERE status='active' AND id IN (${ph})`, ids);
+  const prods = q.all(`SELECT p.id, p.slug, p.name_ar, p.name_en, p.price, s.slug AS store_slug FROM products p LEFT JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND p.id IN (${ph})`, ids);
   const first = new Map();
   for (const x of q.all(`SELECT product_id, media_id FROM product_media WHERE product_id IN (${ph}) ORDER BY is_primary DESC, position`, ids)) if (!first.has(x.product_id)) first.set(x.product_id, x.media_id);
   const media = mediaMap([...first.values()]);
@@ -125,14 +128,15 @@ export const ctaHref = (kind, slug, storeSlug) => {
   const base = `/s/${storeSlug}`;
   return { store: base, new: `${base}/shop?sort=newest`, sale: `${base}/shop?sale=1`, category: `${base}/shop?category=${encodeURIComponent(slug || '')}` }[kind] || base;
 };
-const DEFAULT_LABEL = { store: 'زور المحل', new: 'شوف الأحدث', sale: 'شوف العروض', category: 'تسوق الكوليكشن' };
+const DEFAULT_LABEL = { store: 'زور المحل', new: 'شوف الأحدث', sale: 'شوف العروض', category: 'تسوق الكوليكشن', link: 'تسوق دلوقتي' };
+const fileUrl = (r) => `${r.video_remote ? config.r2.publicUrl : config.mediaBaseUrl}/${r.poster_key}`;
 const storyOut = (r, media, prods, storeSlug, owner = false) => {
   const products = idsOf(r).map((id) => prods.get(id)).filter(Boolean)
-    .map((p) => ({ id: p.id, slug: p.slug, storeSlug, name: { ar: p.name_ar, en: p.name_en }, price: p.price, image: p.image }));
+    .map((p) => ({ id: p.id, slug: p.slug, storeSlug: p.store_slug || storeSlug, name: { ar: p.name_ar, en: p.name_en }, price: p.price, image: p.image }));
   return {
-    id: r.id, kind: r.kind || 'image', image: media.get(r.media_id) || null, video: r.kind === 'video' ? videoUrls(r) : null, bg: r.bg || null,
+    id: r.id, kind: r.kind || 'image', image: (r.platform && r.kind === 'image' && r.poster_key) ? fileUrl(r) : media.get(r.media_id) || null, video: r.kind === 'video' ? videoUrls(r) : null, bg: r.bg || null,
     caption: r.caption, createdAt: r.created_at, expiresAt: r.expires_at, products,
-    cta: r.cta_kind ? { kind: r.cta_kind, slug: r.cta_slug, label: r.cta_label || DEFAULT_LABEL[r.cta_kind], href: storeSlug ? ctaHref(r.cta_kind, r.cta_slug, storeSlug) : null } : null,
+    cta: r.cta_kind ? { kind: r.cta_kind, slug: r.cta_slug, label: r.cta_label || DEFAULT_LABEL[r.cta_kind], href: r.cta_kind === 'link' ? r.cta_slug : storeSlug ? ctaHref(r.cta_kind, r.cta_slug, storeSlug) : null } : null,
     ...(owner ? { views: r.views || 0, clicks: r.clicks || 0 } : {}),
   };
 };
@@ -141,9 +145,25 @@ const hasBody = (o) => o.image || o.video || o.kind === 'text';
 /** للصفحة الرئيسية: المحلات اللي عندها ستوري شغال، الأحدث الأول، وجوه كل محل الستوريات من الأقدم للأحدث. */
 export function activeStories() {
   ensure();
+  const twist = twistGroup();
+  const rest = storeGroups();
+  return twist ? [twist, ...rest] : rest;
+}
+
+/** ستوري تويست الرسمي: مجموعة واحدة في الأول، من غير ما تعتمد على أي محل. */
+function twistGroup() {
+  const rows = q.all("SELECT * FROM store_stories WHERE platform=1 AND expires_at > datetime('now') ORDER BY created_at ASC, id ASC LIMIT 40");
+  if (!rows.length) return null;
+  const prods = productOf(rows);
+  const items = rows.map((r) => storyOut(r, new Map(), prods, null)).filter(hasBody);
+  if (!items.length) return null;
+  return { platform: true, store: { slug: '__twist', name: { ar: 'تويست', en: 'Twist' }, logo: null, logoInitials: 'T', logoColor: '#1B1B1B' }, items };
+}
+
+function storeGroups() {
   const rows = q.all(`SELECT st.* FROM store_stories st JOIN stores s ON s.id=st.store_id
     JOIN story_access sa ON sa.store_id=s.id AND sa.enabled=1
-    WHERE st.expires_at > datetime('now') AND s.status='active' AND s.hidden=0 ORDER BY st.created_at ASC, st.id ASC LIMIT 400`);
+    WHERE st.platform=0 AND st.expires_at > datetime('now') AND s.status='active' AND s.hidden=0 ORDER BY st.created_at ASC, st.id ASC LIMIT 400`);
   if (!rows.length) return [];
   const storeIds = [...new Set(rows.map((r) => r.store_id))];
   const stores = new Map(q.all(`SELECT id, slug, name_ar, name_en, logo_media_id, logo_initials, logo_color FROM stores WHERE id IN (${storeIds.map(() => '?').join(',')})`, storeIds).map((s) => [s.id, s]));
@@ -174,7 +194,7 @@ export function ownStories(storeId) {
 async function dropFiles(r) {
   q.run('DELETE FROM story_events WHERE story_id=?', [r.id]);
   try { const m = getMedia(r.media_id); if (m) await deleteMedia(m); } catch { /* الصورة اتمسحت قبل كده */ }
-  if (r.kind === 'video') await deleteStoryVideo(r);
+  if (r.kind === 'video' || (r.platform && r.poster_key)) await deleteStoryVideo(r);
 }
 
 /** مسح ستوري من الأدمن (مراجعة محتوى) من غير شرط المحل. */
@@ -190,11 +210,11 @@ export async function adminRemoveStory(id) {
 /** كل الستوريات الشغالة مع اسم المحل (للأدمن). */
 export function adminActiveStories() {
   ensure();
-  const rows = q.all(`SELECT st.*, s.slug AS store_slug, s.name_ar AS store_name FROM store_stories st JOIN stores s ON s.id=st.store_id
-    WHERE st.expires_at > datetime('now') ORDER BY st.id DESC LIMIT 200`);
+  const rows = q.all(`SELECT st.*, s.slug AS store_slug, s.name_ar AS store_name FROM store_stories st LEFT JOIN stores s ON s.id=st.store_id
+    WHERE st.expires_at > datetime('now') ORDER BY st.platform DESC, st.id DESC LIMIT 200`);
   const media = mediaMap(rows.map((r) => r.media_id));
   const prods = productOf(rows);
-  return rows.map((r) => ({ ...storyOut(r, media, prods, r.store_slug), store: { slug: r.store_slug, name: r.store_name } }));
+  return rows.map((r) => ({ ...storyOut(r, media, prods, r.store_slug || null, true), platform: !!r.platform, store: r.platform ? { slug: '', name: 'Twist (رسمي)' } : { slug: r.store_slug, name: r.store_name } }));
 }
 
 export async function removeStory(storeId, id) {
@@ -204,6 +224,57 @@ export async function removeStory(storeId, id) {
   q.run('DELETE FROM store_stories WHERE id=?', [r.id]);
   await dropFiles(r);
   return true;
+}
+
+const LINK_RE = /^\/(?!\/)[A-Za-z0-9\-._~%/?=&#+؀-ۿ]*$/;
+/** رابط جوه الموقع بس (بيبدأ بـ / ومش //) — مفيش روابط خارجية. */
+export const cleanLink = (v) => { const t = String(v || '').trim(); return t.length <= 200 && LINK_RE.test(t) ? t : null; };
+
+/**
+ * ستوري تويست الرسمي (من الأدمن): صورة (image: {key, remote}) | فيديو | نص. منتجات من أي محل شغال (لحد 4)،
+ * وزرار لأي صفحة جوه الموقع، ومدة 24 ساعة / يومين / 3 أيام / أسبوع. بيرجع { id } أو { error: limit | product | link | empty }.
+ */
+export function addPlatformStory({ image = null, video = null, caption = '', bg = null, productIds = [], cta = null, hours = 24 }) {
+  ensure();
+  if ((q.get("SELECT COUNT(*) AS n FROM store_stories WHERE platform=1 AND expires_at > datetime('now')")?.n || 0) >= PLATFORM_MAX_ACTIVE) return { error: 'limit' };
+  const text = cleanCaption(caption);
+  const kind = video ? 'video' : image ? 'image' : 'text';
+  if (kind === 'text' && !text) return { error: 'empty' };
+  const ids = [...new Set((Array.isArray(productIds) ? productIds : []).map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, STORY_MAX_PRODUCTS);
+  if (ids.length) {
+    const ok = q.all(`SELECT p.id FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.id IN (${ids.map(() => '?').join(',')})`, ids);
+    if (ok.length !== ids.length) return { error: 'product' };
+  }
+  let c = { cta_kind: null, cta_slug: null, cta_label: '' };
+  if (cta && String(cta.href || '').trim()) {
+    const href = cleanLink(cta.href);
+    if (!href) return { error: 'link' };
+    c = { cta_kind: 'link', cta_slug: href, cta_label: String(cta.label || '').replace(/\s+/g, ' ').trim().slice(0, STORY_MAX_LABEL) };
+  }
+  const hrs = PLATFORM_HOURS.includes(Number(hours)) ? Number(hours) : 24;
+  const media = video ? { video_key: video.key, poster_key: video.posterKey, video_remote: video.remote ? 1 : 0, video_seconds: video.seconds }
+    : image ? { poster_key: image.key, video_remote: image.remote ? 1 : 0 } : {};
+  const id = insert('store_stories', {
+    ...media, ...c, kind, platform: 1, store_id: 0, media_id: null, caption: text, product_ids: ids.length ? JSON.stringify(ids) : null,
+    bg: kind === 'text' ? (TEXT_BGS.includes(bg) ? bg : TEXT_BGS[0]) : null,
+    expires_at: q.get(`SELECT datetime('now', '+${hrs} hours') AS t`).t,
+  });
+  return { id };
+}
+
+/** بحث منتجات من كل المحلات الشغالة (لاختيار منتجات ستوري تويست). */
+export function searchStoryProducts(term = '') {
+  ensure();
+  const t = String(term || '').trim().slice(0, 60).replace(/[%_]/g, '');
+  const like = `%${t}%`;
+  const rows = q.all(`SELECT p.id, p.slug, p.name_ar, p.name_en, p.price, s.slug AS store_slug, s.name_ar AS store_name FROM products p JOIN stores s ON s.id=p.store_id
+    WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (?='' OR p.name_ar LIKE ? OR p.name_en LIKE ? OR s.name_ar LIKE ? OR s.slug LIKE ?) ORDER BY p.id DESC LIMIT 24`, [t, like, like, like, like]);
+  if (!rows.length) return [];
+  const ids = rows.map((r) => r.id); const ph = ids.map(() => '?').join(',');
+  const first = new Map();
+  for (const x of q.all(`SELECT product_id, media_id FROM product_media WHERE product_id IN (${ph}) ORDER BY is_primary DESC, position`, ids)) if (!first.has(x.product_id)) first.set(x.product_id, x.media_id);
+  const media = mediaMap([...first.values()]);
+  return rows.map((r) => ({ id: r.id, slug: r.slug, name: { ar: r.name_ar, en: r.name_en }, price: r.price, storeSlug: r.store_slug, storeName: r.store_name, image: media.get(first.get(r.id)) || null }));
 }
 
 /** تنضيف: بيمسح الستوريات المنتهية (والصورة بتاعتها). آمن لو اتنفذ أكتر من مرة. */

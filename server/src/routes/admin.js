@@ -40,7 +40,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { isWhatsAppConfigured, notifyPlatformDelivery, saveWaSettings, waSettingsView, sendWaTest } from '../lib/whatsapp.js';
 import { mountCashierAdmin } from './admin-cashier.js';
-import { adminStoryStores, setStoriesAllowed, setAllStoriesAllowed, adminActiveStories, adminRemoveStory } from '../lib/stories.js';
+import { adminStoryStores, setStoriesAllowed, setAllStoriesAllowed, adminActiveStories, adminRemoveStory, addPlatformStory, searchStoryProducts, PLATFORM_MAX_ACTIVE, PLATFORM_HOURS } from '../lib/stories.js';
+import { saveStoryImage, saveStoryVideo, looksLikeVideo, deleteStoryVideo, HQ_VIDEO_MAX_SECONDS, HQ_VIDEO_MAX_BYTES } from '../lib/story-video.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { CASHIER_SYSTEMS, CASHIER_IDS, CASHIER_LINK_STATUSES } from '../lib/cashier-catalog.js';
 import { getPlatformFreeShipping, savePlatformFreeShipping, deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing, getMultiStoreRule, saveMultiStoreRule, getZonePolicy, saveZonePolicy, zoneKey } from '../lib/deliveryRates.js';
@@ -1832,7 +1833,37 @@ r.post('/stores/:slug/setup-link', h((req, res) => {
 }));
 
 /* ---- stories: which stores may post (off by default) + moderation ---- */
-r.get('/stories', h((_req, res) => { res.json({ stores: adminStoryStores(), items: adminActiveStories() }); }));
+r.get('/stories', h((_req, res) => { res.json({ stores: adminStoryStores(), items: adminActiveStories(), platform: { max: PLATFORM_MAX_ACTIVE, hours: PLATFORM_HOURS, video: { maxSeconds: HQ_VIDEO_MAX_SECONDS, maxMb: Math.round(HQ_VIDEO_MAX_BYTES / 1048576) } } }); }));
+r.get('/stories/products', h((req, res) => { res.json({ items: searchStoryProducts(req.query.q) }); }));
+
+/* Twist's own (official) story: any photo/video/text, products from any store, a button to any page of the site */
+const platformStoryUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 110 * 1024 * 1024, files: 1 } });
+r.post('/stories/platform', platformStoryUpload.single('file'), h(async (req, res) => {
+  let productIds = [];
+  try { productIds = JSON.parse(req.body?.productIds || '[]'); } catch { throw badRequest('invalid_product', 'Choose products from the list.'); }
+  const cta = req.body?.ctaHref ? { href: req.body.ctaHref, label: req.body.ctaLabel } : null;
+  const common = { caption: req.body?.caption, bg: req.body?.bg, productIds, cta, hours: Number(req.body?.hours) || 24 };
+  const fail = async (out, cleanup) => {
+    if (cleanup) await cleanup();
+    const map = { product: ['invalid_product', 'Choose active products from the list.'], link: ['invalid_link', 'Use a link inside the site, like /shop.'], empty: ['story_empty', 'Write some text or add a photo or video.'] };
+    const [code, msg] = map[out.error] || ['story_limit', `Up to ${PLATFORM_MAX_ACTIVE} official stories at a time.`];
+    throw badRequest(code, msg);
+  };
+  const done = () => res.status(201).json({ items: adminActiveStories() });
+  if (!req.file) { const out = addPlatformStory(common); if (out.error) await fail(out); return done(); }
+  if (looksLikeVideo(req.file.buffer)) {
+    let video;
+    try { video = await saveStoryVideo(req.file.buffer, 0, { hq: true }); } catch (e) { throw badRequest(e.code || 'video_failed', e.message); }
+    const out = addPlatformStory({ ...common, video });
+    if (out.error) await fail(out, () => deleteStoryVideo({ video_key: video.key, poster_key: video.posterKey, video_remote: video.remote ? 1 : 0 }));
+    return done();
+  }
+  let image;
+  try { image = await saveStoryImage(req.file.buffer, 0); } catch (e) { throw badRequest(e.code || 'invalid_image', e.message); }
+  const out = addPlatformStory({ ...common, image });
+  if (out.error) await fail(out, () => deleteStoryVideo({ poster_key: image.key, video_remote: image.remote ? 1 : 0 }));
+  done();
+}));
 r.put('/stories/stores', h((req, res) => {
   const { enabled } = z.object({ enabled: z.boolean() }).parse(req.body);
   setAllStoriesAllowed(enabled);
