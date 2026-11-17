@@ -112,8 +112,8 @@ export default function MarketHome() {
   return (
     <div className="min-h-dvh bg-[#F6F8FB] ">
       <MarketHeader />
-      <FeaturedSlot placement="market_top" />
       <StoriesBar />
+      <FeaturedSlot placement="market_top" />
 
       {/* Hero */}
       <section role="main" id="main" className="relative isolate overflow-hidden pt-6 sm:pt-10">

@@ -157,7 +157,7 @@ function twistGroup() {
   const prods = productOf(rows);
   const items = rows.map((r) => storyOut(r, new Map(), prods, null)).filter(hasBody);
   if (!items.length) return null;
-  return { platform: true, store: { slug: '__twist', name: { ar: 'تويست', en: 'Twist' }, logo: null, logoInitials: 'T', logoColor: '#1B1B1B' }, items };
+  return { platform: true, store: { slug: '__twist', name: { ar: 'تويست', en: 'Twist' }, logo: '/brand/twist-story.png', logoInitials: 'T', logoColor: '#1B1B1B' }, items };
 }
 
 function storeGroups() {

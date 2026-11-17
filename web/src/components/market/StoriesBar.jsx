@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
-import { X, ShoppingBag, Store, Volume2, VolumeX, ChevronLeft, Play, BadgeCheck } from 'lucide-react';
+import { X, ShoppingBag, Store, Volume2, VolumeX, ChevronLeft, BadgeCheck } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
@@ -150,21 +150,17 @@ function Viewer({ groups, start, startItem = 0, onClose, onSeen }) {
   );
 }
 
-/** كارت الستوري في الصفحة الرئيسية (شكل الفيسبوك): معاينة آخر ستوري + لوجو المحل + الاسم. */
+/** دايرة الستوري في الصفحة الرئيسية: لوجو المحل بحلقة ملوّنة (جديد) أو رمادية (اتشاف) + الاسم. */
 function Card({ grp, done, onOpen, ar }) {
-  const it = grp.items[grp.items.length - 1];
   const name = ar ? grp.store.name.ar : grp.store.name.en || grp.store.name.ar;
   return (
-    <button type="button" onClick={onOpen} className="relative h-[190px] w-[108px] shrink-0 overflow-hidden rounded-2xl bg-neutral-800 text-start shadow-sm ring-1 ring-black/5 sm:h-[220px] sm:w-[124px]">
-      {it.kind === 'image' && <div className="absolute inset-0"><SmartImage media={it.image} sizes="130px" className="h-full w-full" imgClassName="h-full w-full object-cover" /></div>}
-      {it.kind === 'video' && (it.video.poster ? <img src={it.video.poster} alt="" className="absolute inset-0 h-full w-full object-cover" /> : <video src={`${it.video.src}#t=0.1`} preload="metadata" muted playsInline className="absolute inset-0 h-full w-full object-cover" />)}
-      {it.kind === 'text' && <div className="absolute inset-0 flex items-center justify-center p-3 text-center" style={textBg(it.bg)}><span className="line-clamp-5 text-[13px] font-bold leading-snug text-white" dir="auto">{it.caption}</span></div>}
-      <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/70" />
-      {it.kind === 'video' && <span className="absolute bottom-9 end-2 grid h-6 w-6 place-items-center rounded-full bg-black/50 text-white"><Play className="h-3 w-3 fill-current" /></span>}
-      <span className={`absolute start-2 top-2 rounded-full p-[2.5px] ${done ? 'bg-neutral-300' : 'bg-gradient-to-tr from-sky-400 via-blue-500 to-blue-700'}`}>
-        <span className="block rounded-full bg-white p-[1.5px]"><StoreLogo store={grp.store} size={34} className="h-[34px] w-[34px]" /></span>
+    <button type="button" onClick={onOpen} aria-label={name} className="flex w-[68px] shrink-0 flex-col items-center gap-1 text-center sm:w-[80px]">
+      <span className={`rounded-full p-[2.5px] ${done ? 'bg-neutral-300' : 'bg-gradient-to-tr from-sky-400 via-blue-500 to-blue-700'}`}>
+        <span className="block rounded-full bg-white p-[2px]"><StoreLogo store={grp.store} size={56} className="h-14 w-14 sm:h-16 sm:w-16" /></span>
       </span>
-      <span className="absolute inset-x-2 bottom-2 line-clamp-2 flex items-center gap-1 text-[12px] font-bold leading-tight text-white drop-shadow">{name}{grp.platform && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-sky-300" />}</span>
+      <span className="flex w-full items-center justify-center gap-0.5 text-[11px] font-semibold leading-tight text-fg sm:text-xs">
+        <span className="truncate">{name}</span>{grp.platform && <BadgeCheck className="h-3.5 w-3.5 shrink-0 text-sky-500" />}
+      </span>
     </button>
   );
 }
@@ -188,8 +184,8 @@ export default function StoriesBar() {
   const ordered = [...groups].sort((a, b) => Number(!!b.platform) - Number(!!a.platform) || Number(allSeen(a)) - Number(allSeen(b))); // تويست الرسمي الأول، وبعدها الجديد
 
   return (
-    <section aria-label={ar ? 'ستوري المحلات' : 'Store stories'} className="mx-auto w-full max-w-7xl px-3 pt-3 sm:px-4">
-      <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" dir={ar ? 'rtl' : 'ltr'}>
+    <section aria-label={ar ? 'ستوري المحلات' : 'Store stories'} className="mx-auto w-full max-w-7xl px-3 pb-1 pt-3 sm:px-4">
+      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" dir={ar ? 'rtl' : 'ltr'}>
         {ordered.map((grp, idx) => <Card key={grp.store.slug} grp={grp} ar={ar} done={allSeen(grp)} onOpen={() => setOpen({ list: ordered, start: idx, startItem: Math.max(0, ordered[idx].items.findIndex((it) => !seen.has(it.id))) })} />)}
       </div>
       {open && <Viewer groups={open.list} start={open.start} startItem={open.startItem} onClose={() => setOpen(null)} onSeen={markSeen} />}

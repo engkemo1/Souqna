@@ -184,7 +184,7 @@ function TwistComposer({ info, onDone }) {
               ? <div className="flex h-full items-center justify-center p-4 text-center" style={{ backgroundColor: bg, backgroundImage: 'linear-gradient(160deg, rgba(255,255,255,.14), rgba(0,0,0,.28))' }}><span className="text-lg font-extrabold leading-snug text-white" dir="auto">{caption || 'النص هنا'}</span></div>
               : preview ? (isVideo ? <video src={preview} muted playsInline controls className="h-full w-full object-contain" /> : <img src={preview} alt="" className="h-full w-full object-contain" />)
                 : <div className="grid h-full place-items-center text-xs text-white/60">اختار صورة أو فيديو</div>}
-            <div className="absolute inset-x-0 top-0 flex items-center gap-1.5 bg-gradient-to-b from-black/60 to-transparent p-2"><span className="grid h-6 w-6 place-items-center rounded-full bg-white text-[11px] font-black">T</span><span className="text-[11px] font-semibold text-white">تويست</span><BadgeCheck className="h-3.5 w-3.5 text-sky-400" /></div>
+            <div className="absolute inset-x-0 top-0 flex items-center gap-1.5 bg-gradient-to-b from-black/60 to-transparent p-2"><img src="/brand/twist-story.png" alt="" className="h-6 w-6 rounded-full" /><span className="text-[11px] font-semibold text-white">تويست</span><BadgeCheck className="h-3.5 w-3.5 text-sky-400" /></div>
             {(picked.length > 0 || href || (mode === 'media' && caption)) && (
               <div className="absolute inset-x-0 bottom-0 space-y-1.5 bg-gradient-to-t from-black/85 to-transparent p-2 pt-8">
                 {mode === 'media' && caption && <p className="text-[11px] leading-snug text-white" dir="auto">{caption}</p>}
