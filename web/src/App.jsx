@@ -104,7 +104,11 @@ const More = lazy(() => import('./pages/dashboard/More.jsx'));
 
 function Root() {
   const { pathname } = useLocation();
-  useEffect(() => { trackSiteVisit(pathname); trackPageEvents(pathname); }, [pathname]);
+  useEffect(() => {
+    trackSiteVisit(pathname);
+    trackPageEvents(pathname);
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [pathname]);
   return (
     <Suspense fallback={<RouteFallback />}>
       <Outlet />

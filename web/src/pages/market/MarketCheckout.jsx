@@ -52,6 +52,25 @@ export default function MarketCheckout() {
   }, {})), [cart.items]);
   const groupKey = JSON.stringify(groups.map((g) => [g.slug, g.items.map((i) => [i.productId, i.variantId, i.qty])]));
   const phoneForQuote = PHONE.test(form.phone.trim()) ? form.phone.trim() : '';
+  // Returning buyer: a known number pre-fills the form. Anyone gets first name + area; full details only on the device that ordered (token kept after an order).
+  const [returning, setReturning] = useState(null);
+  useEffect(() => {
+    if (!phoneForQuote) { setReturning(null); return undefined; }
+    let live = true;
+    const timer = setTimeout(() => {
+      let token; try { token = (JSON.parse(localStorage.getItem('souqna.rb') || '{}'))[phoneForQuote]; } catch { /* private mode */ }
+      api('/marketplace/returning', { method: 'POST', body: { phone: phoneForQuote, ...(token ? { token } : {}) } }).then((r) => {
+        if (!live || !r?.found) { if (live) setReturning(null); return; }
+        setReturning(r);
+        setForm((f) => ({
+          ...f,
+          name: f.name.trim() ? f.name : (r.verified ? r.name : f.name),
+          ...(r.verified ? { governorate: r.governorate || f.governorate, city: r.city || f.city, address: f.address.trim() ? f.address : (r.address || f.address) } : {}),
+        }));
+      }).catch(() => { if (live) setReturning(null); });
+    }, 400);
+    return () => { live = false; clearTimeout(timer); };
+  }, [phoneForQuote]);
   const couponErrorText = (code, min) => ({
     coupon_invalid: ar ? 'الكود ده مش صحيح.' : 'This code is not valid.',
     coupon_expired: ar ? 'الكود ده انتهى.' : 'This code has expired.',
@@ -186,6 +205,7 @@ export default function MarketCheckout() {
         ...(feePending ? {} : { expectedShipping: shipping }), expectedTotal: total,
         stores: groups.map((g) => ({ slug: g.slug, gifts: loadGifts(g.slug), storeNote: (storeNotes[g.slug] || '').trim(), items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, ...(tryPick && tryPick.key === `${g.slug}:${l.productId}:${l.variantId || 0}` ? { tryVariantId: tryPick.altVariantId } : {}) })), ...(codes[g.slug] ? { coupon: codes[g.slug] } : {}) })),
       } });
+      if (result.rememberToken) { try { const m = JSON.parse(localStorage.getItem('souqna.rb') || '{}'); m[form.phone.trim()] = result.rememberToken; localStorage.setItem('souqna.rb', JSON.stringify(m)); } catch { /* private mode */ } }
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
       for (const order of result.orders) rememberOrder({ number: order.number, token: order.trackToken, store: order.store?.[lang] || order.store?.ar || order.storeSlug });
       cart.clear();
@@ -212,7 +232,7 @@ export default function MarketCheckout() {
       <form onSubmit={placeOrder} className="min-w-0 space-y-7 lg:col-span-7">
         <section className="rounded-3xl border border-line bg-elevated p-5 sm:p-6"><h2 className="mb-5 font-semibold">{ar ? 'بيانات التوصيل' : 'Delivery details'}</h2><div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label={ar ? 'الاسم بالكامل' : 'Full name'}><Input autoComplete="name" value={form.name} onChange={set('name')} required minLength={2} /></Field>
-          <Field label={ar ? 'رقم الموبايل' : 'Mobile number'}><Input dir="ltr" inputMode="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} required placeholder="01xxxxxxxxx" /></Field>
+          <Field label={ar ? 'رقم الموبايل' : 'Mobile number'}><Input dir="ltr" inputMode="tel" autoComplete="tel" value={form.phone} onChange={set('phone')} required placeholder="01xxxxxxxxx" />{returning && <span role="status" className="mt-1.5 block text-xs font-medium text-success">{returning.verified ? (ar ? `أهلاً بعودتك ${returning.firstName}! رجّعنا بياناتك من آخر طلب، راجعها وعدّلها لو اتغيّرت.` : `Welcome back ${returning.firstName}! We filled your details from your last order; review and edit if changed.`) : (ar ? `أهلاً ${returning.firstName}! كمّل عنوانك وهيوصلك طلبك.` : `Hi ${returning.firstName}! Add your address and your order is on its way.`)}</span>}</Field>
           <Field label={ar ? 'المحافظة' : 'Governorate'}><Select value={form.governorate} onChange={set('governorate')}>{GOVERNORATES.map((g) => <option key={g} value={g}>{t(`gov.${g}`)}</option>)}</Select></Field>
           {sortedAreas.length > 0 && (
             <Field label={ar ? 'اختار منطقتك (أسرع)' : 'Pick your area (fastest)'} className="sm:col-span-2" hint={pinnedArea ? (ar ? `حددنا منطقتك من الدبوس: ${pinnedArea}. لو غلط غيّرها من القايمة.` : `Area set from your pin: ${pinnedArea}. Change it here if wrong.`) : (ar ? 'السعر بيظهر جنب كل منطقة. لو منطقتك مش موجودة اكتب اسمها تحت.' : 'The price is shown next to each area. If yours is missing, type it below.')}>

@@ -9,7 +9,7 @@ import QuickAddSheet from '../store/QuickAddSheet.jsx';
 export default function ProductRail({ title, items, loading, to, tone = '' }) {
   const { t } = useI18n();
   const [quick, setQuick] = useState(null);
-  if (!loading && !items?.length) return null;
+  if (!loading && (!items?.length || items.length < 2)) return null;
   return (
     <section className={tone}>
       <div className="container py-10 sm:py-12">

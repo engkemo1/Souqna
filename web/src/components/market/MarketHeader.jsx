@@ -81,7 +81,7 @@ export default function MarketHeader() {
           </button>
 
           {/* Store owners: sign in / open the dashboard */}
-          <Link to={owner ? '/dashboard' : '/login'} className="inline-flex h-9 items-center rounded-full border border-line px-3 text-xs font-semibold text-fg transition hover:bg-fg/[0.06]">{owner ? (ar ? 'لوحة المحل' : 'Dashboard') : (ar ? 'دخول المحلات' : 'Store login')}</Link>
+          <Link to={owner ? '/dashboard' : '/login'} className="hidden sm:inline-flex h-9 items-center rounded-full border border-line px-3 text-xs font-semibold text-fg transition hover:bg-fg/[0.06]">{owner ? (ar ? 'لوحة المحل' : 'Dashboard') : (ar ? 'دخول المحلات' : 'Store login')}</Link>
 
         </nav>
       </div>

@@ -52,11 +52,15 @@
     @apply bg-canvas text-fg antialiased;
     text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
+    overflow-x: hidden;
   }
 
   body {
     @apply font-sans text-base leading-normal bg-canvas text-fg;
     min-height: 100dvh;
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
   }
 
   /* Arabic must never be letter-spaced or fake-italicised: both break the joined letterforms. */

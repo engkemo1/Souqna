@@ -46,6 +46,7 @@ import { sendNewOrderAlert, notifyPlatformAlert, notifyCustomerOrderPlaced } fro
 import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
 import { prepareTry, attachTry, tryAlternatives, tryRecord } from '../lib/try-sizes.js';
 import { storeHours } from '../lib/hours.js';
+import { returningFor, signReturning } from '../lib/returning-buyer.js';
 import { waAuthReady } from '../lib/wa.js';
 import {
   serializeStore, serializeCards, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi,
@@ -699,12 +700,12 @@ r.get('/look-of-day', h(async (_req, res) => {
 r.get('/marketplace', h((req, res) => {
   const { q: term = '', category = '', sort = 'featured' } = req.query;
   // a shop with no products yet (a test / just-created store) is not shown on the public pages until it has something to sell
-  const where = ["s.status='active'", 's.hidden=0', "(s.show_when_empty=1 OR (SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0)"];
+  const where = ["s.status='active'", 's.hidden=0', "((SELECT COUNT(*) FROM products px WHERE px.store_id=s.id AND px.status='active') > 0)"];
   const params = [];
   if (category && category !== 'all') {
     const cl = deptSubtree(String(category).replace(/[^a-z_]/g, ''));
     // a store matches when it declared the section OR actually sells an active product filed under it
-    where.push(`(${cl.map(() => 's.departments LIKE ?').join(' OR ')} OR EXISTS (SELECT 1 FROM products pd WHERE pd.store_id=s.id AND pd.status='active' AND pd.department IN (${cl.map(() => '?').join(',')})))`); params.push(...cl.map((d) => `%,${d},%`), ...cl);
+    where.push(`EXISTS (SELECT 1 FROM products pd WHERE pd.store_id=s.id AND pd.status='active' AND pd.department IN (${cl.map(() => '?').join(',')}))`); params.push(...cl);
   }
   if (term) {
     where.push('(s.name_ar LIKE ? OR s.name_en LIKE ? OR s.tagline_ar LIKE ? OR s.tagline_en LIKE ?)');
@@ -1104,6 +1105,13 @@ r.post('/stores/:slug/quote', h((req, res) => {
   res.json({ ...qt, lines: qt.lines.map((l) => ({ ...l, image: media.get(l.mediaId) || null })) });
 }));
 
+/* Returning buyer: pre-fill the checkout from the phone number. Only the first name and the area for anyone; the full details need the device token issued at order time. */
+r.post('/marketplace/returning', h((req, res) => {
+  checkRateLimit(`public:returning:${req.ip}`, { max: 30, windowMs: 600e3, code: 'rate_limited', message: 'Too many requests.' });
+  const body = z.object({ phone: z.string().trim().max(20), token: z.string().max(600).optional() }).parse(req.body);
+  res.json(returningFor(body.phone, body.token));
+}));
+
 r.post('/marketplace/delivery-fee', h((req, res) => {
   const body = z.object({ governorate: z.string().trim().min(2).max(40), city: z.string().trim().min(2).max(60), phone: z.string().max(20).optional().nullable(), stores: z.array(z.object({ slug: z.string().trim().min(1).max(80), items: cartItems, coupon: z.string().trim().max(40).optional().nullable(), gifts: giftChoices })).min(1).max(20) }).parse(req.body);
   if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
@@ -1409,7 +1417,7 @@ r.post('/marketplace/orders', h((req, res) => {
     // Marketplace orders are always delivered by Twist, regardless of the
     // store's default delivery preference. Dispatch is notified when ready.
   }
-  res.status(201).json({ orders: result.map(({ orderId, ...order }) => order) });
+  res.status(201).json({ orders: result.map(({ orderId, ...order }) => order), rememberToken: signReturning(body.phone) });
 }));
 
 /** The platform coupon promoted on the marketplace home (if any). */

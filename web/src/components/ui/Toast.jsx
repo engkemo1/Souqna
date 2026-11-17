@@ -12,8 +12,9 @@ export function ToastProvider({ children }) {
   const toast = useCallback((opts) => {
     const id = ++uid;
     const item = typeof opts === 'string' ? { title: opts } : opts;
-    setToasts((t) => [...t.slice(-2), { id, tone: 'success', duration: 3200, ...item }]);
-    setTimeout(() => dismiss(id), item.duration || (item.action ? 5000 : 3200));
+    const duration = item.duration || (item.action ? 5500 : 3500);
+    setToasts((t) => [...t.slice(-2), { id, tone: 'success', duration, ...item }]);
+    setTimeout(() => dismiss(id), duration);
     return id;
   }, [dismiss]);
 
