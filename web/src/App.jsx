@@ -17,6 +17,7 @@ const MarketSearch = lazy(() => import('./pages/market/MarketSearch.jsx'));
 const CategoryPage = lazy(() => import('./pages/market/CategoryPage.jsx'));
 const MarketCart = lazy(() => import('./pages/market/MarketCart.jsx'));
 const MarketFavorites = lazy(() => import('./pages/market/MarketFavorites.jsx'));
+const Compare = lazy(() => import('./pages/market/Compare.jsx'));
 const MarketCheckout = lazy(() => import('./pages/market/MarketCheckout.jsx'));
 const MarketOrderSuccess = lazy(() => import('./pages/market/MarketOrderSuccess.jsx'));
 const VisualSearch = lazy(() => import('./pages/market/VisualSearch.jsx'));
@@ -125,6 +126,7 @@ const router = createBrowserRouter([
       { path: '/market-checkout', element: <MarketCheckout /> },
       { path: '/market-order-success', element: <MarketOrderSuccess /> },
       { path: '/favorites', element: <MarketFavorites /> },
+      { path: '/compare', element: <Compare /> },
       { path: '/visual', element: <VisualSearch /> },
       { path: '/login', element: <Login /> },
       { path: '/register', element: <Register /> },

@@ -1,13 +1,12 @@
 import SuggestInput, { saveRecent } from './SuggestInput.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Search, Heart, User, ShoppingBag, ChevronDown, Menu, X, Flame } from 'lucide-react';
+import { Search, Heart, User, ShoppingBag, Menu, X, Flame } from 'lucide-react';
 import { useBuyer } from '../../lib/buyer.jsx';
 import { useScrolled } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import Brand from './Brand.jsx';
 import MobileBottomNav from './MobileBottomNav.jsx';
-import Button from '../ui/Button.jsx';
 import { cx } from '../ui/cx.js';
 import { useMarketCart } from '../../lib/cart.jsx';
 import { useAuth } from '../../lib/auth.jsx';
@@ -25,7 +24,7 @@ export default function MarketHeader() {
   const { user: owner } = useAuth() || {};
   const ar = lang === 'ar';
   const { tops } = useDepartments();
-  const TOP_CATEGORIES = tops.slice(0, 8).map((d) => ({ slug: d.slug, text: deptName(d, lang), href: deptHref(d.slug) })); // from the department tree, never hard-coded
+  const TOP_CATEGORIES = tops.slice(0, 5).map((d) => ({ slug: d.slug, text: deptName(d, lang), href: deptHref(d.slug) })); // from the department tree, never hard-coded
   const handleSectionLink = (id) => (event) => {
     setMobileMenuOpen(false);
     if (window.location.pathname !== '/') return;
@@ -79,16 +78,11 @@ export default function MarketHeader() {
           {/* Language selector */}
           <button type="button" onClick={toggle} className="hidden h-9 items-center gap-1 rounded-lg px-2.5 text-sm font-semibold text-fg/80 transition hover:bg-fg/[0.06] active:scale-95 sm:inline-flex">
             <span>{lang === 'ar' ? 'EN' : 'عربي'}</span>
-            <ChevronDown className="h-3.5 w-3.5 opacity-60" />
           </button>
 
           {/* Store owners: sign in / open the dashboard */}
           <Link to={owner ? '/dashboard' : '/login'} className="inline-flex h-9 items-center rounded-full border border-line px-3 text-xs font-semibold text-fg transition hover:bg-fg/[0.06]">{owner ? (ar ? 'لوحة المحل' : 'Dashboard') : (ar ? 'دخول المحلات' : 'Store login')}</Link>
 
-          {/* Owner login button */}
-          <Button size="sm" variant="ghost" to="/join" className="hidden text-xs font-semibold md:inline-flex">
-            {t('market.openStore')}
-          </Button>
         </nav>
       </div>
 

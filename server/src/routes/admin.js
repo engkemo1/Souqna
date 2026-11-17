@@ -43,6 +43,7 @@ import { mountCashierAdmin } from './admin-cashier.js';
 import { adminStoryStores, setStoriesAllowed, setAllStoriesAllowed, adminActiveStories, adminRemoveStory, addPlatformStory, searchStoryProducts, PLATFORM_MAX_ACTIVE, PLATFORM_HOURS } from '../lib/stories.js';
 import { saveStoryImage, saveStoryVideo, looksLikeVideo, deleteStoryVideo, HQ_VIDEO_MAX_SECONDS, HQ_VIDEO_MAX_BYTES } from '../lib/story-video.js';
 import { cashierAccess } from '../lib/cashier-access.js';
+import { settleTry, tryInfoFor } from '../lib/try-sizes.js';
 import { CASHIER_SYSTEMS, CASHIER_IDS, CASHIER_LINK_STATUSES } from '../lib/cashier-catalog.js';
 import { getPlatformFreeShipping, savePlatformFreeShipping, deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing, getMultiStoreRule, saveMultiStoreRule, getZonePolicy, saveZonePolicy, zoneKey } from '../lib/deliveryRates.js';
 
@@ -309,7 +310,7 @@ function applyPickupBranch(row) {
 /** Orders Twist has to collect from stores and deliver. */
 r.get('/deliveries', h((_req, res) => {
   const rows = q.all(`SELECT o.id,o.number,o.status,o.total,o.subtotal,o.shipping,o.shipping_free,o.delivery_group,o.delivery_fee_status,o.delivery_fee_quote,o.track_token,o.delivery_sponsor_share,o.delivery_sponsor_collected,
-      o.delivery_route_id,o.delivery_mode,o.delivery_person_id,o.courier_cost,o.customer_name,o.phone,o.governorate,o.city,o.address,o.notes,o.created_at,o.handoff_at,o.pickup_branch,s.branches_json,
+      o.delivery_route_id,o.delivery_mode,o.delivery_person_id,o.courier_cost,o.has_try,o.try_outcome,o.customer_name,o.phone,o.governorate,o.city,o.address,o.notes,o.created_at,o.handoff_at,o.pickup_branch,s.branches_json,
       s.id AS store_id,s.slug,s.name_ar AS store_name,s.phone AS store_phone,s.whatsapp AS store_whatsapp,s.address_ar AS store_address,s.map_url AS store_map,s.delivery_zone
     FROM orders o JOIN stores s ON s.id=o.store_id
     WHERE o.delivery_by='platform' AND o.status NOT IN ('delivered','cancelled') ORDER BY o.created_at ASC,o.id ASC LIMIT 300`).map(applyPickupBranch);
@@ -321,6 +322,7 @@ r.get('/deliveries', h((_req, res) => {
     if (!grouped.has(key)) grouped.set(key, []); grouped.get(key).push(row);
     if (row.delivery_group) { if (!baskets.has(row.delivery_group)) baskets.set(row.delivery_group, []); baskets.get(row.delivery_group).push(row); }
   }
+  const tryInfo = tryInfoFor(rows.filter((x) => x.has_try).map((x) => x.id));
   const orders = rows.map((row) => {
     const siblings = grouped.get(routeKey(row));
     const basket = row.delivery_group ? (baskets.get(row.delivery_group) || []) : [row];
@@ -328,7 +330,7 @@ r.get('/deliveries', h((_req, res) => {
     const leaderRoute = collectionLeader ? grouped.get(routeKey(collectionLeader)) : siblings;
     const owner = [...siblings].sort((a,b) => a.id-b.id)[0];
     const cost = row.delivery_courier_cost == null ? null : Number(row.delivery_courier_cost);
-    return { ...row,
+    return { ...row, try_sizes: tryInfo.get(row.id) || null,
       delivery_route_id: routeKey(row), delivery_run_owner_id: owner.id,
       delivery_route_count: siblings.length, delivery_route_ready_count: siblings.filter((x) => x.status === 'processing').length,
       delivery_route_shipped_count: siblings.filter((x) => x.status === 'shipped').length,
@@ -462,6 +464,14 @@ r.patch('/orders/:id/delivery-sponsor', h((req,res) => {
   res.json({ ok:true, share:order.delivery_sponsor_share, collected });
 }));
 
+/** "Send me two sizes": the courier records what the shopper kept at the door (main = first size, alt = the other size, none = nothing). */
+r.post('/orders/:id/try-size', h((req, res) => {
+  const { keep } = z.object({ keep: z.enum(['main', 'alt', 'none']) }).parse(req.body);
+  const o = q.get("SELECT id FROM orders WHERE id=? AND delivery_by='platform'", [Number(req.params.id)]);
+  if (!o) throw new AppError(404, 'not_found', 'Order not found.');
+  res.json(settleTry(o.id, keep));
+}));
+
 r.patch('/orders/:id/status', h((req, res) => {
   const { status } = z.object({ status: z.enum(['shipped', 'delivered']) }).parse(req.body);
   const o = q.get("SELECT * FROM orders WHERE id=? AND delivery_by='platform'", [Number(req.params.id)]);
@@ -480,6 +490,7 @@ r.patch('/orders/:id/status', h((req, res) => {
     : o.delivery_group
       ? q.all("SELECT * FROM orders WHERE COALESCE(delivery_route_id,delivery_group,'order:' || id)=? AND delivery_by='platform' AND status<>'cancelled'", [routeId])
     : [o];
+  if (status === 'delivered' && orders.some((item) => item.has_try && !item.try_outcome)) throw new AppError(409, 'try_size_pending', 'Record what the shopper kept from the two sizes before marking this delivered.');
   const expected = status === 'shipped' ? 'processing' : 'shipped';
   if (!orders.length || orders.some((item) => item.status !== expected)) {
     const message = status === 'shipped'

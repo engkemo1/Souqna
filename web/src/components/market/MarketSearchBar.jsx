@@ -1,17 +1,26 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, Camera } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useDepartments } from '../../lib/departments.js';
+import { useDebounced } from '../../lib/hooks.js';
 import SuggestInput, { saveRecent } from './SuggestInput.jsx';
 
 /** Hero search: type any product (كوتشي، فستان، شنطة…) and see every store's matching products with prices. */
-export default function MarketSearchBar({ initial = '', autoFocus, chips = true }) {
+export default function MarketSearchBar({ initial = '', autoFocus, chips = true, onLive }) {
   const { t } = useI18n();
   const nav = useNavigate();
   const { tops: list, label } = useDepartments();
   const [term, setTerm] = useState(initial);
-  const go = (e) => { e.preventDefault(); const q = term.trim(); saveRecent(q); nav(q ? `/search?${new URLSearchParams({ q })}` : '/search'); };
+  const sent = useRef(initial.trim());
+  const dq = useDebounced(term.trim(), 350);
+  // live mode (search page): update the results while typing, once there are 2+ letters (or the box is emptied)
+  useEffect(() => { if (onLive && dq !== sent.current && (dq.length >= 2 || dq === '')) { sent.current = dq; onLive(dq, false); } }, [dq]); // eslint-disable-line react-hooks/exhaustive-deps
+  const go = (e) => {
+    e.preventDefault(); const q = term.trim(); saveRecent(q);
+    if (onLive) { sent.current = q; onLive(q, true); return; } // keeps the filters the shopper already chose
+    nav(q ? `/search?${new URLSearchParams({ q })}` : '/search');
+  };
   return (
     <div>
       <form onSubmit={go} role="search" className="relative">

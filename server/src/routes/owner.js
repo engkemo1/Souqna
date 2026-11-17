@@ -855,6 +855,7 @@ export const productSchema = z.object({
   stock: z.coerce.number().int().min(0).max(100000).optional().default(0),
   low_stock_at: z.coerce.number().int().min(0).max(1000).optional().default(5),
   no_return: z.boolean().optional(),
+  try_sizes: z.boolean().optional(), // the shop lets shoppers have a second size sent along to try at the door
   media: z.array(z.number().int()).max(30).default([]),
   primary_media_id: z.number().int().nullable().optional(),
   seo_title: z.string().trim().max(70).optional().nullable(),
@@ -925,7 +926,7 @@ export function saveProduct(storeId, data, existing) {
       price: data.price, compare_at_price: data.compare_at_price || null, sale_ends_at: data.compare_at_price ? (data.sale_ends_at ?? null) : null, cost: data.cost ?? null, sku: data.sku || null, ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
       category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, wantedDept, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
-      stock, low_stock_at: data.low_stock_at, ...(data.material !== undefined ? { material_ar: (data.material || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.care !== undefined ? { care_ar: (data.care || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
+      stock, low_stock_at: data.low_stock_at, ...(data.try_sizes !== undefined ? { try_sizes: data.try_sizes ? 1 : 0 } : {}), ...(data.material !== undefined ? { material_ar: (data.material || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.care !== undefined ? { care_ar: (data.care || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };
     if (data.attrs !== undefined) { // only when the editor sent them (partial saves from WhatsApp / POS keep the stored values)
       const clean = sanitizeAttrValues(data.attrs, row.department ? deptAttrDefs(row.department) : []);
@@ -1118,13 +1119,14 @@ r.get('/orders/:id', h((req, res) => {
   const runShare = runCost == null || runPosition < 0 ? null : Math.floor(runCost / runOrders.length) + (runPosition < runCost % runOrders.length ? 1 : 0);
   res.json({
     order: {
+      hasTry: !!o.has_try, tryOutcome: o.try_outcome || null,
       id: o.id, number: o.number, status: o.status, deliveryBy: o.delivery_by, pickupBranch: o.pickup_branch || '', reserveUntil: o.reserve_until || null, reserveRecord: o.delivery_by === 'pickup' ? reserveRecord(o.phone) : null, deliveryGroup: o.delivery_group, handoffAt: o.handoff_at, next: ownerNext(o), createdAt: o.created_at, updatedAt: o.updated_at,
       customer: { id: customer?.id, name: o.customer_name, phone: o.phone, governorate: o.governorate, city: o.city, address: o.address, ordersCount: customer?.orders_count || 1, totalSpent: customer?.total_spent ?? o.total },
       notes: o.notes, storeNote: o.store_note || null, payment: o.payment_method, coupon: o.coupon_code, platformDiscount: o.platform_discount || 0,
       subtotal: o.subtotal, discount: o.discount, promoDiscount: o.promo_discount || 0, promotions: orderPromotions(o.id), refunded: q.val('SELECT COALESCE(SUM(refund),0) FROM order_returns WHERE order_id=?', [o.id]) || 0, shipping: o.delivery_group ? 0 : o.shipping, total: o.delivery_group ? o.subtotal - o.discount : o.total,
       shippingFree: !!o.shipping_free,
       shippingSponsorDue: o.delivery_by === 'platform' && o.shipping_free ? runShare : 0,
-      items: items.map((i) => ({ id: i.id, productId: i.product_id, name: bi(i, 'name'), price: i.price, qty: i.qty, isGift: !!i.is_gift, promoDiscount: i.promo_discount || 0, returnedQty: i.returned_qty || 0, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
+      items: items.filter((i) => i.qty > 0 || !i.try_role).map((i) => ({ tryRole: i.try_role || null, tryResult: i.try_result || null, id: i.id, productId: i.product_id, name: bi(i, 'name'), price: i.price, qty: i.qty, isGift: !!i.is_gift, promoDiscount: i.promo_discount || 0, returnedQty: i.returned_qty || 0, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
       events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]),
     },
   });

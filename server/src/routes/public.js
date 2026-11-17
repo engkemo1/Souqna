@@ -44,6 +44,7 @@ import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, get
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert, notifyPlatformAlert, notifyCustomerOrderPlaced } from '../lib/whatsapp.js';
 import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
+import { prepareTry, attachTry, tryAlternatives, tryRecord } from '../lib/try-sizes.js';
 import { storeHours } from '../lib/hours.js';
 import { waAuthReady } from '../lib/wa.js';
 import {
@@ -185,8 +186,14 @@ r.get('/search/suggest', h((req, res) => {
     .map((d) => ({ slug: d.slug, name: { ar: d.name_ar, en: d.name_en } }));
   const stores = q.all(`SELECT s.slug, s.name_ar, s.name_en FROM stores s WHERE s.status='active' AND s.hidden=0 AND (${NORM('s.name_ar')} LIKE ? OR ${NORM('s.name_en')} LIKE ?) LIMIT 3`, [like, like])
     .map((x) => ({ slug: x.slug, name: { ar: x.name_ar, en: x.name_en } }));
+  // typo help right in the dropdown: nothing matches as typed, but a close spelling does
+  let didYouMean;
+  if (!names.length && term.length >= 3) {
+    const fixed = suggestCorrection(term, searchLookups().vocab);
+    if (fixed && fixed !== term) { const p2 = searchPlan(fixed); if (p2 && p2.level <= 2 && p2.count > 0) didYouMean = fixed; }
+  }
   cache(res, 30);
-  res.json({ products: names, departments, stores });
+  res.json({ products: names, departments, stores, didYouMean });
 }));
 
 /** What other shoppers search most (last 2 weeks): only words searched by at least 3 sessions' worth of searches that still find products today. Aggregate only, no personal data. */
@@ -231,6 +238,35 @@ const matCond = (m) => ({ sql: `(${m.words.map(() => `${MAT_TEXT()} LIKE ?`).joi
 const SOLD_OUT_LAST = '(CASE WHEN p.track_stock=1 AND p.stock<=0 THEN 1 ELSE 0 END) ASC';
 
 const AUD_DEPT = { men: 'men', women: 'women', kids: 'kids', boys: 'kids', girls: 'kids' };
+
+/** Side-by-side comparison: up to 4 products with everything a shopper compares (price, material, colours, sizes in stock, store, rating). Public data only. */
+r.get('/compare', h((req, res) => {
+  const ids = [...new Set(String(req.query.ids || '').split(',').map(Number).filter((n) => Number.isInteger(n) && n > 0))].slice(0, 4);
+  if (!ids.length) { cache(res, 30); return res.json({ items: [] }); }
+  const rows = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id WHERE p.id IN (${ids.map(() => '?').join(',')}) AND p.status='active' AND s.status='active' AND s.hidden=0`, ids);
+  const byId = new Map(rows.map((x) => [x.id, x]));
+  const ordered = ids.map((id) => byId.get(id)).filter(Boolean); // keep the order the shopper added them in
+  const cards = serializeCards(ordered);
+  const variants = ordered.length ? q.all(`SELECT product_id, size, stock FROM variants WHERE product_id IN (${ordered.map(() => '?').join(',')}) ORDER BY id`, ordered.map((x) => x.id)) : [];
+  const items = cards.map((c, i) => {
+    const p = ordered[i];
+    const hay = ` ${normText(`${p.name_ar || ''} ${p.name_en || ''} ${p.description_ar || ''} ${p.description_en || ''}`)} `;
+    const mats = MATERIALS.filter((m) => m.words.some((w) => hay.includes(normText(w)))).map((m) => ({ ar: m.ar, en: m.en }));
+    const mine = variants.filter((v) => v.product_id === p.id);
+    const inStock = [...new Set(mine.filter((v) => v.size && v.stock > 0).map((v) => v.size))];
+    const declared = json(p.sizes_json, []).map(String);
+    const sizes = mine.length ? inStock : declared;
+    return {
+      ...c,
+      store: { slug: p.store_slug, name: bi(p, 'store_name') },
+      material: p.material_ar ? { ar: p.material_ar, en: p.material_ar } : (mats[0] || null),
+      colors: (c.colors || []).filter((x) => x && x.hex).slice(0, 12),
+      sizes: sizes.slice(0, 20),
+    };
+  });
+  cache(res, 30);
+  res.json({ items });
+}));
 
 r.get('/search', h((req, res) => {
   const { q: term = '', department = '', store = '', sort = 'relevance', min, max, page = '1', sale, new: isNew, in_stock: inStock, rating, ids, sizes, colors } = req.query;
@@ -374,7 +410,7 @@ r.get('/search', h((req, res) => {
       : d.options.map((o) => ({ ...o, n: byV.get(o.v) || 0 })).filter((o) => o.n > 0 || (attrSel.get(d.key) || []).includes(o.v));
     return { key: d.key, name: { ar: d.ar, en: d.en }, type: d.type, options, selected: attrSel.get(d.key) || [] };
   }).filter((f) => f.options.length);
-  if (term && !ids && pg === 1 && !department && !store && !min && !max && !sale && !isNew && !inStock && !rating && !sizes && !colors) logSearch(term, total > 0 && (!plan || plan.level <= 2)); // plain text searches only; feeds admin → تحليلات السوق
+  if (term && !ids && pg === 1 && !department && !store && !min && !max && !sale && !isNew && !inStock && !rating && !sizes && !colors && req.query.live !== '1') logSearch(term, total > 0 && (!plan || plan.level <= 2)); // plain text searches only; feeds admin → تحليلات السوق
   // "did you mean": when the words didn't match as typed (nothing, or only a loose match) offer the corrected spelling if it really finds products
   let didYouMean;
   if (term && !ids && plan && (plan.level >= 3 || total === 0)) {
@@ -1030,7 +1066,23 @@ r.post('/stores/:slug/page-view', h((req, res) => {
 }));
 
 const giftChoices = z.record(z.string(), z.coerce.number().int()).optional().nullable();
-const cartItems = z.array(z.object({ productId: z.coerce.number().int(), variantId: z.coerce.number().int().nullable().optional(), qty: z.coerce.number().int().min(1).max(20) })).min(1).max(50);
+const cartItems = z.array(z.object({ productId: z.coerce.number().int(), variantId: z.coerce.number().int().nullable().optional(), qty: z.coerce.number().int().min(1).max(20), tryVariantId: z.coerce.number().int().positive().nullable().optional() })).min(1).max(50);
+
+/** "Send me two sizes": which basket lines can have a second size sent along to try, and which sizes. Public product data only. */
+r.post('/marketplace/try-options', h((req, res) => {
+  const body = z.object({
+    phone: z.string().trim().max(20).optional(),
+    items: z.array(z.object({ slug: z.string().trim().min(1).max(80), productId: z.coerce.number().int(), variantId: z.coerce.number().int().nullable().optional(), qty: z.coerce.number().int().min(1).max(20).optional() })).min(1).max(60),
+  }).parse(req.body);
+  const items = [];
+  for (const it of body.items) {
+    const st = q.get("SELECT id FROM stores WHERE slug=? AND status='active' AND hidden=0", [it.slug]);
+    const r1 = st && it.variantId && (it.qty || 1) === 1 ? tryAlternatives(st.id, it.productId, it.variantId) : { eligible: false, alts: [] };
+    items.push({ slug: it.slug, productId: it.productId, variantId: it.variantId ?? null, eligible: r1.eligible, alts: r1.alts, mainSize: r1.mainSize || null });
+  }
+  const phone = /^01[0125][0-9]{8}$/.test(body.phone || '') ? body.phone : null;
+  res.json({ items, blockedUntil: phone ? tryRecord(phone).blockedUntil : null });
+}));
 
 /* Pieces in a basket that cannot be exchanged (the piece opted out, or the whole store accepts no exchanges), so the shopper knows before ordering. */
 r.post('/marketplace/final-sale', h((req, res) => {
@@ -1153,6 +1205,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
     const qt = quote(s, body.items, body.coupon, { phone: body.phone, giftChoices: body.gifts });
     if (body.coupon && qt.couponError) throw new AppError(409, qt.couponError, 'This coupon can no longer be applied.'); // never charge more than the customer was shown
     if (qt.hasErrors) throw new AppError(409, 'cart_changed', 'Some items in your cart are no longer available.', { lines: qt.lines });
+    const tryReq = prepareTry(s, body.items, body.phone); // a second size to try at the door (shop opted in per product)
     if (body.expectedTotal != null && body.expectedTotal !== qt.total) throw new AppError(409, 'price_changed', 'The offers or prices changed. Please review the updated total.', { total: qt.total });
     const now = nowIso();
     let customer = q.get('SELECT * FROM customers WHERE store_id=? AND phone=?', [s.id, body.phone]);
@@ -1177,8 +1230,9 @@ r.post('/stores/:slug/orders', h((req, res) => {
       deductOrderLineStock(l);
     }
     insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
+    attachTry(orderId, tryReq, now);
     consumeCouponAtomically(qt.coupon);
-    return { number, total: qt.total, trackToken, orderId };
+    return { number, total: qt.total, trackToken, orderId, hasTry: !!tryReq, trySize: tryReq?.altSize };
   });
   if (result.duplicate) {
     delete result.orderId;
@@ -1190,7 +1244,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
       .catch((e) => console.error(`[whatsapp] ${result.number} failed: ${e.message}`));
   }
   notifyCustomerOrderPlaced({ phone: body.phone, name: body.name, number: result.number, token: result.trackToken, orderId: result.orderId });
-  notifyStore(s.id, { title: `طلب جديد 🛍️ ${result.number}`, body: `${body.name} · ${result.total} ج.م`, url: `/dashboard/orders/${result.orderId}`, tag: `order-${result.orderId}` });
+  notifyStore(s.id, { title: `طلب جديد 🛍️ ${result.number}`, body: `${body.name} · ${result.total} ج.م${result.hasTry ? ` · تجربة مقاسين (جهّز مقاس ${result.trySize} كمان)` : ''}`, url: `/dashboard/orders/${result.orderId}`, tag: `order-${result.orderId}` });
   notifyPlatformAlert(`طلب جديد من ${s.name_ar} 🛍️ ${result.number} بقيمة ${result.total} ج.م للعميل ${body.name}`);
   delete result.orderId;
   res.status(201).json({ order: result });
@@ -1290,7 +1344,8 @@ r.post('/marketplace/orders', h((req, res) => {
       const qt = quote(store, items, coupon, { phone: body.phone, giftChoices: gifts });
       if (qt.hasErrors) throw new AppError(409, 'cart_changed', 'Some items are no longer available.', { slug, lines: qt.lines });
       if (coupon && qt.couponError) throw new AppError(409, qt.couponError, 'This coupon can no longer be applied.'); // never charge more than the customer was shown
-      return { store, qt, storeNote };
+      const tryReq = prepareTry(store, items, body.phone); // a second size to try at the door (shop opted in per product)
+      return { store, qt, storeNote, tryReq };
     });
     // A fixed-amount or free-delivery Twist code is one gift per basket, not one per store.
     if (prepared.filter(({ qt }) => qt.coupon?.source === 'platform' && qt.coupon.type !== 'percentage').length > 1) throw new AppError(409, 'coupon_one_store', 'This code applies to one store in the basket.');
@@ -1312,7 +1367,7 @@ r.post('/marketplace/orders', h((req, res) => {
     }
     const deliveryGroup = crypto.randomUUID();
     const now = nowIso();
-    const orders = prepared.map(({ store, qt, storeNote }, storeIndex) => {
+    const orders = prepared.map(({ store, qt, storeNote, tryReq }, storeIndex) => {
       // Keep the one basket fee allocated across the store sub-orders so a
       // split dispatch can see each route's correct cash amount.
       const shipping = pendingFee || split.storeShares[storeIndex]?.freeShipping ? 0 : split.storeShares[storeIndex]?.share || 0;
@@ -1339,7 +1394,8 @@ r.post('/marketplace/orders', h((req, res) => {
         deductOrderLineStock(line);
       }
       insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
-      return { orderId, number, trackToken, total: qt.subtotal - qt.discount + shipping, subtotal: qt.subtotal, discount: qt.discount, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, storeWhatsapp: store.whatsapp || store.phone || null, store: { ar: store.name_ar, en: store.name_en } };
+      attachTry(orderId, tryReq, now);
+      return { orderId, number, trackToken, hasTry: !!tryReq, trySize: tryReq?.altSize, total: qt.subtotal - qt.discount + shipping, subtotal: qt.subtotal, discount: qt.discount, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, storeWhatsapp: store.whatsapp || store.phone || null, store: { ar: store.name_ar, en: store.name_en } };
     });
     return orders;
   });
@@ -1348,7 +1404,7 @@ r.post('/marketplace/orders', h((req, res) => {
     // Store notifications are best-effort, after all sub-orders have committed atomically.
     if (store.auto_whatsapp) sendNewOrderAlert(store, order.orderId).catch((e) => console.error(`[whatsapp] ${order.number} failed: ${e.message}`));
     notifyCustomerOrderPlaced({ phone: body.phone, name: body.name, number: order.number, token: order.trackToken, orderId: order.orderId });
-    notifyStore(store.id, { title: `طلب جديد 🛍️ ${order.number}`, body: `${body.name} · ${order.total} ج.م`, url: `/dashboard/orders/${order.orderId}`, tag: `order-${order.orderId}` });
+    notifyStore(store.id, { title: `طلب جديد 🛍️ ${order.number}`, body: `${body.name} · ${order.total} ج.م${order.hasTry ? ` · تجربة مقاسين (جهّز مقاس ${order.trySize} كمان)` : ''}`, url: `/dashboard/orders/${order.orderId}`, tag: `order-${order.orderId}` });
     notifyPlatformAlert(`طلب تويست جديد 🛍️ ${order.number} من ${store.name_ar} بقيمة ${order.total} ج.م للعميل ${body.name}${order.deliveryFeeStatus === 'pending' ? ` ⚠️ المنطقة (${body.city}) خارج جدول التوصيل: كلّموا العميل ${body.phone} بمصاريف الشحن` : ''}`);
     // Marketplace orders are always delivered by Twist, regardless of the
     // store's default delivery preference. Dispatch is notified when ready.
@@ -1389,7 +1445,7 @@ function trackPayload(o) {
   const feeState = o.delivery_group ? q.get("SELECT delivery_fee_status,delivery_fee_quote FROM orders WHERE delivery_group=? AND status<>'cancelled' ORDER BY id LIMIT 1", [o.delivery_group]) : null;
   const basket = o.delivery_group ? q.get("SELECT COUNT(*) AS count, COALESCE(SUM(total),0) AS total, COALESCE(SUM(subtotal-discount),0) AS items_total FROM orders WHERE delivery_group=? AND status<>'cancelled'", [o.delivery_group]) : null;
   return {
-    number: o.number, token: o.track_token, status: o.status, createdAt: o.created_at, updatedAt: o.updated_at,
+    number: o.number, token: o.track_token, status: o.status, createdAt: o.created_at, updatedAt: o.updated_at, hasTry: !!o.has_try, tryOutcome: o.try_outcome || null,
     notes: o.notes || null, storeNote: o.store_note || null,
     deliveryBy: o.delivery_by, reserveUntil: o.reserve_until || null, firstName: String(o.customer_name || '').split(' ')[0],
     city: o.city, governorate: o.governorate, phone: o.phone.replace(/^(\d{3})\d{5}/, '$1•••••'),
@@ -1397,7 +1453,7 @@ function trackPayload(o) {
     deliveryGroupCount: basket?.count ? basket.count : null, deliveryGroupTotal: basket?.count ? (feeState?.delivery_fee_status === 'rejected' ? basket.items_total : basket.total) : null,
     deliveryFeeStatus: feeState?.delivery_fee_status || o.delivery_fee_status || 'confirmed', deliveryFeeQuote: feeState?.delivery_fee_quote ?? o.delivery_fee_quote ?? null,
     store: { name: { ar: s?.name_ar, en: s?.name_en }, slug: s?.slug, phone: s?.phone || null, ...(o.delivery_by === 'pickup' ? (() => { const bn = /^الفرع: (.+?)(?: — |$)/.exec(o.notes || '')?.[1]; const br = bn ? branchOf(bsRow, bn) : null; const p = pickupInfo({ ...(bsRow || {}), address_ar: s?.address_ar, address_en: s?.address_en }, br); return { address: br ? p.address : { ar: s?.address_ar || '', en: s?.address_en || '' }, mapUrl: p.mapUrl, lat: p.lat, lng: p.lng, reserveHours: s?.reserve_hours || 24, ...(br && p.phone ? { phone: p.phone } : {}) }; })() : {}) },
-    items: items.map((i) => ({ isGift: !!i.is_gift, promoDiscount: i.promo_discount || 0, productId: i.product_id, reviewed: i.product_id ? !!q.get('SELECT 1 AS x FROM reviews WHERE order_id=? AND product_id=?', [o.id, i.product_id]) : true, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
+    items: items.filter((i) => i.qty > 0 || !i.try_role).map((i) => ({ tryRole: i.try_role || null, tryResult: i.try_result || null, isGift: !!i.is_gift, promoDiscount: i.promo_discount || 0, productId: i.product_id, reviewed: i.product_id ? !!q.get('SELECT 1 AS x FROM reviews WHERE order_id=? AND product_id=?', [o.id, i.product_id]) : true, name: bi(i, 'name'), price: i.price, qty: i.qty, color: i.color, size: i.size, image: media.get(i.media_id) || null })),
     events,
   };
 }

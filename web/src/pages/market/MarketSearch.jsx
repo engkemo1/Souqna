@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SearchX, SlidersHorizontal, X, Store, MapPin, MessageCircle, Sparkles } from 'lucide-react';
 import { useApi, useDebounced } from '../../lib/hooks.js';
@@ -39,7 +39,9 @@ export default function MarketSearch() {
   const [open, setOpen] = useState(false);
   const key = new URLSearchParams({ q: dq, department, sort, ...Object.fromEntries(FILTER_KEYS.map((k) => [k, params.get(k) || '']).filter(([, v]) => v)) }).toString();
   const activeCount = FILTER_KEYS.filter((k) => params.get(k)).length + (department ? 1 : 0);
-  const { data, error, loading, reload } = useApi(`/search?${key}`);
+  // while the shopper is typing, results update live (live=1 keeps half-typed words out of the search statistics); pressing Search sends the real, counted query
+  const [isLive, setIsLive] = useState(false);
+  const { data, error, loading, reload } = useApi(`/search?${key}${isLive ? '&live=1' : ''}`);
   const [more, setMore] = useState({ key: '', items: [], page: 1 });
   const [busy, setBusy] = useState(false);
   const [quick, setQuick] = useState(null);
@@ -47,6 +49,9 @@ export default function MarketSearch() {
   const page = more.key === key ? more.page : 1;
 
   useEffect(() => { document.title = `${q ? `${q} · ` : ''}${t('search.title')} · ${t('app.name')}`; }, [q, t]);
+  const liveQ = useRef(q);
+  const [barKey, setBarKey] = useState(0);
+  useEffect(() => { if (q !== liveQ.current) { liveQ.current = q; setBarKey((k) => k + 1); setIsLive(false); } }, [q]); // q changed from outside the box (did-you-mean, back button): rebuild the box
   const set = (patch) => { const n = new URLSearchParams(params); for (const [k, v] of Object.entries(patch)) (v ? n.set(k, v) : n.delete(k)); setParams(n, { replace: true }); };
   const loadMore = async () => {
     setBusy(true);
@@ -79,7 +84,7 @@ export default function MarketSearch() {
     <div className="min-h-dvh">
       <MarketHeader />
       <main className="container pb-20 pt-4 sm:pt-8">
-        <div className="max-w-2xl" key={q}><MarketSearchBar initial={q} autoFocus={!q && !department} chips={false} /></div>
+        <div className="max-w-2xl" key={barKey}><MarketSearchBar initial={q} autoFocus={!q && !department} chips={false} onLive={(v, final) => { liveQ.current = v; setIsLive(!final); set({ q: v, page: '' }); }} /></div>
 
         <div className="mt-6 flex items-center justify-between gap-3">
           <button type="button" onClick={() => setOpen(true)} className="inline-flex h-11 items-center gap-2 rounded-xl border border-line-strong bg-elevated px-4 text-sm font-semibold lg:hidden">

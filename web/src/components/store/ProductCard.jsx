@@ -1,13 +1,14 @@
 import { memo, useState } from 'react';
 import SaleCountdown from './SaleCountdown.jsx';
 import { Link } from 'react-router-dom';
-import { Heart, ShoppingBag, Plus } from 'lucide-react';
+import { Heart, ShoppingBag, Plus, ArrowLeftRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import SmartImage from '../ui/SmartImage.jsx';
 import Skeleton from '../ui/Skeleton.jsx';
 import { Price, ColorDots } from '../ui/Commerce.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useFavorites } from '../../lib/cart.jsx';
+import { useCompare } from '../../lib/compare.js';
 import { useToast } from '../ui/Toast.jsx';
 import { sp } from '../../lib/store.jsx';
 import { useDesign, GRID_CLASS, kidTint } from '../../lib/design.js';
@@ -16,10 +17,12 @@ import { OfferChip } from '../promo/OfferCards.jsx';
 
 export const CARD_SIZES = '(min-width:1280px) 22vw, (min-width:1024px) 28vw, (min-width:640px) 33vw, 50vw';
 
-function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showStore, ratio = '4 / 5' }) {
+function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showStore, ratio = '4 / 5.75', comparable = false }) {
   const { t, tr } = useI18n();
   const favs = useFavorites(slug);
   const toast = useToast();
+  const cmp = useCompare();
+  const inCmp = comparable && cmp.has(p.id);
   const fav = favs.has(p.id);
   const [popKey, setPopKey] = useState(0);
   const href = sp(p.store?.slug || slug, `p/${p.slug}`);
@@ -40,6 +43,13 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
     toast({ title: added ? t('fav.added') : t('fav.removed'), tone: 'info', icon: Heart, duration: 1800 });
   };
 
+  const toggleCompare = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const r = cmp.toggle(p.id);
+    if (r === 'full') toast({ title: t('compare.full'), tone: 'info', icon: ArrowLeftRight, duration: 2200 });
+  };
+
   return (
     <motion.article
       initial={{ opacity: 0, y: 14 }}
@@ -56,7 +66,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
           ratio={ratio}
           sizes={CARD_SIZES}
           priority={priority}
-          imgClassName="group-hover:scale-[1.035] [@media(hover:none)]:group-hover:scale-100"
+          imgClassName="group-hover:scale-[1.02] [@media(hover:none)]:group-hover:scale-100"
           className={cx(out && 'opacity-70')}
         />
         {p.hoverImage && (
@@ -65,7 +75,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
             alt=""
             ratio={ratio}
             sizes={CARD_SIZES}
-            className="!absolute inset-0 opacity-0 transition-opacity duration-500 ease-out [@media(hover:hover)]:group-hover:opacity-100"
+            className="!absolute inset-0 opacity-0 transition-opacity duration-700 ease-in-out [@media(hover:hover)]:group-hover:opacity-100 [@media(hover:none)]:group-active:opacity-100"
           />
         )}
 
@@ -111,6 +121,21 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
         </span>
       </button>
 
+      {/* compare (search results only) */}
+      {comparable && (
+        <button
+          type="button"
+          onClick={toggleCompare}
+          aria-pressed={inCmp}
+          aria-label={inCmp ? t('compare.remove') : t('compare.add')}
+          className="absolute end-1.5 top-12 grid h-10 w-10 place-items-center rounded-full transition active:scale-90 sm:end-2 sm:top-[3.25rem]"
+        >
+          <span className={cx('grid h-8 w-8 place-items-center rounded-full shadow-sm backdrop-blur transition', inCmp ? 'bg-neutral-900 text-white' : 'bg-white/85 text-neutral-900 hover:bg-white')}>
+            <ArrowLeftRight className="h-[16px] w-[16px]" strokeWidth={2} />
+          </span>
+        </button>
+      )}
+
       <div className={cx('flex flex-1 flex-col pt-3', bubble && 'px-1.5')}>
         {showStore && p.store && <span className="mb-0.5 truncate text-[13px] font-medium text-fg/70">{tr(p.store.name)}</span>}
         <div className="flex items-start justify-between gap-2">
@@ -138,7 +163,7 @@ export default memo(ProductCard);
 export function ProductCardSkeleton() {
   return (
     <div aria-hidden="true">
-      <Skeleton className="aspect-[4/5] w-full rounded-2xl" />
+      <Skeleton className="aspect-[4/5.75] w-full rounded-2xl" />
       <Skeleton className="mt-3 h-3.5 w-4/5" />
       <Skeleton className="mt-2 h-3.5 w-2/5" />
       <div className="mt-3 flex gap-1.5"><Skeleton circle className="h-3.5 w-3.5" /><Skeleton circle className="h-3.5 w-3.5" /><Skeleton circle className="h-3.5 w-3.5" /></div>

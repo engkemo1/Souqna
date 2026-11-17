@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Clock, Search, Store as StoreIcon, Tag, TrendingUp, X } from 'lucide-react';
+import { Clock, Search, Sparkles, Store as StoreIcon, Tag, TrendingUp, X } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import { useDebounced } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -17,7 +17,7 @@ let popularMemo = { at: 0, items: [] };
 const loadPopular = () => (Date.now() - popularMemo.at < 600000 ? Promise.resolve(popularMemo.items)
   : api('/search/popular').then((r) => { popularMemo = { at: Date.now(), items: Array.isArray(r?.items) ? r.items.slice(0, 6) : [] }; return popularMemo.items; }).catch(() => popularMemo.items));
 
-const ICONS = { popular: TrendingUp, recent: Clock, product: Search, dept: Tag, store: StoreIcon };
+const ICONS = { popular: TrendingUp, recent: Clock, product: Search, dept: Tag, store: StoreIcon, fix: Sparkles };
 
 /**
  * Search input with an Amazon-style suggestion list: product names as you type, matching departments and stores,
@@ -52,6 +52,7 @@ export default function SuggestInput({ value, onChange, className, inputProps = 
     if (!data || dq !== term) return [];
     const name = (n) => n?.[lang] || n?.ar || '';
     return [
+      ...(data.didYouMean ? [{ kind: 'fix', label: data.didYouMean, q: data.didYouMean, hint: ar ? 'تقصد؟' : 'Did you mean?' }] : []),
       ...data.products.map((p) => ({ kind: 'product', label: name(p.name), q: name(p.name) })),
       ...data.departments.map((d) => ({ kind: 'dept', label: name(d.name), hint: ar ? 'قسم' : 'Department', to: `/search?department=${d.slug}` })),
       ...data.stores.map((s) => ({ kind: 'store', label: name(s.name), hint: ar ? 'محل' : 'Store', to: `/s/${s.slug}` })),

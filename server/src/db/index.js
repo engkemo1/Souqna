@@ -307,6 +307,11 @@ export const json = (s, fallback) => {
   add('order_items', 'is_gift', 'INTEGER NOT NULL DEFAULT 0');            // free gift added by a promotion (price is 0)
   add('order_items', 'promotion_id', 'INTEGER');
   add('order_items', 'returned_qty', 'INTEGER NOT NULL DEFAULT 0');
+  add('products', 'try_sizes', 'INTEGER NOT NULL DEFAULT 0');             // 1 = the shop lets shoppers have a second size sent along to try at the door
+  add('order_items', 'try_role', 'TEXT');                                 // 'main' (size chosen first) | 'alt' (the second size sent to try)
+  add('order_items', 'try_result', 'TEXT');                               // NULL until settled at the door, then 'kept' | 'returned'
+  add('orders', 'has_try', 'INTEGER NOT NULL DEFAULT 0');                 // 1 = this order carries a two-size trial
+  add('orders', 'try_outcome', 'TEXT');                                   // what the shopper kept: main | alt | none (NULL = not settled yet)
   add('order_promotions', 'snapshot_json', 'TEXT');   // the definition the order was sold under (re-evaluated for partial returns)
   add('order_returns', 'calc_json', 'TEXT');          // the refund calculation, kept for transparency
   add('promotions', 'image_mode', "TEXT NOT NULL DEFAULT 'auto'");       // auto (by product category) | library (owner picked a shared image) | custom (own upload)

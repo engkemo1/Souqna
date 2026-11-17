@@ -435,6 +435,9 @@ export const messages = {
     'fav.emptyBody': 'دوس على ♡ في أي منتج عشان تحفظه هنا وترجعله بعدين.',
     'fav.added': 'اتحفظ في المفضلة',
     'fav.removed': 'اتشال من المفضلة',
+    'compare.add': 'قارن المنتج ده',
+    'compare.remove': 'شيل من المقارنة',
+    'compare.full': 'تقدر تقارن لحد 4 منتجات بس، شيل واحد الأول',
 
     'cart.title': 'سلة التسوق',
     'cart.empty': 'السلة فاضية',
@@ -1539,6 +1542,9 @@ export const messages = {
     'fav.emptyBody': 'Tap ♡ on any product to save it here for later.',
     'fav.added': 'Saved to favorites',
     'fav.removed': 'Removed from favorites',
+    'compare.add': 'Compare this product',
+    'compare.remove': 'Remove from compare',
+    'compare.full': 'You can compare up to 4 products. Remove one first.',
 
     'cart.title': 'Your cart',
     'cart.empty': 'Your cart is empty',

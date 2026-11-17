@@ -56,6 +56,7 @@ function ReservationView({ o }) {
       </div>
 
       <div className="rounded-3xl border border-line bg-elevated p-5 sm:p-6">
+        {o.hasTry && <p className="mb-3 rounded-xl bg-sky-50 p-3 text-xs font-medium text-sky-900">{o.tryOutcome ? (o.tryOutcome === 'none' ? L('رجّعت المقاسين، والمطلوب منك مصاريف التوصيل بس.', 'You returned both sizes; only the delivery fee applies.') : L('اتسجل المقاس اللي أخدته، والتاني رجع للمحل.', 'Your chosen size is recorded; the other went back to the store.')) : L('المندوب جايبلك مقاسين. قيس وخد المناسب وادفع حقه بس.', 'The courier brings two sizes. Try them, keep one and pay only for it.')}</p>}
         <ul className="space-y-3">
           {o.items.map((it, i) => (
             <li key={i} className="flex flex-wrap items-center gap-3">

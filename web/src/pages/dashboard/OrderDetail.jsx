@@ -207,6 +207,11 @@ export default function OrderDetail() {
             {!pickup && !o.next.length && o.status !== 'cancelled' && <p className="mt-4 text-center text-sm text-muted">{t('orders.final')}</p>}
           </Panel>
 
+          {o.hasTry && (() => { const sizes = o.items.filter((i) => i.tryRole).map((i) => i.size).filter(Boolean); return (
+            <div className="rounded-2xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+              <p className="font-bold">{lang === 'ar' ? `تجربة مقاسين: جهّز ${sizes.join(' و ')}` : `Two-size try: prepare ${sizes.join(' and ')}`}</p>
+              <p className="mt-1 text-xs">{o.tryOutcome ? (o.tryOutcome === 'none' ? (lang === 'ar' ? 'الزبون رجّع المقاسين، ورجعوا للمخزون.' : 'The shopper returned both sizes; stock was restored.') : (lang === 'ar' ? 'الزبون أخد مقاس واحد، والتاني رجع للمخزون.' : 'The shopper kept one size; the other went back to stock.')) : (lang === 'ar' ? 'المندوب هياخد المقاسين، والزبون هيدفع حق المقاس اللي ياخده بس. المقاس التاني بيرجعلك.' : 'The courier takes both. The shopper pays only for the size kept; the other comes back to you.')}</p>
+            </div>); })()}
           <Panel title={`${t('orders.items')} (${o.items.reduce((s, i) => s + i.qty, 0)})`}>
             <ul className="divide-y divide-line">
               {o.items.map((it) => (
@@ -218,6 +223,7 @@ export default function OrderDetail() {
                       {it.color && <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full ring-1 ring-inset ring-black/10" style={{ background: it.color }} /></span>}
                       {it.size && <span>{t('product.size')}: <b className="font-semibold text-fg">{it.size}</b></span>}
                       {it.isGift ? <span className="rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-bold text-success">{lang === 'ar' ? 'هدية مجانية' : 'Free gift'}</span> : <span className="tabular">{formatMoney(it.price, lang)} × {it.qty}</span>}
+                      {it.tryRole && <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-bold text-sky-800">{it.tryRole === 'alt' ? (lang === 'ar' ? 'مقاس للتجربة' : 'Try size') : (lang === 'ar' ? 'المقاس المطلوب' : 'Ordered size')}{it.tryResult === 'returned' ? (lang === 'ar' ? ' · رجع' : ' · returned') : ''}</span>}
                       {it.returnedQty > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">{lang === 'ar' ? `مرتجع ${it.returnedQty}` : `Returned ${it.returnedQty}`}</span>}
                     </p>
                   </div>

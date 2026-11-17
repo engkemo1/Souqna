@@ -12,6 +12,7 @@ import { rememberOrder } from '../../lib/recentOrders.js';
 import { Field, Input, Select, Textarea } from '../../components/ui/Field.jsx';
 import Button from '../../components/ui/Button.jsx';
 import FinalSaleNote from '../../components/market/FinalSaleNote.jsx';
+import TrySizes from '../../components/market/TrySizes.jsx';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import DeliveryBreakdown from '../../components/market/DeliveryBreakdown.jsx';
 import { loadGifts } from '../../lib/promoClient.js';
@@ -42,6 +43,8 @@ export default function MarketCheckout() {
   const [appliedCode, setAppliedCode] = useState(null);
   const [codes, setCodes] = useState({});
   const [couponMsg, setCouponMsg] = useState('');
+  const [tryPick, setTryPick] = useState(null);   // { key, altVariantId, size } - one piece sent in two sizes
+  const [tryVersion, setTryVersion] = useState(0);
   const [applying, setApplying] = useState(false);
   const groups = useMemo(() => Object.values(cart.items.reduce((acc, line) => {
     (acc[line.storeSlug] ||= { slug: line.storeSlug, name: line.storeName, items: [] }).items.push(line);
@@ -181,7 +184,7 @@ export default function MarketCheckout() {
       const result = await api('/marketplace/orders', { method: 'POST', body: {
         name: form.name.trim(), phone: form.phone.trim(), governorate: form.governorate, city: form.city.trim(), address: form.address.trim(), notes: form.notes.trim(),
         ...(feePending ? {} : { expectedShipping: shipping }), expectedTotal: total,
-        stores: groups.map((g) => ({ slug: g.slug, gifts: loadGifts(g.slug), storeNote: (storeNotes[g.slug] || '').trim(), items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty })), ...(codes[g.slug] ? { coupon: codes[g.slug] } : {}) })),
+        stores: groups.map((g) => ({ slug: g.slug, gifts: loadGifts(g.slug), storeNote: (storeNotes[g.slug] || '').trim(), items: g.items.map((l) => ({ productId: l.productId, variantId: l.variantId, qty: l.qty, ...(tryPick && tryPick.key === `${g.slug}:${l.productId}:${l.variantId || 0}` ? { tryVariantId: tryPick.altVariantId } : {}) })), ...(codes[g.slug] ? { coupon: codes[g.slug] } : {}) })),
       } });
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
       for (const order of result.orders) rememberOrder({ number: order.number, token: order.trackToken, store: order.store?.[lang] || order.store?.ar || order.storeSlug });
@@ -189,6 +192,11 @@ export default function MarketCheckout() {
       navigate('/market-order-success', { replace: true, state: { orders: result.orders, name: form.name.split(' ')[0], phone: form.phone, autoOpenWa: true } });
     } catch (e) {
       if (e.code?.startsWith('coupon_')) { setCouponMsg(couponErrorText(e.code)); setAppliedCode(null); setError(couponErrorText(e.code)); setBusy(false); return; }
+      if (e.code === 'try_blocked' || e.code === 'try_unavailable' || e.code === 'try_one_only') {
+        setTryPick(null); setTryVersion((v) => v + 1);
+        setError(e.code === 'try_blocked' ? (ar ? 'خدمة «ابعتلي مقاسين» موقوفة مؤقتًا لرقمك. اطلب مقاس واحد.' : 'Two-size delivery is paused for your number. Order one size.') : (ar ? 'المقاس التاني لم يعد متاحًا. اختار تاني أو اطلب مقاس واحد.' : 'The second size is no longer available. Pick again or order one size.'));
+        setBusy(false); return;
+      }
       if (e.code === 'delivery_fee_changed' || e.code === 'cart_changed') setQuoteVersion((version) => version + 1);
       setError(e.code === 'delivery_fee_changed' ? (ar ? 'الإجمالي اتغيّر بعد تحديث الأسعار. راجع المبلغ الجديد وأكّد تاني.' : 'The total changed after prices were updated. Review the new amount and confirm again.') : e.code === 'cart_changed' ? (ar ? 'في منتج خلص أو اتغيرت كميته. حدّث السلة وحاول تاني.' : 'An item sold out or its stock changed. Update your basket and try again.') : (ar ? 'الطلب ماكملش. راجع البيانات وحاول تاني.' : 'The order could not be completed. Please check your details and try again.'));
       setBusy(false);
@@ -254,6 +262,7 @@ export default function MarketCheckout() {
             <span>✨ {ar ? 'قيس وعاين مع المندوب عند الاستلام، وتقدر تبدل المقاس فوراً داخل بنها.' : 'Try on with the courier before paying, with instant local exchanges in Banha.'}</span>
           </div>
         </section>
+        <TrySizes items={cart.items} phone={phoneForQuote} pick={tryPick} onPick={setTryPick} version={tryVersion} />
         <FinalSaleNote items={cart.items} />
         {error && <p role="alert" className="rounded-xl bg-sale/10 p-3 text-sm text-sale">{error}</p>}
         <Button type="submit" size="lg" full loading={busy} disabled={!quotes || !deliveryQuote || hasErrors}>{feePending ? (ar ? `إرسال الطلب · ${formatMoney(subtotal, lang)} منتجات` : `Place order · ${formatMoney(subtotal, lang)} items`) : groups.length > 1 ? (ar ? `تأكيد ${groups.length} طلبات · ${formatMoney(total, lang)}` : `Confirm ${groups.length} orders · ${formatMoney(total, lang)}`) : (ar ? `تأكيد الطلب · ${formatMoney(total, lang)}` : `Place order · ${formatMoney(total, lang)}`)}</Button>

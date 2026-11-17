@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Store, CreditCard, MapPin, Sparkles, Camera, MessageSquare, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package } from 'lucide-react';
+import { Search, Store, MapPin, Sparkles, Camera, MessageSquare, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
@@ -51,30 +51,6 @@ function HeroStats({ stats = {}, lang }) {
         <div className="hidden h-11 w-11 shrink-0 place-items-center rounded-full bg-[#f6f7f9] text-[#03244D] sm:grid"><Icon className="h-5 w-5" strokeWidth={1.75} /></div>
         <div><p className="font-display text-base font-black text-[#03244D] sm:text-2xl" dir="ltr">{value}</p><p className="text-[10px] font-medium text-muted sm:text-xs">{label}</p></div>
       </div>)}
-    </div>
-  );
-}
-
-function Why() {
-  const { t } = useI18n();
-  const items = [
-    [CreditCard, t('market.why1'), t('market.why1b')],
-    [Truck, t('market.why2'), t('market.why2b')],
-    [Store, t('market.why3'), t('market.why3b')],
-  ];
-  return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      {items.map(([Icon, a, b]) => (
-        <div key={a} className="flex items-center gap-3.5 rounded-2xl border border-line bg-white px-4 py-3.5 shadow-xs">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#EAF0F8] text-brand">
-            <Icon className="h-5 w-5" strokeWidth={1.75} />
-          </span>
-          <div>
-            <p className="text-sm font-bold text-gray-900">{a}</p>
-            <p className="text-[13px] text-gray-500">{b}</p>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -205,9 +181,6 @@ export default function MarketHome() {
         <HeroStats stats={base?.stats || {}} lang={lang} />
       </section>
 
-      {/* Why Strip */}
-      <div className="container mt-6 sm:mt-8"><Why /></div>
-
       <StoreStrip stores={base?.stores || []} />
       </div>
       <LookOfDay />
@@ -273,12 +246,12 @@ export default function MarketHome() {
 
       <FeaturedSlot placement="market_bottom" />
       {lang === 'ar' && (
-        <section className="container mt-14" aria-labelledby="about-twist">
-          <h2 id="about-twist" className="font-display text-xl font-bold text-[#101d3a]">عن تويست (Twist) بنها</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-[#43516a]">
+        <details className="container mt-10 text-sm text-muted">
+          <summary className="cursor-pointer select-none font-semibold text-fg/80">عن تويست (Twist) بنها</summary>
+          <p className="mt-3 max-w-3xl leading-7 text-[#43516a]">
             تويست (Twist) منصة تسوق محلية في بنها بتجمع <Link to="/stores" className="font-semibold text-brand underline-offset-2 hover:underline">محلات الملابس</Link> في مكان واحد: رجالي وحريمي وأطفال وملابس رياضية. تقدر تتصفح المنتجات وتقارن الأسعار وتطلب أونلاين وتتابع طلبك. ولو عندك محل، <Link to="/join" className="font-semibold text-brand underline-offset-2 hover:underline">افتح متجرك باسمك على تويست</Link>.
           </p>
-        </section>
+        </details>
       )}
       <footer className="container mt-16 flex flex-col items-center justify-between gap-4 border-t border-line py-10 text-sm text-muted sm:flex-row">
         <Brand />
