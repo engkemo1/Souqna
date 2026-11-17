@@ -371,18 +371,24 @@ export default function Products() {
                       </div>
                     </div>
                   ) : (
-                    <div key={p.id} className="flex items-center gap-3.5 rounded-2xl border border-line bg-elevated p-3">
-                      <Link to={`${base}/products/${p.id}`} className="shrink-0"><SmartImage media={p.image} ratio="4 / 5" sizes="80px" className="w-[68px] rounded-xl" /></Link>
-                      <Link to={`${base}/products/${p.id}`} className="min-w-0 flex-1">
-                        <p className="truncate font-medium">{tr(p.name)}</p>
-                        <p className="mt-0.5 font-semibold tabular">{formatMoney(p.price, lang)}{p.compareAt && <span className="ms-2 text-xs font-normal text-muted line-through">{formatMoney(p.compareAt, lang)}</span>}</p>
-                        <SaleTag p={p} onSaved={onSaved} />
-                        {weakQ(p) && <p className="mt-1"><WeakTag p={p} t={t} /></p>}
-                        <div className="mt-1.5 flex flex-wrap items-center gap-2">{p.status !== 'active' && <StatusPill status={p.status} t={t} />}<StockPill p={p} t={t} lang={lang} /></div>
-                      </Link>
-                      <button type="button" onClick={() => setSellP(p)} aria-label={t('products.sell')} className="grid h-11 shrink-0 place-items-center gap-0.5 rounded-xl bg-btn px-3 text-[11px] font-semibold text-white transition active:scale-90"><ShoppingBag className="h-4 w-4" />{t('products.sell')}</button>
-                      <button type="button" onClick={() => setQuick(p)} aria-label={t('products.quickEdit')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><Zap className="h-5 w-5" /></button>
-                      <button type="button" onClick={() => setQrP(p)} aria-label={t('qr.productTitle')} className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-secondary text-brand transition active:scale-90"><QrCode className="h-5 w-5" /></button>
+                    <div key={p.id} className="rounded-2xl border border-line bg-elevated p-3">
+                      <div className="flex items-center gap-3.5">
+                        <Link to={`${base}/products/${p.id}`} className="shrink-0"><SmartImage media={p.image} ratio="4 / 5" sizes="80px" className="w-[68px] rounded-xl" /></Link>
+                        <Link to={`${base}/products/${p.id}`} className="min-w-0 flex-1">
+                          <p className="truncate font-medium">{tr(p.name)}</p>
+                          <p className="mt-0.5 font-semibold tabular">{formatMoney(p.price, lang)}{p.compareAt && <span className="ms-2 text-xs font-normal text-muted line-through">{formatMoney(p.compareAt, lang)}</span>}</p>
+                          <SaleTag p={p} onSaved={onSaved} />
+                          {weakQ(p) && <p className="mt-1"><WeakTag p={p} t={t} /></p>}
+                          <div className="mt-1.5 flex flex-wrap items-center gap-2">{p.status !== 'active' && <StatusPill status={p.status} t={t} />}<StockPill p={p} t={t} lang={lang} /></div>
+                        </Link>
+                        <button type="button" onClick={() => setQrP(p)} aria-label={t('qr.productTitle')} className="grid h-10 w-10 shrink-0 place-items-center self-start rounded-xl bg-secondary text-muted transition active:scale-90"><QrCode className="h-[18px] w-[18px]" /></button>
+                      </div>
+                      <div className="mt-3 grid grid-cols-4 gap-2 border-t border-line pt-3">
+                        <button type="button" onClick={() => setSellP(p)} className="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-btn text-[12px] font-semibold text-on-btn transition active:scale-95"><ShoppingBag className="h-[18px] w-[18px]" />{t('products.sell')}</button>
+                        <button type="button" onClick={() => setQuick(p)} className="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-secondary text-[12px] font-semibold text-brand transition active:scale-95"><Zap className="h-[18px] w-[18px]" />{t('products.quickEdit')}</button>
+                        <Link to={`${base}/products/${p.id}`} className="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-secondary text-[12px] font-semibold text-fg transition active:scale-95"><Pencil className="h-[18px] w-[18px]" />{t('common.edit')}</Link>
+                        <button type="button" onClick={() => setDel(p)} className="flex h-14 flex-col items-center justify-center gap-1 rounded-xl bg-sale/10 text-[12px] font-semibold text-sale transition active:scale-95"><Trash2 className="h-[18px] w-[18px]" />{t('common.delete')}</button>
+                      </div>
                     </div>
                   ))}
                 </div>
