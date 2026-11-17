@@ -52,13 +52,13 @@
     @apply bg-canvas text-fg antialiased;
     text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
-    overflow-x: hidden;
+    overflow-x: clip;
   }
 
   body {
     @apply font-sans text-base leading-normal bg-canvas text-fg;
     min-height: 100dvh;
-    overflow-x: hidden;
+    overflow-x: clip;
     width: 100%;
     position: relative;
   }
