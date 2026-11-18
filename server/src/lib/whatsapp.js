@@ -37,14 +37,26 @@ export function waSettingsView() {
   const w = config.wa;
   return { configured: isWhatsAppConfigured(), tokenSet: !!w.token, tokenHint: w.token ? `…${w.token.slice(-4)}` : '', phoneId: w.phoneId, template: w.template, customerTemplate: w.customerTemplate, platformTemplate: w.platformTemplate, serviceTemplate: w.serviceTemplate, alertTemplate: w.alertTemplate, ownerBtnTemplate: w.ownerBtnTemplate || '', customerBtnTemplate: w.customerBtnTemplate || '', authTemplate: w.authTemplate || '', lang: w.lang, platformWa: config.platformWa };
 }
-/** Sends Meta's built-in hello_world template to a number, to prove token + phone id work. */
-export async function sendWaTest(rawTo) {
+/**
+ * Admin "test send": uses the customer template (the real one the site sends) with sample values,
+ * so it proves token + phone id + template all work. Meta only lets hello_world go out from its
+ * public test number, so it is used only when no customer template is set.
+ */
+export async function sendWaTest(rawTo, opts = {}) {
   const to = toWaNumber(rawTo); if (!to) throw new Error('رقم غير صالح');
   if (!isWhatsAppConfigured()) throw new Error('التوكن أو Phone ID مش مضبوطين');
-  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, { method: 'POST', headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: 'hello_world', language: { code: 'en_US' } } }) });
+  const name = String(opts.template || '').trim() || config.wa.customerTemplate;
+  let template;
+  if (name) {
+    const n = Number.isInteger(opts.vars) ? Math.min(Math.max(opts.vars, 0), 10) : 4;
+    const sample = ['عميلنا', 'TEST-1', 'ده اختبار من لوحة الأدمن، تقدر تتجاهله', config.siteUrl];
+    const parameters = Array.from({ length: n }, (_, i) => ({ type: 'text', text: sample[i] || `تجربة ${i + 1}` }));
+    template = { name, language: { code: config.wa.lang }, components: n ? [{ type: 'body', parameters }] : [] };
+  } else template = { name: 'hello_world', language: { code: 'en_US' } };
+  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, { method: 'POST', headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template }) });
   const txt = await res.text().catch(() => '');
   if (!res.ok) throw new Error(`Meta ${res.status}: ${txt.slice(0, 300)}`);
-  return { sent: true, to };
+  return { sent: true, to, template: template.name };
 }
 
 export function isWhatsAppConfigured() {
