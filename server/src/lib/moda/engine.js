@@ -65,7 +65,7 @@ function matchTrainedLesson(text, lessons) {
 const ALT_RE = /(البس|ألبس|الاقي|اجيب|اشتري|اختار)( [^ ]+){0,3} (ايه|اي|ايش)( |$)|(^| )(بديل|بدائل|البديل|حاجه تانيه|حاجات تانيه|مفيش غيره|ايه المتاح|ايه الموجود|ايه اللي موجود)( |$)/;
 import { cairoParts, resolveEventTime, weatherAdvice } from './time.js';
 import { serviceReply } from './service.js';
-import { sizesLabel } from './sizes.js';
+import { sizesLabel, sizeMatch } from './sizes.js';
 import { factualText, unsupportedClaims } from './claims.js';
 
 // الموسم: تويلا بتعرفه لوحدها من تاريخ النهارده (القاهرة) من غير ما تسأل. لو العميل قال صيف/شتا بيغلب.
@@ -467,7 +467,7 @@ async function runModaCore(messages, opts = {}) {
   // ---------- أسئلة عامة من بيانات الموقع الفعلية: ماركات / الأكتر مبيعًا / الجديد / «أرخص من X» ----------
   if (!(answers && Object.keys(answers).length) && !session?.pending && !parsed.garments.length && !parsed.context) {
     const n = norm(text);
-    const live = ensureEnriched(products, K).filter((p) => p && p.inStock !== false && !p.typeConflict && Number(p.photo_mismatch) !== 1);
+    const live = ensureEnriched(products, K).filter((p) => p && p.inStock !== false && !p.typeConflict && !p.colorConflict && !p.sizeConflict && !p.audienceConflict && Number(p.photo_mismatch) !== 1);
     const diverse = (list, per = 2, max = 6) => { const cnt = new Map(); const out = []; for (const p of list) { const k = p.key || p.cat_text || 'x'; if ((cnt.get(k) || 0) >= per) continue; cnt.set(k, (cnt.get(k) || 0) + 1); out.push(p); if (out.length >= max) break; } return out; };
     const numTxt = (n.match(/(?:ارخص من|اقل من|اقل|تحت|لحد|بحد|بحد اقصي|في حدود|حوالي|ميزانيتي|ب)\s*(\d{2,6})/) || n.match(/(\d{2,6})\s*(?:جنيه|ج|egp)(?: او اقل| بس)?( |$)/) || [])[1];
     if (/(^| )(ماركات|ماركه|براند|براندات|brand|brands)( |$)/.test(n)) {
@@ -1245,12 +1245,13 @@ async function runModaCore(messages, opts = {}) {
   }
   // أسماء القطع والتابات عربي بس: لما نعرض منتجات نرد بالعربي حتى لو الطلب بحروف لاتينية (shoes / hoodie aswad)، بدل رد نص إنجليزي وأسماء عربي مخلوطين.
   if (!(needsClarificationFirst || ['clarify', 'chat', 'no_look'].includes(plan.state))) lang = 'ar';
+  const wantCols0 = (pp) => [pp.garments?.[0]?.color, ...(pp.colors || [])].filter(Boolean);
   // شبكة أمان: التخطيط ملقاش (أو لقى بديل) لكن في منتج اسمه/لونه فيه كل كلمات العميل بالظبط: نعرضه بدل «مش موجود»
   if (!needsClarificationFirst && !hasAnswers && ['none', 'alternatives', 'partial'].includes(plan.state) && !parsed.followup && !parsed.flags?.showOther && text.trim().length >= 3) {
     try {
       const wantNet = new Set((parsed.persons || []).map((a) => (a === 'women_hijab' ? 'women' : a)));
       const fitC = parsed.contextEffective === 'evening_out' ? 'evening_out' : null; const fitS = parsed.style || [];
-      const hitsNet = keywordSearch(text, ensureEnriched(products, K), { limit: 12 }).filter((pr) => !wantNet.size || !pr.gender || pr.gender === 'unisex' || wantNet.has(pr.gender)).filter((pr) => !(fitC || fitS.length) || !APPAREL_FAMILIES.test(pr.key || '') || occasionFit(pr, { context: fitC, styles: fitS }).level !== 'unsuitable').slice(0, 6); // مفيش منتج جنس تاني بيتعرض كأنه مطابق
+      const hitsNet = keywordSearch(text, ensureEnriched(products, K), { limit: 12 }).filter((pr) => !wantNet.size || !pr.gender || pr.gender === 'unisex' || wantNet.has(pr.gender)).filter((pr) => { if (!parsed.flags?.size) return true; const m = sizeMatch(pr, String(parsed.flags.size).toUpperCase()); return m === true || (m === null && !(APPAREL_FAMILIES.test(pr.key || '') || /(shoe|sneaker|heel|flat|sandal|loafer|boot|slipper)/.test(pr.key || ''))); }).filter((pr) => !wantCols0(parsed).length || (pr.colorKeys || []).length).filter((pr) => !(fitC || fitS.length) || !APPAREL_FAMILIES.test(pr.key || '') || occasionFit(pr, { context: fitC, styles: fitS }).level !== 'unsuitable').slice(0, 6); // مفيش منتج جنس تاني بيتعرض كأنه مطابق
       const wantGarm = (parsed.garments || []).length <= 1 || (parsed.garments || []).every((g) => g.text === g.key);
       // العميل طلب لون معين ومفيش ولا نتيجة بنفس اللون: مانعرضش النتايج كأنها مطابقة، نسيب رد «البديل الأقرب» الصريح
       const wantCols = [parsed.garments?.[0]?.color, ...(parsed.colors || [])].filter(Boolean);
@@ -1323,7 +1324,7 @@ async function runModaCore(messages, opts = {}) {
   { const wantMat = (parsed.garments || []).map((x) => x.material).filter(Boolean);
     if (wantMat.length && ['full', 'alternatives', 'partial'].includes(plan.state) && !needsClarificationFirst && !res.brainReply) {
       const picks = (plan.people || []).flatMap((pe) => pe.picks.map((x) => x.product));
-      if (picks.length && !picks.some((pr) => pr.materials?.size && wantMat.some((m) => pr.materials.has(m)))) res = { ...res, say: `${res.say} الخامة مش مكتوبة عند المحل، فاتأكد منها من صفحة المنتج أو كلّم المحل.` };
+      if (picks.length && !(plan.relaxed || []).some((x) => x.kind === 'material') && !picks.some((pr) => pr.materials?.size && wantMat.some((m) => pr.materials.has(m)))) res = { ...res, say: `${res.say} الخامة مش مكتوبة عند المحل، فاتأكد منها من صفحة المنتج أو كلّم المحل.` };
     } }
   // تفاصيل مطلوبة مش مسجلة (كم/ذكية/مطرز…): نقولها بصراحة بدل ما نسيب العميل يفتكر إنها اتحققت
   { const nq = norm(text);
@@ -1338,7 +1339,7 @@ async function runModaCore(messages, opts = {}) {
     } }
   // العميل حدد لون ومفيش حاجة بيه في الترشيح: نقولها بصراحة
   { const want = [...new Set([...(parsed.colors || []), ...(parsed.garments || []).map((x) => x.color)].filter(Boolean))];
-    if (want.length && ['full', 'alternatives', 'partial'].includes(plan.state) && !needsClarificationFirst && !res.brainReply && !/(ملقتش|مش متاح بالظبط|مفيش.*بلون)/.test(res.say || '')) {
+    if (want.length && ['full', 'alternatives', 'partial'].includes(plan.state) && !needsClarificationFirst && !res.brainReply && !/(ملقتش|مش متاح بالظبط|مفيش.*بلون)/.test(res.say || '') && !(plan.relaxed || []).some((x) => ['near_color', 'material', 'color'].includes(x.kind))) {
       const picks = (plan.people || []).flatMap((pe) => pe.picks.map((x) => x.product));
       if (picks.length && !picks.some((pr) => (pr.colorKeys || []).some((c) => want.includes(c)))) {
         const names = want.map((c) => String(K.colors.get(c)?.ar || c).split(' ')[0]).join(' / ');

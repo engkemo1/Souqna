@@ -33,7 +33,7 @@ import { matchStore } from '../lib/moda/stores.js';
 import { contactFromEnv } from '../lib/moda/contact.js';
 import { logStylist } from '../lib/stylist-log.js';
 import { runModa } from '../lib/moda/engine.js';
-import { smartLookText, acceptSmartLook } from '../lib/moda/smartlook.js';
+import { smartLookText, acceptSmartLook, isFormalAnchor } from '../lib/moda/smartlook.js';
 import { activeStories, expireStories, bumpStory } from '../lib/stories.js';
 import { enrichAll as enrichModaRows } from '../lib/moda/products.js';
 import { getModaPrompts } from '../lib/modaPrompts.js';
@@ -645,10 +645,19 @@ r.post('/stylist/smart-look', h(async (req, res) => {
   const text = smartLookText(anchor);
   if (!text) return finish({ ok: false, reason: 'audience_unknown' });
   const result = await runModa([{ role: 'user', content: text }], { products: rows, assistantName: st.name, offers: liveOffersForModa, stores: storesForModa, training: stylistTrainingSettings() });
-  const verdict = acceptSmartLook(result, { anchorId: anchor.id, anchorKey: anchor.key, keyOf: (id) => enriched.find((x) => x.id === id)?.key, budget: body.budget || null });
+  const verdict = acceptSmartLook(result, { anchorId: anchor.id, anchorKey: anchor.key, anchorFormal: isFormalAnchor(anchor), keyOf: (id) => enriched.find((x) => x.id === id)?.key, budget: body.budget || null });
   if (!verdict.ok) return finish({ ok: false, reason: verdict.reason });
   const resp = modaClientResponse(result);
   if (!resp.looks?.length || resp.looks.length !== verdict.ids.length) return finish({ ok: false, reason: 'cards_missing' });
+  // بدائل كل قطعة (تيشرت/بولو/هودي/جاكيت…) عشان العميل يبدّل جوه نفس الطقم؛ items[0] هو الاختيار الأساسي
+  const flatItems = result.blocks.tabs.flatMap((tab) => tab.items);
+  // ببيون ⇄ كرافتة: كل واحدة بديل التانية جوه نفس الطقم (لو متاحة عند المحلات)
+  const TIE_PAIR = { bow_tie: 'tie', tie: 'bow_tie' };
+  const hasCuff = anchor.frenchCuff || flatItems.some((x) => enriched.find((e) => e.id === x.id)?.frenchCuff); // الكرافتة العادية ما بتتلبسش مع قميص المانشت المزدوجة
+  const tieAlt = (it) => hasCuff && it?.key === 'bow_tie' ? [] : enriched.filter((x) => x.key === TIE_PAIR[it?.key] && x.gender === anchor.gender && x.inStock && !x.typeConflict).sort((a, b) => a.price - b.price).slice(0, 1).map((x) => ({ id: x.id }));
+  const altsOf = (it) => [...(it.alts || []), ...tieAlt(it)];
+  const altCards = new Map(cardsByIds(flatItems.flatMap((it) => altsOf(it).map((a) => a.id))).map((c) => [c.id, c]));
+  resp.looks = resp.looks.map((l, i) => ({ ...l, items: [...l.items, ...(altsOf(flatItems[i] || {}).map((a) => altCards.get(a.id)).filter(Boolean))] }));
   return finish({ ok: true, anchorId: anchor.id, total: resp.total, looks: resp.looks, styleTips: resp.styleTips || [], palette: resp.palette || [] });
 }));
 

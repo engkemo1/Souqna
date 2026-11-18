@@ -19,11 +19,12 @@ export default function SmartLookCard({ productId, fallback = null }) {
   const [look, setLook] = useState(null);
   const [hidden, setHidden] = useState(false);
   const [removed, setRemoved] = useState(() => new Set());
+  const [picks, setPicks] = useState({}); // index القطعة → رقم البديل المختار
   const [quick, setQuick] = useState(null); // { queue: [card], i }
 
   useEffect(() => {
     let alive = true;
-    setLook(null); setHidden(false); setRemoved(new Set());
+    setLook(null); setHidden(false); setRemoved(new Set()); setPicks({});
     api('/stylist/smart-look', { method: 'POST', body: { productId } })
       .then((r) => { if (alive && r?.ok && r.looks?.length) setLook(r); })
       .catch(() => { /* اقتراح اختياري: لو فشل منعرضش حاجة */ });
@@ -31,7 +32,8 @@ export default function SmartLookCard({ productId, fallback = null }) {
   }, [productId]);
 
   if (!look || hidden) return fallback;
-  const pieces = look.looks.map((l) => ({ label: l.label, p: l.items[l.pick] || l.items[0] })).filter((x) => x.p);
+  const pieces = look.looks.map((l, i) => ({ label: l.label, i, n: l.items.length, p: l.items[picks[i] ?? l.pick] || l.items[0] })).filter((x) => x.p);
+  const swap = (i, n) => setPicks((cur) => ({ ...cur, [i]: ((cur[i] ?? 0) + 1) % n }));
   const kept = pieces.filter((x) => !removed.has(x.p.id));
   const total = kept.reduce((s, x) => s + Number(x.p.price || 0), 0);
   const toggle = (id) => setRemoved((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -49,7 +51,7 @@ export default function SmartLookCard({ productId, fallback = null }) {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {pieces.map(({ label, p }) => {
+        {pieces.map(({ label, p, i, n }) => {
           const off = removed.has(p.id);
           return (
             <div key={p.id} className={cx('min-w-0 rounded-2xl border bg-elevated p-2 transition', off ? 'border-dashed border-line opacity-50' : 'border-line')}>
@@ -63,6 +65,7 @@ export default function SmartLookCard({ productId, fallback = null }) {
               <button type="button" onClick={() => toggle(p.id)} className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-line-strong px-2 py-1.5 text-[11.5px] font-bold transition hover:border-fg">
                 {off ? <RotateCcw className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}{off ? (ar ? 'رجّعها' : 'Put back') : (ar ? 'شيلها من الطقم' : 'Remove')}
               </button>
+              {n > 1 && <button type="button" onClick={() => swap(i, n)} className="mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full bg-secondary px-2 py-1.5 text-[11.5px] font-bold text-fg transition hover:bg-line">{ar ? `غيّرها (${n} اختيارات)` : `Swap (${n} options)`}</button>}
             </div>
           );
         })}

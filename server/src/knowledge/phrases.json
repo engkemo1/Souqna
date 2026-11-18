@@ -191,6 +191,15 @@
     "alt_color": [
       "{wanted} مش متاح بالظبط، فجبتلك أقرب لون ليه"
     ],
+    "alt_color_near": [
+      "{wanted} بالظبط مش متاح دلوقتي، فجبتلك {got} بلون {gotColor} لأنه الأقرب"
+    ],
+    "alt_color_unknown": [
+      "لون {got} مش متسجل عند المحل، فبصّي على صور القطعة قبل ما تطلب"
+    ],
+    "alt_material": [
+      "{wanted} مش متاح بالخامة دي، فجبتلك {got} باللون المطلوب بس بخامة {gotMaterial}"
+    ],
     "budget_swap": [
       "علشان الميزانية، بدّلت {slot} بأرخص بديل مناسب."
     ],
@@ -317,6 +326,15 @@
     ],
     "alt_color": [
       "{wanted} isn't available in that exact colour, so I picked the closest"
+    ],
+    "alt_color_near": [
+      "{wanted} isn't available in that exact colour, so I picked {got} in {gotColor}, the closest shade"
+    ],
+    "alt_color_unknown": [
+      "The colour of {got} isn't listed by the shop, so check its photos before ordering"
+    ],
+    "alt_material": [
+      "{wanted} isn't available in that material, so I picked {got} in the colour you asked for but in {gotMaterial}"
     ],
     "minimal_sneaker_note_women": [
       "The sneaker here is a plain one because no dressy heels or flats are available right now; it works with this look for the occasion. Want me to look for heels or flats?"

@@ -102,8 +102,8 @@ test('assistant display name is used in Arabic and English greeting replies', ()
 
 test('Moda uses local product ratings to change future rankings', async () => {
   const products = enrichAll([
-    { id: 1001, name_ar: 'كوتشي رياضي حريمي', department: 'women', price: 500, stock: 5, track_stock: 1, sold_count: 0, rating: 0 },
-    { id: 1002, name_ar: 'كوتشي رياضي حريمي', department: 'women', price: 500, stock: 5, track_stock: 1, sold_count: 0, rating: 0 },
+    { id: 1001, name_ar: 'كوتشي رياضي حريمي', colors_json: '[{"name_ar":"أسود","name_en":"Black","hex":"#1C1C1E"}]', department: 'women', price: 500, stock: 5, track_stock: 1, sold_count: 0, rating: 0 },
+    { id: 1002, name_ar: 'كوتشي رياضي حريمي', colors_json: '[{"name_ar":"أسود","name_en":"Black","hex":"#1C1C1E"}]', department: 'women', price: 500, stock: 5, track_stock: 1, sold_count: 0, rating: 0 },
   ]);
   const opts = { products, now: new Date('2026-10-12T19:30:00+03:00') };
   const first = await runModa('عايزة كوتشي أسود', opts);

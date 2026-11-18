@@ -20,7 +20,7 @@ export default function StoreLayout() {
   const { slug } = useParams();
   const { pathname } = useLocation();
   const { t, tr } = useI18n();
-  const { data: apiData, error, reload } = useApi(`/stores/${slug}`);
+  const { data: apiData, error, reload } = useApi(`/stores/${slug}`, { keepPrevious: false }); // من غير keepPrevious: بيانات المتجر القديم كانت بتفضل لحد ما الجديد يحمّل فكان التحويل الصامت ده يرجّعك للمتجر الأول
   const navigate = useNavigate();
   // رابط قديم (اتغير اسم/رابط المتجر): حوّل للرابط الجديد من غير ما الزائر يحس.
   useEffect(() => {

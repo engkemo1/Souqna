@@ -127,3 +127,38 @@ export function sizeAudience(p, key = '') {
   }
   return null;
 }
+
+
+/** تعارض بيانات المقاسات: خانة المقاسات (variants) أو sizes_json أو الوصف بيقولوا مقاسات مختلفة تمامًا (مفيش مقاس مشترك) → المنتج مش موثوق. */
+export function sizeSourcesConflict(p) {
+  const srcs = [];
+  const push = (label, parsed) => { if (parsed?.any && (parsed.letters.size || parsed.nums.size || parsed.ages.length)) srcs.push({ label, parsed }); };
+  push('list', parseSizeText(p?.size_list || ''));
+  let sj = p?.sizes_json; if (typeof sj === 'string') { try { sj = JSON.parse(sj); } catch { /* نص عادي */ } }
+  push('json', parseSizeText(Array.isArray(sj) ? sj.map((x) => (typeof x === 'object' ? x?.name || x?.size || x?.label || '' : x)).join(',') : (sj || '')));
+  const text = toAscii(`${p?.name_ar || ''} . ${p?.description_ar || ''} . ${p?.description_en || ''}`).toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه');
+  const segs = text.match(/(مقاسات|المقاسات|مقاس|المقاس|size|sizes)[^.\n]{0,60}/g) || [];
+  push('text', parseSizeText(segs.map((x) => x.replace(/^(مقاسات|المقاسات|مقاس|المقاس|size|sizes)/, '')).join(' , ')));
+  for (let i = 0; i < srcs.length; i += 1) for (let j = i + 1; j < srcs.length; j += 1) {
+    const a = srcs[i].parsed; const b = srcs[j].parsed;
+    const letterBoth = a.letters.size && b.letters.size; const numBoth = a.nums.size && b.nums.size;
+    if (a.ages.length && b.ages.length && !a.ages.some((x) => b.ages.some((y) => x.min <= y.max + 1 && y.min <= x.max + 1))) return `${srcs[i].label}≠${srcs[j].label}:age`;
+    if (letterBoth && ![...a.letters].some((x) => b.letters.has(x))) return `${srcs[i].label}≠${srcs[j].label}`;
+    if (numBoth && ![...a.nums].some((x) => b.nums.has(x))) return `${srcs[i].label}≠${srcs[j].label}`;
+  }
+  return null;
+}
+
+/** الفئة العمرية المختارة في خصائص المنتج (رضيع/طفل صغير…) بتتعارض مع مقاسات بأعمار كبيرة (أو العكس). */
+export function ageAttrConflict(p) {
+  let at = p?.attrs_json; if (typeof at === 'string') { try { at = JSON.parse(at); } catch { at = null; } }
+  const a = String(at?.age || '').toLowerCase(); if (!a) return false;
+  const srcs = [parseSizeText(p?.size_list || ''), parseSizeText(Array.isArray(p?.sizes_json) ? p.sizes_json.join(',') : (() => { try { return JSON.parse(p?.sizes_json || '[]').join(','); } catch { return p?.sizes_json || ''; } })())];
+  const maxAge = Math.max(-1, ...srcs.flatMap((s) => s.ages.map((x) => x.max)));
+  const minAge = Math.min(99, ...srcs.flatMap((s) => s.ages.map((x) => x.min)));
+  if (maxAge < 0) return false;
+  if (['newborn', 'baby'].includes(a)) return maxAge > 3;
+  if (a === 'toddler') return maxAge > 6;
+  if (['kid', 'kids', 'child'].includes(a)) return minAge > 14 || maxAge > 16;
+  return false;
+}

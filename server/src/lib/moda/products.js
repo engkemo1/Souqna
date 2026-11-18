@@ -2,7 +2,7 @@
  * تحليل المنتجات: من اسم المنتج ووصفه وتصنيفه نطلع: نوع القطعة، درجة الرسمية، الفئة (رجال/ست/أطفال)،
  * الألوان، الخامة، والمخزون. كله بقواعد من ملفات المعرفة، بدون موديل.
  */
-import { sizeAudience } from './sizes.js';
+import { sizeAudience, sizeSourcesConflict, ageAttrConflict } from './sizes.js';
 import { norm, tokenize, tokenVariants } from './text.js';
 import { loadKnowledge } from './knowledge.js';
 import { matchTokens } from './parse.js';
@@ -33,6 +33,10 @@ function table(K) {
 const hasToken = (set, tok) => tokenVariants(tok).some((v) => set.has(v));
 
 /** كلمات حاسمة: الاسم اللي فيه كفلينج/روب/لانجري/قميص نوم مستحيل يبقى قميص/فستان مهما كان معاه. */
+/** قميص مانشت مزدوجة (French cuff / دابل مانشت): بيتلبس بكفلينج مع بدلة/سموكن (أفراح، مناسبات رسمية)، مش مع جينز وجاكيت كاجوال. */
+const FRENCH_CUFF_RE = /(^|\s)(دابل|دبل|دوبل|مزدوج[هة]?)\s*(مانشت|مانشيت|مانشيط|كف)(\s|$)|french\s*cuff|double\s*cuff|wing\s*collar|ياق[هة]\s*ويج|(^|\s)(سموكن|تاكسيدو)\s*(قميص)?|قميص\s*(سموكن|تاكسيدو)/i;
+export const isFrenchCuff = (key, name, desc) => key === 'shirt' && (FRENCH_CUFF_RE.test(norm(String(name || ''))) || (/(كافلينج|كفلينج|كافلينك|كفلينك|cufflink)/i.test(norm(String(desc || ''))) && /مانشت|مانشيت|cuff/i.test(norm(`${name || ''} ${desc || ''}`))));
+
 const FORCE_RULES = [
   ['lingerie', /(بدل|بدله|بدلة|بدلات|حزام|طقم)\s*رقص/], // بدلة رقص (ملابس رقص شرقي) مش بدلة رجالي
   ['dress_evening', /\bsoiree?\b/i], // «Soire dress» (soirée = سهرة) عند محل حقيقي: فساتين سهرة مش كاجوال
@@ -122,7 +126,7 @@ const KIDS_BOTH = ['اطفال', 'اطفالي', 'اطفالى', 'للاطفال
 const KIDS_STORE = ['بيبي', 'baby', 'babies', 'kid', 'كيد', 'طفل', 'اطفالي'];
 const MEN_WORDS = ['رجالي', 'رجاليه', 'للرجال', 'رجال', 'شبابي', 'men', 'mens', 'man', 'male'];
 const WOMEN_WORDS = ['حريمي', 'نسائي', 'للنساء', 'ستاتي', 'سيدات', 'للسيدات', 'هوانم', 'محجبات', 'للمحجبات', 'women', 'womens', 'woman', 'ladies', 'female'];
-const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'hijab_cap', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic']);
+const WOMEN_KEYS = new Set(['dress_any', 'dress_casual', 'dress_work', 'dress_party', 'dress_evening', 'dress_bridal', 'dress_beach', 'jumpsuit', 'skirt', 'blouse', 'abaya', 'hijab_cap', 'heels_low', 'heels_high', 'clutch', 'shawl', 'two_piece_set', 'womens_suit', 'hijab_set', 'tarha', 'long_cardigan', 'flats', 'tunic', 'lingerie']);
 const MEN_KEYS = new Set(['suit', 'tuxedo', 'tie', 'bow_tie', 'pocket_square', 'waistcoat', 'classic_set']);
 
 /** الفئة اللي المنتج ليها: men | women | boys | girls | kids | unisex
@@ -215,10 +219,53 @@ export function isMinimalSneaker(key, name, colorKeys) {
   return key === 'sneakers' && !SPORTY_RE.test(name || '') && Boolean(colorKeys?.length) && colorKeys.length <= 2 && colorKeys.every((c) => MINIMAL_COLORS.has(c));
 }
 
+
+/** ألوان المنتج المسجلة في خانة الألوان بس (من غير تخمين من الاسم). */
+function listedColorKeys(row, K) {
+  let list = row.colors_json;
+  if (typeof list === 'string') { try { list = JSON.parse(list); } catch { list = []; } }
+  list = Array.isArray(list) ? list : [];
+  const keys = [];
+  for (const c of list) {
+    const m = matchTokens(tokenize(norm(`${c.name_ar || ''}`)), K).flatMap((x) => x.entries).filter((e) => e.group === 'color').map((e) => e.key);
+    const m2 = m.length ? m : matchTokens(tokenize(norm(`${c.name_en || ''}`)), K).flatMap((x) => x.entries).filter((e) => e.group === 'color').map((e) => e.key);
+    if (m2[0]) keys.push(m2[0]);
+  }
+  return [...new Set(keys)];
+}
+/** ألوان مذكورة صراحة في الاسم، أو في الوصف بعد كلمة «لون/باللون/بلون/color». */
+function statedColorKeys(row, K) {
+  const out = new Set();
+  const add = (text) => { for (const t of tokenize(norm(text))) { const hit = matchTokens([t], K).flatMap((x) => x.entries).find((e) => e.group === 'color'); if (hit) out.add(hit.key); } };
+  add(`${row.name_ar || ''}`);
+  const desc = `${row.description_ar || ''} ${row.description_en || ''}`;
+  for (const m of desc.matchAll(/(?:ب?ال?لون|colou?rs?)\s*:?\s*((?:\S+\s*(?:و|,|،|\/)?\s*){1,3})/gi)) add(m[1]);
+  return out;
+}
+/** تعارض لون: الاسم/الوصف بيقولوا لون والألوان المسجلة مفيهاش أي لون منهم. */
+const COLOR_FAMILY = [['green', 'emerald', 'olive', 'mint'], ['blue', 'sky_blue', 'royal_blue', 'navy'], ['pink', 'blush', 'fuchsia', 'coral'], ['red', 'burgundy', 'coral'], ['white', 'off_white', 'cream', 'champagne', 'silver'], ['beige', 'cream', 'camel', 'champagne'], ['brown', 'camel', 'olive'], ['purple', 'lavender', 'fuchsia'], ['grey', 'silver'], ['gold', 'champagne', 'yellow'], ['orange', 'coral', 'yellow']];
+const sameFamily = (a, b) => a === b || COLOR_FAMILY.some((f) => f.includes(a) && f.includes(b));
+export function colorConflictOf(row, K = loadKnowledge()) {
+  const listed = listedColorKeys(row, K); if (!listed.length) return false;
+  const stated = statedColorKeys(row, K); if (!stated.size) return false;
+  return ![...stated].some((c) => listed.some((l) => sameFamily(c, l)));
+}
+
 /** يضيف حقول تويلا لصف المنتج (بدون تعديل الأصل). */
 export // تصنيفات قريبة مش بتعتبر تعارض (تيشيرت رياضي/تصنيف تيشيرت، جاكيت تريكو/جواكت)
 const NEAR_KEYS = { sport_top: ['tshirt', 'polo', 'top', 'hoodie', 'sweater', 'shirt', 'jacket', 'sport_top'], sport_bottom: ['shorts', 'trousers', 'leggings', 'joggers', 'jeans', 'sport_bottom'], sweater: ['jacket', 'hoodie', 'cardigan', 'long_cardigan', 'sweater'], cardigan: ['jacket', 'sweater'], jacket: ['sweater', 'cardigan', 'hoodie'], hoodie: ['jacket', 'sweater', 'sport_top'] };
 const nearKeys = (a, b) => (NEAR_KEYS[a] || []).includes(b) || (NEAR_KEYS[b] || []).includes(a);
+
+/** فحص تضارب البيانات (اسم/وصف/قسم/مقاسات/ألوان): أي تعارض = المنتج مش مؤكد ومايترشحش. */
+function dataChecks(row, K, key) {
+  const conflicts = [];
+  if (colorConflictOf(row, K)) conflicts.push('color');
+  const sc = sizeSourcesConflict(row); if (sc) conflicts.push(`size:${sc}`);
+  if (ageAttrConflict(row)) conflicts.push('size:age_attr');
+  const v = genderEvidence(row, K, key);
+  if (v.men >= 3 && v.women >= 3 && !v.strongKids) conflicts.push('audience');
+  return { colorConflict: conflicts.includes('color'), sizeConflict: conflicts.some((c) => c.startsWith('size')), audienceConflict: conflicts.includes('audience'), dataConflicts: conflicts };
+}
 export function enrichProduct(row, K = loadKnowledge()) {
   const name = `${row.name_ar || ''} ${row.name_en || ''}`;
   const explicitItem = K.items.get(row.moda_key);
@@ -271,13 +318,13 @@ export function enrichProduct(row, K = loadKnowledge()) {
   const owner = Number(row.style_level) >= 1 && Number(row.style_level) <= 5 ? Number(row.style_level) : null;
   const range = K.items.get(key)?.formality || [1, 5];
   const inferredFormality = key ? inferFormality(key, name, desc, K) : null;
-  const requestedFormality = owner ?? inferredFormality;
+  const requestedFormality = owner ?? (isFrenchCuff(key, name, desc) ? Math.max(inferredFormality ?? 0, 5) : inferredFormality);
   const formality = key && requestedFormality != null ? Math.max(range[0], Math.min(range[1], requestedFormality)) : requestedFormality;
   const inStock = row.track_stock === 0 || row.track_stock === false ? true : Number(row.stock ?? 1) > 0;
   const materials = fabricTokens(K, `${name} ${desc}`);
   const isSleeveless = hasAny(K, name, ['بدون اكمام', 'بدون كم', 'sleeveless', 'مكشوف', 'strapless', 'تانك', 'tank', 'كروب', 'crop top', 'camisole', 'كاميسول', 'حمالات', 'حمالة', 'ستراب']);
   return {
-    ...row, key, typeConflict, headKey: (() => { const h = inferKey(String(name).trim().split(/\s+/)[0] || '', K); return h && h !== key && nearKeys(h, key) ? h : null; })(), minimalSneaker: isMinimalSneaker(key, name, colorKeysOf(row, K)), formality, gender: inferGender(row, key, K), colorKeys: colorKeysOf(row, K), materials, inStock,
+    ...row, key, typeConflict, frenchCuff: isFrenchCuff(key, name, desc), ...dataChecks(row, K, key), headKey: (() => { const h = inferKey(String(name).trim().split(/\s+/)[0] || '', K); return h && h !== key && nearKeys(h, key) ? h : null; })(), minimalSneaker: isMinimalSneaker(key, name, colorKeysOf(row, K)), formality, gender: inferGender(row, key, K), colorKeys: colorKeysOf(row, K), materials, inStock,
     sleeveless: isSleeveless, price: Number(row.price) || 0, popularity: Math.min(2.5, Number(row.sold_count || 0) / 24) + (Number(row.rating || 0) >= 4.3 ? 0.5 : 0),
   };
 }

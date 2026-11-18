@@ -77,7 +77,8 @@ function slotsFor(aud, parsed, look, K, ctxF, adv) {
   look.slots.forEach(([keyStr, req, share], i) => {
     const keys = String(keyStr).split('|');
     if (keys.some((k) => owned.has(k))) return; // عنده القطعة دي
-    slots.push({ keys: resolveKeys(keys, aud, [look.formality, look.formality]), base: keys[0], required: !!req, share, color: null, material: null, explicit: false, hero: i === 0 });
+    const slotKeys = keys.includes('tie') && !keys.includes('bow_tie') && aud === 'men' ? [...keys, 'bow_tie'] : keys; // الببيون بديل الكرافتة (بيتفضّل مع قميص المانشت المزدوجة)
+    slots.push({ keys: resolveKeys(slotKeys, aud, [look.formality, look.formality]), base: keys[0], required: !!req, share, color: null, material: null, explicit: false, hero: i === 0 });
   });
   // طبقة إضافية لو الجو بارد
   const band = bandOf(adv);
@@ -91,12 +92,39 @@ function slotsFor(aud, parsed, look, K, ctxF, adv) {
   return { mode: 'look', slots };
 }
 
+// أنواع اسمها مختلف لكن هي نفس القطعة عند العميل
+const SAME_THING = [['dress_party', 'dress_evening']];
+
+/** ترتيب مستويات التخفيف لـ slot. */
+// ألوان قريبة من بعض (لو اللون المطلوب مش موجود، القريب منه أحسن من لون مختلف خالص)
+export const NEAR_COLORS = {
+  sky_blue: ['blue', 'royal_blue', 'navy'], blue: ['sky_blue', 'royal_blue', 'navy'], royal_blue: ['blue', 'navy', 'sky_blue'], navy: ['blue', 'royal_blue'],
+  brown: ['camel', 'olive'], camel: ['brown', 'beige'], beige: ['cream', 'camel', 'champagne', 'off_white'], cream: ['beige', 'off_white', 'champagne'],
+  pink: ['blush', 'fuchsia', 'coral'], blush: ['pink', 'coral'], fuchsia: ['pink'], coral: ['pink', 'red', 'orange'],
+  red: ['burgundy', 'coral'], burgundy: ['red'], green: ['emerald', 'olive', 'mint'], emerald: ['green'], olive: ['green', 'brown'], mint: ['green'],
+  white: ['off_white', 'cream'], off_white: ['white', 'cream'], grey: ['silver'], silver: ['grey'], gold: ['champagne', 'yellow'], purple: ['lavender'], lavender: ['purple'],
+};
+
 /** ترتيب مستويات التخفيف لـ slot. */
 function levelsFor(slot, K) {
   const subs = [];
   for (const k of slot.keys) if (!NEVER_UNASKED.has(k)) for (const s of K.substitutes[k] || []) if (!slot.keys.includes(s) && !subs.includes(s)) subs.push(s);
+  // مرادفات حقيقية (سواريه/سهرة، جاكت/معطف…): الاتنين بيبدّلوا بعض في القاموس، فمنتج بنفس اللون منهم أحسن من منتج من النوع المطلوب بلون غلط
+  const peers = subs.filter((s) => slot.keys.some((k) => (K.substitutes[s] || []).includes(k)));
   const lv = [{ keys: slot.keys, color: true, fd: 1, rel: null }];
-  if (slot.color) lv.push({ keys: slot.keys, color: false, fd: 1, rel: 'color' });
+  // خامة مطلوبة (جلد…) مش موجودة بنفس اللون: نحافظ على اللون ونقول إن الخامة مختلفة
+  if (slot.material) lv.push({ keys: slot.keys, color: !!slot.color, fd: 1, rel: 'material', mat: false });
+  if (slot.color) {
+    if (peers.length) {
+      // مرادفات حقيقية بنفس المعنى (سواريه = سهرة): بدون تنبيه. باقي الأزواج (أوكسفورد/لوفر، بولو/قميص…) بدائل لازم نقول عليها صراحة.
+      const synonymOnly = peers.filter((s) => SAME_THING.some((g) => g.includes(s) && slot.keys.some((k) => g.includes(k))));
+      const other = peers.filter((s) => !synonymOnly.includes(s));
+      if (synonymOnly.length) lv.push({ keys: [...slot.keys, ...synonymOnly], color: true, fd: 1, rel: 'synonym', mat: slot.material ? false : undefined });
+      if (other.length) lv.push({ keys: [...slot.keys, ...other], color: true, fd: 1, rel: 'substitute', mat: slot.material ? false : undefined });
+    }
+    if (NEAR_COLORS[slot.color]) lv.push({ keys: slot.keys, color: 'near', fd: 1, rel: 'near_color', mat: slot.material ? false : undefined });
+    lv.push({ keys: slot.keys, color: false, fd: 1, rel: 'color' });
+  }
   lv.push({ keys: slot.keys, color: false, fd: 2, rel: 'formality' });
   if (subs.length) {
     if (slot.color) lv.push({ keys: [...slot.keys, ...subs], color: true, fd: 2, rel: 'substitute' });
@@ -105,7 +133,8 @@ function levelsFor(slot, K) {
   return lv;
 }
 
-const primary = (p) => p.colorKeys?.[0] || null;
+const wantAll = (parsed, slot) => [...new Set([...[].concat(slot?.color || []), ...(parsed?.colors || []), ...(parsed?.garments || []).flatMap((g) => [].concat(g.color || []))].filter(Boolean))];
+const primary = (p, want) => (want && p.colorKeys?.find((c) => want.includes(c))) || p.colorKeys?.[0] || null;
 
 // شورت رياضي/تيشيرت تدريب/بنطلون يوجا: المنتجات الرياضية تتلاقى لما العميل يطلب النوع العادي (شورت دايمًا، والباقي لو قال كلمة رياضة)
 const SPORTISH_RE = /(^| )(رياضي|رياضيه|رياضه|رياضة|تدريب|تمارين|يوجا|جري|تراك|جيم|gym|sport|training)( |$)/;
@@ -119,11 +148,15 @@ function sportAlts(key, parsed) {
 const QT_STOP = new Set(['عايز', 'عايزه', 'عايزة', 'عاوز', 'عاوزه', 'ورني', 'وريني', 'محتاج', 'محتاجه', 'ممكن', 'لو', 'سمحت', 'ليا', 'لي', 'من', 'في', 'علي', 'على', 'ميزانيتي', 'جنيه', 'لبس']);
 const _qtCache = new WeakMap();
 function nameToks(t) { return String(t || '').split(' ').map((w) => w.replace(/^ال/, '')).filter((w) => w.length >= 3 && !QT_STOP.has(w)); }
-function queryTokensOf(parsed) { if (!parsed || typeof parsed !== 'object') return []; if (_qtCache.has(parsed)) return _qtCache.get(parsed); const t = [...new Set(nameToks(parsed.normalized))]; _qtCache.set(parsed, t); return t; }
+const CUFF_INTENT_RE = /(دابل|دبل|دوبل|مزدوج[هة]?)\s*(مانشت|مانشيت|كف)|french\s*cuff|double\s*cuff|كفلين[كج]|كافلين[كج]|cufflink|سموكن|تاكسيدو/i;
+function queryTokensOf(parsed) { if (!parsed || typeof parsed !== 'object') return []; if (_qtCache.has(parsed)) return _qtCache.get(parsed); const t = [...new Set(nameToks(parsed.normalized))]; if (CUFF_INTENT_RE.test(String(parsed.normalized || ''))) t.push('__fcuff'); _qtCache.set(parsed, t); return t; }
 function scoreProduct(p, slot, ctx) {
   const { look, K, adv, fTarget, partnerHero, palette, taste, requestedColors, budgetCap, learnedPreferences } = ctx;
   let s = 10;
   if (fTarget && p.formality != null) s -= 3 * Math.abs(p.formality - fTarget);
+  if (p.key === 'bow_tie' && !slot.explicit && slot.base === 'tie') s -= 6; // الببيون بيتقدّم بس مع قميص المانشت المزدوجة أو لو العميل طلبه
+  if (p.frenchCuff && ctx.queryTokens?.includes('__fcuff')) s += 12;
+  if (p.frenchCuff && fTarget) s += fTarget >= 4 ? 3 : -9; // قميص مانشت مزدوجة: للمناسبات الرسمية مع بدلة، مش لطقم كاجوال
   const cols = p.colorKeys || [];
   if (slot.color && cols.includes(slot.color)) s += 6;
   if (requestedColors.length && cols.some((c) => requestedColors.includes(c))) s += 3;
@@ -193,6 +226,8 @@ function candidatesAt(slot, lvl, aud, products, ctx) {
     if (!p.key || !(keys.has(p.key) || (p.headKey && keys.has(p.headKey)))) continue; // headKey: «شورت تمارين» مصنّف رياضي بس اسمه شورت
     if (!p.inStock) continue;
     if (p.typeConflict) continue; // الاسم والقسم/النوع مش متفقين → مانرشحوش
+    if (p.colorConflict || p.sizeConflict || p.audienceConflict) continue; // الاسم/الوصف/الألوان/المقاسات/القسم بيتعارضوا → مش مؤكد، مانرشحوش
+    if (slot.color && !(p.colorKeys || []).length) continue; // العميل حدد لون والمنتج من غير لون مسجل → مش مؤكد، مانرشحوش
     if (NEVER_UNASKED.has(p.key) && !slot.keys.includes(p.key)) continue; // لانجري/روب/بيجامة/كفلينج: بطلب صريح بس
     if (p.key === 'slippers' && context !== 'home' && context !== 'sahel_beach' && !slot.explicit && !slot.keys.includes('slippers')) continue;
     // مناسبة رسمية (خطوبة/فرح…): الكوتشي والجزم الرياضي والشبشب مش بدائل مقبولة إلا لو العميل طلبها بنفسه
@@ -203,8 +238,8 @@ function candidatesAt(slot, lvl, aud, products, ctx) {
     if (ctx.outer?.size && !ctx.requested?.has(p.key) && !layerOK(p, ctx.outer)) continue; // طبقات: مش أي توب تحت الجاكيت
     const cols = p.colorKeys || [];
     if (userAvoid.length && cols.length && cols.every((c) => userAvoid.includes(c))) continue;
-    if (slot.material && p.materials?.size && !p.materials.has(slot.material)) continue; // خامة مش مكتوبة = مش مرفوضة (بنقول للعميل يتأكد)
-    if (slot.color && lvl.color && !cols.includes(slot.color)) continue;
+    if (slot.material && lvl.mat !== false && p.materials?.size && !p.materials.has(slot.material)) continue; // خامة مش مكتوبة = مش مرفوضة (بنقول للعميل يتأكد)
+    if (slot.color && lvl.color) { const okColor = lvl.color === 'near' ? cols.some((c) => (NEAR_COLORS[slot.color] || []).includes(c)) : cols.includes(slot.color); if (!okColor) continue; }
     const hero = HERO_KEYS.has(p.key);
     if (lookAvoidHard && cols.some((c) => lookAvoidHard.includes(c))) continue;
     if (fTargetRange && p.formality != null) {
@@ -300,7 +335,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     if (cap) { const within = chosen.ranked.findIndex((r) => r.p.price <= cap); if (within >= 0) idx = within; else idx = chosen.ranked.reduce((bi, r, i, a) => (r.p.price < a[bi].p.price ? i : bi), 0); }
     const top = chosen.ranked[idx];
     const visible = slot.explicit || slot.hero;
-    if (chosen.lvl.rel && visible) relaxed.push({ slot: slot.base, kind: chosen.lvl.rel, wanted: slot.color ? `${slot.color} ${slot.base}` : slot.base, got: top.p.key });
+    if (chosen.lvl.rel && chosen.lvl.rel !== 'synonym' && visible) relaxed.push({ slot: slot.base, kind: chosen.lvl.rel, wanted: slot.color ? `${slot.color} ${slot.base}` : slot.base, got: top.p.key, wantedColor: slot.color || null, wantedMaterial: slot.material || null, gotColors: top.p.colorKeys || [], gotNear: (top.p.colorKeys || []).filter((c) => (NEAR_COLORS[slot.color] || []).includes(c)), gotColorless: !(top.p.colorKeys || []).length, gotMaterials: [...(top.p.materials || [])] });
     // مجموعة بدائل أرخص للميزانية (بدائل من نفس الاستخدام بنفس الرسمية ±1)
     const subs = []; for (const k of slot.keys) for (const x of K.substitutes[k] || []) if (!slot.keys.includes(x) && !subs.includes(x)) subs.push(x);
     let pool = [];
@@ -311,8 +346,8 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     }
     maxLevel = Math.max(maxLevel, chosen.li);
     scoreSum += top.s;
-    const c0 = primary(top.p); if (c0 && slot.hero && !palette.includes(c0)) palette = [c0, ...palette]; else if (c0 && palette.length < 3 && !palette.includes(c0)) palette.push(c0);
-    picks.push({ slot, product: top.p, ranked: chosen.ranked, pool, relaxedKind: visible ? chosen.lvl.rel : null });
+    const c0 = primary(top.p, wantAll(parsed, slot)); if (c0 && slot.hero && !palette.includes(c0)) palette = [c0, ...palette]; else if (c0 && palette.length < 3 && !palette.includes(c0)) palette.push(c0);
+    picks.push({ slot, product: top.p, ranked: chosen.ranked, pool, relaxedKind: visible && chosen.lvl.rel !== 'synonym' ? chosen.lvl.rel : null });
   }
   // الاختياري ما يبقاش أغلى من 20% من إجمالي المطلوب
   const reqTotal = picks.filter((p) => p.slot.required).reduce((t, p) => t + p.product.price, 0);
@@ -324,6 +359,24 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     if (alt) pk.product = alt.p; else picks.splice(picks.indexOf(pk), 1);
   }
   // رتّب picks بترتيب الـslots الأصلي
+  // قميص مانشت مزدوجة (دابل مانشت) ما بيتلبسش مع كرافتة عادية: الببيون بداله، ولو مفيش ببيون الكرافتة الاختيارية بتتشال
+  if (!picks.some((p) => p.product.frenchCuff)) {
+    // من غير قميص مانشت مزدوجة: الببيون ميظهرش لوحده في أطقم تلقائية (إلا لو العميل طلبه): كرافتة عادية بداله
+    for (const pk of picks) {
+      if (pk.slot.explicit || pk.slot.base !== 'tie' || pk.product.key !== 'bow_tie') continue;
+      const tie = [...(pk.ranked || []), ...(pk.pool || [])].find((r) => r.p.key === 'tie');
+      if (tie) { pk.product = tie.p; pk.ranked = [tie, ...(pk.ranked || []).filter((r) => r.p.key !== 'bow_tie')]; }
+    }
+  }
+  if (picks.some((p) => p.product.frenchCuff)) {
+    for (const pk of [...picks]) {
+      if (pk.slot.explicit || pk.product.key !== 'tie') continue;
+      const bow = [...(pk.ranked || []), ...(pk.pool || [])].find((r) => r.p.key === 'bow_tie');
+      if (bow) { pk.product = bow.p; pk.ranked = [bow, ...(pk.ranked || []).filter((r) => r.p.key !== 'tie')]; }
+      else if (!pk.slot.required) picks.splice(picks.indexOf(pk), 1);
+      else { pk.ranked = (pk.ranked || []).filter((r) => r.p.key !== 'tie'); missing.push({ keys: ['bow_tie'], base: 'bow_tie', material: null, color: null, label: 'ببيون' }); picks.splice(picks.indexOf(pk), 1); }
+    }
+  }
   picks.sort((a, b) => built.slots.indexOf(a.slot) - built.slots.indexOf(b.slot));
   return { aud, mode: built.mode, look, picks, missing, relaxed, score: scoreSum, maxLevel, slotsCount: built.slots.length, palette };
 }
@@ -403,7 +456,7 @@ function altsFor(pk, picks, budget) {
   const kidPick = kid(pk.product); // بديل قطعة أطفال يبقى أطفال، وبديل قطعة كبار يبقى كبار
   const seen = new Set();
   const list = [...(pk.ranked || []), ...(pk.pool || [])]
-    .filter((r) => !used.has(r.p.id) && r.p.price <= max && kid(r.p) === kidPick && !seen.has(r.p.id) && seen.add(r.p.id))
+    .filter((r) => !used.has(r.p.id) && (!r.p.frenchCuff || pk.product.frenchCuff) && r.p.price <= max && kid(r.p) === kidPick && !seen.has(r.p.id) && seen.add(r.p.id))
     .sort((a, b) => b.s - a.s);
   const out = [];
   const otherKind = list.find((r) => !r.viaPool && r.p.key && r.p.key !== pk.product.key); // نوع تاني من نفس الخانة بس، مش بديل أرخص من الـpool
@@ -421,7 +474,9 @@ export function planOutfit(parsed, products, env = {}) {
   // مقاس العميل (لو معروف) بيفلتر المنتجات اللي ليها مقاسات متاحة؛ المنتج من غير بيانات مقاسات بيفضل.
   const wantSize = parsed.flags?.size ? String(parsed.flags.size).toUpperCase() : null;
   // المطابقة بتفهم «M-XXL»، «38-44»، «لارج»، «فري سايز»، أرقام هندي، وخانة المقاسات أو sizes_json أو الوصف. بنخبي بس المنتج اللي مقاساته معروفة ومفيهاش المقاس.
-  if (wantSize) products = products.filter((p) => sizeMatch(p, wantSize) !== false);
+  // لو المقاس مجهول (مفيش بيانات مقاسات) لقطعة لبس/جزمة: مش مؤكد → مانرشحهاش. الإكسسوار من غير مقاس يفضل.
+  const needsSize = (p) => APPAREL_FAMILIES.test(p.key || '') || /(shoe|sneaker|heel|flat|sandal|loafer|boot|slipper)/.test(p.key || '');
+  if (wantSize) products = products.filter((p) => { const m = sizeMatch(p, wantSize); return m === true || (m === null && !needsSize(p)); });
   // سن الطفل («لابني 8 سنين»): بنخبي منتجات الأطفال اللي مقاساتها بالعمر ومش شاملة السن ده
   const kidAge = (parsed.ages || []).length === 1 && (parsed.persons || []).some((x) => x === 'boys' || x === 'girls' || x === 'kids') ? Number(parsed.ages[0]) : null;
   if (kidAge != null && kidAge > 0 && kidAge <= 16) products = products.filter((p) => sizeMatch(p, { age: kidAge }) !== false);
@@ -567,10 +622,10 @@ export function planOutfit(parsed, products, env = {}) {
   else if (parsed.garments.length === 1 && !NO_COLOR_ASK.has(parsed.garments[0].key) && !parsed.garments[0].color && !parsed.colors?.length && !parsed.flags?.colorFlexible && !parsed.flags?.cheapest && state !== 'none' && state !== 'no_look') asks.push('color_preference');
 
   const palette = [];
-  for (const f of fills) for (const p of f.picks) { const c = primary(p.product); if (c && !palette.includes(c) && !['black', 'white'].includes(c) || (c && palette.length < 1 && !palette.includes(c))) palette.push(c); }
+  for (const f of fills) for (const p of f.picks) { const c = primary(p.product, wantAll(parsed, p.slot)); if (c && !palette.includes(c) && !['black', 'white'].includes(c) || (c && palette.length < 1 && !palette.includes(c))) palette.push(c); }
 
   return {
-    ...base, soloFromCouple: parsed.flags?.soloFromCouple || null, state, persons, audienceOpen, context, role, budget, total, over, dropped, missing, relaxed, ask: asks, palette: palette.slice(0, 3), pickColors: [...new Set(fills.flatMap((f) => f.picks.map((p) => primary(p.product))).filter(Boolean))], pickCount: fills.reduce((n, f) => n + f.picks.length, 0),
+    ...base, soloFromCouple: parsed.flags?.soloFromCouple || null, state, persons, audienceOpen, context, role, budget, total, over, dropped, missing, relaxed, ask: asks, palette: palette.slice(0, 3), wantColors: wantAll(parsed), pickColors: [...new Set(fills.flatMap((f) => f.picks.map((p) => primary(p.product, wantAll(parsed, p.slot)))).filter(Boolean))], pickCount: fills.reduce((n, f) => n + f.picks.length, 0),
     people: fills.map((f) => ({
       aud: f.aud, mode: f.mode, look: f.look ? { id: f.look.id, name_ar: f.look.name_ar, tip_ar: f.look.tip_ar, formality: f.look.formality } : null,
       picks: f.picks.map((p) => ({ slotKey: p.slot.base, optional: !p.slot.required, hero: p.slot.hero, product: p.product, relaxed: p.relaxedKind, alts: altsFor(p, f.picks, budget) })),

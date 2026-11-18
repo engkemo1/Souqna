@@ -24,6 +24,7 @@ export function kindOf(res, { photo = false } = {}) {
   if (res.faq) return 'faq';
   if (res.adviceId || res.intent === 'advice') return 'advice';
   if (res.state === 'none' || res.state === 'no_look') return 'none';
+  if ((res.blocks?.tabs || []).some((t) => (t.items || []).some((i) => i.relaxed && i.relaxed !== 'synonym'))) return 'substituted';
   if (res.blocks?.tabs?.length || (res.looks && res.looks.length)) return 'shop';
   if (res.state === 'clarify') return 'clarify';
   if (res.intent === 'greeting' || res.intent === 'thanks') return 'greeting';
@@ -52,7 +53,7 @@ export function stylistLogReport(days = 30) {
   for (const r of rows) {
     kinds[r.kind] = (kinds[r.kind] || 0) + 1;
     if ((r.kind === 'faq' || r.kind === 'advice') && r.ref) refs[`${r.kind}:${r.ref}`] = (refs[`${r.kind}:${r.ref}`] || 0) + 1;
-    if (r.kind === 'fallback' || r.kind === 'none') { const k = `${r.kind}|${r.text}`; lost.set(k, (lost.get(k) || 0) + 1); }
+    if (r.kind === 'fallback' || r.kind === 'none' || r.kind === 'substituted') { const k = `${r.kind}|${r.text}`; lost.set(k, (lost.get(k) || 0) + 1); }
     if (r.kind !== 'photo' && r.ms > 0) times.push(r.ms);
   }
   const total = rows.length;

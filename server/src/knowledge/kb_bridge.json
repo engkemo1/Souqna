@@ -224,14 +224,14 @@
     "_about": "قواعد Twist للتنسيق حوالين قطعة العميل (بتغلب pair_with في قاعدة المعرفة). كل خانة \"a|b\" = النوع الأول أو بدايله. الأنواع اللي مش هنا بتاخد تنسيقها من قاعدة المعرفة.",
     "sneakers": {
       "women": [
-        "tshirt|shirt",
-        "jeans",
-        "jacket"
+        "tshirt|hoodie|shirt|blouse",
+        "jeans|joggers|chinos",
+        "jacket|hoodie|sweater|cardigan"
       ],
       "men": [
-        "tshirt|shirt",
-        "jeans",
-        "jacket"
+        "tshirt|polo|hoodie|shirt",
+        "jeans|joggers|chinos",
+        "jacket|hoodie|sweater|cardigan"
       ]
     },
     "sport_shoes": {

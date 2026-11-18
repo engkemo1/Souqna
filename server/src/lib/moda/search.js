@@ -26,7 +26,7 @@ export function keywordSearch(text, products, { limit = 6 } = {}) {
   const variants = q.map((w) => { const g = ALIASES.find((a) => a.some((x) => stem(norm(x)) === w || w.includes(stem(norm(x))) && stem(norm(x)).length >= 3)); return g ? g.map((x) => stem(norm(x))) : [w]; });
   const out = [];
   for (const p of products || []) {
-    if (!p || p.typeConflict || Number(p.photo_mismatch) === 1 || p.inStock === false) continue;
+    if (!p || p.typeConflict || p.colorConflict || p.sizeConflict || p.audienceConflict || Number(p.photo_mismatch) === 1 || p.inStock === false) continue;
     if (!intimateOk && INTIMATE_KEYS.has(p.key)) continue; // لانجيري/نوم/داخلي: بطلب صريح بس
     const hay = ` ${norm(`${p.name_ar || ''} ${p.name_en || ''} ${p.cat_text || ''} ${p.color_text || ''}`)} `;
     const hayStems = new Set(toks(hay));

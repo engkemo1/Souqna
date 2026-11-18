@@ -79,11 +79,23 @@ const tieWhyToLook = (K, itemsIn, L, ownedLabels = [], ownedKeys = []) => {
   });
 };
 
-const itemCard = (K, pk) => {
-  const p = pk.product;
+/** المنتج متعدد الألوان: اللون المطلوب يتقدّم أول واحد وتظهر صورته لو متاحة */
+const colorImageOf = (p, key) => {
+  let list = p.colors_json; if (typeof list === 'string') { try { list = JSON.parse(list); } catch { list = []; } }
+  const hit = (Array.isArray(list) ? list : []).find((c) => c && (c.image || c.image_url) && [c.name_ar, c.name_en].some((n) => n && String(n).toLowerCase().includes(String(key).replace('_', ' '))));
+  return hit ? (hit.image || hit.image_url) : null;
+};
+export const focusColor = (p, want) => {
+  const w = [].concat(want || []).filter(Boolean).find((c) => p.colorKeys?.includes(c));
+  if (!w) return p;
+  return { ...p, colorKeys: [w, ...p.colorKeys.filter((c) => c !== w)], image: colorImageOf(p, w) || p.image };
+};
+const itemCard = (K, pk, want) => {
+  const wc = [...new Set([...[].concat(pk.slot?.color || []), ...(want || [])])];
+  const p = focusColor(pk.product, wc);
   const fitTip = generateFitAndSizingTip(p);
-  return { id: p.id, key: p.key, label: itemAr(K, p.key || pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null, fitTip: fitTip || null, why: pk.why || K.kb?.whyAr?.(pk.slotKey) || null, whyKind: pk.why ? 'look' : (K.kb?.whyAr?.(pk.slotKey) ? 'piece' : null),
-    alts: (pk.alts || []).map((a) => ({ id: a.id, key: a.key, label: itemAr(K, a.key || pk.slotKey), name: a.name_ar || a.name_en, price: a.price, store: a.store_slug || null, image: a.image || a.image_url || a.thumb || null, colors: a.colorKeys })) };
+  return { id: p.id, key: p.key, label: itemAr(K, p.key || pk.slotKey), name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys, optional: pk.optional, relaxed: pk.relaxed || null, differs: pk.relaxed ? ({ near_color: 'لون قريب من طلبك', color: 'اللون مختلف عن طلبك', material: 'الخامة مختلفة عن طلبك', substitute: 'نوع بديل للي طلبته' }[pk.relaxed] || 'مختلف عن طلبك') : null, fitTip: fitTip || null, why: pk.why || K.kb?.whyAr?.(pk.slotKey) || null, whyKind: pk.why ? 'look' : (K.kb?.whyAr?.(pk.slotKey) ? 'piece' : null),
+    alts: (pk.alts || []).map((a0) => focusColor(a0, wc)).map((a) => ({ id: a.id, key: a.key, label: itemAr(K, a.key || pk.slotKey), name: a.name_ar || a.name_en, price: a.price, store: a.store_slug || null, image: a.image || a.image_url || a.thumb || null, colors: a.colorKeys })) };
 };
 
 /** بيحوّل plan → رد. opts: { seed, lang } */
@@ -126,7 +138,9 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   const occasion = String(ctxAr).replace(/\s*\(.*?\)\s*/g, ' ').split('/')[0].trim() || 'المناسبة';
   const occasionForAr = { home: 'للبيت', engagement_guest: 'للخطوبة', engagement_self: 'لخطوبتك', katb_kitab: 'لكتب الكتاب', wedding_guest: 'للفرح', wedding_self: 'لفرحك', graduation: 'للتخرج', family_gathering: 'للمة العيلة', birthday_party: 'لعيد الميلاد', date_night: 'لخروجة أو عشا', work_formal: 'للشغل', work_casual: 'للشغل', university: 'للجامعة', sport: 'للرياضة', casual_outing: 'للخروجة', travel: 'للسفر', eid: 'للعيد', ramadan_iftar: 'لإفطار رمضان', sahel_beach: 'للساحل', evening_out: 'للسهرة' };
   const occasionFor = L === 'en' ? occasion : (occasionForAr[plan.context] || `لـ${occasion}`);
-  const paletteAr = joinAr((plan.palette || []).map((c) => colorAr(K, c)));
+  // الألوان اللي نقولها لازم تكون ألوان القطع المعروضة فعلًا (مش اللوحة المخططة): لو في قطعة بلون تاني نقوله بصراحة بدل «ألوان بيج متناسقة»
+  const shownColors = [...new Set((plan.people || []).flatMap((pe) => pe.picks.map((pk) => focusColor(pk.product, [...[].concat(pk.slot?.color || []), ...(plan.wantColors || [])]).colorKeys?.[0])).filter(Boolean))];
+  const paletteAr = joinAr((shownColors.length ? shownColors : plan.palette || []).slice(0, 3).map((c) => colorAr(K, c)));
   const couple = !plan.audienceOpen && plan.people.length === 2 && plan.persons.includes('men') && plan.persons.some((a) => a === 'women' || a === 'women_hijab');
   const condolence = plan.tone === 'sober';
 
@@ -134,8 +148,11 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   const relaxedTexts = [];
   const wantedAr = (w) => { const ws = w.split(' '); const c = ws.find((x) => K.colors.has(x)); const it = ws.find((x) => K.items.has(x)); return [it ? itemAr(K, it) : '', c ? colorAr(K, c) : ''].filter(Boolean).join(' '); };
   for (const r of plan.relaxed || []) {
-    if (r.kind.includes('substitute')) relaxedTexts.push(`${say('alt_item', { wanted: wantedAr(r.wanted), got: itemAr(K, r.got) })}.`);
-    else if (r.kind === 'color') relaxedTexts.push(`${say('alt_color', { wanted: wantedAr(r.wanted) })}.`);
+    const matAr = (m) => (K.synonyms?.materials?.[m] || []).find((a) => /[\u0600-\u06FF]/.test(a)) || m;
+    if (r.kind === 'near_color') relaxedTexts.push(`${say('alt_color_near', { wanted: wantedAr(r.wanted), got: itemAr(K, r.got), gotColor: joinAr((r.gotNear?.length ? r.gotNear : r.gotColors || []).slice(0, 2).map((c) => colorAr(K, c))) })}.`);
+    else if (r.kind === 'material') relaxedTexts.push(`${say('alt_material', { wanted: `${itemAr(K, r.got)} ${r.wantedMaterial ? matAr(r.wantedMaterial) : ''}`.trim(), got: itemAr(K, r.got), gotMaterial: (r.gotMaterials || []).length ? joinAr(r.gotMaterials.slice(0, 2).map(matAr)) : 'مش مكتوبة' })}.`);
+    else if (r.kind.includes('substitute')) relaxedTexts.push(`${say('alt_item', { wanted: wantedAr(r.wanted), got: itemAr(K, r.got) })}.`);
+    else if (r.kind === 'color') relaxedTexts.push(`${say(r.gotColorless ? 'alt_color_unknown' : 'alt_color', { wanted: wantedAr(r.wanted), got: itemAr(K, r.got) })}.`);
   }
 
   // ---------- مقدمة حسب الحالة ----------
@@ -218,7 +235,7 @@ export function respond(plan, { seed = '', lang = 'ar', profile = {}, advice = n
   // ---------- بلوكات المنتجات ----------
   const tabs = plan.people.map((pe) => ({
     id: pe.aud, label: plan.audienceOpen ? (pe.aud === 'men' ? (L === 'en' ? 'Men' : 'رجالي') : (L === 'en' ? 'Women' : 'حريمي')) : tabLabel(pe.aud, plan.persons, { ...P }), look: pe.look?.name_ar || null,
-    items: pe.picks.map((pk) => itemCard(K, pk)), subtotal: pe.subtotal,
+    items: pe.picks.map((pk) => itemCard(K, pk, plan.wantColors)), subtotal: pe.subtotal,
     missing: pe.missing.map((m) => ({ key: m.base, material: m.material, label: m.title || itemAr(K, m.base), button: P.order_missing_button, hint: pick(P.order_missing_hint, `${seed}:hint`), payload: { type: 'request_item', key: m.base, material: m.material, color: m.color, audience: pe.aud } })),
   }));
 

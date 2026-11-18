@@ -36,7 +36,7 @@ export function candidatePool(rows, aud, K, { context = null, max = 48, perKey =
   const lo = fr ? fr[0] - 1 : 0; const hi = fr ? fr[1] + 1 : 9;
   const byKey = new Map();
   for (const p of rows || []) {
-    if (!p.key || p.inStock === false || p.typeConflict || !(p.price > 0) || !ok(p.gender)) continue;
+    if (!p.key || p.inStock === false || p.typeConflict || p.colorConflict || p.sizeConflict || p.audienceConflict || !(p.price > 0) || !ok(p.gender)) continue;
     const item = K.items.get(p.key); if (!item || item.virtual || item.family === 'underwear_sleep' || p.key === 'cufflinks') continue;
     if (p.formality != null && (p.formality < lo || p.formality > hi)) continue;
     if (fr && fr[0] >= 4 && ['sneakers', 'sport_shoes', 'slippers'].includes(p.key) && !(p.minimalSneaker && fr[1] < 5)) continue; // رسمي: كوتشي ساده أبيض/أسود بس
