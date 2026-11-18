@@ -884,8 +884,8 @@ r.put('/whatsapp', h((req, res) => {
   res.json(waSettingsView());
 }));
 r.post('/whatsapp/test', h(async (req, res) => {
-  const b = z.object({ to: z.string().trim().min(8).max(20) }).parse(req.body || {});
-  try { res.json(await sendWaTest(b.to)); } catch (e) { throw new AppError(422, 'wa_test_failed', String(e.message || e)); }
+  const b = z.object({ to: z.string().trim().min(8).max(20), template: z.string().trim().regex(/^[A-Za-z0-9_]{1,200}$/).optional().or(z.literal('')), vars: z.number().int().min(0).max(10).optional() }).parse(req.body || {});
+  try { res.json(await sendWaTest(b.to, { template: b.template, vars: b.vars })); } catch (e) { throw new AppError(422, 'wa_test_failed', String(e.message || e)); }
 }));
 r.get('/stylist', h((_req, res) => res.json(stylistStatus())));
 r.get('/stylist/test/:provider', h(async (req, res) => {

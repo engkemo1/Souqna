@@ -192,6 +192,8 @@ function WhatsAppPanel() {
   const { data, reload } = useAdminApi('/whatsapp');
   const [f, setF] = useState(null);
   const [testTo, setTestTo] = useState('');
+  const [testTpl, setTestTpl] = useState('');
+  const [testVars, setTestVars] = useState('4');
   const [busy, setBusy] = useState(false);
   if (data && !f) setF({ token: '', phoneId: data.phoneId || '', template: data.template || '', customerTemplate: data.customerTemplate || '', ownerBtnTemplate: data.ownerBtnTemplate || '', customerBtnTemplate: data.customerBtnTemplate || '', authTemplate: data.authTemplate || '', lang: data.lang || 'ar' });
   if (!data || !f) return <Panel title="واتساب (Meta)"><Skeleton className="h-40 w-full" /></Panel>;
@@ -203,7 +205,7 @@ function WhatsAppPanel() {
   };
   const test = async () => {
     setBusy(true);
-    try { await adminApi('/whatsapp/test', { method: 'POST', body: { to: testTo } }); toast({ title: 'اتبعتت رسالة تجربة، شوف الواتساب' }); }
+    try { await adminApi('/whatsapp/test', { method: 'POST', body: { to: testTo, template: testTpl.trim(), vars: Number(testVars) || 0 } }); toast({ title: 'اتبعتت رسالة تجربة، شوف الواتساب' }); }
     catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy(false);
   };
@@ -226,6 +228,8 @@ function WhatsAppPanel() {
         <div className="flex flex-wrap items-end gap-3">
           <button type="button" disabled={busy} onClick={save} className="rounded-full bg-btn px-5 py-2 text-sm font-bold text-on-btn disabled:opacity-50">حفظ</button>
           <label className="block"><span className="mb-1.5 block text-sm font-medium">تجربة إرسال</span><Input dir="ltr" placeholder="01xxxxxxxxx" value={testTo} onChange={(e) => setTestTo(e.target.value)} className="text-start" /></label>
+          <label className="block"><span className="mb-1.5 block text-sm font-medium">اسم القالب (اختياري)</span><Input dir="ltr" placeholder="order_update" value={testTpl} onChange={(e) => setTestTpl(e.target.value)} className="text-start" /></label>
+          <label className="block"><span className="mb-1.5 block text-sm font-medium">عدد المتغيرات</span><Input dir="ltr" inputMode="numeric" value={testVars} onChange={(e) => setTestVars(e.target.value.replace(/\D/g, '').slice(0, 2))} className="w-20 text-start" /></label>
           <button type="button" disabled={busy || !testTo} onClick={test} className="rounded-full border border-line-strong px-4 py-2 text-sm font-semibold hover:border-fg disabled:opacity-50">ابعت رسالة تجربة</button>
         </div>
       </div>
