@@ -162,7 +162,7 @@ export default function Checkout() {
       setSaved({ name: form.name, phone: form.phone, governorate: form.governorate, city: form.city, address: form.address });
       cart.clear();
       rememberOrder({ number: order.number, token: order.trackToken, store: store.name });
-      navigate(sp(store.slug, `order/${order.number}?t=${order.trackToken}`), { replace: true, state: { name: form.name.split(' ')[0], phone: form.phone, autoOpenWa: true } });
+      navigate(sp(store.slug, `order/${order.number}?t=${order.trackToken}`), { replace: true, state: { name: form.name.split(' ')[0], phone: form.phone, autoOpenWa: !order.waAuto, waAuto: Boolean(order.waAuto) } });
     } catch (err) {
       setPlacing(false);
       if (err.code?.startsWith('coupon_')) {

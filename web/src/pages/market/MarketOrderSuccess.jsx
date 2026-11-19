@@ -17,9 +17,10 @@ export default function MarketOrderSuccess() {
 
   // Each store's WhatsApp message goes to that store's owner (never to the Twist team).
   const toWa = (raw) => { const d = String(raw || '').replace(/\D/g, ''); return !d ? null : d.startsWith('20') ? d : `20${d.replace(/^0/, '')}`; };
+  // when the server already sent the order to the store on WhatsApp by itself, the customer must NOT be asked to send it manually
   const storeWaLinks = state.orders.map((o) => {
     const phone = toWa(o.storeWhatsapp);
-    if (!phone) return null;
+    if (!phone || o.waAuto) return null;
     const msg = [
       `طلب جديد من Twist 🛍️`,
       `رقم الطلب: ${o.number}`,
@@ -64,6 +65,15 @@ export default function MarketOrderSuccess() {
         ))}
       </ol>
     </section>
+
+    {/* The system already messaged the store (and the customer) on WhatsApp: just tell the customer, no action needed */}
+    {state.orders.some((o) => o.waAuto || o.customerWa) && <div className="mt-6 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 p-4 text-center sm:p-5">
+      <p className="text-base font-bold text-fg">{ar ? 'تمام، طلبك اتبعت ✅' : 'Done, your order was sent ✅'}</p>
+      <p className="mt-1 text-xs text-muted sm:text-sm">{[
+        state.orders.some((o) => o.waAuto) ? (ar ? 'بعتنا الطلب لصاحب المحل على واتساب تلقائياً، مش لازم تعمل حاجة.' : 'We sent your order to the store owner on WhatsApp automatically.') : '',
+        state.orders.some((o) => o.customerWa) ? (ar ? 'وهتوصلك رسالة تأكيد على واتساب فيها زراير لمتابعة طلبك.' : 'You will also get a WhatsApp confirmation with buttons to follow your order.') : '',
+      ].filter(Boolean).join(' ')}</p>
+    </div>}
 
     {/* WhatsApp confirmation banner: one button per store, sent to the store owner */}
     {storeWaLinks.length > 0 && <div className="mt-6 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 p-4 sm:p-5 text-center">

@@ -4,10 +4,10 @@ import { motion } from 'framer-motion';
 import { Check, Copy, PhoneCall, Package, Truck, PackageSearch, MessageCircle } from 'lucide-react';
 import { trackUrl } from '../../lib/recentOrders.js';
 import { useStore, sp } from '../../lib/store.jsx';
+import { SALES_WHATSAPP } from '../../config/contact.js';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
-import { SALES_WHATSAPP } from '../../config/contact.js';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -27,6 +27,8 @@ export default function OrderSuccess() {
   const o = data?.order;
   const name = state?.name || o?.firstName || '';
 
+  // Only when the store is NOT set to receive orders on WhatsApp automatically does the customer send the order by hand.
+  const manualWa = !state?.waAuto;
   const rawWa = store?.whatsapp || store?.phone;
   const targetWa = rawWa ? (rawWa.replace(/\D/g, '').startsWith('20') ? rawWa.replace(/\D/g, '') : `20${rawWa.replace(/\D/g, '').replace(/^0/, '')}`) : SALES_WHATSAPP;
   const itemsText = (o?.items || []).map((it) => `• ${it.qty}× ${tr(it.name)}${it.size ? ` (${it.size})` : ''}`).join('\n');
@@ -43,13 +45,13 @@ export default function OrderSuccess() {
   const waUrl = `https://api.whatsapp.com/send?phone=${targetWa}&text=${encodeURIComponent(waMsg)}`;
 
   useEffect(() => {
-    if (state?.autoOpenWa && waUrl) {
+    if (manualWa && state?.autoOpenWa && waUrl) {
       const timer = setTimeout(() => {
         window.open(waUrl, '_blank');
       }, 700);
       return () => clearTimeout(timer);
     }
-  }, [state?.autoOpenWa, waUrl]);
+  }, [manualWa, state?.autoOpenWa, waUrl]);
 
   return (
     <div className="container max-w-2xl pt-10 sm:pt-16">
@@ -76,26 +78,33 @@ export default function OrderSuccess() {
           </div>
         </div>
 
-        {/* WhatsApp confirmation banner */}
-        <div className="mt-5 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 p-4 sm:p-5 text-center">
-          <p className="text-base font-bold text-fg">
-            {lang === 'ar' ? 'تأكيد واستلام أسرع لطلبك عبر واتساب 💬' : 'Faster confirmation via WhatsApp 💬'}
-          </p>
-          <p className="mt-1 text-xs sm:text-sm text-muted">
-            {lang === 'ar'
-              ? 'اضغط هنا لإرسال تفاصيل طلبك للإدارة على واتساب مباشرة لتأكيد الاستلام وبدء التجهيز فوراً.'
-              : 'Tap below to send your order details directly via WhatsApp for instant confirmation.'}
-          </p>
-          <a
-            href={waUrl}
-            target="_blank"
-            rel="noreferrer"
-            className="mt-3.5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] font-bold text-neutral-900 shadow-sm transition hover:bg-[#20ba59] active:scale-[0.99] sm:w-auto sm:px-8"
-          >
-            <MessageCircle className="h-5 w-5 fill-white text-white" />
-            {lang === 'ar' ? 'إرسال تفاصيل الطلب على واتساب' : 'Send order to WhatsApp'}
-          </a>
-        </div>
+        {manualWa ? (
+          /* WhatsApp confirmation banner */
+          <div className="mt-5 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 p-4 sm:p-5 text-center">
+            <p className="text-base font-bold text-fg">
+              {lang === 'ar' ? 'تأكيد واستلام أسرع لطلبك عبر واتساب 💬' : 'Faster confirmation via WhatsApp 💬'}
+            </p>
+            <p className="mt-1 text-xs sm:text-sm text-muted">
+              {lang === 'ar'
+                ? 'اضغط هنا لإرسال تفاصيل طلبك للإدارة على واتساب مباشرة لتأكيد الاستلام وبدء التجهيز فوراً.'
+                : 'Tap below to send your order details directly via WhatsApp for instant confirmation.'}
+            </p>
+            <a
+              href={waUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-3.5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#25D366] font-bold text-neutral-900 shadow-sm transition hover:bg-[#20ba59] active:scale-[0.99] sm:w-auto sm:px-8"
+            >
+              <MessageCircle className="h-5 w-5 fill-white text-white" />
+              {lang === 'ar' ? 'إرسال تفاصيل الطلب على واتساب' : 'Send order to WhatsApp'}
+            </a>
+          </div>
+        ) : (
+          <div className="mt-5 rounded-2xl border border-[#25D366]/40 bg-[#25D366]/10 p-4 text-center sm:p-5">
+            <p className="text-base font-bold text-fg">{lang === 'ar' ? 'تمام، طلبك اتبعت ✅' : 'Done, your order was sent ✅'}</p>
+            <p className="mt-1 text-xs text-muted sm:text-sm">{lang === 'ar' ? 'بعتنا الطلب لصاحب المحل على واتساب تلقائياً، مش لازم تعمل حاجة.' : 'We sent your order to the store owner on WhatsApp automatically.'}</p>
+          </div>
+        )}
 
         <div className="mt-6 border-t border-line pt-5">
           <h2 className="mb-4 text-sm font-semibold">{t('success.whatsNext')}</h2>
