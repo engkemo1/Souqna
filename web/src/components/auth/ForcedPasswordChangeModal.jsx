@@ -1,9 +1,8 @@
 import { useState } from 'react';
 import { useAuth } from '../../lib/auth.jsx';
 import { useToast } from '../ui/Toast.jsx';
-import Input from '../ui/Input.jsx';
 import Button from '../ui/Button.jsx';
-import { Field } from '../ui/Field.jsx';
+import { Field, Input } from '../ui/Field.jsx';
 import { Eye, EyeOff, Lock, AlertTriangle } from 'lucide-react';
 
 export default function ForcedPasswordChangeModal() {
