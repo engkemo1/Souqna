@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "node --test --no-warnings test/pos-engine.test.js"
+    "test": "node --test --no-warnings test/pos-engine.test.js test/hooks.test.js test/store-info.test.js"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
