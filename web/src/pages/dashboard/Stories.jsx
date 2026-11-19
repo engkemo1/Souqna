@@ -223,6 +223,7 @@ export default function Stories() {
               <Button icon={Plus} onClick={publish} disabled={!canPublish} loading={busy}>{ar ? 'انشر الستوري' : 'Publish story'}</Button>
               {(file || caption || picked.length > 0 || withBtn) && <Button variant="secondary" onClick={reset}>{ar ? 'إلغاء' : 'Cancel'}</Button>}
             </div>
+            {busy && isVideo && <p role="status" className="text-xs text-muted">{ar ? 'بنرفع الفيديو ونجهّزه للعرض على الموبايل. ممكن ياخد من ثواني لحد دقيقة حسب حجمه، فمتقفلش الصفحة. الأسرع: فيديو MP4 أقل من 30 ثانية.' : 'Uploading and preparing your video. This can take a few seconds up to a minute, so keep this page open. Fastest: an MP4 under 30 seconds.'}</p>}
             {full && <p className="text-xs text-red-600">{ar ? `وصلت للحد الأقصى (${max}). امسح ستوري أو استنى لحد ما يخلص.` : `Limit reached (${max}). Delete one or wait for it to expire.`}</p>}
           </div>
         </div>

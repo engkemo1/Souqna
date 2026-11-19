@@ -83,7 +83,14 @@ export async function saveStoryVideo(buf, storeId, { hq = false } = {}) {
       const inp = path.join(dir, 'in.bin'); const mp4 = path.join(dir, 'out.mp4'); const jpg = path.join(dir, 'poster.jpg');
       await fs.writeFile(inp, buf);
       try {
-        await exclusive(() => run('ffmpeg', ['-y', '-protocol_whitelist', 'file', '-threads', '2', '-i', inp, '-t', String(maxSec), '-vf', `scale='min(${width},iw)':-2,format=yuv420p`, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', hq ? '22' : '28', '-c:a', 'aac', '-b:a', hq ? '128k' : '96k', '-movflags', '+faststart', '-max_muxing_queue_size', '1024', mp4], hq ? 300000 : 120000));
+        // fast path: a short H.264/AAC MP4 that is already small enough is only re-wrapped (about a second) instead of re-encoded (can take a minute)
+        let done = false;
+        const pr = await run('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,codec_name,width:format=duration', '-of', 'json', inp], 10000).then((o) => JSON.parse(o), () => null);
+        const vs = pr?.streams?.find((x) => x.codec_type === 'video'); const as = pr?.streams?.find((x) => x.codec_type === 'audio');
+        if (isMp4(buf) && vs?.codec_name === 'h264' && (!as || as.codec_name === 'aac') && vs.width && vs.width <= width && Number(pr.format?.duration) <= maxSec + 0.5 && buf.length <= maxBytes) {
+          try { await run('ffmpeg', ['-y', '-protocol_whitelist', 'file', '-i', inp, '-c', 'copy', '-movflags', '+faststart', mp4], 60000); done = true; } catch { done = false; }
+        }
+        if (!done) await exclusive(() => run('ffmpeg', ['-y', '-protocol_whitelist', 'file', '-threads', '2', '-i', inp, '-t', String(maxSec), '-vf', `scale='min(${width},iw)':-2,format=yuv420p`, '-c:v', 'libx264', '-preset', hq ? 'veryfast' : 'superfast', '-crf', hq ? '22' : '28', '-c:a', 'aac', '-b:a', hq ? '128k' : '96k', '-movflags', '+faststart', '-max_muxing_queue_size', '1024', mp4], hq ? 300000 : 120000));
         await run('ffmpeg', ['-y', '-protocol_whitelist', 'file', '-i', mp4, '-frames:v', '1', '-vf', `scale='min(${width},iw)':-2`, '-q:v', hq ? '2' : '4', jpg], 30000).catch(() => {});
       } catch (e) { throw fail('video_failed', 'Could not process this video.'); }
       out = await fs.readFile(mp4);
