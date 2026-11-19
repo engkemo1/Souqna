@@ -270,3 +270,31 @@ test('QA-02a: tokens lacking tv (token_version) are strictly rejected for owners
   const buyerRes = await req('GET', '/api/buyer/me', null, { 'x-buyer-token': legacyBuyerToken });
   assert.equal(buyerRes.status, 401, 'legacy buyer token without tv must be rejected');
 });
+
+test('QA-06: in-memory limiter handles general buckets without SQLite WAL traffic, while auth buckets use SQLite', async () => {
+  const { checkRateLimit } = await import('../src/lib/rate-limit.js');
+  const initialSqliteCount = Number(q.val('SELECT COUNT(*) FROM rate_limits') || 0);
+
+  // 1. General bucket: stored in-memory, zero SQLite inserts
+  const genBucket = `search:ip-${randomUUID().slice(0, 8)}`;
+  for (let i = 0; i < 5; i++) {
+    checkRateLimit(genBucket, { max: 10, windowMs: 60e3 });
+  }
+  const afterGenCount = Number(q.val('SELECT COUNT(*) FROM rate_limits') || 0);
+  assert.equal(afterGenCount, initialSqliteCount, 'General API rate limit hits must NOT insert into SQLite');
+
+  // Trigger limit in-memory
+  assert.throws(
+    () => {
+      for (let i = 0; i < 10; i++) checkRateLimit(genBucket, { max: 5, windowMs: 60e3 });
+    },
+    (err) => err.status === 429,
+    'In-memory limiter properly throws 429',
+  );
+
+  // 2. Auth-critical bucket: stored in SQLite
+  const authBucket = `auth:login:ip-${randomUUID().slice(0, 8)}`;
+  checkRateLimit(authBucket, { max: 10, windowMs: 60e3 });
+  const afterAuthCount = Number(q.val('SELECT COUNT(*) FROM rate_limits') || 0);
+  assert.equal(afterAuthCount, initialSqliteCount + 1, 'Auth-critical bucket inserts into SQLite rate_limits table');
+});

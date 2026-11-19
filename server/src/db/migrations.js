@@ -70,6 +70,13 @@ export const MIGRATIONS = [
       `);
     },
   },
+  {
+    version: '0005_rate_limits_index',
+    name: 'Ensure composite index on rate_limits(bucket, ts) exists',
+    up(db) {
+      db.exec('CREATE INDEX IF NOT EXISTS idx_rate_limits_bucket_ts ON rate_limits(bucket, ts)');
+    },
+  },
 ];
 
 export function runMigrations(db) {
