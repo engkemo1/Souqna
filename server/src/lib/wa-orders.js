@@ -4,6 +4,7 @@
  *    ord:confirm  → confirms the order (pending → confirmed) and offers the next step button
  *    ord:ready    → marks it ready / handed over (confirmed → processing | delivered for in-store pickup)
  *    ord:help     → the steps, in plain Arabic
+ *    ord:open     → sends the dashboard link of the order
  *    ord:nope     → how to cancel (cancelling stays in the dashboard: it returns stock and re-prices delivery)
  *  Customer (buttons on the order message): cust:track | address | cancel | store — answered from the real order data only.
  * Only the number registered for the store (owner) or the order's phone (customer) can use them. Dormant unless WA_ENABLED=1.
@@ -67,6 +68,8 @@ async function owner(m, act, o, store) {
     const to2 = o.delivery_by === 'pickup' ? 'delivered' : 'processing';
     if (o.status !== 'confirmed' || !moveStatus(o, to2)) return sendText(to, `الطلب ${o.number} حالته دلوقتي: ${LABEL[o.status] || o.status}. ${where}`);
     await sendText(to, o.delivery_by === 'platform' ? `تمام ✅ بلّغنا فريق تويست عشان يستلم الطلب ${o.number} منك.` : `تمام ✅ اتسجّل إن الطلب ${o.number} ${o.delivery_by === 'pickup' ? 'اتسلّم للعميل' : 'جاهز'}.`);
+  } else if (act === 'open') {
+    await sendText(to, `${where}`);
   } else if (act === 'nope') {
     await sendText(to, `لو مش هتقدر تلبّي الطلب ${o.number}: افتحه من لوحتك واختار «إلغاء» وهنرجّع المخزون ونبلّغ العميل.\n${where}`);
   }

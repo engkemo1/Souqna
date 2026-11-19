@@ -63,9 +63,9 @@ export function isWhatsAppConfigured() {
   return Boolean(config.wa.token && config.wa.phoneId);
 }
 
-/** Buttons of the store-owner template: 3 quick replies (confirm / can't / how) + a link that opens the order in the dashboard. Order must match the template in Meta. */
+/** Buttons of the store-owner template: 4 quick replies (confirm / can't / how / open the order); «open» is answered with the dashboard link. Order must match the template in Meta. */
 const qr = (i, payload) => ({ type: 'button', sub_type: 'quick_reply', index: String(i), parameters: [{ type: 'payload', payload }] });
-const ownerButtons = (orderId) => [qr(0, `ord:confirm:${orderId}`), qr(1, `ord:nope:${orderId}`), qr(2, `ord:help:${orderId}`), { type: 'button', sub_type: 'url', index: '3', parameters: [{ type: 'text', text: String(orderId) }] }];
+const ownerButtons = (orderId) => [qr(0, `ord:confirm:${orderId}`), qr(1, `ord:nope:${orderId}`), qr(2, `ord:help:${orderId}`), qr(3, `ord:open:${orderId}`)];
 const customerButtons = (orderId) => [qr(0, `cust:track:${orderId}`), qr(1, `cust:address:${orderId}`), qr(2, `cust:cancel:${orderId}`), qr(3, `cust:store:${orderId}`)];
 
 export async function sendNewOrderAlert(store, orderId, toOverride) {
@@ -186,6 +186,9 @@ export function notifyGuestOrderWhatsApp({ phone, name, number, text, token, ord
       .catch((e) => console.error(`[whatsapp] customer update ${number} failed: ${e.message}`));
   } catch (e) { console.error(`[whatsapp] customer update failed: ${e.message}`); }
 }
+
+/** True when a customer order message will really be sent (token + phone id + customer template all set). */
+export const customerWaReady = () => isWhatsAppConfigured() && Boolean(config.wa.customerTemplate);
 
 /** Order received → the customer (account or guest) gets a WhatsApp saying the store will confirm it. Needs WA_CUSTOMER_TEMPLATE; never throws. */
 export function notifyCustomerOrderPlaced({ phone, name, number, token, orderId }) {
