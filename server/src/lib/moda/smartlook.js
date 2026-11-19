@@ -20,7 +20,7 @@ export function smartLookText(anchor) {
     const c = SUIT_COLOR_AR[anchor.colorKeys?.[0]];
     return `معايا ${name} ${aud} نسقلي عليه بدلة ${c || ''} وقميص دابل مانشت وحذاء لحضور فرح كضيف ميزانيتي 5000`.replace(/\s+/g, ' ');
   }
-  if (anchor?.frenchCuff) return `معايا ${name} ${aud} نسقلي عليه بدلة وكرافتة وحذاء لحضور فرح كضيف ميزانيتي 5000`;
+  if (anchor?.frenchCuff) return `معايا ${name} ${aud} نسقلي عليه بدلة سودا وببيون وحذاء لحضور فرح كضيف ميزانيتي 5000`;
   return `معايا ${name} ${aud} نسقلي عليه باقي الطقم`;
 }
 
@@ -46,6 +46,15 @@ export function acceptSmartLook(result, { anchorId = null, anchorKey = null, anc
     const keys = items.map((i) => i.key);
     if (!keys.some((k) => FORMAL_SUIT.has(k))) return { ok: false, reason: 'formal_needs_suit' };
     if (keys.some((k) => FORMAL_BAD.has(k))) return { ok: false, reason: 'formal_casual_piece' };
+    const suit = items.find((i) => FORMAL_SUIT.has(i.key));
+    const tie = items.find((i) => FORMAL_ACC.has(i.key));
+    if (suit && tie) {
+      const suitCol = suit.colors?.[0];
+      const tieCol = tie.colors?.[0];
+      if (tieCol === 'black' && suitCol && ['beige', 'white', 'cream', 'khaki'].includes(suitCol)) {
+        return { ok: false, reason: 'tie_suit_color' };
+      }
+    }
   }
   if (items.some((i) => i.repaired)) return { ok: false, reason: 'repaired' };
   if (result.blocks.over > 0) return { ok: false, reason: 'over_budget' };
