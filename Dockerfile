@@ -83,8 +83,11 @@ COPY shared/package.json ./shared/package.json
 COPY server/package.json ./server/package.json
 COPY web/package.json ./web/package.json
 
+# CLIP (visual search) needs onnxruntime-node. Its installer otherwise tries to download a CUDA/GPU build that does not exist (404) and fails,
+# so npm silently drops the optional @huggingface/transformers package. This server has no GPU, so skip the CUDA part.
+ENV ONNXRUNTIME_NODE_INSTALL_CUDA=skip
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --omit=dev --no-audit --no-fund
+    npm ci --omit=dev --no-audit --no-fund --onnxruntime-node-install-cuda=skip
 
 # Source code — copied AFTER deps to maximize cache reuse.
 COPY shared ./shared

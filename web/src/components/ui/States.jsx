@@ -1,12 +1,16 @@
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { RefreshCw, WifiOff, SearchX } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import Button from './Button.jsx';
 import { cx } from './cx.js';
 
 export function EmptyState({ icon: Icon = SearchX, title, body, action, className, art, compact }) {
+  const shouldReduceMotion = useReducedMotion();
   return (
-    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}
+    <motion.div
+      initial={shouldReduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={shouldReduceMotion ? { duration: 0 } : { duration: 0.4 }}
       className={cx('mx-auto flex max-w-md flex-col items-center text-center', compact ? 'py-10' : 'py-16 sm:py-20', className)}>
       {art || (
         <div className="relative mb-6">

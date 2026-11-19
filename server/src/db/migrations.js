@@ -45,6 +45,31 @@ export const MIGRATIONS = [
       `);
     },
   },
+  {
+    version: '0004_slug_redirects_and_not_found_logs',
+    name: 'Add slug_redirects and not_found_logs tables for dead link management and SEO observability',
+    up(db) {
+      db.exec(`
+        CREATE TABLE IF NOT EXISTS slug_redirects (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          kind TEXT NOT NULL DEFAULT 'product',
+          source_path TEXT NOT NULL UNIQUE,
+          target_path TEXT NOT NULL,
+          status_code INTEGER DEFAULT 301,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS not_found_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          path TEXT NOT NULL,
+          referrer TEXT,
+          user_agent TEXT,
+          ip TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_not_found_logs_path ON not_found_logs(path, created_at DESC);
+      `);
+    },
+  },
 ];
 
 export function runMigrations(db) {

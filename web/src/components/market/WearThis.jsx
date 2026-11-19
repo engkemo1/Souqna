@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import { ArrowRight, Camera } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 
@@ -6,7 +7,7 @@ export default function WearThis({ className = '' }) {
   const { t } = useI18n();
   return (
     <section className={className}>
-      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { photo: true, similar: true } }))}
+      <Link to="/visual"
         className="group relative flex h-full min-h-[190px] w-full flex-col overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-brand/[0.08] via-elevated to-elevated p-5 text-start shadow-[0_8px_24px_rgba(3,36,77,.04)] transition hover:border-fg/30/50 hover:shadow-[0_12px_30px_rgba(3,36,77,.09)] sm:p-6">
         <span className="pointer-events-none absolute -end-8 -top-10 h-36 w-36 rounded-full bg-brand/[0.08] transition group-hover:scale-110" />
         <span className="relative flex items-center gap-3">
@@ -17,7 +18,7 @@ export default function WearThis({ className = '' }) {
           </span>
         </span>
         <span className="relative mt-auto inline-flex w-fit items-center gap-2 rounded-xl bg-btn px-4 py-2.5 text-xs font-bold text-on-btn transition group-hover:brightness-95 sm:text-[13px]">{t('wear.cta')}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></span>
-      </button>
+      </Link>
     </section>
   );
 }

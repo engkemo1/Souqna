@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard, Eye, Wallet, TrendingUp, AlertTriangle, History, MessageCircle } from 'lucide-react';
+import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard, Eye, Wallet, TrendingUp, AlertTriangle, History, MessageCircle, Shirt } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -35,6 +35,7 @@ const NAV_GROUPS = [
     { to: '/admin/couriers', icon: Wallet, label: 'حساب المندوبين' },
     { to: '/admin/services', icon: Camera, label: 'الخدمات', badge: 'services' },
     { to: '/admin/sourcing', icon: PackagePlus, label: 'طلبات من برّه', badge: 'sourcing' },
+    { to: '/admin/custom-requests', icon: Shirt, label: 'تصميمات مخصصة', badge: 'custom' },
   ] },
   { label: 'التحليلات', items: [
     { to: '/admin/alerts', icon: AlertTriangle, label: 'التنبيهات والمتابعة' },
@@ -102,7 +103,7 @@ function Gate({ onAuthed }) {
 /** Polls for new delivery requests: bell counter, toast, optional sound + browser notification. */
 function useDeliveryAlerts() {
   const toast = useToast();
-  const [counts, setCounts] = useState({ open: 0, ready: 0, services: 0, sourcing: 0, depts: 0, products: 0 });
+  const [counts, setCounts] = useState({ open: 0, ready: 0, services: 0, sourcing: 0, custom: 0, depts: 0, products: 0 });
   const [recent, setRecent] = useState([]);
   const [sound, setSound] = useState(() => { try { return localStorage.getItem('bo.adminSound') !== '0'; } catch { return true; } });
   const since = useRef(null);
@@ -122,7 +123,7 @@ function useDeliveryAlerts() {
       try {
         const d = await adminApi(`/notifications${since.current ? `?since=${encodeURIComponent(since.current)}` : ''}`);
         if (stop) return;
-        setCounts({ open: d.open, ready: d.ready, services: d.servicesNew, sourcing: d.sourcingNew, depts: d.deptsPending || 0, products: d.productsIssues || 0 });
+        setCounts({ open: d.open, ready: d.ready, services: d.servicesNew, sourcing: d.sourcingNew, custom: d.customNew || 0, depts: d.deptsPending || 0, products: d.productsIssues || 0 });
         const freshDepts = (d.deptPendingItems || []).filter((x) => !seenDepts.current.has(x.id));
         (d.deptPendingItems || []).forEach((x) => seenDepts.current.add(x.id));
         const freshStores = since.current ? (d.newStores || []) : [];
@@ -131,6 +132,7 @@ function useDeliveryAlerts() {
           for (const x of freshStores) { toast({ title: `محل جديد: ${x.name_ar}`, tone: 'info', duration: 12000 }); try { if (document.hidden && Notification?.permission === 'granted') new Notification('محل جديد', { body: x.name_ar }); } catch { /* ignore */ } }
           if (soundRef.current) beep();
         }
+        if (since.current && d.custom?.length) { for (const cr of d.custom.slice().reverse()) toast({ title: `طلب تصميم مخصص من ${cr.name}`, description: cr.number, tone: 'info', duration: 10000 }); if (soundRef.current) beep(); }
         if (since.current && d.sourcing?.length) { for (const sr of d.sourcing.slice().reverse()) toast({ title: `طلب من برّه بنها: ${sr.title}`, description: sr.number, tone: 'info', duration: 10000 }); if (soundRef.current) beep(); }
         if (since.current && d.services?.length) {
           for (const sv of d.services.slice().reverse()) toast({ title: `${sv.type === 'design_banner' ? 'طلب تصميم بنر' : sv.type === 'design_cover' ? 'طلب تصميم غلاف' : 'طلب تصوير جديد'} من ${sv.store_name}`, description: sv.type?.startsWith('design') ? 'عايز يشوف أشكال ويختار' : sv.plan === 'monthly' ? 'اشتراك شهري' : 'مرة واحدة', tone: 'info', duration: 10000 });

@@ -1126,6 +1126,41 @@ function CashierSyncPanel() {
   );
 }
 
+function BrokenLinksPanel() {
+  const { data, loading } = useAdminApi('/broken-links');
+  const items = data?.items || [];
+  return (
+    <Panel title="الروابط المفقودة الأكثر طلباً (404)" subtitle="روابط الإعلانات أو الواتساب أو المنتجات المحذوفة اللي الزوار دخلوها وملاقوهاش" className="lg:col-span-3">
+      {loading && !data ? <Skeleton className="h-32 w-full" /> : !items.length ? (
+        <p className="py-4 text-sm text-muted">مفيش أي روابط مفقودة مسجلة حتى الآن.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-start text-sm">
+            <thead>
+              <tr className="border-b border-line text-muted">
+                <th className="pb-2 text-start font-medium">الرابط</th>
+                <th className="pb-2 text-center font-medium">عدد الزيارات</th>
+                <th className="pb-2 text-start font-medium">آخر زيارة</th>
+                <th className="pb-2 text-start font-medium">المصدر (Referrer)</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-line">
+              {items.slice(0, 15).map((row, i) => (
+                <tr key={i} className="hover:bg-secondary/40">
+                  <td className="py-2.5 font-mono text-xs" dir="ltr">{row.path}</td>
+                  <td className="py-2.5 text-center font-bold text-sale">{row.hits}</td>
+                  <td className="py-2.5 text-xs text-muted" dir="ltr">{fmtDateTime(row.last_hit)}</td>
+                  <td className="py-2.5 truncate max-w-xs text-xs text-muted" dir="ltr">{row.referrer || 'مباشر'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
 export default function System() {
   const [searchParams] = useSearchParams();
   const requestedSection = searchParams.get('section');
@@ -1156,6 +1191,7 @@ export default function System() {
           <BackupPanel data={data} reload={reload} />
           <ResourcePanel />
           <GeminiUsagePanel />
+          <BrokenLinksPanel />
           <Panel title="السيرفر">
             <dl className="space-y-3 text-sm">
               {[['البيئة', data.env], ['Node', data.node], ['شغال من', uptime(data.uptimeSec)], ['تخزين الصور', data.mediaR2Enabled ? 'Cloudflare R2' : 'قرص السيرفر (R2 غير مفعّل)'], ['واتساب API', data.whatsappConfigured ? 'متوصل' : 'غير متوصل'], ['قالب واتساب', data.template], ['التسجيل العام', data.registrationOpen ? 'مفتوح' : 'مقفول']].map(([k, v]) => (

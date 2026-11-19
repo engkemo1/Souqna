@@ -246,17 +246,42 @@ if (fs.existsSync(config.webDist)) {
     .replace(/<meta name="twitter:description" content="[^"]*"\s*\/>/, `<meta name="twitter:description" content="${esc(description)}" />`)
     .replace(/<meta name="twitter:image" content="[^"]*"\s*\/>/, `<meta name="twitter:image" content="${esc(image)}" />`);
   // A URL that does not exist must answer 404 (not 200) so search engines drop it; the page body is still the app so shoppers see the friendly "not found" screen.
+  const logNotFound = (req) => {
+    try {
+      const p = req.originalUrl || req.url || req.path;
+      const ref = req.get('referrer') || req.get('referer') || null;
+      const ua = req.get('user-agent') || null;
+      const ip = req.ip || null;
+      q.run('INSERT INTO not_found_logs (path, referrer, user_agent, ip) VALUES (?, ?, ?, ?)', [p, ref, ua, ip]);
+    } catch { /* ignore */ }
+  };
   const notFoundPage = (res) => res.status(404).set('X-Robots-Tag', 'noindex').set('Cache-Control', 'no-cache').type('html').send(readIndexHtml());
   const ldTag = (o) => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
   const withLd = (html, objs) => html.replace('</head>', `${objs.map(ldTag).join('')}</head>`);
   const trunc = (x, n = 155) => { const t = String(x || '').replace(/\s+/g, ' ').trim(); return t.length > n ? `${t.slice(0, n - 1).trimEnd()}…` : t; };
   app.get('/s/:slug/p/:pslug', (req, res, next) => {
-    const item = q.get(`SELECT p.id, p.name_ar, p.seo_title, p.seo_description, p.description_ar, p.price, p.stock, p.track_stock, p.rating, p.rating_count, p.sku, s.name_ar AS store_name_ar
+    try {
+      const red = q.get('SELECT target_path, status_code FROM slug_redirects WHERE source_path=?', [`/s/${req.params.slug}/p/${req.params.pslug}`]);
+      if (red) return res.redirect(red.status_code || 301, red.target_path);
+    } catch { /* ignore */ }
+
+    const item = q.get(`SELECT p.id, p.status, p.name_ar, p.seo_title, p.seo_description, p.description_ar, p.price, p.stock, p.track_stock, p.rating, p.rating_count, p.sku, s.name_ar AS store_name_ar, s.status AS store_status
       FROM products p JOIN stores s ON s.id=p.store_id
-      WHERE s.slug=? AND s.status='active' AND s.hidden=0 AND s.search_indexable=1 AND p.slug=? AND p.status='active'`, [req.params.slug, req.params.pslug]);
-    if (!item) {
-      const exists = q.get("SELECT 1 AS x FROM products p JOIN stores s ON s.id=p.store_id WHERE s.slug=? AND p.slug=? AND s.status='active'", [req.params.slug, req.params.pslug]);
-      return exists ? next() : notFoundPage(res); // exists but private/not indexable: the app still shows it, noindex comes from the middleware
+      WHERE s.slug=? AND p.slug=?`, [req.params.slug, req.params.pslug]);
+
+    if (!item || item.store_status !== 'active') {
+      logNotFound(req);
+      return notFoundPage(res);
+    }
+
+    if (item.status === 'archived') {
+      logNotFound(req);
+      return res.status(410).set('X-Robots-Tag', 'noindex').set('Cache-Control', 'no-cache').type('html').send(readIndexHtml());
+    }
+
+    if (item.status !== 'active') {
+      logNotFound(req);
+      return notFoundPage(res);
     }
     const mediaId = q.get('SELECT media_id FROM product_media WHERE product_id=? ORDER BY is_primary DESC, position LIMIT 1', [item.id])?.media_id;
     const imageBase = mediaMap([mediaId]).get(mediaId)?.base;

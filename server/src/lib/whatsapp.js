@@ -68,8 +68,8 @@ const qr = (i, payload) => ({ type: 'button', sub_type: 'quick_reply', index: St
 const ownerButtons = (orderId) => [qr(0, `ord:confirm:${orderId}`), qr(1, `ord:nope:${orderId}`), qr(2, `ord:help:${orderId}`), { type: 'button', sub_type: 'url', index: '3', parameters: [{ type: 'text', text: String(orderId) }] }];
 const customerButtons = (orderId) => [qr(0, `cust:track:${orderId}`), qr(1, `cust:address:${orderId}`), qr(2, `cust:cancel:${orderId}`), qr(3, `cust:store:${orderId}`)];
 
-export async function sendNewOrderAlert(store, orderId) {
-  const to = toWaNumber(store.whatsapp);
+export async function sendNewOrderAlert(store, orderId, toOverride) {
+  const to = toWaNumber(toOverride || store.whatsapp);
   if (!to) return { skipped: 'no_store_whatsapp' };
   if (!isWhatsAppConfigured()) return { skipped: 'not_configured' };
 
@@ -190,4 +190,24 @@ export function notifyGuestOrderWhatsApp({ phone, name, number, text, token, ord
 /** Order received → the customer (account or guest) gets a WhatsApp saying the store will confirm it. Needs WA_CUSTOMER_TEMPLATE; never throws. */
 export function notifyCustomerOrderPlaced({ phone, name, number, token, orderId }) {
   notifyGuestOrderWhatsApp({ phone, name, number, token, orderId, text: 'وصلنا طلبك وبانتظار تأكيد المحل. هنبلغك أول ما يتأكد' });
+}
+
+/**
+ * Admin test: sends the REAL customer message of an existing order to a number the admin chooses.
+ * With the buttons template set, its buttons act on that order, so use a test order. Throws on Meta errors.
+ */
+export async function sendCustomerOrderTest(orderId, rawTo) {
+  const to = toWaNumber(rawTo); if (!to) throw new Error('رقم غير صالح');
+  if (!isWhatsAppConfigured()) throw new Error('التوكن أو Phone ID مش مضبوطين');
+  if (!config.wa.customerTemplate) throw new Error('قالب العميل مش متحدد');
+  const o = q.get('SELECT id, number, customer_name, track_token FROM orders WHERE id=?', [orderId]);
+  if (!o) throw new Error('الأوردر مش موجود');
+  const params = [o.customer_name || 'عميلنا', o.number, 'وصلنا طلبك وبانتظار تأكيد المحل. هنبلغك أول ما يتأكد', `${config.siteUrl}/track/${o.track_token || ''}`].map((v) => ({ type: 'text', text: String(v || '-').replace(/\s+/g, ' ').slice(0, 900) }));
+  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: config.wa.customerBtnTemplate || config.wa.customerTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }, ...(config.wa.customerBtnTemplate ? customerButtons(o.id) : [])] } }),
+  });
+  if (!res.ok) throw new Error(`Meta ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
+  return { sent: true, to, order: o.number };
 }

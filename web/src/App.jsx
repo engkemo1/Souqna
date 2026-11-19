@@ -31,6 +31,7 @@ const LookShare = lazy(() => import('./pages/market/LookShare.jsx'));
 const LookOfDayDetail = lazy(() => import('./pages/market/LookOfDayDetail.jsx'));
 const Legal = lazy(() => import('./pages/market/Legal.jsx'));
 const Request = lazy(() => import('./pages/market/Request.jsx'));
+const CustomDesign = lazy(() => import('./pages/market/CustomDesign.jsx'));
 const BanhaRunner = lazy(() => import('./pages/market/BanhaRunner.jsx'));
 const Pos = lazy(() => import('./pages/pos/Pos.jsx'));
 const RemoteScanner = lazy(() => import('./pages/pos/RemoteScanner.jsx'));
@@ -82,6 +83,7 @@ const AdminDeliveryZones = lazy(() => import('./pages/admin/DeliveryZones.jsx'))
 const AdminSubscriptions = lazy(() => import('./pages/admin/Subscriptions.jsx'));
 const AdminServices = lazy(() => import('./pages/admin/Services.jsx'));
 const AdminSourcing = lazy(() => import('./pages/admin/Sourcing.jsx'));
+const AdminCustomRequests = lazy(() => import('./pages/admin/CustomRequests.jsx'));
 const AdminBuyers = lazy(() => import('./pages/admin/Buyers.jsx'));
 const AdminPhotos = lazy(() => import('./pages/admin/Photos.jsx'));
 const AdminReports = lazy(() => import('./pages/admin/Reports.jsx'));
@@ -145,6 +147,7 @@ const router = createBrowserRouter([
       { path: '/legal', element: <Legal /> },
       { path: '/legal/:doc', element: <Legal /> },
       { path: '/request', element: <Request /> },
+      { path: '/custom-design', element: <CustomDesign /> },
       { path: '/request/:token', element: <Request /> },
       { path: '/play/banha', element: <BanhaRunner /> },
       { path: '/pos', element: <Pos /> },
@@ -210,6 +213,7 @@ const router = createBrowserRouter([
           { path: 'subscriptions', element: <AdminSubscriptions /> },
           { path: 'services', element: <AdminServices /> },
           { path: 'sourcing', element: <AdminSourcing /> },
+          { path: 'custom-requests', element: <AdminCustomRequests /> },
           { path: 'buyers', element: <AdminBuyers /> },
           { path: 'photos', element: <AdminPhotos /> },
           { path: 'coupons', element: <AdminCoupons /> },

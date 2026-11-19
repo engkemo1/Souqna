@@ -822,22 +822,9 @@ r.delete('/products/:id', h(async (req, res) => {
   const pid = Number(req.params.id);
   const p = q.get('SELECT * FROM products WHERE id = ?', [pid]);
   if (!p) throw new AppError(404, 'not_found', 'المنتج غير موجود.');
-  const hasOrders = q.val('SELECT COUNT(*) FROM order_items WHERE product_id = ?', [pid]);
-  if (hasOrders) {
-    q.run("UPDATE products SET status = 'archived', updated_at = ? WHERE id = ?", [nowIso(), pid]);
-    invalidateModaCatalogue();
-    return res.json({ archived: true, deleted: false });
-  }
-  const mediaIds = q.all('SELECT media_id FROM product_media WHERE product_id = ?', [pid]).map((x) => x.media_id);
-  q.run('DELETE FROM products WHERE id = ?', [pid]);
-  for (const mid of mediaIds) {
-    if (!q.val('SELECT COUNT(*) FROM product_media WHERE media_id = ?', [mid])) {
-      const m = getMedia(mid);
-      if (m) { try { await deleteMedia(m); } catch { /* ignore */ } }
-    }
-  }
+  q.run("UPDATE products SET status = 'archived', updated_at = ? WHERE id = ?", [nowIso(), pid]);
   invalidateModaCatalogue();
-  res.json({ archived: false, deleted: true });
+  return res.json({ archived: true, deleted: false });
 }));
 
 export default r;

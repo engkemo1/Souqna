@@ -2,7 +2,7 @@
   "name": "souqna",
   "private": true,
   "version": "1.0.0",
-  "description": "Souqna \u2014 multi-store fashion e-commerce platform for Banha",
+  "description": "Souqna — multi-store fashion e-commerce platform for Banha",
   "workspaces": [
     "server",
     "web",
@@ -19,6 +19,7 @@
     "format:check": "node server/src/scripts/format-check.js"
   },
   "devDependencies": {
+    "@playwright/test": "^1.65.1",
     "concurrently": "^9.1.0"
   },
   "overrides": {

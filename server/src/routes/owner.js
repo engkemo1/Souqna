@@ -1071,11 +1071,9 @@ r.post('/products/:id/sell', h((req, res) => {
 r.delete('/products/:id', h((req, res) => {
   const p = q.get('SELECT * FROM products WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!p) throw notFound('Product');
-  const hasOrders = q.val('SELECT COUNT(*) FROM order_items WHERE product_id=?', [p.id]);
-  if (hasOrders) q.run("UPDATE products SET status='archived' WHERE id=?", [p.id]);
-  else q.run('DELETE FROM products WHERE id=?', [p.id]);
+  q.run("UPDATE products SET status='archived', updated_at=? WHERE id=?", [nowIso(), p.id]);
   invalidateModaCatalogue();
-  res.json({ archived: !!hasOrders });
+  res.json({ archived: true });
 }));
 
 /* ---------------------------------------------------------- orders */

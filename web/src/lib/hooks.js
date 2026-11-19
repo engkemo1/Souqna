@@ -7,18 +7,46 @@ export const invalidate = (prefix = '') => { for (const k of cache.keys()) if (k
 export const primeCache = (key, data) => cache.set(key, data);
 
 export function useApi(path, { enabled = true, keepPrevious = true } = {}) {
-  const [state, setState] = useState(() => ({ data: path ? cache.get(path) : undefined, error: null, loading: !!path && enabled && !cache.has(path) }));
+  const [state, setState] = useState(() => ({
+    path,
+    data: path ? cache.get(path) : undefined,
+    error: null,
+    loading: !!path && enabled && !cache.has(path),
+  }));
   const [tick, setTick] = useState(0);
   const prev = useRef(state.data);
+
+  if (state.path !== path) {
+    const cached = path ? cache.get(path) : undefined;
+    setState({
+      path,
+      data: cached !== undefined ? cached : (keepPrevious ? state.data : undefined),
+      error: null,
+      loading: !!path && enabled && cached === undefined,
+    });
+  }
 
   useEffect(() => {
     if (!path || !enabled) return undefined;
     const ctrl = new AbortController();
     const cached = cache.get(path);
-    setState((s) => ({ data: cached ?? (keepPrevious ? s.data : undefined), error: null, loading: !cached }));
+    setState((s) => ({
+      path,
+      data: cached !== undefined ? cached : (keepPrevious && s.path === path ? s.data : undefined),
+      error: null,
+      loading: cached === undefined,
+    }));
     api(path, { signal: ctrl.signal })
-      .then((data) => { cache.set(path, data); prev.current = data; setState({ data, error: null, loading: false }); })
-      .catch((error) => { if (error.name !== 'AbortError') setState((s) => ({ ...s, error, loading: false })); });
+      .then((data) => {
+        cache.set(path, data);
+        prev.current = data;
+        setState({ path, data, error: null, loading: false });
+      })
+      .catch((error) => {
+        if (error.name !== 'AbortError') {
+          setState((s) => ({ ...s, path, error, loading: false }));
+        }
+      });
     return () => ctrl.abort();
   }, [path, enabled, tick, keepPrevious]);
 
@@ -29,7 +57,13 @@ export function useApi(path, { enabled = true, keepPrevious = true } = {}) {
     return { ...s, data };
   }), [path]);
 
-  return { ...state, reload, mutate, isRefreshing: state.loading && state.data !== undefined };
+  const isSamePath = state.path === path;
+  const currentCached = path ? cache.get(path) : undefined;
+  const data = isSamePath ? state.data : (currentCached !== undefined ? currentCached : (keepPrevious ? state.data : undefined));
+  const loading = isSamePath ? state.loading : (!!path && enabled && currentCached === undefined);
+  const error = isSamePath ? state.error : null;
+
+  return { data, error, loading, reload, mutate, isRefreshing: loading && data !== undefined };
 }
 
 export function useMediaQuery(query) {

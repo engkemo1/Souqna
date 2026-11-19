@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { waUsage, saveWaRates } from '../lib/wa-cost.js';
-import { isWhatsAppConfigured, notifyPlatformDelivery, saveWaSettings, waSettingsView, sendWaTest } from '../lib/whatsapp.js';
+import { isWhatsAppConfigured, notifyPlatformDelivery, saveWaSettings, waSettingsView, sendWaTest, sendNewOrderAlert, sendCustomerOrderTest } from '../lib/whatsapp.js';
 import { mountCashierAdmin } from './admin-cashier.js';
 import { adminStoryStores, setStoriesAllowed, setAllStoriesAllowed, adminActiveStories, adminRemoveStory, addPlatformStory, searchStoryProducts, PLATFORM_MAX_ACTIVE, PLATFORM_HOURS } from '../lib/stories.js';
 import { saveStoryImage, saveStoryVideo, looksLikeVideo, deleteStoryVideo, HQ_VIDEO_MAX_SECONDS, HQ_VIDEO_MAX_BYTES } from '../lib/story-video.js';
@@ -868,6 +868,31 @@ r.get('/resources', h(async (_req, res) => {
   res.json({ disk, database, memory: { rssBytes: memory.rss, heapUsedBytes: memory.heapUsed, heapTotalBytes: memory.heapTotal }, r2, checkedAt: new Date().toISOString() });
 }));
 
+r.get('/broken-links', h((req, res) => {
+  let items = [];
+  try {
+    items = q.all(`
+      SELECT path, referrer, user_agent, COUNT(*) AS hits, MAX(created_at) AS last_hit
+      FROM not_found_logs
+      GROUP BY path
+      ORDER BY hits DESC
+      LIMIT 100
+    `);
+  } catch { items = []; }
+  res.json({ items });
+}));
+
+r.post('/slug-redirects', h((req, res) => {
+  const { sourcePath, targetPath, statusCode = 301, kind = 'product' } = req.body || {};
+  if (!sourcePath || !targetPath) throw badRequest('missing_fields', 'sourcePath and targetPath required');
+  q.run(`
+    INSERT INTO slug_redirects (kind, source_path, target_path, status_code)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(source_path) DO UPDATE SET target_path=?, status_code=?
+  `, [kind, sourcePath, targetPath, statusCode, targetPath, statusCode]);
+  res.json({ ok: true, sourcePath, targetPath, statusCode });
+}));
+
 /* ---- Gemini: how much of the daily free limit is used (photo checks + Moda) ---- */
 r.get('/ai-usage', h((_req, res) => res.json({ gemini: geminiUsage({ configured: providerReady.gemini() }) })));
 r.put('/ai-usage', h((req, res) => {
@@ -890,6 +915,19 @@ r.put('/whatsapp/rates', h((req, res) => {
   const b = z.object({ utility: n.optional(), authentication: n.optional(), marketing: n.optional(), service: n.optional(), fx: n.optional() }).parse(req.body || {});
   saveWaRates(b);
   res.json(waUsage(Number(req.query.days) || 30));
+}));
+r.post('/whatsapp/test-order', h(async (req, res) => {
+  const b = z.object({ order: z.string().trim().min(1).max(40), to: z.string().trim().min(8).max(20), kind: z.enum(['owner', 'customer']) }).parse(req.body || {});
+  const o = q.get('SELECT id, number, store_id FROM orders WHERE number=? OR id=?', [b.order, /^\d+$/.test(b.order) ? Number(b.order) : -1]);
+  if (!o) throw new AppError(404, 'order_not_found', 'الأوردر مش موجود');
+  try {
+    if (b.kind === 'customer') return res.json(await sendCustomerOrderTest(o.id, b.to));
+    const store = q.get('SELECT * FROM stores WHERE id=?', [o.store_id]);
+    if (!store) throw new Error('المحل مش موجود');
+    const out = await sendNewOrderAlert(store, o.id, b.to);
+    if (!out.sent) throw new Error(out.skipped === 'not_configured' ? 'التوكن أو Phone ID مش مضبوطين' : `ما اتبعتش: ${out.skipped}`);
+    return res.json({ ...out, order: o.number });
+  } catch (e) { throw new AppError(422, 'wa_test_failed', String(e.message || e)); }
 }));
 r.post('/whatsapp/test', h(async (req, res) => {
   const b = z.object({ to: z.string().trim().min(8).max(20), template: z.string().trim().regex(/^[A-Za-z0-9_]{1,200}$/).optional().or(z.literal('')), vars: z.number().int().min(0).max(10).optional() }).parse(req.body || {});
@@ -1194,6 +1232,29 @@ r.patch('/sourcing/:id', h((req, res) => {
   res.json({ ok: true });
 }));
 
+/* ---------------------------------------------------------- custom clothing design requests */
+const CUSTOM_STATUSES = ['new', 'contacted', 'quoted', 'agreed', 'in_progress', 'done', 'cancelled'];
+r.get('/custom-requests', h((req, res) => {
+  const status = CUSTOM_STATUSES.includes(String(req.query.status)) ? String(req.query.status) : null;
+  const items = q.all(`SELECT c.*, s.name_ar AS store_name, s.whatsapp AS store_whatsapp FROM custom_requests c LEFT JOIN stores s ON s.id=c.store_id ${status ? 'WHERE c.status=?' : ''} ORDER BY (c.status='new') DESC, c.created_at DESC LIMIT 200`, status ? [status] : []);
+  const counts = Object.fromEntries(q.all('SELECT status, COUNT(*) AS c FROM custom_requests GROUP BY status').map((x) => [x.status, x.c]));
+  counts.all = Object.values(counts).reduce((a, b) => a + b, 0);
+  const stores = q.all("SELECT id, name_ar FROM stores WHERE status='active' ORDER BY name_ar LIMIT 500");
+  res.json({ items, counts, stores });
+}));
+r.patch('/custom-requests/:id', h((req, res) => {
+  const b = z.object({
+    status: z.enum(CUSTOM_STATUSES).optional(), store_id: z.coerce.number().int().positive().nullable().optional(),
+    agreed_price: z.coerce.number().int().min(0).max(1e8).nullable().optional(), deposit: z.coerce.number().int().min(0).max(1e8).nullable().optional(),
+    admin_note: z.string().max(1000).optional(),
+  }).parse(req.body);
+  const row = q.get('SELECT id FROM custom_requests WHERE id=?', [Number(req.params.id)]);
+  if (!row) throw new AppError(404, 'not_found', 'Request not found.');
+  if (b.store_id && !q.get('SELECT id FROM stores WHERE id=?', [b.store_id])) throw new AppError(422, 'validation_failed', 'Store not found.');
+  update('custom_requests', row.id, { ...b, updated_at: new Date().toISOString().slice(0, 19).replace('T', ' ') });
+  res.json({ ok: true });
+}));
+
 /** Polled by the admin UI: new delivery requests since a timestamp + live counters. */
 r.get('/notifications', h((req, res) => {
   const since = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(String(req.query.since || '')) ? String(req.query.since) : '1970-01-01 00:00:00';
@@ -1210,6 +1271,7 @@ r.get('/notifications', h((req, res) => {
   res.json({
     services, servicesNew: q.val("SELECT COUNT(*) FROM service_requests WHERE status='new'"),
     sourcing: q.all("SELECT id, number, title, created_at AS at FROM sourcing_requests WHERE created_at > ? ORDER BY created_at DESC LIMIT 10", [since]), sourcingNew: q.val("SELECT COUNT(*) FROM sourcing_requests WHERE status IN ('new','approved')"),
+    custom: q.all("SELECT id, number, name, created_at AS at FROM custom_requests WHERE created_at > ? ORDER BY created_at DESC LIMIT 10", [since]), customNew: q.val("SELECT COUNT(*) FROM custom_requests WHERE status='new'"),
     deptsPending: pendingDepts.length, deptPendingItems: pendingDepts.map((d) => ({ id: d.id, name: d.name_ar })),
     productsIssues: countProductsWithIssues(),
     newStores: q.all('SELECT id, name_ar FROM stores WHERE created_at > ? ORDER BY id DESC LIMIT 10', [since]),

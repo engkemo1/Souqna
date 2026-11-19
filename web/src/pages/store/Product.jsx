@@ -106,6 +106,101 @@ function ProductSkeleton() {
   );
 }
 
+function ProductNotFoundRecovery({ store, pslug, isArchived, onRetry }) {
+  const { t, tr, lang } = useI18n();
+  const ar = lang === 'ar';
+  const queryDefault = pslug ? decodeURIComponent(pslug).replace(/[-_]+/g, ' ').trim() : '';
+  const [query, setQuery] = useState(queryDefault);
+  const navigate = useNavigate();
+  const { data: bestSellers } = useApi(`/stores/${store.slug}/products?limit=4&sort=featured`);
+
+  const onStoreSearch = (e) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    navigate(`/s/${store.slug}/search?q=${encodeURIComponent(query.trim())}`);
+  };
+
+  const onMarketSearch = (e) => {
+    e.preventDefault();
+    if (!query.trim()) return;
+    navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+  };
+
+  return (
+    <div className="container py-12 sm:py-16">
+      <div className="mx-auto max-w-xl text-center">
+        <div className="relative mb-6 inline-flex">
+          <div className="absolute inset-0 -m-3 rounded-full bg-primary/[0.07]" />
+          <div className="relative grid h-16 w-16 place-items-center rounded-2xl bg-elevated text-brand shadow-soft ring-1 ring-line">
+            <PackageX className="h-7 w-7" strokeWidth={1.6} />
+          </div>
+        </div>
+        <h2 className="font-display text-2xl font-bold text-fg sm:text-3xl">
+          {isArchived
+            ? (ar ? 'المنتج ده مش متاح حالياً' : 'This product is no longer available')
+            : (ar ? 'الصفحة دي مش موجودة' : 'Product not found')}
+        </h2>
+        <p className="mt-2 text-base text-muted">
+          {isArchived
+            ? (ar ? 'القطعة دي لم تعد متوفرة في المحل حالياً. تقدر تدور على بدائل أو تشوف الأكثر مبيعاً.' : 'This piece is out of catalog. You can search for alternatives or browse best sellers.')
+            : (ar ? 'المنتج اللي بتدور عليه ممكن يكون اتنقل أو رابطه اتغير.' : 'The product you are looking for might have moved or the link changed.')}
+        </p>
+
+        {/* Search box prefilled with slug words */}
+        <form onSubmit={onStoreSearch} className="mt-6">
+          <div className="relative mx-auto flex max-w-md items-center">
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={ar ? 'ابحث في المتجر أو السوق...' : 'Search in store or market...'}
+              className="h-12 w-full rounded-2xl border border-line-strong bg-elevated ps-4 pe-28 text-sm shadow-sm outline-none transition focus:border-ring focus:shadow-ring"
+            />
+            <button
+              type="submit"
+              className="absolute end-1.5 top-1/2 -translate-y-1/2 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-on-primary shadow-sm hover:opacity-90"
+            >
+              {ar ? 'بحث بالمحل' : 'Search store'}
+            </button>
+          </div>
+          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
+            <button
+              type="button"
+              onClick={onMarketSearch}
+              className="text-xs font-semibold text-brand hover:underline"
+            >
+              {ar ? '🔍 دوّر على نفس الاسم في سوق Twist كله' : '🔍 Search across all Twist stores'}
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Button to={sp(store.slug, 'shop')} variant="outline">
+            {ar ? `تصفح كل معروضات ${tr(store.name)}` : `Browse ${tr(store.name)}`}
+          </Button>
+          <Button to="/">
+            {ar ? 'الرجوع للرئيسية' : 'Back to Home'}
+          </Button>
+        </div>
+      </div>
+
+      {/* Best sellers */}
+      {bestSellers?.items?.length > 0 && (
+        <div className="mt-14 border-t border-line pt-10">
+          <h3 className="mb-6 font-display text-lg font-bold text-fg sm:text-xl">
+            {ar ? `الأكثر طلباً في ${tr(store.name)}` : `Best sellers from ${tr(store.name)}`}
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
+            {bestSellers.items.slice(0, 4).map((item, i) => (
+              <ProductCard key={item.id} product={item} slug={store.slug} index={i} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Product() {
   const { pslug } = useParams();
   const nav = useNavigate();
@@ -163,9 +258,17 @@ export default function Product() {
   }, [p]);
 
   if (error) {
-    return error.status === 404
-      ? <EmptyState icon={PackageX} title={t('error.notFound')} body={t('error.notFoundBody')} action={<Button to={sp(store.slug, 'shop')}>{t('store.shopAll')}</Button>} />
-      : <ErrorState error={error} onRetry={reload} />;
+    if (error.status === 404 || error.status === 410 || error.code === 'product_archived') {
+      return (
+        <ProductNotFoundRecovery
+          store={store}
+          pslug={pslug}
+          isArchived={error.status === 410 || error.code === 'product_archived'}
+          onRetry={reload}
+        />
+      );
+    }
+    return <ErrorState error={error} onRetry={reload} />;
   }
   if (loading && !p) return <ProductSkeleton />;
   if (!p) return null;

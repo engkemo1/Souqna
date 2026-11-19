@@ -825,6 +825,7 @@ r.get('/stores/:slug', h((req, res) => {
   );
   cache(res, 30);
   res.json({
+    requestedSlug: req.params.slug,
     store: serializeStore(s),
     // Top-level categories carry their sub-categories (counts include them); allCategories is the flat list.
     categories: categories.filter((c) => !c.parent_id).map((c) => {
@@ -965,8 +966,12 @@ r.get('/product-owner/:pslug', h((req, res) => {
 }));
 r.get('/stores/:slug/products/:pslug', h((req, res) => {
   const s = loadStore(req.params.slug);
-  const p = q.get("SELECT * FROM products WHERE store_id=? AND slug=? AND status='active'", [s.id, req.params.pslug]);
+  const p = q.get('SELECT * FROM products WHERE store_id=? AND slug=?', [s.id, req.params.pslug]);
   if (!p) throw notFound('Product');
+  if (p.status === 'archived') {
+    throw new AppError(410, 'product_archived', 'المنتج ده مش متاح حالياً');
+  }
+  if (p.status !== 'active') throw notFound('Product');
   q.run('UPDATE products SET views=views+1 WHERE id=?', [p.id]);
   const related = serializeCards(
     q.all(`SELECT * FROM products WHERE store_id=? AND ${ACTIVE} AND id<>? ORDER BY (category_id IS ?) DESC, sold_count DESC LIMIT 8`, [s.id, p.id, p.category_id]),
@@ -1547,6 +1552,32 @@ r.post('/sourcing/:token/respond', h((req, res) => {
   if (x.status !== 'quoted') throw new AppError(409, 'sourcing_not_quoted', 'There is no price to answer yet.');
   q.run('UPDATE sourcing_requests SET status=?, updated_at=? WHERE id=?', [accept ? 'approved' : 'cancelled', nowIso(), x.id]);
   res.json({ ok: true });
+}));
+
+/* ---------------------------------------------------------- custom clothing design requests (customer service calls back; no in-site chat) */
+const CUSTOM_KINDS = ['graduation', 'company', 'restaurant', 'team', 'event', 'other'];
+r.post('/custom-requests', h((req, res) => {
+  const ipBucket = `public:custom:${req.ip}`;
+  checkRateLimit(ipBucket, { max: 6, windowMs: 3600e3, record: false, code: 'rate_limited', message: 'Too many requests, try again later.' });
+  const clean = (v) => (v === undefined || v === '' ? undefined : v);
+  const b = z.object({
+    name: z.string().trim().min(2).max(60), phone: z.string().trim().min(8).max(20),
+    kind: z.enum(CUSTOM_KINDS).default('other'), item: z.string().trim().max(80).optional(),
+    qty: z.preprocess(clean, z.coerce.number().int().min(1).max(100000).optional()),
+    details: z.string().trim().min(5).max(1500), budget: z.preprocess(clean, z.coerce.number().int().min(0).max(1e7).optional()),
+    needed_by: z.string().trim().max(40).optional(), contact_pref: z.enum(['call', 'whatsapp']).default('call'),
+    link: z.preprocess(clean, z.string().trim().url().max(400).optional()),
+  }).parse(req.body);
+  const phone = normPhone(b.phone);
+  if (!/^01[0-9]{9}$/.test(phone)) throw new AppError(422, 'validation_failed', 'Enter a valid Egyptian mobile number.', { phone: 'phone_invalid' });
+  const phoneBucket = `public:custom-phone:${phone}`;
+  checkRateLimit(phoneBucket, { max: 3, windowMs: 3600e3, record: false, code: 'rate_limited', message: 'Too many requests, try again later.' });
+  recordRateLimitHit(ipBucket); recordRateLimitHit(phoneBucket);
+  const number = `CD-${new Date().toISOString().slice(2, 10).replace(/-/g, '')}-${crypto.randomInt(1000, 9999)}`;
+  const now = nowIso();
+  insert('custom_requests', { number, name: b.name, phone, kind: b.kind, item: b.item || null, qty: b.qty ?? null, details: b.details, budget: b.budget ?? null, needed_by: b.needed_by || null, contact_pref: b.contact_pref, link: b.link || null, created_at: now, updated_at: now });
+  try { notifyPlatformAlert(`طلب تصميم مخصص جديد ${number} من ${b.name} (${phone})`); } catch { /* alert is best-effort */ }
+  res.status(201).json({ number });
 }));
 
 export default r;

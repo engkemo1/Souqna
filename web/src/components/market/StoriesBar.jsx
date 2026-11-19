@@ -126,7 +126,7 @@ function Viewer({ groups, start, startItem = 0, onClose, onSeen }) {
             {item.products.length > 0 && (
               <div className="flex gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
                 {item.products.map((p) => (
-                  <Link key={p.id} to={`/s/${p.storeSlug || group.store.slug}/p/${p.slug}`} onClick={click} className={`flex shrink-0 items-center gap-2.5 rounded-2xl bg-white p-2 text-neutral-900 ${item.products.length === 1 ? 'w-full' : 'w-[200px]'}`}>
+                  <Link key={p.id} to={`/s/${p.storeSlug || p.store?.slug || group.store.slug}/p/${p.slug}`} onClick={click} className={`flex shrink-0 items-center gap-2.5 rounded-2xl bg-white p-2 text-neutral-900 ${item.products.length === 1 ? 'w-full' : 'w-[200px]'}`}>
                     <SmartImage media={p.image} ratio="1 / 1" sizes="64px" className="h-14 w-14 shrink-0 rounded-xl bg-neutral-100" />
                     <span className="min-w-0 flex-1">
                       <span className="line-clamp-2 block text-[13px] font-semibold leading-tight">{nm(p.name)}</span>

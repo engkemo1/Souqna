@@ -749,6 +749,9 @@ async function similarFromPhoto(image) {
   const m = String(image).match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
   if (!m) throw Object.assign(new Error('badimg'), { code: 'stylist_bad_image' });
   const found = await searchByImage(Buffer.from(m[2], 'base64'), { limit: 12 });
+  // The colour-only model cannot tell a hoodie from a wedding dress (it just matches cream to cream): never present its matches as «similar».
+  // Hand the photo to the normal stylist flow instead, which first understands what the item IS.
+  if (found.model === 'color-v1') return null;
   const exact = found.groups.flatMap((g) => g.items.map((x) => ({ id: x.id, label: g.label })));
   const near = found.groups.flatMap((g) => (g.similar || []).map((x) => ({ id: x.id, label: g.label })));
   const picked = (exact.length ? exact : near).filter((x, i, a) => a.findIndex((y) => y.id === x.id) === i).slice(0, 8);

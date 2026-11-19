@@ -25,8 +25,10 @@ export default function StoreLayout() {
   // رابط قديم (اتغير اسم/رابط المتجر): حوّل للرابط الجديد من غير ما الزائر يحس.
   useEffect(() => {
     const cur = apiData?.store?.slug;
-    if (cur && cur !== slug) navigate(pathname.replace(`/s/${slug}`, `/s/${cur}`) + window.location.search + window.location.hash, { replace: true });
-  }, [apiData, slug]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (cur && cur !== slug && (!apiData?.requestedSlug || apiData.requestedSlug === slug)) {
+      navigate(pathname.replace(`/s/${slug}`, `/s/${cur}`) + window.location.search + window.location.hash, { replace: true });
+    }
+  }, [apiData, slug, pathname, navigate]);
   // وضع المعاينة الحية: لما المتجر يتفتح جوه مصمّم المتجر (?preview=design) بيسمع إعدادات التصميم الغير محفوظة ويرسمها فورًا.
   const isPreview = typeof window !== 'undefined' && window.parent !== window && new URLSearchParams(window.location.search).get('preview') === 'design';
   const [preview, setPreview] = useState(null);
@@ -119,7 +121,7 @@ export default function StoreLayout() {
       <AnnouncementBar />
       <StoreHeader />
       <main id="main" className={hideBottomNav ? 'min-h-[60dvh]' : 'min-h-[60dvh] pb-[calc(var(--bottom-nav-h)+var(--safe-b))] lg:pb-0'}>
-        <Outlet />
+        <Outlet key={slug} />
       </main>
       <StoreFooter />
       {!hideBottomNav && <BottomNav />}
