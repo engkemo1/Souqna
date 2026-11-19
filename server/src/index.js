@@ -1,4 +1,5 @@
 import { customerDepartments } from './lib/departments.js';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 import express from 'express';
@@ -33,20 +34,35 @@ import { startIndexNow, indexNowKey } from './lib/indexnow.js';
 const app = express();
 app.disable('x-powered-by');
 app.set('trust proxy', 1);
+
+app.use((_req, res, next) => {
+  res.locals.cspNonce = crypto.randomBytes(16).toString('base64');
+  next();
+});
+
 // OpenStreetMap tiles are refused without a Referer, so send the origin (helmet's default is no-referrer)
 // Content-Security-Policy: locks framing, base URI, plugins and form targets; resources stay open to https so maps, fonts and media keep working
 const r2Origin = config.r2?.publicUrl ? [config.r2.publicUrl] : [];
+const siteOrigin = config.siteUrl ? [config.siteUrl] : [];
 const CSP = {
   useDefaults: false,
   reportOnly: Boolean(config.cspReportOnly),
   directives: {
     defaultSrc: ["'self'"],
-    scriptSrc: ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'", 'blob:', 'https://accounts.google.com', 'https://apis.google.com'],
+    scriptSrc: [
+      "'self'",
+      "'unsafe-inline'",
+      "'wasm-unsafe-eval'",
+      'blob:',
+      'https://accounts.google.com',
+      'https://apis.google.com',
+      (_req, res) => `'nonce-${res.locals.cspNonce}'`,
+    ],
     styleSrc: ["'self'", "'unsafe-inline'", 'https://accounts.google.com'],
-    imgSrc: ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org', 'https://*.r2.dev', 'https://*.cloudflarestorage.com', 'https://*.googleusercontent.com', 'https://twistegy.com', ...r2Origin],
+    imgSrc: ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org', 'https://*.googleusercontent.com', ...siteOrigin, ...r2Origin],
     fontSrc: ["'self'", 'data:'],
     mediaSrc: ["'self'", 'data:', 'blob:', ...r2Origin],
-    connectSrc: ["'self'", 'blob:', 'https://accounts.google.com', 'https://nominatim.openstreetmap.org', 'https://*.tile.openstreetmap.org', 'https://*.r2.dev', ...r2Origin],
+    connectSrc: ["'self'", 'blob:', 'https://accounts.google.com', 'https://nominatim.openstreetmap.org', 'https://*.tile.openstreetmap.org', ...siteOrigin, ...r2Origin],
     workerSrc: ["'self'", 'blob:'],
     manifestSrc: ["'self'"],
     frameSrc: ["'self'", 'https://accounts.google.com', 'https://www.google.com', 'https://maps.google.com'],

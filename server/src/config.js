@@ -53,7 +53,7 @@ export function buildConfig(rawEnv = process.env) {
     indexNowKey: parsed.INDEXNOW_KEY || (env !== 'production' ? '4c71c0c9e5781e1ad172891efd3e6767' : 'off'),
     siteUrl: parsed.PUBLIC_SITE_URL.replace(/\/+$/, ''),
     platformWa: parsed.PLATFORM_WA,
-    cspReportOnly: parsed.CSP_REPORT_ONLY === '1',
+    cspReportOnly: env === 'production' ? parsed.CSP_REPORT_ONLY !== '0' : parsed.CSP_REPORT_ONLY === '1',
     wa: {
       token: parsed.WA_TOKEN,
       phoneId: parsed.WA_PHONE_ID,
