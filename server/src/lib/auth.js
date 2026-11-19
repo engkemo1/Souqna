@@ -93,7 +93,9 @@ export function requireOwner(req, _res, next) {
     const user = q.get('SELECT id, name, email, role, token_version, must_change_password FROM users WHERE id=?', [payload.sub]);
     if (!user) throw new Error('no user');
     const expectedTv = Number(user.token_version ?? 1);
-    if (payload.tv === undefined || Number(payload.tv) !== expectedTv) {
+    // Tokens issued before token versions existed carry no `tv`: keep store owners signed in as long as the account was never revoked (version still 1).
+    const tvOk = payload.tv === undefined ? expectedTv === 1 : Number(payload.tv) === expectedTv;
+    if (!tvOk) {
       throw new Error('token_revoked');
     }
     if (user.role === 'disabled') return next(new AppError(403, 'account_disabled', 'This account is disabled. Contact Twist.'));
