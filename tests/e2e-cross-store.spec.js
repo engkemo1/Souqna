@@ -172,9 +172,19 @@ test('QA-16: 404 requests on /s/*/p/* are logged and observable in admin broken-
     headers: { 'User-Agent': 'QA-Test-Agent', 'Referer': 'https://twistegy.com/test-ref' },
   });
 
+  // Login to admin to get session
+  const { codeAt } = await import('../server/src/lib/totp.js');
+  const code = codeAt(process.env.ADMIN_TOTP_SECRET);
+  const loginRes = await fetch(`${baseUrl}/api/admin/login`, {
+    method: 'POST',
+    headers: { 'x-admin-key': process.env.ADMIN_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  const { session } = await loginRes.json();
+
   // Admin endpoint returns the broken link
   const adminRes = await fetch(`${baseUrl}/api/admin/broken-links`, {
-    headers: { 'Authorization': `Bearer ${process.env.ADMIN_KEY}` },
+    headers: { 'x-admin-key': process.env.ADMIN_KEY, 'x-admin-session': session },
   });
   expect(adminRes.status).toBe(200);
   const data = await adminRes.json();
