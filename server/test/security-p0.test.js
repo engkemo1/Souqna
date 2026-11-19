@@ -251,3 +251,22 @@ test('P0-11: Admin enforces TOTP in production, persists TOTP replay step in DB,
     config.adminTotpSecret = prevTotp;
   }
 });
+
+test('QA-02a: tokens lacking tv (token_version) are strictly rejected for owners and buyers', async () => {
+  const jwt = (await import('jsonwebtoken')).default;
+  const email = `tv-test-${randomUUID().slice(0, 8)}@example.test`;
+  const uid = insert('users', { name: 'TV Owner', email, password_hash: await hashPassword('Pass#123'), role: 'owner', token_version: 1 });
+  insert('stores', { owner_id: uid, slug: `tv-${uid}`, code: 'TV', name_ar: 'محل تي في', name_en: 'TV Store', departments: ',men,' });
+
+  // 1. Owner token WITHOUT tv claim is rejected with 401
+  const legacyOwnerToken = jwt.sign({ sub: uid }, config.jwtSecret, { algorithm: 'HS256', expiresIn: '1h' });
+  const ownerRes = await req('GET', '/api/owner/store', null, { Authorization: `Bearer ${legacyOwnerToken}` });
+  assert.equal(ownerRes.status, 401, 'legacy owner token without tv must be rejected');
+
+  // 2. Buyer token WITHOUT tv claim is rejected
+  const buyerId = insert('buyers', { name: 'TV Buyer', phone: '01099998888', password_hash: await hashPassword('Pass#123'), phone_verified: 1, token_version: 1 });
+  const buyerSecret = `${config.jwtSecret}:buyer`;
+  const legacyBuyerToken = jwt.sign({ sub: buyerId, k: 'buyer' }, buyerSecret, { algorithm: 'HS256', expiresIn: '1h' });
+  const buyerRes = await req('GET', '/api/buyer/me', null, { 'x-buyer-token': legacyBuyerToken });
+  assert.equal(buyerRes.status, 401, 'legacy buyer token without tv must be rejected');
+});

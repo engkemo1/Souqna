@@ -24,7 +24,7 @@ export function buyerFromReq(req) {
     const p = jwt.verify(t, SECRET, { algorithms: ['HS256'] });
     if (p.k === 'buyer') {
       const row = q.get('SELECT id, name, phone, phone_verified, last_seen_at, blocked, token_version FROM buyers WHERE id=?', [p.sub]);
-      if (row && (p.tv === undefined || Number(p.tv) === Number(row.token_version ?? 1))) b = row;
+      if (row && p.tv !== undefined && Number(p.tv) === Number(row.token_version ?? 1)) b = row;
     }
   } catch { return null; }
   if (b && (b.blocked || isPhoneBlocked(b.phone))) return null; // blocked by the team: signed out everywhere

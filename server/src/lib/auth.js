@@ -87,8 +87,8 @@ export function requireOwner(req, _res, next) {
     const user = q.get('SELECT id, name, email, role, token_version, must_change_password FROM users WHERE id=?', [payload.sub]);
     if (!user) throw new Error('no user');
     const expectedTv = Number(user.token_version ?? 1);
-    if (payload.tv !== undefined && Number(payload.tv) !== expectedTv) {
-      throw new Error('token revoked');
+    if (payload.tv === undefined || Number(payload.tv) !== expectedTv) {
+      throw new Error('token_revoked');
     }
     if (user.role === 'disabled') return next(new AppError(403, 'account_disabled', 'This account is disabled. Contact Twist.'));
     if (user.role === 'demo' && !['GET', 'HEAD', 'OPTIONS'].includes(req.method) && req.path !== '/store/theme/preview') {
