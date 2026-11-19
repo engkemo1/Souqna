@@ -174,31 +174,39 @@ app.use((req, res, next) => {
 app.use('/media', express.static(config.mediaDir, { immutable: true, maxAge: '365d', fallthrough: false }));
 
 app.get('/api/health', (_req, res) => res.json({ ok: true, status: 'alive', uptimeSec: Math.round(process.uptime()) }));
-app.get('/api/ready', (_req, res) => {
+app.get('/api/ready', (req, res) => {
   try {
     const dbCheck = q.val('SELECT 1');
-    const migrationsCount = q.val('SELECT COUNT(*) FROM schema_migrations');
     if (dbCheck !== 1) throw new Error('db check failed');
-    res.json({
-      ok: true,
-      status: 'ready',
-      db: true,
-      migrations: Number(migrationsCount || 0),
-      workerRole: config.workerRole,
-      r2Configured: Boolean(config.r2?.bucket && config.r2?.accessKeyId),
-    });
+    const isAdmin = Boolean(req.headers['x-admin-key'] && req.headers['x-admin-key'] === config.adminKey);
+    if (isAdmin) {
+      const migrationsCount = q.val('SELECT COUNT(*) FROM schema_migrations');
+      return res.json({
+        ok: true,
+        status: 'ready',
+        db: true,
+        migrations: Number(migrationsCount || 0),
+        workerRole: config.workerRole,
+        r2Configured: Boolean(config.r2?.bucket && config.r2?.accessKeyId),
+      });
+    }
+    res.json({ ok: true, status: 'ready' });
   } catch (err) {
-    res.status(503).json({ ok: false, status: 'not_ready', error: err.message });
+    res.status(503).json({ ok: false, status: 'not_ready' });
   }
 });
-app.get('/api/version', (_req, res) => {
-  res.json({
+app.get('/api/version', (req, res) => {
+  const isAdmin = Boolean(req.headers['x-admin-key'] && req.headers['x-admin-key'] === config.adminKey);
+  const base = {
     name: 'twist-store',
     version: process.env.APP_VERSION || '1.0.0',
     commit: process.env.GIT_SHA || 'dev',
-    env: config.env,
-    node: process.version,
-  });
+  };
+  if (isAdmin) {
+    base.env = config.env;
+    base.node = process.version;
+  }
+  res.json(base);
 });
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);

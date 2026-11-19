@@ -100,9 +100,17 @@ RUN sed -i 's/\r$//' /app/server/start.sh /app/server/litestream.yml \
  && chmod +x /app/server/start.sh \
  && cp /app/server/litestream.yml /etc/litestream.yml
 
-# Ensure the data directory exists and is owned by the node user.
-RUN mkdir -p /app/server/data /app/.model-cache \
+# Ensure the volume mount points exist and are owned by the non-root node user (QA-03)
+RUN mkdir -p /app/server/data/db /app/server/data/media /app/server/data/backups /app/.model-cache \
  && chown -R node:node /app
+
+# Build arguments for version and git commit hash (QA-10)
+ARG GIT_SHA=dev
+ARG APP_VERSION=1.0.0
+ENV GIT_SHA=${GIT_SHA}
+ENV APP_VERSION=${APP_VERSION}
+LABEL org.opencontainers.image.revision=${GIT_SHA}
+LABEL org.opencontainers.image.version=${APP_VERSION}
 
 # ⚠️ NEVER run as root in production.
 USER node

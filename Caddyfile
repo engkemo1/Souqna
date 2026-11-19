@@ -15,7 +15,7 @@
 
 {
     # Global options
-    email admin@twistegy.com
+    email {$ACME_EMAIL:admin@twistegy.com}
     # Uncomment to use Cloudflare DNS challenge (needed for wildcard certs):
     # acme_dns cloudflare {env.CF_API_TOKEN}
 }
@@ -23,7 +23,7 @@
 twistegy.com, www.twistegy.com {
 
     # ---- TLS / HSTS ----
-    header Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    header Strict-Transport-Security "max-age=31536000; includeSubDomains"
     header X-Content-Type-Options "nosniff"
     header X-Frame-Options "SAMEORIGIN"
     header Referrer-Policy "strict-origin-when-cross-origin"
@@ -61,11 +61,7 @@ twistegy.com, www.twistegy.com {
 
     # ---- Logging ----
     log {
-        output file /var/log/caddy/access.log {
-            roll_size     20mb
-            roll_keep     5
-            roll_keep_for 72h
-        }
+        output stdout
         format json
     }
 }

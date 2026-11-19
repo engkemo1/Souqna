@@ -17,13 +17,16 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
+      args:
+        GIT_SHA: ${GIT_SHA:-dev}
+        APP_VERSION: ${APP_VERSION:-1.0.0}
     image: twist-store:latest
     restart: unless-stopped
     env_file: .env
     environment:
       NODE_ENV: production
       PORT: "10000"
-      DB_FILE: /app/server/data/souqna.db
+      DB_FILE: /app/server/data/db/souqna.db
       MEDIA_DIR: /app/server/data/media
       BACKUP_DIR: /app/server/data/backups
     volumes:

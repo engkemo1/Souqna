@@ -12,6 +12,7 @@ process.env.ADMIN_KEY = 'reliability-test-admin-key-16chars';
 process.env.NODE_ENV = 'test';
 
 const { app } = await import('../src/index.js');
+const { config } = await import('../src/config.js');
 const { db: d, tx } = await import('../src/db/index.js');
 const { runMigrations } = await import('../src/db/migrations.js');
 const { createWarmupServer } = await import('../src/boot.js');
@@ -85,18 +86,36 @@ test('1. Warmup server returns 200 on /api/health and 503 on /api/ready; live se
     await new Promise((resolve) => warmup.close(resolve));
   }
 
-  // Live server endpoints
-  const liveReady = await fetch(`${baseUrl}/api/ready`);
-  assert.equal(liveReady.status, 200);
-  const liveReadyBody = await liveReady.json();
-  assert.equal(liveReadyBody.ok, true);
-  assert.equal(liveReadyBody.db, true);
+  // Live server endpoints (QA-10: public info disclosure hardened)
+  const liveReadyPublic = await fetch(`${baseUrl}/api/ready`);
+  assert.equal(liveReadyPublic.status, 200);
+  const publicReadyBody = await liveReadyPublic.json();
+  assert.equal(publicReadyBody.ok, true);
+  assert.equal(publicReadyBody.status, 'ready');
+  assert.equal(publicReadyBody.migrations, undefined, 'public /api/ready must not leak migrations count');
+  assert.equal(publicReadyBody.workerRole, undefined, 'public /api/ready must not leak workerRole');
 
-  const verRes = await fetch(`${baseUrl}/api/version`);
-  assert.equal(verRes.status, 200);
-  const verBody = await verRes.json();
-  assert.equal(verBody.name, 'twist-store');
-  assert.ok(verBody.version);
+  // Admin / internal request gets full diagnostics
+  const liveReadyAdmin = await fetch(`${baseUrl}/api/ready`, { headers: { 'x-admin-key': config.adminKey } });
+  assert.equal(liveReadyAdmin.status, 200);
+  const adminReadyBody = await liveReadyAdmin.json();
+  assert.equal(adminReadyBody.ok, true);
+  assert.equal(adminReadyBody.db, true);
+  assert.ok(adminReadyBody.migrations >= 1);
+
+  // Version endpoint: public hides env & node, admin reveals
+  const verResPublic = await fetch(`${baseUrl}/api/version`);
+  assert.equal(verResPublic.status, 200);
+  const verPublicBody = await verResPublic.json();
+  assert.equal(verPublicBody.name, 'twist-store');
+  assert.ok(verPublicBody.version);
+  assert.equal(verPublicBody.env, undefined, 'public /api/version must not expose environment');
+  assert.equal(verPublicBody.node, undefined, 'public /api/version must not expose node version');
+
+  const verResAdmin = await fetch(`${baseUrl}/api/version`, { headers: { 'x-admin-key': config.adminKey } });
+  const verAdminBody = await verResAdmin.json();
+  assert.ok(verAdminBody.env, 'admin /api/version has env');
+  assert.ok(verAdminBody.node, 'admin /api/version has node version');
 });
 
 test('2. Schema migrations tracking and nested tx() SAVEPOINT rollback', () => {
