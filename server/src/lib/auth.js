@@ -13,12 +13,18 @@ export async function hashPassword(plain) {
 export async function verifyPassword(plain, hash) {
   if (!plain || !hash) return { valid: false, needsRehash: false, matched: '' };
   const raw = String(plain);
-  let valid = await bcrypt.compare(raw, hash);
-  let matched = raw;
-  if (!valid && raw.trim() !== raw && raw.trim().length > 0) {
-    valid = await bcrypt.compare(raw.trim(), hash);
-    if (valid) matched = raw.trim();
+  const trimmed = raw.trim();
+
+  // Primary check: try the trimmed password first as it is the canonical form
+  let valid = await bcrypt.compare(trimmed, hash);
+  let matched = trimmed;
+
+  // Fallback check ONLY if the raw password had whitespace and trimmed failed
+  if (!valid && raw !== trimmed && raw.length > 0) {
+    valid = await bcrypt.compare(raw, hash);
+    if (valid) matched = raw;
   }
+
   if (!valid) return { valid: false, needsRehash: false, matched: '' };
   let rounds = 10;
   try {

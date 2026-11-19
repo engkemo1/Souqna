@@ -55,3 +55,46 @@ test('Load Test: 100 concurrent requests over /api/health with p99 < 500ms and 0
   assert.equal(errorCount, 0, `0% error rate expected, got ${errorCount} errors`);
   assert.ok(p99 < 500, `p99 latency should be < 500ms, got ${p99.toFixed(2)}ms`);
 });
+
+test('QA-07 Load Test: 50 concurrent logins with p95 measurement', async () => {
+  const { db, insert } = await import('../src/db/index.js');
+  const { hashPassword } = await import('../src/lib/auth.js');
+
+  const email = `load-user-${randomUUID().slice(0, 8)}@example.test`;
+  const pass = 'CorrectLoginPass#123';
+  const hashed = await hashPassword(pass);
+  const uid = insert('users', { name: 'Load User', email, password_hash: hashed, role: 'owner', token_version: 1 });
+  insert('stores', { owner_id: uid, slug: `load-st-${uid}`, code: 'LD', name_ar: 'محل لود', name_en: 'Load Store', departments: ',men,' });
+
+  const CONCURRENT_LOGINS = 50;
+  const latencies = [];
+  let errors = 0;
+
+  const runLogin = async () => {
+    const t0 = performance.now();
+    try {
+      const res = await fetch(`${base}/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: pass }),
+      });
+      const dur = performance.now() - t0;
+      latencies.push(dur);
+      if (res.status !== 200) errors++;
+    } catch {
+      errors++;
+    }
+  };
+
+  const tasks = Array.from({ length: CONCURRENT_LOGINS }, () => runLogin());
+  await Promise.all(tasks);
+
+  latencies.sort((a, b) => a - b);
+  const p50 = latencies[Math.floor(latencies.length * 0.50)];
+  const p95 = latencies[Math.floor(latencies.length * 0.95)];
+  const p99 = latencies[Math.floor(latencies.length * 0.99)];
+
+  console.log(`[QA-07 login-load-test] 50 concurrent logins: errors=${errors}, p50=${p50.toFixed(2)}ms, p95=${p95.toFixed(2)}ms, p99=${p99.toFixed(2)}ms`);
+  assert.equal(errors, 0, 'All 50 concurrent logins must succeed');
+  assert.ok(p95 < 5000, `p95 latency under 50 concurrent logins must be < 5000ms, got ${p95.toFixed(2)}ms`);
+});
