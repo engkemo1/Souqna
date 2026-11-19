@@ -184,13 +184,13 @@ function ChangePassword() {
     } catch (e2) { setErr(e2.fields?.current ? 'الباسورد الحالي غلط.' : (e2.message || 'حصلت مشكلة، جرّب تاني.')); }
     setBusy(false);
   };
-  const attrs = { dir: 'ltr', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false, type: show ? 'text' : 'password' };
+  const attrs = { dir: 'ltr', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false, reveal: false, type: show ? 'text' : 'password' };
   return (
     <Panel title="تغيير الباسورد">
       <form onSubmit={submit} className="grid gap-4 sm:max-w-sm">
         <Field label="الباسورد الحالي"><Input {...attrs} autoComplete="current-password" value={v.current} onChange={(e) => setV({ ...v, current: e.target.value })} /></Field>
         <Field label="الباسورد الجديد" hint="8 حروف أو أكتر">
-          <div className="relative">
+          <div dir="ltr" className="relative">
             <Input {...attrs} autoComplete="new-password" className="pe-12" value={v.next} onChange={(e) => setV({ ...v, next: e.target.value })} />
             <button type="button" onClick={() => setShow((x) => !x)} aria-label={show ? 'إخفاء الباسورد' : 'إظهار الباسورد'} className="absolute end-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-muted hover:text-fg">{show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>
           </div>

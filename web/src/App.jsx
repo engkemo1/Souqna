@@ -84,6 +84,7 @@ const AdminSubscriptions = lazy(() => import('./pages/admin/Subscriptions.jsx'))
 const AdminServices = lazy(() => import('./pages/admin/Services.jsx'));
 const AdminSourcing = lazy(() => import('./pages/admin/Sourcing.jsx'));
 const AdminCustomRequests = lazy(() => import('./pages/admin/CustomRequests.jsx'));
+const AdminGuide = lazy(() => import('./pages/admin/AdminGuide.jsx'));
 const AdminBuyers = lazy(() => import('./pages/admin/Buyers.jsx'));
 const AdminPhotos = lazy(() => import('./pages/admin/Photos.jsx'));
 const AdminReports = lazy(() => import('./pages/admin/Reports.jsx'));
@@ -96,10 +97,8 @@ const AdminAudit = lazy(() => import('./pages/admin/AuditLog.jsx'));
 const AdminStories = lazy(() => import('./pages/admin/Stories.jsx'));
 const AdminCampaigns = lazy(() => import('./pages/admin/Campaigns.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
-const AdminFeatured = lazy(() => import('./pages/admin/FeaturedAds.jsx'));
-const AdminAdvertisers = lazy(() => import('./pages/admin/Advertisers.jsx'));
+const AdminFeatured = lazy(() => import('./pages/admin/AdsHub.jsx'));
 const AdvertiserPage = lazy(() => import('./pages/market/AdvertiserPage.jsx'));
-const AdminHomepageAds = lazy(() => import('./pages/admin/HomepageAds.jsx'));
 const StoreManage = lazy(() => import('./pages/admin/StoreManage.jsx'));
 const AdminSystem = lazy(() => import('./pages/admin/System.jsx'));
 const More = lazy(() => import('./pages/dashboard/More.jsx'));
@@ -214,12 +213,13 @@ const router = createBrowserRouter([
           { path: 'services', element: <AdminServices /> },
           { path: 'sourcing', element: <AdminSourcing /> },
           { path: 'custom-requests', element: <AdminCustomRequests /> },
+          { path: 'guide', element: <AdminGuide /> },
           { path: 'buyers', element: <AdminBuyers /> },
           { path: 'photos', element: <AdminPhotos /> },
           { path: 'coupons', element: <AdminCoupons /> },
-          { path: 'ads', element: <AdminHomepageAds /> },
+          { path: 'ads', element: <Navigate to="/admin/featured" replace /> },
           { path: 'featured', element: <AdminFeatured /> },
-          { path: 'advertisers', element: <AdminAdvertisers /> },
+          { path: 'advertisers', element: <Navigate to="/admin/featured?tab=advertisers" replace /> },
           { path: 'traffic', element: <AdminTraffic /> },
           { path: 'couriers', element: <AdminCouriers /> },
           { path: 'alerts', element: <AdminAlerts /> },

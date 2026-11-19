@@ -141,6 +141,16 @@ function Card({ id, step, title, hint, done, children, className, bare }) {
 
 const chipCls = (on) => cx('inline-flex h-10 items-center rounded-full border px-4 text-sm font-medium transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg');
 
+/** شرح مختصر فوق أي مكان بيضيف قسم: إيه هو وليه مهم. */
+function SectionTip({ L }) {
+  return (
+    <div role="note" className="flex gap-2.5 rounded-xl bg-secondary px-3 py-2.5 text-[12.5px] leading-relaxed text-on-secondary">
+      <Info className="mt-0.5 h-4 w-4 shrink-0" />
+      <p>{L('القسم بيرتّب منتجاتك في صفحة محلك، والعميل بيدخل عليه يلاقي اللي عايزه أسرع. القسم بتاعك انت: تعدّله أو تمسحه أو ترتّبه في أي وقت من «الأقسام».', 'A section groups your products on your store page so customers find things faster. It is yours: edit, delete or reorder it anytime from “Sections”.')}</p>
+    </div>
+  );
+}
+
 /** اختيار نوع المنتج على طريقة Amazon: الفئة (لمين؟) ← ابحث أو تصفح الأنواع. من النوع بنحدد القسم والمقاسات تلقائي. */
 function TypePicker({ tree, audience, typeKey, onChange, error, suggested, customName, onAddSection, sections = [], department = '', onPickSection }) {
   const { lang } = useI18n();
@@ -222,6 +232,7 @@ function TypePicker({ tree, audience, typeKey, onChange, error, suggested, custo
         </div>
       ) : adding ? (
         <div className="space-y-2.5 rounded-xl border border-dashed border-line-strong p-3">
+          <SectionTip L={L} />
           <p className="text-[13px] text-muted">{L('اكتب اسم القسم وإحنا نضيفه في متجرك ونختاره للمنتج ده.', 'Name the new section — we add it to your store and pick it.')}</p>
           <Input value={adding.name} autoFocus onChange={(e) => setAdding({ name: e.target.value })} placeholder={L('مثال: شوز', 'e.g. Shoes')} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); submitAdd(); } }} />
           <div className="flex gap-2"><button type="button" disabled={busy} onClick={submitAdd} className="h-10 flex-1 rounded-xl bg-fg text-sm font-semibold text-canvas disabled:opacity-60">{busy ? '…' : L('إضافة واختيار', 'Add & select')}</button><button type="button" onClick={() => setAdding(null)} className="h-10 rounded-xl border border-line-strong px-4 text-sm">{L('إلغاء', 'Cancel')}</button></div>
@@ -784,12 +795,14 @@ export default function ProductEditor() {
         </Field>}
         {cats?.items && (
           <Field label={L('المجموعة في متجرك', 'Collection in your store')} optional={t('common.optional')} hint={L('بترتّب منتجاتك في صفحة المحل (زي: هوديز، شتوي).', 'Groups products on your store page.')}>
+            <div className="mb-2.5"><SectionTip L={L} /></div>
             <Select value={f.category_id} onChange={(e) => set({ category_id: e.target.value })}>
               <option value="">{L('من غير مجموعة', 'No collection')}</option>
               {cats.items.filter((c) => !c.parentId).flatMap((c) => [c, ...cats.items.filter((k) => k.parentId === c.id)]).map((c) => <option key={c.id} value={c.id}>{c.parentId ? '— ' : ''}{tr(c.name)}</option>)}
             </Select>
             {newCat ? (
               <div className="mt-3 space-y-2.5 rounded-xl border border-dashed border-line-strong p-3">
+                <SectionTip L={L} />
                 <Input value={newCat.name} onChange={(e) => setNewCat({ ...newCat, name: e.target.value })} placeholder={L('اسم القسم الجديد (مثال: هوديز)', 'New section name')} aria-label={L('اسم القسم الجديد', 'New section name')} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCat(); } }} />
                 {(cats?.items || []).some((c) => !c.parentId) && (
                   <Select value={newCat.parent} onChange={(e) => setNewCat({ ...newCat, parent: e.target.value })}>

@@ -81,15 +81,16 @@ export const FeaturedCard = memo(function FeaturedCard({ item, variant, priority
   const hasMedia = !!(item.image.offer || item.image.desktop || item.image.mobile || item.fg);
   const fg = item.color || '#ffffff';
   const style = { background: item.bg || undefined, color: hasMedia || item.bg ? fg : undefined };
-  const Wrap = item.external ? 'a' : Link;
-  const wrapProps = item.external ? { href: item.href, target: '_blank', rel: 'noopener noreferrer sponsored' } : { to: item.href };
+  const noClick = !!item.noClick;
+  const Wrap = noClick ? 'div' : item.external ? 'a' : Link;
+  const wrapProps = noClick ? {} : item.external ? { href: item.href, target: '_blank', rel: 'noopener noreferrer sponsored' } : { to: item.href };
   const lay = item.layout || { width: 'wide', height: 'm' };
   const heights = { s: 'min-h-36 sm:min-h-44', l: 'min-h-72 sm:min-h-[26rem]' };
   const baseH = { hero: 'min-h-80 sm:min-h-72 lg:min-h-80', grid: 'min-h-48 sm:min-h-56', slot: 'min-h-32', strip: 'min-h-44' }[variant] || 'min-h-48';
   const radius = lay.width === 'full' && variant !== 'slot' && variant !== 'strip' ? 'rounded-none' : variant === 'slot' || variant === 'strip' ? 'rounded-2xl' : 'rounded-3xl';
   const sizeCls = cx(heights[lay.height] || baseH, radius, variant === 'strip' && 'w-72 shrink-0 snap-start sm:w-80');
   return (
-    <Wrap ref={ref} {...wrapProps} onClick={(e) => { if (preview) e.preventDefault(); else onClick?.(item); }} aria-label={title}
+    <Wrap ref={ref} {...wrapProps} onClick={(e) => { if (preview) e.preventDefault(); else if (!noClick) onClick?.(item); }} aria-label={title}
       className={cx('group relative isolate flex overflow-hidden text-white shadow-sm transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand', !hasMedia && !item.bg && 'bg-fg', sizeCls)} style={style}>
       <Media lively={hero && !calm} item={item} device={device} priority={priority} sizes={variant === 'hero' ? '100vw' : '(min-width:1024px) 33vw, 80vw'} />
       {item.fg && <img src={item.fg.src} alt="" loading="lazy" decoding="async" className={cx('pointer-events-none absolute bottom-0 z-[1] max-h-[92%] object-contain', FG_SIDE[item.fg.pos] || FG_SIDE.end)} style={{ width: `${item.fg.size}%` }} />}
@@ -113,7 +114,7 @@ export const FeaturedCard = memo(function FeaturedCard({ item, variant, priority
         )}
         <motion.p {...enter(0.05)} className={cx('font-display font-extrabold leading-[1.1]', hero ? 'text-3xl [text-shadow:0_2px_20px_rgba(0,0,0,.5)] sm:text-6xl' : 'text-lg sm:text-xl')}>{title}</motion.p>
         {subtitle && <motion.p {...enter(0.18)} className={cx('mt-1.5 line-clamp-2 text-sm leading-relaxed opacity-90', hero && 'sm:mt-3 sm:text-lg')}>{subtitle}</motion.p>}
-        {cta && (
+        {cta && !noClick && (
           <motion.span {...enter(0.32)} className={cx('relative mt-3 inline-flex items-center gap-2 overflow-hidden rounded-full px-4 py-2 text-sm font-bold transition', hero && 'sm:mt-6 sm:px-7 sm:py-3.5 sm:text-base', CTA[item.ctaStyle] || CTA.solid)}>
             {hero && !calm && <motion.span aria-hidden className="pointer-events-none absolute inset-y-0 w-1/3 -skew-x-12 bg-orange-300/50 blur-md" initial={{ x: '-200%' }} animate={{ x: '500%' }} transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 2.6, ease: 'easeInOut' }} />}
             <span className="relative">{cta}</span>
@@ -138,12 +139,13 @@ function Ticker({ items, lang, onClick }) {
 }
 function TickerItem({ item, lang, onClick }) {
   const ref = useImpression(item.id, item.placement);
-  const Wrap = item.external ? 'a' : Link;
-  const props = item.external ? { href: item.href, target: '_blank', rel: 'noopener noreferrer sponsored' } : { to: item.href };
+  const noClick = !!item.noClick;
+  const Wrap = noClick ? 'span' : item.external ? 'a' : Link;
+  const props = noClick ? {} : item.external ? { href: item.href, target: '_blank', rel: 'noopener noreferrer sponsored' } : { to: item.href };
   const sub = pick(item.subtitle, lang);
   return (
     <li ref={ref} className="shrink-0">
-      <Wrap {...props} onClick={() => onClick(item)} className="inline-flex items-center gap-2 font-medium hover:text-brand">
+      <Wrap {...props} onClick={noClick ? undefined : () => onClick(item)} className="inline-flex items-center gap-2 font-medium hover:text-brand">
         <span className="rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand">{pick(item.badge, lang) || LABEL[lang]}</span>
         {pick(item.title, lang)}{sub ? <span className="text-muted"> — {sub}</span> : null}
       </Wrap>

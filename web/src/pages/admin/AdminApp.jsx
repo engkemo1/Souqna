@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, DatabaseBackup, Menu, X, CreditCard, Eye, Wallet, TrendingUp, AlertTriangle, History, MessageCircle, Shirt } from 'lucide-react';
+import { LayoutDashboard, Store, ShoppingBag, Truck, ShieldCheck, Bell, LogOut, KeyRound, BellRing, Volume2, VolumeX, Menu, X } from 'lucide-react';
 import { useTheme, DASHBOARD_THEME } from '../../lib/theme.js';
 import { ToastProvider, useToast } from '../../components/ui/Toast.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -9,55 +9,8 @@ import Brand from '../../components/market/Brand.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { useAppManifest } from '../../lib/pwa.js';
 import PageHelp from './PageHelp.jsx';
+import { NAV_GROUPS } from './adminNav.js';
 import { adminApi, adminKey, adminSession, setAdminAuthFail, fmtMoney } from './adminApi.js';
-
-const NAV_GROUPS = [
-  { label: 'الرئيسية', items: [{ to: '/admin', end: true, icon: LayoutDashboard, label: 'نظرة عامة' }] },
-  { label: 'إدارة السوق', items: [
-    { to: '/admin/stores', icon: Store, label: 'المحلات' },
-    { to: '/admin/products', icon: Package, label: 'المنتجات والمعاينة', badge: 'products' },
-    { to: '/admin/subscriptions', icon: CreditCard, label: 'اشتراكات المحلات' },
-    { to: '/admin/departments', icon: Tags, label: 'الأقسام', badge: 'depts' },
-    { to: '/admin/image-library', icon: Camera, label: 'مكتبة صور الأقسام' },
-    { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات' },
-    { to: '/admin/featured', icon: Sparkles, label: 'الإعلانات والعروض المميزة' },
-    { to: '/admin/advertisers', icon: Megaphone, label: 'المعلنون الخارجيون' },
-    { to: '/admin/ads', icon: Megaphone, label: 'إعلانات الرئيسية' },
-    { to: '/admin/buyers', icon: Users, label: 'العملاء والحسابات' },
-    { to: '/admin/photos', icon: Camera, label: 'أحدث الصور' },
-  ] },
-  { label: 'الطلبات والتشغيل', items: [
-    { to: '/admin/orders', icon: ShoppingBag, label: 'الطلبات' },
-    { to: '/admin/deliveries', icon: Truck, label: 'التوصيل', badge: 'open' },
-    { to: '/admin/delivery-zones', icon: MapPin, label: 'مناطق الاستلام والخصم' },
-    { to: '/admin/delivery-rates', icon: MapPin, label: 'رسوم المناطق' },
-    { to: '/admin/delivery-people', icon: Users, label: 'أفراد الدليفري' },
-    { to: '/admin/couriers', icon: Wallet, label: 'حساب المندوبين' },
-    { to: '/admin/services', icon: Camera, label: 'الخدمات', badge: 'services' },
-    { to: '/admin/sourcing', icon: PackagePlus, label: 'طلبات من برّه', badge: 'sourcing' },
-    { to: '/admin/custom-requests', icon: Shirt, label: 'تصميمات مخصصة', badge: 'custom' },
-  ] },
-  { label: 'التحليلات', items: [
-    { to: '/admin/alerts', icon: AlertTriangle, label: 'التنبيهات والمتابعة' },
-    { to: '/admin/growth', icon: TrendingUp, label: 'النمو وصحة الكتالوج' },
-    { to: '/admin/traffic', icon: Eye, label: 'الزيارات' },
-    { to: '/admin/insights', icon: TrendingUp, label: 'تحليلات السوق' },
-    { to: '/admin/stylist-log', icon: Sparkles, label: 'أسئلة تويلا وسرعتها' },
-    { to: '/admin/stylist/training', icon: Sparkles, label: 'تدريب تويلا وقواعدها' },
-    { to: '/admin/campaigns', icon: Megaphone, label: 'الحملات والإعلانات' },
-    { to: '/admin/stories', icon: Camera, label: 'ستوري المحلات' },
-    { to: '/admin/reports', icon: BarChart3, label: 'التقارير' },
-    { to: '/admin/audit', icon: History, label: 'سجل الحركات' },
-  ] },
-  { label: 'الذكاء الاصطناعي والمنصة', items: [
-    { to: '/admin/system?section=cashier', icon: DatabaseBackup, label: 'ربط الكاشير' },
-    { to: '/admin/system?section=moda', icon: Sparkles, label: 'المساعد الذكي' },
-    { to: '/admin/system?section=whatsapp', icon: MessageCircle, label: 'واتساب' },
-    { to: '/admin/system?section=visual', icon: ScanSearch, label: 'البحث المرئي' },
-    { to: '/admin/system?section=security', icon: DatabaseBackup, label: 'السيرفر والنسخ' },
-  ] },
-];
-const NAV = NAV_GROUPS.flatMap((g) => g.items);
 
 function Gate({ onAuthed }) {
   const [key, setKey] = useState('');
@@ -274,7 +227,7 @@ function MobileDrawer({ open, onClose, alerts, onLogout, location }) {
                     ? location.pathname === '/admin/system' && (new URLSearchParams(location.search).get('section') || 'security') === targetSec
                     : undefined;
                   return (
-                    <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
+                    <NavLink key={n.to} to={n.to} end={n.end} title={n.desc} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
                       <n.icon className="h-[18px] w-[18px]" />{n.label}
                       {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-on-sale">{alerts.counts[n.badge]}</span>}
                     </NavLink>
@@ -316,7 +269,7 @@ function Shell({ onLogout }) {
                     ? location.pathname === '/admin/system' && (new URLSearchParams(location.search).get('section') || 'security') === targetSec
                     : undefined;
                   return (
-                    <NavLink key={n.to} to={n.to} end={n.end} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
+                    <NavLink key={n.to} to={n.to} end={n.end} title={n.desc} className={({ isActive }) => cx('flex h-10 items-center gap-3 rounded-xl px-3 text-[14px] font-medium transition', (active ?? isActive) ? 'bg-fg text-canvas' : 'text-fg hover:bg-fg/[0.06]')}>
                       <n.icon className="h-[18px] w-[18px]" />{n.label}
                       {n.badge && alerts.counts[n.badge] > 0 && <span className="ms-auto rounded-full bg-sale px-2 text-xs font-bold text-on-sale">{alerts.counts[n.badge]}</span>}
                     </NavLink>

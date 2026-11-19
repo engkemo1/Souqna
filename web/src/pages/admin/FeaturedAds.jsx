@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, Copy, Eye, MousePointerClick, Pause, Pencil, Play, Plus, Archive, Trash2, RotateCcw, ImagePlus, Sparkles, AlertTriangle, Check } from 'lucide-react';
+import { BarChart3, Copy, Eye, MousePointerClick, Pause, Pencil, Play, Plus, Archive, Trash2, RotateCcw, ImagePlus, Sparkles, AlertTriangle, Check, Store, Package, Tags, LayoutTemplate, MessageCircle, ExternalLink, Ban, Building2, Tag } from 'lucide-react';
 import { PageHeader, KpiCard, FilterTabs, SearchInput, ListSkeleton } from '../../components/dash/Kit.jsx';
 import Badge from '../../components/ui/Badge.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -48,6 +48,129 @@ const toBody = (f) => ({
 });
 const bi = (o, lang = 'ar') => (o && (o[lang] || o.ar || o.en)) || '';
 const fmtDt = (s) => (s ? s.replace('T', ' ') : '—');
+
+/* ---- «لما العميل يضغط على الإعلان»: one clear choice, mapped onto the existing destination / store / product / category fields ---- */
+const PAGES = [['/', 'الصفحة الرئيسية'], ['/search', 'البحث'], ['/visual', 'البحث بالصورة'], ['/custom-design', 'تصميم ملابس على الطلب']];
+const ACTIONS = [
+  ['store', 'يفتح صفحة محل', Store, 'العميل يدخل على المحل.'],
+  ['product', 'يفتح منتج معين', Package, 'العميل يدخل مباشرة على صفحة منتج.'],
+  ['category', 'يفتح قسم في محل', Tags, 'العميل يدخل على قسم معين جوه المحل.'],
+  ['page', 'يفتح صفحة في الموقع', LayoutTemplate, 'صفحة من صفحات تويست (البحث، التصميم المخصص…).'],
+  ['whatsapp', 'يفتح واتساب', MessageCircle, 'محادثة واتساب على رقم تحدده، برسالة جاهزة.'],
+  ['link', 'يفتح رابط خارجي', ExternalLink, 'أي موقع على https، بيفتح في تبويب جديد.'],
+  ['none', 'ما يعملش حاجة', Ban, 'إعلان للعرض بس (إعلان تعريفي)، مش بيتضغط.'],
+];
+const NO_CLICK = '#none';
+function actionOf(f) {
+  const u = f.destination_url || '';
+  if (u === NO_CLICK) return 'none';
+  if (/^https:\/\/wa\.me\//i.test(u)) return 'whatsapp';
+  if (/^https?:/i.test(u)) return 'link';
+  if (u.startsWith('/')) return 'page';
+  if (f.product_id) return 'product';
+  if (f.category_id) return 'category';
+  if (f.store_id) return 'store';
+  return '';
+}
+const waParts = (u) => { const m = /^https:\/\/wa\.me\/(\d+)(?:\?text=(.*))?$/i.exec(u || ''); let text = ''; try { text = m?.[2] ? decodeURIComponent(m[2]) : ''; } catch { /* keep empty */ } return { phone: m?.[1] || '', text }; };
+const waUrl = (phone, text) => {
+  let d = String(phone).replace(/\D/g, '');
+  if (/^01\d{9}$/.test(d)) d = `2${d}`;
+  return d ? `https://wa.me/${d}${text ? `?text=${encodeURIComponent(text).replace(/'/g, '%27')}` : ''}` : '';
+};
+function ClickAction({ f, setF, stores, targets, fe }) {
+  const guided = f.type === 'custom' && f.mode !== 'advertiser';
+  const act = actionOf(f);
+  const [wa, setWa] = useState(() => waParts(f.destination_url));
+  const cleanCta = (x, none) => ({ ...x, cta_ar: none ? '' : (x.cta_ar || 'اكتشف الآن'), cta_en: none ? '' : (x.cta_en || 'Explore now') });
+  const pick = (k) => setF((x) => {
+    const base = { ...x, destination_url: '', product_id: k === 'product' ? x.product_id : '', category_id: k === 'category' ? x.category_id : '' };
+    if (k === 'none') return cleanCta({ ...base, destination_url: NO_CLICK, product_id: '', category_id: '' }, true);
+    if (k === 'page') return cleanCta({ ...base, destination_url: PAGES.some(([p]) => p === x.destination_url) ? x.destination_url : '/' }, false);
+    if (k === 'link') return cleanCta({ ...base, destination_url: /^https?:/i.test(x.destination_url) && act === 'link' ? x.destination_url : 'https://' }, false);
+    if (k === 'whatsapp') { setWa({ phone: '', text: '' }); return cleanCta({ ...base, store_id: '' }, false); }
+    return cleanCta(base, false);
+  });
+  const setWaField = (patch) => { const n = { ...wa, ...patch }; setWa(n); setF((x) => ({ ...x, destination_url: waUrl(n.phone, n.text) })); };
+  const storeName = (stores || []).find((s) => String(s.id) === String(f.store_id));
+  const prod = targets?.products?.find((p) => String(p.id) === String(f.product_id));
+  const cat = targets?.categories?.find((c) => String(c.id) === String(f.category_id));
+  const needsStore = ['store', 'product', 'category'].includes(act);
+  const summary = {
+    store: storeName ? `يفتح صفحة محل «${bi(storeName.name)}».` : 'اختار المحل.',
+    product: prod ? `يفتح منتج «${bi(prod.name)}» في «${bi(storeName?.name)}».` : 'اختار المحل والمنتج.',
+    category: cat ? `يفتح قسم «${bi(cat.name)}» في «${bi(storeName?.name)}».` : 'اختار المحل والقسم.',
+    page: `يفتح صفحة «${PAGES.find(([p]) => p === f.destination_url)?.[1] || f.destination_url}».`,
+    whatsapp: wa.phone ? 'يفتح محادثة واتساب على الرقم ده.' : 'اكتب رقم الواتساب.',
+    link: `يفتح ${f.destination_url} في تبويب جديد.`,
+    none: 'الإعلان بيتعرض بس ومش بيتضغط، وزرار الإعلان بيتشال.',
+  }[act];
+  if (!guided) {
+    return (
+      <div className="rounded-2xl border border-line bg-fg/[0.03] p-4 text-sm">
+        <b className="block">لما العميل يضغط على الإعلان</b>
+        <p className="mt-1 text-muted">{f.type === 'offer' ? 'بيفتح صفحة العرض في المحل تلقائي.' : 'بيفتح صفحة المعلن تلقائي.'}</p>
+      </div>
+    );
+  }
+  return (
+    <section className="space-y-3 rounded-2xl border border-line p-4" aria-label="عند الضغط على الإعلان">
+      <div><b className="block">لما العميل يضغط على الإعلان، يحصل إيه؟</b><p className="text-sm text-muted">اختار حاجة واحدة.</p></div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        {ACTIONS.map(([k, label, Icon, hint]) => (
+          <button key={k} type="button" aria-pressed={act === k} onClick={() => pick(k)} className={`flex items-start gap-3 rounded-xl border p-3 text-start transition ${act === k ? 'border-fg bg-fg/[0.04]' : 'border-line hover:border-line-strong'}`}>
+            <span className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-fg/[0.06]"><Icon className="h-4 w-4" /></span>
+            <span className="min-w-0"><b className="block text-sm">{label}</b><span className="block text-xs text-muted">{hint}</span></span>
+          </button>
+        ))}
+      </div>
+      {needsStore && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="المحل" error={fe.store_id && 'اختار المحل'}>
+            <Select value={f.store_id} onChange={(e) => setF((x) => ({ ...x, store_id: e.target.value, product_id: '', category_id: '' }))}>
+              <option value="">— اختار المحل —</option>
+              {(stores || []).map((s) => <option key={s.id} value={s.id}>{bi(s.name)}</option>)}
+            </Select>
+          </Field>
+          {act === 'product' && f.store_id && <Field label="المنتج"><Select value={f.product_id} onChange={(e) => setF((x) => ({ ...x, product_id: e.target.value }))}><option value="">— اختار المنتج —</option>{(targets?.products || []).map((p) => <option key={p.id} value={p.id}>{bi(p.name)}</option>)}</Select></Field>}
+          {act === 'category' && f.store_id && <Field label="القسم"><Select value={f.category_id} onChange={(e) => setF((x) => ({ ...x, category_id: e.target.value }))}><option value="">— اختار القسم —</option>{(targets?.categories || []).map((c) => <option key={c.id} value={c.id}>{bi(c.name)}</option>)}</Select></Field>}
+        </div>
+      )}
+      {act === 'page' && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="الصفحة"><Select value={PAGES.some(([p]) => p === f.destination_url) ? f.destination_url : '__custom'} onChange={(e) => setF((x) => ({ ...x, destination_url: e.target.value === '__custom' ? '/' : e.target.value }))}>
+            {PAGES.map(([p, l]) => <option key={p} value={p}>{l}</option>)}<option value="__custom">مسار تاني…</option>
+          </Select></Field>
+          {!PAGES.some(([p]) => p === f.destination_url) && <Field label="المسار" error={fe.destination_url && 'مسار غير صالح'} hint="لازم يبدأ بـ / زي /s/اسم-المحل"><Input dir="ltr" value={f.destination_url} onChange={(e) => setF((x) => ({ ...x, destination_url: e.target.value }))} placeholder="/search" /></Field>}
+        </div>
+      )}
+      {act === 'whatsapp' && (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="رقم الواتساب" error={fe.destination_url && 'رقم غير صالح'}><Input dir="ltr" inputMode="tel" value={wa.phone} onChange={(e) => setWaField({ phone: e.target.value })} placeholder="01XXXXXXXXX" /></Field>
+          <Field label="الرسالة الجاهزة" optional="اختياري"><Input value={wa.text} onChange={(e) => setWaField({ text: e.target.value })} maxLength={150} placeholder="أهلاً، عايز أعرف أكتر عن العرض" /></Field>
+        </div>
+      )}
+      {act === 'link' && <Field label="الرابط" error={fe.destination_url && 'رابط غير آمن — لازم https'} hint="لازم يبدأ بـ https://"><Input dir="ltr" value={f.destination_url} onChange={(e) => setF((x) => ({ ...x, destination_url: e.target.value }))} placeholder="https://example.com" /></Field>}
+      <p className={`rounded-xl px-3 py-2 text-sm ${act ? 'bg-emerald-50 text-emerald-900' : 'bg-amber-50 text-amber-900'}`}>{act ? `النتيجة: ${summary}` : 'لسه ما اخترتش. لو سيبتها كده الإعلان هيفتح الصفحة الرئيسية.'}</p>
+    </section>
+  );
+}
+
+/** Tiny page sketch with the chosen slot highlighted, so «where will it appear» is obvious at a glance. */
+const SKETCH = {
+  market_top: ['top', 'hero', 'strip', 'grid', 'bottom'], market_hero: ['top', 'hero', 'strip', 'grid', 'bottom'], market_strip: ['top', 'hero', 'strip', 'grid', 'bottom'], market_grid: ['top', 'hero', 'strip', 'grid', 'bottom'], market_bottom: ['top', 'hero', 'strip', 'grid', 'bottom'],
+  store_hero: ['hero', 'offers', 'ticker'], store_offers: ['hero', 'offers', 'ticker'], store_ticker: ['hero', 'offers', 'ticker'], search_slot: ['bar', 'slot', 'res', 'res'],
+};
+const SKETCH_ON = { market_top: 'top', market_hero: 'hero', market_strip: 'strip', market_grid: 'grid', market_bottom: 'bottom', store_hero: 'hero', store_offers: 'offers', store_ticker: 'ticker', search_slot: 'slot' };
+const SKETCH_H = { top: 'h-1.5', hero: 'h-6', strip: 'h-2.5', grid: 'h-4', bottom: 'h-1.5', offers: 'h-4', ticker: 'h-1.5', bar: 'h-1.5', slot: 'h-3', res: 'h-2.5' };
+function SlotSketch({ k }) {
+  const rows = SKETCH[k] || [];
+  return (
+    <span aria-hidden="true" className="flex w-14 shrink-0 flex-col gap-[3px] rounded-lg border border-line bg-canvas p-1.5">
+      {rows.map((r, i) => <span key={i} className={`block w-full rounded-[3px] ${SKETCH_H[r]} ${SKETCH_ON[k] === r ? 'bg-emerald-500' : 'bg-fg/10'}`} />)}
+    </span>
+  );
+}
 
 /* ---- duration helpers (all wall-clock strings are Cairo time, 'YYYY-MM-DDTHH:MM') ---- */
 const cairoNow = () => {
@@ -244,7 +367,7 @@ function Wizard({ editing, meta, onClose, onSaved }) {
             {[['custom', 'إعلان مخصص', 'صورة وعنوان ورابط من اختيارك — لأي حاجة.'], ['offer', 'ترويج عرض محل', 'بتروّج لعرض شغال فعلاً عند المحل. السعر والأهلية بيفضلوا من نظام العروض.'], ['advertiser', 'معلن خارجي', 'لعميل ما عندوش محل على Twist — الإعلان يفتح صفحة تعريفية خفيفة باسمه (صور، موقع، واتساب).']].map(([v, t, d]) => (
               <button key={v} type="button" onClick={() => setF((x) => ({ ...x, mode: v, type: v === 'offer' ? 'offer' : 'custom', ...(v === 'advertiser' ? { store_id: '', promotion_id: '', product_id: '', category_id: '' } : { advertiser_id: '' }) }))} aria-pressed={f.mode === v}
                 className={`rounded-2xl border p-4 text-start transition ${f.mode === v ? 'border-fg bg-fg/[0.04]' : 'border-line hover:border-line-strong'}`}>
-                <b className="flex items-center gap-2">{f.mode === v && <Check className="h-4 w-4" />}{t}</b><span className="mt-1 block text-sm text-muted">{d}</span>
+                <b className="flex items-center gap-2">{(() => { const I = { custom: Sparkles, offer: Tag, advertiser: Building2 }[v]; return <span className={`grid h-8 w-8 place-items-center rounded-lg ${f.mode === v ? 'bg-fg text-canvas' : 'bg-fg/[0.06]'}`}><I className="h-4 w-4" /></span>; })()}{t}{f.mode === v && <Check className="h-4 w-4 text-emerald-600" />}</b><span className="mt-1 block text-sm text-muted">{d}</span>
               </button>
             ))}
           </div>
@@ -296,15 +419,7 @@ function Wizard({ editing, meta, onClose, onSaved }) {
             <Field label="الشارة (عربي)" optional="اختياري" hint="مثال: خصم ٣٠٪"><Input value={f.badge_ar} onChange={set('badge_ar')} maxLength={24} /></Field>
             <Field label="Badge (EN)" optional="اختياري"><Input dir="ltr" value={f.badge_en} onChange={set('badge_en')} maxLength={24} /></Field>
           </div>
-          <Field label="الرابط" optional={f.type === 'offer' || !!f.store_id || f.mode === 'advertiser'} error={fe.destination_url && 'رابط غير آمن — استخدم مسار داخلي (/…) أو https'} hint={f.mode === 'advertiser' ? 'سيبه فاضي — الإعلان هيفتح صفحة المعلن تلقائي.' : 'مسار داخلي زي /search أو رابط https. لو فاضي بنستخدم صفحة المحل/المنتج/القسم.'}>
-            <Input dir="ltr" value={f.destination_url} onChange={set('destination_url')} placeholder="/search" />
-          </Field>
-          {targets && (
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="منتج بعينه (اختياري)"><Select value={f.product_id} onChange={(e) => setF((x) => ({ ...x, product_id: e.target.value, category_id: '' }))}><option value="">—</option>{targets.products.map((p) => <option key={p.id} value={p.id}>{bi(p.name)}</option>)}</Select></Field>
-              <Field label="قسم بعينه (اختياري)"><Select value={f.category_id} onChange={(e) => setF((x) => ({ ...x, category_id: e.target.value, product_id: '' }))}><option value="">—</option>{targets.categories.map((c) => <option key={c.id} value={c.id}>{bi(c.name)}</option>)}</Select></Field>
-            </div>
-          )}
+          <ClickAction f={f} setF={setF} stores={stores} targets={targets} fe={fe} />
         </div>
       )}
 
@@ -381,7 +496,7 @@ function Wizard({ editing, meta, onClose, onSaved }) {
                 const cur = f.placements.find((p) => p.key === pl.key);
                 return (
                   <div key={pl.key} className={`rounded-xl border p-3 ${cur ? 'border-fg/40' : 'border-line'}`}>
-                    <Switch checked={!!cur} onChange={() => togglePlacement(pl.key)} label={pl.ar} description={`الحد الأقصى ${pl.limit} · ${pl.scope === 'store' ? 'صفحة المحل' : 'السوق'}`} />
+                    <div className="flex items-center gap-3"><SlotSketch k={pl.key} /><div className="min-w-0 flex-1"><Switch checked={!!cur} onChange={() => togglePlacement(pl.key)} label={pl.ar} description={`الحد الأقصى ${pl.limit} · ${pl.scope === 'store' ? 'صفحة المحل' : 'السوق'} · المربع الأخضر هو مكان الإعلان`} /></div></div>
                     {cur && (
                       <div className="mt-3 grid gap-3 sm:grid-cols-4">
                         <Field label="الترتيب"><Input type="number" min="0" max="99" value={cur.order} onChange={(e) => patchPlacement(pl.key, { order: Number(e.target.value) })} /></Field>

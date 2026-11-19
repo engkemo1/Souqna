@@ -1365,7 +1365,7 @@ r.get('/categories', h((req, res) => {
     const depts = c.system ? deptSubtree(c.slug.replace(/-/g, '_')) : [];
     c.count = q.val(`SELECT COUNT(*) FROM products p WHERE p.store_id=? AND p.status<>'archived' AND (p.category_id=?${depts.length ? ` OR p.department IN (${depts.map(() => '?').join(',')})` : ''})`, [req.store.id, c.id, ...depts]);
   }
-  res.json({ items: rows.map(serializeCategory), canManageTop: !!req.adminStore });
+  res.json({ items: rows.map(serializeCategory), canManageTop: true }); // the store owner controls every section of his own store
 }));
 
 function checkCatParent(storeId, parentId, selfId) {
@@ -1425,13 +1425,23 @@ r.post('/categories', h((req, res) => {
   // Owners can add their own sections (top-level or under a main one); platform (system) sections stay admin-managed.
   const norm = (x) => String(x || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ًٌٍَُِّْ]/g, '').replace(/\s+/g, ' ').trim();
   const mine = q.all('SELECT name_ar, name_en, system FROM categories WHERE store_id=?', [req.store.id]);
-  if (!req.adminStore && mine.filter((c) => !c.system).length >= 12) throw badRequest('too_many_sections', 'You reached the maximum number of sections.');
+  if (!req.adminStore && mine.filter((c) => !c.system).length >= 60) throw badRequest('too_many_sections', 'You reached the maximum number of sections.');
   if (mine.some((c) => norm(c.name_ar) === norm(d.name_ar) || norm(c.name_en) === norm(d.name_en))) throw badRequest('section_exists', 'A section with this name already exists.');
   // Same name (or plural/singular of it: فستان ~ فساتين) as an official section ANYWHERE in the tree = use that one, do not create a duplicate.
   const skelN = (x) => { const n = norm(x).replace(/(^| )ال/g, '$1').replace(/\s+/g, ''); return (n[0] || '') + n.slice(1).replace(/[اويىه]/g, ''); };
   const mineKey = [skelN(d.name_ar), skelN(d.name_en)].filter((k) => k.length >= 2);
   if (mineKey.length) {
     const hit = q.all('SELECT slug, name_ar, name_en, parent_slug FROM departments WHERE active=1').find((x) => mineKey.includes(skelN(x.name_ar)) || mineKey.includes(skelN(x.name_en)));
+    if (hit && !req.adminStore) {
+      // an official section this owner removed earlier: adding it again just brings it back
+      const catSlug = hit.slug.replace(/_/g, '-');
+      if (q.get('SELECT 1 AS x FROM store_hidden_sections WHERE store_id=? AND slug=?', [req.store.id, catSlug])) {
+        q.run('DELETE FROM store_hidden_sections WHERE store_id=? AND slug=?', [req.store.id, catSlug]);
+        ensureDeptCategories(req.store.id, [hit.slug]);
+        const back = q.get('SELECT * FROM categories WHERE store_id=? AND slug=?', [req.store.id, catSlug]);
+        if (back) { invalidateModaCatalogue(); return res.status(201).json({ category: serializeCategory({ ...back, count: 0 }), pending: false, restored: true }); }
+      }
+    }
     if (hit && !req.adminStore) throw new AppError(409, 'section_exists', 'This section already exists.', { existing: hit.slug, existing_name: hit.name_ar });
   }
   const parentId = checkCatParent(req.store.id, d.parent_id, null);
@@ -1470,9 +1480,8 @@ r.put('/categories/:id', h((req, res) => {
   const c = q.get('SELECT * FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!c) throw notFound('Category');
   const d = catSchema.parse(req.body);
-  if (!req.adminStore && c.system) throw badRequest('system_category', 'This section is managed by the platform admin.');
   let parentId;
-  if (req.adminStore && d.parent_id !== undefined) parentId = checkCatParent(req.store.id, d.parent_id, c.id);
+  if (d.parent_id !== undefined) parentId = checkCatParent(req.store.id, d.parent_id, c.id);
   update('categories', c.id, { name_ar: d.name_ar, name_en: d.name_en, media_id: d.media_id === undefined ? undefined : d.media_id, parent_id: parentId });
   res.json({ category: serializeCategory(q.get('SELECT * FROM categories WHERE id=?', [c.id])) });
 }));
@@ -1482,8 +1491,8 @@ r.put('/categories-order', h((req, res) => {
   res.status(204).end();
 }));
 r.delete('/categories/:id', h((req, res) => {
-  const cur = q.get('SELECT parent_id, system FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
-  if (!req.adminStore && cur && cur.system) throw badRequest('system_category', 'This section is managed by the platform admin.');
+  const cur = q.get('SELECT parent_id, system, slug FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
+  if (cur?.system) q.run('INSERT OR IGNORE INTO store_hidden_sections (store_id, slug) VALUES (?,?)', [req.store.id, cur.slug]); // removed from THIS store only; the platform department is untouched
   q.run('UPDATE categories SET parent_id=NULL WHERE parent_id=? AND store_id=?', [req.params.id, req.store.id]);
   q.run('DELETE FROM categories WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   res.status(204).end();

@@ -1,5 +1,5 @@
-import { forwardRef, useId, cloneElement, isValidElement } from 'react';
-import { ChevronDown, AlertCircle } from 'lucide-react';
+import { forwardRef, useId, useState, cloneElement, isValidElement } from 'react';
+import { ChevronDown, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { cx } from './cx.js';
 
 export function Field({ label, hint, error, optional, children, className, labelEnd, id: idProp }) {
@@ -30,18 +30,31 @@ export function Field({ label, hint, error, optional, children, className, label
 const base = 'w-full rounded-xl border bg-elevated text-fg placeholder:text-muted/70 transition duration-150 outline-none focus:border-ring focus:shadow-ring disabled:opacity-60';
 const border = (invalid) => (invalid ? 'border-sale focus:border-sale' : 'border-line-strong hover:border-fg/30');
 
-export const Input = forwardRef(function Input({ className, invalid, prefix, suffix, size = 'md', ...rest }, ref) {
+export const Input = forwardRef(function Input({ className, invalid, prefix, suffix, size = 'md', reveal = true, type, ...rest }, ref) {
   const h = size === 'lg' ? 'h-[52px] text-base' : size === 'sm' ? 'h-10 text-sm' : 'h-12 text-base';
+  const [shown, setShown] = useState(false);
+  // every password field gets a show/hide eye (pass reveal={false} if the page draws its own)
+  if (type === 'password' && reveal && !suffix) {
+    return (
+      <div dir={rest.dir} className={cx('relative flex items-center', className)}>
+        {prefix && <span className="pointer-events-none absolute start-3.5 text-sm text-muted">{prefix}</span>}
+        <input ref={ref} type={shown ? 'text' : 'password'} className={cx(base, border(invalid), h, prefix ? 'ps-12' : 'ps-3.5', 'pe-12')} {...rest} />
+        <button type="button" onClick={() => setShown((v) => !v)} aria-label={shown ? 'إخفاء كلمة السر' : 'إظهار كلمة السر'} aria-pressed={shown} title={shown ? 'إخفاء' : 'إظهار'} className="absolute end-1.5 grid h-10 w-10 place-items-center rounded-lg text-muted hover:bg-fg/[0.06] hover:text-fg">
+          {shown ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+        </button>
+      </div>
+    );
+  }
   if (prefix || suffix) {
     return (
       <div className={cx('relative flex items-center', className)}>
         {prefix && <span className="pointer-events-none absolute start-3.5 text-sm text-muted">{prefix}</span>}
-        <input ref={ref} className={cx(base, border(invalid), h, prefix ? 'ps-12' : 'ps-3.5', suffix ? 'pe-12' : 'pe-3.5')} {...rest} />
+        <input ref={ref} type={type} className={cx(base, border(invalid), h, prefix ? 'ps-12' : 'ps-3.5', suffix ? 'pe-12' : 'pe-3.5')} {...rest} />
         {suffix && <span className="pointer-events-none absolute end-3.5 text-sm text-muted">{suffix}</span>}
       </div>
     );
   }
-  return <input ref={ref} className={cx(base, border(invalid), h, 'px-3.5', className)} {...rest} />;
+  return <input ref={ref} type={type} className={cx(base, border(invalid), h, 'px-3.5', className)} {...rest} />;
 });
 
 export const Textarea = forwardRef(function Textarea({ className, invalid, rows = 4, ...rest }, ref) {

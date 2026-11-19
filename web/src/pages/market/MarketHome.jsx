@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, Store, MapPin, Sparkles, Camera, MessageSquare, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package, Shirt } from 'lucide-react';
+import { Search, Store, MapPin, Sparkles, Camera, MessageSquare, Truck, BarChart3, Smartphone, Palette, Banknote, Image as ImageIcon, ArrowRight, ShoppingBag, Heart, User, Package } from 'lucide-react';
 import { useApi } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
@@ -16,6 +16,7 @@ import StylistChat from '../../components/market/StylistChat.jsx';
 import ModaAvatar from '../../components/market/ModaAvatar.jsx';
 import WearThis from '../../components/market/WearThis.jsx';
 import RequestBanner from '../../components/market/RequestBanner.jsx';
+import CustomDesignBanner from '../../components/market/CustomDesignBanner.jsx';
 import LookOfDay from '../../components/market/LookOfDay.jsx';
 // the illustrated street is heavy SVG: load it in its own chunk so the first paint of the page is not delayed
 const StreetScene = lazy(() => import('../../components/market/StreetScene.jsx'));
@@ -173,6 +174,7 @@ export default function MarketHome() {
         {showWearThis && <WearThis className="h-full" />}
         <RequestBanner compact className={showWearThis ? 'h-full' : 'h-full md:col-span-2'} />
       </div>
+      {lang === 'ar' && <div className="container mt-5 sm:mt-7"><CustomDesignBanner /></div>}
       <FeaturedSlot placement="market_hero" />
 
       <div className="container mt-5 sm:mt-7">
@@ -221,15 +223,6 @@ export default function MarketHome() {
         </div>
       </section>
 
-      {lang === 'ar' && (
-        <section className="container mt-10">
-          <Link to="/custom-design" className="flex items-center gap-4 rounded-2xl border border-line bg-white p-4 transition hover:border-brand sm:p-5">
-            <span className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-[#EAF0F8] text-brand"><Shirt className="h-6 w-6" /></span>
-            <span className="min-w-0 flex-1"><span className="block font-bold text-[#03244D]">عاوز هدوم بتصميمك؟</span><span className="mt-0.5 block text-sm text-muted">لدفعة التخرّج أو الشركة أو المطعم أو الفريق. ابعت طلبك وهنكلمك.</span></span>
-            <ArrowRight className="h-4 w-4 shrink-0 text-muted rtl:rotate-180" />
-          </Link>
-        </section>
-      )}
       {/* owner CTA */}
       <section className="container mt-16">
         <div className="relative overflow-hidden rounded-[32px] border border-line bg-gradient-to-br from-[#EAF0F8] via-white to-white px-6 py-12 text-[#03244D] shadow-[0_18px_50px_rgba(3,36,77,.06)] sm:px-12 sm:py-16 lg:grid lg:grid-cols-2 lg:items-center lg:gap-12">

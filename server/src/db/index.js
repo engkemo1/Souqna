@@ -79,6 +79,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   // custom clothing design requests (graduation / company / restaurant / team ...): customer service calls back, partner shop or workshop executes
   db.exec(`CREATE TABLE IF NOT EXISTS custom_requests (id INTEGER PRIMARY KEY AUTOINCREMENT, number TEXT NOT NULL UNIQUE, name TEXT NOT NULL, phone TEXT NOT NULL, kind TEXT NOT NULL DEFAULT 'other', item TEXT, qty INTEGER, details TEXT, budget INTEGER, needed_by TEXT, contact_pref TEXT NOT NULL DEFAULT 'call', link TEXT, status TEXT NOT NULL DEFAULT 'new', store_id INTEGER, agreed_price INTEGER, deposit INTEGER, admin_note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_custom_requests_status ON custom_requests(status, created_at)');
+  // sections an owner removed from his OWN storefront: ensureDeptCategories() must not bring them back
+  db.exec(`CREATE TABLE IF NOT EXISTS store_hidden_sections (store_id INTEGER NOT NULL, slug TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')), PRIMARY KEY (store_id, slug))`);
   // customers' «this is not similar» votes on visual-search results: lets the admin see where the model is wrong
   db.exec(`CREATE TABLE IF NOT EXISTS visual_feedback (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL, model TEXT, family TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   db.exec('CREATE INDEX IF NOT EXISTS idx_visual_feedback_product ON visual_feedback(product_id)');

@@ -74,8 +74,8 @@ export default function Login() {
       <form onSubmit={submit} noValidate className="space-y-4">
         <Field label={t('auth.email')} error={fe.email}><Input type="email" autoComplete="email" autoCapitalize="none" autoCorrect="off" spellCheck={false} dir="ltr" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="store-name@twist.com" onFocus={(e) => { const el = e.target; if (!form.email) { setForm({ ...form, email: '@twist.com' }); setTimeout(() => el.setSelectionRange(0, 0), 0); } }} onBlur={() => { if (form.email === '@twist.com') setForm({ ...form, email: '' }); }} className="text-start" /></Field>
         <Field label={t('auth.password')} error={fe.password}>
-          <div className="relative">
-            <Input type={show ? 'text' : 'password'} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} dir="ltr" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pe-12 text-start" />
+          <div dir="ltr" className="relative">
+            <Input reveal={false} type={show ? 'text' : 'password'} autoComplete="current-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} dir="ltr" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} className="pe-12 text-start" />
             <button type="button" onClick={() => setShow((s) => !s)} aria-label={t('auth.showPassword')} className="absolute end-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-muted hover:text-fg">{show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>
           </div>
         </Field>

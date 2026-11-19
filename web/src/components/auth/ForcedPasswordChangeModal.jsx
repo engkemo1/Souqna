@@ -40,7 +40,7 @@ export default function ForcedPasswordChangeModal() {
     }
   };
 
-  const attrs = { dir: 'ltr', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false, type: show ? 'text' : 'password' };
+  const attrs = { dir: 'ltr', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false, reveal: false, type: show ? 'text' : 'password' };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-sm" role="dialog" aria-modal="true">
@@ -67,7 +67,7 @@ export default function ForcedPasswordChangeModal() {
           </Field>
 
           <Field label="كلمة المرور الجديدة" hint="8 أحرف أو أكثر">
-            <div className="relative">
+            <div dir="ltr" className="relative">
               <Input
                 {...attrs}
                 autoComplete="new-password"

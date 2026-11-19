@@ -17,7 +17,7 @@ import PageTransition from '../../components/PageTransition.jsx';
 import { SUBSECTION_SUGGESTIONS } from '../../lib/subsections.js';
 
 function CatRow({ c, onEdit, onDelete, onDragEnd, onAddSub, canTop, parent, t, tr }) {
-  const locked = !!c.system && !canTop; // أقسام الأدمن (الرئيسية وأنواعها) مفيهاش تعديل لصاحب المحل؛ اللي هو أضافه يعدّل فيه
+  const locked = false; // صاحب المحل بيتحكم في كل أقسام محله (تعديل، حذف، ترتيب)، ومفيش حاجة بتتأثر عند المنصة
   const controls = useDragControls();
   return (
     <Reorder.Item value={c} dragListener={false} dragControls={controls} onDragEnd={onDragEnd} className="list-none" whileDrag={{ scale: 1.02, boxShadow: '0 20px 40px -20px rgba(0,0,0,.3)' }}>
@@ -47,7 +47,7 @@ export default function Categories() {
   const [del, setDel] = useState(null);
   const [picks, setPicks] = useState([]);
   const items = data?.items || [];
-  const canTop = !!data?.canManageTop;
+  const canTop = true;
   const ref = useRef(items);
   ref.current = items;
 
@@ -91,7 +91,12 @@ export default function Categories() {
 
   return (
     <PageTransition>
-      <PageHeader title={t('categories.title')} subtitle={items.length > 1 ? t('categories.reorderHint') : null} actions={<Button icon={Plus} onClick={() => setForm({})}>{canTop ? t('categories.new') : 'قسم فرعي جديد'}</Button>} />
+      <PageHeader title={t('categories.title')} subtitle={items.length > 1 ? t('categories.reorderHint') : null} actions={<Button icon={Plus} onClick={() => setForm({})}>{t('categories.new')}</Button>} />
+      <div role="note" className="mb-5 max-w-3xl rounded-2xl border border-line bg-elevated p-4 text-sm leading-relaxed">
+        <b className="block">إيه هي الأقسام وليه مهمة؟</b>
+        <p className="mt-1 text-muted">الأقسام هي اللي بترتّب منتجاتك في صفحة محلك، والعميل بيدخل عليها يلاقي اللي عايزه أسرع (زي: هوديز، شتوي، أطفال). ده <b className="text-fg">محلك انت</b> وانت بتتحكم فيه بالكامل: ضيف أي قسم، غيّر اسمه، رتّبه بالسحب، أو امسحه، ومحدش تاني بيتأثر.</p>
+        <p className="mt-1 text-muted">مسح قسم بيشيله من محلك بس. المنتجات اللي جواه مش بتتمسح، وتقدر ترجّعه في أي وقت بإضافة قسم بنفس الاسم.</p>
+      </div>
       {error ? <ErrorState error={error} onRetry={reload} /> : !data ? <ListSkeleton rows={4} /> : !items.length ? (
         <EmptyState icon={FolderTree} title={t('categories.empty')} body={t('categories.emptyBody')} action={canTop ? <Button icon={Plus} onClick={() => setForm({})}>{t('categories.new')}</Button> : null} />
       ) : (
@@ -106,7 +111,7 @@ export default function Categories() {
             const parent = items.find((x) => x.id === Number(f.parent_id));
             const have = new Set(items.filter((x) => x.parentId === parent?.id).map((x) => x.name.ar));
             const sugg = (parent && SUBSECTION_SUGGESTIONS[parent.slug] || []).filter((x) => !have.has(x.ar));
-            if (!parent) return <p className="rounded-xl bg-secondary px-3 py-2 text-[13px] text-muted">اختار القسم الرئيسي الأول (تحت)، وهتظهرلك أقسام جاهزة تختار منها.</p>;
+            if (!parent) return <p className="rounded-xl bg-secondary px-3 py-2 text-[13px] text-muted">اكتب اسم القسم اللي عايزه. ولو ده قسم فرعي، اختار القسم الرئيسي من تحت وهتظهرلك أقسام جاهزة تختار منها.</p>;
             return sugg.length ? (
               <div>
                 <p className="mb-2 text-sm font-medium">اختار من الأقسام الجاهزة لـ «{tr(parent.name)}» أو اكتب قسمك تحت</p>
@@ -132,7 +137,7 @@ export default function Categories() {
           <Field label={t('editor.images')} optional={t('common.optional')}><MediaUploader value={f.media} onChange={(m) => setF((x) => ({ ...x, media: m.slice(-1) }))} kind="category" max={1} /></Field>
         </div>
       </Sheet>
-      <ConfirmDialog open={!!del} onClose={() => setDel(null)} onConfirm={remove} danger title={t('common.delete')} body={del ? t('categories.confirmDelete', { name: tr(del.name) }) : ''} confirmLabel={t('common.delete')} />
+      <ConfirmDialog open={!!del} onClose={() => setDel(null)} onConfirm={remove} danger title={t('common.delete')} body={del ? `هتمسح «${tr(del.name)}» من محلك بس. المنتجات اللي جواه مش هتتمسح${!del.parentId && items.some((x) => x.parentId === del.id) ? '، والأقسام الفرعية بتاعته هتبقى أقسام رئيسية' : ''}، والمنصة والمحلات التانية مش هتتأثر.` : ''} confirmLabel={t('common.delete')} />
     </PageTransition>
   );
 }

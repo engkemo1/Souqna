@@ -10,7 +10,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import { adminApi, useAdminApi, fmtNum, fmtDateTime, waLink } from './adminApi.js';
 
 export const CUSTOM_STATUS_AR = { new: 'جديد', contacted: 'اتكلمنا معاه', quoted: 'اتبعت السعر', agreed: 'اتفقنا', in_progress: 'بيتنفّذ', done: 'اتسلّم', cancelled: 'ملغي' };
-const KIND_AR = { graduation: 'دفعة تخرّج', company: 'شركة', restaurant: 'مطعم / كافيه', team: 'فريق / نادي', event: 'فعالية', other: 'أخرى' };
+const KIND_AR = { graduation: 'دفعة تخرّج', company: 'شركة', restaurant: 'مطعم / كافيه', team: 'فريق / نادي', baby: 'طقم سبوع', event: 'فعالية', other: 'أخرى' };
 const TONE = { new: 'warning', contacted: 'info', quoted: 'info', agreed: 'success', in_progress: 'violet', done: 'success', cancelled: 'danger' };
 
 function Row({ r, stores, onChanged }) {

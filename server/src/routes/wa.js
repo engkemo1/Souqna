@@ -24,7 +24,11 @@ r.get('/webhook', (req, res) => {
 });
 
 r.post('/webhook', (req, res) => {
-  if (!validSignature(req.rawBody, req.get('x-hub-signature-256'))) return res.sendStatus(401);
+  if (!validSignature(req.rawBody, req.get('x-hub-signature-256'))) {
+    console.warn('[wa] webhook rejected: bad/missing x-hub-signature-256 (WA_APP_SECRET must equal the Meta App Secret)');
+    return res.sendStatus(401);
+  }
+  console.log(`[wa] webhook in: ${(Array.isArray(req.body?.entry) ? req.body.entry : []).flatMap((e) => (e.changes || []).map((c) => c.field)).join(',') || 'empty'}`);
   res.sendStatus(200);
   const entries = Array.isArray(req.body?.entry) ? req.body.entry : [];
   for (const entry of entries) {

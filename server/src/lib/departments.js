@@ -68,10 +68,12 @@ export function deptAncestors(slug) {
 /** كل متجر ليه قسم (كاتيجوري) لكل قسم بيبيعه؛ صاحب المحل بيضيف أقسام فرعية جواهم. */
 export function ensureDeptCategories(storeId, slugs) {
   const by = new Map(deptRows().map((r) => [r.slug, r]));
+  const hidden = new Set(q.all('SELECT slug FROM store_hidden_sections WHERE store_id=?', [storeId]).map((r) => r.slug)); // the owner deleted these from his own store
   const ensure = (node, depth = 0) => {
     const catSlug = node.slug.replace(/_/g, '-');
     const ex = q.get('SELECT id FROM categories WHERE store_id=? AND slug=?', [storeId, catSlug]);
     if (ex) return ex.id;
+    if (hidden.has(catSlug)) return null;
     let parentId = null;
     const parent = node.parent_slug ? by.get(node.parent_slug) : null;
     if (parent && parent.parent_slug && depth < 3) parentId = ensure(parent, depth + 1); // أب هو قسم مش قسم رئيسي (مثال: فساتين أفراح تحت فساتين)

@@ -41,7 +41,7 @@ export default function Setup() {
             </div>
             <label className="grid gap-1 text-sm">الإيميل<input className="rounded-lg border px-3 py-2" value={info.email} readOnly dir="ltr" /></label>
             <label className="grid gap-1 text-sm">الباسورد الجديد
-              <span className="relative block">
+              <span dir="ltr" className="relative block">
                 <input className="w-full rounded-lg border px-3 py-2 pe-12" type={show ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)} minLength={8} required dir="ltr" autoComplete="new-password" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
                 <button type="button" onClick={() => setShow((v) => !v)} aria-label={show ? 'إخفاء الباسورد' : 'إظهار الباسورد'} className="absolute end-1 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-lg text-muted hover:text-fg">{show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}</button>
               </span>

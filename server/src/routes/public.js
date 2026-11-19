@@ -1568,7 +1568,7 @@ r.post('/sourcing/:token/respond', h((req, res) => {
 }));
 
 /* ---------------------------------------------------------- custom clothing design requests (customer service calls back; no in-site chat) */
-const CUSTOM_KINDS = ['graduation', 'company', 'restaurant', 'team', 'event', 'other'];
+const CUSTOM_KINDS = ['graduation', 'company', 'restaurant', 'team', 'baby', 'event', 'other'];
 r.post('/custom-requests', h((req, res) => {
   const ipBucket = `public:custom:${req.ip}`;
   checkRateLimit(ipBucket, { max: 6, windowMs: 3600e3, record: false, code: 'rate_limited', message: 'Too many requests, try again later.' });

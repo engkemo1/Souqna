@@ -208,7 +208,7 @@ export function normalizeCampaign(body, { partial = false } = {}) {
   out.cta_ar = text('cta_ar', 30); out.cta_en = text('cta_en', 30);
   out.badge_ar = text('badge_ar', 24); out.badge_en = text('badge_en', 24);
 
-  const dest = safeUrl(b.destination_url);
+  const dest = String(b.destination_url ?? '').trim() === '#none' ? '#none' : safeUrl(b.destination_url); // '#none' = display-only ad, not clickable
   if (dest === null) f.destination_url = 'bad_url'; else out.destination_url = dest;
   for (const k of ['desktop_image', 'mobile_image']) { const u = safeImage(b[k]); if (u === null) f[k] = 'bad_url'; else out[k] = u; }
 
@@ -359,7 +359,7 @@ function publicShape(row, placement, liveByStore, mediaCache) {
   const href = destinationOf(row);
   return {
     id: row.id, type: row.type, placement, title, subtitle, cta: biOf(row, 'cta'), badge: biOf(row, 'badge'),
-    href, external: /^https?:/i.test(href),
+    href, external: /^https?:/i.test(href), noClick: href === '#none',
     image: { desktop: row.desktop_image || null, mobile: row.mobile_image || null, offer: offer?.image || null },
     bg: row.background_color, color: row.text_color, ctaStyle: row.cta_style, align: row.text_align || 'start', overlay: row.overlay ?? 65,
     layout: { width: row.layout_width || 'wide', height: row.layout_height || 'm', align: row.layout_align || 'center' },
