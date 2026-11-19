@@ -14,6 +14,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { fetchWithRetry } from './http-client.js';
 import sharp from 'sharp';
 
 const MODEL_URL = process.env.BG_MODEL_URL || 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx';
@@ -34,7 +35,7 @@ async function ensureModel() {
     downloading = (async () => {
       await fsp.mkdir(DIR, { recursive: true });
       const tmp = `${CACHED}.${process.pid}.part`;
-      const res = await fetch(MODEL_URL);
+      const res = await fetchWithRetry(MODEL_URL, {}, { timeoutMs: 60_000, retries: 2, circuitKey: 'model-download' });
       if (!res.ok || !res.body) throw new Error(`model download ${res.status}`);
       await pipeline(Readable.fromWeb(res.body), fs.createWriteStream(tmp));
       const st = await fsp.stat(tmp);

@@ -6,6 +6,7 @@
  */
 import sharp from 'sharp';
 import { recordAi } from './ai-usage.js';
+import { fetchWithRetry } from './http-client.js';
 import { randomUUID } from 'node:crypto';
 import { q, tx } from '../db/index.js';
 import { listDepartments } from './departments.js';
@@ -408,13 +409,19 @@ async function callGemini(system, messages) {
   let lastErr = null;
   for (const model of models) {
     for (const thinking of [true, false]) {
-      const res = await fetch(`${base}/models/${model}:generateContent`, {
-        method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': geminiKey() },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] }, contents,
-          generationConfig: { temperature: 0.5, maxOutputTokens: 900, responseMimeType: 'application/json', ...(thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
-        }), signal: AbortSignal.timeout(25000),
-      });
+      const res = await fetchWithRetry(
+        `${base}/models/${model}:generateContent`,
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-goog-api-key': geminiKey() },
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents,
+            generationConfig: { temperature: 0.5, maxOutputTokens: 900, responseMimeType: 'application/json', ...(thinking ? { thinkingConfig: { thinkingBudget: 0 } } : {}) },
+          }),
+        },
+        { timeoutMs: 25_000, retries: 0, circuitKey: 'gemini-ai' },
+      );
       const j = await res.json().catch(() => ({}));
       if (res.ok) { geminiGoodModel = model; lastError = ''; recordAi('gemini', 'moda', 'ok', '', model); return (j.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join(''); }
       lastErr = new Error(`Gemini ${res.status} (${model}): ${JSON.stringify(j.error || j).slice(0, 160)}`);
@@ -436,7 +443,11 @@ async function callCompat(name, system, messages) {
     try {
       const body = { model, messages: [{ role: 'system', content: system }, ...messages], max_tokens: 1600, temperature: 0.4 };
       if (c.effort && /gpt-oss/.test(model)) body.reasoning_effort = 'low';
-      const res = await fetch(`${c.base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${process.env[c.key]}` }, body: JSON.stringify(body), signal: AbortSignal.timeout(40000) });
+      const res = await fetchWithRetry(
+        `${c.base}/chat/completions`,
+        { method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${process.env[c.key]}` }, body: JSON.stringify(body) },
+        { timeoutMs: 40_000, retries: 0, circuitKey: `llm-${name}` },
+      );
       if (!res.ok) { const t = (await res.text()).slice(0, 160); const e = new Error(`${c.label} ${res.status} (${model}): ${t}`); e.status = res.status; throw e; }
       const j = await res.json();
       const out = j.choices?.[0]?.message?.content || '';
@@ -456,27 +467,39 @@ export async function callLlm(provider, system, messages) {
   if (COMPAT[provider]) return callCompat(provider, system, messages);
   if (provider === 'extra') {
     const c = extraCfg();
-    const res = await fetch(`${c.base}/chat/completions`, {
-      method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${c.key}` },
-      body: JSON.stringify({ model: c.model, messages: [{ role: 'system', content: system }, ...messages], max_tokens: 1100, temperature: 0.4 }), signal: AbortSignal.timeout(40000),
-    });
+    const res = await fetchWithRetry(
+      `${c.base}/chat/completions`,
+      {
+        method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${c.key}` },
+        body: JSON.stringify({ model: c.model, messages: [{ role: 'system', content: system }, ...messages], max_tokens: 1100, temperature: 0.4 }),
+      },
+      { timeoutMs: 40_000, retries: 0, circuitKey: 'extra-ai' },
+    );
     if (!res.ok) throw new Error(`Extra AI ${res.status} (${c.model}): ${(await res.text()).slice(0, 160)}`);
     const j = await res.json();
     return j.choices?.[0]?.message?.content || '';
   }
   if (provider === 'anthropic') {
-    const res = await fetch(process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages', {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': anthropicKey(), 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: process.env.STYLIST_MODEL || 'claude-haiku-4-5', max_tokens: 1100, temperature: 0.4, system, messages }), signal: AbortSignal.timeout(30000),
-    });
+    const res = await fetchWithRetry(
+      process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages',
+      {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': anthropicKey(), 'anthropic-version': '2023-06-01' },
+        body: JSON.stringify({ model: process.env.STYLIST_MODEL || 'claude-haiku-4-5', max_tokens: 1100, temperature: 0.4, system, messages }),
+      },
+      { timeoutMs: 30_000, retries: 0, circuitKey: 'anthropic-ai' },
+    );
     if (!res.ok) throw new Error(`Anthropic ${res.status}: ${(await res.text()).slice(0, 160)}`);
     const j = await res.json();
     return (j.content || []).map((c) => c.text || '').join('');
   }
-  const res = await fetch(`${process.env.CF_API_BASE || 'https://api.cloudflare.com/client/v4'}/accounts/${cfAccount()}/ai/run/${process.env.STYLIST_CF_MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast'}`, {
-    method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${cfToken()}` },
-    body: JSON.stringify({ messages: [{ role: 'system', content: system }, ...messages], response_format: { type: 'json_object' }, max_tokens: 1100, temperature: 0.4 }), signal: AbortSignal.timeout(40000),
-  });
+  const res = await fetchWithRetry(
+    `${process.env.CF_API_BASE || 'https://api.cloudflare.com/client/v4'}/accounts/${cfAccount()}/ai/run/${process.env.STYLIST_CF_MODEL || '@cf/meta/llama-3.3-70b-instruct-fp8-fast'}`,
+    {
+      method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${cfToken()}` },
+      body: JSON.stringify({ messages: [{ role: 'system', content: system }, ...messages], response_format: { type: 'json_object' }, max_tokens: 1100, temperature: 0.4 }),
+    },
+    { timeoutMs: 40_000, retries: 0, circuitKey: 'cloudflare-ai' },
+  );
   const j = await res.json().catch(() => ({}));
   if (!res.ok || j.success === false) throw new Error(`Cloudflare AI ${res.status}: ${JSON.stringify(j.errors || j).slice(0, 160)}`);
   const response = j.result?.response ?? j.result?.text ?? '';

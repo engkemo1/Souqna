@@ -4,6 +4,7 @@
  */
 import crypto from 'node:crypto';
 import { config } from '../config.js';
+import { fetchWithRetry } from './http-client.js';
 
 const c = config.r2;
 export const r2Enabled = Boolean(c.accountId && c.accessKeyId && c.secretAccessKey && c.bucket && c.publicUrl);
@@ -34,7 +35,11 @@ async function request(method, key, body, contentType, acct = { bucket: c.bucket
   const signature = crypto.createHmac('sha256', kSig).update(toSign).digest('hex');
   headers.authorization = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${scope}, SignedHeaders=${names.join(';')}, Signature=${signature}`;
   delete headers.host;
-  const res = await fetch(`${endpoint}${pathName}`, { method, headers, body: method === 'PUT' ? payload : undefined });
+  const res = await fetchWithRetry(
+    `${endpoint}${pathName}`,
+    { method, headers, body: method === 'PUT' ? payload : undefined },
+    { timeoutMs: 30_000, retries: method === 'GET' ? 2 : 1, circuitKey: 'cloudflare-r2' },
+  );
   if (!res.ok && !(method === 'DELETE' && res.status === 404)) {
     throw new Error(`R2 ${method} ${key} failed: ${res.status} ${(await res.text()).slice(0, 200)}`);
   }

@@ -3,11 +3,12 @@ import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { config } from '../config.js';
 import { AppError } from './errors.js';
+import { fetchWithRetry } from './http-client.js';
 
 let cache = { at: 0, keys: new Map() };
 async function googleKeys(force = false) {
   if (!force && cache.keys.size && Date.now() - cache.at < 3600e3) return cache.keys;
-  const r = await fetch('https://www.googleapis.com/oauth2/v3/certs', { signal: AbortSignal.timeout(8000) });
+  const r = await fetchWithRetry('https://www.googleapis.com/oauth2/v3/certs', {}, { timeoutMs: 8000, retries: 2, circuitKey: 'google-oauth' });
   if (!r.ok) throw new Error(`google certs ${r.status}`);
   const { keys } = await r.json();
   cache = { at: Date.now(), keys: new Map((keys || []).map((k) => [k.kid, crypto.createPublicKey({ key: k, format: 'jwk' })])) };

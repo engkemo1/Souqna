@@ -10,6 +10,7 @@
 import crypto from 'node:crypto';
 import sharp from 'sharp';
 import { recordAi, usageDay } from './ai-usage.js';
+import { fetchWithRetry } from './http-client.js';
 
 const key = () => process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
 export const reviewEnabled = () => process.env.CUTOUT_REVIEW !== '0' && Boolean(key() || process.env.ANTHROPIC_API_KEY);
@@ -51,9 +52,15 @@ async function askGemini(original, result) {
   const day = usageDay();
   for (const model of [...new Set([goodModel, ...MODELS()].filter(Boolean))]) {
     if (usedUp.get(model) === day) { limited = true; continue; } // already told "limit reached" today: don't ask again until it renews
-    const res = await fetch(`${base}/models/${model}:generateContent`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key() }, body: JSON.stringify(body), signal: AbortSignal.timeout(Number(process.env.CUTOUT_REVIEW_TIMEOUT_MS) || 15000),
-    });
+    const res = await fetchWithRetry(
+      `${base}/models/${model}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': key() },
+        body: JSON.stringify(body),
+      },
+      { timeoutMs: Number(process.env.CUTOUT_REVIEW_TIMEOUT_MS) || 15_000, retries: 0, circuitKey: 'gemini-ai' },
+    );
     const j = await res.json().catch(() => ({}));
     if (res.ok) {
       goodModel = model;
@@ -74,11 +81,15 @@ const anthropicKey = () => process.env.ANTHROPIC_API_KEY || '';
 async function askClaude(original, result) {
   const img = async (b) => ({ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: await b64(b) } });
   const model = process.env.CUTOUT_REVIEW_CLAUDE || 'claude-haiku-4-5';
-  const res = await fetch(process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages', {
-    method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': anthropicKey(), 'anthropic-version': '2023-06-01' },
-    body: JSON.stringify({ model, max_tokens: 200, temperature: 0, messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT }, await img(original), await img(result)] }] }),
-    signal: AbortSignal.timeout(Number(process.env.CUTOUT_REVIEW_TIMEOUT_MS) || 20000),
-  });
+  const res = await fetchWithRetry(
+    process.env.ANTHROPIC_URL || 'https://api.anthropic.com/v1/messages',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': anthropicKey(), 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model, max_tokens: 200, temperature: 0, messages: [{ role: 'user', content: [{ type: 'text', text: PROMPT }, await img(original), await img(result)] }] }),
+    },
+    { timeoutMs: Number(process.env.CUTOUT_REVIEW_TIMEOUT_MS) || 20_000, retries: 0, circuitKey: 'anthropic-ai' },
+  );
   if (!res.ok) {
     const msg = `Claude ${res.status}: ${(await res.text()).slice(0, 160)}`;
     recordAi('anthropic', 'photo_check', res.status === 429 ? 'limited' : 'failed', msg, model);

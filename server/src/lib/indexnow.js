@@ -1,5 +1,6 @@
 import { q } from '../db/index.js';
 import { config } from '../config.js';
+import { fetchWithRetry } from './http-client.js';
 
 /**
  * IndexNow: tells Bing (and other engines that support it) about new pages right away instead of waiting for a crawl.
@@ -14,12 +15,15 @@ export const indexNowKey = () => (KEY && KEY !== 'off' ? KEY : null);
 
 async function submit(origin, urls) {
   for (let i = 0; i < urls.length; i += 9000) {
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json; charset=utf-8' },
-      body: JSON.stringify({ host: new URL(origin).host, key: KEY, keyLocation: `${origin}/${KEY}.txt`, urlList: urls.slice(i, i + 9000) }),
-      signal: AbortSignal.timeout(20000),
-    });
+    const res = await fetchWithRetry(
+      ENDPOINT,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=utf-8' },
+        body: JSON.stringify({ host: new URL(origin).host, key: KEY, keyLocation: `${origin}/${KEY}.txt`, urlList: urls.slice(i, i + 9000) }),
+      },
+      { timeoutMs: 15_000, retries: 2, circuitKey: 'indexnow' },
+    );
     if (res.status !== 200 && res.status !== 202) throw new Error(`IndexNow answered ${res.status}`);
   }
 }

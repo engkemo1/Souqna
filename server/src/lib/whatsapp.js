@@ -8,6 +8,7 @@
  */
 import { config } from '../config.js';
 import { q } from '../db/index.js';
+import { fetchWithRetry } from './http-client.js';
 
 /** 01012345678 -> 201012345678 */
 export function toWaNumber(raw) {
@@ -53,7 +54,15 @@ export async function sendWaTest(rawTo, opts = {}) {
     const parameters = Array.from({ length: n }, (_, i) => ({ type: 'text', text: sample[i] || `تجربة ${i + 1}` }));
     template = { name, language: { code: config.wa.lang }, components: n ? [{ type: 'body', parameters }] : [] };
   } else template = { name: 'hello_world', language: { code: 'en_US' } };
-  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, { method: 'POST', headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template }) });
+  const res = await fetchWithRetry(
+    `${config.wa.apiBase}/${config.wa.phoneId}/messages`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template }),
+    },
+    { timeoutMs: 10_000, retries: 0, circuitKey: 'meta-whatsapp' },
+  );
   const txt = await res.text().catch(() => '');
   if (!res.ok) throw new Error(`Meta ${res.status}: ${txt.slice(0, 300)}`);
   return { sent: true, to, template: template.name };
@@ -80,16 +89,20 @@ export async function sendNewOrderAlert(store, orderId, toOverride) {
   const params = [store.name_ar, o.number, o.customer_name, o.phone, address, String(o.total), summary]
     .map((text) => ({ type: 'text', text: String(text || '-').slice(0, 1000) }));
 
-  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messaging_product: 'whatsapp',
-      to,
-      type: 'template',
-      template: { name: config.wa.ownerBtnTemplate || config.wa.template, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }, ...(config.wa.ownerBtnTemplate ? ownerButtons(orderId) : [])] },
-    }),
-  });
+  const res = await fetchWithRetry(
+    `${config.wa.apiBase}/${config.wa.phoneId}/messages`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        to,
+        type: 'template',
+        template: { name: config.wa.ownerBtnTemplate || config.wa.template, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }, ...(config.wa.ownerBtnTemplate ? ownerButtons(orderId) : [])] },
+      }),
+    },
+    { timeoutMs: 10_000, retries: 0, circuitKey: 'meta-whatsapp' },
+  );
   if (!res.ok) {
     const detail = await res.text().catch(() => '');
     throw new Error(`whatsapp ${res.status}: ${detail.slice(0, 300)}`);
@@ -109,12 +122,16 @@ export async function sendPlatformDeliveryAlert(orderId) {
   const customerAddr = [o.address, o.city, o.governorate].filter(Boolean).join('، ');
   const params = [o.store_name, o.number, o.store_phone, o.store_address, o.customer_name, o.phone, customerAddr, String(o.total)]
     .map((text) => ({ type: 'text', text: String(text || '-').slice(0, 300) }));
-  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to: config.platformWa, type: 'template',
-      template: { name: config.wa.platformTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }] } }),
-  });
+  const res = await fetchWithRetry(
+    `${config.wa.apiBase}/${config.wa.phoneId}/messages`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: config.platformWa, type: 'template',
+        template: { name: config.wa.platformTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }] } }),
+    },
+    { timeoutMs: 10_000, retries: 0, circuitKey: 'meta-whatsapp' },
+  );
   if (!res.ok) throw new Error(`whatsapp ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
   return { sent: true, to: config.platformWa };
 }
@@ -137,12 +154,16 @@ export async function sendPlatformServiceAlert(requestId) {
   const planLabel = r.type === 'design_banner' ? 'تصميم بنر' : r.type === 'design_cover' ? 'تصميم غلاف' : r.plan === 'monthly' ? 'اشتراك شهري' : 'مرة واحدة';
   const params = [r.store_name, planLabel, r.items_count ? String(r.items_count) : '-', r.preferred_date || 'أي وقت', r.phone || r.store_phone, r.notes || '-']
     .map((text) => ({ type: 'text', text: String(text || '-').slice(0, 300) }));
-  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to: config.platformWa, type: 'template',
-      template: { name: config.wa.serviceTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }] } }),
-  });
+  const res = await fetchWithRetry(
+    `${config.wa.apiBase}/${config.wa.phoneId}/messages`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: config.platformWa, type: 'template',
+        template: { name: config.wa.serviceTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }] } }),
+    },
+    { timeoutMs: 10_000, retries: 0, circuitKey: 'meta-whatsapp' },
+  );
   if (!res.ok) throw new Error(`whatsapp ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
   return { sent: true, to: config.platformWa };
 }
@@ -155,12 +176,16 @@ export function notifyPlatformService(requestId) {
 /** Short team alert (new store, new section request). Needs an approved one-variable template named in WA_ALERT_TEMPLATE; skipped otherwise. */
 export async function sendPlatformAlert(text) {
   if (!isWhatsAppConfigured() || !config.wa.alertTemplate) return { skipped: 'not_configured' };
-  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to: config.platformWa, type: 'template',
-      template: { name: config.wa.alertTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: [{ type: 'text', text: String(text).replace(/\s+/g, ' ').slice(0, 300) }] }] } }),
-  });
+  const res = await fetchWithRetry(
+    `${config.wa.apiBase}/${config.wa.phoneId}/messages`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to: config.platformWa, type: 'template',
+        template: { name: config.wa.alertTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: [{ type: 'text', text: String(text).replace(/\s+/g, ' ').slice(0, 300) }] }] } }),
+    },
+    { timeoutMs: 10_000, retries: 0, circuitKey: 'meta-whatsapp' },
+  );
   if (!res.ok) throw new Error(`whatsapp ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
   return { sent: true, to: config.platformWa };
 }
@@ -178,11 +203,15 @@ export function notifyGuestOrderWhatsApp({ phone, name, number, text, token, ord
     const to = toWaNumber(phone);
     if (!to) return;
     const params = [name || 'عميلنا', number, text, `${config.siteUrl}/track/${token}`].map((v) => ({ type: 'text', text: String(v || '-').replace(/\s+/g, ' ').slice(0, 900) }));
-    fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: (orderId && config.wa.customerBtnTemplate) || config.wa.customerTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }, ...(orderId && config.wa.customerBtnTemplate ? customerButtons(orderId) : [])] } }),
-    }).then(async (res) => { if (!res.ok) console.error(`[whatsapp] customer update ${number} failed: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`); })
+    fetchWithRetry(
+      `${config.wa.apiBase}/${config.wa.phoneId}/messages`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: (orderId && config.wa.customerBtnTemplate) || config.wa.customerTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }, ...(orderId && config.wa.customerBtnTemplate ? customerButtons(orderId) : [])] } }),
+      },
+      { timeoutMs: 10_000, retries: 0, circuitKey: 'meta-whatsapp' },
+    ).then(async (res) => { if (!res.ok) console.error(`[whatsapp] customer update ${number} failed: ${res.status} ${(await res.text().catch(() => '')).slice(0, 200)}`); })
       .catch((e) => console.error(`[whatsapp] customer update ${number} failed: ${e.message}`));
   } catch (e) { console.error(`[whatsapp] customer update failed: ${e.message}`); }
 }
@@ -206,11 +235,15 @@ export async function sendCustomerOrderTest(orderId, rawTo) {
   const o = q.get('SELECT id, number, customer_name, track_token FROM orders WHERE id=?', [orderId]);
   if (!o) throw new Error('الأوردر مش موجود');
   const params = [o.customer_name || 'عميلنا', o.number, 'وصلنا طلبك وبانتظار تأكيد المحل. هنبلغك أول ما يتأكد', `${config.siteUrl}/track/${o.track_token || ''}`].map((v) => ({ type: 'text', text: String(v || '-').replace(/\s+/g, ' ').slice(0, 900) }));
-  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: config.wa.customerBtnTemplate || config.wa.customerTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }, ...(config.wa.customerBtnTemplate ? customerButtons(o.id) : [])] } }),
-  });
+  const res = await fetchWithRetry(
+    `${config.wa.apiBase}/${config.wa.phoneId}/messages`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', to, type: 'template', template: { name: config.wa.customerBtnTemplate || config.wa.customerTemplate, language: { code: config.wa.lang }, components: [{ type: 'body', parameters: params }, ...(config.wa.customerBtnTemplate ? customerButtons(o.id) : [])] } }),
+    },
+    { timeoutMs: 10_000, retries: 0, circuitKey: 'meta-whatsapp' },
+  );
   if (!res.ok) throw new Error(`Meta ${res.status}: ${(await res.text().catch(() => '')).slice(0, 300)}`);
   return { sent: true, to, order: o.number };
 }

@@ -4,6 +4,7 @@
  */
 import crypto from 'node:crypto';
 import { config } from '../config.js';
+import { fetchWithRetry } from './http-client.js';
 
 export const waReady = () => Boolean(config.wa.enabled && config.wa.token && config.wa.phoneId);
 export const waAuthReady = () => waReady() && Boolean(config.wa.authTemplate);
@@ -18,11 +19,15 @@ export function waNumber(raw) {
 }
 
 async function post(body) {
-  const res = await fetch(`${config.wa.apiBase}/${config.wa.phoneId}/messages`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messaging_product: 'whatsapp', ...body }),
-  });
+  const res = await fetchWithRetry(
+    `${config.wa.apiBase}/${config.wa.phoneId}/messages`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${config.wa.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messaging_product: 'whatsapp', ...body }),
+    },
+    { timeoutMs: 8000, retries: 0, circuitKey: 'meta-whatsapp' },
+  );
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
     const err = new Error(`whatsapp ${res.status}: ${JSON.stringify(data?.error || data).slice(0, 300)}`);
@@ -70,8 +75,10 @@ export function validSignature(rawBody, header) {
 /** Download an inbound photo/document by its media id. */
 export async function downloadMedia(mediaId) {
   const auth = { Authorization: `Bearer ${config.wa.token}` };
-  const meta = await fetch(`${config.wa.apiBase}/${mediaId}`, { headers: auth }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`media meta ${r.status}`))));
-  const res = await fetch(meta.url, { headers: auth });
+  const metaRes = await fetchWithRetry(`${config.wa.apiBase}/${mediaId}`, { headers: auth }, { timeoutMs: 10_000, retries: 1, circuitKey: 'meta-whatsapp-media' });
+  if (!metaRes.ok) throw new Error(`media meta ${metaRes.status}`);
+  const meta = await metaRes.json();
+  const res = await fetchWithRetry(meta.url, { headers: auth }, { timeoutMs: 20_000, retries: 1, circuitKey: 'meta-whatsapp-media' });
   if (!res.ok) throw new Error(`media download ${res.status}`);
   return { buffer: Buffer.from(await res.arrayBuffer()), mime: meta.mime_type || '' };
 }
