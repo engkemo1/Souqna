@@ -5,9 +5,7 @@
 #   docker compose up -d
 #
 # Data layout:
-#   ./data/db/     → SQLite database (backed up to R2 via Litestream)
-#   ./data/media/  → uploaded product photos (back up separately to object storage)
-#   ./data/backups/→ local daily backups (SQL dumps)
+#   app_data volume → /app/server/data: souqna.db (SQLite, Litestream to R2), media/, backups/
 #
 # TLS is handled by Caddy (caddy service); the app never does TLS itself.
 
@@ -26,13 +24,13 @@ services:
     environment:
       NODE_ENV: production
       PORT: "10000"
-      DB_FILE: /app/server/data/db/souqna.db
+      DB_FILE: /app/server/data/souqna.db
       MEDIA_DIR: /app/server/data/media
       BACKUP_DIR: /app/server/data/backups
     volumes:
-      - db_data:/app/server/data/db
-      - media_data:/app/server/data/media
-      - backup_data:/app/server/data/backups
+      # ONE volume for the whole data dir (database, media, backups, litestream). Do not split it:
+      # the live production database sits at /app/server/data/souqna.db inside this volume.
+      - app_data:/app/server/data
     networks:
       - internal
     # Only expose internally to Caddy — do NOT bind a host port.
@@ -92,8 +90,6 @@ networks:
     driver: bridge
 
 volumes:
-  db_data:
-  media_data:
-  backup_data:
+  app_data:
   caddy_data:
   caddy_config:
