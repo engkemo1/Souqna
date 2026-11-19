@@ -34,6 +34,9 @@ function route(path, headers) {
 let onUnauthorized = () => {};
 export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 
+let onPasswordChangeRequired = () => {};
+export const setPasswordChangeRequiredHandler = (fn) => { onPasswordChangeRequired = fn; };
+
 export async function api(rawPath, { method = 'GET', body, signal, headers: rawHeaders = {} } = {}) {
   const { path, headers, scoped } = route(rawPath, rawHeaders);
   const token = scoped ? null : tokenStore.get();
@@ -60,6 +63,7 @@ export async function api(rawPath, { method = 'GET', body, signal, headers: rawH
   if (!res.ok) {
     const err = data?.error || {};
     if (res.status === 401 && path.startsWith('/owner') && !scoped) onUnauthorized();
+    if (res.status === 403 && err.code === 'password_change_required') onPasswordChangeRequired();
     throw new ApiError(res.status, err.code || 'server_error', err.message || 'Request failed', err.fields);
   }
   return data;

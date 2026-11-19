@@ -20,3 +20,14 @@ This document records autonomous engineering decisions made while hardening Twis
 ## ADR-004: Canonical Deployment Target — Docker Compose + Caddy + Litestream R2
 - **Context:** The repo contained conflicting references to Render Free (`render.yaml`), Railway, and a VPS (`/opt/sewqna`). Render Free sleeps and has an ephemeral filesystem unsuitable for SQLite.
 - **Decision:** Standardize on the single-container Docker image running under `docker-compose.yml` (compatible with any Linux VPS or Railway container) fronted by Caddy for automatic HTTPS/HSTS/compression, with Litestream streaming SQLite WAL to a private Cloudflare R2 bucket. Mark `render.yaml` clearly as non-production/deprecated.
+
+## ADR-005: Client Session Lifecycle, Token Transport, and Forced Password Change (QA-02)
+- **Context:**
+  1. Storing tokens in `localStorage` leaves sessions vulnerable to client script theft, but purely relying on cookies breaks the offline POS where requests must sync across connection drops.
+  2. Tokens expire after 1 hour, causing sudden 401 unhandled errors for long-open dashboards or cashier screens.
+  3. Temporary seeded owner passwords require immediate password resets (`must_change_password=1`), returning `403 password_change_required` from the server.
+- **Decision:**
+  1. **Dual Transport Strategy:** Server sets an `HttpOnly; SameSite=Lax; Path=/api` cookie (`twist_owner_token`) on all login/me/change-password responses. The client app maintains the token in memory/storage to provide `Authorization: Bearer` strictly for offline-capable POS flows and fallback API calls.
+  2. **Silent Refresh:** The client `AuthProvider` proactively invokes `GET /api/auth/me` every 30 minutes (~50% of the 1-hour token lifetime) and upon tab focus / visibility restoration (with a 5-minute debounce). This keeps the session fresh indefinitely while the user is actively working.
+  3. **Offline POS Resilience:** Unsynced sales queue in IndexedDB (`twist-pos`). If an attempted sync returns 401 due to token expiry, `usePos` flags `authExpired=true` without clearing or discarding any queued sales. The cashier is prompted to re-authenticate, after which the queue automatically flushes to the server.
+  4. **Enforced Password Change:** Global API interceptor listens for `403` with `error.code: 'password_change_required'` (or `user.mustChangePassword: true`) and surfaces `ForcedPasswordChangeModal`, blocking navigation until a valid new password is set.

@@ -13,6 +13,7 @@ import { BrandMark } from '../../components/market/Brand.jsx';
 import { StoreLogo } from '../../components/store/StoreChrome.jsx';
 import LangToggle from '../../components/LangToggle.jsx';
 import { StoreQrButton } from '../../components/dash/QrShare.jsx';
+import ForcedPasswordChangeModal from '../../components/auth/ForcedPasswordChangeModal.jsx';
 import Skeleton from '../../components/ui/Skeleton.jsx';
 import { cx } from '../../components/ui/cx.js';
 
@@ -224,6 +225,7 @@ export default function DashboardLayout() {
           <Outlet />
         </main>
       </div>
+      <ForcedPasswordChangeModal />
       <MobileNav pending={pending} />
     </div>
   );
