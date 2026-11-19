@@ -1131,6 +1131,13 @@ r.put('/look-of-day', h(async (req, res) => {
 
 /* ---- visual search settings (on/off, model, free daily quota) ---- */
 r.get('/visual', h((_req, res) => res.json(visualStatus())));
+r.get('/visual/feedback', h((_req, res) => {
+  const total = q.val("SELECT COUNT(*) FROM visual_feedback WHERE created_at >= datetime('now','-30 days')");
+  const items = q.all(`SELECT f.product_id AS id, p.name_ar, s.name_ar AS store_name, COUNT(*) AS votes, MAX(f.model) AS model
+    FROM visual_feedback f JOIN products p ON p.id=f.product_id JOIN stores s ON s.id=p.store_id
+    WHERE f.created_at >= datetime('now','-30 days') GROUP BY f.product_id ORDER BY votes DESC LIMIT 20`);
+  res.json({ total, items });
+}));
 r.get('/visual/demand', h((req, res) => {
   const days = [7, 30, 90].includes(Number(req.query.days)) ? Number(req.query.days) : 30;
   res.json({ items: unmetDemand({ days, limit: 20 }), totals: demandTotals({ days }), ownersEnabled: demandForOwnersEnabled() });

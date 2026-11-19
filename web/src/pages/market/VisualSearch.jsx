@@ -44,6 +44,7 @@ export default function VisualSearch() {
   const input = useRef(null);
   const requestId = useRef(0);
   const [prog, setProg] = useState({ upload: 0, analysisStart: 0, expected: 6000 });
+  const [voted, setVoted] = useState(() => new Set());
   const deptRef = useRef('');
   const canPasteBtn = typeof navigator !== 'undefined' && Boolean(navigator.clipboard?.read);
 
@@ -109,6 +110,12 @@ export default function VisualSearch() {
   const similar = [...new Map(similarSource.map((p) => [`${p.store.slug}-${p.id}`, p])).values()].slice(0, 12);
   const detectedLabel = (state.data?.detected || []).map(groupLabel).find(Boolean) || '';
   const requestHref = `/request?from=visual&title=${encodeURIComponent(t('visual.requestTitle', { item: detectedLabel || t('visual.itemFallback') }))}`;
+
+  // «مش شبه»: tell us a result does not match, so we can fix the catalogue / model. Counted only; the shopper just gets a thank-you.
+  const reportBad = async (p, family) => {
+    setVoted((v) => new Set(v).add(p.id));
+    try { await api('/visual-feedback', { method: 'POST', body: { product_id: p.id, model: state.data?.model || '', family: family || '' } }); toast({ title: lang === 'ar' ? 'شكراً، هنراجعها' : 'Thanks, we will review it' }); } catch { /* best effort */ }
+  };
 
   const share = async () => {
     try {
@@ -200,6 +207,7 @@ export default function VisualSearch() {
         )}
 
         <div className="mx-auto mt-8 max-w-6xl">
+          {state.data && state.data.reliable === false && !state.loading && <p role="note" className="mx-auto mb-5 max-w-2xl rounded-2xl bg-amber-50 px-4 py-3 text-center text-sm text-amber-900">{lang === 'ar' ? 'البحث دلوقتي بالألوان والشكل بس، فممكن تظهر قطع لونها قريب ونوعها مختلف. لو مش شبه صورتك، دوس على «مش شبه».' : 'Search is matching colours and shape only right now, so some results may be a different type of item.'}</p>}
           {state.loading && <ProductGrid>{Array.from({ length: 8 }, (_, i) => <ProductCardSkeleton key={i} />)}</ProductGrid>}
           {state.error && <div role="alert" className="mx-auto max-w-xl rounded-3xl border border-sale/20 bg-sale/5 p-6 text-center"><p className="font-semibold">{t('visual.searchErrorTitle')}</p><p className="mt-2 text-sm text-muted">{errorMessage(t, state.error)}</p><Button className="mt-4" onClick={() => blob && run(blob, dept, type)}>{t('visual.retry')}</Button></div>}
           {current && (
@@ -208,6 +216,7 @@ export default function VisualSearch() {
               <ProductGrid>{current.items.map((p, i) => (
                 <div key={`${p.store.slug}-${p.id}`} className="relative">
                   <ProductCard product={p} slug={p.store.slug} index={i} showStore />
+                  <button type="button" disabled={voted.has(p.id)} onClick={() => reportBad(p, current.type)} className="mt-1.5 w-full rounded-lg py-1.5 text-center text-[12.5px] text-muted underline-offset-4 hover:underline disabled:no-underline disabled:opacity-60">{voted.has(p.id) ? (lang === 'ar' ? 'اتسجّل، شكراً' : 'Noted, thanks') : (lang === 'ar' ? 'مش شبه صورتي؟' : 'Not like my photo?')}</button>
                 </div>
               ))}</ProductGrid>
               <p className="mt-8 text-center text-sm text-muted">{t('visual.note')}</p>

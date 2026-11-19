@@ -16,6 +16,7 @@ function VisualPanel() {
   const toast = useToast();
   const { data, reload } = useAdminApi('/visual');
   const { data: dem, reload: reloadDem } = useAdminApi('/visual/demand');
+  const { data: fb } = useAdminApi('/visual/feedback');
   const [f, setF] = useState(null);
   const [busy, setBusy] = useState(false);
   if (data && !f) setF({ enabled: data.enabled, model: data.model, dailyFree: String(data.dailyFree), minSimilarity: String(data.minSimilarity) });
@@ -69,6 +70,17 @@ function VisualPanel() {
             <div key={k} className="flex justify-between gap-3"><dt className="text-muted">{k}</dt><dd className="font-medium" dir="auto">{v}</dd></div>
           ))}
         </dl>
+        {fb && (
+          <div className="border-t border-line pt-4">
+            <p className="text-sm font-semibold">زباين قالوا «مش شبه» (آخر 30 يوم): {fb.total}</p>
+            <p className="mt-1 text-[12.5px] text-muted">المنتجات اللي ظهرت في نتايج البحث بالصورة واتعلّم عليها إنها مش مناسبة. لو منتج تكرر هنا، غالباً صورته أو تصنيفه محتاج مراجعة.</p>
+            {fb.items.length ? (
+              <ul className="mt-2 divide-y divide-line text-sm">
+                {fb.items.map((x) => <li key={x.id} className="flex justify-between gap-3 py-1.5"><span>{x.name_ar} <span className="text-muted">· {x.store_name}</span></span><span className="shrink-0 text-muted">{x.votes} صوت</span></li>)}
+              </ul>
+            ) : <p className="mt-2 text-[12.5px] text-muted">لسه مفيش ملاحظات.</p>}
+          </div>
+        )}
         {dem && (
           <div className="border-t border-line pt-4">
             <Switch checked={dem.ownersEnabled} onChange={async (v) => { try { await adminApi('/visual/demand/owners', { method: 'PUT', body: { enabled: v } }); toast({ title: v ? 'التقرير ظاهر لأصحاب المحلات' : 'التقرير مقفول عن أصحاب المحلات' }); reloadDem(); } catch (x) { toast({ tone: 'error', title: x.message }); } }} label="إظهار «الناس بتدوّر على إيه؟» لأصحاب المحلات" description="لما تفعّله بيظهر لكل صاحب محل كارت في لوحته وسطر في تقريره الأسبوعي بالقطع اللي الزباين بيدوّروا عليها ومش لاقينها. وهو دايمًا ظاهر لك هنا في الأدمن." />

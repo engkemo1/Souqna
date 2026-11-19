@@ -42,7 +42,7 @@ import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
 import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, getPlatformFreeShipping } from '../lib/deliveryRates.js';
 import { notifyStore } from '../lib/push.js';
-import { sendNewOrderAlert, notifyPlatformAlert, notifyCustomerOrderPlaced } from '../lib/whatsapp.js';
+import { sendNewOrderAlert, notifyPlatformAlert, notifyCustomerOrderPlaced, isWhatsAppConfigured, customerWaReady } from '../lib/whatsapp.js';
 import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
 import { prepareTry, attachTry, tryAlternatives, tryRecord } from '../lib/try-sizes.js';
 import { storeHours } from '../lib/hours.js';
@@ -480,7 +480,19 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
   const groups = found.groups.map((g) => ({ type: g.type, label: g.label, confidence: g.confidence, items: g.items.map((x) => byCard.get(x.id)).filter(Boolean), similar: (g.similar || []).map((x) => byCard.get(x.id)).filter(Boolean) }));
   const withItems = groups.filter((g) => g.items.length);
   const first = withItems[0] || groups[0];
-  res.json({ items: first?.items || [], total: withItems.reduce((n, g) => n + g.items.length, 0), groups, detected: found.detected, noMatch: withItems.length === 0 });
+  // `reliable` is false when only the colour model answered (it matches colours, not garment types): the page says so honestly
+  res.json({ items: first?.items || [], total: withItems.reduce((n, g) => n + g.items.length, 0), groups, detected: found.detected, noMatch: withItems.length === 0, reliable: found.model !== 'color-v1', model: found.model });
+}));
+
+/** «مش شبه»: a shopper says a visual-search result does not match their photo. Only counted, never shown to other shoppers. */
+r.post('/visual-feedback', h((req, res) => {
+  const bucket = `public:visual-feedback:${req.ip}`;
+  checkRateLimit(bucket, { max: 60, windowMs: 3600e3, record: false, code: 'rate_limited', message: 'Too many requests.' });
+  const b = z.object({ product_id: z.coerce.number().int().positive(), model: z.string().trim().max(60).optional(), family: z.string().trim().max(40).optional() }).parse(req.body);
+  if (!q.get('SELECT id FROM products WHERE id=?', [b.product_id])) throw notFound('Product');
+  recordRateLimitHit(bucket);
+  insert('visual_feedback', { product_id: b.product_id, model: b.model || null, family: b.family || null });
+  res.status(201).json({ ok: true });
 }));
 
 /* Web Share Target: «Share → Twist» from Instagram / WhatsApp / the gallery (installed PWA, see manifest.webmanifest).
@@ -1268,6 +1280,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
   notifyCustomerOrderPlaced({ phone: body.phone, name: body.name, number: result.number, token: result.trackToken, orderId: result.orderId });
   notifyStore(s.id, { title: `طلب جديد 🛍️ ${result.number}`, body: `${body.name} · ${result.total} ج.م${result.hasTry ? ` · تجربة مقاسين (جهّز مقاس ${result.trySize} كمان)` : ''}`, url: `/dashboard/orders/${result.orderId}`, tag: `order-${result.orderId}` });
   notifyPlatformAlert(`طلب جديد من ${s.name_ar} 🛍️ ${result.number} بقيمة ${result.total} ج.م للعميل ${body.name}`);
+  result.waAuto = Boolean(s.auto_whatsapp && s.whatsapp) && isWhatsAppConfigured(); // the page then skips the manual «send to the store» step
   delete result.orderId;
   res.status(201).json({ order: result });
 }));
@@ -1417,7 +1430,7 @@ r.post('/marketplace/orders', h((req, res) => {
       }
       insert('order_events', { order_id: orderId, status: 'pending', note: null, created_at: now });
       attachTry(orderId, tryReq, now);
-      return { orderId, number, trackToken, hasTry: !!tryReq, trySize: tryReq?.altSize, total: qt.subtotal - qt.discount + shipping, subtotal: qt.subtotal, discount: qt.discount, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, storeWhatsapp: store.whatsapp || store.phone || null, store: { ar: store.name_ar, en: store.name_en } };
+      return { orderId, number, trackToken, hasTry: !!tryReq, trySize: tryReq?.altSize, total: qt.subtotal - qt.discount + shipping, subtotal: qt.subtotal, discount: qt.discount, shipping, deliveryFeeStatus: pendingFee ? 'pending' : 'confirmed', deliveryGroup, storeSlug: store.slug, waAuto: Boolean(store.auto_whatsapp) && isWhatsAppConfigured(), customerWa: customerWaReady(), storeWhatsapp: store.whatsapp || store.phone || null, store: { ar: store.name_ar, en: store.name_en } };
     });
     return orders;
   });
