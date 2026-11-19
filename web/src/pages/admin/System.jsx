@@ -187,6 +187,64 @@ function CashierGuidePanel() {
   );
 }
 
+const WA_CAT_LABEL = { utility: 'خدمية (تحديثات الطلبات)', authentication: 'كود دخول', marketing: 'تسويقية', service: 'ردود خلال 24 ساعة (مجانية)', unknown: 'غير محددة' };
+
+/** What WhatsApp messages cost: counts come from Meta's delivery receipts, the price per message is typed in from the Meta invoice. */
+function WaCostPanel() {
+  const toast = useToast();
+  const [days, setDays] = useState('30');
+  const { data, reload } = useAdminApi(`/whatsapp/usage?days=${days}`);
+  const [rates, setRates] = useState(null);
+  const [busy, setBusy] = useState(false);
+  if (data && !rates) setRates({ utility: String(data.rates.utility || ''), authentication: String(data.rates.authentication || ''), marketing: String(data.rates.marketing || ''), service: String(data.rates.service || ''), fx: String(data.rates.fx || '') });
+  if (!data || !rates) return <Panel title="تكلفة رسائل واتساب"><Skeleton className="h-32 w-full" /></Panel>;
+  const saveRates = async () => {
+    setBusy(true);
+    try {
+      const body = {}; for (const k of Object.keys(rates)) body[k] = Number(rates[k]) || 0;
+      await adminApi('/whatsapp/rates', { method: 'PUT', body });
+      toast({ title: 'اتحفظت الأسعار' }); reload();
+    } catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy(false);
+  };
+  const t = data.totals;
+  const rateField = (k, label) => (
+    <label className="block"><span className="mb-1.5 block text-sm font-medium">{label}</span><Input dir="ltr" inputMode="decimal" placeholder="0.0000" value={rates[k]} onChange={(e) => setRates({ ...rates, [k]: e.target.value.replace(/[^0-9.]/g, '') })} className="text-start" /></label>
+  );
+  return (
+    <Panel title="تكلفة رسائل واتساب">
+      <div className="space-y-4">
+        <p className="text-xs text-fg-muted">الأعداد جاية من إشعارات التسليم اللي ميتا بتبعتها للموقع (لازم الـwebhook يكون شغال ومشترك في messages). السعر بتاخده من فاتورة ميتا أو صفحة الأسعار وتكتبه تحت، لأنه بيتغير.</p>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          {['7', '30', '90'].map((d) => (
+            <button key={d} type="button" onClick={() => { setDays(d); }} className={`rounded-full border px-3 py-1 font-semibold ${days === d ? 'border-fg bg-fg text-bg' : 'border-line-strong'}`}>آخر {d} يوم</button>
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-xl border border-line p-3"><div className="text-xs text-fg-muted">كل الرسائل</div><div className="text-xl font-bold">{t.messages}</div></div>
+          <div className="rounded-xl border border-line p-3"><div className="text-xs text-fg-muted">المحسوبة (مدفوعة)</div><div className="text-xl font-bold">{t.billable}</div></div>
+          <div className="rounded-xl border border-line p-3"><div className="text-xs text-fg-muted">التكلفة بالدولار</div><div className="text-xl font-bold" dir="ltr">${t.usd}</div></div>
+          <div className="rounded-xl border border-line p-3"><div className="text-xs text-fg-muted">بالجنيه</div><div className="text-xl font-bold">{t.egp == null ? 'حط سعر الدولار' : fmtMoney(t.egp)}</div></div>
+        </div>
+        {data.byCategory.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line p-4 text-sm text-fg-muted">لسه مفيش رسائل مسجّلة. بعد ما الـwebhook يشتغل وتتبعت رسائل، الأعداد هتظهر هنا.</p>
+        ) : (
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-start text-xs text-fg-muted"><th className="py-1 text-start">النوع</th><th className="text-start">العدد</th><th className="text-start">المحسوب</th><th className="text-start">فشل</th><th className="text-start">التكلفة $</th></tr></thead>
+            <tbody>{data.byCategory.map((r) => (<tr key={r.category} className="border-t border-line"><td className="py-1.5">{WA_CAT_LABEL[r.category] || r.category}</td><td>{r.total}</td><td>{r.billable}</td><td>{r.failed}</td><td dir="ltr" className="text-start">{r.usd}</td></tr>))}</tbody></table></div>
+        )}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {rateField('utility', 'سعر الرسالة الخدمية $')}
+          {rateField('authentication', 'سعر كود الدخول $')}
+          {rateField('marketing', 'سعر التسويقية $')}
+          {rateField('service', 'سعر ردود الـ24 ساعة $')}
+          {rateField('fx', 'سعر الدولار بالجنيه')}
+        </div>
+        <button type="button" disabled={busy} onClick={saveRates} className="rounded-full bg-btn px-5 py-2 text-sm font-bold text-on-btn disabled:opacity-50">حفظ الأسعار</button>
+      </div>
+    </Panel>
+  );
+}
+
 function WhatsAppPanel() {
   const toast = useToast();
   const { data, reload } = useAdminApi('/whatsapp');
@@ -194,6 +252,7 @@ function WhatsAppPanel() {
   const [testTo, setTestTo] = useState('');
   const [testTpl, setTestTpl] = useState('');
   const [testVars, setTestVars] = useState('4');
+  const [testOrder, setTestOrder] = useState('');
   const [busy, setBusy] = useState(false);
   if (data && !f) setF({ token: '', phoneId: data.phoneId || '', template: data.template || '', customerTemplate: data.customerTemplate || '', ownerBtnTemplate: data.ownerBtnTemplate || '', customerBtnTemplate: data.customerBtnTemplate || '', authTemplate: data.authTemplate || '', lang: data.lang || 'ar' });
   if (!data || !f) return <Panel title="واتساب (Meta)"><Skeleton className="h-40 w-full" /></Panel>;
@@ -206,6 +265,12 @@ function WhatsAppPanel() {
   const test = async () => {
     setBusy(true);
     try { await adminApi('/whatsapp/test', { method: 'POST', body: { to: testTo, template: testTpl.trim(), vars: Number(testVars) || 0 } }); toast({ title: 'اتبعتت رسالة تجربة، شوف الواتساب' }); }
+    catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy(false);
+  };
+  const testOrderSend = async (kind) => {
+    setBusy(true);
+    try { const r = await adminApi('/whatsapp/test-order', { method: 'POST', body: { order: testOrder.trim(), to: testTo, kind } }); toast({ title: `اتبعتت رسالة الأوردر ${r.order || ''} على رقمك` }); }
     catch (x) { toast({ tone: 'error', title: x.message }); }
     setBusy(false);
   };
@@ -231,6 +296,15 @@ function WhatsAppPanel() {
           <label className="block"><span className="mb-1.5 block text-sm font-medium">اسم القالب (اختياري)</span><Input dir="ltr" placeholder="order_update" value={testTpl} onChange={(e) => setTestTpl(e.target.value)} className="text-start" /></label>
           <label className="block"><span className="mb-1.5 block text-sm font-medium">عدد المتغيرات</span><Input dir="ltr" inputMode="numeric" value={testVars} onChange={(e) => setTestVars(e.target.value.replace(/\D/g, '').slice(0, 2))} className="w-20 text-start" /></label>
           <button type="button" disabled={busy || !testTo} onClick={test} className="rounded-full border border-line-strong px-4 py-2 text-sm font-semibold hover:border-fg disabled:opacity-50">ابعت رسالة تجربة</button>
+        </div>
+        <div className="mt-4 space-y-2 rounded-xl border border-line p-3">
+          <div className="text-sm font-semibold">جرّب أوردر موجود على رقمك</div>
+          <p className="text-xs text-fg-muted">بيبعت رسالة الأوردر الحقيقية (بأزرارها) على الرقم اللي كتبته فوق في «تجربة إرسال». الأزرار بتأثر على الأوردر الفعلي (تأكيد، رفض...)، فاستخدم أوردر تجريبي بس.</p>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="block"><span className="mb-1.5 block text-sm font-medium">رقم الأوردر</span><Input dir="ltr" placeholder="TW-1234" value={testOrder} onChange={(e) => setTestOrder(e.target.value)} className="text-start" /></label>
+            <button type="button" disabled={busy || !testTo || !testOrder.trim()} onClick={() => testOrderSend('owner')} className="rounded-full border border-line-strong px-4 py-2 text-sm font-semibold hover:border-fg disabled:opacity-50">ابعت رسالة المحل</button>
+            <button type="button" disabled={busy || !testTo || !testOrder.trim()} onClick={() => testOrderSend('customer')} className="rounded-full border border-line-strong px-4 py-2 text-sm font-semibold hover:border-fg disabled:opacity-50">ابعت رسالة العميل</button>
+          </div>
         </div>
       </div>
     </Panel>
@@ -1092,7 +1166,7 @@ export default function System() {
           </>}
           {section === 'visual' && <VisualPanel />}
           {section === 'cashier' && <><CashierSyncPanel /><CashierGuidePanel /></>}
-          {section === 'whatsapp' && <WhatsAppPanel />}
+          {section === 'whatsapp' && (<><WhatsAppPanel /><div className="mt-4"><WaCostPanel /></div></>)}
           {section === 'moda' && <>
           <StylistPanel />
           <ModaPromptsPanel />

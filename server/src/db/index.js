@@ -74,6 +74,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   db.exec(`CREATE TABLE IF NOT EXISTS customer_flags (phone TEXT PRIMARY KEY, blocked INTEGER NOT NULL DEFAULT 0, reason TEXT, note TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   db.exec(`CREATE TABLE IF NOT EXISTS wa_otps (phone TEXT PRIMARY KEY, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, tries INTEGER NOT NULL DEFAULT 0, sent_at INTEGER NOT NULL)`);
   db.exec(`CREATE TABLE IF NOT EXISTS wa_inbound (id TEXT PRIMARY KEY, from_wa TEXT NOT NULL, type TEXT NOT NULL, body TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+  db.exec(`CREATE TABLE IF NOT EXISTS wa_msgs (id TEXT PRIMARY KEY, to_wa TEXT, status TEXT, category TEXT, billable INTEGER, error TEXT, ts INTEGER NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_wa_msgs_ts ON wa_msgs(ts)');
   db.exec(`CREATE TABLE IF NOT EXISTS pickup_zones (id INTEGER PRIMARY KEY, key TEXT NOT NULL UNIQUE, name TEXT NOT NULL, fee INTEGER NOT NULL DEFAULT 0 CHECK (fee >= 0 AND fee <= 5000), courier_cost INTEGER NOT NULL DEFAULT 0 CHECK (courier_cost >= 0 AND courier_cost <= 5000), created_at TEXT NOT NULL DEFAULT (datetime('now')))`);
   { const pz = db.prepare('PRAGMA table_info(pickup_zones)').all().map((c) => c.name); if (!pz.includes('extra_fee')) db.exec('ALTER TABLE pickup_zones ADD COLUMN extra_fee INTEGER CHECK (extra_fee IS NULL OR (extra_fee >= 0 AND extra_fee <= 500))'); } // extra delivery fee when this zone joins a basket (NULL = default 5)
   // every store is shown by default, even before it has products (the admin can switch it off per store)

@@ -38,6 +38,7 @@ import { offsiteEnabled, r2Enabled } from '../lib/r2.js';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { waUsage, saveWaRates } from '../lib/wa-cost.js';
 import { isWhatsAppConfigured, notifyPlatformDelivery, saveWaSettings, waSettingsView, sendWaTest } from '../lib/whatsapp.js';
 import { mountCashierAdmin } from './admin-cashier.js';
 import { adminStoryStores, setStoriesAllowed, setAllStoriesAllowed, adminActiveStories, adminRemoveStory, addPlatformStory, searchStoryProducts, PLATFORM_MAX_ACTIVE, PLATFORM_HOURS } from '../lib/stories.js';
@@ -882,6 +883,13 @@ r.put('/whatsapp', h((req, res) => {
   const b = z.object({ token: s, phoneId: z.string().trim().regex(/^\d{0,30}$/).optional(), template: s, customerTemplate: s, ownerBtnTemplate: s, customerBtnTemplate: s, authTemplate: s, platformTemplate: s, serviceTemplate: s, alertTemplate: s, lang: z.string().trim().max(10).optional() }).parse(req.body || {});
   saveWaSettings(b);
   res.json(waSettingsView());
+}));
+r.get('/whatsapp/usage', h((req, res) => res.json(waUsage(Number(req.query.days) || 30))));
+r.put('/whatsapp/rates', h((req, res) => {
+  const n = z.coerce.number().min(0).max(1000);
+  const b = z.object({ utility: n.optional(), authentication: n.optional(), marketing: n.optional(), service: n.optional(), fx: n.optional() }).parse(req.body || {});
+  saveWaRates(b);
+  res.json(waUsage(Number(req.query.days) || 30));
 }));
 r.post('/whatsapp/test', h(async (req, res) => {
   const b = z.object({ to: z.string().trim().min(8).max(20), template: z.string().trim().regex(/^[A-Za-z0-9_]{1,200}$/).optional().or(z.literal('')), vars: z.number().int().min(0).max(10).optional() }).parse(req.body || {});

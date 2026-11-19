@@ -7,6 +7,7 @@ import { Router } from 'express';
 import { config } from '../config.js';
 import { q } from '../db/index.js';
 import { validSignature } from '../lib/wa.js';
+import { recordWaStatus } from '../lib/wa-cost.js';
 
 const r = Router();
 const handlers = [];
@@ -30,6 +31,7 @@ r.post('/webhook', (req, res) => {
     for (const change of entry.changes || []) {
       const v = change.value || {};
       if (v.metadata?.phone_number_id && config.wa.phoneId && v.metadata.phone_number_id !== config.wa.phoneId) continue;
+      for (const st of v.statuses || []) recordWaStatus(st); // delivery receipts carry the pricing category (cost tracking)
       for (const m of v.messages || []) {
         const contact = (v.contacts || []).find((c) => c.wa_id === m.from) || null;
         const body = m.text?.body || m.image?.caption || m.button?.text || m.interactive?.button_reply?.title || null;
