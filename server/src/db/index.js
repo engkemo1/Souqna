@@ -175,6 +175,22 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!ocols.includes('handoff_at')) db.exec('ALTER TABLE orders ADD COLUMN handoff_at TEXT');
   if (!ocols.includes('platform_discount')) db.exec('ALTER TABLE orders ADD COLUMN platform_discount INTEGER NOT NULL DEFAULT 0');
   if (!ocols.includes('buyer_id')) db.exec('ALTER TABLE orders ADD COLUMN buyer_id INTEGER');
+  // Twist-wide sale campaigns (Black Friday…): see lib/sale-campaigns.js
+  if (!ocols.includes('campaign_id')) db.exec('ALTER TABLE orders ADD COLUMN campaign_id INTEGER');
+  if (!ocols.includes('campaign_discount')) db.exec('ALTER TABLE orders ADD COLUMN campaign_discount INTEGER NOT NULL DEFAULT 0'); // part of `discount` + `platform_discount` funded by the campaign
+  if (!ocols.includes('campaign_ship_id')) db.exec('ALTER TABLE orders ADD COLUMN campaign_ship_id INTEGER');
+  if (!ocols.includes('campaign_shipping')) db.exec('ALTER TABLE orders ADD COLUMN campaign_shipping INTEGER NOT NULL DEFAULT 0'); // delivery fee waived by a free-shipping campaign (Twist revenue given up)
+  db.exec(`CREATE TABLE IF NOT EXISTS sale_campaigns (
+    id INTEGER PRIMARY KEY, kind TEXT NOT NULL DEFAULT 'discount', name TEXT NOT NULL DEFAULT '', status TEXT NOT NULL DEFAULT 'draft', ended_reason TEXT,
+    starts_at INTEGER NOT NULL, ends_at INTEGER NOT NULL, percent INTEGER NOT NULL DEFAULT 0, dept_percent_json TEXT NOT NULL DEFAULT '{}',
+    mode TEXT NOT NULL DEFAULT 'best', allow_coupons INTEGER NOT NULL DEFAULT 0, respect_excl INTEGER NOT NULL DEFAULT 1, min_subtotal INTEGER NOT NULL DEFAULT 0,
+    store_ids_json TEXT NOT NULL DEFAULT '[]', budget INTEGER NOT NULL DEFAULT 0, headline TEXT NOT NULL DEFAULT '', sub TEXT NOT NULL DEFAULT '',
+    theme TEXT NOT NULL DEFAULT 'blackfriday', color1 TEXT NOT NULL DEFAULT '', color2 TEXT NOT NULL DEFAULT '', fall_glyphs TEXT NOT NULL DEFAULT '', fall_density TEXT NOT NULL DEFAULT 'low', fall_speed TEXT NOT NULL DEFAULT 'calm',
+    show_bar INTEGER NOT NULL DEFAULT 1, show_fall INTEGER NOT NULL DEFAULT 1, fall_style TEXT NOT NULL DEFAULT 'percent', show_hero INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL)`);
+  db.exec('CREATE INDEX IF NOT EXISTS idx_orders_campaign ON orders(campaign_id)');
+  { const sc = db.prepare('PRAGMA table_info(sale_campaigns)').all().map((c) => c.name); // look & feel columns added after the first release of the table
+    for (const [n, d] of [['theme', "'blackfriday'"], ['color1', "''"], ['color2', "''"], ['fall_glyphs', "''"], ['fall_density', "'low'"], ['fall_speed', "'calm'"]]) if (!sc.includes(n)) db.exec(`ALTER TABLE sale_campaigns ADD COLUMN ${n} TEXT NOT NULL DEFAULT ${d}`); }
   if (!ocols.includes('track_token')) db.exec('ALTER TABLE orders ADD COLUMN track_token TEXT');
   if (!ocols.includes('shipping_free')) db.exec('ALTER TABLE orders ADD COLUMN shipping_free INTEGER NOT NULL DEFAULT 0');
   if (!ocols.includes('courier_cost')) db.exec('ALTER TABLE orders ADD COLUMN courier_cost INTEGER');

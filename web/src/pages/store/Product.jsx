@@ -16,7 +16,6 @@ import { useAddToCart } from '../../components/store/useAddToCart.js';
 import ProductCard from '../../components/store/ProductCard.jsx';
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
 import SizeAdvisor from '../../components/store/SizeAdvisor.jsx';
-import SmartLookCard from '../../components/market/SmartLookCard.jsx';
 import ReviewsSection from '../../components/store/ReviewsSection.jsx';
 import { useBuyer } from '../../lib/buyer.jsx';
 import { api } from '../../lib/api.js';
@@ -25,6 +24,7 @@ import { ProductOffersPanel } from '../../components/promo/OfferCards.jsx';
 import { SectionHeader } from './StoreHome.jsx';
 import { Price, QtyStepper } from '../../components/ui/Commerce.jsx';
 import SaleCountdown from '../../components/store/SaleCountdown.jsx';
+import DiscountBadge from '../../components/campaign/DiscountBadge.jsx';
 import Skeleton, { SkeletonText } from '../../components/ui/Skeleton.jsx';
 import { ErrorState, EmptyState } from '../../components/ui/States.jsx';
 import Button, { IconButton } from '../../components/ui/Button.jsx';
@@ -106,101 +106,6 @@ function ProductSkeleton() {
   );
 }
 
-function ProductNotFoundRecovery({ store, pslug, isArchived, onRetry }) {
-  const { t, tr, lang } = useI18n();
-  const ar = lang === 'ar';
-  const queryDefault = pslug ? decodeURIComponent(pslug).replace(/[-_]+/g, ' ').trim() : '';
-  const [query, setQuery] = useState(queryDefault);
-  const navigate = useNavigate();
-  const { data: bestSellers } = useApi(`/stores/${store.slug}/products?limit=4&sort=featured`);
-
-  const onStoreSearch = (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    navigate(`/s/${store.slug}/search?q=${encodeURIComponent(query.trim())}`);
-  };
-
-  const onMarketSearch = (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-    navigate(`/search?q=${encodeURIComponent(query.trim())}`);
-  };
-
-  return (
-    <div className="container py-12 sm:py-16">
-      <div className="mx-auto max-w-xl text-center">
-        <div className="relative mb-6 inline-flex">
-          <div className="absolute inset-0 -m-3 rounded-full bg-primary/[0.07]" />
-          <div className="relative grid h-16 w-16 place-items-center rounded-2xl bg-elevated text-brand shadow-soft ring-1 ring-line">
-            <PackageX className="h-7 w-7" strokeWidth={1.6} />
-          </div>
-        </div>
-        <h2 className="font-display text-2xl font-bold text-fg sm:text-3xl">
-          {isArchived
-            ? (ar ? 'المنتج ده مش متاح حالياً' : 'This product is no longer available')
-            : (ar ? 'الصفحة دي مش موجودة' : 'Product not found')}
-        </h2>
-        <p className="mt-2 text-base text-muted">
-          {isArchived
-            ? (ar ? 'القطعة دي لم تعد متوفرة في المحل حالياً. تقدر تدور على بدائل أو تشوف الأكثر مبيعاً.' : 'This piece is out of catalog. You can search for alternatives or browse best sellers.')
-            : (ar ? 'المنتج اللي بتدور عليه ممكن يكون اتنقل أو رابطه اتغير.' : 'The product you are looking for might have moved or the link changed.')}
-        </p>
-
-        {/* Search box prefilled with slug words */}
-        <form onSubmit={onStoreSearch} className="mt-6">
-          <div className="relative mx-auto flex max-w-md items-center">
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={ar ? 'ابحث في المتجر أو السوق...' : 'Search in store or market...'}
-              className="h-12 w-full rounded-2xl border border-line-strong bg-elevated ps-4 pe-28 text-sm shadow-sm outline-none transition focus:border-ring focus:shadow-ring"
-            />
-            <button
-              type="submit"
-              className="absolute end-1.5 top-1/2 -translate-y-1/2 rounded-xl bg-primary px-3.5 py-2 text-xs font-bold text-on-primary shadow-sm hover:opacity-90"
-            >
-              {ar ? 'بحث بالمحل' : 'Search store'}
-            </button>
-          </div>
-          <div className="mt-2.5 flex flex-wrap items-center justify-center gap-2">
-            <button
-              type="button"
-              onClick={onMarketSearch}
-              className="text-xs font-semibold text-brand hover:underline"
-            >
-              {ar ? '🔍 دوّر على نفس الاسم في سوق Twist كله' : '🔍 Search across all Twist stores'}
-            </button>
-          </div>
-        </form>
-
-        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-          <Button to={sp(store.slug, 'shop')} variant="outline">
-            {ar ? `تصفح كل معروضات ${tr(store.name)}` : `Browse ${tr(store.name)}`}
-          </Button>
-          <Button to="/">
-            {ar ? 'الرجوع للرئيسية' : 'Back to Home'}
-          </Button>
-        </div>
-      </div>
-
-      {/* Best sellers */}
-      {bestSellers?.items?.length > 0 && (
-        <div className="mt-14 border-t border-line pt-10">
-          <h3 className="mb-6 font-display text-lg font-bold text-fg sm:text-xl">
-            {ar ? `الأكثر طلباً في ${tr(store.name)}` : `Best sellers from ${tr(store.name)}`}
-          </h3>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-5">
-            {bestSellers.items.slice(0, 4).map((item, i) => (
-              <ProductCard key={item.id} product={item} slug={store.slug} index={i} />
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 export default function Product() {
   const { pslug } = useParams();
   const nav = useNavigate();
@@ -258,17 +163,9 @@ export default function Product() {
   }, [p]);
 
   if (error) {
-    if (error.status === 404 || error.status === 410 || error.code === 'product_archived') {
-      return (
-        <ProductNotFoundRecovery
-          store={store}
-          pslug={pslug}
-          isArchived={error.status === 410 || error.code === 'product_archived'}
-          onRetry={reload}
-        />
-      );
-    }
-    return <ErrorState error={error} onRetry={reload} />;
+    return error.status === 404
+      ? <EmptyState icon={PackageX} title={t('error.notFound')} body={t('error.notFoundBody')} action={<Button to={sp(store.slug, 'shop')}>{t('store.shopAll')}</Button>} />
+      : <ErrorState error={error} onRetry={reload} />;
   }
   if (loading && !p) return <ProductSkeleton />;
   if (!p) return null;
@@ -334,7 +231,7 @@ export default function Product() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <div className="mb-2 flex flex-wrap items-center gap-2">
-                {p.discount > 0 && <span className="rounded-full bg-sale px-2.5 py-0.5 text-xs font-bold text-on-sale">-{p.discount}%</span>}
+                {p.discount > 0 && <DiscountBadge pct={p.discount} campaign={p.campaign} />}
                 {p.isNew && <span className="rounded-full bg-fg px-2.5 py-0.5 text-xs font-semibold text-canvas">{t('product.new')}</span>}
                 {p.category && <Link to={sp(store.slug, `shop?category=${p.category.slug}`)} className="text-xs font-medium text-muted hover:text-fg">{tr(p.category.name)}</Link>}
               </div>
@@ -353,7 +250,7 @@ export default function Product() {
           </div>
 
           <Price value={p.price} compareAt={p.compareAt} size="xl" showSave className="mt-5" />
-          <SaleCountdown ms={p.saleEndsAt} className="mt-3" />
+          <SaleCountdown ms={p.saleEndsAt} campaign={p.campaign} name={p.campaign?.name} save={p.compareAt ? p.compareAt - p.price : 0} className="mt-3" />
           <ProductOffersPanel slug={store.slug} offers={data.offers || []} />
 
           <div className="mt-7">
@@ -396,8 +293,7 @@ export default function Product() {
               : exchangeLabel(t, store) && <li className="flex items-center gap-3"><RefreshCcw className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{exchangeLabel(t, store)}</li>}
           </ul>
 
-                    {/* Complete the Look: اقتراح طقم كامل لو متناسق، وإلا زرار «اسأل تويلا» */}
-          <SmartLookCard productId={p.id} fallback={(
+                    {/* Complete the Look with Twyla */}
           <div className="mt-6 rounded-2xl border border-brand/20 bg-gradient-to-br from-brand/5 via-canvas to-brand/10 p-4 shadow-sm">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-3">
@@ -423,7 +319,6 @@ export default function Product() {
               </button>
             </div>
           </div>
-          )} />
 
           <div className="mt-6 border-t border-line">
             <Accordion title={t('product.description')} defaultOpen><p dir="auto" className="whitespace-pre-line text-start">{tr(p.description)}</p></Accordion>

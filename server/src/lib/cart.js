@@ -5,6 +5,7 @@ import { evaluateCart } from './promotions/engine.js';
 import { eligiblePromotions, categoryChains } from './promotions/store.js';
 import { giftIdsOf } from './promotions/definition.js';
 import { describePromotion, hintText } from './promotions/describe.js';
+import { campaignUnit, discountMode, discountAllowsCoupons, discountCampaignId, shippingCampaignFor } from './sale-campaigns.js';
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -58,6 +59,7 @@ export function quote(store, items = [], couponCode, { phone, giftChoices } = {}
       available = p.track_stock ? variant.stock : 99;
     }
     const mediaId = q.val('SELECT media_id FROM product_media WHERE product_id=? ORDER BY is_primary DESC, position LIMIT 1', [p.id]);
+    const cu = campaignUnit(p); // Twist-wide sale campaign: EGP off ONE unit (0 = not in the campaign)
     lines.push({
       productId: p.id,
       variantId: variant?.id ?? null,
@@ -70,7 +72,8 @@ export function quote(store, items = [], couponCode, { phone, giftChoices } = {}
       trackStock: !!p.track_stock,
       mediaId,
       categoryId: p.category_id ?? null,
-      excludedFromPromos: !!p.exclude_from_promotions,
+      excludedFromPromos: !!p.exclude_from_promotions || (cu > 0 && discountMode() !== 'stack'), // a campaign line doesn't also take a store promotion (except in stack mode)
+      campaignUnit: cu,
       error: available <= 0 ? 'out_of_stock' : qty > available ? 'insufficient_stock' : null,
     });
   }
@@ -85,7 +88,10 @@ export function quote(store, items = [], couponCode, { phone, giftChoices } = {}
   /* ---- store promotions (server-side, from the database only) ---- */
   const promo = applyPromotions(store, lines, paid, { phone, giftChoices });
   const promoDiscount = promo.discount;
-  const payable = subtotal - promoDiscount;
+  // Twist-funded campaign discount: a `discount`-level amount (never a price edit), counted per paid unit.
+  const campaignDiscount = paid.reduce((s, l) => s + (l.campaignUnit || 0) * l.qty, 0);
+  const campaignId = campaignDiscount > 0 ? discountCampaignId() : null;
+  const payable = subtotal - promoDiscount - campaignDiscount;
 
   let discount = 0;
   let freeShipping = store.free_shipping_over > 0 && subtotal >= store.free_shipping_over;
@@ -96,7 +102,7 @@ export function quote(store, items = [], couponCode, { phone, giftChoices } = {}
     let r = findCoupon(store.id, couponCode);
     if (r.error === 'coupon_invalid') r = findPlatformCoupon(couponCode, phone); // not a store code → try a Twist code
     if (r.error) couponError = r.error;
-    else if (promo.blocksCoupons) couponError = 'coupon_not_combinable';
+    else if (promo.blocksCoupons || (campaignDiscount > 0 && !discountAllowsCoupons())) couponError = 'coupon_not_combinable';
     else if (payable < r.offer.min_subtotal) couponError = 'coupon_min_subtotal';
     else {
       const o = r.offer;
@@ -109,7 +115,14 @@ export function quote(store, items = [], couponCode, { phone, giftChoices } = {}
     }
   }
   const couponDiscount = discount;
-  discount += promoDiscount;
+  discount += promoDiscount + campaignDiscount;
+  // Free-shipping campaign (Twist gives up its own delivery fee; tracked apart from platform_discount).
+  let campaignShipping = 0;
+  let shipCampId = null;
+  if (!freeShipping && subtotal > 0) {
+    const sc = shippingCampaignFor(subtotal - discount, [store.id]);
+    if (sc) { freeShipping = true; campaignShipping = store.shipping_fee; shipCampId = sc.id; }
+  }
   const shipping = freeShipping || subtotal === 0 ? 0 : store.shipping_fee;
   return {
     lines: promo.lines,
@@ -123,7 +136,12 @@ export function quote(store, items = [], couponCode, { phone, giftChoices } = {}
     total: Math.max(0, subtotal - discount + shipping),
     coupon,
     couponError,
-    platformDiscount,
+    platformDiscount: platformDiscount + campaignDiscount,
+    campaignDiscount,
+    campaignId,
+    campaignShipId: shipCampId,
+    campaignShipping,
+    storeId: store.id,
     couponMinSubtotal: couponError === 'coupon_min_subtotal' ? (findCoupon(store.id, couponCode)?.offer || findPlatformCoupon(couponCode, phone)?.offer)?.min_subtotal : undefined,
     freeShippingOver: store.free_shipping_over,
     hasErrors: lines.some((l) => l.error),

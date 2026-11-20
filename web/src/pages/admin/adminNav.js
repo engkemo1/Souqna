@@ -1,4 +1,4 @@
-import { BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, Wallet, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, CreditCard, Eye, TrendingUp, AlertTriangle, History, MessageCircle, Shirt, BookOpen, Wrench, Images, Film, Banknote, Bike, Activity, MessagesSquare, GraduationCap, Plug, Server } from 'lucide-react';
+import { Percent, BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, Wallet, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, CreditCard, Eye, TrendingUp, AlertTriangle, History, MessageCircle, Shirt, BookOpen, Wrench, Images, Film, Banknote, Bike, Activity, MessagesSquare, GraduationCap, Plug, Server } from 'lucide-react';
 
 /**
  * Single source of truth for the admin sidebar AND the in-app guide (/admin/guide).
@@ -30,6 +30,7 @@ export const NAV_GROUPS = [
   ] },
   { label: 'العملاء والتسويق', items: [
     { to: '/admin/buyers', icon: Users, label: 'العملاء والحسابات', desc: 'حسابات العملاء المسجلين وبياناتهم الأساسية.' },
+    { to: '/admin/sales', icon: Percent, label: 'حملات التخفيضات', desc: 'بلاك فرايدي وأي خصم أو شحن مجاني على كل المنتجات: حدد النسبة والمدة، شوف حاسبة الخسارة قبل التشغيل، وتابع التكلفة الفعلية.' },
     { to: '/admin/coupons', icon: Ticket, label: 'الكوبونات', desc: 'كوبونات خصم المنصة: اعمل كوبون وحدد قيمته ومدته أو وقّفه.' },
     { to: '/admin/featured', icon: Sparkles, label: 'الإعلانات', desc: 'كل الإعلانات في صفحة واحدة: اختار نوع الإعلان (مخصص، عرض محل، معلن خارجي)، وشكله، ومكانه، وإيه اللي يحصل لما العميل يضغط عليه.' },
     { to: '/admin/campaigns', icon: Megaphone, label: 'حملات الإحالة', desc: 'حملات الإعلان والإحالة وأثرها على الطلبات.' },

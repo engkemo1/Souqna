@@ -96,13 +96,15 @@ export function CartSummary({ slug, onNavigate, compact }) {
   const { t, lang } = useI18n();
   const { quote } = useStoreQuote(slug, cart.items);
   const saved = quote?.promoDiscount || 0;
+  const camp = quote?.campaignDiscount || 0; // Twist sale campaign (Black Friday…)
   return (
     <div className="space-y-3">
-      <div className="flex justify-between text-base"><span className="text-muted">{t('cart.subtotal')}</span><span className="font-semibold tabular">{formatMoney(cart.subtotal, lang)}</span></div>
+      <div className="flex justify-between text-base"><span className="text-muted">{t('cart.subtotal')}</span><span className="font-semibold tabular">{formatMoney(quote ? quote.subtotal : cart.subtotal, lang)}</span></div>
+      {camp > 0 && <div className="flex justify-between text-base text-success"><span>{lang === 'ar' ? 'خصم الحملة' : 'Sale discount'}</span><span className="font-semibold tabular">−{formatMoney(camp, lang)}</span></div>}
       {saved > 0 && <div className="flex justify-between text-base text-success"><span>{lang === 'ar' ? 'خصم العروض' : 'Offers discount'}</span><span className="font-semibold tabular">−{formatMoney(saved, lang)}</span></div>}
       {!compact && (
         <div className="flex justify-between text-base"><span className="text-muted">{t('cart.shipping')}</span>
-          <span className="tabular">{store.freeShippingOver > 0 && cart.subtotal >= store.freeShippingOver ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(store.shippingFee, lang)}</span>
+          <span className="tabular">{quote ? (quote.shipping === 0 ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(quote.shipping, lang)) : store.freeShippingOver > 0 && cart.subtotal >= store.freeShippingOver ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(store.shippingFee, lang)}</span>
         </div>
       )}
       <Button full size="lg" to={sp(slug, 'checkout')} onClick={onNavigate}>{t('cart.checkout')}</Button>

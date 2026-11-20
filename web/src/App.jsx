@@ -97,11 +97,14 @@ const AdminAudit = lazy(() => import('./pages/admin/AuditLog.jsx'));
 const AdminStories = lazy(() => import('./pages/admin/Stories.jsx'));
 const AdminCampaigns = lazy(() => import('./pages/admin/Campaigns.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
+const AdminSaleCampaigns = lazy(() => import('./pages/admin/SaleCampaigns.jsx'));
 const AdminFeatured = lazy(() => import('./pages/admin/AdsHub.jsx'));
 const AdvertiserPage = lazy(() => import('./pages/market/AdvertiserPage.jsx'));
 const StoreManage = lazy(() => import('./pages/admin/StoreManage.jsx'));
 const AdminSystem = lazy(() => import('./pages/admin/System.jsx'));
 const More = lazy(() => import('./pages/dashboard/More.jsx'));
+
+import CampaignLayer from './components/campaign/CampaignLayer.jsx';
 
 function Root() {
   const { pathname } = useLocation();
@@ -112,6 +115,7 @@ function Root() {
   }, [pathname]);
   return (
     <Suspense fallback={<RouteFallback />}>
+      <CampaignLayer pathname={pathname} />
       <Outlet />
       <ScrollRestoration getKey={(loc) => loc.pathname} />
     </Suspense>
@@ -217,6 +221,7 @@ const router = createBrowserRouter([
           { path: 'buyers', element: <AdminBuyers /> },
           { path: 'photos', element: <AdminPhotos /> },
           { path: 'coupons', element: <AdminCoupons /> },
+          { path: 'sales', element: <AdminSaleCampaigns /> },
           { path: 'ads', element: <Navigate to="/admin/featured" replace /> },
           { path: 'featured', element: <AdminFeatured /> },
           { path: 'advertisers', element: <Navigate to="/admin/featured?tab=advertisers" replace /> },

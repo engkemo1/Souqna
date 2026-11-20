@@ -41,6 +41,8 @@ test('a velvet tracksuit that exists in the catalogue (no recorded type) is foun
   assert.ok(!found.includes(3), 'red dress is not returned');
   assert.ok(!out.groups.some((g) => g.type === 'sport' || g.type === 'tops'), 'per-garment duplicates of the set are folded away');
   assert.ok(out.groups.some((g) => g.type === 'shoes'), 'shoes are still searched separately');
+  const all = out.groups.flatMap((g) => g.items.map((x) => x.id));
+  assert.equal(new Set(all).size, all.length, 'a product is listed in one group only');
 });
 
 test('a same-colour top + bottom that is NOT a set still searches the pieces (no regression)', async () => {

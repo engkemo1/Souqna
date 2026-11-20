@@ -40,7 +40,8 @@ import { getModaPrompts } from '../lib/modaPrompts.js';
 import { AUDIENCE_KEYS } from '../lib/product-types.js';
 import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
-import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, getPlatformFreeShipping } from '../lib/deliveryRates.js';
+import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, shippingCampaignOnly, getPlatformFreeShipping } from '../lib/deliveryRates.js';
+import { publicCampaigns, onSaleSql } from '../lib/sale-campaigns.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert, notifyPlatformAlert, notifyCustomerOrderPlaced, isWhatsAppConfigured, customerWaReady } from '../lib/whatsapp.js';
 import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
@@ -285,7 +286,7 @@ r.get('/search', h((req, res) => {
   if (plan) { where.push(plan.where); params.push(...plan.params); }
   if (min) { where.push('p.price >= ?'); params.push(clampInt(min, 0, 1e7, 0)); }
   if (max) { where.push('p.price <= ?'); params.push(clampInt(max, 0, 1e7, 1e7)); }
-  if (sale === '1') where.push('p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price');
+  if (sale === '1') where.push(onSaleSql('p'));
   if (isNew) { const days = isNew === '1' ? 30 : [7, 30, 90].includes(Number(isNew)) ? Number(isNew) : 0; if (days) where.push(`(p.is_new=1 OR p.created_at >= datetime('now','-${days} days'))`); }
   if (inStock === '1') where.push('(p.track_stock=0 OR p.stock>0)');
   if (rating === '1' || rating === '4') where.push('p.rating >= 4');
@@ -774,7 +775,7 @@ r.get('/marketplace', h((req, res) => {
     return serializeCards(rs).map((c, i) => ({ ...c, store: { slug: rs[i].store_slug, name: bi(rs[i], 'store_name') } }));
   };
   const newest = railRows("ORDER BY p.created_at DESC, p.id DESC LIMIT 30");
-  const deals = railRows('AND p.compare_at_price IS NOT NULL AND p.compare_at_price > p.price ORDER BY (p.compare_at_price - p.price) * 1.0 / p.compare_at_price DESC LIMIT 30');
+  const deals = railRows(`AND ${onSaleSql('p')} ORDER BY (CASE WHEN p.compare_at_price > p.price THEN (p.compare_at_price - p.price) * 1.0 / p.compare_at_price ELSE 0 END) DESC, p.sold_count DESC LIMIT 30`);
   const deptCounts = q.all("SELECT p.department AS slug, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL GROUP BY p.department");
   const countBy = new Map();
   for (const d of deptCounts) for (const sl of [d.slug, ...deptAncestors(d.slug)]) countBy.set(sl, (countBy.get(sl) || 0) + d.n);
@@ -899,7 +900,7 @@ r.get('/stores/:slug/products', h((req, res) => {
     const plan = searchPlan(term, s.id);
     where.push(plan ? plan.where : '1=0'); if (plan) params.push(...plan.params);
   }
-  if (sale === '1') where.push('p.compare_at_price > p.price');
+  if (sale === '1') where.push(onSaleSql('p'));
   if (min) { where.push('p.price >= ?'); params.push(clampInt(min, 0, 1e7, 0)); }
   if (max) { where.push('p.price <= ?'); params.push(clampInt(max, 0, 1e7, 1e7)); }
   if (sizes) {
@@ -1143,7 +1144,7 @@ r.post('/marketplace/delivery-fee', h((req, res) => {
   if (new Set(body.stores.map((s) => s.slug)).size !== body.stores.length) throw badRequest('duplicate_store', 'A store can only appear once.');
   const storeQuotes = body.stores.map(({ slug, items, coupon, gifts }) => quote(loadStore(slug), items, coupon, { phone: body.phone, giftChoices: gifts }));
   const bd = computeBasketDelivery(body.stores.map((s) => s.slug), body.governorate, body.city);
-  const platformFree = platformFreeApplies(storeQuotes.reduce((sum, qt) => sum + qt.subtotal - qt.discount, 0));
+  const platformFree = platformFreeApplies(storeQuotes.reduce((sum, qt) => sum + qt.subtotal - qt.discount, 0), storeQuotes.map((qt) => qt.storeId));
   const split = splitSharedDeliveryFee(bd.fee, storeQuotes.map((qt) => ({ freeShipping: platformFree || qt.shipping === 0 })));
   const needsFee = storeQuotes.some((qt) => qt.shipping > 0);
   res.json({
@@ -1154,7 +1155,15 @@ r.post('/marketplace/delivery-fee', h((req, res) => {
   });
 }));
 
-r.get('/marketplace/free-shipping', h((_req, res) => res.json(getPlatformFreeShipping())));
+r.get('/marketplace/free-shipping', h((_req, res) => {
+  const s = getPlatformFreeShipping();
+  const c = publicCampaigns().shipping; // a live free-shipping campaign overrides the standing setting while it runs (unless the standing one is more generous)
+  if (c && !c.scoped && (!s.enabled || c.min < s.over)) return res.json({ enabled: true, over: c.min, campaign: true, endsAt: c.endsAt, name: c.name });
+  res.json(s);
+}));
+
+/** Live Twist-wide sale campaigns (discount + free shipping) for the countdown, top bar, falling effect and hero banner. */
+r.get('/campaigns/active', h((_req, res) => { res.set('Cache-Control', 'public, max-age=10'); res.json(publicCampaigns()); }));
 
 r.get('/marketplace/delivery-areas', h((_req, res) => {
   const rows = q.all("SELECT id, governorate, city, fee, distance_km, lat, lng FROM delivery_rates WHERE city <> '*' ORDER BY id");
@@ -1256,7 +1265,7 @@ r.post('/stores/:slug/orders', h((req, res) => {
       governorate: body.governorate, city: body.city, address: body.address, notes: body.notes, store_note: body.storeNote || null,
       status: 'pending', delivery_by: 'platform', subtotal: qt.subtotal, discount: qt.discount, promo_discount: qt.promoDiscount || 0, shipping: qt.shipping, total: qt.total,
       shipping_free: qt.shipping === 0 ? 1 : 0,
-      coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, idempotency_key: body.idempotencyKey || null, created_at: now, updated_at: now,
+      coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, campaign_id: qt.campaignId || null, campaign_discount: qt.campaignDiscount || 0, campaign_ship_id: qt.campaignShipping ? qt.campaignShipId : null, campaign_shipping: qt.campaignShipping || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, idempotency_key: body.idempotencyKey || null, created_at: now, updated_at: now,
     });
     recordOrderPromotions(orderId, s.id, qt, now);
     for (const l of qt.lines) {
@@ -1340,7 +1349,8 @@ r.post('/stores/:slug/reserve', h((req, res) => {
     const orderId = insert('orders', {
       store_id: s.id, number, customer_id: customer.id, customer_name: body.name, phone: body.phone, notes: body.notes,
       status: 'pending', delivery_by: 'pickup', payment_method: 'in_store', reserve_until: until,
-      subtotal: qt.subtotal, discount: qt.promoDiscount || 0, promo_discount: qt.promoDiscount || 0, shipping: 0, total: qt.subtotal - (qt.promoDiscount || 0), shipping_free: 1,
+      subtotal: qt.subtotal, discount: (qt.promoDiscount || 0) + (qt.campaignDiscount || 0), promo_discount: qt.promoDiscount || 0, shipping: 0, total: qt.subtotal - (qt.promoDiscount || 0) - (qt.campaignDiscount || 0), shipping_free: 1,
+      platform_discount: qt.campaignDiscount || 0, campaign_id: qt.campaignId || null, campaign_discount: qt.campaignDiscount || 0, // Twist sale campaign: the shopper pays the campaign price at the store, Twist reimburses the store
       track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, created_at: now, updated_at: now,
     });
     for (const l of qt.lines) {
@@ -1349,7 +1359,7 @@ r.post('/stores/:slug/reserve', h((req, res) => {
     }
     recordOrderPromotions(orderId, s.id, qt, now);
     insert('order_events', { order_id: orderId, status: 'pending', note: 'reserve', created_at: now });
-    return { number, total: qt.subtotal - (qt.promoDiscount || 0), trackToken, orderId, confirmBy: until, holdHours: hours };
+    return { number, total: qt.subtotal - (qt.promoDiscount || 0) - (qt.campaignDiscount || 0), trackToken, orderId, confirmBy: until, holdHours: hours };
   });
   notifyStore(s.id, { title: `طلب حجز للقياس 🛍️ ${result.number}`, body: `${body.name} عايز يقيس. أكّد إن القطعة موجودة خلال ساعتين`, url: `/dashboard/orders/${result.orderId}`, tag: `order-${result.orderId}` });
   notifyPlatformAlert(`حجز للقياس في ${s.name_ar} 🛍️ ${result.number} للعميل ${body.name}`);
@@ -1390,10 +1400,14 @@ r.post('/marketplace/orders', h((req, res) => {
     const needsFee = prepared.some(({ qt }) => qt.shipping > 0);
     const basketDelivery = computeBasketDelivery(prepared.map(({ store }) => store.slug), body.governorate, body.city);
     const fullRouteFee = basketDelivery.fee;
-    const platformFree = platformFreeApplies(prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0));
+    const basketNet = prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0);
+    const platformFree = platformFreeApplies(basketNet, prepared.map(({ store }) => store.id));
+    // Delivery made free ONLY by a free-shipping campaign: remember what the customer would have paid (Twist's revenue given up).
+    const shipCamp = platformFree ? shippingCampaignOnly(basketNet, prepared.map(({ store }) => store.id)) : null;
     // Area not on the delivery price list: place the order without a fee, customer service calls with the shipping cost.
     const pendingFee = needsFee && !platformFree && !basketDelivery.matched;
     const split = splitSharedDeliveryFee(fullRouteFee, prepared.map(({ qt }) => ({ freeShipping: platformFree || qt.shipping === 0 })));
+    const campaignSplit = shipCamp ? splitSharedDeliveryFee(fullRouteFee, prepared.map(({ qt }) => ({ freeShipping: qt.shipping === 0 && !qt.campaignShipping }))) : null;
     const marketplaceShipping = pendingFee ? 0 : split.customerFee;
     const marketplaceTotal = prepared.reduce((sum, { qt }) => sum + qt.subtotal - qt.discount, 0) + marketplaceShipping;
     if ((!pendingFee && body.expectedShipping != null && body.expectedShipping !== marketplaceShipping)
@@ -1420,7 +1434,7 @@ r.post('/marketplace/orders', h((req, res) => {
         governorate: body.governorate, city: body.city, address: body.address, notes: body.notes, store_note: storeNote || null,
         status: 'pending', delivery_fee_status: pendingFee ? 'pending' : 'confirmed', delivery_fee_quote: null, delivery_by: 'platform', delivery_group: deliveryGroup, delivery_route_id: deliveryGroup, delivery_mode: 'pooled', subtotal: qt.subtotal, discount: qt.discount, promo_discount: qt.promoDiscount || 0, shipping, total: qt.subtotal - qt.discount + shipping,
         shipping_free: qt.shipping === 0 ? 1 : 0,
-        coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, idempotency_key: body.idempotencyKey ? `${body.idempotencyKey}:${store.id}` : null, created_at: now, updated_at: now,
+        coupon_code: qt.coupon?.code ?? null, platform_discount: qt.platformDiscount || 0, campaign_id: qt.campaignId || null, campaign_discount: qt.campaignDiscount || 0, campaign_ship_id: shipCamp && !pendingFee && !qt.shipping && campaignSplit.storeShares[storeIndex]?.share ? shipCamp.id : null, campaign_shipping: shipCamp && !pendingFee && !qt.shipping ? (campaignSplit.storeShares[storeIndex]?.freeShipping ? 0 : campaignSplit.storeShares[storeIndex]?.share || 0) : 0, track_token: trackToken, buyer_id: buyerFromReq(req)?.id ?? null, idempotency_key: body.idempotencyKey ? `${body.idempotencyKey}:${store.id}` : null, created_at: now, updated_at: now,
       });
       consumeCouponAtomically(qt.coupon);
       recordOrderPromotions(orderId, store.id, qt, now);

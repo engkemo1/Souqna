@@ -1,4 +1,5 @@
 import { q } from '../db/index.js';
+import { shippingCampaignFor } from './sale-campaigns.js';
 
 const clean = (value) =>
   String(value || '')
@@ -65,9 +66,16 @@ export function savePlatformFreeShipping({ enabled, over }) {
   }
   return getPlatformFreeShipping();
 }
-export function platformFreeApplies(basketSubtotal) {
+/** Free delivery from the standing Twist setting OR a live free-shipping campaign (stores = ids in the basket, for campaign scope). */
+export function platformFreeApplies(basketSubtotal, storeIds = []) {
   const p = getPlatformFreeShipping();
-  return p.enabled && basketSubtotal >= p.over;
+  return (p.enabled && basketSubtotal >= p.over) || !!shippingCampaignFor(basketSubtotal, storeIds);
+}
+/** The campaign that is the ONLY reason delivery is free for this basket (null if the standing setting already makes it free). */
+export function shippingCampaignOnly(basketSubtotal, storeIds = []) {
+  const p = getPlatformFreeShipping();
+  if (p.enabled && basketSubtotal >= p.over) return null;
+  return shippingCampaignFor(basketSubtotal, storeIds);
 }
 
 export function saveDeliveryPricing(pricing) {

@@ -26,10 +26,12 @@ function FreeShipBar({ over, subtotal, name }) {
 /** One store's lines + the server's verdict on its offers (prices, gifts, progress hints). */
 function StoreGroup({ group, cart, lang, ar, freeOver, onSaving }) {
   const { quote, gifts, setGifts } = useStoreQuote(group.slug, group.items);
-  const list = group.items.reduce((s, l) => s + l.qty * l.price, 0);
-  const saving = quote?.promoDiscount || 0;
+  const localList = group.items.reduce((s, l) => s + l.qty * l.price, 0);
+  const list = quote ? quote.subtotal : localList; // the server's list-price subtotal (a Twist sale campaign is taken off below)
+  const saving = (quote?.promoDiscount || 0) + (quote?.campaignDiscount || 0);
   const storeTotal = list - saving;
-  useEffect(() => { onSaving(group.slug, saving); }, [saving]); // eslint-disable-line react-hooks/exhaustive-deps
+  const delta = localList - storeTotal; // how far the server's net is below the prices saved in the cart (promos + Twist sale campaign)
+  useEffect(() => { onSaving(group.slug, delta); }, [delta]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section className="overflow-hidden rounded-3xl border border-line bg-elevated">
         <header className="flex items-center justify-between gap-3 border-b border-line bg-canvas px-4 py-3.5 sm:px-5"><Link to={`/s/${group.slug}`} className="inline-flex items-center gap-2 font-semibold hover:text-brand"><Store className="h-4 w-4" />{group.name?.[lang] || group.name?.ar || group.slug}</Link><span className="text-xs text-muted">{group.items.length} {ar ? 'منتج' : 'items'}</span></header>
@@ -62,9 +64,9 @@ export default function MarketCart() {
 
   return <div className="min-h-dvh"><MarketHeader /><main className="container max-w-4xl py-8 sm:py-12">
     <div className="mb-7 flex items-center gap-3"><span className="grid h-12 w-12 place-items-center rounded-2xl bg-secondary text-brand"><ShoppingBag className="h-6 w-6" /></span><div><h1 className="font-display text-2xl font-bold sm:text-3xl">{ar ? 'سلة Twist' : 'Twist basket'}</h1><p className="mt-1 text-sm text-muted">{ar ? 'منتجاتك من كل المحلات في مكان واحد' : 'Your picks from all stores, together'}</p></div></div>
-    {pfs?.enabled && groups.length > 0 && (cart.subtotal >= pfs.over
+    {pfs?.enabled && groups.length > 0 && (cart.subtotal - totalSaving >= pfs.over
       ? <p className="mb-5 rounded-2xl bg-success/10 px-4 py-3 text-sm font-semibold text-success">{ar ? 'التوصيل مجاني على طلبك من Twist' : 'Delivery is free on your Twist order'}</p>
-      : <p className="mb-5 rounded-2xl bg-secondary px-4 py-3 text-sm font-medium">{ar ? `ضيف ${formatMoney(pfs.over - cart.subtotal, lang)} كمان والتوصيل يبقى مجاني` : `Add ${formatMoney(pfs.over - cart.subtotal, lang)} more for free delivery`}</p>)}
+      : <p className="mb-5 rounded-2xl bg-secondary px-4 py-3 text-sm font-medium">{ar ? `ضيف ${formatMoney(pfs.over - (cart.subtotal - totalSaving), lang)} كمان والتوصيل يبقى مجاني` : `Add ${formatMoney(pfs.over - (cart.subtotal - totalSaving), lang)} more for free delivery`}</p>)}
     {!groups.length ? <div className="rounded-3xl border border-line bg-elevated px-5 py-16 text-center"><ShoppingBag className="mx-auto h-10 w-10 text-muted" /><h2 className="mt-4 text-lg font-semibold">{ar ? 'السلة لسه فاضية' : 'Your basket is empty'}</h2><p className="mt-2 text-sm text-muted">{ar ? 'ضيف منتجات من صفحات المحلات لسلة Twist.' : 'Add products from store pages to this basket.'}</p><Button to="/search" className="mt-6">{ar ? 'اكتشف المنتجات' : 'Explore products'}</Button></div> : <>
       {groups.length > 1 && (
         <div className="mb-5 flex items-center gap-3.5 rounded-2xl border border-brand/20 bg-gradient-to-r from-brand/5 via-brand/10 to-transparent p-4">

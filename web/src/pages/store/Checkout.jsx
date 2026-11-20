@@ -73,6 +73,7 @@ function Summary({ quote, items, coupon, onApply, onRemove, couponError, applyin
 
       <dl className="mt-6 space-y-2.5 border-t border-line pt-5 text-base">
         <div className="flex justify-between"><dt className="text-muted">{t('cart.subtotal')}</dt><dd className="tabular">{quote ? formatMoney(quote.subtotal, lang) : <Skeleton className="h-4 w-16" />}</dd></div>
+        {quote?.campaignDiscount > 0 && <div className="flex justify-between text-success"><dt>{lang === 'ar' ? 'خصم الحملة' : 'Sale discount'}</dt><dd className="tabular">−{formatMoney(quote.campaignDiscount, lang)}</dd></div>}
         {quote?.promoDiscount > 0 && <div className="flex justify-between text-success"><dt>{lang === 'ar' ? 'خصم العروض' : 'Offers discount'}</dt><dd className="tabular">−{formatMoney(quote.promoDiscount, lang)}</dd></div>}
         {quote?.couponDiscount > 0 && <div className="flex justify-between text-success"><dt>{t('cart.discount')}</dt><dd className="tabular">−{formatMoney(quote.couponDiscount, lang)}</dd></div>}
         <div className="flex justify-between"><dt className="text-muted">{t('cart.shipping')}</dt><dd className="tabular">{!quote ? <Skeleton className="h-4 w-12" /> : quote.shipping === 0 ? <span className="font-semibold text-success">{t('common.free')}</span> : formatMoney(quote.shipping, lang)}</dd></div>

@@ -347,6 +347,11 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
     const GARMENT = ['tops', 'bottoms', 'sport', 'suiting', 'dresses', 'outerwear', 'underwear_sleep'];
     groups = groups.filter((g) => g === setGroup || !GARMENT.includes(g.type) || g.items.some((x) => !covered.has(x.id)));
   }
+  // One product, one place: with the family only a soft prior, the same product can pass the floor in several groups (the set, the top, the
+  // bottom…). Keep it in the group where it scores best, so the shopper does not see 30 repeated cards.
+  const owner = new Map();
+  groups.forEach((g, gi) => g.items.forEach((x) => { const o = owner.get(x.id); if (!o || x.score > o.score) owner.set(x.id, { gi, score: x.score }); }));
+  groups.forEach((g, gi) => { g.items = g.items.filter((x) => owner.get(x.id).gi === gi); });
   // Safety net: nothing found in any detected family → look across the WHOLE catalogue with the full-photo vector, so a product that
   // exists but is filed/typed differently is still offered (as "closest", never as an exact match).
   if (!type && !groups.some((g) => g.items.length || g.similar.length)) { // never when the shopper picked a type themselves

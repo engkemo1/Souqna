@@ -1,6 +1,8 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { useCampaigns } from '../../lib/campaigns.js';
+import { look } from '../../lib/campaignTheme.js';
 
 const cx = (...a) => a.filter(Boolean).join(' ');
 
@@ -225,7 +227,7 @@ function Roof({ kind, y }) {
   return <g transform={`translate(40,${y})`}><path d="M-16 0 L16 0 L12 -14 L-12 -14 Z" fill={ORANGE} /><ellipse cx="-6" cy="-24" rx="7" ry="13" fill="#8FB9A0" transform="rotate(-18 -6 -16)" /><ellipse cx="7" cy="-26" rx="7" ry="14" fill="#A7C9B3" transform="rotate(16 7 -16)" /><ellipse cx="0" cy="-30" rx="6" ry="14" fill="#8FB9A0" /></g>;
 }
 
-function Shop({ shop, label, lang, count, index = 0 }) {
+function Shop({ shop, label, lang, count, index = 0, deal = null }) {
   const { x, top, wall, awning, kind, dept, sale, roof } = shop;
   const awY = top + 76, wy = top + 140, dy = top + 150;
   const known = typeof count === 'number';
@@ -249,6 +251,7 @@ function Shop({ shop, label, lang, count, index = 0 }) {
         </g>
         <Window wy={wy} kind={kind} sale={sale && !soon} soon={soon} />
         <Door dy={dy} lang={lang} soon={soon} />
+        {deal && !soon && <SaleTag x={160} y={top + 20} deal={deal} lang={lang} />}
         {/* the shop's stock, written on its stall board: a shopper sees which shops have a lot to look at */}
         {known && <g transform="translate(64,460)"><rect x="-38" y="-9" width="76" height="18" rx="9" fill={soon ? '#6C7A99' : ORANGE} /><text y="4.5" textAnchor="middle" fontSize="11" fontWeight="800" fill="#FFFFFF" className="font-display">{countLabel}</text></g>}
       </g></g>
@@ -392,6 +395,49 @@ function Cat({ x }) {
   );
 }
 
+/* ---- live Twist sale campaign (admin → حملات التخفيضات): extra pieces that only exist while a campaign runs ---- */
+const star = (r1, r2, n) => Array.from({ length: n * 2 }, (_, i) => { const a = (Math.PI * i) / n - Math.PI / 2; const r = i % 2 ? r2 : r1; return `${(Math.cos(a) * r).toFixed(1)},${(Math.sin(a) * r).toFixed(1)}`; }).join(' ');
+const STAR = star(27, 22, 14);
+/** a discount starburst pinned on a shop's sign */
+function SaleTag({ x, y, deal, lang }) {
+  const ar = lang === 'ar';
+  return (
+    <g transform={`translate(${x},${y}) rotate(-9)`} style={{ pointerEvents: 'none' }}>
+      <g className="st-pulse">
+        <polygon points={STAR} fill={deal.c2} stroke="#FFFFFF" strokeWidth="2" />
+        <text y={deal.pct ? -6 : 1} textAnchor="middle" fontSize="8.5" fontWeight="800" fill="#111" className="font-display">{ar ? 'خصم' : 'SALE'}</text>
+        {deal.pct ? <text y="11" textAnchor="middle" fontSize="17" fontWeight="900" fill="#111" className="font-display" direction="ltr">{`${deal.pct}%`}</text> : null}
+      </g>
+    </g>
+  );
+}
+/** a banner hung across the street between two ropes */
+function StreetBanner({ cx, y = 44, text, sub, c1, c2, w = 250 }) {
+  const x = cx - w / 2;
+  return (
+    <g style={{ pointerEvents: 'none' }}>
+      <path d={`M${x + 24} ${y + 2} L${x + 6} 92 M${x + w - 24} ${y + 2} L${x + w - 6} 92`} stroke={NAVY} strokeWidth="1.4" opacity="0.5" />
+      <g className="st-flap">
+        <rect x={x} y={y} width={w} height="42" rx="10" fill={c1} stroke={c2} strokeWidth="2.5" />
+        <rect x={x + 5} y={y + 5} width={w - 10} height="32" rx="7" fill="none" stroke="#FFFFFF" strokeWidth="1" opacity="0.28" />
+        <text x={cx} y={y + (sub ? 19 : 27)} textAnchor="middle" fontSize="17" fontWeight="900" fill="#FFFFFF" className="font-display">{text}</text>
+        {sub ? <text x={cx} y={y + 34} textAnchor="middle" fontSize="11" fontWeight="700" fill={c2}>{sub}</text> : null}
+      </g>
+    </g>
+  );
+}
+/** a "free delivery" flag on a pole above a delivery vehicle */
+function ShipSign({ cx, c1, c2, lang }) {
+  const ar = lang === 'ar';
+  return (
+    <g transform={`translate(${cx},652)`} style={{ pointerEvents: 'none' }}><g className="st-bob">
+      <rect x="-0.8" y="-96" width="1.6" height="18" fill={NAVY} />
+      <rect x="-42" y="-114" width="84" height="20" rx="10" fill={c2} stroke="#FFFFFF" strokeWidth="1.6" />
+      <text y="-100" textAnchor="middle" fontSize="10.5" fontWeight="900" fill={c1 === '#111111' ? '#111' : c1} className="font-display">{ar ? 'شحن مجاني' : 'Free delivery'}</text>
+    </g></g>
+  );
+}
+
 /** brand text that stays readable when its vehicle is mirrored */
 function Mark({ x, y, flip, size, fill, children, weight = 800 }) {
   return <g transform={`translate(${x},${y}) scale(${flip ? -1 : 1},1)`}><text className="font-display" textAnchor="middle" fontSize={size} fontWeight={weight} fill={fill}>{children}</text></g>;
@@ -454,15 +500,17 @@ const VEHICLES = [
 const VB_Y0 = 30; const VB_H = 640;
 const box = (x, y, w, h) => ({ position: 'absolute', left: `${(x / W) * 100}%`, top: `${((y - VB_Y0) / VB_H) * 100}%`, width: `${(w / W) * 100}%`, height: `${(h / VB_H) * 100}%`, pointerEvents: 'none' });
 
-function Vehicles() {
+const SIGN_CX = { tuk: 38, scooter: 28, van: 4 };
+function Vehicles({ ship, lang }) {
   const a = -260; const b = W + 160;
   return VEHICLES.map((v, i) => {
     const from = v.right ? a : b; const to = v.right ? b : a;
     return (
-      <div key={i} aria-hidden="true" className="st-drive" style={{ ...box(-100, 652 - 110, 200, 122), '--from': `${from / 2}%`, '--to': `${to / 2}%`, '--dd': `${v.dur}s`, '--dl': `${-v.dur * v.phase}s` }}>
+      <div key={i} aria-hidden="true" className="st-drive" style={{ ...box(-100, 652 - 134, 200, 146), '--from': `${from / 2}%`, '--to': `${to / 2}%`, '--dd': `${v.dur}s`, '--dl': `${-v.dur * v.phase}s` }}>
         <div className="st-rattle h-full w-full">
-          <svg viewBox={`-100 ${652 - 110} 200 122`} className="block h-full w-full overflow-visible">
+          <svg viewBox={`-100 ${652 - 134} 200 146`} className="block h-full w-full overflow-visible">
             {v.kind === 'tuk' ? <Tuktuk x={0} flip={v.right} /> : v.kind === 'van' ? <Van x={0} flip={v.right} /> : <Scooter x={0} flip={!v.right} />}
+            {ship && <ShipSign cx={((v.kind === 'scooter' ? !v.right : v.right) ? -1 : 1) * SIGN_CX[v.kind]} c1={ship.c1} c2={ship.c2} lang={lang} />}
           </svg>
         </div>
       </div>
@@ -558,9 +606,13 @@ const N_SWAG = Math.ceil((W + 20) / 540); const SWAG_L = (W + 20) / N_SWAG;
 const SWAGS = Array.from({ length: N_SWAG }, (_, k) => [-10 + k * SWAG_L, -10 + (k + 1) * SWAG_L, 92, 34]);
 
 /** the whole illustration — memoised so scrolling (arrow state, hint) never re-renders its ~2k nodes */
-const Art = memo(function Art({ lang, labels, counts }) {
+const BANNER_GAP = 1100;
+const Art = memo(function Art({ lang, labels, counts, camp }) {
   const ar = lang === 'ar';
-  const colors = COLORS; const swags = SWAGS;
+  const dc = camp?.discount || null; const sc = camp?.shipping || null;
+  const dl = dc ? look(dc) : null; const sl = sc ? look(sc) : null;
+  const colors = dl ? [dl.c2, dl.c1, '#FFFFFF'] : COLORS; const swags = SWAGS; // festive bunting while a discount campaign runs
+  const bannersAt = (offset) => Array.from({ length: Math.max(1, Math.round(W / BANNER_GAP)) }, (_, k) => offset + k * BANNER_GAP).filter((x) => x < W - 140);
   return (
         <div className="relative shrink-0 select-none overflow-hidden [--h:360px] sm:[--h:440px] lg:[--h:540px]" style={{ height: 'var(--h)', width: `calc(var(--h) * ${W / VB_H})`, background: 'linear-gradient(180deg,#F6F9FD 0%,#EEF3FA 50%,#F4F7FB 100%)' }}>
         <Sky />
@@ -570,7 +622,7 @@ const Art = memo(function Art({ lang, labels, counts }) {
           </defs>
           <Skyline />
 
-          {SHOPS.map((shop, index) => <Shop key={shop.dept} index={index} shop={shop} label={labels[shop.dept] || (ar ? shop.ar : shop.en)} lang={lang} count={typeof counts[shop.dept] === 'number' ? counts[shop.dept] : undefined} />)}
+          {SHOPS.map((shop, index) => <Shop key={shop.dept} index={index} shop={shop} label={labels[shop.dept] || (ar ? shop.ar : shop.en)} lang={lang} count={typeof counts[shop.dept] === 'number' ? counts[shop.dept] : undefined} deal={dc ? { pct: dc.depts?.[shop.dept] ?? dc.percent, c2: dl.c2 } : null} />)}
 
           {swags.map(([x0, x1, y0, sag], si) => (
             <g key={si}>
@@ -578,6 +630,9 @@ const Art = memo(function Art({ lang, labels, counts }) {
               {[0, 1, 2].map((ph) => <g key={ph} className="st-flutter" style={{ animationDelay: `${-ph * 0.55}s` }}>{swag(x0, x1, y0, sag, 17, colors).filter((_, i) => i % 3 === ph).map((f, i) => <path key={i} d={`M${f.x - 9} ${f.y} L${f.x + 9} ${f.y} L${f.x} ${f.y + 24} Z`} fill={f.c} />)}</g>)}
             </g>
           ))}
+
+          {dc && bannersAt(380).map((x) => <StreetBanner key={`bd${x}`} cx={x} text={dc.headline || dc.name || (ar ? 'تخفيضات' : 'Sale')} sub={dc.percent ? (ar ? `خصم ${dc.percent}% على كل المنتجات` : `${dc.percent}% off everything`) : (ar ? 'خصومات على كل المنتجات' : 'Deals on everything')} c1={dl.c1} c2={dl.c2} />)}
+          {sc && bannersAt(dc ? 930 : 380).map((x) => <StreetBanner key={`bs${x}`} cx={x} text={sc.headline || (ar ? 'الشحن علينا' : 'Free delivery')} sub={sc.min ? (ar ? `شحن مجاني من ${sc.min} جنيه` : `Free delivery over ${sc.min} EGP`) : (ar ? 'شحن مجاني على كل الطلبات' : 'Free delivery on every order')} c1={sl.c1} c2={sl.c2} w={230} />)}
 
           <rect y="480" width={W} height="86" fill="#E6EAF0" />
           {Array.from({ length: Math.ceil(W / 62) + 1 }, (_, i) => <rect key={i} x={i * 62 - 10} y="480" width="2" height="86" fill="#CBD3DE" opacity="0.7" />)}
@@ -602,14 +657,17 @@ const Art = memo(function Art({ lang, labels, counts }) {
           </g>
 
         </svg>
-        <Vehicles />
+        <Vehicles ship={sl ? { c1: sl.c1, c2: sl.c2 } : null} lang={lang} />
         </div>
   );
-}, (p, n) => p.lang === n.lang && JSON.stringify(p.labels) === JSON.stringify(n.labels) && JSON.stringify(p.counts) === JSON.stringify(n.counts));
+}, (p, n) => p.lang === n.lang && JSON.stringify(p.labels) === JSON.stringify(n.labels) && JSON.stringify(p.counts) === JSON.stringify(n.counts) && campKey(p.camp) === campKey(n.camp));
+function campKey(c) { return JSON.stringify([c?.discount && [c.discount.id, c.discount.theme, c.discount.color1, c.discount.color2, c.discount.percent, c.discount.depts, c.discount.headline, c.discount.sub], c?.shipping && [c.shipping.id, c.shipping.theme, c.shipping.color1, c.shipping.color2, c.shipping.min, c.shipping.headline]]); }
 
 /** The whole street scrolls sideways (drag, swipe, arrows): every department has its own shop, and the shop shows how much is inside. */
 export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', className = '' }) {
   const ar = lang === 'ar';
+  const { discount, shipping } = useCampaigns(); // Twist sale campaigns: sale tags on the shops, banners over the street, free-delivery flags on the vehicles
+  const camp = discount || shipping ? { discount, shipping } : null;
   const ref = useRef(null);
   const drag = useRef(null);
   const [edge, setEdge] = useState({ start: true, end: false });
@@ -636,7 +694,7 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
     const part = new IntersectionObserver((entries) => { for (const e of entries) e.target.style.animationPlayState = e.isIntersecting ? 'running' : 'paused'; }, { root: scroller, rootMargin: '0px 160px 0px 160px' });
     scroller.querySelectorAll('.st-flap,.st-wave,.st-glow,.st-sway,.st-walk,.st-step,.st-bob,.st-wag,.st-pulse,.st-flutter').forEach((n) => part.observe(n));
     return () => { whole.disconnect(); part.disconnect(); };
-  }, []);
+  }, [campKey(camp)]); // re-observe when campaign pieces (banners, sale tags) appear or change
   const onDown = (e) => { if (e.pointerType !== 'mouse') return; drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; };
   const onMove = (e) => { const d = drag.current; if (!d) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 5) d.moved = true; if (d.moved) ref.current.scrollLeft = d.left + dx; };
   const onUp = () => { setTimeout(() => { drag.current = null; }, 0); };
@@ -688,7 +746,7 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
         className="no-scrollbar scrollbar-none cursor-grab overflow-x-auto overscroll-x-contain active:cursor-grabbing"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        <Art lang={lang} labels={labels} counts={counts} />
+        <Art lang={lang} labels={labels} counts={counts} camp={camp} />
       </div>
 
       {/* edge fades + arrows */}

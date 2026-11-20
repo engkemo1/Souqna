@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
 import SaleCountdown from './SaleCountdown.jsx';
+import DiscountBadge from '../campaign/DiscountBadge.jsx';
 import { Link } from 'react-router-dom';
 import { Heart, ShoppingBag, Plus, ArrowLeftRight } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -84,7 +85,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
           {/* One or two badges at most, by priority — a stack of three reads as noise. */}
           {[
             p.badge && <span key="b" className={cx('rounded-full px-2 py-0.5 text-xs font-bold', tone)}>{p.badge.text}</span>,
-            p.discount > 0 && <span key="d" className="rounded-full bg-sale px-2 py-0.5 text-xs font-bold text-on-sale tabular sm:text-xs">-{p.discount}%</span>,
+            p.discount > 0 && <DiscountBadge key="d" pct={p.discount} campaign={p.campaign} />,
             p.offer && !out && <OfferChip key="o" offer={p.offer} className="max-w-[9.5rem]" />,
             p.isNew && !out && <span key="n" className="rounded-full bg-neutral-900/85 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur sm:text-xs">{t('product.new')}</span>,
           ].filter(Boolean).slice(0, 2)}
@@ -151,7 +152,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
           )}
         </div>
         <Price value={p.price} compareAt={p.compareAt} size="sm" className={cx('mt-1.5 sm:[&>span:first-child]:text-base', bubble && '[&>span:first-child]:font-extrabold')} />
-        <SaleCountdown ms={p.saleEndsAt} variant="chip" className="mt-1.5" />
+        <SaleCountdown ms={p.saleEndsAt} campaign={p.campaign} variant="chip" className="mt-1.5" />
         <ColorDots colors={p.colors} className="mt-2" />
       </div>
     </motion.article>

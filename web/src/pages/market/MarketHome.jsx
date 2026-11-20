@@ -28,6 +28,7 @@ import BuyAgain from '../../components/market/BuyAgain.jsx';
 import SimilarViewed from '../../components/market/SimilarViewed.jsx';
 import StoreStrip from '../../components/market/StoreStrip.jsx';
 import StoreCard from '../../components/market/StoreCard.jsx';
+import CampaignHero from '../../components/campaign/CampaignHero.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { cx } from '../../components/ui/cx.js';
@@ -89,6 +90,7 @@ export default function MarketHome() {
   return (
     <div className="min-h-dvh bg-[#F6F8FB] ">
       <MarketHeader />
+      <CampaignHero />
       <StoriesBar />
       <FeaturedSlot placement="market_top" />
 

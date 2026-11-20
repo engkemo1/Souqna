@@ -5,6 +5,7 @@ import { q, json } from '../db/index.js';
 import { mediaMap, getMedia, serializeMedia } from './media.js';
 import { sameDayActive, cairoNow } from './sameDay.js';
 import { storeHours } from './hours.js';
+import { cardPricing } from './sale-campaigns.js';
 
 export const bi = (row, field) => ({ ar: row[`${field}_ar`] ?? '', en: row[`${field}_en`] ?? '' });
 
@@ -101,14 +102,16 @@ export function serializeCards(rows) {
   const sd = new Map(q.all(`SELECT id, same_day_date, same_day_until FROM stores WHERE id IN (${[...new Set(rows.map((r) => r.store_id))].map(() => '?').join(',')})`, [...new Set(rows.map((r) => r.store_id))]).map((x) => [x.id, sameDayActive(x, nowC)]));
   return rows.map((p) => {
     const images = (byProduct.get(p.id) || []).map((id) => media.get(id)).filter(Boolean);
+    const cp = cardPricing(p); // Twist-wide sale campaign (null when the product isn't in it)
     return {
       id: p.id,
       slug: p.slug,
       name: bi(p, 'name'),
-      price: p.price,
-      compareAt: p.compare_at_price && p.compare_at_price > p.price ? p.compare_at_price : null,
-      discount: p.compare_at_price > p.price ? Math.round((1 - p.price / p.compare_at_price) * 100) : 0,
-      saleEndsAt: p.compare_at_price > p.price && p.sale_ends_at > Date.now() ? p.sale_ends_at : null, // a timed discount: when it ends (ms)
+      price: cp ? cp.price : p.price,
+      compareAt: cp ? cp.compareAt : p.compare_at_price && p.compare_at_price > p.price ? p.compare_at_price : null,
+      discount: cp ? cp.discount : p.compare_at_price > p.price ? Math.round((1 - p.price / p.compare_at_price) * 100) : 0,
+      saleEndsAt: cp ? cp.endsAt : p.compare_at_price > p.price && p.sale_ends_at > Date.now() ? p.sale_ends_at : null, // a timed discount: when it ends (ms)
+      campaign: cp ? { id: cp.id, name: cp.name, endsAt: cp.endsAt } : null,
       image: images[0] || null,
       hoverImage: images[1] || null,
       colors: json(p.colors_json, []),

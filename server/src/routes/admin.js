@@ -40,6 +40,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { waUsage, saveWaRates } from '../lib/wa-cost.js';
 import { quotaView, setQuota } from '../lib/wa-quota.js';
+import { listCampaigns, getCampaign, saveCampaign, setCampaignStatus, deleteCampaign, estimate as estimateCampaign, campaignReport } from '../lib/sale-campaigns.js';
 import { isWhatsAppConfigured, notifyPlatformDelivery, saveWaSettings, waSettingsView, sendWaTest, sendNewOrderAlert, sendCustomerOrderTest } from '../lib/whatsapp.js';
 import { mountCashierAdmin } from './admin-cashier.js';
 import { adminStoryStores, setStoriesAllowed, setAllStoriesAllowed, adminActiveStories, adminRemoveStory, addPlatformStory, searchStoryProducts, PLATFORM_MAX_ACTIVE, PLATFORM_HOURS } from '../lib/stories.js';
@@ -917,6 +918,30 @@ r.put('/whatsapp/rates', h((req, res) => {
   saveWaRates(b);
   res.json(waUsage(Number(req.query.days) || 30));
 }));
+/* ---- Twist-wide sale campaigns (Black Friday discount + free shipping) ---- */
+const campaignBody = z.object({
+  kind: z.enum(['discount', 'shipping']).optional(), name: z.string().max(80).optional(), status: z.enum(['draft', 'active', 'ended']).optional(),
+  startsAt: z.number().optional(), endsAt: z.number().optional(), percent: z.number().min(0).max(90).optional(),
+  deptPercent: z.record(z.string().max(40), z.number().min(0).max(90)).optional(), mode: z.enum(['best', 'skip', 'override', 'stack']).optional(),
+  allowCoupons: z.boolean().optional(), respectExcl: z.boolean().optional(), minSubtotal: z.number().min(0).optional(),
+  storeIds: z.array(z.number()).max(500).optional(), budget: z.number().min(0).optional(),
+  headline: z.string().max(80).optional(), sub: z.string().max(140).optional(),
+  theme: z.enum(['blackfriday', 'newyear', 'ramadan', 'eid', 'valentine', 'summer', 'sale']).optional(), color1: z.string().max(9).optional(), color2: z.string().max(9).optional(), fallGlyphs: z.string().max(40).optional(), fallDensity: z.enum(['off', 'low', 'medium', 'high']).optional(), fallSpeed: z.enum(['calm', 'normal', 'lively']).optional(),
+  showBar: z.boolean().optional(), showFall: z.boolean().optional(), fallStyle: z.enum(['percent', 'tags', 'coins', 'stars', 'snow']).optional(), showHero: z.boolean().optional(),
+}).passthrough();
+const campErr = (r) => {
+  if (!r.error) return false;
+  const msg = { not_found: 'الحملة مش موجودة', ends_before_start: 'وقت النهاية لازم يكون بعد البداية', percent_required: 'اكتب نسبة الخصم (عامة أو لقسم)', overlap: `فيه حملة تانية شغالة في نفس الوقت: ${r.with?.name || ''}`, already_over: 'الحملة دي وقتها خلص', has_orders: 'الحملة عليها طلبات — اقفلها بدل ما تمسحها' }[r.error] || r.error;
+  throw new AppError(r.error === 'not_found' ? 404 : 400, r.error, msg);
+};
+r.get('/sale-campaigns', h((_req, res) => res.json({ campaigns: listCampaigns(), stores: q.all("SELECT id, name_ar AS name FROM stores WHERE status='active' ORDER BY name_ar"), departments: q.all('SELECT slug, name_ar AS name FROM departments WHERE active=1 ORDER BY sort, id') })));
+r.post('/sale-campaigns/estimate', h((req, res) => res.json(estimateCampaign(campaignBody.parse(req.body || {})))));
+r.post('/sale-campaigns', h((req, res) => { const out = saveCampaign(campaignBody.parse(req.body || {})); campErr(out); res.json(out); }));
+r.put('/sale-campaigns/:id', h((req, res) => { const out = saveCampaign(campaignBody.parse(req.body || {}), Number(req.params.id)); campErr(out); res.json(out); }));
+r.post('/sale-campaigns/:id/status', h((req, res) => { const { status } = z.object({ status: z.enum(['draft', 'active', 'ended']) }).parse(req.body); const out = setCampaignStatus(Number(req.params.id), status); campErr(out); res.json(out); }));
+r.get('/sale-campaigns/:id/report', h((req, res) => { const out = campaignReport(Number(req.params.id)); if (!out) return res.status(404).json({ error: 'not_found' }); res.json(out); }));
+r.delete('/sale-campaigns/:id', h((req, res) => { const out = deleteCampaign(Number(req.params.id)); campErr(out); res.json(out); }));
+
 r.get('/whatsapp/quota', h((_req, res) => res.json(quotaView())));
 r.put('/whatsapp/quota', h((req, res) => {
   const n = z.coerce.number().int().min(0).max(100000);
