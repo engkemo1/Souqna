@@ -12,10 +12,11 @@ import sharp from 'sharp';
 import { q } from '../db/index.js';
 import { readMediaFile } from './media.js';
 import { visualProductFamily, visualTypeOptions } from './visual-taxonomy.js';
+import { candidatesFor, isSetName } from './visual-related.js';
 import { clipReady, clipStatus, clipEmbedImage, clipEmbedTexts, CLIP_MODEL_NAME } from './visual-clip.js';
 import { detectPerson } from './visual-person.js';
 import { cropRegions, colorDescriptor, rankConfident, normalize, toBlob, fromBlob, dominantColor, FRIENDLY_AR } from './visual-core.js';
-import { buildTextPrototypes, buildCentroids, detectItems, vectorForFamily } from './visual-classify.js';
+import { buildTextPrototypes, buildCentroids, detectItems, detectSet, vectorForFamily } from './visual-classify.js';
 
 const GRID_W = 6, GRID_H = 8, HUE_BINS = 12;
 
@@ -229,7 +230,7 @@ function loadCatalog(model) {
        LEFT JOIN categories cat ON cat.id=p.category_id
       WHERE v.model=? AND p.status='active' AND (p.track_stock=0 OR p.stock>0) AND s.status='active' AND s.hidden=0
       ORDER BY v.product_id, is_primary DESC, v.slot`, [model])
-    .map((r) => ({ id: r.id, vec: fromBlob(r.vec), hist: r.hist ? fromBlob(r.hist) : null, department: r.department, family: visualProductFamily(r) }));
+    .map((r) => ({ id: r.id, vec: fromBlob(r.vec), hist: r.hist ? fromBlob(r.hist) : null, department: r.department, family: visualProductFamily(r), isSet: isSetName(r) }));
   // `vectors`: every photo (search pool; a product counts once, via its best photo). `rows`: one per product (primary photo first) — used for
   // "training": the catalogue's own labelled products become per-family centroids (used only by the CLIP classifier).
   const seen = new Set(); const rows = [];
@@ -253,6 +254,7 @@ export async function protosFor(model, cat) {
   if (textProtos?.model !== model) textProtos = { model, map: await buildTextPrototypes(clipEmbedTexts) };
   return { text: textProtos.map, centroids: cat.centroids };
 }
+
 
 /** The «closest alternatives» list (shown under the exact matches, clearly labelled) goes this far below the match floor. */
 const SIMILAR_MARGIN = { clip: 0.15, jina: 0.10, color: 0.07 };
@@ -299,14 +301,18 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
   if (isClip) {
     const protos = await protosFor(model, cat);
     if (type) { const pick = vectorForFamily(regions, protos, type); detections = [{ family: type, p: pick.p, vec: pick.vec, hist: histOf(pick.regionKey) }]; }
-    else detections = detectItems(regions, protos).map((d) => ({ ...d, hist: histOf(d.regionKey) }));
+    else {
+      detections = detectItems(regions, protos).map((d) => ({ ...d, hist: histOf(d.regionKey) }));
+      const set = detectSet(regions, protos);
+      if (set) detections.unshift({ ...set, hist: histOf('full') }); // searched IN ADDITION to the separate pieces; duplicates are folded below
+    }
   } else {
     detections = [{ family: type, p: 1, vec: regions[0].vec, hist: null }];
   }
 
   const wholeHist = await colorDescriptor(buffer).catch(() => null); // colour naming for the demand log (all models)
-  const groups = detections.map((d) => {
-    const cands = d.family ? pool.filter((r) => r.family === d.family) : pool;
+  let groups = detections.map((d) => {
+    const cands = candidatesFor(pool, d.family);
     const best = rankConfident(d.vec, d.hist, cands, { floor: -Infinity, window: Infinity, limit: 1, useColor: isClip })[0]?.score ?? null;
     const items = rankConfident(d.vec, d.hist, cands, { floor, limit, useColor: isClip });
     // «closest alternatives»: same garment type, below the strict floor, never the same products as `items`; the UI labels them honestly
@@ -318,7 +324,23 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
       color: dominantColor(d.hist || wholeHist)?.key || '', best, items, similar,
     };
   });
-  return { model, detected: groups.map(({ type: t, label, confidence }) => ({ type: t, label, confidence })), groups };
+  // A matching set that was found is one result: fold away the per-garment groups (top / bottom / whole-outfit guesses) it already covers.
+  // Separate pieces that found something ELSE (e.g. different shoes) stay, and so do all of them when no set matched.
+  const setGroup = groups.find((g) => g.type === 'set' && g.items.length);
+  if (setGroup) {
+    const covered = new Set(setGroup.items.map((x) => x.id));
+    const GARMENT = ['tops', 'bottoms', 'sport', 'suiting', 'dresses', 'outerwear', 'underwear_sleep'];
+    groups = groups.filter((g) => g === setGroup || !GARMENT.includes(g.type) || g.items.some((x) => !covered.has(x.id)));
+  }
+  // Safety net: nothing found in any detected family → look across the WHOLE catalogue with the full-photo vector, so a product that
+  // exists but is filed/typed differently is still offered (as "closest", never as an exact match).
+  if (!type && !groups.some((g) => g.items.length || g.similar.length)) { // never when the shopper picked a type themselves
+    const full = regions.find((r) => r.key === 'full') || regions[0];
+    const similar = rankConfident(full.vec, full.hist, pool, { floor: similarFloorOf(model, floor), window: Infinity, limit: 4, useColor: isClip }); // same floor as the per-type «closest» lists: never filler
+    if (similar.length) groups.push({ type: '', label: '', confidence: 0, color: dominantColor(full.hist || wholeHist)?.key || '', best: similar[0].score, items: [], similar });
+  }
+  const diag = { model, floor: Math.round(floor * 100), pool: pool.length, best: groups.map((g) => (g.best == null ? null : Math.round(g.best * 100) / 100)), families: groups.map((g) => g.type || '*') };
+  return { model, detected: groups.map(({ type: t, label, confidence }) => ({ type: t, label, confidence })), groups, diag };
 }
 
 export { VisualProviderError };

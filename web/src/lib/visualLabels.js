@@ -2,6 +2,6 @@
 export const EN_LABELS = {
   tops: 'Tops & shirts', bottoms: 'Pants & jeans', dresses: 'Dresses', suiting: 'Suits & tailoring',
   outerwear: 'Jackets & coats', modest: 'Abayas, scarves & jalabiyas', shoes: 'Shoes', bags: 'Bags',
-  accessories: 'Accessories', sport: 'Sportswear', underwear_sleep: 'Sleepwear & underwear',
+  accessories: 'Accessories', sport: 'Sportswear', underwear_sleep: 'Sleepwear & underwear', set: 'Sets & tracksuits',
 };
 export const familyLabel = (family, arLabel, lang) => (lang === 'ar' ? arLabel : (EN_LABELS[family] || arLabel));

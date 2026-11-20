@@ -481,7 +481,7 @@ r.post('/visual-search', photoUpload.single('file'), h(async (req, res) => {
   const withItems = groups.filter((g) => g.items.length);
   const first = withItems[0] || groups[0];
   // `reliable` is false when only the colour model answered (it matches colours, not garment types): the page says so honestly
-  res.json({ items: first?.items || [], total: withItems.reduce((n, g) => n + g.items.length, 0), groups, detected: found.detected, noMatch: withItems.length === 0, reliable: found.model !== 'color-v1', model: found.model });
+  res.json({ items: first?.items || [], total: withItems.reduce((n, g) => n + g.items.length, 0), groups, detected: found.detected, noMatch: withItems.length === 0, reliable: found.model !== 'color-v1', model: found.model, diag: found.diag });
 }));
 
 /** «مش شبه»: a shopper says a visual-search result does not match their photo. Only counted, never shown to other shoppers. */

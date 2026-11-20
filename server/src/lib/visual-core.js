@@ -11,6 +11,7 @@ export const FRIENDLY_AR = {
   tops: 'تيشيرتات وقمصان', bottoms: 'بناطيل وجينز', dresses: 'فساتين', suiting: 'بدل وأطقم',
   outerwear: 'جاكيتات وبالطو', modest: 'عبايات وطرح وجلاليب', shoes: 'أحذية', bags: 'شنط',
   accessories: 'إكسسوارات', sport: 'ملابس رياضية', underwear_sleep: 'بيجامات وملابس داخلية',
+  set: 'أطقم وترنجات',
 };
 
 export const dot = (a, b) => { let s = 0; const n = Math.min(a.length, b.length); for (let i = 0; i < n; i++) s += a[i] * b[i]; return s; };
@@ -172,6 +173,7 @@ export function rankConfident(queryVec, queryHist, candidates, { floor, window =
   for (const c of candidates) {
     let score = dot(queryVec, c.vec);
     if (!Number.isFinite(score)) continue;
+    if (c.penalty) score -= c.penalty; // related family / untyped product: allowed, but an exact-family product wins a tie
     if (useColor && queryHist && c.hist) {
       const cs = colorSimilarity(queryHist, c.hist);
       score += RANK.colorWeight * (cs - 0.5) - (cs < RANK.colorVetoBelow ? RANK.colorVetoPenalty : 0);

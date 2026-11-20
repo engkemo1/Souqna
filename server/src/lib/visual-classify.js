@@ -7,7 +7,7 @@
  *     the more this part is trusted (weight n/(n+40), capped), so it adapts to how local shops actually photograph.
  *  3. Outfit photos are cropped (top / bottom / feet) so one photo can yield several detected pieces.
  */
-import { cosine, softmax, normalize } from './visual-core.js';
+import { cosine, softmax, normalize, colorSimilarity } from './visual-core.js';
 
 const TEMPLATES = ['a photo of {x}', 'a product photo of {x}', 'a person wearing {x}'];
 export const FAMILY_PROMPTS = {
@@ -103,4 +103,21 @@ export function vectorForFamily(regions, protos, family) {
     if (p > pick.p) pick = { vec: r.vec, p, regionKey: r.key };
   }
   return pick;
+}
+
+/**
+ * A matching set (tracksuit, velvet suit, two-piece) photographed on a person: the upper and lower crops share the same
+ * colours and both read as clothing (not shoes/bags). Returns { family:'set', p, regionKey:'full', vec } or null.
+ * The whole-outfit vector is used, so the search compares "the set" with product photos of sets.
+ */
+export function detectSet(regions, protos, { minColor = 0.55 } = {}) {
+  const by = Object.fromEntries(regions.map((r) => [r.key, r]));
+  if (!by.upper || !by.lower || !by.full || !by.upper.hist || !by.lower.hist) return null;
+  const garment = new Set(['tops', 'bottoms', 'sport', 'suiting', 'dresses', 'outerwear', 'underwear_sleep']);
+  const top = (r) => familyProbabilities(r.vec, protos)[0];
+  const u = top(by.upper); const l = top(by.lower);
+  if (!garment.has(u.family) || !garment.has(l.family)) return null;
+  const same = colorSimilarity(by.upper.hist, by.lower.hist);
+  if (same < minColor) return null;
+  return { family: 'set', p: Math.min(0.95, 0.5 + 0.5 * same), regionKey: 'full', vec: by.full.vec };
 }
