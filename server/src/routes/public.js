@@ -41,7 +41,7 @@ import { AUDIENCE_KEYS } from '../lib/product-types.js';
 import { loadKnowledge as loadModaKnowledge } from '../lib/moda/knowledge.js';
 import { quote } from '../lib/cart.js';
 import { computeBasketDelivery, splitSharedDeliveryFee, platformFreeApplies, shippingCampaignOnly, getPlatformFreeShipping } from '../lib/deliveryRates.js';
-import { publicCampaigns, onSaleSql } from '../lib/sale-campaigns.js';
+import { publicCampaigns as publicSaleCampaigns, onSaleSql } from '../lib/sale-campaigns.js';
 import { notifyStore } from '../lib/push.js';
 import { sendNewOrderAlert, notifyPlatformAlert, notifyCustomerOrderPlaced, isWhatsAppConfigured, customerWaReady } from '../lib/whatsapp.js';
 import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
@@ -1157,13 +1157,13 @@ r.post('/marketplace/delivery-fee', h((req, res) => {
 
 r.get('/marketplace/free-shipping', h((_req, res) => {
   const s = getPlatformFreeShipping();
-  const c = publicCampaigns().shipping; // a live free-shipping campaign overrides the standing setting while it runs (unless the standing one is more generous)
+  const c = publicSaleCampaigns().shipping; // a live free-shipping campaign overrides the standing setting while it runs (unless the standing one is more generous)
   if (c && !c.scoped && (!s.enabled || c.min < s.over)) return res.json({ enabled: true, over: c.min, campaign: true, endsAt: c.endsAt, name: c.name });
   res.json(s);
 }));
 
 /** Live Twist-wide sale campaigns (discount + free shipping) for the countdown, top bar, falling effect and hero banner. */
-r.get('/campaigns/active', h((_req, res) => { res.set('Cache-Control', 'public, max-age=10'); res.json(publicCampaigns()); }));
+r.get('/campaigns/active', h((_req, res) => { res.set('Cache-Control', 'public, max-age=10'); res.json(publicSaleCampaigns()); }));
 
 r.get('/marketplace/delivery-areas', h((_req, res) => {
   const rows = q.all("SELECT id, governorate, city, fee, distance_km, lat, lng FROM delivery_rates WHERE city <> '*' ORDER BY id");
