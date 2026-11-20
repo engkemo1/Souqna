@@ -56,7 +56,7 @@ function Gate({ onAuthed }) {
 /** Polls for new delivery requests: bell counter, toast, optional sound + browser notification. */
 function useDeliveryAlerts() {
   const toast = useToast();
-  const [counts, setCounts] = useState({ open: 0, ready: 0, services: 0, sourcing: 0, custom: 0, depts: 0, products: 0 });
+  const [counts, setCounts] = useState({ open: 0, ready: 0, services: 0, sourcing: 0, custom: 0, depts: 0, products: 0, wa: 0 });
   const [recent, setRecent] = useState([]);
   const [sound, setSound] = useState(() => { try { return localStorage.getItem('bo.adminSound') !== '0'; } catch { return true; } });
   const since = useRef(null);
@@ -76,7 +76,7 @@ function useDeliveryAlerts() {
       try {
         const d = await adminApi(`/notifications${since.current ? `?since=${encodeURIComponent(since.current)}` : ''}`);
         if (stop) return;
-        setCounts({ open: d.open, ready: d.ready, services: d.servicesNew, sourcing: d.sourcingNew, custom: d.customNew || 0, depts: d.deptsPending || 0, products: d.productsIssues || 0 });
+        setCounts({ open: d.open, ready: d.ready, services: d.servicesNew, sourcing: d.sourcingNew, custom: d.customNew || 0, depts: d.deptsPending || 0, products: d.productsIssues || 0, wa: d.waUpgradeNew || 0 });
         const freshDepts = (d.deptPendingItems || []).filter((x) => !seenDepts.current.has(x.id));
         (d.deptPendingItems || []).forEach((x) => seenDepts.current.add(x.id));
         const freshStores = since.current ? (d.newStores || []) : [];
@@ -85,6 +85,7 @@ function useDeliveryAlerts() {
           for (const x of freshStores) { toast({ title: `محل جديد: ${x.name_ar}`, tone: 'info', duration: 12000 }); try { if (document.hidden && Notification?.permission === 'granted') new Notification('محل جديد', { body: x.name_ar }); } catch { /* ignore */ } }
           if (soundRef.current) beep();
         }
+        if (since.current && d.waUpgrade?.length) { for (const w of d.waUpgrade.slice().reverse()) { toast({ title: `${w.name} عايز يزوّد حد واتساب`, description: 'افتح واتساب ← إضافة المنتجات بواتساب وكلّمه', tone: 'info', duration: 15000 }); try { if (document.hidden && Notification?.permission === 'granted') new Notification('طلب زيادة حد واتساب', { body: w.name }); } catch { /* ignore */ } } if (soundRef.current) beep(); }
         if (since.current && d.custom?.length) { for (const cr of d.custom.slice().reverse()) toast({ title: `طلب تصميم مخصص من ${cr.name}`, description: cr.number, tone: 'info', duration: 10000 }); if (soundRef.current) beep(); }
         if (since.current && d.sourcing?.length) { for (const sr of d.sourcing.slice().reverse()) toast({ title: `طلب من برّه بنها: ${sr.title}`, description: sr.number, tone: 'info', duration: 10000 }); if (soundRef.current) beep(); }
         if (since.current && d.services?.length) {

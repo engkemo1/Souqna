@@ -54,7 +54,7 @@ export const NAV_GROUPS = [
     { to: '/admin/system?section=visual', icon: ScanSearch, label: 'البحث المرئي', desc: 'البحث بالصورة: حالة النموذج، نتايج التجارب، وإبلاغات «مش شبه».' },
   ] },
   { label: 'الربط والإعدادات', items: [
-    { to: '/admin/system?section=whatsapp', icon: MessageCircle, label: 'واتساب', desc: 'ربط واتساب (Meta): رسايل الأوردرات والتكلفة والاختبار.' },
+    { to: '/admin/system?section=whatsapp', icon: MessageCircle, label: 'واتساب', badge: 'wa', desc: 'ربط واتساب (Meta): رسايل الأوردرات والتكلفة والاختبار.' },
     { to: '/admin/system?section=cashier', icon: Plug, label: 'ربط الكاشير', desc: 'حالة أجهزة الكاشير المربوطة والمزامنة مع المحلات.' },
     { to: '/admin/system?section=security', icon: Server, label: 'السيرفر والنسخ', desc: 'صحة السيرفر والنسخ الاحتياطي واستخدام المساحة.' },
   ] },

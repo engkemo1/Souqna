@@ -39,6 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { waUsage, saveWaRates } from '../lib/wa-cost.js';
+import { quotaView, setQuota } from '../lib/wa-quota.js';
 import { isWhatsAppConfigured, notifyPlatformDelivery, saveWaSettings, waSettingsView, sendWaTest, sendNewOrderAlert, sendCustomerOrderTest } from '../lib/whatsapp.js';
 import { mountCashierAdmin } from './admin-cashier.js';
 import { adminStoryStores, setStoriesAllowed, setAllStoriesAllowed, adminActiveStories, adminRemoveStory, addPlatformStory, searchStoryProducts, PLATFORM_MAX_ACTIVE, PLATFORM_HOURS } from '../lib/stories.js';
@@ -916,6 +917,12 @@ r.put('/whatsapp/rates', h((req, res) => {
   saveWaRates(b);
   res.json(waUsage(Number(req.query.days) || 30));
 }));
+r.get('/whatsapp/quota', h((_req, res) => res.json(quotaView())));
+r.put('/whatsapp/quota', h((req, res) => {
+  const n = z.coerce.number().int().min(0).max(100000);
+  const body = z.object({ default: n.optional(), store_id: z.coerce.number().int().positive().optional(), limit: n.nullable().optional(), enabled: z.boolean().optional(), store_enabled: z.boolean().optional(), botNumber: z.string().max(20).optional(), planPrice: z.string().max(40).optional(), message: z.object({ upg: z.string().max(600).optional(), limit: z.string().max(600).optional(), off: z.string().max(600).optional() }).optional() }).parse(req.body || {});
+  res.json(setQuota(body));
+}));
 r.post('/whatsapp/test-order', h(async (req, res) => {
   const b = z.object({ order: z.string().trim().min(1).max(40), to: z.string().trim().min(8).max(20), kind: z.enum(['owner', 'customer']) }).parse(req.body || {});
   const o = q.get('SELECT id, number, store_id FROM orders WHERE number=? OR id=?', [b.order, /^\d+$/.test(b.order) ? Number(b.order) : -1]);
@@ -1275,12 +1282,14 @@ r.get('/notifications', h((req, res) => {
     WHERE o.delivery_by='platform' AND e.status='processing' AND e.created_at >= ? ORDER BY e.created_at DESC, e.id DESC LIMIT 10`, [since]);
   const pendingDepts = q.all('SELECT id, slug, name_ar FROM departments WHERE active=0 ORDER BY id DESC LIMIT 50').filter((d) => PENDING_RE.test(d.slug));
   const services = q.all("SELECT r.id, r.plan, r.type, r.created_at AS at, s.name_ar AS store_name FROM service_requests r JOIN stores s ON s.id=r.store_id WHERE r.created_at > ? ORDER BY r.created_at DESC LIMIT 10", [since]);
+  const waAsks = q.all("SELECT s.id, s.name_ar AS name, a.value AS at FROM app_settings a JOIN stores s ON a.key = 'wa_upgrade_' || s.id ORDER BY a.value DESC LIMIT 50");
   res.json({
     services, servicesNew: q.val("SELECT COUNT(*) FROM service_requests WHERE status='new'"),
     sourcing: q.all("SELECT id, number, title, created_at AS at FROM sourcing_requests WHERE created_at > ? ORDER BY created_at DESC LIMIT 10", [since]), sourcingNew: q.val("SELECT COUNT(*) FROM sourcing_requests WHERE status IN ('new','approved')"),
     custom: q.all("SELECT id, number, name, created_at AS at FROM custom_requests WHERE created_at > ? ORDER BY created_at DESC LIMIT 10", [since]), customNew: q.val("SELECT COUNT(*) FROM custom_requests WHERE status='new'"),
     deptsPending: pendingDepts.length, deptPendingItems: pendingDepts.map((d) => ({ id: d.id, name: d.name_ar })),
     productsIssues: countProductsWithIssues(),
+    waUpgradeNew: waAsks.length, waUpgrade: waAsks.filter((x) => x.at > since),
     newStores: q.all('SELECT id, name_ar FROM stores WHERE created_at > ? ORDER BY id DESC LIMIT 10', [since]),
     items, readyItems, now: new Date().toISOString().slice(0, 19).replace('T', ' '),
     open: q.val("SELECT COUNT(*) FROM orders WHERE delivery_by='platform' AND status NOT IN ('delivered','cancelled')"),

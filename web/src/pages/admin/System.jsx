@@ -199,6 +199,78 @@ function CashierGuidePanel() {
   );
 }
 
+/** Products added by WhatsApp: switch the feature on/off, set the monthly cap (the default and per store), and see who is using it. */
+function WaProductsPanel() {
+  const toast = useToast();
+  const { data, reload } = useAdminApi('/whatsapp/quota');
+  const [def, setDef] = useState(null);
+  const [pick, setPick] = useState('');
+  const [lim, setLim] = useState('');
+  const [msg, setMsg] = useState({});
+  const [bot, setBot] = useState(null);
+  const [price, setPrice] = useState(null);
+  const save = async (body, okText) => {
+    try { await adminApi('/whatsapp/quota', { method: 'PUT', body }); toast({ title: okText || 'اتحفظ' }); reload(); } catch (x) { toast({ tone: 'error', title: x.message }); }
+  };
+  if (!data) return <Panel title="إضافة المنتجات بواتساب"><Skeleton className="h-32 w-full" /></Panel>;
+  const shownDef = def ?? String(data.default);
+  return (
+    <Panel title="إضافة المنتجات بواتساب">
+      <div className="space-y-5">
+        <p className="text-xs text-fg-muted">كل منتج بيتضاف بواتساب بيكلّفنا حوالي رسالتين. الحد الشهري بيحمي الفاتورة، ولو محل عايز أكتر زوّد حده بعد الاشتراك. المحل دايمًا يقدر يضيف من لوحة التحكم بدون حد.</p>
+        <Switch checked={data.enabled} onChange={(v) => save({ enabled: v }, v ? 'الميزة اتفعّلت لكل المحلات' : 'الميزة اتقفلت لكل المحلات')} label="تفعيل الإضافة بواتساب" description="لو قفلتها، أي صاحب محل يبعت صورة هيجيله رد إن الخدمة موقوفة، ومفيش منتج بيتحط." />
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="block"><span className="mb-1.5 block text-sm font-medium">سعر الاشتراك الشهري (نص يظهر للمحلات، اختياري)</span><Input placeholder="مثلاً 49 ج.م/شهر" maxLength={40} value={price ?? data.planPrice} onChange={(e) => setPrice(e.target.value)} className="w-56" /></label>
+          <button type="button" onClick={async () => { await save({ planPrice: price ?? data.planPrice }, 'اتحفظ السعر'); setPrice(null); }} className="rounded-full bg-btn px-5 py-2 text-sm font-bold text-on-btn">حفظ السعر</button>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="block"><span className="mb-1.5 block text-sm font-medium">رقم واتساب الأعمال اللي أصحاب المحلات بيبعتوله الصور</span><Input dir="ltr" inputMode="tel" placeholder="2010xxxxxxxx" value={bot ?? data.botNumber} onChange={(e) => setBot(e.target.value.replace(/[^\d+ ]/g, ''))} className="w-56 text-start" /></label>
+          <button type="button" onClick={async () => { await save({ botNumber: bot ?? data.botNumber }, 'اتحفظ الرقم'); setBot(null); }} className="rounded-full bg-btn px-5 py-2 text-sm font-bold text-on-btn">حفظ الرقم</button>
+        </div>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="block"><span className="mb-1.5 block text-sm font-medium">الحد الشهري الافتراضي لكل محل (قطعة)</span><Input dir="ltr" inputMode="numeric" value={shownDef} onChange={(e) => setDef(e.target.value.replace(/\D/g, ''))} className="w-32 text-start" /></label>
+          <button type="button" onClick={() => { save({ default: Number(shownDef) || 0 }); setDef(null); }} className="rounded-full bg-btn px-5 py-2 text-sm font-bold text-on-btn">حفظ</button>
+        </div>
+        <div className="space-y-3 rounded-xl border border-line p-3">
+          <div className="text-sm font-semibold">الرسايل اللي بتتبعت لصاحب المحل</div>
+          <label className="block"><span className="mb-1.5 block text-xs text-fg-muted">لما يوصل للحد الشهري (اكتب {'{limit}'} عشان يتحط رقم الحد). سيبها فاضية للنص الافتراضي.</span>
+            <Textarea rows={3} value={msg.limit ?? data.messages.limit} placeholder={data.defaults.limit} onChange={(e) => setMsg({ ...msg, limit: e.target.value })} /></label>
+          <label className="block"><span className="mb-1.5 block text-xs text-fg-muted">الرد بعد ما يضغط «عايز أزوّد الحد». سيبها فاضية للنص الافتراضي.</span>
+            <Textarea rows={2} value={msg.upg ?? data.messages.upg} placeholder={data.defaults.upg} onChange={(e) => setMsg({ ...msg, upg: e.target.value })} /></label>
+          <label className="block"><span className="mb-1.5 block text-xs text-fg-muted">لما الميزة تكون موقوفة (عامة أو للمحل ده). سيبها فاضية للنص الافتراضي.</span>
+            <Textarea rows={3} value={msg.off ?? data.messages.off} placeholder={data.defaults.off} onChange={(e) => setMsg({ ...msg, off: e.target.value })} /></label>
+          <button type="button" disabled={msg.limit === undefined && msg.off === undefined && msg.upg === undefined} onClick={async () => { await save({ message: msg }, 'اتحفظت الرسايل'); setMsg({}); }} className="rounded-full bg-btn px-5 py-2 text-sm font-bold text-on-btn disabled:opacity-40">حفظ الرسايل</button>
+        </div>
+        <div className="space-y-2 rounded-xl border border-line p-3">
+          <div className="text-sm font-semibold">تعديل محل بعينه (اشتراك أو إيقاف)</div>
+          <div className="flex flex-wrap items-end gap-2">
+            <select value={pick} onChange={(e) => { setPick(e.target.value); const s = data.stores.find((x) => String(x.id) === e.target.value); setLim(s ? String(s.limit) : ''); }} className="h-10 min-w-[12rem] rounded-xl border border-line-strong bg-elevated px-3 text-sm">
+              <option value="">اختار المحل</option>
+              {data.all.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <Input dir="ltr" inputMode="numeric" placeholder="الحد" value={lim} onChange={(e) => setLim(e.target.value.replace(/\D/g, ''))} className="w-28 text-start" />
+            <button type="button" disabled={!pick || lim === ''} onClick={() => save({ store_id: Number(pick), limit: Number(lim) }, 'اتحفظ حد المحل')} className="rounded-full bg-btn px-4 py-2 text-sm font-bold text-on-btn disabled:opacity-40">حفظ حد المحل</button>
+            <button type="button" disabled={!pick} onClick={() => { save({ store_id: Number(pick), limit: null }, 'رجع للحد الافتراضي'); setLim(''); }} className="rounded-full border border-line-strong px-4 py-2 text-sm font-semibold disabled:opacity-40">رجّعه للافتراضي</button>
+          </div>
+        </div>
+        {data.stores.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-line p-4 text-sm text-fg-muted">لسه مفيش محل استخدم الإضافة بواتساب.</p>
+        ) : (
+          <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="text-xs text-fg-muted"><th className="py-1 text-start">المحل</th><th className="text-start">الشهر ده</th><th className="text-start">الحد</th><th className="text-start">مفعّل</th></tr></thead>
+            <tbody>{data.stores.map((s) => (
+              <tr key={s.id} className="border-t border-line">
+                <td className="py-1.5">{s.name}{s.requested ? <span className="ms-2 rounded-full bg-brand/10 px-2 py-0.5 text-xs font-bold text-brand">طلب زيادة</span> : null}</td>
+                <td className={s.used >= s.limit ? 'font-bold text-danger' : ''}>{s.used}</td>
+                <td>{s.limit}{s.custom ? ' ✱' : ''}</td>
+                <td><Switch checked={s.enabled} onChange={(v) => save({ store_id: s.id, store_enabled: v }, v ? 'اتفعّل للمحل' : 'اتوقف للمحل')} label="" /></td>
+              </tr>))}</tbody></table>
+            <p className="mt-1 text-xs text-fg-muted">✱ حد مخصص للمحل ده.</p></div>
+        )}
+      </div>
+    </Panel>
+  );
+}
+
 const WA_CAT_LABEL = { utility: 'خدمية (تحديثات الطلبات)', authentication: 'كود دخول', marketing: 'تسويقية', service: 'ردود خلال 24 ساعة (مجانية)', unknown: 'غير محددة' };
 
 /** What WhatsApp messages cost: counts come from Meta's delivery receipts, the price per message is typed in from the Meta invoice. */
@@ -1214,7 +1286,7 @@ export default function System() {
           </>}
           {section === 'visual' && <VisualPanel />}
           {section === 'cashier' && <><CashierSyncPanel /><CashierGuidePanel /></>}
-          {section === 'whatsapp' && (<><WhatsAppPanel /><div className="mt-4"><WaCostPanel /></div></>)}
+          {section === 'whatsapp' && (<><WhatsAppPanel /><div className="mt-4"><WaProductsPanel /></div><div className="mt-4"><WaCostPanel /></div></>)}
           {section === 'moda' && <>
           <StylistPanel />
           <ModaPromptsPanel />

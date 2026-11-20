@@ -17,6 +17,8 @@ export const RELATED_FAMILIES = {
 /** score taken off a candidate that is only a related family / has no recorded type, so exact-family products still win ties */
 export const RELATED_PENALTY = 0.03;
 export const UNTYPED_PENALTY = 0.045;
+/** a product of an UNRELATED family stays searchable (the detected family is a guess), with a bigger penalty and `soft: true` (never used for the «closest» lists) */
+export const OTHER_PENALTY = 0.07;
 
 /** names that say "this is a matching set" (ترنج / طقم / سوت / سلوبيت / بدلة …) */
 const SET_NAME = /(طقم|ترنج|ترينج|تريننج|سوت|بدل[ةه]|سلوبيت|تراك\s?سوت|تراك|مجموع[ةه]|two[\s-]?piece|track\s?suit|jogging\s?suit|\bset\b|\bsuit\b|co-?ord)/i;
@@ -28,7 +30,7 @@ export const isSetName = (row) => SET_NAME.test(`${row?.name_ar || ''} ${row?.na
  * exact-family products still win ties. `set` = a matching outfit: products named طقم/ترنج/سوت… or filed under sport/suiting.
  * pool rows: { id, vec, hist, family, isSet }
  */
-export function candidatesFor(pool, family) {
+export function candidatesFor(pool, family, { strict = false } = {}) {
   if (!family) return pool;
   if (family === 'set') {
     return pool.filter((r) => r.isSet || r.family === 'suiting' || r.family === 'sport')
@@ -40,6 +42,9 @@ export function candidatesFor(pool, family) {
     if (r.family === family) out.push(r);
     else if (related.has(r.family)) out.push({ ...r, penalty: RELATED_PENALTY });
     else if (!r.family) out.push({ ...r, penalty: UNTYPED_PENALTY });
+    // The family was GUESSED from the photo (a flat-lay jacket may read as "bottoms"). Unless the shopper chose the type themselves
+    // (strict), keep the other families searchable too: a genuinely similar photo still wins, the penalty keeps the guess meaningful.
+    else if (!strict) out.push({ ...r, penalty: OTHER_PENALTY, soft: true });
   }
   return out;
 }

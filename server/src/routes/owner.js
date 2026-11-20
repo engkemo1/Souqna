@@ -11,6 +11,7 @@ import { productTypeTree, deriveDepartment, audienceOrNull, AUDIENCE_KEYS } from
 import { inferGender, inferKey } from '../lib/moda/products.js';
 import { notifyPlatformDelivery, notifyPlatformService } from '../lib/whatsapp.js';
 import { notifyPlatformAlert } from '../lib/whatsapp.js';
+import { ownerView as waProductsView } from '../lib/wa-quota.js';
 import { h, notFound, badRequest, AppError } from '../lib/errors.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { requireOwner } from '../lib/auth.js';
@@ -88,6 +89,7 @@ r.get('/notifications', h((req, res) => {
   res.json({ pending, adminFlagged, newOrders, now: nowIso() });
 }));
 
+r.get('/wa-products', h((req, res) => res.json(waProductsView(req.store))));
 r.get('/store', h((req, res) => {
   const t = buildTheme(json(req.store.theme_json, {}));
   res.json({ store: serializeStore(req.store), user: req.user, themeReport: t.report, themeChecks: t.checks, features: (() => { const a = cashierAccess(req.store.id); const own = q.val('SELECT cashier_id FROM store_cashier_links WHERE store_id=?', [req.store.id]) === 'twist'; return { cashier: a.allowed, cashierState: a.state, cashierEndsAt: a.endsAt, pos: a.allowed && own, stories: storiesAllowed(req.store.id) }; })() });

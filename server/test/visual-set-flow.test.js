@@ -51,3 +51,16 @@ test('a same-colour top + bottom that is NOT a set still searches the pieces (no
   const out = await visual.searchByImage(black, { _model: 'fake-clip' });
   assert.ok(out.groups.flatMap((g) => g.items.map((x) => x.id)).includes(5), 'the typed top is still found');
 });
+
+test('adaptive standout: below the absolute floor but clearly the best of the pool → accepted; an unrelated photo → nothing', async () => {
+  rows.length = 0;
+  for (let i = 0; i < 40; i++) add(100 + i, `تيشيرت ${i}`, 'tops', [0.5 + (i % 7) * 0.02, 0.5 - (i % 5) * 0.02, 0.5 + (i % 3) * 0.03]);
+  add(7, 'تيشيرت ازرق', 'tops', [0.1, 0.2, 0.9]);
+  visual.invalidateVisualCache();
+  const solidImg = (r, g, b) => sharp({ create: { width: 400, height: 400, channels: 3, background: { r, g, b } } }).jpeg().toBuffer();
+  const hit = await visual.searchByImage(await solidImg(51, 77, 204), { type: 'tops', _model: 'fake-clip', _floor: 0.9999 });
+  assert.deepEqual(hit.groups[0].items.map((x) => x.id), [7], 'the standout product is accepted');
+  assert.equal(hit.diag.adaptive, true);
+  const none = await visual.searchByImage(await solidImg(230, 40, 40), { type: 'tops', _model: 'fake-clip', _floor: 0.9999 });
+  assert.deepEqual(none.groups[0].items, [], 'nothing stands out → nothing');
+});

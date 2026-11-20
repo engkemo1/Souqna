@@ -168,26 +168,47 @@ export const RANK = {
  * candidates: [{ id, vec, hist? }]. Returns only confident matches, best first — possibly an empty list.
  * score = cosine + small colour adjustment; kept if score >= floor AND within `window` of the best score.
  */
-export function rankConfident(queryVec, queryHist, candidates, { floor, window = RANK.window, limit = 24, useColor = true } = {}) {
-  const scored = [];
-  for (const c of candidates) {
-    let score = dot(queryVec, c.vec);
-    if (!Number.isFinite(score)) continue;
-    if (c.penalty) score -= c.penalty; // related family / untyped product: allowed, but an exact-family product wins a tie
-    if (useColor && queryHist && c.hist) {
-      const cs = colorSimilarity(queryHist, c.hist);
-      score += RANK.colorWeight * (cs - 0.5) - (cs < RANK.colorVetoBelow ? RANK.colorVetoPenalty : 0);
-    }
-    scored.push({ id: c.id, score });
-  }
-  // a product can have several photos: it counts once, with its best-matching photo
+export function rankConfident(queryVec, queryHist, candidates, { floor, window = RANK.window, limit = 24, useColor = true, extraQueries = [] } = {}) {
+  // `extraQueries` [{ vec, hist }]: more views of the same photo (e.g. the whole photo next to the cropped garment). A product is scored by its
+  // BEST query: the catalogue vectors are whole-photo vectors, so a garment crop alone scores noticeably lower than the whole photo of the same item.
+  const queries = [{ vec: queryVec, hist: queryHist }, ...extraQueries];
+  // a product can have several photos: it counts once, with its best-matching photo (and best query)
   const bestById = new Map();
-  for (const x of scored) if (!(bestById.get(x.id) >= x.score)) bestById.set(x.id, x.score);
-  if (bestById.size !== scored.length) { scored.length = 0; for (const [id, score] of bestById) scored.push({ id, score }); }
+  for (const qy of queries) {
+    for (const c of candidates) {
+      let score = dot(qy.vec, c.vec);
+      if (!Number.isFinite(score)) continue;
+      if (c.penalty) score -= c.penalty; // related family / untyped product: allowed, but an exact-family product wins a tie
+      if (useColor && qy.hist && c.hist) {
+        const cs = colorSimilarity(qy.hist, c.hist);
+        score += RANK.colorWeight * (cs - 0.5) - (cs < RANK.colorVetoBelow ? RANK.colorVetoPenalty : 0);
+      }
+      if (!(bestById.get(c.id) >= score)) bestById.set(c.id, score);
+    }
+  }
+  const scored = [...bestById].map(([id, score]) => ({ id, score }));
   scored.sort((a, b) => b.score - a.score);
   const best = scored[0]?.score;
   if (best === undefined || best < floor) return [];
   return scored.filter((x) => x.score >= floor && x.score >= best - window).slice(0, limit);
+}
+
+/**
+ * Adaptive second chance for a query whose best product is below the absolute floor (a worn photo vs a flat-lay catalogue photo
+ * always scores lower than a re-shot of the same photo). It is accepted only when it STANDS OUT from the whole candidate pool:
+ * z-score of the best product over all candidate scores, a clear gap to the runner-up, and a still-sane absolute score (`minScore`).
+ * Needs enough candidates for the statistics. Returns [] when nothing stands out — so an unrelated photo still gets nothing.
+ * candidates: [{ id, vec, hist?, penalty? }] → [{ id, score, z }]
+ */
+export function rankStandout(queryVec, queryHist, candidates, { minScore, minZ = 3.5, minGap = 0.02, minPool = 30, window = 0.04, limit = 6, useColor = true, extraQueries = [] } = {}) {
+  const all = rankConfident(queryVec, queryHist, candidates, { floor: -Infinity, window: Infinity, limit: Infinity, useColor, extraQueries });
+  if (all.length < minPool) return [];
+  const n = all.length; const mean = all.reduce((a, x) => a + x.score, 0) / n;
+  const sd = Math.sqrt(all.reduce((a, x) => a + (x.score - mean) ** 2, 0) / n) || 1e-9;
+  const top = all[0];
+  const z = (top.score - mean) / sd;
+  if (top.score < minScore || z < minZ || (top.score - (all[1]?.score ?? -1) < minGap && z < minZ + 1)) return [];
+  return all.filter((x) => x.score >= top.score - window && (x.score - mean) / sd >= minZ - 0.5).slice(0, limit).map((x) => ({ ...x, z: (x.score - mean) / sd }));
 }
 
 export const toBlob = (f32) => Buffer.from(f32.buffer, f32.byteOffset, f32.byteLength);

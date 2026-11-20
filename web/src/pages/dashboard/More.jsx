@@ -5,6 +5,7 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { useNav } from './DashboardLayout.jsx';
 import { StoreLogo } from '../../components/store/StoreChrome.jsx';
 import AppAlertsCard from '../../components/dash/AppAlertsCard.jsx';
+import WaProductsCard from '../../components/dash/WaProductsCard.jsx';
 import InstallStoreApp from '../../components/auth/InstallStoreApp.jsx';
 import BiometricToggle from '../../components/auth/BiometricToggle.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
@@ -34,6 +35,7 @@ export default function More() {
           </ul>
         </div>
       ))}
+      <WaProductsCard className="mb-5" />
       <AppAlertsCard className="mb-5" />
       <InstallStoreApp className="mb-5" />
       <BiometricToggle className="mb-5" />

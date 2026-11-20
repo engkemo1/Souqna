@@ -7,6 +7,7 @@ import { q, db } from '../db/index.js';
 import { cairoNow } from './sameDay.js';
 import { shiftDay } from './traffic.js';
 import { notifyPlatformAlert } from './whatsapp.js';
+import { waDigestLines } from './wa-quota.js';
 
 const money = (n) => new Intl.NumberFormat('en-US').format(Math.round(n || 0));
 
@@ -29,6 +30,7 @@ export function buildReport(day, offset = cairoOffsetHours()) {
   if (top) lines.push(`أعلى محل: ${top.name} (${top.n} طلب)`);
   lines.push(`محلات جديدة: ${stores} · عملاء جدد: ${buyers}`);
   if (ads && (ads.v || ads.c)) lines.push(`الإعلانات المميزة: ${money(ads.v)} مشاهدة · ${money(ads.c)} نقرة`);
+  try { lines.push(...waDigestLines(day, mod)); } catch { /* the WhatsApp-products section is optional */ }
   return { text: lines.join('\n'), orders: o.n, sales: o.sales };
 }
 

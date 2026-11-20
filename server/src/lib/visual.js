@@ -15,7 +15,7 @@ import { visualProductFamily, visualTypeOptions } from './visual-taxonomy.js';
 import { candidatesFor, isSetName } from './visual-related.js';
 import { clipReady, clipStatus, clipEmbedImage, clipEmbedTexts, CLIP_MODEL_NAME } from './visual-clip.js';
 import { detectPerson } from './visual-person.js';
-import { cropRegions, colorDescriptor, rankConfident, normalize, toBlob, fromBlob, dominantColor, FRIENDLY_AR } from './visual-core.js';
+import { cropRegions, colorDescriptor, rankConfident, rankStandout, normalize, toBlob, fromBlob, dominantColor, FRIENDLY_AR } from './visual-core.js';
 import { buildTextPrototypes, buildCentroids, detectItems, detectSet, vectorForFamily } from './visual-classify.js';
 
 const GRID_W = 6, GRID_H = 8, HUE_BINS = 12;
@@ -230,7 +230,7 @@ function loadCatalog(model) {
        LEFT JOIN categories cat ON cat.id=p.category_id
       WHERE v.model=? AND p.status='active' AND (p.track_stock=0 OR p.stock>0) AND s.status='active' AND s.hidden=0
       ORDER BY v.product_id, is_primary DESC, v.slot`, [model])
-    .map((r) => ({ id: r.id, vec: fromBlob(r.vec), hist: r.hist ? fromBlob(r.hist) : null, department: r.department, family: visualProductFamily(r), isSet: isSetName(r) }));
+    .map((r) => ({ id: r.id, slot: r.slot, vec: fromBlob(r.vec), hist: r.hist ? fromBlob(r.hist) : null, department: r.department, family: visualProductFamily(r), isSet: isSetName(r) }));
   // `vectors`: every photo (search pool; a product counts once, via its best photo). `rows`: one per product (primary photo first) — used for
   // "training": the catalogue's own labelled products become per-family centroids (used only by the CLIP classifier).
   const seen = new Set(); const rows = [];
@@ -259,6 +259,8 @@ export async function protosFor(model, cat) {
 /** The «closest alternatives» list (shown under the exact matches, clearly labelled) goes this far below the match floor. */
 const SIMILAR_MARGIN = { clip: 0.15, jina: 0.10, color: 0.07 };
 const SIMILAR_MAX = 8;
+/** how far below the best match a product may be and still count as a match (CLIP): look-alike listings of one garment, or one item in several colours, sit close together */
+const ITEM_WINDOW_CLIP = 0.12;
 const similarFloorOf = (model, floor) => Math.max(0.4, floor - (model === CLIP_MODEL_NAME ? SIMILAR_MARGIN.clip : model === JINA_MODEL ? SIMILAR_MARGIN.jina : SIMILAR_MARGIN.color));
 const floorOf = (settings, model) => (model === CLIP_MODEL_NAME ? settings.minSimilarityByModel.clip : model === JINA_MODEL ? settings.minSimilarityByModel.jina : settings.minSimilarityByModel.color) / 100;
 
@@ -269,7 +271,7 @@ const floorOf = (settings, model) => (model === CLIP_MODEL_NAME ? settings.minSi
  * With `type`: only that family. A group with no item above the quality gate simply has an empty `items` list —
  * nothing weak is ever added as filler; the UI offers a sourcing request instead.
  */
-export async function searchByImage(buffer, { department = '', type = '', limit = 24, _model } = {}) {
+export async function searchByImage(buffer, { department = '', type = '', limit = 24, _model, _floor, _excludeSlot, _expectId } = {}) {
   if (type && !visualTypeOptions().some((candidate) => candidate.key === type)) throw new VisualProviderError('Unknown item type.', 422);
   const settings = visualSettings();
   const model = _model || await activeModel();
@@ -278,7 +280,7 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
   if (isClip && !_model && !cat.vectors.length && loadCatalog('color-v1').vectors.length) {
     return searchByImage(buffer, { department, type, limit, _model: 'color-v1' });
   }
-  const floor = floorOf(settings, model);
+  const floor = Number.isFinite(_floor) ? _floor : floorOf(settings, model);
 
   let regions;
   if (isClip) {
@@ -294,7 +296,8 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
     regions = [{ key: 'full', vec: (await embedImage(buffer, model)).vec, hist: null }];
   }
 
-  const pool = department ? cat.vectors.filter((r) => r.department === department) : cat.vectors;
+  let pool = department ? cat.vectors.filter((r) => r.department === department) : cat.vectors;
+  if (_excludeSlot) pool = pool.filter((r) => r.slot !== _excludeSlot); // evaluation hook: leave one photo out
   const histOf = (key) => regions.find((r) => r.key === key)?.hist || null;
 
   let detections;
@@ -311,17 +314,29 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
   }
 
   const wholeHist = await colorDescriptor(buffer).catch(() => null); // colour naming for the demand log (all models)
+  const fullRegion = regions.find((r) => r.key === 'full');
   let groups = detections.map((d) => {
-    const cands = candidatesFor(pool, d.family);
-    const best = rankConfident(d.vec, d.hist, cands, { floor: -Infinity, window: Infinity, limit: 1, useColor: isClip })[0]?.score ?? null;
-    const items = rankConfident(d.vec, d.hist, cands, { floor, limit, useColor: isClip });
+    // the whole photo is searched too (catalogue vectors are whole-photo vectors); a product is scored by the better of the two views
+    const extraQueries = isClip && fullRegion && fullRegion.vec !== d.vec ? [{ vec: fullRegion.vec, hist: fullRegion.hist }] : [];
+    const qo = { useColor: isClip, extraQueries };
+    const cands = candidatesFor(pool, d.family, { strict: Boolean(type) });
+    const typed = cands.filter((r) => !r.soft); // «closest» lists stay within the detected family / related / untyped
+    const best = rankConfident(d.vec, d.hist, cands, { floor: -Infinity, window: Infinity, limit: 1, ...qo })[0]?.score ?? null;
+    let items = rankConfident(d.vec, d.hist, cands, { floor, limit, window: isClip ? ITEM_WINDOW_CLIP : undefined, ...qo });
+    // Nothing above the absolute floor, but one product clearly stands out from the whole pool (typical for a worn photo vs a flat-lay
+    // catalogue photo, whose cosine is lower than a re-shot): accept it. Unrelated photos have no outlier and still get nothing.
+    let adaptive = false;
+    if (!items.length && d.family !== 'set') {
+      const out = rankStandout(d.vec, d.hist, cands, { minScore: similarFloorOf(model, floor), limit: 6, ...qo });
+      if (out.length) { items = out.map(({ id, score }) => ({ id, score })); adaptive = true; }
+    }
     // «closest alternatives»: same garment type, below the strict floor, never the same products as `items`; the UI labels them honestly
     const shown = new Set(items.map((x) => x.id));
-    const similar = rankConfident(d.vec, d.hist, cands, { floor: similarFloorOf(model, floor), window: Infinity, limit: limit + SIMILAR_MAX, useColor: isClip })
+    const similar = rankConfident(d.vec, d.hist, typed, { floor: similarFloorOf(model, floor), window: Infinity, limit: limit + SIMILAR_MAX, ...qo })
       .filter((x) => !shown.has(x.id)).slice(0, SIMILAR_MAX);
     return {
       type: d.family || '', label: FRIENDLY_AR[d.family] || '', confidence: Math.round(d.p * 100) / 100,
-      color: dominantColor(d.hist || wholeHist)?.key || '', best, items, similar,
+      color: dominantColor(d.hist || wholeHist)?.key || '', best, items, similar, adaptive,
     };
   });
   // A matching set that was found is one result: fold away the per-garment groups (top / bottom / whole-outfit guesses) it already covers.
@@ -336,10 +351,17 @@ export async function searchByImage(buffer, { department = '', type = '', limit 
   // exists but is filed/typed differently is still offered (as "closest", never as an exact match).
   if (!type && !groups.some((g) => g.items.length || g.similar.length)) { // never when the shopper picked a type themselves
     const full = regions.find((r) => r.key === 'full') || regions[0];
-    const similar = rankConfident(full.vec, full.hist, pool, { floor: similarFloorOf(model, floor), window: Infinity, limit: 4, useColor: isClip }); // same floor as the per-type «closest» lists: never filler
+    const similar = rankConfident(full.vec, full.hist, pool, { floor: similarFloorOf(model, floor) - 0.02, window: Infinity, limit: SIMILAR_MAX, useColor: isClip });
     if (similar.length) groups.push({ type: '', label: '', confidence: 0, color: dominantColor(full.hist || wholeHist)?.key || '', best: similar[0].score, items: [], similar });
   }
-  const diag = { model, floor: Math.round(floor * 100), pool: pool.length, best: groups.map((g) => (g.best == null ? null : Math.round(g.best * 100) / 100)), families: groups.map((g) => g.type || '*') };
+  // evaluation hook: where does the product that SHOULD be found end up? (wrong family / below the floor / cut by the window)
+  const expect = _expectId ? detections.map((d) => {
+    const c = candidatesFor(pool, d.family, { strict: Boolean(type) });
+    const all = rankConfident(d.vec, d.hist, c, { floor: -Infinity, window: Infinity, limit: Infinity, useColor: isClip, extraQueries: isClip && fullRegion && fullRegion.vec !== d.vec ? [{ vec: fullRegion.vec, hist: fullRegion.hist }] : [] });
+    const i = all.findIndex((x) => x.id === _expectId);
+    return { family: d.family || '*', productFamily: pool.find((r) => r.id === _expectId)?.family ?? null, inCands: c.some((r) => r.id === _expectId), rank: i < 0 ? null : i + 1, score: i < 0 ? null : Math.round(all[i].score * 1000) / 1000, best: all[0] ? Math.round(all[0].score * 1000) / 1000 : null };
+  }) : undefined;
+  const diag = { expect, model, floor: Math.round(floor * 100), pool: pool.length, best: groups.map((g) => (g.best == null ? null : Math.round(g.best * 100) / 100)), families: groups.map((g) => g.type || '*'), adaptive: groups.some((g) => g.adaptive) };
   return { model, detected: groups.map(({ type: t, label, confidence }) => ({ type: t, label, confidence })), groups, diag };
 }
 
