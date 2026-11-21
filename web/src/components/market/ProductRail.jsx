@@ -11,7 +11,7 @@ export default function ProductRail({ title, items, loading, to, tone = '' }) {
   const [quick, setQuick] = useState(null);
   if (!loading && (!items?.length || items.length < 2)) return null;
   return (
-    <section className={tone}>
+    <section className={`${tone} [content-visibility:auto] [contain-intrinsic-size:auto_520px]`}>
       <div className="container py-10 sm:py-12">
         <div className="mb-6 flex items-end justify-between gap-3">
           <h2 className="font-display text-display-sm font-bold">{title}</h2>

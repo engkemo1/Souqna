@@ -80,7 +80,8 @@ app.use((_req, res, next) => {
   res.setHeader('Permissions-Policy', 'camera=(self), microphone=(), geolocation=(self), payment=()');
   next();
 });
-app.use(compression());
+// Caddy (in front) already gzips/zstds on its own cores; doing it here too would burn the single Node thread. Only compress direct (non-proxied) requests.
+app.use(compression({ filter: (req, res) => (req.headers['x-forwarded-for'] ? false : compression.filter(req, res)) }));
 const ALLOWED_ORIGINS = new Set([
   config.siteUrl,
   'https://twistegy.com',

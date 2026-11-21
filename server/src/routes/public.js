@@ -48,12 +48,21 @@ import { confirmDeadline, reserveRecord } from '../lib/reserve.js';
 import { prepareTry, attachTry, tryAlternatives, tryRecord } from '../lib/try-sizes.js';
 import { storeHours } from '../lib/hours.js';
 import { returningFor, signReturning } from '../lib/returning-buyer.js';
+import { microCache } from '../lib/micro-cache.js';
 import { waAuthReady } from '../lib/wa.js';
 import {
   serializeStore, serializeCards, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi,
 } from '../lib/serialize.js';
 
 const r = Router();
+
+// Public, user-independent GETs are answered from memory for a few seconds (see lib/micro-cache.js): the first visitor
+// computes, the next thousands get the stored answer. Admin edits appear within the TTL.
+{
+  const mc = microCache(15); const mcShort = microCache(8);
+  for (const p of ['/marketplace', '/departments', '/departments/:slug', '/homepage-ads', '/featured', '/stories', '/stylist/prompts', '/look-of-day', '/marketplace/free-shipping', '/marketplace/delivery-areas', '/promo', '/search/popular', '/stores/:slug', '/stores/:slug/home']) r.get(p, mc, (_req, _res, next) => next());
+  r.get('/stores/:slug/products', mcShort, (_req, _res, next) => next());
+}
 
 const cache = (res, seconds = 30) => res.set('Cache-Control', `public, max-age=${seconds}, stale-while-revalidate=${seconds * 4}`);
 

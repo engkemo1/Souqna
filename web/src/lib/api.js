@@ -37,7 +37,27 @@ export const setUnauthorizedHandler = (fn) => { onUnauthorized = fn; };
 let onPasswordChangeRequired = () => {};
 export const setPasswordChangeRequiredHandler = (fn) => { onPasswordChangeRequired = fn; };
 
-export async function api(rawPath, { method = 'GET', body, signal, headers: rawHeaders = {} } = {}) {
+/** Identical GETs fired at the same moment (several components asking for the same list) share one request. */
+const inflight = new Map();
+export function api(rawPath, opts = {}) {
+  const { method = 'GET', signal } = opts;
+  if (method !== 'GET' || opts.body) return apiRaw(rawPath, opts);
+  const key = `${rawPath}|${tokenStore.get() || ''}|${buyerTokenStore.get() || ''}|${adminScope ? adminScope.slug : ''}`;
+  let p = inflight.get(key);
+  if (!p) {
+    p = apiRaw(rawPath, { ...opts, signal: undefined }).finally(() => inflight.delete(key));
+    inflight.set(key, p);
+  }
+  if (!signal) return p;
+  return new Promise((resolve, reject) => {
+    const abort = () => reject(new DOMException('Aborted', 'AbortError'));
+    if (signal.aborted) return abort();
+    signal.addEventListener('abort', abort, { once: true });
+    p.then(resolve, reject).finally(() => signal.removeEventListener('abort', abort));
+  });
+}
+
+async function apiRaw(rawPath, { method = 'GET', body, signal, headers: rawHeaders = {} } = {}) {
   const { path, headers, scoped } = route(rawPath, rawHeaders);
   const token = scoped ? null : tokenStore.get();
   let res;

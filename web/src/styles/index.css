@@ -50,7 +50,6 @@
 @layer base {
   html {
     @apply bg-canvas text-fg antialiased;
-    text-rendering: optimizeLegibility;
     scroll-behavior: smooth;
     overflow-x: clip;
   }

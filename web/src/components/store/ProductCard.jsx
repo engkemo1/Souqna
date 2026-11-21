@@ -3,7 +3,6 @@ import SaleCountdown from './SaleCountdown.jsx';
 import DiscountBadge from '../campaign/DiscountBadge.jsx';
 import { Link } from 'react-router-dom';
 import { Heart, ShoppingBag, Plus, ArrowLeftRight } from 'lucide-react';
-import { motion } from 'framer-motion';
 import SmartImage from '../ui/SmartImage.jsx';
 import Skeleton from '../ui/Skeleton.jsx';
 import { Price, ColorDots } from '../ui/Commerce.jsx';
@@ -15,6 +14,9 @@ import { sp } from '../../lib/store.jsx';
 import { useDesign, GRID_CLASS, kidTint } from '../../lib/design.js';
 import { cx } from '../ui/cx.js';
 import { OfferChip } from '../promo/OfferCards.jsx';
+
+// touch phones have no hover: skip the second (hover) image there entirely — half the images, half the decoding
+const CAN_HOVER = typeof window !== 'undefined' && !!window.matchMedia && window.matchMedia('(hover: hover)').matches;
 
 export const CARD_SIZES = '(min-width:1280px) 22vw, (min-width:1024px) 28vw, (min-width:640px) 33vw, 50vw';
 
@@ -52,11 +54,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
   };
 
   return (
-    <motion.article
-      initial={{ opacity: 0, y: 14 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: '0px 0px -40px 0px' }}
-      transition={{ duration: 0.5, delay: Math.min(index % 4, 3) * 0.06, ease: [0.22, 1, 0.36, 1] }}
+    <article
       className={cx('group relative flex min-w-0 flex-col', wrap)}
       style={tint ? { background: tint.bg, '--c-text': '31 35 64', '--c-muted': '84 89 112', '--c-sale': '185 28 28', '--c-on-sale': '255 255 255' } : undefined}
     >
@@ -70,7 +68,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
           imgClassName="group-hover:scale-[1.02] [@media(hover:none)]:group-hover:scale-100"
           className={cx(out && 'opacity-70')}
         />
-        {p.hoverImage && (
+        {p.hoverImage && CAN_HOVER && (
           <SmartImage
             media={p.hoverImage}
             alt=""
@@ -155,7 +153,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
         <SaleCountdown ms={p.saleEndsAt} campaign={p.campaign} variant="chip" className="mt-1.5" />
         <ColorDots colors={p.colors} className="mt-2" />
       </div>
-    </motion.article>
+    </article>
   );
 }
 

@@ -11,7 +11,7 @@ import { runMigrations } from './migrations.js';
 fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
 
 export const db = new DatabaseSync(config.dbFile);
-db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA wal_autocheckpoint = 1000;');
+db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA wal_autocheckpoint = 1000; PRAGMA cache_size = -65536; PRAGMA mmap_size = 268435456; PRAGMA temp_store = MEMORY;');
 db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
 {
   const cols = db.prepare('PRAGMA table_info(pos_sale_items)').all().map((c) => c.name);

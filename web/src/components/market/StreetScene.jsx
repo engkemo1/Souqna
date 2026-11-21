@@ -684,7 +684,7 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
   useEffect(() => {
     const root = rootRef.current; const scroller = ref.current; if (!root || !scroller) return undefined;
     // low-end / data-saver devices keep only the GPU-composited motion (vehicles, clouds, birds, sun)
-    const nav = navigator; const lite = !!(nav.connection && nav.connection.saveData) || (nav.deviceMemory && nav.deviceMemory <= 2) || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 2);
+    const nav = navigator; const lite = !!(nav.connection && nav.connection.saveData) || (nav.deviceMemory && nav.deviceMemory <= 2) || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 2) || window.matchMedia('(max-width: 767px)').matches; // phones: the scene stays, its ~120 looping animations don't
     root.dataset.lite = lite ? '1' : '0';
     if (!('IntersectionObserver' in window)) return undefined;
     // 1) pause everything while the street is off-screen vertically

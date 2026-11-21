@@ -23,8 +23,8 @@ function SmartImage({ media, alt, sizes = '100vw', ratio, fit = 'cover', priorit
   const aspect = ratio === 'natural' && media ? `${media.w} / ${media.h}` : ratio;
   return (
     <div className={cx('relative overflow-hidden', className)} style={{ aspectRatio: aspect, backgroundColor: media?.color || undefined }}>
-      {showPlaceholder && media?.lqip && !failed && (
-        <img src={media.lqip} alt="" aria-hidden="true" className={cx('absolute inset-0 h-full w-full scale-110 blur-xl transition-opacity duration-700', fit === 'cover' ? 'object-cover' : 'object-contain', loaded ? 'opacity-0' : 'opacity-100')} />
+      {showPlaceholder && media?.lqip && !failed && !loaded && (
+        <img src={media.lqip} alt="" aria-hidden="true" decoding="async" className={cx('absolute inset-0 h-full w-full', fit === 'cover' ? 'object-cover' : 'object-contain')} />
       )}
       {media && !failed ? (
         <picture>
@@ -44,7 +44,7 @@ function SmartImage({ media, alt, sizes = '100vw', ratio, fit = 'cover', priorit
             onLoad={(e) => { setLoaded(true); onLoad?.(e); }}
             onError={() => setFailed(true)}
             style={{ objectPosition: position }}
-            className={cx('absolute inset-0 h-full w-full transition-[opacity,transform] duration-700 ease-out', fit === 'cover' ? 'object-cover' : 'object-contain', loaded ? 'opacity-100' : 'opacity-0', imgClassName)}
+            className={cx('absolute inset-0 h-full w-full transition-opacity duration-300 ease-out', fit === 'cover' ? 'object-cover' : 'object-contain', loaded ? 'opacity-100' : 'opacity-0', imgClassName)}
           />
         </picture>
       ) : (
