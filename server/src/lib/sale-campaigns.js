@@ -149,10 +149,8 @@ export function shippingCampaignFor(net, storeIds = []) {
 }
 
 /** What the storefront needs (cacheable by the client for a few seconds). */
-export function publicCampaigns() {
-  const out = { serverNow: now(), discount: null, shipping: null };
-  for (const c of activeCampaigns()) {
-    const v = {
+function pub(c) {
+  return {
       id: c.id, kind: c.kind, name: c.name, headline: c.headline || '', sub: c.sub || '', endsAt: c.ends_at, startsAt: c.starts_at,
       percent: c.percent, min: c.min_subtotal || 0, mode: c.mode,
       showBar: !!c.show_bar, showFall: !!c.show_fall, fallStyle: FALL_STYLES.includes(c.fall_style) ? c.fall_style : 'percent', showHero: !!c.show_hero,
@@ -160,19 +158,42 @@ export function publicCampaigns() {
       allowCoupons: c.allowCoupons,
       depts: Object.keys(c.deptPercent || {}).length ? c.deptPercent : null,
       scoped: c.storeIds.length > 0,
-    };
+  };
+}
+
+/** Armed campaigns whose "coming soon" teaser is showing (announce time passed, start not yet). Nothing is discounted yet. */
+function upcomingCampaigns() {
+  const t = now();
+  try {
+    return q.all("SELECT * FROM sale_campaigns WHERE status='active' AND announce_at IS NOT NULL AND announce_at<=? AND starts_at>? AND ends_at>?", [t, t, t]).map(hydrate);
+  } catch { return []; }
+}
+
+export function publicCampaigns() {
+  const out = { serverNow: now(), discount: null, shipping: null, soon: { discount: null, shipping: null } };
+  for (const c of activeCampaigns()) {
+    const v = pub(c);
     if (c.kind === 'discount' && !out.discount) out.discount = v;
     if (c.kind === 'shipping' && !out.shipping) out.shipping = v;
+  }
+  for (const c of upcomingCampaigns()) {
+    const v = { ...pub(c), phase: 'soon' };
+    if (c.kind === 'discount' && !out.discount && !out.soon.discount) out.soon.discount = v;
+    if (c.kind === 'shipping' && !out.shipping && !out.soon.shipping) out.soon.shipping = v;
   }
   return out;
 }
 
 /* -------------------------------------------------------------------- admin CRUD */
 
-const COLS = ['kind', 'name', 'status', 'starts_at', 'ends_at', 'percent', 'dept_percent_json', 'mode', 'allow_coupons', 'respect_excl', 'min_subtotal', 'store_ids_json', 'budget', 'headline', 'sub', 'show_bar', 'show_fall', 'fall_style', 'show_hero', 'theme', 'color1', 'color2', 'fall_glyphs', 'fall_density', 'fall_speed'];
+const COLS = ['kind', 'name', 'status', 'starts_at', 'ends_at', 'percent', 'dept_percent_json', 'mode', 'allow_coupons', 'respect_excl', 'min_subtotal', 'store_ids_json', 'budget', 'headline', 'sub', 'show_bar', 'show_fall', 'fall_style', 'show_hero', 'theme', 'color1', 'color2', 'fall_glyphs', 'fall_density', 'fall_speed', 'announce_at'];
 
 function clean(b, cur = {}) {
   const kind = b.kind ?? cur.kind ?? 'discount';
+  const startsAt = int(b.startsAt ?? cur.starts_at, now());
+  const rawAnn = b.announceAt !== undefined ? b.announceAt : cur.announce_at;
+  const annN = rawAnn == null || rawAnn === '' || rawAnn === false ? 0 : int(rawAnn);
+  const announceAt = annN > 0 && annN < startsAt ? annN : null; // a teaser only makes sense BEFORE the start
   const dept = {};
   for (const [k, v] of Object.entries(b.deptPercent ?? cur.deptPercent ?? {})) { const n = pctOf(v); if (n && /^[a-z0-9_-]{1,40}$/i.test(k)) dept[k] = n; }
   const ids = [...new Set((b.storeIds ?? cur.storeIds ?? []).map((x) => int(x)).filter((x) => x > 0))];
@@ -180,7 +201,8 @@ function clean(b, cur = {}) {
     kind: kind === 'shipping' ? 'shipping' : 'discount',
     name: String(b.name ?? cur.name ?? '').trim().slice(0, 80) || (kind === 'shipping' ? 'شحن مجاني' : 'حملة تخفيضات'),
     status: ['draft', 'active', 'ended'].includes(b.status ?? cur.status) ? (b.status ?? cur.status) : 'draft',
-    starts_at: int(b.startsAt ?? cur.starts_at, now()),
+    starts_at: startsAt,
+    announce_at: announceAt,
     ends_at: int(b.endsAt ?? cur.ends_at, now() + 24 * 3600e3),
     percent: pctOf(b.percent ?? cur.percent),
     dept_percent_json: JSON.stringify(dept),
@@ -210,6 +232,14 @@ export function validateCampaign(c) {
   return null;
 }
 
+/** draft | scheduled (armed, not announced yet) | soon (teaser + countdown to start is showing) | live | ended */
+function phaseOf(c, t = now()) {
+  if (c.status === 'ended' || (c.status === 'active' && c.ends_at <= t)) return 'ended';
+  if (c.status !== 'active') return 'draft';
+  if (c.starts_at <= t) return 'live';
+  return c.announce_at && c.announce_at <= t ? 'soon' : 'scheduled';
+}
+
 function view(r) {
   const c = hydrate(r);
   const spent = campaignSpent(r.id);
@@ -219,7 +249,9 @@ function view(r) {
     allowCoupons: c.allowCoupons, respectExcl: c.respectExcl, minSubtotal: c.min_subtotal, storeIds: c.storeIds, budget: c.budget,
     headline: c.headline, sub: c.sub, showBar: !!c.show_bar, showFall: !!c.show_fall, fallStyle: c.fall_style, showHero: !!c.show_hero,
     theme: c.theme || 'blackfriday', color1: c.color1 || '', color2: c.color2 || '', fallGlyphs: c.fall_glyphs || '', fallDensity: c.fall_density || 'low', fallSpeed: c.fall_speed || 'calm',
+    announceAt: c.announce_at || null,
     live: c.status === 'active' && c.starts_at <= now() && c.ends_at > now(),
+    phase: phaseOf(c),
     spent,
   };
 }
@@ -289,7 +321,7 @@ export function estimate(draft = {}) {
   const days = Math.max(0.25, (c.ends_at - c.starts_at) / 86400e3);
   const since = new Date(now() - 30 * 86400e3).toISOString();
   const stores = q.all("SELECT id, name_ar AS name, slug, shipping_fee FROM stores WHERE status='active'").filter((s) => inScope(c, s.id));
-  const hist = new Map(q.all("SELECT store_id, COUNT(*) AS n, COALESCE(AVG(subtotal),0) AS avg_sub, COALESCE(AVG(shipping),0) AS avg_ship FROM orders WHERE created_at>=? AND status<>'cancelled' GROUP BY store_id", [since]).map((r) => [r.store_id, r]));
+  const hist = new Map(q.all("SELECT store_id, COUNT(*) AS n, COALESCE(AVG(subtotal),0) AS avg_sub, COALESCE(AVG(shipping),0) AS avg_ship, COALESCE(SUM(CASE WHEN subtotal>=? THEN shipping ELSE 0 END),0)*1.0/COUNT(*) AS ship_elig, SUM(CASE WHEN subtotal>=? THEN 1 ELSE 0 END)*1.0/COUNT(*) AS share_elig FROM orders WHERE created_at>=? AND status<>'cancelled' GROUP BY store_id", [c.min_subtotal || 0, c.min_subtotal || 0, since]).map((r) => [r.store_id, r]));
   const prods = q.all("SELECT id, store_id, department, price, compare_at_price, track_stock, stock, exclude_from_promotions FROM products WHERE status='active'");
   const per = new Map(stores.map((s) => [s.id, { id: s.id, name: s.name, products: 0, affected: 0, stockUnits: 0, maxExposure: 0, listValue: 0, discValue: 0, ratio: 0, orders30: 0, avgBasket: 0, avgShip: 0, shipFee: s.shipping_fee || 0 }]));
   for (const p of prods) {
@@ -308,11 +340,13 @@ export function estimate(draft = {}) {
     const h = hist.get(row.id);
     row.orders30 = h?.n || 0;
     row.avgBasket = Math.round(h?.avg_sub || (row.stockUnits ? row.listValue / row.stockUnits : 0)); // no orders yet → one average piece
-    row.avgShip = Math.round(h?.avg_ship || row.shipFee || 0);
+    // free shipping only costs us on orders that qualify (basket ≥ the minimum): average over ALL orders of the shipping we would waive
+    row.avgShip = Math.round(h ? (c.min_subtotal > 0 ? h.ship_elig : h.avg_ship) : (row.shipFee || 0));
+    row.eligShare = h ? (c.min_subtotal > 0 ? h.share_elig : 1) : 1;
     row.ratio = row.listValue ? row.discValue / row.listValue : 0; // avg % of a basket that the campaign takes off
     // one typical order costs us: average basket × the share the campaign takes off it
     row.perOrder = Math.round(row.avgBasket * row.ratio);
-    row.perOrderShip = c.kind === 'shipping' ? (row.avgShip || row.shipFee) : 0;
+    row.perOrderShip = c.kind === 'shipping' ? row.avgShip : 0;
     tot.stores += 1; tot.products += row.products; tot.affected += row.affected; tot.maxExposure += row.maxExposure;
     tot.orders30 += row.orders30; tot.base += row.orders30 * row.perOrder; tot.shipBase += row.orders30 * row.perOrderShip;
     rows.push(row);

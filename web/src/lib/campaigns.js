@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from './api.js';
 
 /** Live Twist sale campaigns for the storefront (countdown, top bar, falling effect, hero). Shared fetch, refreshed every minute. */
-let state = { discount: null, shipping: null, offset: 0, loaded: false };
+let state = { discount: null, shipping: null, soon: { discount: null, shipping: null }, offset: 0, loaded: false };
 const subs = new Set();
 let timer = null;
 let inflight = false;
@@ -12,10 +12,13 @@ async function load() {
   inflight = true;
   try {
     const d = await api('/campaigns/active');
-    state = { discount: d.discount || null, shipping: d.shipping || null, offset: (d.serverNow || Date.now()) - Date.now(), loaded: true };
+    state = { discount: d.discount || null, shipping: d.shipping || null, soon: { discount: d.soon?.discount || null, shipping: d.soon?.shipping || null }, offset: (d.serverNow || Date.now()) - Date.now(), loaded: true };
     subs.forEach((f) => f(state));
   } catch { /* no campaign info → show nothing */ } finally { inflight = false; }
 }
+
+/** Re-read the campaigns now (used the moment a countdown-to-start reaches zero, so the sale flips to live without a page reload). */
+export const refreshCampaigns = () => load();
 
 export function useCampaigns() {
   const [s, setS] = useState(state);

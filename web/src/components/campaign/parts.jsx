@@ -95,9 +95,12 @@ function Cells({ end, offset, size = 'lg' }) {
   );
 }
 
+const startText = (ms) => { try { return new Date(ms).toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }); } catch { return ''; } };
+
 const text = (c) => {
   const ship = c.kind === 'shipping';
   const head = c.headline || (ship ? 'الشحن علينا' : look(c).emoji && (c.name || 'تخفيضات'));
+  if (c.phase === 'soon') return { head, sub: `هيبدأ ${startText(c.startsAt)} — جهّز سلتك من دلوقتي` };
   const sub = c.sub || (ship ? `شحن مجاني على طلباتك${c.min ? ` من ${one.format(c.min)} جنيه` : ''}` : c.percent ? `خصم ${one.format(c.percent)}% على كل المنتجات` : 'خصومات على كل المنتجات');
   return { head, sub };
 };
@@ -123,6 +126,7 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
   const l = look(c);
   const ship = c.kind === 'shipping';
   const { head, sub } = text(c);
+  const soon = c.phase === 'soon'; // announced, not started yet: countdown to the START, no shopping button
   const grad = `linear-gradient(to left, ${l.c1} 0%, ${l.c1} 58%, color-mix(in srgb, ${l.c2} 38%, ${l.c1}) 100%)`; // text side stays solid → always readable
   const Cta = preview ? 'span' : Link;
   return (
@@ -140,13 +144,18 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
           </div>
         )}
         <div className={!ship ? 'ps-[78px] sm:ps-0' : ''}>
-          <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold sm:px-3 sm:py-1 sm:text-xs" style={{ background: l.c2, color: '#111' }}>{l.emoji} {ship ? 'شحن مجاني' : 'عرض لفترة محدودة'}</div>
+          <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold sm:px-3 sm:py-1 sm:text-xs" style={{ background: l.c2, color: '#111' }}>{soon ? '⏳ قريباً' : <>{l.emoji} {ship ? 'شحن مجاني' : 'عرض لفترة محدودة'}</>}</div>
           <h2 className="mt-2 font-display text-[26px] font-black leading-tight sm:mt-3 sm:text-5xl">{head}</h2>
           <p className="mt-1 max-w-xl text-[13px] leading-snug opacity-90 sm:mt-2 sm:text-lg">{sub}</p>
         </div>
         <div className="flex items-center justify-between gap-2 sm:col-start-1 sm:mt-2 sm:justify-start sm:gap-3">
-          <Cells end={c.endsAt} offset={offset} />
-          <Cta {...(preview ? {} : { to: ship ? '/search' : '/search?sale=1' })} className="shrink-0 rounded-full px-4 py-2 text-[13px] font-black shadow-lg transition active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm sm:hover:scale-[1.03]" style={{ background: l.c2, color: '#111' }}>{ship ? 'ابدأ التسوق' : 'تسوق العروض'} ←</Cta>
+          <div className="flex flex-col gap-1">
+            <span className="text-[11px] font-bold opacity-85 sm:text-xs">{soon ? 'هيبدأ بعد' : 'ينتهي بعد'}</span>
+            <Cells end={soon ? c.startsAt : c.endsAt} offset={offset} />
+          </div>
+          {soon
+            ? <span className="shrink-0 rounded-full px-4 py-2 text-[13px] font-black sm:px-5 sm:py-2.5 sm:text-sm" style={{ background: 'rgba(255,255,255,.18)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.3)' }}>استعد ⏰</span>
+            : <Cta {...(preview ? {} : { to: ship ? '/search' : '/search?sale=1' })} className="shrink-0 rounded-full px-4 py-2 text-[13px] font-black shadow-lg transition active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm sm:hover:scale-[1.03]" style={{ background: l.c2, color: '#111' }}>{ship ? 'ابدأ التسوق' : 'تسوق العروض'} ←</Cta>}
         </div>
         {!ship && (
           <div className="hidden sm:absolute sm:end-10 sm:top-1/2 sm:block sm:-translate-y-1/2" aria-hidden="true">
@@ -174,28 +183,29 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
 export function TopBar({ items, offset = 0, preview = false }) {
   useCss();
   const [i, setI] = useState(0);
-  const [gone, setGone] = useState(() => { try { return sessionStorage.getItem('tw.bar.off') === items.map((x) => x.id).join(','); } catch { return false; } });
+  const [gone, setGone] = useState(() => { try { return sessionStorage.getItem('tw.bar.off') === items.map((x) => x.id + (x.phase || '')).join(','); } catch { return false; } });
   useEffect(() => {
     if (items.length < 2) return undefined;
     const id = setInterval(() => setI((x) => x + 1), 5000);
     return () => clearInterval(id);
   }, [items.length]);
   const c = items.length ? items[i % items.length] : null;
-  const t = useCountdownInline(c?.endsAt, offset); // hook first, before any early return
+  const soon = c?.phase === 'soon';
+  const t = useCountdownInline(soon ? c?.startsAt : c?.endsAt, offset); // hook first, before any early return
   if (!c || (gone && !preview)) return null;
   const l = look(c);
   const { head, sub } = text(c);
   return (
     <div role="region" aria-label="عرض" className="tw-anim relative z-[36] text-white" style={{ background: `linear-gradient(to left, ${l.c1}, ${l.c1} 60%, color-mix(in srgb, ${l.c2} 38%, ${l.c1}))` }}>
       <div className="container flex items-center justify-center gap-x-3 gap-y-0.5 py-1.5 text-center text-[12.5px] font-bold sm:text-sm">
-        <span key={c.id} className="flex min-w-0 flex-wrap items-center justify-center gap-x-2" style={{ animation: 'twFade .4s ease' }}>
+        <span key={`${c.id}${c.phase || ''}`} className="flex min-w-0 flex-wrap items-center justify-center gap-x-2" style={{ animation: 'twFade .4s ease' }}>
           <span aria-hidden="true">{l.emoji}</span>
-          <span className="truncate">{head}</span>
+          <span className="truncate">{head}{soon ? ' — قريباً' : ''}</span>
           <span className="hidden font-medium opacity-90 sm:inline">· {sub}</span>
         </span>
-        <span className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-black tabular-nums" dir="ltr" style={{ background: l.c2, color: '#111' }}>{t}</span>
+        <span className="shrink-0 rounded-full px-2.5 py-0.5 text-xs font-black tabular-nums" dir="rtl" style={{ background: l.c2, color: '#111' }}>{soon ? 'يبدأ بعد ' : ''}<span dir="ltr" className="inline-block">{t}</span></span>
       </div>
-      {!preview && <button type="button" aria-label="إخفاء" onClick={() => { setGone(true); try { sessionStorage.setItem('tw.bar.off', items.map((x) => x.id).join(',')); } catch { /* ignore */ } }} className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1 opacity-70 hover:opacity-100"><X className="h-3.5 w-3.5" /></button>}
+      {!preview && <button type="button" aria-label="إخفاء" onClick={() => { setGone(true); try { sessionStorage.setItem('tw.bar.off', items.map((x) => x.id + (x.phase || '')).join(',')); } catch { /* ignore */ } }} className="absolute end-1 top-1/2 -translate-y-1/2 rounded-full p-1 opacity-70 hover:opacity-100"><X className="h-3.5 w-3.5" /></button>}
     </div>
   );
 }

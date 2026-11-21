@@ -10,8 +10,8 @@ const EVERY = 6500;
  * they take turns (slide + fade), with dots to jump; it pauses while the shopper hovers/touches it. One banner = no motion.
  */
 export default function CampaignHero() {
-  const { discount, shipping, offset } = useCampaigns();
-  const items = [discount, shipping].filter((c) => c && c.showHero);
+  const { discount, shipping, soon, offset } = useCampaigns();
+  const items = [discount, shipping, soon?.discount, soon?.shipping].filter((c) => c && c.showHero);
   const [i, setI] = useState(0);
   const [hold, setHold] = useState(false);
   const n = items.length;
@@ -31,7 +31,7 @@ export default function CampaignHero() {
             const on = k === cur;
             const dir = k < cur ? -1 : 1;
             return (
-              <div key={c.id} aria-hidden={!on} inert={on ? undefined : ''} style={{ gridArea: '1 / 1', display: 'flex', opacity: on ? 1 : 0, transform: on ? 'none' : `translateX(${dir * 6}%)`, transition: 'opacity .7s ease, transform .7s cubic-bezier(.22,.8,.3,1)', pointerEvents: on ? 'auto' : 'none' }}>
+              <div key={`${c.id}${c.phase || ''}`} aria-hidden={!on} inert={on ? undefined : ''} style={{ gridArea: '1 / 1', display: 'flex', opacity: on ? 1 : 0, transform: on ? 'none' : `translateX(${dir * 6}%)`, transition: 'opacity .7s ease, transform .7s cubic-bezier(.22,.8,.3,1)', pointerEvents: on ? 'auto' : 'none' }}>
                 <HeroBanner c={c} offset={offset} />
               </div>
             );
@@ -40,7 +40,7 @@ export default function CampaignHero() {
         {n > 1 && (
           <div className="absolute bottom-2.5 start-1/2 z-20 flex -translate-x-1/2 gap-1.5 rtl:translate-x-1/2" role="tablist" aria-label="العروض">
             {items.map((c, k) => (
-              <button key={c.id} type="button" role="tab" aria-selected={k === cur} aria-label={c.kind === 'shipping' ? 'الشحن المجاني' : 'التخفيضات'} onClick={() => setI(k)} className="h-1.5 rounded-full transition-all" style={{ width: k === cur ? 22 : 7, background: look(items[cur]).c2, opacity: k === cur ? 1 : 0.5 }} />
+              <button key={`${c.id}${c.phase || ''}`} type="button" role="tab" aria-selected={k === cur} aria-label={c.kind === 'shipping' ? 'الشحن المجاني' : 'التخفيضات'} onClick={() => setI(k)} className="h-1.5 rounded-full transition-all" style={{ width: k === cur ? 22 : 7, background: look(items[cur]).c2, opacity: k === cur ? 1 : 0.5 }} />
             ))}
           </div>
         )}
