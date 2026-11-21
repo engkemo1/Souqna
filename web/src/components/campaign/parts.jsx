@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { X } from 'lucide-react';
-import { look } from '../../lib/campaignTheme.js';
+import { look, hypeFor, hypeStage, hasOwnHype } from '../../lib/campaignTheme.js';
+
+const HYPE_SEED = Math.floor(Math.random() * 1000); // each visit starts on a different line
 import { useCountdown } from '../../lib/campaigns.js';
 
 const two = new Intl.NumberFormat('ar-EG', { minimumIntegerDigits: 2, useGrouping: false });
@@ -86,8 +88,8 @@ function Cells({ end, offset, size = 'lg' }) {
   return (
     <div className="flex items-stretch gap-1.5 sm:gap-2" dir="rtl" aria-label="الوقت المتبقي">
       {cells.map(([n, label]) => (
-        <div key={label} className={`rounded-xl text-center backdrop-blur ${big ? 'min-w-[46px] px-1.5 py-1 sm:min-w-[64px] sm:px-3 sm:py-2' : 'min-w-[44px] px-1.5 py-1'}`} style={{ background: 'rgba(255,255,255,.14)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.22)' }}>
-          <div className={`font-display font-black tabular-nums leading-none ${big ? 'text-xl sm:text-3xl' : 'text-lg'}`} dir="ltr">{two.format(n)}</div>
+        <div key={label} className={`rounded-xl text-center backdrop-blur ${big ? 'min-w-[46px] px-1.5 py-1 sm:min-w-[84px] sm:px-4 sm:py-3' : 'min-w-[44px] px-1.5 py-1'}`} style={{ background: 'rgba(255,255,255,.14)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.22)' }}>
+          <div className={`font-display font-black tabular-nums leading-none ${big ? 'text-xl sm:text-4xl' : 'text-lg'}`} dir="ltr">{two.format(n)}</div>
           <div className={`mt-0.5 opacity-80 sm:mt-1 ${big ? 'text-[10px] sm:text-[11px]' : 'text-[10px]'}`}>{label}</div>
         </div>
       ))}
@@ -100,7 +102,7 @@ const startText = (ms) => { try { return new Date(ms).toLocaleString('ar-EG', { 
 const text = (c) => {
   const ship = c.kind === 'shipping';
   const head = c.headline || (ship ? 'الشحن علينا' : look(c).emoji && (c.name || 'تخفيضات'));
-  if (c.phase === 'soon') return { head, sub: `هيبدأ ${startText(c.startsAt)} — جهّز سلتك من دلوقتي` };
+  if (c.phase === 'soon') return { head, sub: `هيبدأ ${startText(c.startsAt)}` };
   const sub = c.sub || (ship ? `شحن مجاني على طلباتك${c.min ? ` من ${one.format(c.min)} جنيه` : ''}` : c.percent ? `خصم ${one.format(c.percent)}% على كل المنتجات` : 'خصومات على كل المنتجات');
   return { head, sub };
 };
@@ -120,6 +122,21 @@ function Truck() {
   );
 }
 
+/** One short hype line that follows the clock: before the start → while running → final hours. */
+function Hype({ c, offset }) {
+  const soon = c.phase === 'soon';
+  const t = useCountdown(soon ? c.startsAt : c.endsAt, offset);
+  const stage = hypeStage(soon, t.left, (c.endsAt - t.left) - c.startsAt); // live: now = endsAt − left
+  const [turn, setTurn] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => { if (!document.hidden) setTurn((x) => x + 1); }, 9000); // the line changes every few seconds while the shopper looks at the banner
+    return () => clearInterval(id);
+  }, []);
+  const line = hypeFor(c, stage, HYPE_SEED + turn);
+  if (!line) return null;
+  return <p key={`${stage}-${hasOwnHype(c, stage) ? 0 : (HYPE_SEED + turn) % 4}`} className="mt-2 max-w-xl text-[13px] font-extrabold leading-snug sm:mt-3 sm:text-lg" style={{ color: look(c).c2, animation: 'twFade .5s ease' }}>{line}</p>;
+}
+
 /** Big animated banner. `preview` = rendered inside the admin (no router link, no fixed positioning). */
 export function HeroBanner({ c, offset = 0, preview = false }) {
   useCss();
@@ -137,7 +154,7 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
       {l.glyphs.filter((g) => !/[\d%٪]/.test(g)).slice(0, 4).map((g, i) => (
         <span key={i} aria-hidden="true" className="absolute select-none text-2xl opacity-40 sm:text-3xl sm:opacity-60" style={{ top: `${14 + (i * 23) % 60}%`, insetInlineEnd: `${6 + i * 11}%`, animation: `twFloat ${4 + i}s ease-in-out ${i * 0.4}s infinite` }}>{g}</span>
       ))}
-      <div className="relative z-10 flex flex-col gap-2.5 px-4 pb-4 pt-4 sm:grid sm:grid-cols-[1fr_auto] sm:items-center sm:gap-8 sm:px-10 sm:py-9">
+      <div className="relative z-10 flex flex-col gap-2.5 px-4 pb-4 pt-4 sm:grid sm:grid-cols-[1fr_auto] sm:content-center sm:items-center sm:gap-x-8 sm:gap-y-5 sm:px-10 sm:py-9">
         {!ship && (
           <div aria-hidden="true" className="absolute start-3 top-3 grid h-[66px] w-[66px] place-items-center rounded-full font-display font-black sm:hidden" style={{ background: l.c2, color: '#111', animation: 'twPulse 2.6s ease-in-out infinite', boxShadow: `0 0 0 4px ${l.c2}33, 0 0 0 9px ${l.c2}1a` }}>
             <span className="text-center leading-none"><span className="block text-[9px] font-bold opacity-70">خصم حتى</span><span className="text-[22px]" dir="ltr">{c.percent ? `${one.format(c.percent)}%` : '٪'}</span></span>
@@ -147,15 +164,16 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
           <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold sm:px-3 sm:py-1 sm:text-xs" style={{ background: l.c2, color: '#111' }}>{soon ? '⏳ قريباً' : <>{l.emoji} {ship ? 'شحن مجاني' : 'عرض لفترة محدودة'}</>}</div>
           <h2 className="mt-2 font-display text-[26px] font-black leading-tight sm:mt-3 sm:text-5xl">{head}</h2>
           <p className="mt-1 max-w-xl text-[13px] leading-snug opacity-90 sm:mt-2 sm:text-lg">{sub}</p>
+          <Hype c={c} offset={offset} />
         </div>
-        <div className="flex items-center justify-between gap-2 sm:col-start-1 sm:mt-2 sm:justify-start sm:gap-3">
-          <div className="flex flex-col gap-1">
+        <div className="flex items-center justify-between gap-2 sm:contents">
+          <div className={`flex flex-col gap-1 sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:items-center sm:self-center sm:gap-2 ${ship ? '' : 'sm:me-48'}`}>
             <span className="text-[11px] font-bold opacity-85 sm:text-xs">{soon ? 'هيبدأ بعد' : 'ينتهي بعد'}</span>
             <Cells end={soon ? c.startsAt : c.endsAt} offset={offset} />
           </div>
           {soon
-            ? <span className="shrink-0 rounded-full px-4 py-2 text-[13px] font-black sm:px-5 sm:py-2.5 sm:text-sm" style={{ background: 'rgba(255,255,255,.18)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.3)' }}>استعد ⏰</span>
-            : <Cta {...(preview ? {} : { to: ship ? '/search' : '/search?sale=1' })} className="shrink-0 rounded-full px-4 py-2 text-[13px] font-black shadow-lg transition active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm sm:hover:scale-[1.03]" style={{ background: l.c2, color: '#111' }}>{ship ? 'ابدأ التسوق' : 'تسوق العروض'} ←</Cta>}
+            ? <span className="shrink-0 sm:col-start-1 sm:row-start-2 sm:justify-self-start rounded-full px-4 py-2 text-[13px] font-black sm:px-5 sm:py-2.5 sm:text-sm" style={{ background: 'rgba(255,255,255,.18)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.3)' }}>استعد ⏰</span>
+            : <Cta {...(preview ? {} : { to: ship ? '/search' : '/search?sale=1' })} className="shrink-0 sm:col-start-1 sm:row-start-2 sm:self-start sm:justify-self-start rounded-full px-4 py-2 text-[13px] font-black shadow-lg transition active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm sm:hover:scale-[1.03]" style={{ background: l.c2, color: '#111' }}>{ship ? 'ابدأ التسوق' : 'تسوق العروض'} ←</Cta>}
         </div>
         {!ship && (
           <div className="hidden sm:absolute sm:end-10 sm:top-1/2 sm:block sm:-translate-y-1/2" aria-hidden="true">

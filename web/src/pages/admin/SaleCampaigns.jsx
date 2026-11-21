@@ -6,7 +6,7 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { adminApi, useAdminApi, fmtNum } from './adminApi.js';
-import { THEMES, DENSITY, look } from '../../lib/campaignTheme.js';
+import { THEMES, DENSITY, DEFAULT_HYPE, HYPE_STAGES, look } from '../../lib/campaignTheme.js';
 import { HeroBanner, TopBar, FallCanvas } from '../../components/campaign/parts.jsx';
 
 const MODES = [
@@ -31,7 +31,7 @@ function blank(kind = 'discount') {
   return {
     kind, name: kind === 'shipping' ? 'شحن مجاني' : 'حملة تخفيضات', startsAt: s, endsAt: s + 24 * 3600e3, percent: 30, deptPercent: {}, mode: 'best',
     allowCoupons: false, respectExcl: true, minSubtotal: 0, storeIds: [], budget: 0, headline: '', sub: '',
-    announceAt: null, showBar: true, showFall: true, showHero: true, status: 'draft', theme: 'blackfriday', color1: '', color2: '', fallGlyphs: '', fallDensity: 'low', fallSpeed: 'calm',
+    announceAt: null, showHype: true, hype: {}, showBar: true, showFall: true, showHero: true, status: 'draft', theme: 'blackfriday', color1: '', color2: '', fallGlyphs: '', fallDensity: 'low', fallSpeed: 'calm',
   };
 }
 /** Black Friday: Friday 27 Nov 2026, Cairo time (UTC+2). */
@@ -206,19 +206,22 @@ function StorePicker({ stores, value, onChange }) {
 
 /** Live preview of exactly what customers will see (banner, top bar, falling shapes). */
 function LookPreview({ d }) {
-  const [end] = useState(() => Date.now() + 2.5 * 3600e3);
-  const [ph, setPh] = useState('live');
-  const soon = ph === 'soon';
-  const c = { id: 0, kind: d.kind, phase: soon ? 'soon' : 'live', headline: d.headline, sub: d.sub, percent: d.percent, min: d.minSubtotal, startsAt: end, endsAt: soon ? end + 24 * 3600e3 : end, theme: d.theme, color1: d.color1, color2: d.color2, glyphs: d.fallGlyphs, density: d.fallDensity, speed: d.fallSpeed, name: d.name };
+  const [t0] = useState(() => Date.now());
+  const [ph, setPh] = useState('l_mid'); // the time stage being previewed
+  const st = HYPE_STAGES.find((x) => x.key === ph) || HYPE_STAGES[6];
+  const soon = !!st.soon;
+  const startsAt = soon ? t0 + st.preview.startsIn : t0 - st.preview.elapsed;
+  const end = soon ? startsAt + 24 * 3600e3 : t0 + st.preview.endsIn;
+  const c = { id: 0, kind: d.kind, phase: soon ? 'soon' : 'live', showHype: d.showHype, hype: d.hype, headline: d.headline, sub: d.sub, percent: d.percent, min: d.minSubtotal, startsAt, endsAt: end, theme: d.theme, color1: d.color1, color2: d.color2, glyphs: d.fallGlyphs, density: d.fallDensity, speed: d.fallSpeed, name: d.name };
   const l = look(c);
   const k = `${d.theme}|${d.color1}|${d.color2}|${d.fallGlyphs}|${d.fallDensity}|${d.fallSpeed}|${d.percent}`;
   return (
     <div className="space-y-3">
-      <div className="flex gap-1.5">
-        {[['live', 'أثناء الحملة'], ['soon', 'قبل البداية (قريباً)']].map(([k, label]) => (
-          <button key={k} type="button" onClick={() => setPh(k)} className={cx('flex-1 rounded-lg border px-2 py-1.5 text-xs font-semibold', ph === k ? 'border-brand bg-brand/10 text-brand' : 'border-line')}>{label}</button>
-        ))}
-      </div>
+      <label className="block text-xs font-semibold text-muted">شوف الشكل في أي وقت:
+        <select value={ph} onChange={(e) => setPh(e.target.value)} className={cx(inp, 'mt-1 text-fg')}>
+          {['قبل البداية', 'أثناء الحملة'].map((g) => (<optgroup key={g} label={g}>{HYPE_STAGES.filter((x) => x.group === g).map((x) => (<option key={x.key} value={x.key}>{x.label}</option>))}</optgroup>))}
+        </select>
+      </label>
       <div className="overflow-hidden rounded-xl border border-line"><TopBar key={ph} items={[c]} preview /></div>
       <HeroBanner key={`h${ph}`} c={c} preview />
       {!soon && d.showFall && d.fallDensity !== 'off' && (
@@ -359,6 +362,22 @@ function Editor({ init, meta, onClose, onSaved }) {
             </div>
             <Field label="العنوان الكبير"><input className={inp} value={d.headline} placeholder={ship ? 'الشحن علينا' : THEMES[d.theme].name} onChange={(e) => set({ headline: e.target.value })} /></Field>
             <Field label="سطر تحته"><input className={inp} value={d.sub} onChange={(e) => set({ sub: e.target.value })} /></Field>
+            <Switch on={d.showHype} onChange={(v) => set({ showHype: v })} label="جملة تحميس بالعامية في البانر" hint="سطر واحد بيتغيّر لوحده: قبل البداية، أثناء الحملة، وفي آخر ٣ ساعات. سيب الخانة فاضية وهنكتب لك جملة جاهزة." />
+            {d.showHype && (
+              <details className="rounded-xl border border-line p-3">
+                <summary className="cursor-pointer text-sm font-semibold">تعديل الجمل لكل مرحلة (سيب أي خانة فاضية وهنكتب لك جملة جاهزة)</summary>
+                <div className="mt-3 space-y-2">
+                  {['قبل البداية', 'أثناء الحملة'].map((g) => (
+                    <div key={g} className="space-y-2">
+                      <div className="text-xs font-bold text-muted">{g}</div>
+                      {HYPE_STAGES.filter((x) => x.group === g).map((x) => (
+                        <Field key={x.key} label={x.label}><input className={inp} maxLength={100} value={d.hype?.[x.key] || ''} placeholder={DEFAULT_HYPE[ship ? 'shipping' : 'discount'][x.key][0]} onChange={(e) => set({ hype: { ...(d.hype || {}), [x.key]: e.target.value } })} /></Field>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </details>
+            )}
             <Switch on={d.showHero} onChange={(v) => set({ showHero: v })} label="بانر كبير متحرّك في أول الصفحة الرئيسية" />
             <Switch on={d.showBar} onChange={(v) => set({ showBar: v })} label="شريط رفيع فوق كل الصفحات بعدّاد (العميل يقدر يقفله)" />
             <Switch on={d.showFall} onChange={(v) => set({ showFall: v })} label="أشكال بتنزل من فوق على كل الصفحات (بتتقفل في السلة والدفع، وللي مفعّل «تقليل الحركة»)" />

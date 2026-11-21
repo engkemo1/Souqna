@@ -35,9 +35,9 @@ export async function measure(cases, search, opts = {}) {
 }
 
 /** Same measurement at several floors (cosine, 0..1): the table shows recall bought per floor, and the false-positive cost. */
-export async function sweep(cases, search, floors) {
+export async function sweep(cases, search, floors, onRow) {
   const rows = [];
-  for (const f of floors) { const m = await measure(cases, search, { _floor: f }); rows.push({ floor: f, strictRecall: m.strictRecall, equivRecall: m.equivRecall, avgItems: m.avgItems, noiseFalsePositive: m.noiseFalsePositive }); }
+  for (const f of floors) { const m = await measure(cases, search, { _floor: f }); const row = { floor: f, strictRecall: m.strictRecall, equivRecall: m.equivRecall, avgItems: m.avgItems, noiseFalsePositive: m.noiseFalsePositive }; rows.push(row); if (onRow) onRow(row); }
   return rows;
 }
 

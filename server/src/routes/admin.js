@@ -921,7 +921,7 @@ r.put('/whatsapp/rates', h((req, res) => {
 /* ---- Twist-wide sale campaigns (Black Friday discount + free shipping) ---- */
 const campaignBody = z.object({
   kind: z.enum(['discount', 'shipping']).optional(), name: z.string().max(80).optional(), status: z.enum(['draft', 'active', 'ended']).optional(),
-  startsAt: z.number().optional(), endsAt: z.number().optional(), announceAt: z.number().nullable().optional(), percent: z.number().min(0).max(90).optional(),
+  startsAt: z.number().optional(), endsAt: z.number().optional(), announceAt: z.number().nullable().optional(), showHype: z.boolean().optional(), hype: z.record(z.string().max(20), z.string().max(100)).optional(), percent: z.number().min(0).max(90).optional(),
   deptPercent: z.record(z.string().max(40), z.number().min(0).max(90)).optional(), mode: z.enum(['best', 'skip', 'override', 'stack']).optional(),
   allowCoupons: z.boolean().optional(), respectExcl: z.boolean().optional(), minSubtotal: z.number().min(0).optional(),
   storeIds: z.array(z.number()).max(500).optional(), budget: z.number().min(0).optional(),

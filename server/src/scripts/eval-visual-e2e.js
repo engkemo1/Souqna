@@ -74,10 +74,11 @@ if (res.fails.length) {
 if (doSweep) {
   console.log('\nfloor sweep:');
   // the sweep repeats every search once per floor: use a sample (all noise photos + up to 120 real ones) so it finishes in minutes
-  const sample = [...cases.filter((c) => c.kind !== 'noise').sort(() => Math.random() - 0.5).slice(0, 120), ...cases.filter((c) => c.kind === 'noise')];
-  console.log(`  (sweep sample: ${sample.length} photos × 13 floors)`);
-  const rows = await sweep(sample, search, [0.55, 0.58, 0.61, 0.64, 0.67, 0.70, 0.73, 0.76, 0.79, 0.82, 0.85, 0.88, 0.91]);
-  for (const r of rows) console.log(`  floor ${String(Math.round(r.floor * 100)).padEnd(3)} match ${pct(r.strictRecall).padEnd(7)} incl.look-alike ${pct(r.equivRecall).padEnd(7)} shown/search ${r.avgItems.toFixed(1).padEnd(5)} false-matches ${pct(r.noiseFalsePositive)}`);
+  const sample = [...cases.filter((c) => c.kind !== 'noise').sort(() => Math.random() - 0.5).slice(0, 70), ...cases.filter((c) => c.kind === 'noise')];
+  console.log(`  (sweep sample: ${sample.length} photos × 8 floors)`);
+  const show = (r) => console.log(`  floor ${String(Math.round(r.floor * 100)).padEnd(3)} match ${pct(r.strictRecall).padEnd(7)} incl.look-alike ${pct(r.equivRecall).padEnd(7)} shown/search ${r.avgItems.toFixed(1).padEnd(5)} false-matches ${pct(r.noiseFalsePositive)}`);
+  // each row is printed as soon as it is ready (the sweep takes a while: do not copy the output before "Recommended floor" appears)
+  const rows = await sweep(sample, search, [0.64, 0.68, 0.70, 0.72, 0.74, 0.76, 0.78, 0.80], show);
   const rec = recommendFloor(rows, target);
   console.log(rec ? `\nRecommended floor: ${Math.round(rec * 100)}  (highest floor that still reaches ${pct(target)}; set it in Admin → النظام → البحث بالصورة)` : `\nNo floor reaches ${pct(target)} with ≤2% false matches on this catalogue — see the failures above.`);
 }

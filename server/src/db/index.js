@@ -191,7 +191,9 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   db.exec('CREATE INDEX IF NOT EXISTS idx_orders_campaign ON orders(campaign_id)');
   { const sc = db.prepare('PRAGMA table_info(sale_campaigns)').all().map((c) => c.name); // look & feel columns added after the first release of the table
     for (const [n, d] of [['theme', "'blackfriday'"], ['color1', "''"], ['color2', "''"], ['fall_glyphs', "''"], ['fall_density', "'low'"], ['fall_speed', "'calm'"]]) if (!sc.includes(n)) db.exec(`ALTER TABLE sale_campaigns ADD COLUMN ${n} TEXT NOT NULL DEFAULT ${d}`);
-    if (!sc.includes('announce_at')) db.exec('ALTER TABLE sale_campaigns ADD COLUMN announce_at INTEGER'); } // when the "coming soon" teaser + countdown-to-start begins (null = only when it starts)
+    if (!sc.includes('announce_at')) db.exec('ALTER TABLE sale_campaigns ADD COLUMN announce_at INTEGER');
+    if (!sc.includes('show_hype')) db.exec('ALTER TABLE sale_campaigns ADD COLUMN show_hype INTEGER NOT NULL DEFAULT 1'); // the short hype line on the banner (colloquial Arabic)
+    if (!sc.includes('hype_json')) db.exec("ALTER TABLE sale_campaigns ADD COLUMN hype_json TEXT NOT NULL DEFAULT '{}'"); } // announce_at = when the "coming soon" teaser starts (null = only at start) · hype_json = admin overrides of the banner hype line per time stage
   if (!ocols.includes('track_token')) db.exec('ALTER TABLE orders ADD COLUMN track_token TEXT');
   if (!ocols.includes('shipping_free')) db.exec('ALTER TABLE orders ADD COLUMN shipping_free INTEGER NOT NULL DEFAULT 0');
   if (!ocols.includes('courier_cost')) db.exec('ALTER TABLE orders ADD COLUMN courier_cost INTEGER');
