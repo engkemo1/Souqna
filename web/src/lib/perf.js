@@ -36,9 +36,9 @@ export function initPerf() {
   if (typeof requestAnimationFrame !== 'function') return;
   // Measure twice (about 1 s each, a few seconds apart) and use the MEDIAN frame time, so one janky moment (images decoding,
   // a throttled/background tab, a tab switch) can't wrongly demote a good device. Only two slow verdicts in a row count.
-  let slow = 0; let runs = 0;
+  let slow = 0; let waits = 0;
   const probe = () => {
-    if (document.visibilityState !== 'visible' || !document.hasFocus()) { if (runs < 6) { runs += 1; setTimeout(probe, 3000); } return; }
+    if (document.visibilityState !== 'visible' || !document.hasFocus()) { if (waits < 8) { waits += 1; setTimeout(probe, 3000); } return; }
     const d = []; let last = performance.now(); let bad = false;
     const onVis = () => { bad = true; };
     document.addEventListener('visibilitychange', onVis, { once: true });
@@ -46,19 +46,18 @@ export function initPerf() {
       d.push(t - last); last = t;
       if (d.length < 45) { requestAnimationFrame(tick); return; }
       document.removeEventListener('visibilitychange', onVis);
-      runs += 1;
-      if (bad) { if (runs < 6) setTimeout(probe, 3000); return; }
+      if (bad) { if (waits < 8) { waits += 1; setTimeout(probe, 3000); } return; }
       d.sort((x, y) => x - y);
       const med = d[d.length >> 1];
       const want = med > 50 ? 2 : med > 34 ? 1 : 0; // median slower than ~20 fps → low · slower than ~30 fps → mid
       const cur = ORDER.indexOf(perfTier());
       if (want > cur) {
         slow += 1;
-        if (slow >= 2) { const t2 = ORDER[want]; setPerf(t2); try { localStorage.setItem('tw.perf2', JSON.stringify({ t: t2, ts: Date.now() })); } catch { /* ignore */ } }
+        if (slow >= 2) { const t2 = ORDER[want]; setPerf(t2); slow = 0; try { localStorage.setItem('tw.perf2', JSON.stringify({ t: t2, ts: Date.now() })); } catch { /* ignore */ } if (t2 !== 'low') setTimeout(probe, 3000); }
         else setTimeout(probe, 2500);
       } else {
         slow = 0;
-        if (want === 0 && html.dataset.perfReady !== '1') { html.dataset.perfReady = '1'; window.dispatchEvent(new Event('perf-change')); } // device proved smooth → heavy decorative motion may start
+        if (want === 0 && html.dataset.perfReady !== '1') { html.dataset.perfReady = '1'; window.dispatchEvent(new Event('perf-change')); setTimeout(probe, 3500); } // device proved smooth → motion starts, then we re-check that it STAYS smooth with the motion on (and step down if not)
       }
     };
     requestAnimationFrame(tick);
