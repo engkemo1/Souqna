@@ -685,7 +685,7 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
     const root = rootRef.current; const scroller = ref.current; if (!root || !scroller) return undefined;
     // low-end / data-saver devices keep only the GPU-composited motion (vehicles, clouds, birds, sun)
     // motion levels: '0' everything moves (desktop) · '2' phones: only the walkers + the overlay traffic/clouds/birds/sun move · '1' frozen shops (weak / data-saver devices)
-    const level = () => { const t = document.documentElement.dataset.perf; return t === 'low' ? '1' : t === 'mid' ? '2' : '0'; }; // shared device tier (lib/perf.js)
+    const level = () => { const d = document.documentElement.dataset; const t = d.perf; return t === 'low' || d.perfReady !== '1' ? '1' : t === 'mid' ? '2' : '0'; }; // frozen until the device has proved it is smooth // shared device tier (lib/perf.js)
     root.dataset.lite = level();
     const onTier = () => { root.dataset.lite = level(); };
     window.addEventListener('perf-change', onTier);
@@ -706,7 +706,7 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
 
 
   return (
-    <div ref={rootRef} className={cx('st-root relative', className)} data-paused="0" data-lite="0">
+    <div ref={rootRef} className={cx('st-root relative', className)} data-paused="0" data-lite="1">
       <style>{`
 @media (prefers-reduced-motion: no-preference){
 .st-flap{transform-origin:50% 0;transform-box:fill-box;animation:st-flap 4s ease-in-out infinite alternate}

@@ -34,15 +34,29 @@ export const perfTier = () => html.dataset.perf || 'high';
 export function initPerf() {
   setPerf(start());
   if (typeof requestAnimationFrame !== 'function') return;
+  // Measure twice (about 1 s each, a few seconds apart) and use the MEDIAN frame time, so one janky moment (images decoding,
+  // a throttled/background tab, a tab switch) can't wrongly demote a good device. Only two slow verdicts in a row count.
+  let slow = 0; let runs = 0;
   const probe = () => {
-    if (document.visibilityState !== 'visible') { setTimeout(probe, 2000); return; }
-    let n = 0; let last = performance.now(); let sum = 0;
+    if (document.visibilityState !== 'visible' || !document.hasFocus()) { if (runs < 6) { runs += 1; setTimeout(probe, 3000); } return; }
+    const d = []; let last = performance.now(); let bad = false;
+    const onVis = () => { bad = true; };
+    document.addEventListener('visibilitychange', onVis, { once: true });
     const tick = (t) => {
-      sum += t - last; last = t; n += 1;
-      if (n < 50) { requestAnimationFrame(tick); return; }
-      const avg = sum / n; const cur = ORDER.indexOf(perfTier());
-      const want = avg > 40 ? 2 : avg > 25 ? 1 : 0; // slower than ~25 fps → one step down, slower than ~40 ms/frame → straight to low
-      if (want > cur) { const t2 = ORDER[want]; setPerf(t2); try { localStorage.setItem('tw.perf', JSON.stringify({ t: t2, ts: Date.now() })); } catch { /* ignore */ } }
+      d.push(t - last); last = t;
+      if (d.length < 45) { requestAnimationFrame(tick); return; }
+      document.removeEventListener('visibilitychange', onVis);
+      runs += 1;
+      if (bad) { if (runs < 6) setTimeout(probe, 3000); return; }
+      d.sort((x, y) => x - y);
+      const med = d[d.length >> 1];
+      const want = med > 50 ? 2 : med > 34 ? 1 : 0; // median slower than ~20 fps → low · slower than ~30 fps → mid
+      const cur = ORDER.indexOf(perfTier());
+      if (want > cur) {
+        slow += 1;
+        if (slow >= 2) { const t2 = ORDER[want]; setPerf(t2); try { localStorage.setItem('tw.perf', JSON.stringify({ t: t2, ts: Date.now() })); } catch { /* ignore */ } }
+        else setTimeout(probe, 2500);
+      } else slow = 0;
     };
     requestAnimationFrame(tick);
   };
