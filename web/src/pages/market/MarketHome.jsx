@@ -20,7 +20,6 @@ import CustomDesignBanner from '../../components/market/CustomDesignBanner.jsx';
 import LookOfDay from '../../components/market/LookOfDay.jsx';
 // the illustrated street is heavy SVG: load it in its own chunk so the first paint of the page is not delayed
 const StreetScene = lazy(() => import('../../components/market/StreetScene.jsx'));
-const DeptStrip = lazy(() => import('../../components/market/DeptStrip.jsx')); // light category cards for weak devices (replaces the heavy street scene)
 const streetFallback = <div aria-hidden="true" className="h-[360px] w-full sm:h-[440px] lg:h-[540px]" style={{ background: 'linear-gradient(180deg,#F6F9FD 0%,#EEF3FA 50%,#F4F7FB 100%)' }} />;
 import { useDepartments } from '../../lib/departments.js';
 import ProductRail from '../../components/market/ProductRail.jsx';
@@ -62,7 +61,7 @@ export default function MarketHome() {
   const { t, tr, lang } = useI18n();
   const location = useLocation();
   const nav = useNavigate();
-  const [weak, setWeak] = useState(() => document.documentElement.dataset.perf === 'low'); // weak device → no street scene (≈2,300 DOM nodes + SVG animation)
+  const [weak, setWeak] = useState(() => document.documentElement.dataset.perf === 'low'); // weak device → a single still picture instead of the street scene (≈2,300 DOM nodes + SVG animation)
   useEffect(() => { const f = () => setWeak(document.documentElement.dataset.perf === 'low'); window.addEventListener('perf-change', f); return () => window.removeEventListener('perf-change', f); }, []);
   const [heroSearch, setHeroSearch] = useState('');
   const [heroMode, setHeroMode] = useState('photo');
@@ -169,9 +168,9 @@ export default function MarketHome() {
           </div>
 
         </div>
-        <div className="relative mt-2 md:mt-4" style={weak ? undefined : { WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 26%, #000 86%, transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0%, #000 26%, #000 86%, transparent 100%)' }}>
+        <div className="relative mt-2 md:mt-4" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, #000 26%, #000 86%, transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0%, #000 26%, #000 86%, transparent 100%)' }}>
           {weak
-            ? <div className="container py-2"><Suspense fallback={null}><DeptStrip /></Suspense></div>
+            ? <Link to="/search" aria-label="Twist" className="block"><img src="/street-lite.webp" width="1600" height="540" alt="" decoding="async" className="h-[230px] w-full object-cover sm:h-[360px] lg:h-[540px]" /></Link>
             : <Suspense fallback={streetFallback}><StreetScene lang={lang} labels={deptLabels} counts={deptCounts} /></Suspense>}
         </div>
       </section>

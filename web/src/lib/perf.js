@@ -18,7 +18,7 @@ function start() {
   const mid = /3g/.test(conn.effectiveType || '') || (mem && mem <= 4) || (cores && cores <= 4) || phone;
   let tier = weak ? 'low' : mid ? 'mid' : 'high';
   try {
-    const s = JSON.parse(localStorage.getItem('tw.perf') || 'null');
+    const s = JSON.parse(localStorage.getItem('tw.perf2') || 'null');
     if (s && Date.now() - s.ts < 7 * 864e5 && ORDER.indexOf(s.t) > ORDER.indexOf(tier)) tier = s.t;
   } catch { /* storage unavailable */ }
   return tier;
@@ -54,7 +54,7 @@ export function initPerf() {
       const cur = ORDER.indexOf(perfTier());
       if (want > cur) {
         slow += 1;
-        if (slow >= 2) { const t2 = ORDER[want]; setPerf(t2); try { localStorage.setItem('tw.perf', JSON.stringify({ t: t2, ts: Date.now() })); } catch { /* ignore */ } }
+        if (slow >= 2) { const t2 = ORDER[want]; setPerf(t2); try { localStorage.setItem('tw.perf2', JSON.stringify({ t: t2, ts: Date.now() })); } catch { /* ignore */ } }
         else setTimeout(probe, 2500);
       } else slow = 0;
     };
