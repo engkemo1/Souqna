@@ -76,6 +76,26 @@
     </script>
   </head>
   <body>
+    <!--boot-->
+    <!-- Instant first paint: a lightweight page outline shows while the app loads. The server keeps this block for the home page only; main.jsx removes it as soon as the real page is on screen. (No inline <script>: the Content-Security-Policy blocks those.) -->
+    <link rel="preload" as="fetch" href="/api/marketplace?q=&category=all&sort=featured" crossorigin="anonymous" />
+    <link rel="preload" as="fetch" href="/api/departments" crossorigin="anonymous" />
+    <div id="boot" aria-hidden="true">
+      <style>
+        #boot{position:absolute;inset:0 0 auto 0;z-index:5;background:#fff;min-height:100vh}
+        #boot i{display:block;border-radius:16px;background:linear-gradient(100deg,#eef2f8 30%,#f8fafd 50%,#eef2f8 70%);background-size:300% 100%;animation:bootsh 1.4s linear infinite}
+        @keyframes bootsh{from{background-position:100% 0}to{background-position:0 0}}
+        #boot .bar{height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 16px;border-bottom:1px solid #e2e8f0}
+        #boot .bar b{display:block;width:92px;height:28px;border-radius:8px;background:#03244D}
+        #boot .wrap{padding:16px;max-width:1280px;margin:0 auto}
+        #boot .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:16px}
+        @media(min-width:768px){#boot .grid{grid-template-columns:repeat(4,1fr);gap:20px}}
+        @media(prefers-reduced-motion:reduce){#boot i{animation:none}}
+      </style>
+      <div class="bar"><b></b><i style="width:42%;height:36px;border-radius:999px"></i></div>
+      <div class="wrap"><i style="height:210px"></i><div class="grid"><i style="aspect-ratio:4/5.2"></i><i style="aspect-ratio:4/5.2"></i><i style="aspect-ratio:4/5.2"></i><i style="aspect-ratio:4/5.2"></i></div></div>
+    </div>
+    <!--/boot-->
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

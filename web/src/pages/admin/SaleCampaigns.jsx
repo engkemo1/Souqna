@@ -31,7 +31,7 @@ function blank(kind = 'discount') {
   return {
     kind, name: kind === 'shipping' ? 'شحن مجاني' : 'حملة تخفيضات', startsAt: s, endsAt: s + 24 * 3600e3, percent: 30, deptPercent: {}, mode: 'best',
     allowCoupons: false, respectExcl: true, minSubtotal: 0, storeIds: [], budget: 0, headline: '', sub: '',
-    announceAt: null, showHype: true, hype: {}, showBar: true, showFall: true, showHero: true, status: 'draft', theme: 'blackfriday', color1: '', color2: '', fallGlyphs: '', fallDensity: 'low', fallSpeed: 'calm',
+    announceAt: null, showHype: true, hype: {}, badge: { mode: 'all', title: '', sub: '', chips: [] }, showBar: true, showFall: true, showHero: true, status: 'draft', theme: 'blackfriday', color1: '', color2: '', fallGlyphs: '', fallDensity: 'low', fallSpeed: 'calm',
   };
 }
 /** Black Friday: Friday 27 Nov 2026, Cairo time (UTC+2). */
@@ -212,9 +212,9 @@ function LookPreview({ d }) {
   const soon = !!st.soon;
   const startsAt = soon ? t0 + st.preview.startsIn : t0 - st.preview.elapsed;
   const end = soon ? startsAt + 24 * 3600e3 : t0 + st.preview.endsIn;
-  const c = { id: 0, kind: d.kind, phase: soon ? 'soon' : 'live', showHype: d.showHype, hype: d.hype, headline: d.headline, sub: d.sub, percent: d.percent, min: d.minSubtotal, startsAt, endsAt: end, theme: d.theme, color1: d.color1, color2: d.color2, glyphs: d.fallGlyphs, density: d.fallDensity, speed: d.fallSpeed, name: d.name };
+  const c = { id: 0, kind: d.kind, phase: soon ? 'soon' : 'live', showHype: d.showHype, hype: d.hype, badge: d.badge, headline: d.headline, sub: d.sub, percent: d.percent, min: d.minSubtotal, startsAt, endsAt: end, theme: d.theme, color1: d.color1, color2: d.color2, glyphs: d.fallGlyphs, density: d.fallDensity, speed: d.fallSpeed, name: d.name };
   const l = look(c);
-  const k = `${d.theme}|${d.color1}|${d.color2}|${d.fallGlyphs}|${d.fallDensity}|${d.fallSpeed}|${d.percent}`;
+  const k = `${d.theme}|${d.color1}|${d.color2}|${d.fallGlyphs}|${d.fallDensity}|${d.fallSpeed}|${d.percent}|${JSON.stringify(d.badge || {})}`;
   return (
     <div className="space-y-3">
       <label className="block text-xs font-semibold text-muted">شوف الشكل في أي وقت:
@@ -362,6 +362,28 @@ function Editor({ init, meta, onClose, onSaved }) {
             </div>
             <Field label="العنوان الكبير"><input className={inp} value={d.headline} placeholder={ship ? 'الشحن علينا' : THEMES[d.theme].name} onChange={(e) => set({ headline: e.target.value })} /></Field>
             <Field label="سطر تحته"><input className={inp} value={d.sub} onChange={(e) => set({ sub: e.target.value })} /></Field>
+            {!ship && (
+              <div className="space-y-3 rounded-xl border border-line p-3">
+                <div className="text-sm font-bold">الدايرة الصفراء في البانر</div>
+                <Field label="تعرض إيه؟">
+                  <select className={inp} value={d.badge?.mode || 'all'} onChange={(e) => set({ badge: { ...(d.badge || {}), mode: e.target.value } })}>
+                    <option value="all">«خصم X% على كل المنتجات» (الأوضح للعميل)</option>
+                    <option value="percent">«خصم حتى X%»</option>
+                    <option value="custom">نص من عندي</option>
+                    <option value="none">من غير دايرة</option>
+                  </select>
+                </Field>
+                {d.badge?.mode === 'custom' && (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="النص الكبير (قصير)" hint="مثال: ١+١ أو ٣٠٪ أو مجاناً"><input className={inp} maxLength={10} value={d.badge?.title || ''} onChange={(e) => set({ badge: { ...(d.badge || {}), title: e.target.value } })} /></Field>
+                    <Field label="سطر صغير فوقه (اختياري)"><input className={inp} maxLength={24} value={d.badge?.sub || ''} onChange={(e) => set({ badge: { ...(d.badge || {}), sub: e.target.value } })} /></Field>
+                  </div>
+                )}
+              </div>
+            )}
+            <Field label="شارات تحت العنوان على الكمبيوتر (اختياري، حتى ٤)" hint="كل سطر شارة قصيرة، مثال: الخصم على كل المنتجات · الدفع عند الاستلام · شحن لكل المحافظات">
+              <textarea className={inp} rows={3} maxLength={200} value={(d.badge?.chips || []).join('\n')} onChange={(e) => set({ badge: { ...(d.badge || {}), chips: e.target.value.split('\n').slice(0, 4) } })} />
+            </Field>
             <Switch on={d.showHype} onChange={(v) => set({ showHype: v })} label="جملة تحميس بالعامية في البانر" hint="سطر واحد بيتغيّر لوحده: قبل البداية، أثناء الحملة، وفي آخر ٣ ساعات. سيب الخانة فاضية وهنكتب لك جملة جاهزة." />
             {d.showHype && (
               <details className="rounded-xl border border-line p-3">

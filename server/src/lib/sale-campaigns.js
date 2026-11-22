@@ -151,7 +151,7 @@ export function shippingCampaignFor(net, storeIds = []) {
 /** What the storefront needs (cacheable by the client for a few seconds). */
 function pub(c) {
   return {
-      id: c.id, kind: c.kind, name: c.name, headline: c.headline || '', sub: c.sub || '', showHype: c.show_hype == null ? true : !!c.show_hype, hype: parse(c.hype_json, {}), endsAt: c.ends_at, startsAt: c.starts_at,
+      id: c.id, kind: c.kind, name: c.name, headline: c.headline || '', sub: c.sub || '', showHype: c.show_hype == null ? true : !!c.show_hype, hype: parse(c.hype_json, {}), badge: parse(c.badge_json, {}), endsAt: c.ends_at, startsAt: c.starts_at,
       percent: c.percent, min: c.min_subtotal || 0, mode: c.mode,
       showBar: !!c.show_bar, showFall: !!c.show_fall, fallStyle: FALL_STYLES.includes(c.fall_style) ? c.fall_style : 'percent', showHero: !!c.show_hero,
       theme: c.theme || 'blackfriday', color1: c.color1 || '', color2: c.color2 || '', glyphs: c.fall_glyphs || '', density: c.fall_density || 'low', speed: c.fall_speed || 'calm',
@@ -186,7 +186,7 @@ export function publicCampaigns() {
 
 /* -------------------------------------------------------------------- admin CRUD */
 
-const COLS = ['kind', 'name', 'status', 'starts_at', 'ends_at', 'percent', 'dept_percent_json', 'mode', 'allow_coupons', 'respect_excl', 'min_subtotal', 'store_ids_json', 'budget', 'headline', 'sub', 'show_bar', 'show_fall', 'fall_style', 'show_hero', 'theme', 'color1', 'color2', 'fall_glyphs', 'fall_density', 'fall_speed', 'announce_at', 'show_hype', 'hype_json'];
+const COLS = ['kind', 'name', 'status', 'starts_at', 'ends_at', 'percent', 'dept_percent_json', 'mode', 'allow_coupons', 'respect_excl', 'min_subtotal', 'store_ids_json', 'budget', 'headline', 'sub', 'show_bar', 'show_fall', 'fall_style', 'show_hero', 'theme', 'color1', 'color2', 'fall_glyphs', 'fall_density', 'fall_speed', 'announce_at', 'show_hype', 'hype_json', 'badge_json'];
 
 /** Hype-line overrides keyed by time stage (see the storefront's HYPE_STAGES); unknown keys and empty texts are dropped. */
 export const HYPE_KEYS = ['s_far', 's_days', 's_day', 's_hour', 's_min', 'l_start', 'l_mid', 'l_last', 'l_hour', 'l_min'];
@@ -194,6 +194,18 @@ const hypeMap = (m) => {
   const out = {};
   if (m && typeof m === 'object') for (const k of HYPE_KEYS) { const t = String(m[k] ?? '').replace(/[<>]/g, '').trim().slice(0, 100); if (t) out[k] = t; }
   return out;
+};
+
+/** Banner badge: mode percent | all | custom | none (default 'all' = "X% on ALL products") + optional short chips. */
+export const BADGE_MODES = ['all', 'percent', 'custom', 'none'];
+const badgeMap = (m) => {
+  const t = (v, n) => String(v ?? '').replace(/[<>]/g, '').trim().slice(0, n);
+  const o = m && typeof m === 'object' ? m : {};
+  return {
+    mode: BADGE_MODES.includes(o.mode) ? o.mode : 'all',
+    title: t(o.title, 10), sub: t(o.sub, 24),
+    chips: (Array.isArray(o.chips) ? o.chips : []).map((x) => t(x, 40)).filter(Boolean).slice(0, 4),
+  };
 };
 
 function clean(b, cur = {}) {
@@ -224,6 +236,7 @@ function clean(b, cur = {}) {
     sub: String(b.sub ?? cur.sub ?? '').trim().slice(0, 140),
     show_hype: (b.showHype ?? (cur.show_hype != null ? !!cur.show_hype : true)) ? 1 : 0,
     hype_json: JSON.stringify(hypeMap(b.hype ?? parse(cur.hype_json, {}))),
+    badge_json: JSON.stringify(badgeMap(b.badge ?? parse(cur.badge_json, {}))),
     show_bar: (b.showBar ?? (cur.show_bar != null ? !!cur.show_bar : true)) ? 1 : 0,
     show_fall: (b.showFall ?? (cur.show_fall != null ? !!cur.show_fall : true)) ? 1 : 0,
     fall_style: FALL_STYLES.includes(b.fallStyle ?? cur.fall_style) ? (b.fallStyle ?? cur.fall_style) : 'percent',
@@ -257,7 +270,7 @@ function view(r) {
     id: c.id, kind: c.kind, name: c.name, status: c.status, endedReason: c.ended_reason || null,
     startsAt: c.starts_at, endsAt: c.ends_at, percent: c.percent, deptPercent: c.deptPercent, mode: c.mode,
     allowCoupons: c.allowCoupons, respectExcl: c.respectExcl, minSubtotal: c.min_subtotal, storeIds: c.storeIds, budget: c.budget,
-    headline: c.headline, sub: c.sub, showHype: c.show_hype == null ? true : !!c.show_hype, hype: parse(c.hype_json, {}), showBar: !!c.show_bar, showFall: !!c.show_fall, fallStyle: c.fall_style, showHero: !!c.show_hero,
+    headline: c.headline, sub: c.sub, showHype: c.show_hype == null ? true : !!c.show_hype, hype: parse(c.hype_json, {}), badge: badgeMap(parse(c.badge_json, {})), showBar: !!c.show_bar, showFall: !!c.show_fall, fallStyle: c.fall_style, showHero: !!c.show_hero,
     theme: c.theme || 'blackfriday', color1: c.color1 || '', color2: c.color2 || '', fallGlyphs: c.fall_glyphs || '', fallDensity: c.fall_density || 'low', fallSpeed: c.fall_speed || 'calm',
     announceAt: c.announce_at || null,
     live: c.status === 'active' && c.starts_at <= now() && c.ends_at > now(),

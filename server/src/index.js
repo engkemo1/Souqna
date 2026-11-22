@@ -5,6 +5,7 @@ import path from 'node:path';
 import express from 'express';
 import helmet from 'helmet';
 import { publicSlug, storedSlug } from './lib/seo-slugs.js';
+import { prewarm } from './lib/micro-cache.js';
 import compression from 'compression';
 import cors from 'cors';
 import { config } from './config.js';
@@ -244,16 +245,19 @@ if (fs.existsSync(config.webDist)) {
   const indexHtmlPath = path.join(config.webDist, 'index.html');
   let cachedIndexHtml = null;
   let cachedIndexMtime = 0;
-  const readIndexHtml = () => {
+  let cachedIndexWithBoot = null;
+  // The instant-first-paint outline (<!--boot-->…<!--/boot-->) belongs to the home page only: every other page gets the HTML without it.
+  const readIndexHtml = (keepBoot = false) => {
     try {
       const stat = fs.statSync(indexHtmlPath);
       if (!cachedIndexHtml || stat.mtimeMs !== cachedIndexMtime) {
-        cachedIndexHtml = fs.readFileSync(indexHtmlPath, 'utf8');
+        cachedIndexWithBoot = fs.readFileSync(indexHtmlPath, 'utf8');
+        cachedIndexHtml = cachedIndexWithBoot.replace(/<!--boot-->[\s\S]*?<!--\/boot-->/, '');
         cachedIndexMtime = stat.mtimeMs;
       }
-      return cachedIndexHtml;
+      return keepBoot ? cachedIndexWithBoot : cachedIndexHtml;
     } catch {
-      return cachedIndexHtml || '';
+      return (keepBoot ? cachedIndexWithBoot : cachedIndexHtml) || '';
     }
   };
   app.use(express.static(config.webDist, { index: false, maxAge: '1h', setHeaders: (res, p) => { if (p.includes('/assets/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable'); if (/\/(sw\.js|offline\.html)$|\.webmanifest$/.test(p)) res.setHeader('Cache-Control', 'no-cache'); } }));
@@ -435,7 +439,7 @@ if (fs.existsSync(config.webDist)) {
     if (/\.[a-z0-9]{2,5}$/i.test(req.path) && !/^\/(s|c|a|look|track)\//.test(req.path)) return res.status(404).type('text/plain').send('Not found'); // a missing file (image, script...) is not an HTML page
     if (!hit && req.path !== '/' && !KNOWN_APP_ROUTES.test(req.path)) return notFoundPage(res); // unknown URL: real 404 + noindex
     if (!hit && req.path === '/') {
-      const homeHtml = readIndexHtml().replace('<div id="root"></div>', '<div id="root"><div style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"><h1>كل محلات الملابس في بنها في مكان واحد</h1><p>تويست (Twist) بنها: اكتشف الموضة، قارن الأسعار واطلب أونلاين من محلات الملابس.</p><nav><a href="/stores">محلات الملابس في بنها</a></nav></div></div>');
+      const homeHtml = readIndexHtml(true).replace('<div id="root"></div>', '<div id="root"><div style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap"><h1>كل محلات الملابس في بنها في مكان واحد</h1><p>تويست (Twist) بنها: اكتشف الموضة، قارن الأسعار واطلب أونلاين من محلات الملابس.</p><nav><a href="/stores">محلات الملابس في بنها</a></nav></div></div>');
       return res.set('Cache-Control', 'public, max-age=300, stale-while-revalidate=1800').type('html').send(homeHtml);
     }
     if (!hit) {
@@ -509,6 +513,8 @@ export function startServer(existingServer) {
   } else {
     activeHttpServer = app.listen(config.port, () => console.log(`Twist API ready on http://localhost:${config.port}`));
   }
+
+  prewarm(config.port, ['/marketplace?q=&category=all&sort=featured', '/departments', '/departments?all=1', '/homepage-ads', '/stylist/prompts', '/look-of-day', '/marketplace/free-shipping']);
 
   const onSignal = (sig) => {
     gracefulShutdown(sig, { exitProcess: true }).catch(() => process.exit(1));

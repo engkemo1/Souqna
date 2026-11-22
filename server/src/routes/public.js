@@ -59,10 +59,24 @@ const r = Router();
 // Public, user-independent GETs are answered from memory for a few seconds (see lib/micro-cache.js): the first visitor
 // computes, the next thousands get the stored answer. Admin edits appear within the TTL.
 {
-  const mc = microCache(15); const mcShort = microCache(8);
-  for (const p of ['/marketplace', '/departments', '/departments/:slug', '/homepage-ads', '/featured', '/stories', '/stylist/prompts', '/look-of-day', '/marketplace/free-shipping', '/marketplace/delivery-areas', '/promo', '/search/popular', '/stores/:slug', '/stores/:slug/home']) r.get(p, mc, (_req, _res, next) => next());
+  const mc = microCache(15); const mcShort = microCache(8); const mcHome = microCache(30); // 30s > the 20s warm-up round, so the home answers are always fresh in memory
+  for (const p of ['/marketplace', '/departments']) r.get(p, mcHome, (_req, _res, next) => next());
+  for (const p of ['/departments/:slug', '/homepage-ads', '/featured', '/stories', '/stylist/prompts', '/look-of-day', '/marketplace/free-shipping', '/marketplace/delivery-areas', '/promo', '/search/popular', '/stores/:slug', '/stores/:slug/home']) r.get(p, mc, (_req, _res, next) => next());
   r.get('/stores/:slug/products', mcShort, (_req, _res, next) => next());
+  // browsing pages (category / sale / newest, no typed words) are shared by many visitors; typed searches stay uncached because each one is logged
+  r.get('/search', (req, res, next) => (req.query.q ? next() : mcShort(req, res, next)), (_req, _res, next) => next());
 }
+
+/** Tiny time-boxed memo for heavy read-only queries (facet counts): identical questions inside `ms` reuse the answer. Bounded size. */
+const MEMO = new Map();
+const memo = (key, ms, fn) => {
+  const hit = MEMO.get(key); const now = Date.now();
+  if (hit && hit.exp > now) return hit.val;
+  const val = fn();
+  if (MEMO.size >= 300) MEMO.delete(MEMO.keys().next().value);
+  MEMO.set(key, { val, exp: now + ms });
+  return val;
+};
 
 const cache = (res, seconds = 30) => res.set('Cache-Control', `public, max-age=${seconds}, stale-while-revalidate=${seconds * 4}`);
 
@@ -84,7 +98,7 @@ function loadStore(slug) {
 /** Customer-facing tree: hidden sections and sections with nothing in them (no products, no shops) stay out unless the admin set "show when empty". */
 const publicDept = ({ slug, name, sizes, image, images, parent, level, profile_effective: profile, attrs_effective: attrs, description, icon, product_count, stores_count, seo }) => ({ slug, name, sizes, image, images, parent, level, profile, attrs, description, icon, product_count, stores_count, seo });
 // ?all=1: every non-hidden section (store setup, product forms and labels need sections that have no products yet)
-r.get('/departments', h((req, res) => { cache(res, 60); res.json({ departments: (req.query.all ? listDepartments().filter((d) => d.visibility !== 'hidden') : customerDepartments()).map(publicDept) }); }));
+r.get('/departments', h((req, res) => { cache(res, 60); const list = (req.query.all ? listDepartments().filter((d) => d.visibility !== 'hidden') : customerDepartments()).map(publicDept); res.json({ departments: req.query.attrs ? list : list.map(({ attrs, ...d }) => d) }); })); // attribute definitions are ~75% of the payload and only product pages / the product editor need them: ask with ?attrs=1
 /** One section's landing data: breadcrumb, own details, visible children (with images), SEO. Reads stored rows only — never generates anything. */
 r.get('/departments/:slug', h((req, res) => {
   const all = listDepartments(); const by = new Map(all.map((d) => [d.slug, d]));
@@ -147,14 +161,24 @@ const normText = (s) => String(s).toLowerCase().replace(/[أإآ]/g, 'ا').repla
 
 // ---- smarter search (see lib/search-text.js): words, spellings, synonyms, typos ----
 let searchCache = { at: 0, vocab: new Map(), rows: [], depts: [], cats: [], stores: [] };
+// Rebuilding this index walks every product, so on a big catalogue it freezes the server for a moment. It is rebuilt only when the catalogue
+// actually changed (cheap fingerprint below), and in any case at most every 5 minutes.
+const searchFingerprint = () => {
+  const p = q.get("SELECT COUNT(*) AS n, COALESCE(MAX(updated_at),'') AS u, COALESCE(MAX(id),0) AS m FROM products WHERE status='active'");
+  const s = q.get("SELECT COUNT(*) AS n FROM stores WHERE status='active' AND hidden=0");
+  return `${p.n}|${p.u}|${p.m}|${s.n}`;
+};
 const searchLookups = () => {
-  if (Date.now() - searchCache.at < 20000) return searchCache;
+  const now = Date.now();
+  if (now - searchCache.at < 20000) return searchCache;
+  const fp = searchFingerprint();
+  if (searchCache.fp === fp && now - searchCache.built < 300000) { searchCache.at = now; return searchCache; }
   const prods = q.all("SELECT p.id, p.name_ar, p.name_en, p.description_ar, p.description_en, p.badge_text, p.department, p.category_id, p.store_id FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0");
   const depts = q.all('SELECT slug, name_ar, name_en FROM departments WHERE active=1');
   const cats = q.all("SELECT c.id, c.name_ar, c.name_en FROM categories c WHERE EXISTS (SELECT 1 FROM products p WHERE p.category_id=c.id AND p.status='active')");
   const stores = q.all("SELECT id, name_ar, name_en FROM stores WHERE status='active' AND hidden=0");
   searchCache = {
-    at: Date.now(), rows: prods.map(prepareRow), depts, cats, stores,
+    at: Date.now(), built: Date.now(), fp, rows: prods.map(prepareRow), depts, cats, stores,
     vocab: vocabFrom([...prods.flatMap((n) => [n.name_ar, n.name_en]), ...depts.flatMap((d) => [d.name_ar, d.name_en]), ...cats.flatMap((c) => [c.name_ar, c.name_en])]),
   };
   return searchCache;
@@ -408,8 +432,12 @@ r.get('/search', h((req, res) => {
   }
   const facetColors = [...colorMap.values()].sort((a, b) => b.n - a.n).slice(0, 16);
   // الخامات: عدد المنتجات لكل خامة (جوه نفس القسم والفئة) في استعلام واحد
-  const matSums = MATERIALS.map((m, i) => { const c = matCond(m); return { sql: `SUM(CASE WHEN ${c.sql} THEN 1 ELSE 0 END) AS m${i}`, params: c.params }; });
-  const matRow = q.get(`SELECT ${matSums.map((x) => x.sql).join(', ')} FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preMat.where.join(' AND ')}`, [...matSums.flatMap((x) => x.params), ...preMat.params]) || {};
+  // The text of each product is normalised ONCE (materialised CTE) and then matched against every material word. Normalising it again for every word
+  // made this single query take seconds on a big catalogue and froze the whole server while it ran. The answer is also kept 60 s (see memo).
+  const matSums = MATERIALS.map((m, i) => ({ sql: `SUM(CASE WHEN (${m.words.map(() => 't LIKE ?').join(' OR ')}) THEN 1 ELSE 0 END) AS m${i}`, params: m.words.map((w) => `%${normText(w)}%`) }));
+  const matSql = `WITH pt AS MATERIALIZED (SELECT ${MAT_TEXT()} AS t FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preMat.where.join(' AND ')}) SELECT ${matSums.map((x) => x.sql).join(', ')} FROM pt`;
+  const matParams = [...preMat.params, ...matSums.flatMap((x) => x.params)];
+  const matRow = memo(`mat|${matSql}|${JSON.stringify(matParams)}`, 60_000, () => q.get(matSql, matParams)) || {};
     const materials = MATERIALS.map((m, i) => ({ key: m.key, name: { ar: m.ar, en: m.en }, n: Number(matRow[`m${i}`]) || 0 })).filter((m) => m.n > 0 || matList.includes(m.key)).sort((a, b) => b.n - a.n);
   // counts per option of every department filter; each one ignores its own selection but respects the others
   const attrFacets = attrDefs.map((d) => {

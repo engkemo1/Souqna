@@ -6,7 +6,7 @@ import { cx } from './cx.js';
 /**
  * Responsive, layout-stable image:
  *  - reserves space via aspect-ratio (no layout shift)
- *  - blurred LQIP + dominant colour placeholder
+ *  - dominant-colour placeholder (no second 'blurred preview' <img>: it doubled the image count and decode work)
  *  - WebP with JPEG fallback, srcset + sizes so the browser picks the right rendition
  *  - native lazy loading (eager + high priority for LCP images)
  *  - fade-in on load, graceful error fallback
@@ -23,9 +23,6 @@ function SmartImage({ media, alt, sizes = '100vw', ratio, fit = 'cover', priorit
   const aspect = ratio === 'natural' && media ? `${media.w} / ${media.h}` : ratio;
   return (
     <div className={cx('relative overflow-hidden', className)} style={{ aspectRatio: aspect, backgroundColor: media?.color || undefined }}>
-      {showPlaceholder && media?.lqip && !failed && !loaded && (
-        <img src={media.lqip} alt="" aria-hidden="true" decoding="async" className={cx('absolute inset-0 h-full w-full', fit === 'cover' ? 'object-cover' : 'object-contain')} />
-      )}
       {media && !failed ? (
         <picture>
           {!isUrl && <source type="image/webp" srcSet={srcSet(media, 'webp')} sizes={sizes} />}

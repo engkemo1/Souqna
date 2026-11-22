@@ -43,3 +43,18 @@ export function microCache(ttlSeconds = 15) {
 }
 
 export const clearMicroCache = () => store.clear();
+
+/**
+ * Keeps the busiest answers permanently warm: every `everyMs` the server asks itself for them (same URL the website uses),
+ * so a visitor never has to wait for the heavy home-page queries — they always find a fresh stored answer.
+ */
+export function prewarm(port, paths, everyMs = 20_000) {
+  const run = async () => {
+    for (const p of paths) {
+      try { const r = await fetch(`http://127.0.0.1:${port}/api${p}`, { headers: { 'accept-encoding': 'identity' } }); await r.arrayBuffer(); } catch { /* next round */ }
+      await new Promise((ok) => setTimeout(ok, 50)); // let real visitors in between
+    }
+  };
+  setTimeout(run, 3000).unref();
+  return setInterval(run, everyMs).unref();
+}

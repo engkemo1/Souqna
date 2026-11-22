@@ -123,7 +123,7 @@ export default function Product() {
   const toast = useToast();
   const add = useAddToCart(store.slug);
   const p = data?.product;
-  const depts = useDepartments({ all: true });
+  const depts = useDepartments({ all: true, attrs: true });
   // category-specific details (fabric, fit, finish...) from the product's own attribute values, labelled by its section's definitions; merchant-only fields are never shown
   const specRows = (() => {
     const defs = depts.bySlug.get(p?.department)?.attrs || [];

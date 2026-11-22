@@ -14,6 +14,7 @@ import sharp from 'sharp';
 import { q } from '../db/index.js';
 import { readMediaFile } from '../lib/media.js';
 import { reindexPending, invalidateVisualCache, searchByImage, activeModel, visualSettings, loadVisualCatalog } from '../lib/visual.js';
+import { clipReady } from '../lib/visual-clip.js';
 import { augmentedShot } from '../lib/visual-eval.js';
 import { measure, sweep, recommendFloor, failureReason } from '../lib/visual-acceptance.js';
 
@@ -23,6 +24,7 @@ const pct = (x) => (Number.isFinite(x) ? `${(100 * x).toFixed(1)}%` : 'n/a');
 
 async function bytes(m) { for (const f of ['md.jpg', 'md.webp', 'sm.jpg', 'sm.webp', 'original.jpg']) { try { return await readMediaFile(m, f); } catch { /* next */ } } return null; }
 
+if (visualSettings().model === 'clip') { console.log('waiting for the CLIP model to load (the first run downloads it)...'); await clipReady(); }
 const model = await activeModel();
 console.log(`model: ${model}   floor(clip/color): ${visualSettings().minSimilarityByModel.clip}/${visualSettings().minSimilarityByModel.color}`);
 if (model === 'color-v1') console.log('WARNING: the colour model answers searches (CLIP is not selected or could not load). Results below describe the colour model.');

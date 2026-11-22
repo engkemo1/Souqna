@@ -492,7 +492,7 @@ export default function ProductEditor() {
     } catch (x) { toast({ tone: 'error', duration: x.code === 'too_many_sections' ? 10000 : 3200, title: x.code === 'section_exists' ? L('القسم ده موجود عندك بالفعل', 'This section already exists') : x.code === 'too_many_sections' ? L('وصلت للحد الأقصى: 12 قسم خاص في متجرك، فمش هينفع تضيف قسم جديد. اختار قسم من الأقسام الموجودة في القائمة (هتلاقي اللي محتاجه فيها)، أو امسح قسم مش بتستخدمه من صفحة «الأقسام» وجرّب تاني.', 'You have reached the limit of 12 custom sections, so a new one cannot be added. Pick one of your existing sections from the list (you will most likely find what you need there), or delete an unused section from the Sections page and try again.') : (errorMessage ? errorMessage(x) : (x.message || 'Error')) }); } finally { setCatBusy(false); }
   };
   const { data: tree } = useApi('/owner/product-types');
-  const { data: pubDepts, reload: reloadPubDepts } = useApi('/departments?all=1');
+  const { data: pubDepts, reload: reloadPubDepts } = useApi('/departments?all=1&attrs=1');
   const { data: pickerData, reload: reloadPicker } = useApi('/owner/category-picker');
   const sectionOptions = useMemo(() => (pickerData?.departments || []).filter((d) => d.leaf).map((d) => ({ slug: d.slug, ar: d.name?.ar || '', en: d.name?.en || '', crumb: (d.breadcrumb || []).map((n) => n?.ar).filter(Boolean).join(' › ') })), [pickerData]);
   const [f, setF] = useState(EMPTY);

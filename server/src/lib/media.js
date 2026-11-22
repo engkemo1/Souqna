@@ -38,7 +38,7 @@ import { r2Enabled, r2Put, r2Delete, r2Get } from './r2.js';
 export const renderWebp = (buf, name, width, crisp = false) => {
   let p = sharp(buf).resize({ width, withoutEnlargement: true });
   if (crisp) p = p.sharpen({ sigma: 0.5, m1: 0.3, m2: 1.0, x1: 3, y2: 4, y3: 6 });
-  return p.webp({ quality: name === 'thumb' ? 66 : 74, effort: 6, smartSubsample: true }).toBuffer();
+  return p.webp({ quality: name === 'thumb' ? 66 : 74, effort: Number(process.env.WEBP_EFFORT) || 6, smartSubsample: true }).toBuffer();
 };
 const ORIGINAL_JPEG = { quality: 90, mozjpeg: true, chromaSubsampling: '4:4:4' }; // the master every rendition is made from: keep it clean
 // Between processing steps: practically lossless and full colour resolution (re-saving with normal JPEG settings each step

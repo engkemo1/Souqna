@@ -3,9 +3,9 @@ import { useApi } from './hooks.js';
 import { useI18n } from './i18n.jsx';
 
 /** Departments are managed by the platform team (admin → الأقسام). Labels come from the API, never hard-coded. */
-export function useDepartments({ all = false } = {}) {
+export function useDepartments({ all = false, attrs = false } = {}) {
   const { lang, t } = useI18n();
-  const { data } = useApi(all ? '/departments?all=1' : '/departments');
+  const { data } = useApi(`/departments${all || attrs ? `?${[all && 'all=1', attrs && 'attrs=1'].filter(Boolean).join('&')}` : ''}`);
   const list = data?.departments || [];
   const bySlug = useMemo(() => new Map(list.map((d) => [d.slug, d])), [list]);
   const label = useCallback((slug) => {

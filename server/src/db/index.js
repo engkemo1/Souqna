@@ -13,6 +13,13 @@ fs.mkdirSync(path.dirname(config.dbFile), { recursive: true });
 export const db = new DatabaseSync(config.dbFile);
 db.exec('PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000; PRAGMA wal_autocheckpoint = 1000; PRAGMA cache_size = -65536; PRAGMA mmap_size = 268435456; PRAGMA temp_store = MEMORY;');
 db.exec(fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
+// Home-page shelves ("newest", "best sellers", per-section) sort the whole catalogue: these indexes let SQLite read just the top rows.
+for (const ddl of [
+  'CREATE INDEX IF NOT EXISTS idx_products_active_new ON products(status, created_at DESC, id DESC)',
+  'CREATE INDEX IF NOT EXISTS idx_products_active_sold ON products(status, sold_count DESC)',
+  'CREATE INDEX IF NOT EXISTS idx_products_active_dept_sold ON products(status, department, sold_count DESC)',
+  'CREATE INDEX IF NOT EXISTS idx_products_active_dept_new ON products(status, department, created_at DESC, id DESC)',
+]) { try { db.exec(ddl); } catch { /* column added by a later migration on a brand-new database: the next boot creates it */ } }
 {
   const cols = db.prepare('PRAGMA table_info(pos_sale_items)').all().map((c) => c.name);
   if (!cols.includes('no_return')) db.exec('ALTER TABLE pos_sale_items ADD COLUMN no_return INTEGER NOT NULL DEFAULT 0');
@@ -193,7 +200,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
     for (const [n, d] of [['theme', "'blackfriday'"], ['color1', "''"], ['color2', "''"], ['fall_glyphs', "''"], ['fall_density', "'low'"], ['fall_speed', "'calm'"]]) if (!sc.includes(n)) db.exec(`ALTER TABLE sale_campaigns ADD COLUMN ${n} TEXT NOT NULL DEFAULT ${d}`);
     if (!sc.includes('announce_at')) db.exec('ALTER TABLE sale_campaigns ADD COLUMN announce_at INTEGER');
     if (!sc.includes('show_hype')) db.exec('ALTER TABLE sale_campaigns ADD COLUMN show_hype INTEGER NOT NULL DEFAULT 1'); // the short hype line on the banner (colloquial Arabic)
-    if (!sc.includes('hype_json')) db.exec("ALTER TABLE sale_campaigns ADD COLUMN hype_json TEXT NOT NULL DEFAULT '{}'"); } // announce_at = when the "coming soon" teaser starts (null = only at start) · hype_json = admin overrides of the banner hype line per time stage
+    if (!sc.includes('hype_json')) db.exec("ALTER TABLE sale_campaigns ADD COLUMN hype_json TEXT NOT NULL DEFAULT '{}'");
+    if (!sc.includes('badge_json')) db.exec("ALTER TABLE sale_campaigns ADD COLUMN badge_json TEXT NOT NULL DEFAULT '{}'"); } // badge_json = the banner's round badge (percent / all products / custom / none) + optional highlight chips // announce_at = when the "coming soon" teaser starts (null = only at start) · hype_json = admin overrides of the banner hype line per time stage
   if (!ocols.includes('track_token')) db.exec('ALTER TABLE orders ADD COLUMN track_token TEXT');
   if (!ocols.includes('shipping_free')) db.exec('ALTER TABLE orders ADD COLUMN shipping_free INTEGER NOT NULL DEFAULT 0');
   if (!ocols.includes('courier_cost')) db.exec('ALTER TABLE orders ADD COLUMN courier_cost INTEGER');

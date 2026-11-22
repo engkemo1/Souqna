@@ -47,6 +47,17 @@
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Weak / slow devices (see lib/perf.js): no blur-behind effects, no smooth-scroll, instant transitions. */
+html[data-perf='low'] *,
+html[data-perf='low'] *::before,
+html[data-perf='low'] *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+
 @layer base {
   html {
     @apply bg-canvas text-fg antialiased;

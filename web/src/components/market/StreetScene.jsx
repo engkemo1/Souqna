@@ -684,16 +684,20 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
   useEffect(() => {
     const root = rootRef.current; const scroller = ref.current; if (!root || !scroller) return undefined;
     // low-end / data-saver devices keep only the GPU-composited motion (vehicles, clouds, birds, sun)
-    const nav = navigator; const lite = !!(nav.connection && nav.connection.saveData) || (nav.deviceMemory && nav.deviceMemory <= 2) || (nav.hardwareConcurrency && nav.hardwareConcurrency <= 2) || window.matchMedia('(max-width: 767px)').matches; // phones: the scene stays, its ~120 looping animations don't
-    root.dataset.lite = lite ? '1' : '0';
-    if (!('IntersectionObserver' in window)) return undefined;
+    // motion levels: '0' everything moves (desktop) · '2' phones: only the walkers + the overlay traffic/clouds/birds/sun move · '1' frozen shops (weak / data-saver devices)
+    const level = () => { const t = document.documentElement.dataset.perf; return t === 'low' ? '1' : t === 'mid' ? '2' : '0'; }; // shared device tier (lib/perf.js)
+    root.dataset.lite = level();
+    const onTier = () => { root.dataset.lite = level(); };
+    window.addEventListener('perf-change', onTier);
+    let stop = false;
+    if (!('IntersectionObserver' in window)) return () => { stop = true; window.removeEventListener('perf-change', onTier); };
     // 1) pause everything while the street is off-screen vertically
     const whole = new IntersectionObserver(([e]) => { root.dataset.paused = e.isIntersecting ? '0' : '1'; }, { threshold: 0 });
     whole.observe(root);
     // 2) inside the scroller only animate what is actually in view (a phone sees ~2 of the 14 shops)
     const part = new IntersectionObserver((entries) => { for (const e of entries) e.target.style.animationPlayState = e.isIntersecting ? 'running' : 'paused'; }, { root: scroller, rootMargin: '0px 160px 0px 160px' });
     scroller.querySelectorAll('.st-flap,.st-wave,.st-glow,.st-sway,.st-walk,.st-step,.st-bob,.st-wag,.st-pulse,.st-flutter').forEach((n) => part.observe(n));
-    return () => { whole.disconnect(); part.disconnect(); };
+    return () => { stop = true; window.removeEventListener('perf-change', onTier); whole.disconnect(); part.disconnect(); };
   }, [campKey(camp)]); // re-observe when campaign pieces (banners, sale tags) appear or change
   const onDown = (e) => { if (e.pointerType !== 'mouse') return; drag.current = { x: e.clientX, left: ref.current.scrollLeft, moved: false }; };
   const onMove = (e) => { const d = drag.current; if (!d) return; const dx = e.clientX - d.x; if (Math.abs(dx) > 5) d.moved = true; if (d.moved) ref.current.scrollLeft = d.left + dx; };
@@ -738,7 +742,8 @@ export default function StreetScene({ labels = {}, counts = {}, lang = 'ar', cla
 .st-flutter{animation:st-flutter 1.6s ease-in-out infinite alternate}
 @keyframes st-flutter{from{transform:translateY(-1.4px)}to{transform:translateY(1.4px)}}
 .st-root[data-paused="1"] *{animation-play-state:paused!important}
-.st-root[data-lite="1"] svg.st-main *{animation:none!important}
+.st-root[data-lite="1"] svg.st-main *,.st-root[data-lite="1"] .st-drive,.st-root[data-lite="1"] .st-drift{animation:none!important}
+.st-root[data-lite="2"] svg.st-main *:not(.st-walk):not(.st-step){animation:none!important}
 }
 `}</style>
       <div

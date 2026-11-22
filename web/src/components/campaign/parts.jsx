@@ -8,7 +8,7 @@ import { useCountdown } from '../../lib/campaigns.js';
 
 const two = new Intl.NumberFormat('ar-EG', { minimumIntegerDigits: 2, useGrouping: false });
 const one = new Intl.NumberFormat('ar-EG', { useGrouping: false });
-const reduced = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
+const reduced = () => { try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.dataset.perf === 'low'; } catch { return false; } }; // weak devices (lib/perf.js) skip the falling shapes too
 
 const CSS = `
 @keyframes twTruck{0%{transform:translateX(-170px)}100%{transform:translateX(calc(100cqw + 40px))}}
@@ -107,6 +107,18 @@ const text = (c) => {
   return { head, sub };
 };
 
+/** The round badge. Admin picks: 'all' (X% on ALL products, default) · 'percent' (up to X%) · 'custom' · 'none'. */
+const badgeOf = (c) => {
+  if (c.kind === 'shipping') return null;
+  const b = c.badge || {};
+  const mode = b.mode || 'all';
+  const pct = c.percent ? `${one.format(c.percent)}%` : '٪';
+  if (mode === 'none') return null;
+  if (mode === 'custom') return b.title ? { top: b.sub || '', big: b.title, bottom: '', small: b.title.length > 5 } : null;
+  if (mode === 'percent') return { top: 'خصم حتى', big: pct, bottom: '' };
+  return { top: 'خصم', big: pct, bottom: 'على كل المنتجات', mTop: 'خصم على الكل' };
+};
+
 function Truck() {
   return (
     <svg viewBox="0 0 132 64" aria-hidden="true" className="h-[44px] w-[90px] sm:h-[64px] sm:w-[132px]" style={{ animation: 'twBob .5s ease-in-out infinite' }}>
@@ -143,6 +155,8 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
   const l = look(c);
   const ship = c.kind === 'shipping';
   const { head, sub } = text(c);
+  const bd = badgeOf(c);
+  const chips = (c.badge?.chips || []).filter(Boolean).slice(0, 4);
   const soon = c.phase === 'soon'; // announced, not started yet: countdown to the START, no shopping button
   const grad = `linear-gradient(to left, ${l.c1} 0%, ${l.c1} 58%, color-mix(in srgb, ${l.c2} 38%, ${l.c1}) 100%)`; // text side stays solid → always readable
   const Cta = preview ? 'span' : Link;
@@ -155,19 +169,24 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
         <span key={i} aria-hidden="true" className="absolute select-none text-2xl opacity-40 sm:text-3xl sm:opacity-60" style={{ top: `${14 + (i * 23) % 60}%`, insetInlineEnd: `${6 + i * 11}%`, animation: `twFloat ${4 + i}s ease-in-out ${i * 0.4}s infinite` }}>{g}</span>
       ))}
       <div className="relative z-10 flex flex-col gap-2.5 px-4 pb-4 pt-4 sm:grid sm:grid-cols-[1fr_auto] sm:content-center sm:items-center sm:gap-x-8 sm:gap-y-5 sm:px-10 sm:py-9">
-        {!ship && (
+        {bd && (
           <div aria-hidden="true" className="absolute start-3 top-3 grid h-[66px] w-[66px] place-items-center rounded-full font-display font-black sm:hidden" style={{ background: l.c2, color: '#111', animation: 'twPulse 2.6s ease-in-out infinite', boxShadow: `0 0 0 4px ${l.c2}33, 0 0 0 9px ${l.c2}1a` }}>
-            <span className="text-center leading-none"><span className="block text-[9px] font-bold opacity-70">خصم حتى</span><span className="text-[22px]" dir="ltr">{c.percent ? `${one.format(c.percent)}%` : '٪'}</span></span>
+            <span className="text-center leading-none">{(bd.mTop || bd.top) && <span className="block text-[8px] font-bold opacity-70">{bd.mTop || bd.top}</span>}<span className={bd.small ? 'text-[15px]' : 'text-[22px]'} dir="ltr">{bd.big}</span></span>
           </div>
         )}
-        <div className={!ship ? 'ps-[78px] sm:ps-0' : ''}>
+        <div className={bd ? 'ps-[78px] sm:ps-0' : ''}>
           <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold sm:px-3 sm:py-1 sm:text-xs" style={{ background: l.c2, color: '#111' }}>{soon ? '⏳ قريباً' : <>{l.emoji} {ship ? 'شحن مجاني' : 'عرض لفترة محدودة'}</>}</div>
           <h2 className="mt-2 font-display text-[26px] font-black leading-tight sm:mt-3 sm:text-5xl">{head}</h2>
           <p className="mt-1 max-w-xl text-[13px] leading-snug opacity-90 sm:mt-2 sm:text-lg">{sub}</p>
           <Hype c={c} offset={offset} />
+          {chips.length > 0 && (
+            <ul className="mt-4 hidden flex-wrap gap-2 sm:flex">
+              {chips.map((x, i) => (<li key={i} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold" style={{ background: 'rgba(255,255,255,.14)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.28)' }}><span style={{ color: l.c2 }}>✓</span>{x}</li>))}
+            </ul>
+          )}
         </div>
         <div className="flex items-center justify-between gap-2 sm:contents">
-          <div className={`flex flex-col gap-1 sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:items-center sm:self-center sm:gap-2 ${ship ? '' : 'sm:me-48'}`}>
+          <div className={`flex flex-col gap-1 sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:items-center sm:self-center sm:gap-2 ${bd ? 'sm:me-52' : ''}`}>
             <span className="text-[11px] font-bold opacity-85 sm:text-xs">{soon ? 'هيبدأ بعد' : 'ينتهي بعد'}</span>
             <Cells end={soon ? c.startsAt : c.endsAt} offset={offset} />
           </div>
@@ -175,10 +194,10 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
             ? <span className="shrink-0 sm:col-start-1 sm:row-start-2 sm:justify-self-start rounded-full px-4 py-2 text-[13px] font-black sm:px-5 sm:py-2.5 sm:text-sm" style={{ background: 'rgba(255,255,255,.18)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.3)' }}>استعد ⏰</span>
             : <Cta {...(preview ? {} : { to: ship ? '/search' : '/search?sale=1' })} className="shrink-0 sm:col-start-1 sm:row-start-2 sm:self-start sm:justify-self-start rounded-full px-4 py-2 text-[13px] font-black shadow-lg transition active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm sm:hover:scale-[1.03]" style={{ background: l.c2, color: '#111' }}>{ship ? 'ابدأ التسوق' : 'تسوق العروض'} ←</Cta>}
         </div>
-        {!ship && (
+        {bd && (
           <div className="hidden sm:absolute sm:end-10 sm:top-1/2 sm:block sm:-translate-y-1/2" aria-hidden="true">
-            <div className="grid h-40 w-40 place-items-center rounded-full font-display font-black" style={{ background: l.c2, color: '#111', animation: 'twPulse 2.6s ease-in-out infinite', boxShadow: `0 0 0 8px ${l.c2}33, 0 0 0 18px ${l.c2}1a` }}>
-              <span className="text-center leading-none"><span className="block text-xs font-bold opacity-70">خصم حتى</span><span className="text-5xl" dir="ltr">{c.percent ? `${one.format(c.percent)}%` : '٪'}</span></span>
+            <div className="grid h-44 w-44 place-items-center rounded-full font-display font-black" style={{ background: l.c2, color: '#111', animation: 'twPulse 2.6s ease-in-out infinite', boxShadow: `0 0 0 8px ${l.c2}33, 0 0 0 18px ${l.c2}1a` }}>
+              <span className="text-center leading-none">{bd.top && <span className="block text-sm font-bold opacity-75">{bd.top}</span>}<span className={`block ${bd.small ? 'text-4xl' : 'text-6xl'}`} dir="ltr">{bd.big}</span>{bd.bottom && <span className="mt-1.5 block text-[13px] font-extrabold">{bd.bottom}</span>}</span>
             </div>
           </div>
         )}

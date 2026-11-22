@@ -28,6 +28,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
   const inCmp = comparable && cmp.has(p.id);
   const fav = favs.has(p.id);
   const [popKey, setPopKey] = useState(0);
+  const [peek, setPeek] = useState(false); // the hover photo is only created once the pointer/finger gets near the card
   const href = sp(p.store?.slug || slug, `p/${p.slug}`);
   const out = p.stock === 'out';
   const { card } = useDesign();
@@ -55,6 +56,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
 
   return (
     <article
+      onPointerEnter={CAN_HOVER ? () => setPeek(true) : undefined}
       className={cx('group relative flex min-w-0 flex-col', wrap)}
       style={tint ? { background: tint.bg, '--c-text': '31 35 64', '--c-muted': '84 89 112', '--c-sale': '185 28 28', '--c-on-sale': '255 255 255' } : undefined}
     >
@@ -68,7 +70,7 @@ function ProductCard({ product: p, slug, onQuickAdd, priority, index = 0, showSt
           imgClassName="group-hover:scale-[1.02] [@media(hover:none)]:group-hover:scale-100"
           className={cx(out && 'opacity-70')}
         />
-        {p.hoverImage && CAN_HOVER && (
+        {p.hoverImage && CAN_HOVER && peek && (
           <SmartImage
             media={p.hoverImage}
             alt=""
