@@ -56,7 +56,10 @@ export function initPerf() {
         slow += 1;
         if (slow >= 2) { const t2 = ORDER[want]; setPerf(t2); try { localStorage.setItem('tw.perf2', JSON.stringify({ t: t2, ts: Date.now() })); } catch { /* ignore */ } }
         else setTimeout(probe, 2500);
-      } else slow = 0;
+      } else {
+        slow = 0;
+        if (want === 0 && html.dataset.perfReady !== '1') { html.dataset.perfReady = '1'; window.dispatchEvent(new Event('perf-change')); } // device proved smooth → heavy decorative motion may start
+      }
     };
     requestAnimationFrame(tick);
   };
