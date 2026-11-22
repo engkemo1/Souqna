@@ -38,7 +38,7 @@ export function initPerf() {
   // a throttled/background tab, a tab switch) can't wrongly demote a good device. Only two slow verdicts in a row count.
   let slow = 0; let waits = 0;
   const probe = () => {
-    if (document.visibilityState !== 'visible' || !document.hasFocus()) { if (waits < 8) { waits += 1; setTimeout(probe, 3000); } return; }
+    if (document.visibilityState !== 'visible') { if (waits < 200) { waits += 1; setTimeout(probe, 3000); } return; } // hidden tab: try again later (no focus check — in-app browsers never report focus)
     const d = []; let last = performance.now(); let bad = false;
     const onVis = () => { bad = true; };
     document.addEventListener('visibilitychange', onVis, { once: true });
@@ -46,7 +46,7 @@ export function initPerf() {
       d.push(t - last); last = t;
       if (d.length < 45) { requestAnimationFrame(tick); return; }
       document.removeEventListener('visibilitychange', onVis);
-      if (bad) { if (waits < 8) { waits += 1; setTimeout(probe, 3000); } return; }
+      if (bad) { if (waits < 200) { waits += 1; setTimeout(probe, 3000); } return; }
       d.sort((x, y) => x - y);
       const med = d[d.length >> 1];
       const want = med > 50 ? 2 : med > 34 ? 1 : 0; // median slower than ~20 fps → low · slower than ~30 fps → mid
