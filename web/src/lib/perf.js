@@ -11,15 +11,17 @@ const html = document.documentElement;
 const nav = navigator;
 const conn = nav.connection || {};
 const mem = nav.deviceMemory; const cores = nav.hardwareConcurrency;
+let floor = 'low'; // the lowest tier this device may be demoted to — a strong desktop never goes below 'mid' (the static picture is only for genuinely weak devices; many open tabs or a busy moment must not strip it)
 
 function start() {
   const weak = !!conn.saveData || /(^|-)2g$/.test(conn.effectiveType || '') || (mem && mem <= 2) || (cores && cores <= 2);
   const phone = (() => { try { return window.matchMedia('(max-width: 767px)').matches; } catch { return false; } })();
   const mid = /3g/.test(conn.effectiveType || '') || (mem && mem <= 4) || (cores && cores <= 4) || phone;
   let tier = weak ? 'low' : mid ? 'mid' : 'high';
+  if (tier === 'high') floor = 'mid';
   try {
     const s = JSON.parse(localStorage.getItem('tw.perf2') || 'null');
-    if (s && Date.now() - s.ts < 7 * 864e5 && ORDER.indexOf(s.t) > ORDER.indexOf(tier)) tier = s.t;
+    if (s && Date.now() - s.ts < 7 * 864e5 && ORDER.indexOf(s.t) > ORDER.indexOf(tier)) tier = ORDER[Math.min(ORDER.indexOf(s.t), ORDER.indexOf(floor))];
   } catch { /* storage unavailable */ }
   return tier;
 }
@@ -49,7 +51,7 @@ export function initPerf() {
       if (bad) { if (waits < 200) { waits += 1; setTimeout(probe, 3000); } return; }
       d.sort((x, y) => x - y);
       const med = d[d.length >> 1];
-      const want = med > 50 ? 2 : med > 34 ? 1 : 0; // median slower than ~20 fps → low · slower than ~30 fps → mid
+      const want = Math.min(med > 50 ? 2 : med > 34 ? 1 : 0, ORDER.indexOf(floor)); // median slower than ~20 fps → low · slower than ~30 fps → mid
       const cur = ORDER.indexOf(perfTier());
       if (want > cur) {
         slow += 1;
