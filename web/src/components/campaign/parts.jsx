@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { X } from 'lucide-react';
+import { ArrowLeft, Bell, Check, X } from 'lucide-react';
 import { look, hypeFor, hypeStage, hasOwnHype } from '../../lib/campaignTheme.js';
 
 const HYPE_SEED = Math.floor(Math.random() * 1000); // each visit starts on a different line
@@ -19,6 +19,7 @@ const CSS = `
 @keyframes twPulse{0%,100%{transform:scale(1) rotate(-4deg)}50%{transform:scale(1.07) rotate(-4deg)}}
 @keyframes twShine{0%{transform:translateX(-120%) skewX(-18deg)}60%,100%{transform:translateX(320%) skewX(-18deg)}}
 @keyframes twFloat{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-10px) rotate(6deg)}}
+@keyframes twPing{0%{box-shadow:0 0 0 0 var(--ping,rgba(255,255,255,.5))}75%,100%{box-shadow:0 0 0 9px transparent}}
 @keyframes twFade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
 @media (prefers-reduced-motion: reduce){.tw-anim,.tw-anim *{animation:none !important}}
 `;
@@ -81,17 +82,19 @@ export function FallCanvas({ c, contained = false }) {
   return <canvas ref={ref} aria-hidden="true" className="pointer-events-none" style={{ position: contained ? 'absolute' : 'fixed', inset: 0, width: '100%', height: '100%', zIndex: contained ? 1 : 60 }} />;
 }
 
-function Cells({ end, offset, size = 'lg' }) {
+function Cells({ end, offset }) {
   const t = useCountdown(end, offset);
   const cells = [t.d > 0 && [t.d, 'يوم'], [t.h, 'ساعة'], [t.m, 'دقيقة'], [t.s, 'ثانية']].filter(Boolean);
-  const big = size === 'lg';
   return (
-    <div className="flex items-stretch gap-1.5 sm:gap-2" dir="rtl" aria-label="الوقت المتبقي">
-      {cells.map(([n, label]) => (
-        <div key={label} className={`rounded-xl text-center backdrop-blur ${big ? 'min-w-[46px] px-1.5 py-1 sm:min-w-[84px] sm:px-4 sm:py-3' : 'min-w-[44px] px-1.5 py-1'}`} style={{ background: 'rgba(255,255,255,.14)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.22)' }}>
-          <div className={`font-display font-black tabular-nums leading-none ${big ? 'text-xl sm:text-4xl' : 'text-lg'}`} dir="ltr">{two.format(n)}</div>
-          <div className={`mt-0.5 opacity-80 sm:mt-1 ${big ? 'text-[10px] sm:text-[11px]' : 'text-[10px]'}`}>{label}</div>
-        </div>
+    <div className="flex items-start gap-1 sm:gap-2" dir="rtl" aria-label="الوقت المتبقي">
+      {cells.map(([n, label], i) => (
+        <Fragment key={label}>
+          {i > 0 && <span aria-hidden="true" className="pt-1.5 text-base font-black opacity-35 sm:pt-3 sm:text-2xl">:</span>}
+          <div className="min-w-[46px] rounded-xl px-1.5 py-1.5 text-center sm:min-w-[92px] sm:rounded-2xl sm:px-3 sm:py-3.5" style={{ background: 'linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.04))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.14), inset 0 1px 0 rgba(255,255,255,.2), 0 12px 26px -14px rgba(0,0,0,.7)' }}>
+            <div className="font-display text-xl font-black tabular-nums leading-none sm:text-[44px]" dir="ltr">{two.format(n)}</div>
+            <div className="mt-1 text-[10px] font-medium opacity-60 sm:mt-1.5 sm:text-[11px]">{label}</div>
+          </div>
+        </Fragment>
       ))}
     </div>
   );
@@ -149,7 +152,25 @@ function Hype({ c, offset }) {
   return <p key={`${stage}-${hasOwnHype(c, stage) ? 0 : (HYPE_SEED + turn) % 4}`} className="mt-2 max-w-xl text-[13px] font-extrabold leading-snug sm:mt-3 sm:text-lg" style={{ color: look(c).c2, animation: 'twFade .5s ease' }}>{line}</p>;
 }
 
-/** Big animated banner. `preview` = rendered inside the admin (no router link, no fixed positioning). */
+/** The round seal (gold disc + slowly turning hairline ring). Admin picks what it says (see badgeOf). */
+function Seal({ bd, l, gold }) {
+  return (
+    <div aria-hidden="true" className="relative grid h-[196px] w-[196px] place-items-center">
+      <div className="absolute inset-3 rounded-full opacity-50 blur-2xl" style={{ background: l.c2 }} />
+      <div className="absolute inset-0 rounded-full" style={{ background: `conic-gradient(from 0deg, ${l.c2}, transparent 38%, ${l.c2}99 66%, transparent)`, WebkitMask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px))', mask: 'radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px))', animation: 'twSpin 16s linear infinite' }} />
+      <div className="relative grid h-[160px] w-[160px] place-items-center rounded-full font-display font-black" style={{ background: gold, color: '#1b1305', boxShadow: `inset 0 2px 0 rgba(255,255,255,.65), inset 0 -16px 30px rgba(0,0,0,.14), 0 22px 44px -14px ${l.c2}b3` }}>
+        <div className="absolute inset-2 rounded-full" style={{ boxShadow: 'inset 0 0 0 1.5px rgba(27,19,5,.14)' }} />
+        <span className="relative text-center leading-none">
+          {bd.top && <span className="block text-[15px] font-extrabold tracking-[.18em] opacity-75">{bd.top}</span>}
+          <span className={`block ${bd.top ? 'mt-1' : ''} ${bd.small ? 'text-[38px] tracking-tight' : 'text-[58px]'}`} dir="ltr">{bd.big}</span>
+          {bd.bottom && <span className="mt-2 block text-[12.5px] font-extrabold opacity-85">{bd.bottom}</span>}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** Big banner. `preview` = rendered inside the admin (no router link, no fixed positioning). */
 export function HeroBanner({ c, offset = 0, preview = false }) {
   useCss();
   const l = look(c);
@@ -158,49 +179,45 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
   const bd = badgeOf(c);
   const chips = (c.badge?.chips || []).filter(Boolean).slice(0, 4);
   const soon = c.phase === 'soon'; // announced, not started yet: countdown to the START, no shopping button
-  const grad = `linear-gradient(to left, ${l.c1} 0%, ${l.c1} 58%, color-mix(in srgb, ${l.c2} 38%, ${l.c1}) 100%)`; // text side stays solid → always readable
+  const gold = `linear-gradient(150deg, color-mix(in srgb, ${l.c2} 52%, #fff) 0%, ${l.c2} 50%, color-mix(in srgb, ${l.c2} 80%, #000) 100%)`;
+  const bg = `radial-gradient(60% 130% at 9% 50%, ${l.c2}40 0%, transparent 64%), radial-gradient(45% 80% at 100% 0%, ${l.c2}16 0%, transparent 70%), linear-gradient(120deg, color-mix(in srgb, ${l.c1} 90%, #fff) 0%, ${l.c1} 55%, color-mix(in srgb, ${l.c1} 72%, #000) 100%)`;
   const Cta = preview ? 'span' : Link;
+  const cta = (extra = '') => (soon
+    ? <span className={`inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-[13px] font-bold sm:px-5 sm:py-3 sm:text-sm ${extra}`} style={{ background: 'rgba(255,255,255,.09)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.22)' }}><Bell className="h-4 w-4" style={{ color: l.c2 }} aria-hidden="true" />استعد</span>
+    : <Cta {...(preview ? {} : { to: ship ? '/search' : '/search?sale=1' })} className={`inline-flex shrink-0 items-center gap-2.5 rounded-full py-1.5 pe-1.5 ps-4 text-[13px] font-black transition active:scale-95 sm:ps-6 sm:text-sm sm:hover:brightness-105 ${extra}`} style={{ background: gold, color: '#1b1305', boxShadow: `0 14px 30px -12px ${l.c2}b3` }}>{ship ? 'ابدأ التسوق' : 'تسوق العروض'}<span className="grid h-7 w-7 place-items-center rounded-full bg-[#1b1305] text-white sm:h-8 sm:w-8"><ArrowLeft className="h-4 w-4" aria-hidden="true" /></span></Cta>);
   return (
-    <section className="tw-anim relative flex flex-1 flex-col justify-center overflow-hidden rounded-3xl text-white" style={{ background: grad, containerType: 'inline-size', boxShadow: '0 18px 50px -20px rgba(0,0,0,.45)' }}>
-      <div aria-hidden="true" className="absolute -top-24 -end-16 h-64 w-64 rounded-full blur-3xl" style={{ background: l.c2, opacity: 0.28 }} />
-      <div aria-hidden="true" className="absolute -bottom-28 -start-20 h-64 w-64 rounded-full blur-3xl" style={{ background: l.c2, opacity: 0.16 }} />
-      <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 start-0 w-1/4" style={{ background: 'linear-gradient(90deg,transparent,rgba(255,255,255,.18),transparent)', animation: 'twShine 6s ease-in-out infinite' }} />
-      {l.glyphs.filter((g) => !/[\d%٪]/.test(g)).slice(0, 4).map((g, i) => (
-        <span key={i} aria-hidden="true" className="absolute select-none text-2xl opacity-40 sm:text-3xl sm:opacity-60" style={{ top: `${14 + (i * 23) % 60}%`, insetInlineEnd: `${6 + i * 11}%`, animation: `twFloat ${4 + i}s ease-in-out ${i * 0.4}s infinite` }}>{g}</span>
-      ))}
-      <div className="relative z-10 flex flex-col gap-2.5 px-4 pb-4 pt-4 sm:grid sm:grid-cols-[1fr_auto] sm:content-center sm:items-center sm:gap-x-8 sm:gap-y-5 sm:px-10 sm:py-9">
+    <section className="tw-anim relative isolate flex flex-1 flex-col justify-center overflow-hidden rounded-[22px] text-white sm:rounded-[28px]" style={{ background: bg, containerType: 'inline-size', boxShadow: `0 28px 64px -30px ${l.c1}, inset 0 0 0 1px rgba(255,255,255,.08)` }}>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-80" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,.1) 1px, transparent 1.3px)', backgroundSize: '22px 22px', WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 50%, transparent 100%)', maskImage: 'linear-gradient(90deg, transparent 0%, #000 50%, transparent 100%)' }} />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-10 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${l.c2}aa, transparent)` }} />
+      <div className="relative z-10 flex flex-col gap-3.5 px-4 pb-4 pt-4 sm:flex-row sm:items-center sm:gap-14 sm:px-12 sm:py-10">
         {bd && (
-          <div aria-hidden="true" className="absolute start-3 top-3 grid h-[66px] w-[66px] place-items-center rounded-full font-display font-black sm:hidden" style={{ background: l.c2, color: '#111', animation: 'twPulse 2.6s ease-in-out infinite', boxShadow: `0 0 0 4px ${l.c2}33, 0 0 0 9px ${l.c2}1a` }}>
+          <div aria-hidden="true" className="absolute start-3 top-3 grid h-[64px] w-[64px] place-items-center rounded-full font-display font-black sm:hidden" style={{ background: gold, color: '#1b1305', boxShadow: `inset 0 1.5px 0 rgba(255,255,255,.65), 0 8px 20px -8px ${l.c2}b3, 0 0 0 3px ${l.c2}33` }}>
             <span className="text-center leading-none">{(bd.mTop || bd.top) && <span className="block text-[8px] font-bold opacity-70">{bd.mTop || bd.top}</span>}<span className={bd.small ? 'text-[15px]' : 'text-[22px]'} dir="ltr">{bd.big}</span></span>
           </div>
         )}
-        <div className={bd ? 'ps-[78px] sm:ps-0' : ''}>
-          <div className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold sm:px-3 sm:py-1 sm:text-xs" style={{ background: l.c2, color: '#111' }}>{soon ? '⏳ قريباً' : <>{l.emoji} {ship ? 'شحن مجاني' : 'عرض لفترة محدودة'}</>}</div>
-          <h2 className="mt-2 font-display text-[26px] font-black leading-tight sm:mt-3 sm:text-5xl">{head}</h2>
-          <p className="mt-1 max-w-xl text-[13px] leading-snug opacity-90 sm:mt-2 sm:text-lg">{sub}</p>
+        <div className={`min-w-0 sm:max-w-[520px] ${bd ? 'ps-[76px] sm:ps-0' : ''}`}>
+          <span className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-bold sm:text-xs" style={{ background: 'rgba(255,255,255,.07)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.16)', color: l.c2, '--ping': `${l.c2}99` }}>
+            <span className="h-2 w-2 rounded-full" style={{ background: l.c2, animation: 'twPing 1.8s ease-out infinite' }} />
+            {soon ? 'قريباً' : ship ? 'شحن مجاني' : 'عرض لفترة محدودة'}
+          </span>
+          <h2 className="mt-2.5 font-display text-[28px] font-black leading-[1.1] tracking-tight sm:mt-4 sm:text-[56px]" style={{ textShadow: '0 2px 24px rgba(0,0,0,.35)' }}>{head}</h2>
+          <p className="mt-1.5 max-w-xl text-[13px] leading-snug text-white/75 sm:mt-3 sm:text-lg">{sub}</p>
           <Hype c={c} offset={offset} />
           {chips.length > 0 && (
-            <ul className="mt-4 hidden flex-wrap gap-2 sm:flex">
-              {chips.map((x, i) => (<li key={i} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-bold" style={{ background: 'rgba(255,255,255,.14)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.28)' }}><span style={{ color: l.c2 }}>✓</span>{x}</li>))}
+            <ul className="mt-5 hidden flex-wrap gap-2 sm:flex">
+              {chips.map((x, i) => (<li key={i} className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-sm font-semibold" style={{ background: 'rgba(255,255,255,.07)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.14)' }}><Check className="h-3.5 w-3.5" strokeWidth={3} style={{ color: l.c2 }} aria-hidden="true" />{x}</li>))}
             </ul>
           )}
+          <div className="mt-6 hidden sm:block">{cta()}</div>
         </div>
-        <div className="flex items-center justify-between gap-2 sm:contents">
-          <div className={`flex flex-col gap-1 sm:col-start-2 sm:row-span-2 sm:row-start-1 sm:items-center sm:self-center sm:gap-2 ${bd ? 'sm:me-52' : ''}`}>
-            <span className="text-[11px] font-bold opacity-85 sm:text-xs">{soon ? 'هيبدأ بعد' : 'ينتهي بعد'}</span>
+        <div className="flex items-end justify-between gap-3 sm:flex-col sm:items-start sm:justify-center sm:gap-4">
+          <div className="flex flex-col gap-1.5 sm:gap-3">
+            <span className="inline-flex items-center gap-2 text-[11px] font-bold text-white/70 sm:text-xs"><span aria-hidden="true" className="hidden h-px w-6 sm:block" style={{ background: l.c2 }} />{soon ? 'هيبدأ بعد' : 'ينتهي بعد'}</span>
             <Cells end={soon ? c.startsAt : c.endsAt} offset={offset} />
           </div>
-          {soon
-            ? <span className="shrink-0 sm:col-start-1 sm:row-start-2 sm:justify-self-start rounded-full px-4 py-2 text-[13px] font-black sm:px-5 sm:py-2.5 sm:text-sm" style={{ background: 'rgba(255,255,255,.18)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.3)' }}>استعد ⏰</span>
-            : <Cta {...(preview ? {} : { to: ship ? '/search' : '/search?sale=1' })} className="shrink-0 sm:col-start-1 sm:row-start-2 sm:self-start sm:justify-self-start rounded-full px-4 py-2 text-[13px] font-black shadow-lg transition active:scale-95 sm:px-5 sm:py-2.5 sm:text-sm sm:hover:scale-[1.03]" style={{ background: l.c2, color: '#111' }}>{ship ? 'ابدأ التسوق' : 'تسوق العروض'} ←</Cta>}
+          <div className="sm:hidden">{cta()}</div>
         </div>
-        {bd && (
-          <div className="hidden sm:absolute sm:end-10 sm:top-1/2 sm:block sm:-translate-y-1/2" aria-hidden="true">
-            <div className="grid h-44 w-44 place-items-center rounded-full font-display font-black" style={{ background: l.c2, color: '#111', animation: 'twPulse 2.6s ease-in-out infinite', boxShadow: `0 0 0 8px ${l.c2}33, 0 0 0 18px ${l.c2}1a` }}>
-              <span className="text-center leading-none">{bd.top && <span className="block text-sm font-bold opacity-75">{bd.top}</span>}<span className={`block ${bd.small ? 'text-4xl' : 'text-6xl'}`} dir="ltr">{bd.big}</span>{bd.bottom && <span className="mt-1.5 block text-[13px] font-extrabold">{bd.bottom}</span>}</span>
-            </div>
-          </div>
-        )}
+        {bd && <div className="hidden shrink-0 sm:ms-auto sm:block"><Seal bd={bd} l={l} gold={gold} /></div>}
       </div>
       {ship && (
         <div aria-hidden="true" dir="ltr" className="relative h-[52px] overflow-hidden sm:h-[78px]">
