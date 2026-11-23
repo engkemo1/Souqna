@@ -7,6 +7,7 @@ import { initPerf } from './lib/perf.js';
 // the home page code downloads in parallel with the app shell instead of after it
 if (window.location.pathname === '/') import('./pages/market/MarketHome.jsx').catch(() => {});
 
+// device speed tier → <html data-perf>: weak devices get fewer effects
 initPerf();
 
 // Remove the instant-first-paint outline once the real page has content (or after 8 s at the latest, or right away on any page but the home page).
@@ -18,7 +19,7 @@ initPerf();
   const mo = new MutationObserver(() => { if (root.querySelector('section')) done(); });
   mo.observe(root, { childList: true, subtree: true });
   setTimeout(done, 8000);
-})(); // device speed tier → <html data-perf>: weak devices get fewer effects
+})();
 
 // After a new deploy, an open tab can still point at old hashed chunks — reload once instead of leaving a tap doing nothing.
 window.addEventListener('vite:preloadError', (e) => {

@@ -272,6 +272,13 @@ const matCond = (m) => ({ sql: `(${m.words.map(() => `${MAT_TEXT()} LIKE ?`).joi
 // sold-out products stay visible (own page, SEO) but always sort after the ones that can be bought
 const SOLD_OUT_LAST = '(CASE WHEN p.track_stock=1 AND p.stock<=0 THEN 1 ELSE 0 END) ASC';
 
+// Lingerie sinks to the end of the default ("relevance") order — casual wear, abayas, hijab, bags… come first. It stays in the same
+// pages (حريمي included) and in every other sort, so nothing is hidden; it just isn't what a shopper meets first.
+// Matches the product name or its store category (normalised: لانجري / لانجيري / lingerie).
+const LINGERIE_WORDS = ['لانجري', 'لانجيري'];
+const LINGERIE_COND = `(${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(p.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')} OR LOWER(COALESCE(p.name_en,'')) LIKE '%lingerie%' OR EXISTS (SELECT 1 FROM categories lc WHERE lc.id=p.category_id AND (${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(lc.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')})))`;
+const LINGERIE_LAST = `(CASE WHEN ${LINGERIE_COND} THEN 1 ELSE 0 END) ASC`;
+
 const AUD_DEPT = { men: 'men', women: 'women', kids: 'kids', boys: 'kids', girls: 'kids' };
 
 /** Side-by-side comparison: up to 4 products with everything a shopper compares (price, material, colours, sizes in stock, store, rating). Public data only. */
@@ -384,7 +391,7 @@ r.get('/search', h((req, res) => {
   const rel = scoreSql.length ? `(${scoreSql.join(' + ')}) DESC, ` : '';
   const orderParams = [];
   const order = {
-    relevance: `${rel}p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC, p.id DESC`, price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: 'p.created_at DESC', best: 'p.sold_count DESC',
+    relevance: `${rel}${LINGERIE_LAST}, p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC, p.id DESC`, price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: 'p.created_at DESC', best: 'p.sold_count DESC',
     discount: '(1.0*p.price/COALESCE(p.compare_at_price,p.price)) ASC, p.sold_count DESC', rating: 'p.rating DESC, p.rating_count DESC, p.sold_count DESC',
   }[sort] || 'p.sold_count DESC';
   if (sort === 'relevance' || !['price_asc', 'price_desc', 'newest', 'best', 'discount', 'rating'].includes(sort)) orderParams.push(...scoreParams);

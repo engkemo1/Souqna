@@ -55,7 +55,7 @@ export function initPerf() {
       const cur = ORDER.indexOf(perfTier());
       if (want > cur) {
         slow += 1;
-        if (slow >= 2) { const t2 = ORDER[want]; setPerf(t2); slow = 0; try { localStorage.setItem('tw.perf2', JSON.stringify({ t: t2, ts: Date.now() })); } catch { /* ignore */ } if (t2 !== 'low') setTimeout(probe, 3000); }
+        if (slow >= 2) { const t2 = ORDER[want]; if (t2 === 'mid' && floor === 'mid') html.dataset.perfReady = '1'; setPerf(t2); slow = 0; try { localStorage.setItem('tw.perf2', JSON.stringify({ t: t2, ts: Date.now() })); } catch { /* ignore */ } if (t2 !== 'low') setTimeout(probe, 3000); }
         else setTimeout(probe, 2500);
       } else {
         slow = 0;
