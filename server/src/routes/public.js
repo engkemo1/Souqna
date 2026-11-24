@@ -832,6 +832,8 @@ r.get('/marketplace', h((req, res) => {
     { re: /^women(_|$)|حريمي/i, name: null },
     { re: /^kids(_|$)|أطفال|اطفال/i, name: null },
     { re: /cosmetic|beauty|make-?up|skin|perfume|fragrance|تجميل|مكياج|ماك ?اب|ميك ?اب|عطور|عطر|برفان|بيرفيوم|عناية|بشرة/i, name: { ar: 'مستحضرات تجميل', en: 'Cosmetics' } },
+    { re: /^accessories(\s|$)/i, name: null }, // إكسسوارات: صف مستقل بعد التجميل
+    { re: /^women_lingerie$/, name: { ar: 'لانجيري', en: 'Lingerie' }, sub: true, lingerie: true }, // اللانجيري: صفه الخاص في آخر الرئيسية (مش بيزحم حريمي)
   ];
   const deptKey = (d) => `${d.slug || ''} ${d.name?.ar || ''} ${d.name?.en || ''}`;
   const tops = departments.filter((d) => !d.parent && d.products >= 1);
@@ -839,13 +841,14 @@ r.get('/marketplace', h((req, res) => {
   // Per shelf: until it has 10 products that actually sold, show its regular products (newest first);
   // once it has 10 sellers, it turns into "الأكثر طلباً في <القسم>" (best sellers of that shelf only).
   const deptRails = DEPT_GROUPS.map((g) => {
-    const hits = tops.filter((x) => g.re.test(deptKey(x))).sort((a, b) => b.products - a.products);
+    const hits = (g.sub ? departments : tops).filter((x) => g.re.test(g.sub ? x.slug : deptKey(x))).sort((a, b) => b.products - a.products);
     if (!hits.length) return null;
-    const sub = [...new Set(hits.flatMap((d) => deptSubtree(d.slug)))]; const ph = sub.map(() => '?').join(',');
+    const noLingerie = new Set(deptSubtree('women_lingerie')); // اللانجيري ليه قسمه الخاص — مش بيزحم صف حريمي في الرئيسية
+    const sub = [...new Set(hits.flatMap((d) => deptSubtree(d.slug)))].filter((x) => g.lingerie || !noLingerie.has(x)); const ph = sub.map(() => '?').join(',');
     const name = g.name || hits[0].name; // shelf title (cosmetics is always «مستحضرات تجميل»)
-    const sold = railRows(`AND p.sold_count > 0 AND p.department IN (${ph}) ORDER BY p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
+    const sold = railRows(`AND p.sold_count > 0 AND p.department IN (${ph}) ORDER BY ${LINGERIE_LAST}, p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
     if (sold.length >= BEST_MIN) return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: true, items: sold };
-    return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`AND p.department IN (${ph}) ORDER BY p.created_at DESC, p.id DESC LIMIT 40`, sub, BEST_MIN) };
+    return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`AND p.department IN (${ph}) ORDER BY ${LINGERIE_LAST}, p.created_at DESC, p.id DESC LIMIT 40`, sub, BEST_MIN) };
   }).filter(Boolean);
   cache(res, 60);
   res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });

@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Store, Camera, Heart, User } from 'lucide-react';
+import { Home, LayoutGrid, Camera, Heart, User } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { cx } from '../ui/cx.js';
 
@@ -19,7 +19,7 @@ export default function MobileBottomNav() {
 
   const items = [
     { to: '/', icon: Home, label: lang === 'ar' ? 'الرئيسية' : 'Home', on: pathname === '/' },
-    { to: '/stores', icon: Store, label: lang === 'ar' ? 'المحلات' : 'Stores', on: pathname.startsWith('/stores') },
+    { to: '/categories', icon: LayoutGrid, label: lang === 'ar' ? 'الأقسام' : 'Sections', on: pathname.startsWith('/categories') || pathname.startsWith('/c/') },
     { to: '/visual', icon: Camera, label: lang === 'ar' ? 'بالصورة' : 'By photo', on: pathname.startsWith('/visual'), main: true },
     { to: '/favorites', icon: Heart, label: t('store.favorites'), on: pathname.startsWith('/favorites') },
     { to: '/account', icon: User, label: t('acc.title'), on: pathname.startsWith('/account') },

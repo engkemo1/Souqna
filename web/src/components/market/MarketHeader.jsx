@@ -1,7 +1,7 @@
 import SuggestInput, { saveRecent } from './SuggestInput.jsx';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { Search, Heart, User, ShoppingBag, Menu, X, Flame } from 'lucide-react';
+import { Search, Camera, Heart, User, ShoppingBag, Menu, X, Flame } from 'lucide-react';
 import { useBuyer } from '../../lib/buyer.jsx';
 import { useScrolled } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
@@ -16,6 +16,9 @@ import { deptHref, deptName } from './CategoryCards.jsx';
 export default function MarketHeader() {
   const { t, lang, toggle } = useI18n();
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // phones: the search box lives in the sticky header, always visible; pages with their own search bar / flows skip it
+  const showBar = !/^\/(search|visual|market-cart|market-checkout|order)/.test(pathname);
   const [query, setQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const scrolled = useScrolled(10);
@@ -60,7 +63,7 @@ export default function MarketHeader() {
           </Link>
 
           {/* Search */}
-          <Link to="/search" aria-label={t('search.open')} className="grid h-10 w-10 place-items-center rounded-full text-fg transition hover:bg-fg/[0.06] md:hidden">
+          <Link to="/search" aria-label={t('search.open')} className={cx('grid h-10 w-10 place-items-center rounded-full text-fg transition hover:bg-fg/[0.06] md:hidden', showBar && 'hidden')}>
             <Search className="h-5 w-5" strokeWidth={1.75} />
           </Link>
 
@@ -85,6 +88,17 @@ export default function MarketHeader() {
 
         </nav>
       </div>
+
+      {/* Phones: a pinned search bar under the top row. Tapping it opens the search page (full-screen suggestions, keyboard ready), so nothing ever resizes or jumps inside the header. */}
+      {showBar && (
+        <div className="container relative pb-2.5 md:hidden">
+          <Link to="/search" aria-label={t('search.placeholder')} className="flex h-11 w-full items-center gap-2.5 rounded-full border border-line-strong bg-[#f5f6f8] ps-4 pe-14 text-[15px] text-muted transition active:bg-white">
+            <Search className="h-[18px] w-[18px] shrink-0 text-brand" aria-hidden="true" />
+            <span className="truncate">{ar ? 'ابحث: فستان، كوتشي، شنطة…' : 'Search: dress, sneakers, bag…'}</span>
+          </Link>
+          <Link to="/visual" aria-label={ar ? 'البحث بصورة' : 'Search by photo'} className="absolute end-6 top-[calc(50%-5px)] grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-[#FFF3EB] text-[#F8620A] transition active:scale-95"><Camera className="h-[17px] w-[17px]" /></Link>
+        </div>
+      )}
 
       {/* Secondary Categories Nav */}
       <div className="hidden border-t border-line/40 bg-white/70 py-2 md:block">
