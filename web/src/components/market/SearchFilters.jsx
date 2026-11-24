@@ -121,7 +121,8 @@ export default function SearchFilters({ params, set, facets, departments, label,
         </Group>
       )}
 
-      {facets?.categories?.length > 0 && (!params.get('department') || params.get('category')) && (
+      {/* الأنواع المصنّفة تلقائيًا بتغطي جزء بس من المنتجات (أرقامها أقل من أرقام الأقسام)، فمبنعرضهاش كقائمة تصفّح. القائمة بتظهر بس لو نوع مختار فعلًا، عشان تتشال. */}
+      {facets?.categories?.length > 0 && params.get('category') && (
         <Group title={t('search.category')} badge={params.get('category') ? 1 : 0}>
           <ul className="space-y-0.5">
             <ShowMore items={facets.categories} limit={8} lang={lang} keepOpen={(c) => params.get('category') === c.key} render={(c) => {

@@ -291,8 +291,7 @@ const SOLD_OUT_LAST = '(CASE WHEN p.track_stock=1 AND p.stock<=0 THEN 1 ELSE 0 E
 // pages (حريمي included) and in every other sort, so nothing is hidden; it just isn't what a shopper meets first.
 // Matches the product name or its store category (normalised: لانجري / لانجيري / lingerie).
 const LINGERIE_WORDS = ['لانجري', 'لانجيري', 'رقص']; // + dance wear (بدلة رقص…)
-const BODY_WORDS = ['بدي', 'بودي', 'بادي']; // «بدي» as a whole word only (so «بديل» etc. never match)
-const LINGERIE_COND = `(${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(p.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')} OR ${BODY_WORDS.map((w) => `(' ' || ${NORM("COALESCE(p.name_ar,'')")} || ' ') LIKE '% ${w} %'`).join(' OR ')} OR LOWER(COALESCE(p.name_en,'')) LIKE '%lingerie%' OR LOWER(COALESCE(p.name_en,'')) LIKE '%bodysuit%' OR EXISTS (SELECT 1 FROM categories lc WHERE lc.id=p.category_id AND (${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(lc.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')})))`;
+const LINGERIE_COND = `(${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(p.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')} OR LOWER(COALESCE(p.name_en,'')) LIKE '%lingerie%' OR LOWER(COALESCE(p.name_en,'')) LIKE '%bodysuit%' OR EXISTS (SELECT 1 FROM categories lc WHERE lc.id=p.category_id AND (${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(lc.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')})))`;
 const LINGERIE_LAST = `(CASE WHEN ${LINGERIE_COND} THEN 1 ELSE 0 END) ASC`;
 
 const AUD_DEPT = { men: 'men', women: 'women', kids: 'kids', boys: 'kids', girls: 'kids' };
@@ -862,7 +861,7 @@ r.get('/marketplace', h((req, res) => {
     const noLingerie = new Set(deptSubtree('women_lingerie')); // اللانجيري ليه قسمه الخاص — مش بيزحم صف حريمي في الرئيسية
     const sub = [...new Set(hits.flatMap((d) => deptSubtree(d.slug)))].filter((x) => g.lingerie || !noLingerie.has(x)); const ph = sub.map(() => '?').join(',');
     const name = g.name || hits[0].name; // shelf title (cosmetics is always «مستحضرات تجميل»)
-    // الصف بتاع اللانجيري بيشمل كمان البدي وبدل/أحزمة الرقص (أي قسم)، وباقي الصفوف مش بتعرضهم
+    // الصف بتاع اللانجيري بيشمل كمان بدل/أحزمة الرقص (أي قسم)، وباقي الصفوف مش بتعرضهم
     const scope = g.lingerie ? `AND (p.department IN (${ph}) OR ${LINGERIE_COND})` : `AND p.department IN (${ph}) AND NOT ${LINGERIE_COND}`;
     const sold = railRows(`AND p.sold_count > 0 ${scope} ORDER BY ${LINGERIE_LAST}, p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
     if (sold.length >= BEST_MIN) return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: true, items: sold };

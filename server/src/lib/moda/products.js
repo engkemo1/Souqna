@@ -309,6 +309,9 @@ export function enrichProduct(row, K = loadKnowledge()) {
     if (!near && !(headK && headK === key && headK === catKey) && catKey && nameKey && !WEAK_KEYS.has(catKey) && !WEAK_KEYS.has(nameKey) && fam(catKey) && fam(nameKey) && fam(catKey) !== fam(nameKey)) typeConflict = true;
   }
   if (/(^|\s)(رقص|راقصه|راقصة)(\s|$)|belly\s?dance/i.test(norm(name))) typeConflict = true; // أزياء الرقص مش للتنسيق
+  // ألعاب الكروت («كوتشينة» / قسم ألعاب وهدايا) مش لبس: مفيش نوع، فمتدخلش في أي تنسيق ولا تتفهم على إنها «كوتشي».
+  const notFashion = row.department === 'games_gifts' || /(^|\s)كوتشين[ةه](\s|$)/.test(norm(name));
+  if (notFashion) { key = null; typeConflict = false; }
   if (Number(row.photo_mismatch) === 1) typeConflict = true; // صورة المنتج (CLIP) نوعها مختلف عن اسمه/قسمه
   const desc = `${row.description_ar || ''}`;
   if (key === 'dress_any') {
@@ -324,7 +327,7 @@ export function enrichProduct(row, K = loadKnowledge()) {
   const materials = fabricTokens(K, `${name} ${desc}`);
   const isSleeveless = hasAny(K, name, ['بدون اكمام', 'بدون كم', 'sleeveless', 'مكشوف', 'strapless', 'تانك', 'tank', 'كروب', 'crop top', 'camisole', 'كاميسول', 'حمالات', 'حمالة', 'ستراب']);
   return {
-    ...row, key, typeConflict, frenchCuff: isFrenchCuff(key, name, desc), ...dataChecks(row, K, key), headKey: (() => { const h = inferKey(String(name).trim().split(/\s+/)[0] || '', K); return h && h !== key && nearKeys(h, key) ? h : null; })(), minimalSneaker: isMinimalSneaker(key, name, colorKeysOf(row, K)), formality, gender: inferGender(row, key, K), colorKeys: colorKeysOf(row, K), materials, inStock,
+    ...row, key, notFashion, typeConflict, frenchCuff: isFrenchCuff(key, name, desc), ...dataChecks(row, K, key), headKey: (() => { const h = inferKey(String(name).trim().split(/\s+/)[0] || '', K); return h && h !== key && nearKeys(h, key) ? h : null; })(), minimalSneaker: isMinimalSneaker(key, name, colorKeysOf(row, K)), formality, gender: inferGender(row, key, K), colorKeys: colorKeysOf(row, K), materials, inStock,
     sleeveless: isSleeveless, price: Number(row.price) || 0, popularity: Math.min(2.5, Number(row.sold_count || 0) / 24) + (Number(row.rating || 0) >= 4.3 ? 0.5 : 0),
   };
 }

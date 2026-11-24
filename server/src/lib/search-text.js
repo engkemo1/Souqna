@@ -235,7 +235,14 @@ export function prepareRow(r) {
   };
 }
 
-const has = (hay, alt) => (alt.exact ? hay.includes(` ${alt.text} `) : hay.includes(` ${alt.text}`));
+// words that START with a shorter word but mean something else: «كوتشي» (shoes) must not find «كوتشينة» (playing cards)
+const NOT_EXTENSIONS = [{ stem: 'كوتش', word: 'كوتشينه' }];
+const has = (hay, alt) => {
+  if (alt.exact) return hay.includes(` ${alt.text} `);
+  let h = hay;
+  for (const { stem, word } of NOT_EXTENSIONS) if (alt.text.startsWith(stem) && alt.text !== word && word.startsWith(alt.text) && h.includes(` ${word}`)) h = h.split(` ${word}`).join(' ~');
+  return h.includes(` ${alt.text}`);
+};
 
 /**
  * Find the products matching the tokens. `lookup` = { depts, cats, stores } (arrays of {slug|id, names…}) so a word like "حذاء" also finds

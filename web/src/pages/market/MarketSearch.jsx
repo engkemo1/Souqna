@@ -21,6 +21,8 @@ import { PROFILES } from '@souqna/shared/catalog';
 import { api } from '../../lib/api.js';
 import RequestBanner from '../../components/market/RequestBanner.jsx';
 import SmartImage from '../../components/ui/SmartImage.jsx';
+import { CategoryImage, deptName } from '../../components/market/CategoryCards.jsx';
+import { emojiFor } from '../../lib/deptIcons.js';
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
 
 export default function MarketSearch() {
@@ -78,6 +80,42 @@ export default function MarketSearch() {
     ...csv('colors').map((h) => ({ id: `color-${h}`, label: t('search.color'), swatch: h, remove: () => without('colors', h) })),
   ].filter(Boolean);
   const clearFilters = () => { const n = new URLSearchParams(); if (q) n.set('q', q); if (sort !== 'relevance') n.set('sort', sort); setParams(n, { replace: true }); };
+  // «تسوّق حسب النوع»: the real sections (leaf level) with their real product counts — not the AI-typed subset, which only covers a fraction of the catalogue
+  const covers = useApi('/departments/covers').data?.covers || {};
+  const deptN = new Map((data?.facets?.departments || []).map((d) => [d.slug, d.n]));
+  const underSelected = (d) => { if (!department) return true; for (let sl = d.slug, i = 0; sl && i < 8; sl = bySlug.get(sl)?.parent, i++) if (sl === department && d.slug !== department) return true; return false; };
+  const softLast = (d) => (/lingerie/.test(d.slug) || /لانج|رقص/.test(d.name?.ar || '') ? 1 : 0); // lingerie / dance wear stay in the row, but at the end
+  const withN = list.filter((d) => (deptN.get(d.slug) || 0) > 0);
+  const typeTiles = withN.filter((d) => underSelected(d) && !withN.some((c) => c.parent === d.slug)).sort((x, y) => (softLast(x) - softLast(y)) || (deptN.get(y.slug) - deptN.get(x.slug))).slice(0, 12);
+  const sameName = (d) => typeTiles.some((x) => x.slug !== d.slug && deptName(x, lang) === deptName(d, lang)); // «تيشيرتات» exists under رجالي and حريمي: say which one
+  const resetAttrs = Object.fromEntries(attrKeys.map((k) => [k, '']));
+  const oldCats = data?.facets?.categories || [];
+  const typeRow = !params.get('category') && (typeTiles.length > 1 || oldCats.length > 1) ? (
+    <section className="mb-7" aria-label={t('search.shopByCategory')}>
+      <h2 className="mb-3 font-display text-lg font-bold">{t('search.shopByCategory')}</h2>
+      <div className="scroll-x -mx-4 gap-3 px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0 lg:grid-cols-4 xl:grid-cols-6">
+        {typeTiles.length > 1 ? typeTiles.map((d) => (
+          <button key={d.slug} type="button" onClick={() => set({ department: d.slug, category: '', ...resetAttrs })} className="group w-32 shrink-0 text-start sm:w-auto">
+            <span className="relative block aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-[#EAF0F8] to-[#FFF3EB] ring-1 ring-line transition group-hover:ring-fg/40">
+              {d.image || d.images?.card ? <CategoryImage dept={d} sizes="(min-width:1024px) 14vw, 40vw" className="transition duration-500 group-hover:scale-105" />
+                : covers[d.slug] ? <SmartImage media={covers[d.slug]} ratio="1 / 1" sizes="(min-width:1024px) 14vw, 40vw" className="w-full transition duration-500 group-hover:scale-105" />
+                  : <span className="grid h-full w-full place-items-center text-4xl" aria-hidden="true">{emojiFor(d)}</span>}
+            </span>
+            <span className="mt-2 block truncate text-sm font-semibold">{deptName(d, lang)}</span>
+            <span className="block truncate text-xs text-muted">{formatNumber(deptN.get(d.slug), lang)}{sameName(d) && rootOf(d.slug) ? ` · ${label(rootOf(d.slug))}` : ''}</span>
+          </button>
+        )) : oldCats.slice(0, 12).map((c) => (
+          <button key={c.key} type="button" onClick={() => set({ category: c.key })} className="group w-32 shrink-0 text-start sm:w-auto">
+            <span className="block overflow-hidden rounded-2xl bg-secondary ring-1 ring-line transition group-hover:ring-fg/40">
+              {c.image ? <SmartImage media={c.image} ratio="1 / 1" sizes="(min-width:1024px) 14vw, 40vw" className="w-full transition duration-500 group-hover:scale-105" /> : <span className="block aspect-square" />}
+            </span>
+            <span className="mt-2 block truncate text-sm font-semibold">{c.name[lang] || c.name.ar}</span>
+            <span className="block text-xs text-muted">{formatNumber(c.n, lang)}</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  ) : null;
   const panel = <SearchFilters params={params} set={set} facets={data?.facets} departments={list} label={label} activeCount={activeCount} onClear={clearFilters} />;
 
   return (
@@ -99,22 +137,7 @@ export default function MarketSearch() {
         <div className="mt-5 lg:grid lg:grid-cols-[260px_minmax(0,1fr)] lg:gap-10">
           <aside className="hidden lg:block"><div className="sticky top-24 max-h-[calc(100dvh-7rem)] overflow-y-auto pe-1">{panel}</div></aside>
           <div className="min-w-0">
-        {!params.get('category') && (data?.facets?.categories?.length || 0) > 1 && (
-          <section className="mb-7" aria-label={t('search.shopByCategory')}>
-            <h2 className="mb-3 font-display text-lg font-bold">{t('search.shopByCategory')}</h2>
-            <div className="scroll-x -mx-4 gap-3 px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0 lg:grid-cols-4 xl:grid-cols-6">
-              {data.facets.categories.slice(0, 12).map((c) => (
-                <button key={c.key} type="button" onClick={() => set({ category: c.key })} className="group w-32 shrink-0 text-start sm:w-auto">
-                  <span className="block overflow-hidden rounded-2xl bg-secondary ring-1 ring-line transition group-hover:ring-fg/40">
-                    {c.image ? <SmartImage media={c.image} ratio="1 / 1" sizes="(min-width:1024px) 14vw, 40vw" className="w-full transition duration-500 group-hover:scale-105" /> : <span className="block aspect-square" />}
-                  </span>
-                  <span className="mt-2 block truncate text-sm font-semibold">{c.name[lang] || c.name.ar}</span>
-                  <span className="block text-xs text-muted">{formatNumber(c.n, lang)}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-        )}
+        {typeRow}
         {activeCount > 0 && (
           <div className="mb-4 flex flex-wrap items-center gap-2" aria-label={t('search.activeFilters')}>
             {activeChips.map((c) => (
