@@ -35,6 +35,7 @@ import { describeProduct, invalidateModaCatalogue, providerReady, stylistSetting
 import { loadKnowledge } from '../lib/moda/knowledge.js';
 import { normalizeDesignPatch, BADGE_TONES } from '@souqna/shared/layout';
 import { designSuggestion } from '../lib/store-designer.js';
+import { analyzeFitSoon } from '../lib/fit-ai.js';
 import { processImage, serializeMedia, getMedia, mediaMap, deleteMedia, readMediaFile, previewStyles, matchProductPhotos } from '../lib/media.js';
 import {
   serializeStore, serializeProductDetail, serializeCategory, serializeBanner, serializeOffer, bi, stockStatus,
@@ -789,7 +790,7 @@ r.get('/products/:id', h((req, res) => {
   res.json({
     product: {
       ...serializeProductDetail(p),
-      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, noReturn: !!p.no_return, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '', audience: p.audience || '', badgeText: p.badge_text || '', badgeTone: p.badge_tone || '', ...suggestTypeFor(p),
+      status: p.status, cost: p.cost, featured: !!p.featured, isNewFlag: !!p.is_new, noReturn: !!p.no_return, categoryId: p.category_id, department: p.department || '', styleLevel: p.style_level ?? null, modaKey: p.moda_key || '', sizeFit: p.size_fit || '', sizeFitAiOn: !!p.size_fit_ai_on, sizeFitAiNote: p.size_fit_ai ? (p.size_fit_ai_note || '') : '', audience: p.audience || '', badgeText: p.badge_text || '', badgeTone: p.badge_tone || '', ...suggestTypeFor(p),
       compareAt: p.compare_at_price, saleEndsAt: p.sale_ends_at || null, sold: p.sold_count, views: p.views,
       ...serializeOwnerModeration(p),
     },
@@ -842,6 +843,8 @@ export const productSchema = z.object({
   department: z.string().max(31).nullable().optional(),
   style_level: z.number().int().min(1).max(5).nullable().optional(),
   moda_key: z.string().max(80).nullable().optional(),
+  size_fit_ai_on: z.boolean().optional(), // صاحب المحل بيسيب الذكاء الاصطناعي يقرأ التفصيل من الصور
+  size_fit: z.enum(['small', 'true', 'large']).nullable().optional(), // تفصيل المقاس: ضيق / مظبوط / واسع
   attrs: z.record(z.string().max(25), z.union([z.string().max(60), z.array(z.string().max(60)).max(8)])).optional(), // product-type filters (material, fit, ...), validated against the department's definitions
   material: z.string().trim().max(80).nullable().optional(), // الخامه (من صاحب المحل)
   care: z.string().trim().max(300).nullable().optional(), // تعليمات الغسيل والعناية (من صاحب المحل)
@@ -928,7 +931,7 @@ export function saveProduct(storeId, data, existing) {
       price: data.price, compare_at_price: data.compare_at_price || null, sale_ends_at: data.compare_at_price ? (data.sale_ends_at ?? null) : null, cost: data.cost ?? null, sku: data.sku || null, ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
       category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, wantedDept, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
-      stock, low_stock_at: data.low_stock_at, ...(data.try_sizes !== undefined ? { try_sizes: data.try_sizes ? 1 : 0 } : {}), ...(data.material !== undefined ? { material_ar: (data.material || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.care !== undefined ? { care_ar: (data.care || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
+      stock, low_stock_at: data.low_stock_at, ...(data.try_sizes !== undefined ? { try_sizes: data.try_sizes ? 1 : 0 } : {}), ...(data.size_fit !== undefined ? { size_fit: data.size_fit || null } : {}), ...(data.size_fit_ai_on !== undefined ? { size_fit_ai_on: data.size_fit_ai_on ? 1 : 0 } : {}), ...(data.material !== undefined ? { material_ar: (data.material || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.care !== undefined ? { care_ar: (data.care || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };
     if (data.attrs !== undefined) { // only when the editor sent them (partial saves from WhatsApp / POS keep the stored values)
       const clean = sanitizeAttrValues(data.attrs, row.department ? deptAttrDefs(row.department) : []);
@@ -972,6 +975,7 @@ r.post('/products', h((req, res) => {
   if (req.adminStore) update('products', id, { admin_review_status: 'approved', admin_reviewed_at: nowIso() });
   invalidateModaCatalogue();
   triggerReindex();
+  analyzeFitSoon(id);
   matchProductPhotos(id); // in the background: all photos of the product end up with the same kind of background
   const saved = q.get('SELECT * FROM products WHERE id=?', [id]);
   res.status(201).json({ product: { ...serializeProductDetail(saved), modaKey: saved.moda_key || '' } });
@@ -986,6 +990,7 @@ r.put('/products/:id', h((req, res) => {
   else if (p.admin_review_status || p.admin_review_note || p.admin_flags_json) update('products', p.id, { admin_review_status: null, admin_review_note: null, admin_flags_json: null });
   invalidateModaCatalogue();
   matchProductPhotos(p.id);
+  analyzeFitSoon(p.id);
   notifyPriceDrop(p.id, p.price, data.price);
   if (p.track_stock && p.stock <= 0 && q.val('SELECT stock FROM products WHERE id=?', [p.id]) > 0) notifyBackInStock(p.id);
   triggerReindex();

@@ -141,6 +141,8 @@ export function serializeProductDetail(p) {
     care: p.care_ar || null,
     material: p.material_ar || null,
     trySizes: !!p.try_sizes,
+    sizeFit: p.size_fit || null,
+    sizeFitAi: !p.size_fit && p.size_fit_ai_on && p.size_fit_ai ? { fit: p.size_fit_ai, note: p.size_fit_ai_note || null, stretch: !!p.size_fit_ai_stretch } : null,
     sku: p.sku,
     barcode: p.barcode || null,
     department: p.department || null,

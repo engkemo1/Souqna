@@ -23,6 +23,18 @@ function letterIndex({ sex, height, weight }) {
 
 const nearest = (values, target) => values.reduce((best, v) => (best == null || Math.abs(v - target) < Math.abs(best - target) || (Math.abs(v - target) === Math.abs(best - target) && v > best) ? v : best), null);
 
+/** The size this shopper probably takes, from the height/weight/foot they already gave the size helper (kept on this device); null when unknown. */
+export function savedSuggestion(product) {
+  try {
+    const b = JSON.parse(localStorage.getItem('moda.body') || '{}');
+    const kind = advisorKind(product?.department, product?.sizes || []);
+    if (!kind || !(b.weight || b.foot)) return null;
+    const r = suggestSize({ kind, sizes: product.sizes, sex: b.sex === 'f' ? 'f' : 'm', height: Number(b.height) || 0, weight: Number(b.weight) || 0, foot: Number(b.foot) || 0 });
+    // the shop says this piece runs small: the next size up is the safer pick
+    return (product.sizeFit === 'small' && r?.alt) || r?.size || null;
+  } catch { return null; }
+}
+
 /** → { size, alt } (alt = the size to take if the shopper likes it loose), both picked from `sizes`, or null when it cannot say. */
 export function suggestSize({ kind, sizes, sex, height, weight, foot }) {
   if (kind === 'letter' || kind === 'suit') {

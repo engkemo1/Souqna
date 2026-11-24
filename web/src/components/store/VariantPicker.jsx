@@ -18,7 +18,7 @@ export function sizeStock(product, color, size) {
   return v ? (product.trackStock === false ? 99 : v.stock) : 0; // stock tracking off = always available
 }
 
-export default function VariantPicker({ product, color, size, onColor: setColor, onSize, sizeError }) {
+export default function VariantPicker({ product, color, size, onColor: setColor, onSize, sizeError, advisor = null, sizeNote = null, suggested = null }) {
   const { t, tr } = useI18n();
   const colors = product.colors || [];
   const sizes = product.sizes || [];
@@ -52,6 +52,7 @@ export default function VariantPicker({ product, color, size, onColor: setColor,
         <fieldset>
           <div className="mb-3 flex items-center justify-between">
             <legend className="text-sm font-semibold">{t('product.size')}</legend>
+            {advisor}
           </div>
           <div className="flex flex-wrap gap-2">
             {sizes.map((s) => {
@@ -64,11 +65,13 @@ export default function VariantPicker({ product, color, size, onColor: setColor,
                     active ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg',
                     stock <= 0 && 'cursor-not-allowed text-muted/60 line-through decoration-1 hover:border-line-strong')}>
                   {s}
+                  {suggested === s && !active && stock > 0 && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-success px-1.5 text-[10px] font-bold leading-4 text-on-success">{t('size.mine')}</span>}
                   {stock > 0 && stock <= 3 && !active && <span className="absolute -top-1.5 end-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-elevated" />}
                 </button>
               );
             })}
           </div>
+          {sizeNote && <p className="mt-2.5 text-[13px] leading-5 text-muted" aria-live="polite">{sizeNote}</p>}
           {sizeError && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-2.5 text-sm font-medium text-sale" role="alert">{t('product.pleaseSelectSize')}</motion.p>}
         </fieldset>
       )}

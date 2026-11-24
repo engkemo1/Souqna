@@ -136,6 +136,8 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!pcols.includes('badge_text')) db.exec('ALTER TABLE products ADD COLUMN badge_text TEXT'); // شارة مخصصة على كارت المنتج (مثلاً: قطن مصري 100%)
   if (!pcols.includes('badge_tone')) db.exec('ALTER TABLE products ADD COLUMN badge_tone TEXT');
   if (!pcols.includes('audience')) db.exec('ALTER TABLE products ADD COLUMN audience TEXT'); // الفئة: men|women|boys|girls|kids|unisex (فاضي = مستنتج من الاسم)
+  for (const [c, d] of [['size_fit_ai', 'TEXT'], ['size_fit_ai_note', 'TEXT'], ['size_fit_ai_stretch', 'INTEGER'], ['size_fit_ai_key', 'TEXT'], ['size_fit_ai_on', 'INTEGER']]) if (!pcols.includes(c)) db.exec(`ALTER TABLE products ADD COLUMN ${c} ${d}`); // قراءة الذكاء الاصطناعي لتفصيل القطعة (لو المحل ما حددش)
+  if (!pcols.includes('size_fit')) db.exec('ALTER TABLE products ADD COLUMN size_fit TEXT'); // تفصيل المقاس من صاحب المحل: small | true | large (فاضي = مش محدد)
   if (!pcols.includes('moda_key')) db.exec('ALTER TABLE products ADD COLUMN moda_key TEXT'); // نوع القطعة الصريح لمحرك تويلا (فاضي = تلقائي)
   if (!pcols.includes('photo_mismatch')) db.exec('ALTER TABLE products ADD COLUMN photo_mismatch INTEGER'); // فحص الصورة (CLIP): 1 = الصورة نوعها مختلف عن الاسم/القسم → تويلا ما بترشحوش، 0/فاضي = سليم
   if (!pcols.includes('photo_note')) db.exec('ALTER TABLE products ADD COLUMN photo_note TEXT');

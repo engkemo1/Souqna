@@ -5,7 +5,7 @@
  */
 import { q } from '../db/index.js';
 
-const KINDS = ['photo_check', 'moda'];
+const KINDS = ['photo_check', 'moda', 'fit'];
 export const usageDay = (d = new Date()) => d.toLocaleDateString('en-CA', { timeZone: 'America/Los_Angeles' });
 
 let ready = false;

@@ -12,6 +12,30 @@ const KIDS = [['1-2', '80-92'], ['2-3', '92-98'], ['3-4', '98-104'], ['4-5', '10
 const BODY = [['XS', '80-84', '60-64', '86-90'], ['S', '84-88', '64-68', '90-94'], ['M', '88-94', '68-74', '94-100'], ['L', '94-100', '74-80', '100-106'], ['XL', '100-108', '80-88', '106-114'], ['XXL', '108-116', '88-96', '114-122']];
 const NO_CHART = ['bags', 'hijab', 'accessories', 'abaya', 'jalabiya', 'shoes'];
 
+/** What the shop says about how this piece fits (set once in the seller dashboard). */
+export function fitNote(product, lang) {
+  const ar = lang === 'ar';
+  if (product?.sizeFit === 'small') return ar ? 'المحل بيقول: التفصيل ضيق شوية، فكّر تاخد مقاس أكبر.' : 'The shop says it runs small: consider sizing up.';
+  if (product?.sizeFit === 'large') return ar ? 'المحل بيقول: التفصيل واسع شوية، ممكن تاخد مقاس أصغر.' : 'The shop says it runs large: you may size down.';
+  if (product?.sizeFit === 'true') return ar ? 'المحل بيقول: المقاس مظبوط على الجداول.' : 'The shop says it fits true to size.';
+  const ai = product?.sizeFitAi; // automatic reading of the photo: shown only when the shop did not say, and labelled as such
+  if (ai?.note) return `${ar ? 'حسب تحليل تلقائي للصور:' : 'Automatic photo reading:'} ${ar ? ai.note : (ai.fit === 'small' ? 'cut looks slim, consider sizing up.' : ai.fit === 'large' ? 'cut looks loose, you may size down.' : 'cut looks regular.')}`;
+  return null;
+}
+
+/** One line about what a chosen size roughly means, from the general charts ("M: bust 88-94 · waist 68-74 cm"); null when we have no honest chart for it. */
+export function sizeHint(product, size, lang) {
+  if (!size || NO_CHART.includes(product?.department) || /perfume|fragrance|beauty|makeup|care/i.test(product?.department || '')) return null;
+  const ar = lang === 'ar';
+  const k = KIDS.find((r) => r[0] === String(size).replace(/\s/g, ''));
+  if (k && (product.department === 'kids' || /kids|girls|boys|baby/i.test(product.department || ''))) return ar ? `${size} سنة: مناسب لطول ${'\u200E'}${k[1]}${'\u200E'} سم تقريبًا` : `${size} yrs: fits about ${k[1]} cm tall`;
+  const key = String(size).toUpperCase().replace(/\s/g, '').replace('XXXL', '3XL').replace('2XL', 'XXL');
+  const b = BODY.find((r) => r[0] === key);
+  if (!b) return null;
+  const r = (x) => `\u200E${x}\u200E`; // keeps "88-94" reading left-to-right inside Arabic text
+  return ar ? `${size} تقريبًا: صدر ${r(b[1])} · وسط ${r(b[2])} · أرداف ${r(b[3])} سم. لو بين مقاسين خد الأكبر.` : `${size} roughly: bust ${b[1]} · waist ${b[2]} · hips ${b[3]} cm. Between two sizes? Take the bigger one.`;
+}
+
 /** Static size table for products the calculator cannot cover (kids, lingerie, sleepwear...). */
 function SizeChart({ kids, lang, open, onClose }) {
   const ar = lang === 'ar';
@@ -42,6 +66,7 @@ const load = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}');
 const save = (b) => {
   try {
     localStorage.setItem(KEY, JSON.stringify(b));
+    window.dispatchEvent(new Event('moda-body')); // the product page marks the suggested size right away
     // Twila (the stylist) remembers it too, so she does not ask again
     const p = JSON.parse(localStorage.getItem('moda.profile') || '{}');
     const bits = [b.height && `${b.height}cm`, b.weight && `${b.weight}kg`].filter(Boolean).join(' / ');
@@ -50,7 +75,7 @@ const save = (b) => {
 };
 
 /** "What's my size?" — a small, transparent calculator on the product page; picks only from the sizes this product really has. */
-export default function SizeAdvisor({ product, onPick }) {
+export default function SizeAdvisor({ product, onPick, compact = false }) {
   const { t, lang } = useI18n();
   const kind = advisorKind(product.department, product.sizes);
   const [open, setOpen] = useState(false);
@@ -64,7 +89,7 @@ export default function SizeAdvisor({ product, onPick }) {
   if (!kind && chart) {
     return (
       <>
-        <button type="button" onClick={() => setOpen(true)} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand underline-offset-2 hover:underline"><Ruler className="h-4 w-4" />{lang === 'ar' ? 'دليل المقاسات' : 'Size guide'}</button>
+        <button type="button" onClick={() => setOpen(true)} className={compact ? 'inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3 py-1.5 text-[13px] font-semibold text-brand transition hover:border-fg active:scale-95' : 'mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand underline-offset-2 hover:underline'}><Ruler className="h-4 w-4" />{lang === 'ar' ? 'دليل المقاسات' : 'Size guide'}</button>
         <SizeChart kids={chart === 'kids'} lang={lang} open={open} onClose={() => setOpen(false)} />
       </>
     );
@@ -79,7 +104,7 @@ export default function SizeAdvisor({ product, onPick }) {
   const num = (v, set, label, ph, id) => <Field label={label}><Input id={id} dir="ltr" inputMode="decimal" value={v} onChange={(e) => set(e.target.value.replace(/[^\d.]/g, ''))} placeholder={ph} className="text-start" required /></Field>;
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand underline-offset-2 hover:underline"><Ruler className="h-4 w-4" />{t('size.title')}</button>
+      <button type="button" onClick={() => setOpen(true)} className={compact ? 'inline-flex items-center gap-1.5 rounded-full border border-line-strong bg-elevated px-3 py-1.5 text-[13px] font-semibold text-brand transition hover:border-fg active:scale-95' : 'mt-3 inline-flex items-center gap-2 text-sm font-semibold text-brand underline-offset-2 hover:underline'}><Ruler className="h-4 w-4" />{t('size.title')}</button>
       <Sheet open={open} onClose={() => setOpen(false)} title={t('size.title')} description={t('size.sub')} side="auto" desktop="center">
         <form onSubmit={go} className="space-y-4 pb-2">
           <div className="flex justify-center"><ModaAvatar size={52} ring talking={false} /></div>

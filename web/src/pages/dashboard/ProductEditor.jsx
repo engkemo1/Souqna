@@ -31,7 +31,7 @@ const PRESET_COLORS = [
 
 const EMPTY = {
   name_ar: '', name_en: '', description_ar: '', description_en: '', care: '', material: '', price: '', compare_at_price: '', sale_ends_at: null, cost: '', sku: '', barcode: '', variantCodes: {},
-  category_id: '', department: '', attrs: {}, audience: '', moda_key: '', style_level: '', badge_text: '', badge_tone: 'brand', status: 'active', featured: false, is_new: false, no_return: false, try_sizes: false, colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
+  category_id: '', department: '', attrs: {}, audience: '', moda_key: '', style_level: '', badge_text: '', badge_tone: 'brand', status: 'active', featured: false, is_new: false, no_return: false, try_sizes: false, size_fit: '', size_fit_ai_on: false, size_fit_ai_note: '', colors: [], sizes: [], matrix: {}, track_stock: true, stock: 0, low_stock_at: 5,
   media: [], seo_title: '', seo_description: '',
 };
 const STYLE_LEVELS = [['1', 'بيتي'], ['2', 'كاجوال'], ['3', 'شيك'], ['4', 'رسمي'], ['5', 'سواريه']];
@@ -71,7 +71,7 @@ function fromProduct(p) {
     ...EMPTY,
     name_ar: p.name.ar, name_en: p.name.en && p.name.en !== p.name.ar ? p.name.en : '', description_ar: p.description.ar || '', description_en: p.description.en || '', care: p.care || '', material: p.material || '',
     price: String(p.price), compare_at_price: p.compareAt ? String(p.compareAt) : '', sale_ends_at: p.saleEndsAt || null, cost: p.cost != null ? String(p.cost) : '', sku: p.sku || '', barcode: p.barcode || '', variantCodes: codes,
-    category_id: p.categoryId ? String(p.categoryId) : '', department: p.department || '', attrs: p.attrs || {}, audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', badge_text: p.badgeText || '', badge_tone: p.badgeTone || 'brand', status: p.status, featured: p.featured, is_new: p.isNewFlag, no_return: !!p.noReturn, try_sizes: !!p.trySizes,
+    category_id: p.categoryId ? String(p.categoryId) : '', department: p.department || '', attrs: p.attrs || {}, audience: p.audience || p.suggestedAudience || '', moda_key: p.modaKey || p.suggestedModaKey || '', style_level: p.styleLevel ? String(p.styleLevel) : '', badge_text: p.badgeText || '', badge_tone: p.badgeTone || 'brand', status: p.status, featured: p.featured, is_new: p.isNewFlag, no_return: !!p.noReturn, try_sizes: !!p.trySizes, size_fit: p.sizeFit || '', size_fit_ai_on: !!p.sizeFitAiOn, size_fit_ai_note: p.sizeFitAiNote || '',
     colors: p.colors, sizes: p.sizes, matrix, variantIds: ids, track_stock: p.trackStock, stock: p.stockCount, low_stock_at: p.lowStockAt,
     media: p.media, seo_title: p.seo.title || '', seo_description: p.seo.description || '',
   };
@@ -86,7 +86,7 @@ function toPayload(f) {
   return {
     name_ar: f.name_ar, name_en: f.name_en, description_ar: f.description_ar, description_en: f.description_en, care: f.care.trim() || null, material: f.material.trim() || null,
     price: Number(f.price), compare_at_price: f.compare_at_price ? Number(f.compare_at_price) : null, sale_ends_at: f.compare_at_price && f.sale_ends_at ? Number(f.sale_ends_at) : null, cost: f.cost ? Number(f.cost) : null,
-    sku: f.sku || null, barcode: f.barcode || null, category_id: f.category_id ? Number(f.category_id) : null, ...(f.department && f.deptTouched ? { department: f.department } : {}), attrs: Object.fromEntries(Object.entries(f.attrs || {}).filter(([, v]) => v !== '' && v != null)), audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, badge_text: f.badge_text.trim() || null, badge_tone: f.badge_text.trim() ? f.badge_tone : null, status: f.status, featured: f.featured, is_new: f.is_new, no_return: f.no_return, try_sizes: f.try_sizes,
+    sku: f.sku || null, barcode: f.barcode || null, category_id: f.category_id ? Number(f.category_id) : null, ...(f.department && f.deptTouched ? { department: f.department } : {}), attrs: Object.fromEntries(Object.entries(f.attrs || {}).filter(([, v]) => v !== '' && v != null)), audience: f.audience || null, moda_key: f.moda_key || null, style_level: f.style_level ? Number(f.style_level) : null, badge_text: f.badge_text.trim() || null, badge_tone: f.badge_text.trim() ? f.badge_tone : null, status: f.status, featured: f.featured, is_new: f.is_new, no_return: f.no_return, try_sizes: f.try_sizes, size_fit: f.size_fit || null, size_fit_ai_on: !!f.size_fit_ai_on && !f.size_fit,
     colors: f.colors, sizes: f.sizes, variants, track_stock: f.track_stock, stock: Number(f.stock || 0), low_stock_at: Number(f.low_stock_at || 0),
     media: f.media.map((m) => m.id), primary_media_id: f.media[0]?.id ?? null, seo_title: f.seo_title || null, seo_description: f.seo_description || null,
   };
@@ -820,6 +820,21 @@ export default function ProductEditor() {
         <Switch label={t('editor.featured')} description={t('editor.featuredHint')} checked={f.featured} onChange={(v) => set({ featured: v })} />
         <Switch label={t('editor.markNew')} description={t('editor.markNewHint')} checked={f.is_new} onChange={(v) => set({ is_new: v })} />
         <Switch label={t('editor.noReturn')} description={t('editor.noReturnHint')} checked={f.no_return} onChange={(v) => set({ no_return: v })} />
+        {f.sizes.length > 0 && !(f.sizes.length === 1 && f.sizes[0] === 'One size') && (
+          <Field label={lang === 'ar' ? 'تفصيل المقاس (اختياري)' : 'How does it fit? (optional)'} hint={lang === 'ar' ? 'اختياري، بس مهم: الزبون بيشوف السطر ده تحت المقاسات فيختار مقاسه صح، وده بيقلّل الاستبدال والمرتجعات اللي بتتحمّلها. لو ما حددتش، ممكن الموقع يعرض قراءة تلقائية من الصور (مكتوب عليها إنها تلقائية) ولو عرفت إنها غلط حدد انت. سيبه «مش محدد» لو مش متأكد.' : 'Optional but useful: shoppers see this under the sizes and pick the right one, which means fewer exchanges and returns for you. If left empty the site may show an automatic reading of the photos (labelled as automatic). Leave it as Not set if unsure.'}>
+            <div role="radiogroup" className="grid grid-cols-4 gap-2">
+              {[['', 'مش محدد', 'Not set'], ['small', 'ضيق', 'Runs small'], ['true', 'مظبوط', 'True to size'], ['large', 'واسع', 'Runs large']].map(([v, ar, en]) => (
+                <button key={v || 'none'} type="button" role="radio" aria-checked={f.size_fit === v} onClick={() => set({ size_fit: v })} className={cx('h-11 rounded-xl border px-1 text-sm font-semibold transition', f.size_fit === v ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{lang === 'ar' ? ar : en}</button>
+              ))}
+            </div>
+            {!f.size_fit && (
+              <div className="mt-3">
+                <Switch label={lang === 'ar' ? 'سيب الذكاء الاصطناعي يحدده' : 'Let AI work it out'} description={lang === 'ar' ? 'بيبص على صور المنتج ووصفه ويكتب للزبون سطر عن القصّة، ومكتوب عليه إنه تحليل تلقائي.' : 'It reads the photos and description and tells shoppers about the cut, labelled as automatic.'} checked={f.size_fit_ai_on} onChange={(v) => set({ size_fit_ai_on: v })} />
+                {f.size_fit_ai_on && f.size_fit_ai_note && <p className="mt-1 text-xs text-muted">{lang === 'ar' ? 'القراءة الحالية: ' : 'Current reading: '}{f.size_fit_ai_note}</p>}
+              </div>
+            )}
+          </Field>
+        )}
         <Switch label={lang === 'ar' ? 'تجربة مقاسين' : 'Try two sizes'} description={lang === 'ar' ? 'الزبون يقدر يطلب مقاسين من القطعة دي مع المندوب ويشتري المناسب بس. بتجهّز المقاسين، والمقاس اللي مااتاخدش بيرجعلك. لازم يكون للقطعة أكتر من مقاس.' : 'Shoppers can have two sizes of this piece sent with the courier and keep one. You prepare both; the unkept size comes back. Needs more than one size.'} checked={f.try_sizes} onChange={(v) => set({ try_sizes: v })} />
         <ProductOffers productId={isNew ? null : Number(id)} pending={offerIds} onPending={setOfferIds} quick={quickOffers} onQuick={setQuickOffers} price={Number(f.price) || 0} hasSale={!!f.compare_at_price && Number(f.compare_at_price) > Number(f.price)} nameHint={f.name_ar} />
       </div>

@@ -16,7 +16,8 @@ import { useAddToCart } from '../../components/store/useAddToCart.js';
 import { px } from '../../lib/pixel.js';
 import ProductCard from '../../components/store/ProductCard.jsx';
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
-import SizeAdvisor from '../../components/store/SizeAdvisor.jsx';
+import SizeAdvisor, { sizeHint, fitNote } from '../../components/store/SizeAdvisor.jsx';
+import { savedSuggestion } from '../../lib/sizeAdvisor.js';
 import ReviewsSection from '../../components/store/ReviewsSection.jsx';
 import { useBuyer } from '../../lib/buyer.jsx';
 import { api } from '../../lib/api.js';
@@ -124,6 +125,7 @@ export default function Product() {
   const toast = useToast();
   const add = useAddToCart(store.slug);
   const p = data?.product;
+  useEffect(() => { if (!p) return undefined; const f = () => setMine(savedSuggestion(p)); f(); window.addEventListener('moda-body', f); return () => window.removeEventListener('moda-body', f); }, [p?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (p?.id) px('ViewContent', { content_ids: [String(p.id)], content_type: 'product', content_name: tr(p.name), value: Number(p.price) || 0, currency: 'EGP' }); }, [p?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const depts = useDepartments({ all: true, attrs: true });
   // category-specific details (fabric, fit, finish...) from the product's own attribute values, labelled by its section's definitions; merchant-only fields are never shown
@@ -136,6 +138,7 @@ export default function Product() {
   })();
   const [color, setColor] = useState(null);
   const [size, setSize] = useState(null);
+  const [mine, setMine] = useState(null); // the size this shopper probably takes, from measurements they gave once
   const [qty, setQty] = useState(1);
   const [sizeError, setSizeError] = useState(false);
   const [addState, setAddState] = useState('idle');
@@ -257,8 +260,8 @@ export default function Product() {
 
           <div className="mt-7">
             <VariantPicker product={p} color={color} size={size} onColor={(c) => { setColor(c); setSize(p.sizes.length === 1 ? p.sizes[0] : null); }}
-              onSize={(s) => { setSize(s); setSizeError(false); }} sizeError={sizeError} />
-            <SizeAdvisor product={p} onPick={(s) => { setSize(s); setSizeError(false); }} />
+              onSize={(s) => { setSize(s); setSizeError(false); }} sizeError={sizeError}
+              advisor={<SizeAdvisor compact product={p} onPick={(s) => { setSize(s); setSizeError(false); }} />} suggested={mine} sizeNote={[fitNote(p, lang), sizeHint(p, size, lang), mine && size !== mine ? (lang === 'ar' ? `مقاسك المقترح حسب قياساتك: ${mine}` : `Your suggested size: ${mine}`) : null].filter(Boolean).join(' ') || null} />
           </div>
 
           <AnimatePresence>
