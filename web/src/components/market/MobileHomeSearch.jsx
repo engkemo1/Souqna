@@ -10,7 +10,7 @@ import { useDepartments } from '../../lib/departments.js';
 export default function MobileHomeSearch() {
   const { lang } = useI18n();
   const ar = lang === 'ar';
-  const { list } = useDepartments();
+  const { list, label } = useDepartments();
   // One row: the main sections (women / men / kids) first, then the most stocked specific sections.
   const chips = useMemo(() => {
     const mains = list.filter((d) => !d.parent && d.product_count > 0 && ['women', 'men', 'kids'].includes(d.slug));

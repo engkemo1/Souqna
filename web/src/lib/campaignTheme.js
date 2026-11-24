@@ -3,7 +3,7 @@
  * how many fall and how fast — so the same system serves Black Friday, New Year, Ramadan, Eid, Valentine…
  */
 export const THEMES = {
-  blackfriday: { name: 'بلاك فرايدي', c1: '#111111', c2: '#F5B301', glyphs: ['%', '٪', '🏷️'], pct: true, emoji: '🔥' },
+  blackfriday: { name: 'بلاك فرايدي', c1: '#111111', c2: '#F5B301', glyphs: ['%', '٪', '🏷️'], pct: true, emoji: '🔥', art: '/brand/bf-bg.webp' },
   newyear: { name: 'رأس السنة', c1: '#0B1B3F', c2: '#F4C95D', glyphs: ['✨', '🎉', '🎆', '⭐', '🥂'], emoji: '🎆' },
   ramadan: { name: 'رمضان', c1: '#2A1458', c2: '#E9B949', glyphs: ['🌙', '⭐', '✦', '🏮'], emoji: '🌙' },
   eid: { name: 'العيد', c1: '#0B6B4F', c2: '#F2D37A', glyphs: ['🎈', '✨', '🌙', '🎁'], emoji: '🎁' },
@@ -22,7 +22,7 @@ export function look(c) {
   const base = custom.length ? custom : t.glyphs;
   const glyphs = !custom.length && t.pct && c?.kind !== 'shipping' && c?.percent ? [...base, `${c.percent}%`] : base;
   return {
-    c1: ok(c?.color1) ? c.color1 : t.c1, c2: ok(c?.color2) ? c.color2 : t.c2, glyphs, emoji: t.emoji,
+    c1: ok(c?.color1) ? c.color1 : t.c1, c2: ok(c?.color2) ? c.color2 : t.c2, glyphs, emoji: t.emoji, art: c?.kind === 'shipping' ? null : t.art || null, // picture banner (theme artwork), never on free-shipping campaigns
     count: DENSITY[c?.density] ?? DENSITY.low, speed: SPEED[c?.speed] ?? SPEED.calm,
   };
 }
