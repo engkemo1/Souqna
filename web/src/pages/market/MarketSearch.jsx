@@ -29,7 +29,7 @@ export default function MarketSearch() {
   const { t, lang } = useI18n();
   const [params, setParams] = useSearchParams();
   const q = params.get('q') || '';
-  useEffect(() => { if (q.trim()) px('Search', { search_string: q.trim().slice(0, 100), content_type: 'product' }); }, [q]);
+  useEffect(() => { const v = q.trim(); if (!v) return undefined; const id = setTimeout(() => px('Search', { search_string: v.slice(0, 100), content_type: 'product' }), 1500); return () => clearTimeout(id); }, [q]); // waits until the shopper stops typing so one search is one event
   const department = params.get('department') || '';
   const sort = params.get('sort') || 'relevance';
   const { list, label, pathLabel, bySlug, childrenOf } = useDepartments({ all: true });
