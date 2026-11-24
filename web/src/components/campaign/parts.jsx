@@ -176,7 +176,7 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
   const l = look(c);
   const ship = c.kind === 'shipping';
   const { head, sub } = text(c);
-  const bd = badgeOf(c);
+  const bd = l.art ? null : badgeOf(c); // a picture banner already says it — no seal on top of the artwork
   const chips = (c.badge?.chips || []).filter(Boolean).slice(0, 4);
   const soon = c.phase === 'soon'; // announced, not started yet: countdown to the START, no shopping button
   const gold = `linear-gradient(150deg, color-mix(in srgb, ${l.c2} 52%, #fff) 0%, ${l.c2} 50%, color-mix(in srgb, ${l.c2} 80%, #000) 100%)`;
@@ -188,6 +188,12 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
   return (
     <section className="tw-anim relative isolate flex flex-1 flex-col justify-center overflow-hidden rounded-[22px] text-white sm:rounded-[28px]" style={{ background: bg, containerType: 'inline-size', boxShadow: `0 28px 64px -30px ${l.c1}, inset 0 0 0 1px rgba(255,255,255,.08)` }}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-80" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,.1) 1px, transparent 1.3px)', backgroundSize: '22px 22px', WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 50%, transparent 100%)', maskImage: 'linear-gradient(90deg, transparent 0%, #000 50%, transparent 100%)' }} />
+      {l.art && (
+        <>
+          <img aria-hidden="true" alt="" src={l.art} decoding="async" className="pointer-events-none absolute end-0 top-0 h-[84%] w-[84%] object-cover object-left opacity-90 ltr:-scale-x-100 sm:inset-y-0 sm:h-full sm:w-[60%] sm:opacity-100" style={{ WebkitMaskImage: 'linear-gradient(to right, #000 52%, transparent 100%), linear-gradient(to bottom, #000 62%, transparent 100%)', maskImage: 'linear-gradient(to right, #000 52%, transparent 100%), linear-gradient(to bottom, #000 62%, transparent 100%)', WebkitMaskComposite: 'source-in', maskComposite: 'intersect' }} />
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 sm:hidden" style={{ background: 'linear-gradient(0deg, rgba(8,8,8,.92) 0%, rgba(8,8,8,.5) 38%, transparent 66%), linear-gradient(270deg, rgba(8,8,8,.82) 0%, rgba(8,8,8,.45) 42%, transparent 78%)' }} />
+        </>
+      )}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-10 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${l.c2}aa, transparent)` }} />
       <div className="relative z-10 flex flex-col gap-3.5 px-4 pb-4 pt-4 sm:flex-row sm:items-center sm:gap-14 sm:px-12 sm:py-10">
         {bd && (

@@ -99,6 +99,21 @@ function loadStore(slug) {
 const publicDept = ({ slug, name, sizes, image, images, parent, level, profile_effective: profile, attrs_effective: attrs, description, icon, product_count, stores_count, seo }) => ({ slug, name, sizes, image, images, parent, level, profile, attrs, description, icon, product_count, stores_count, seo });
 // ?all=1: every non-hidden section (store setup, product forms and labels need sections that have no products yet)
 r.get('/departments', h((req, res) => { cache(res, 60); const list = (req.query.all ? listDepartments().filter((d) => d.visibility !== 'hidden') : customerDepartments()).map(publicDept); res.json({ departments: req.query.attrs ? list : list.map(({ attrs, ...d }) => d) }); })); // attribute definitions are ~75% of the payload and only product pages / the product editor need them: ask with ?attrs=1
+/** One real product picture per section (rolled up to its parents) — the round section pictures on /categories show it until the platform uploads its own. Lingerie never fronts a parent section. */
+r.get('/departments/covers', h((_req, res) => {
+  cache(res, 300);
+  const rows = q.all(`SELECT p.id, p.department FROM products p JOIN stores s ON s.id=p.store_id
+    WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL AND (p.track_stock=0 OR p.stock>0)
+    ORDER BY ${LINGERIE_LAST}, ${WEAK_PHOTO} ASC, p.featured DESC, p.sold_count DESC, p.id DESC`);
+  const pick = new Map(); // section slug → product id (first in the order above wins)
+  for (const p of rows) for (const sl of [p.department, ...deptAncestors(p.department)]) if (!pick.has(sl)) pick.set(sl, p.id);
+  const ids = [...new Set(pick.values())];
+  const prods = ids.length ? q.all(`SELECT p.* FROM products p WHERE p.id IN (${ids.map(() => '?').join(',')})`, ids) : [];
+  const image = new Map(serializeCards(prods).map((c) => [c.id, c.image]));
+  const covers = {};
+  for (const [sl, id] of pick) if (image.get(id)) covers[sl] = image.get(id);
+  res.json({ covers });
+}));
 /** One section's landing data: breadcrumb, own details, visible children (with images), SEO. Reads stored rows only — never generates anything. */
 r.get('/departments/:slug', h((req, res) => {
   const all = listDepartments(); const by = new Map(all.map((d) => [d.slug, d]));
@@ -275,8 +290,9 @@ const SOLD_OUT_LAST = '(CASE WHEN p.track_stock=1 AND p.stock<=0 THEN 1 ELSE 0 E
 // Lingerie sinks to the end of the default ("relevance") order — casual wear, abayas, hijab, bags… come first. It stays in the same
 // pages (حريمي included) and in every other sort, so nothing is hidden; it just isn't what a shopper meets first.
 // Matches the product name or its store category (normalised: لانجري / لانجيري / lingerie).
-const LINGERIE_WORDS = ['لانجري', 'لانجيري'];
-const LINGERIE_COND = `(${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(p.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')} OR LOWER(COALESCE(p.name_en,'')) LIKE '%lingerie%' OR EXISTS (SELECT 1 FROM categories lc WHERE lc.id=p.category_id AND (${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(lc.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')})))`;
+const LINGERIE_WORDS = ['لانجري', 'لانجيري', 'رقص']; // + dance wear (بدلة رقص…)
+const BODY_WORDS = ['بدي', 'بودي', 'بادي']; // «بدي» as a whole word only (so «بديل» etc. never match)
+const LINGERIE_COND = `(${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(p.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')} OR ${BODY_WORDS.map((w) => `(' ' || ${NORM("COALESCE(p.name_ar,'')")} || ' ') LIKE '% ${w} %'`).join(' OR ')} OR LOWER(COALESCE(p.name_en,'')) LIKE '%lingerie%' OR LOWER(COALESCE(p.name_en,'')) LIKE '%bodysuit%' OR EXISTS (SELECT 1 FROM categories lc WHERE lc.id=p.category_id AND (${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(lc.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')})))`;
 const LINGERIE_LAST = `(CASE WHEN ${LINGERIE_COND} THEN 1 ELSE 0 END) ASC`;
 
 const AUD_DEPT = { men: 'men', women: 'women', kids: 'kids', boys: 'kids', girls: 'kids' };
@@ -846,9 +862,11 @@ r.get('/marketplace', h((req, res) => {
     const noLingerie = new Set(deptSubtree('women_lingerie')); // اللانجيري ليه قسمه الخاص — مش بيزحم صف حريمي في الرئيسية
     const sub = [...new Set(hits.flatMap((d) => deptSubtree(d.slug)))].filter((x) => g.lingerie || !noLingerie.has(x)); const ph = sub.map(() => '?').join(',');
     const name = g.name || hits[0].name; // shelf title (cosmetics is always «مستحضرات تجميل»)
-    const sold = railRows(`AND p.sold_count > 0 AND p.department IN (${ph}) ORDER BY ${LINGERIE_LAST}, p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
+    // الصف بتاع اللانجيري بيشمل كمان البدي وبدل/أحزمة الرقص (أي قسم)، وباقي الصفوف مش بتعرضهم
+    const scope = g.lingerie ? `AND (p.department IN (${ph}) OR ${LINGERIE_COND})` : `AND p.department IN (${ph}) AND NOT ${LINGERIE_COND}`;
+    const sold = railRows(`AND p.sold_count > 0 ${scope} ORDER BY ${LINGERIE_LAST}, p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
     if (sold.length >= BEST_MIN) return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: true, items: sold };
-    return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`AND p.department IN (${ph}) ORDER BY ${LINGERIE_LAST}, p.created_at DESC, p.id DESC LIMIT 40`, sub, BEST_MIN) };
+    return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`${scope} ORDER BY ${LINGERIE_LAST}, p.created_at DESC, p.id DESC LIMIT 40`, sub, BEST_MIN) };
   }).filter(Boolean);
   cache(res, 60);
   res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });

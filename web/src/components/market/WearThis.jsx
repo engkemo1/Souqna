@@ -7,17 +7,14 @@ export default function WearThis({ className = '' }) {
   const { t } = useI18n();
   return (
     <section className={className}>
-      <Link to="/visual"
-        className="group relative flex h-full min-h-[190px] w-full flex-col overflow-hidden rounded-3xl border border-line bg-gradient-to-br from-brand/[0.08] via-elevated to-elevated p-5 text-start shadow-[0_8px_24px_rgba(3,36,77,.04)] transition hover:border-fg/30/50 hover:shadow-[0_12px_30px_rgba(3,36,77,.09)] sm:p-6">
-        <span className="pointer-events-none absolute -end-8 -top-10 h-36 w-36 rounded-full bg-brand/[0.08] transition group-hover:scale-110" />
-        <span className="relative flex items-center gap-3">
-          <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-btn text-on-btn shadow-sm"><Camera className="h-5 w-5" /></span>
-          <span className="min-w-0">
-            <span className="block font-display text-base font-bold leading-snug sm:text-lg">{t('wear.title')}</span>
-            <span className="mt-1 block text-xs leading-relaxed text-muted sm:text-[13px]">{t('wear.sub')}</span>
-          </span>
+      <Link to="/visual" style={{ background: 'radial-gradient(120% 120% at 15% 90%, #274a85 0%, #14305c 45%, #0b1f42 100%)' }}
+        className="group relative flex h-full min-h-[150px] sm:min-h-[200px] w-full flex-col overflow-hidden rounded-3xl p-4 text-start shadow-[0_14px_30px_-16px_rgba(11,31,66,.7)] transition hover:shadow-[0_18px_36px_-16px_rgba(11,31,66,.85)] sm:p-6">
+        <img src="/brand/card-visual.webp" alt="" aria-hidden="true" width="560" height="445" loading="lazy" decoding="async" className="pointer-events-none absolute bottom-0 end-0 w-[48%] max-w-[270px] [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)]  transition duration-300 group-hover:scale-[1.04]" />
+        <span className="relative block max-w-[52%] pb-3 sm:pb-4">
+          <span className="block font-display text-[15px] font-bold leading-snug text-white sm:text-lg">{t('wear.title')}</span>
+          <span className="mt-1 line-clamp-2 text-xs leading-relaxed text-white/70 sm:line-clamp-none sm:text-[13px]">{t('wear.sub')}</span>
         </span>
-        <span className="relative mt-auto inline-flex w-fit items-center gap-2 rounded-xl bg-btn px-4 py-2.5 text-xs font-bold text-on-btn transition group-hover:brightness-95 sm:text-[13px]">{t('wear.cta')}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></span>
+        <span className="relative mt-auto inline-flex w-fit items-center gap-2 rounded-xl bg-[#ff8a3d] px-3.5 py-2 text-xs font-bold text-white shadow-[0_8px_16px_-8px_rgba(255,138,61,.9)] transition group-hover:brightness-105 sm:text-[13px]"><Camera className="h-4 w-4" />{t('wear.cta')}<ArrowRight className="h-4 w-4 rtl:rotate-180" /></span>
       </Link>
     </section>
   );

@@ -42,6 +42,8 @@ export default function VisualSearch() {
   const [active, setActive] = useState(0);
   const [state, setState] = useState({ loading: false, data: null, error: null });
   const input = useRef(null);
+  const cam = useRef(null);
+  const ar = lang === 'ar';
   const requestId = useRef(0);
   const [prog, setProg] = useState({ upload: 0, analysisStart: 0, expected: 6000 });
   const [voted, setVoted] = useState(() => new Set());
@@ -131,32 +133,42 @@ export default function VisualSearch() {
     <div className="min-h-dvh">
       <MarketHeader />
       <main className="container pb-20 pt-6 sm:pt-10">
-        <div className="mx-auto max-w-3xl text-center">
-          <span className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-secondary text-brand"><Camera className="h-7 w-7" /></span>
-          <h1 className="mt-4 font-display text-[clamp(1.8rem,1.2rem+2.4vw,2.8rem)] font-bold leading-tight">{t('visual.title')}</h1>
-          <p className="mt-3 text-[16px] leading-relaxed text-muted">{t('visual.sub')}</p>
-
+        <div className="mx-auto max-w-3xl">
           <input ref={input} type="file" accept="image/*" className="sr-only" onChange={pick} aria-label={t('visual.pick')} />
+          <input ref={cam} type="file" accept="image/*" capture="environment" className="sr-only" onChange={pick} aria-label={ar ? 'صوّر دلوقتي' : 'Take a photo'} />
           {!preview ? (
-            <button type="button" onClick={() => input.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={onDrop}
-              className="mt-8 flex w-full flex-col items-center gap-2 rounded-3xl border-2 border-dashed border-line-strong bg-elevated px-6 py-12 transition hover:border-fg active:scale-[0.99] sm:py-14">
-              <ImagePlus className="h-9 w-9 text-brand" /><span className="text-lg font-bold">{t('visual.pick')}</span><span className="text-sm text-muted">{t('visual.pickHint')}</span>
-            </button>
-          ) : (
-            <div className="mt-7 flex items-center gap-4 rounded-3xl border border-line bg-elevated p-3 text-start">
-              <img src={preview} alt="" className="h-24 w-24 shrink-0 rounded-2xl object-cover" />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">{state.loading ? t('visual.searching') : state.error ? t('visual.searchErrorTitle') : groups.length ? t('visual.results', { n: state.data.total }) : state.data ? t('visual.noMatchTitle') : ''}</p>
-                {state.loading ? <SearchProgress uploadPct={prog.upload} analysisStart={prog.analysisStart} expectedMs={prog.expected} /> : <p className="mt-1 text-xs text-muted">{groups.length ? t('visual.previewHint') : ''}</p>}
+            <>
+              <div onDragOver={(e) => e.preventDefault()} onDrop={onDrop} className="relative overflow-hidden rounded-[28px] px-5 pb-6 pt-5 text-center text-white shadow-[0_18px_40px_-22px_rgba(11,31,66,.8)]" style={{ background: 'radial-gradient(120% 120% at 50% 0%, #274a85 0%, #14305c 50%, #0b1f42 100%)' }}>
+                <img src="/brand/visual-hero.webp" alt="" aria-hidden="true" width="620" height="410" decoding="async" className="mx-auto h-auto w-[min(78%,290px)] [mask-image:linear-gradient(90deg,transparent,#000_10%,#000_90%,transparent)] drop-shadow-[0_18px_22px_rgba(0,0,0,.35)]" />
+                <h1 className="mt-1 font-display text-[clamp(1.35rem,1.1rem+2vw,2.2rem)] font-bold leading-tight">{ar ? 'شفت لبس عجبك؟ صوّره ولاقيه' : t('visual.title')}</h1>
+                <p className="mx-auto mt-2 max-w-md text-[14.5px] leading-relaxed text-white/75">{ar ? 'صوّر أي حاجة عجبتك أو ارفع صورتها، وهنوريك أقرب القطع الموجودة فعلاً في محلات بنها بسعرها.' : t('visual.sub')}</p>
+                <div className="mx-auto mt-5 grid max-w-md gap-2.5 sm:grid-cols-2">
+                  <button type="button" onClick={() => cam.current?.click()} className="inline-flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-[#ff8a3d] text-[15px] font-bold text-white shadow-[0_10px_20px_-10px_rgba(255,138,61,.9)] transition active:scale-[0.98]"><Camera className="h-5 w-5" />{ar ? 'صوّر دلوقتي' : 'Take a photo'}</button>
+                  <button type="button" onClick={() => input.current?.click()} className="inline-flex h-[52px] items-center justify-center gap-2 rounded-2xl bg-white/10 text-[15px] font-bold text-white ring-1 ring-inset ring-white/25 transition active:scale-[0.98]"><ImagePlus className="h-5 w-5" />{ar ? 'اختار من المعرض' : 'Choose from gallery'}</button>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[13px] text-white/65">
+                  {canPasteBtn && <button type="button" onClick={pasteFromClipboard} className="inline-flex items-center gap-1.5 font-semibold text-white/90 underline-offset-4 hover:underline"><ClipboardPaste className="h-4 w-4" />{t('visual.paste')}</button>}
+                  <span className="hidden sm:inline">{t('visual.dropHint')}</span>
+                </div>
               </div>
-              <Button variant="outline" icon={RefreshCcw} onClick={() => input.current?.click()}>{t('visual.again')}</Button>
-            </div>
-          )}
-          {!preview && (
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm text-muted">
-              {canPasteBtn && <button type="button" onClick={pasteFromClipboard} className="inline-flex items-center gap-1.5 font-semibold text-fg underline-offset-4 hover:underline"><ClipboardPaste className="h-4 w-4" />{t('visual.paste')}</button>}
-              <span>{t('visual.dropHint')}</span>
-            </div>
+              <ol className="mt-5 grid grid-cols-3 gap-2 text-center text-[12.5px] leading-snug text-muted">
+                {[[ar ? 'صوّر أو ارفع صورة' : 'Snap or upload'], [ar ? 'بنقارنها بالمحلات' : 'We compare it'], [ar ? 'اختار القطعة واطلبها' : 'Pick and order']].map(([txt], i) => (
+                  <li key={i} className="flex flex-col items-center gap-1.5"><span className="grid h-7 w-7 place-items-center rounded-full bg-secondary text-[13px] font-bold text-brand">{i + 1}</span>{txt}</li>
+                ))}
+              </ol>
+            </>
+          ) : (
+            <>
+              <h1 className="sr-only">{t('visual.title')}</h1>
+              <div className="flex items-center gap-3 rounded-3xl border border-line bg-elevated p-3 text-start">
+                <img src={preview} alt="" className="h-20 w-20 shrink-0 rounded-2xl object-cover" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-bold">{state.loading ? t('visual.searching') : state.error ? t('visual.searchErrorTitle') : groups.length ? t('visual.results', { n: state.data.total }) : state.data ? t('visual.noMatchTitle') : ''}</p>
+                  {state.loading ? <SearchProgress uploadPct={prog.upload} analysisStart={prog.analysisStart} expectedMs={prog.expected} /> : <p className="mt-1 text-xs text-muted">{groups.length ? t('visual.previewHint') : ''}</p>}
+                </div>
+                <Button variant="outline" icon={RefreshCcw} onClick={() => input.current?.click()}>{ar ? 'صورة تانية' : t('visual.again')}</Button>
+              </div>
+            </>
           )}
           {!preview && !install.installed && install.canPrompt && (
             <div className="mt-5 flex items-center gap-3 rounded-2xl bg-secondary p-4 text-start">
@@ -169,11 +181,11 @@ export default function VisualSearch() {
 
         {preview && !state.loading && (groups.length > 1 || type) && (
           <section className="mx-auto mt-6 max-w-5xl">
-            <div className="flex flex-wrap justify-center gap-2" role="tablist" aria-label={t('visual.detected')}>
-              {groups.length > 1 && <span className="self-center text-sm font-semibold text-muted">{t('visual.detected')}</span>}
+            <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:justify-center sm:px-0 [scrollbar-width:none]" role="tablist" aria-label={t('visual.detected')}>
+              {groups.length > 1 && <span className="shrink-0 self-center text-sm font-semibold text-muted">{t('visual.detected')}</span>}
               {groups.length > 1 && groups.map((g, i) => (
                 <button key={g.type || i} type="button" role="tab" aria-selected={current === g} onClick={() => setActive(i)}
-                  className={cx('rounded-full border px-4 py-2 text-sm font-semibold transition', current === g ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>
+                  className={cx('shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition', current === g ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg')}>
                   {groupLabel(g)} <span className="opacity-70">({g.items.length})</span>
                 </button>
               ))}
@@ -212,7 +224,7 @@ export default function VisualSearch() {
           {state.error && <div role="alert" className="mx-auto max-w-xl rounded-3xl border border-sale/20 bg-sale/5 p-6 text-center"><p className="font-semibold">{t('visual.searchErrorTitle')}</p><p className="mt-2 text-sm text-muted">{errorMessage(t, state.error)}</p><Button className="mt-4" onClick={() => blob && run(blob, dept, type)}>{t('visual.retry')}</Button></div>}
           {current && (
             <>
-              <div className="mb-5 flex flex-wrap items-end justify-between gap-2"><h2 className="font-display text-xl font-bold">{t('visual.results', { n: current.items.length })}{groupLabel(current) ? ` — ${groupLabel(current)}` : ''}</h2><div className="flex items-center gap-3"><p className="hidden text-sm text-muted sm:block">{t('visual.previewHint')}</p><Button variant="outline" icon={Share2} onClick={share}>{t('visual.share')}</Button></div></div>
+              <div className="mb-4 flex items-center justify-between gap-2"><div><h2 className="font-display text-xl font-bold">{ar ? 'الأقرب لصورتك' : t('visual.results', { n: current.items.length })}{groupLabel(current) ? ` — ${groupLabel(current)}` : ''}</h2><p className="mt-0.5 text-[13px] text-muted">{ar ? `${current.items.length} قطعة — افتح أي واحدة للتفاصيل` : t('visual.previewHint')}</p></div><Button variant="outline" icon={Share2} onClick={share}>{t('visual.share')}</Button></div>
               <ProductGrid>{current.items.map((p, i) => (
                 <div key={`${p.store.slug}-${p.id}`} className="relative">
                   <ProductCard product={p} slug={p.store.slug} index={i} showStore />

@@ -91,12 +91,12 @@ export default function MarketHeader() {
 
       {/* Phones: a pinned search bar under the top row. Tapping it opens the search page (full-screen suggestions, keyboard ready), so nothing ever resizes or jumps inside the header. */}
       {showBar && (
-        <div className="container relative pb-2.5 md:hidden">
-          <Link to="/search" aria-label={t('search.placeholder')} className="flex h-11 w-full items-center gap-2.5 rounded-full border border-line-strong bg-[#f5f6f8] ps-4 pe-14 text-[15px] text-muted transition active:bg-white">
-            <Search className="h-[18px] w-[18px] shrink-0 text-brand" aria-hidden="true" />
-            <span className="truncate">{ar ? 'ابحث: فستان، كوتشي، شنطة…' : 'Search: dress, sneakers, bag…'}</span>
+        <div className="container relative pb-3 md:hidden">
+          <Link to="/search" aria-label={t('search.placeholder')} className="flex h-12 w-full items-center gap-3 rounded-2xl border border-[#03244D]/15 bg-white ps-1.5 pe-14 shadow-[0_8px_20px_-12px_rgba(3,36,77,.45)] transition active:scale-[.99]">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#03244D] text-white"><Search className="h-[18px] w-[18px]" aria-hidden="true" /></span>
+            <span className="truncate text-[14.5px] font-medium text-[#6b7587]">{ar ? 'ابحث عن فستان، كوتشي، شنطة…' : 'Search dress, sneakers, bags…'}</span>
           </Link>
-          <Link to="/visual" aria-label={ar ? 'البحث بصورة' : 'Search by photo'} className="absolute end-6 top-[calc(50%-5px)] grid h-8 w-8 -translate-y-1/2 place-items-center rounded-full bg-[#FFF3EB] text-[#F8620A] transition active:scale-95"><Camera className="h-[17px] w-[17px]" /></Link>
+          <Link to="/visual" aria-label={ar ? 'البحث بصورة' : 'Search by photo'} className="absolute end-[22px] top-[calc(50%-6px)] grid h-9 w-9 -translate-y-1/2 place-items-center rounded-xl bg-[#FFF3EB] text-[#F8620A] transition active:scale-95"><Camera className="h-[18px] w-[18px]" /></Link>
         </div>
       )}
 
