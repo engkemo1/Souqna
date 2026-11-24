@@ -5,6 +5,7 @@ import { useApi, useDebounced } from '../../lib/hooks.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { useDepartments } from '../../lib/departments.js';
 import { formatNumber, formatMoney } from '../../lib/format.js';
+import { px } from '../../lib/pixel.js';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import MarketSearchBar from '../../components/market/MarketSearchBar.jsx';
 import StylistChat from '../../components/market/StylistChat.jsx';
@@ -13,7 +14,6 @@ import ProductCard, { ProductCardSkeleton, ProductGrid } from '../../components/
 import Button from '../../components/ui/Button.jsx';
 import { Select } from '../../components/ui/Field.jsx';
 import { EmptyState, ErrorState } from '../../components/ui/States.jsx';
-import { cx } from '../../components/ui/cx.js';
 import SearchFilters from '../../components/market/SearchFilters.jsx';
 import FeaturedSlot from '../../components/featured/FeaturedSlot.jsx';
 import CategoryHeader from '../../components/market/CategoryHeader.jsx';
@@ -29,6 +29,7 @@ export default function MarketSearch() {
   const { t, lang } = useI18n();
   const [params, setParams] = useSearchParams();
   const q = params.get('q') || '';
+  useEffect(() => { if (q.trim()) px('Search', { search_string: q.trim().slice(0, 100), content_type: 'product' }); }, [q]);
   const department = params.get('department') || '';
   const sort = params.get('sort') || 'relevance';
   const { list, label, pathLabel, bySlug, childrenOf } = useDepartments({ all: true });
@@ -86,19 +87,32 @@ export default function MarketSearch() {
   const underSelected = (d) => { if (!department) return true; for (let sl = d.slug, i = 0; sl && i < 8; sl = bySlug.get(sl)?.parent, i++) if (sl === department && d.slug !== department) return true; return false; };
   const softLast = (d) => (/lingerie/.test(d.slug) || /لانج|رقص/.test(d.name?.ar || '') ? 1 : 0); // lingerie / dance wear stay in the row, but at the end
   const withN = list.filter((d) => (deptN.get(d.slug) || 0) > 0);
-  const typeTiles = withN.filter((d) => underSelected(d) && !withN.some((c) => c.parent === d.slug)).sort((x, y) => (softLast(x) - softLast(y)) || (deptN.get(y.slug) - deptN.get(x.slug))).slice(0, 12);
+  // lingerie / dance wear only when the shopper is looking for them (a «فستان» search must not offer «لانجيري» tiles), and with plenty of results a section holding one stray match is noise, not a choice
+  const wantsSoft = /لانج|لنج|رقص|lingerie|dance/i.test(q || '') || /lingerie|dance/.test(department || '');
+  const minN = (data?.total || 0) >= 12 ? 2 : 1;
+  const typeTiles = withN.filter((d) => underSelected(d) && !withN.some((c) => c.parent === d.slug) && (wantsSoft || !softLast(d)) && !(wantsSoft && d.slug === 'games_gifts') && deptN.get(d.slug) >= minN).sort((x, y) => (softLast(x) - softLast(y)) || (deptN.get(y.slug) - deptN.get(x.slug))).slice(0, 12);
   const sameName = (d) => typeTiles.some((x) => x.slug !== d.slug && deptName(x, lang) === deptName(d, lang)); // «تيشيرتات» exists under رجالي and حريمي: say which one
   const resetAttrs = Object.fromEntries(attrKeys.map((k) => [k, '']));
   const oldCats = data?.facets?.categories || [];
+  // phones: one swipeable row of small chips (like Jumia / Amazon) so products start right under the search box; picture tiles are for bigger screens
+  const typeChips = typeTiles.length > 1
+    ? typeTiles.map((d) => ({ k: d.slug, name: `${deptName(d, lang)}${sameName(d) && rootOf(d.slug) ? ` · ${label(rootOf(d.slug))}` : ''}`, n: deptN.get(d.slug), go: () => set({ department: d.slug, category: '', ...resetAttrs }) }))
+    : oldCats.slice(0, 12).map((c) => ({ k: c.key, name: c.name[lang] || c.name.ar, n: c.n, go: () => set({ category: c.key }) }));
   const typeRow = !params.get('category') && (typeTiles.length > 1 || oldCats.length > 1) ? (
-    <section className="mb-7" aria-label={t('search.shopByCategory')}>
+    <>
+    <section className="mb-4 sm:hidden" aria-label={t('search.shopByCategory')}>
+      <div className="scroll-x -mx-4 gap-2 px-4">
+        {typeChips.map((c) => (<button key={c.k} type="button" onClick={c.go} className="shrink-0 whitespace-nowrap rounded-full border border-line-strong bg-elevated px-3.5 py-1.5 text-[13px] font-semibold transition active:scale-95">{c.name} <span className="text-muted">{formatNumber(c.n, lang)}</span></button>))}
+      </div>
+    </section>
+    <section className="mb-7 hidden sm:block" aria-label={t('search.shopByCategory')}>
       <h2 className="mb-3 font-display text-lg font-bold">{t('search.shopByCategory')}</h2>
       <div className="scroll-x -mx-4 gap-3 px-4 sm:mx-0 sm:grid sm:grid-cols-3 sm:gap-4 sm:px-0 lg:grid-cols-4 xl:grid-cols-6">
         {typeTiles.length > 1 ? typeTiles.map((d) => (
           <button key={d.slug} type="button" onClick={() => set({ department: d.slug, category: '', ...resetAttrs })} className="group w-32 shrink-0 text-start sm:w-auto">
             <span className="relative block aspect-square overflow-hidden rounded-2xl bg-gradient-to-br from-[#EAF0F8] to-[#FFF3EB] ring-1 ring-line transition group-hover:ring-fg/40">
-              {d.image || d.images?.card ? <CategoryImage dept={d} sizes="(min-width:1024px) 14vw, 40vw" className="transition duration-500 group-hover:scale-105" />
-                : covers[d.slug] ? <SmartImage media={covers[d.slug]} ratio="1 / 1" sizes="(min-width:1024px) 14vw, 40vw" className="w-full transition duration-500 group-hover:scale-105" />
+              {covers[d.slug] ? <SmartImage media={covers[d.slug]} ratio="1 / 1" sizes="(min-width:1024px) 14vw, 40vw" className="w-full transition duration-500 group-hover:scale-105" />
+                : d.image || d.images?.card ? <CategoryImage dept={d} sizes="(min-width:1024px) 14vw, 40vw" className="transition duration-500 group-hover:scale-105" />
                   : <span className="grid h-full w-full place-items-center text-4xl" aria-hidden="true">{emojiFor(d)}</span>}
             </span>
             <span className="mt-2 block truncate text-sm font-semibold">{deptName(d, lang)}</span>
@@ -115,6 +129,7 @@ export default function MarketSearch() {
         ))}
       </div>
     </section>
+    </>
   ) : null;
   const panel = <SearchFilters params={params} set={set} facets={data?.facets} departments={list} label={label} activeCount={activeCount} onClear={clearFilters} />;
 

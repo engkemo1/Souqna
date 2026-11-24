@@ -13,6 +13,7 @@ import { formatNumber } from '../../lib/format.js';
 import Gallery from '../../components/store/Gallery.jsx';
 import VariantPicker, { resolveVariant } from '../../components/store/VariantPicker.jsx';
 import { useAddToCart } from '../../components/store/useAddToCart.js';
+import { px } from '../../lib/pixel.js';
 import ProductCard from '../../components/store/ProductCard.jsx';
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
 import SizeAdvisor from '../../components/store/SizeAdvisor.jsx';
@@ -123,6 +124,7 @@ export default function Product() {
   const toast = useToast();
   const add = useAddToCart(store.slug);
   const p = data?.product;
+  useEffect(() => { if (p?.id) px('ViewContent', { content_ids: [String(p.id)], content_type: 'product', content_name: tr(p.name), value: Number(p.price) || 0, currency: 'EGP' }); }, [p?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   const depts = useDepartments({ all: true, attrs: true });
   // category-specific details (fabric, fit, finish...) from the product's own attribute values, labelled by its section's definitions; merchant-only fields are never shown
   const specRows = (() => {

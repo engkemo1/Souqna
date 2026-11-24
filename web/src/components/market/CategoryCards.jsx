@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useI18n } from '../../lib/i18n.jsx';
 import { cx } from '../ui/cx.js';
+import SmartImage from '../ui/SmartImage.jsx';
 
 /** Where a section opens. Section landing pages live at /c/:slug (the old /search?department= URLs keep working). */
 export const deptHref = (slug) => `/c/${encodeURIComponent(slug)}`;
@@ -11,10 +12,12 @@ export const deptName = (d, lang) => d?.name?.[lang] || d?.name?.ar || d?.slug |
  * A stored picture of a section, in the rendition that fits its card (thumb 160 / card 480 / hero 1200), lazy-loaded.
  * No picture, or a broken one, shows a neutral placeholder — never a generic stock photo and never a generation request.
  */
-export function CategoryImage({ dept, sizes, priority = false, className }) {
+export function CategoryImage({ dept, sizes, priority = false, className, preferCover = false }) {
   const [bad, setBad] = useState(false);
   const im = dept?.images;
   const src = im?.card || dept?.image;
+  // no picture of its own: a real product photo from the section (the server sends it as `cover`) beats a generic placeholder
+  if ((!src || bad || preferCover) && dept?.cover) return <SmartImage media={dept.cover} sizes={sizes} priority={priority} className={cx('h-full w-full', className)} />;
   if (!src || bad) {
     return <img src="/departments/category-placeholder.png" alt="" loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : undefined} decoding="async" className={cx('h-full w-full object-cover', className)} />;
   }
@@ -86,13 +89,13 @@ export function CircleRail({ items, label, active, backTo, onPick }) {
         onPick ? (
           <button key={c.slug} type="button" role="listitem" onClick={() => onPick(active === c.slug ? '' : c.slug)} aria-pressed={active === c.slug} className="group w-[76px] shrink-0 snap-start text-center sm:w-[96px] focus-visible:outline-none">
             <span className={`mx-auto block h-[72px] w-[72px] overflow-hidden rounded-full bg-[#EAF0F8] ring-2 shadow-[0_6px_16px_-8px_rgba(3,36,77,0.5)] ${active === c.slug ? 'ring-brand ring-4' : 'ring-white'} transition duration-300 group-hover:-translate-y-0.5 group-hover:ring-brand group-focus-visible:ring-brand sm:h-[92px] sm:w-[92px]`}>
-              <CategoryImage dept={c} sizes="92px" className="pointer-events-none text-2xl" />
+              <CategoryImage dept={c} sizes="92px" preferCover className="pointer-events-none text-2xl" />
             </span>
             <span className="mt-2 line-clamp-2 block text-[12px] font-bold leading-snug text-[#03244D] sm:text-[13px]">{deptName(c, lang)}</span>
           </button>
         ) : <Link key={c.slug} role="listitem" to={active === c.slug && backTo ? backTo : deptHref(c.slug)} draggable={false} aria-current={active === c.slug ? 'page' : undefined} className="group w-[76px] shrink-0 snap-start text-center sm:w-[96px] focus-visible:outline-none">
           <span className={`mx-auto block h-[72px] w-[72px] overflow-hidden rounded-full bg-[#EAF0F8] ring-2 shadow-[0_6px_16px_-8px_rgba(3,36,77,0.5)] ${active === c.slug ? 'ring-brand ring-4' : 'ring-white'} transition duration-300 group-hover:-translate-y-0.5 group-hover:ring-brand group-focus-visible:ring-brand sm:h-[92px] sm:w-[92px]`}>
-            <CategoryImage dept={c} sizes="92px" className="pointer-events-none text-2xl" />
+            <CategoryImage dept={c} sizes="92px" preferCover className="pointer-events-none text-2xl" />
           </span>
           <span className="mt-2 line-clamp-2 block text-[12px] font-bold leading-snug text-[#03244D] sm:text-[13px]">{deptName(c, lang)}</span>
         </Link>

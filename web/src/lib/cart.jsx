@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useMemo, useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { px } from './pixel.js';
 
 const CartContext = createContext(null);
 const KEY = 'souqna.carts.v1';
@@ -132,6 +133,7 @@ export function useFavorites(slug) {
       added = !list.includes(id);
       return { ...f, [slug]: added ? [id, ...list] : list.filter((x) => x !== id) };
     });
+    if (!ids.includes(id)) px('AddToWishlist', { content_ids: [String(id)], content_type: 'product' });
     return !ids.includes(id);
   }, [ctx, slug, ids]);
   return { ids, has: (id) => (slug ? ids.includes(id) : allIds.includes(id)), toggle, count: ids.length };

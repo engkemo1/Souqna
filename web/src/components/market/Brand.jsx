@@ -13,7 +13,7 @@ export default function Brand({ to = '/', className, sub }) {
   const { t } = useI18n();
   return (
     <Link to={to} className={cx('flex items-center gap-2.5', className)} aria-label={`${t('app.name')} — ${sub || 'كل المحلات في مكان واحد'}`}>
-      <img src="/brand/twist-logo.png" className="h-[58px] w-auto shrink-0 object-contain" alt="" aria-hidden="true" />
+      <img src="/brand/twist-logo.webp" width="169" height="58" fetchPriority="high" decoding="async" className="h-[58px] w-auto shrink-0 object-contain" alt="" aria-hidden="true" />
     </Link>
   );
 }

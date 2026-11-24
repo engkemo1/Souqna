@@ -13,6 +13,7 @@ import Skeleton from '../../components/ui/Skeleton.jsx';
 import Button from '../../components/ui/Button.jsx';
 import { StatusBadge } from '../../components/ui/Badge.jsx';
 import { ErrorState } from '../../components/ui/States.jsx';
+import { pxPurchase } from '../../lib/pixel.js';
 import { useToast } from '../../components/ui/Toast.jsx';
 
 export default function OrderSuccess() {
@@ -25,6 +26,7 @@ export default function OrderSuccess() {
   const token = params.get('t');
   const { data, error, reload } = useApi(token ? `/track/${token}` : null);
   const o = data?.order;
+  useEffect(() => { if (o?.number) pxPurchase(String(o.number), [o]); }, [o?.number]); // eslint-disable-line react-hooks/exhaustive-deps
   const name = state?.name || o?.firstName || '';
 
   // Only when the store is NOT set to receive orders on WhatsApp automatically does the customer send the order by hand.

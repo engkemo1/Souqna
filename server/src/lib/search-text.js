@@ -82,7 +82,9 @@ export const GROUPS = [
   ['اسدال', 'اسدالات', 'إسدال', 'اسدل', 'صلاه', 'لبس صلاه', 'ملابس صلاه', 'prayer'],
   ['جلابيه', 'جلاليب', 'جلابيات', 'جلابية', 'galabiya', 'jalabiya', 'galabeya', 'جلباب', 'قفطان', 'قفاطين', 'كفتان'],
   // bags / accessories
-  ['شنطه', 'شنط', 'حقيبه', 'حقايب', 'حقائب', 'bag', 'bags', 'شنطة', 'كروس', 'باك باك', 'backpack', 'محفظه', 'wallet', 'clutch'],
+  ['شنطه', 'شنط', 'حقيبه', 'حقايب', 'حقائب', 'bag', 'bags', 'شنطة', 'كروس', 'باك باك', 'backpack', 'clutch'],
+  ['عطر', 'عطور', 'عطرى', 'perfume', 'perfumes', 'parfum', 'برفان', 'برفيوم', 'بيرفيوم', 'fragrance', 'fragrances', 'eau de parfum', 'edp'],
+  ['محفظه', 'محافظ', 'wallet', 'wallets', 'كارت هولدر', 'cardholder'],
   ['حزام', 'احزمه', 'حزام جلد', 'belt', 'belts'],
   ['كرافته', 'كرافت', 'كرافتات', 'ربطه عنق', 'tie', 'ties', 'papillon', 'فيونكه', 'ببيون', 'ببيوت'],
   ['ساعه', 'ساعات', 'watch', 'watches'],
@@ -236,7 +238,7 @@ export function prepareRow(r) {
 }
 
 // words that START with a shorter word but mean something else: «كوتشي» (shoes) must not find «كوتشينة» (playing cards)
-const NOT_EXTENSIONS = [{ stem: 'كوتش', word: 'كوتشينه' }];
+const NOT_EXTENSIONS = [{ stem: 'كوتش', word: 'كوتشينه' }, { stem: 'sandal', word: 'sandalwood' }];
 const has = (hay, alt) => {
   if (alt.exact) return hay.includes(` ${alt.text} `);
   let h = hay;

@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { px } from './pixel.js';
 
 /**
  * Anonymous, session-level beacons for the admin analytics (visits, campaigns, funnel). Nothing here can break the page.
@@ -60,12 +61,24 @@ export function trackSiteVisit(pathname) {
   } catch { /* tracking must never break the page */ }
 }
 
+/** Once per browser session: shopper added something to the cart (feeds the admin funnel). */
+export function trackSiteEvent(name) {
+  try {
+    if (SKIP.test(window.location.pathname) || new URLSearchParams(window.location.search).get('preview')) return;
+    const k = `souqna.ev.${name}`;
+    if (sessionStorage.getItem(k)) return;
+    sessionStorage.setItem(k, '1');
+    api('/site/event', { method: 'POST', body: { name } }).catch(() => {});
+  } catch { /* never break the page */ }
+}
+
 /** Funnel steps: reached checkout / finished an order (once per browser session each). */
 export function trackPageEvents(pathname) {
   try {
     if (new URLSearchParams(window.location.search).get('preview')) return;
     if (CHECKOUT.test(pathname) && !sessionStorage.getItem('souqna.ev.checkout')) {
       sessionStorage.setItem('souqna.ev.checkout', '1');
+      px('InitiateCheckout');
       api('/site/event', { method: 'POST', body: { name: 'checkout_start' } }).catch(() => {});
     }
     if (ORDER_DONE.test(pathname) && !sessionStorage.getItem('souqna.ev.order')) {

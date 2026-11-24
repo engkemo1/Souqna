@@ -357,7 +357,7 @@ export default function StylistChat() {
           {/* Always use our moda.webp avatar with clean ring */}
           <span className="flex h-[40px] w-[40px] shrink-0 items-center justify-center overflow-hidden rounded-full bg-white ring-2 ring-white/90 shadow-xs">
             <img
-              src="/moda/moda.webp"
+              src="/moda/moda-96.webp" width="40" height="40" loading="lazy" decoding="async"
               alt={name}
               className="h-full w-full object-cover object-top"
               style={{ objectPosition: '50% 10%' }}

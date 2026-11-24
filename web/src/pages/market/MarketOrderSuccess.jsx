@@ -5,11 +5,13 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { formatMoney } from '../../lib/format.js';
 import MarketHeader from '../../components/market/MarketHeader.jsx';
 import Button from '../../components/ui/Button.jsx';
+import { pxPurchase } from '../../lib/pixel.js';
 
 export default function MarketOrderSuccess() {
   const { state } = useLocation();
   const { lang } = useI18n();
   const ar = lang === 'ar';
+  useEffect(() => { if (state?.orders?.length) pxPurchase(state.orders.map((o) => o.number).join(','), state.orders); }, [state]);
   if (!state?.orders?.length) return <Navigate to="/" replace />;
   const total = state.orders.reduce((sum, order) => sum + order.total, 0);
   const shipping = state.orders.reduce((sum, order) => sum + (order.shipping || 0), 0);

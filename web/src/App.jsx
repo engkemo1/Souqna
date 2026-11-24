@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate, useLocation, useParams } from 'react-router-dom';
 import { trackSiteVisit, trackPageEvents } from './lib/siteTracker.js';
+import { pxPageView } from './lib/pixel.js';
 import { MotionConfig } from 'framer-motion';
 import { I18nProvider } from './lib/i18n.jsx';
 import { AuthProvider } from './lib/auth.jsx';
@@ -114,6 +115,7 @@ function Root() {
   useEffect(() => {
     trackSiteVisit(pathname);
     trackPageEvents(pathname);
+    pxPageView();
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
   }, [pathname]);
   return (

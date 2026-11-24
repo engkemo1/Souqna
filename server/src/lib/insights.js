@@ -193,7 +193,7 @@ export function logSearch(term, found) {
   } catch { /* logging must never break search */ }
 }
 
-export const EVENTS = ['checkout_start'];
+export const EVENTS = ['checkout_start', 'add_to_cart'];
 export function trackEvent(name) {
   if (!EVENTS.includes(name)) return false;
   db.prepare('INSERT INTO site_events (day, event, n) VALUES (?, ?, 1) ON CONFLICT(day, event) DO UPDATE SET n=n+1').run(cairoDay(), name);
@@ -236,9 +236,11 @@ export function marketInsights(days = 30) {
   const visits = q.val('SELECT COALESCE(SUM(visits),0) FROM site_visits WHERE day BETWEEN ? AND ?', [from, today]);
   const productViews = q.val("SELECT COALESCE(SUM(views),0) FROM store_page_views WHERE page_type='product' AND day BETWEEN ? AND ?", [from, today]);
   const checkouts = q.val("SELECT COALESCE(SUM(n),0) FROM site_events WHERE event='checkout_start' AND day BETWEEN ? AND ?", [from, today]);
+  const carts = q.val("SELECT COALESCE(SUM(n),0) FROM site_events WHERE event='add_to_cart' AND day BETWEEN ? AND ?", [from, today]);
   const steps = [
     { key: 'visits', label: 'دخلوا الموقع', n: visits },
     { key: 'views', label: 'شافوا منتج', n: productViews },
+    { key: 'cart', label: 'حطوا منتج في السلة', n: carts },
     { key: 'checkout', label: 'وصلوا لصفحة الشراء', n: checkouts },
     { key: 'orders', label: 'كملوا الطلب', n: live.length },
   ].map((s, i, a) => { const p = i && a[i - 1].n ? Math.round((s.n / a[i - 1].n) * 100) : null; return { ...s, ofPrev: p != null && p <= 100 ? p : null }; }); // >100% just means the earlier step was not tracked yet

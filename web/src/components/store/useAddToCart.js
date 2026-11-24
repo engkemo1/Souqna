@@ -4,6 +4,8 @@ import { useI18n } from '../../lib/i18n.jsx';
 import { useToast } from '../ui/Toast.jsx';
 import { pickSrc } from '../../lib/image.js';
 import { useNavigate } from 'react-router-dom';
+import { px } from '../../lib/pixel.js';
+import { trackSiteEvent } from '../../lib/siteTracker.js';
 
 /** Fly a thumbnail from `fromEl` to the cart icon — a subtle, fast confirmation. */
 function flyToCart(fromEl, src) {
@@ -50,6 +52,8 @@ export function useAddToCart(slug) {
       size: size && size !== 'One size' ? size : null,
       qty,
     });
+    trackSiteEvent('add_to_cart');
+    px('AddToCart', { content_ids: [String(product.id)], content_type: 'product', content_name: tr(product.name), value: (Number(product.price) || 0) * qty, currency: 'EGP' });
     flyToCart(fromEl, pickSrc(image, 400));
     // One basket for all of Twist: confirm in place and let the shopper keep browsing.
     toast({ title: t('product.added'), description: tr(product.name), image: pickSrc(image, 160), action: { label: t('cart.viewCart'), onClick: () => navigate('/market-cart') } });

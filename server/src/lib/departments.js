@@ -155,4 +155,4 @@ export const deptProfile = (slug) => inheritance().profile(slug);
 export const deptAttrDefs = (slug) => inheritance().attrs(slug);
 
 /** Sections customers may see: not hidden, and either something in them (products / shops) or the admin said "show when empty". */
-export const customerDepartments = () => listDepartments().filter((d) => d.visibility !== 'hidden' && (d.product_count > 0 || d.stores_count > 0 || d.show_empty));
+export const customerDepartments = () => listDepartments().filter((d) => d.visibility !== 'hidden' && (d.product_count > 0 || d.show_empty));

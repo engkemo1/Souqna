@@ -100,8 +100,10 @@ const publicDept = ({ slug, name, sizes, image, images, parent, level, profile_e
 // ?all=1: every non-hidden section (store setup, product forms and labels need sections that have no products yet)
 r.get('/departments', h((req, res) => { cache(res, 60); const list = (req.query.all ? listDepartments().filter((d) => d.visibility !== 'hidden') : customerDepartments()).map(publicDept); res.json({ departments: req.query.attrs ? list : list.map(({ attrs, ...d }) => d) }); })); // attribute definitions are ~75% of the payload and only product pages / the product editor need them: ask with ?attrs=1
 /** One real product picture per section (rolled up to its parents) — the round section pictures on /categories show it until the platform uploads its own. Lingerie never fronts a parent section. */
-r.get('/departments/covers', h((_req, res) => {
-  cache(res, 300);
+/** One real product photo per section (its best-selling, well-photographed, in-stock product), cached 5 min. Sections without a stored picture show it instead of a placeholder. */
+let coversMemo = { at: 0, v: null };
+function sectionCovers() {
+  if (coversMemo.v && Date.now() - coversMemo.at < 300000) return coversMemo.v;
   const rows = q.all(`SELECT p.id, p.department FROM products p JOIN stores s ON s.id=p.store_id
     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL AND (p.track_stock=0 OR p.stock>0)
     ORDER BY ${LINGERIE_LAST}, ${WEAK_PHOTO} ASC, p.featured DESC, p.sold_count DESC, p.id DESC`);
@@ -112,7 +114,12 @@ r.get('/departments/covers', h((_req, res) => {
   const image = new Map(serializeCards(prods).map((c) => [c.id, c.image]));
   const covers = {};
   for (const [sl, id] of pick) if (image.get(id)) covers[sl] = image.get(id);
-  res.json({ covers });
+  coversMemo = { at: Date.now(), v: covers };
+  return covers;
+}
+r.get('/departments/covers', h((_req, res) => {
+  cache(res, 300);
+  res.json({ covers: sectionCovers() });
 }));
 /** One section's landing data: breadcrumb, own details, visible children (with images), SEO. Reads stored rows only — never generates anything. */
 r.get('/departments/:slug', h((req, res) => {
@@ -125,9 +132,10 @@ r.get('/departments/:slug', h((req, res) => {
   if (!visible.has(d.slug)) throw new AppError(404, 'not_found', 'Section not found.');
   const crumbs = []; for (let c = d, i = 0; c && i < 10; c = by.get(c.parent), i++) crumbs.unshift({ slug: publicSlug(c.slug), name: c.name });
   cache(res, 60);
-  res.json({ department: publicDept(d), canonical: publicSlug(d.slug), redirected_from: redirectedFrom, breadcrumb: crumbs, children: all.filter((x) => x.parent === d.slug && visible.has(x.slug)).map(publicDept),
+  const covers = sectionCovers(); const withCover = (x) => { const o = publicDept(x); if (covers[x.slug]) o.cover = covers[x.slug]; return o; }; // a real product photo: shown when a section has no stored picture, and preferred on the small round tiles
+  res.json({ department: withCover(d), canonical: publicSlug(d.slug), redirected_from: redirectedFrom, breadcrumb: crumbs, children: all.filter((x) => x.parent === d.slug && visible.has(x.slug)).map(withCover),
     // the other sections under the same parent, so a leaf page can keep showing its siblings as the filter row
-    siblings: d.parent ? all.filter((x) => x.parent === d.parent && visible.has(x.slug)).map(publicDept) : [] });
+    siblings: d.parent ? all.filter((x) => x.parent === d.parent && visible.has(x.slug)).map(withCover) : [] });
 }));
 
 r.get('/homepage-ads', h((_req, res) => {
@@ -778,6 +786,9 @@ r.get('/look-of-day', h(async (_req, res) => {
   res.json(await lookOfDay());
 }));
 
+/** The marketplace list is read by the home page, the cart and the stores strip: they only need the card fields, not each shop's hours / contacts / theme / customization (that was ~180KB of the response). */
+const MARKET_STORE_KEYS = ['id', 'slug', 'name', 'tagline', 'category', 'departments', 'city', 'logo', 'logoInitials', 'logoColor', 'cover', 'rating', 'ratingCount', 'featured', 'offerBadge', 'shippingFee', 'freeShippingOver', 'productCount', 'sameDay', 'sameDayUntil', 'deliveryMode', 'returnDays'];
+const slimStore = (st) => { const o = {}; for (const k of MARKET_STORE_KEYS) o[k] = st[k]; const c = st.theme?.cssVars?.['--c-primary']; if (c) o.theme = { cssVars: { '--c-primary': c } }; return o; };
 r.get('/marketplace', h((req, res) => {
   const { q: term = '', category = '', sort = 'featured' } = req.query;
   // a shop with no products yet (a test / just-created store) is not shown on the public pages until it has something to sell
@@ -868,7 +879,7 @@ r.get('/marketplace', h((req, res) => {
     return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`${scope} ORDER BY ${LINGERIE_LAST}, p.created_at DESC, p.id DESC LIMIT 40`, sub, BEST_MIN) };
   }).filter(Boolean);
   cache(res, 60);
-  res.json({ stores: rows.map((s) => serializeStore(s)), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });
+  res.json({ stores: rows.map((s) => slimStore(serializeStore(s))), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });
 }));
 
 /* ---------------------------------------------------------- storefront */

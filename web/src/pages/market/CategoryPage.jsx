@@ -6,6 +6,7 @@ import { CategoryImage, CircleRail, deptName } from '../../components/market/Cat
 import ProductCard, { ProductCardSkeleton, ProductGrid } from '../../components/store/ProductCard.jsx';
 import QuickAddSheet from '../../components/store/QuickAddSheet.jsx';
 import Button from '../../components/ui/Button.jsx';
+import SmartImage from '../../components/ui/SmartImage.jsx';
 import { Select } from '../../components/ui/Field.jsx';
 import { EmptyState, ErrorState } from '../../components/ui/States.jsx';
 import { useApi, useDebounced } from '../../lib/hooks.js';
@@ -72,12 +73,13 @@ export default function CategoryPage() {
   // Show sections that are already used by a store even before their first product is published.
   // This keeps valid sections such as "فساتين سواريه" discoverable instead of hiding them
   // just because their products are currently assigned to the parent section.
-  const hasContent = (c) => c.product_count > 0 || c.stores_count > 0 || c.show_empty;
+  const hasContent = (c) => c.product_count > 0 || c.show_empty;
   const own = children.filter(hasContent);
   const sibs = (data?.siblings || []).filter(hasContent);
   const circles = [...(own.length ? own : sibs)].sort((x, y) => x.level - y.level);
   const desc = dept?.description?.[lang] || dept?.description?.ar || '';
   const hasPic = !!(dept?.images?.hero || dept?.images?.card || dept?.image);
+  const total = prods.data?.total || 0;
 
   return (
     <div className="min-h-dvh bg-[#F6F8FB] text-[#03244D]">
@@ -87,30 +89,50 @@ export default function CategoryPage() {
           <div className="container py-10"><div className="h-56 animate-pulse rounded-3xl bg-fg/5" /></div>
         ) : dept && (
           <>
-            <section className={`relative isolate overflow-hidden ${hasPic ? 'bg-[#EAF0F8]' : 'bg-gradient-to-br from-[#03244D] via-[#0B3A73] to-[#C44300]'}`}>
-              {/* a section with no picture gets a clean brand gradient — the small placeholder tile would look blurry stretched over a full-width banner */}
-              {hasPic && <div className="absolute inset-0 -z-10"><CategoryImage dept={dept} priority sizes="100vw" className="opacity-90" /></div>}
+            {hasPic ? (
+            <section className="relative isolate overflow-hidden bg-[#EAF0F8]">
+              <div className="absolute inset-0 -z-10"><CategoryImage dept={dept} priority sizes="100vw" className="opacity-90" /></div>
               <div className="absolute inset-0 -z-10 bg-gradient-to-t from-black/70 via-black/25 to-black/10" />
-              <div className="container flex min-h-[220px] flex-col justify-end py-6 sm:min-h-[300px] sm:py-10">
-                <nav aria-label="breadcrumb" className="mb-3 flex flex-wrap items-center gap-1 text-[13px] text-white/85">
+              <div className="container flex min-h-[150px] flex-col justify-end py-4 sm:min-h-[300px] sm:py-10">
+                <nav aria-label="breadcrumb" className={`mb-3 flex flex-wrap items-center gap-1 text-[13px] text-white/85`}>
                   <Link to="/" className="hover:underline">{lang === 'ar' ? 'الرئيسية' : 'Home'}</Link>
                   {trail.map((c, i) => (
                     <span key={c.slug} className="inline-flex items-center gap-1"><ChevronLeft className="h-3.5 w-3.5 ltr:rotate-180" aria-hidden="true" />
-                      {i === trail.length - 1 ? <span aria-current="page" className="font-bold text-white">{deptName(c, lang)}</span> : <Link to={`/c/${c.slug}`} className="hover:underline">{deptName(c, lang)}</Link>}
+                      {i === trail.length - 1 ? <span aria-current="page" className={`font-bold text-white`}>{deptName(c, lang)}</span> : <Link to={`/c/${c.slug}`} className="hover:underline">{deptName(c, lang)}</Link>}
                     </span>
                   ))}
                 </nav>
-                <h1 className="font-display text-3xl font-black text-white drop-shadow sm:text-5xl">{deptName(dept, lang)}</h1>
+                <h1 className="font-display text-2xl font-black text-white drop-shadow sm:text-5xl">{deptName(dept, lang)}</h1>
                 {desc && <p className="mt-2 max-w-2xl text-sm leading-7 text-white/90 sm:text-base">{desc}</p>}
               </div>
             </section>
+            ) : (
+            <section className="border-b border-line bg-white">
+              <div className="container flex items-center gap-4 py-4 sm:py-8">
+                <div className="min-w-0 flex-1">
+                <nav aria-label="breadcrumb" className={`mb-1.5 flex flex-wrap items-center gap-1 text-[13px] text-muted`}>
+                  <Link to="/" className="hover:underline">{lang === 'ar' ? 'الرئيسية' : 'Home'}</Link>
+                  {trail.map((c, i) => (
+                    <span key={c.slug} className="inline-flex items-center gap-1"><ChevronLeft className="h-3.5 w-3.5 ltr:rotate-180" aria-hidden="true" />
+                      {i === trail.length - 1 ? <span aria-current="page" className={`font-bold text-[#03244D]`}>{deptName(c, lang)}</span> : <Link to={`/c/${c.slug}`} className="hover:underline">{deptName(c, lang)}</Link>}
+                    </span>
+                  ))}
+                </nav>
+                  <h1 className="font-display text-2xl font-black leading-tight text-[#03244D] sm:text-4xl">{deptName(dept, lang)}</h1>
+                  {total > 0 && <p className="mt-1 text-[13px] font-semibold text-muted">{lang === 'ar' ? `${new Intl.NumberFormat('ar-EG').format(total)} منتج` : `${total} items`}</p>}
+                  {desc && <p className="mt-2 line-clamp-2 max-w-2xl text-[13px] leading-6 text-muted sm:line-clamp-none sm:text-base sm:leading-7">{desc}</p>}
+                </div>
+                {dept.cover && <div className="h-[76px] w-[76px] shrink-0 overflow-hidden rounded-2xl bg-[#EAF0F8] ring-1 ring-black/5 sm:h-32 sm:w-32"><SmartImage media={dept.cover} sizes="128px" priority className="h-full w-full" /></div>}
+              </div>
+            </section>
+            )}
 
             <div className="container py-6 sm:py-8">
               {circles.length > 0 && <section aria-label={lang === 'ar' ? 'الأقسام' : 'Sections'} className="mb-6"><CircleRail items={circles} active={selectedChild} onPick={setSelectedChild} label={lang === 'ar' ? 'الأقسام' : 'Sections'} /></section>}
 
               <section aria-label={lang === 'ar' ? 'المنتجات' : 'Products'}>
-                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <div className="relative flex-1 sm:max-w-sm">
+                <div className="mb-4 grid grid-cols-2 gap-2.5 sm:flex sm:flex-row sm:items-center sm:gap-3">
+                  <div className="relative col-span-2 flex-1 sm:max-w-sm">
                     <Search className="pointer-events-none absolute start-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-muted" />
                     <input type="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder={lang === 'ar' ? `ابحث في ${deptName(dept, lang)}` : `Search in ${deptName(dept, lang)}`} aria-label={t('search.title')} className="h-11 w-full rounded-xl border border-line-strong bg-white ps-10 pe-3 text-base outline-none transition focus:border-brand focus:ring-2 focus:ring-brand/10" />
                   </div>
