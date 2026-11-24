@@ -14,6 +14,7 @@ import { matchFaq, faqAnswer } from './faq.js';
 import { isInfoQuestion, searchAdvice, adviceByPhrase, HONEST_FALLBACK } from './knowledgeQa.js';
 const STRONG_INFO = /(^| )(هل|ازاي|ليه|لية|يعني ايه|ايه الفرق|الفرق بين|الفرق ما بين|معني|معنى|بيتكرمش|بتتكرمش|بيصغر|بتصغر|بيكبر|بيبهت|بتبهت|بيتنفس|بيحك|بيسخن|بيشف|بيتوسع|بيدوم|بتدوم|بيفضل|هيصغر|هيكبر|هيبهت|هيتكرمش|بيتغسل|بتتغسل|بيتكوي|بتتكوي|يتغسل|تتغسل|بتوسع|بيوسع|بتضيق|بيضيق|بتتمدد|بيتمدد|بيصفر|بتصفر|خامه|خامة)( |$)/;
 import { keywordSearch } from './search.js';
+import { beautyMatch } from './beauty.js';
 import { occasionOf, isGenericAsk, isOutfitAsk, INTIMATE_KEYS, explicitIntimate, rejectedFamilies, familyOfKey, productTypeChoices, productTypeQuestion, SMART_CASUAL_RE, occasionFit, APPAREL_FAMILIES } from './intent.js';
 import { offersAnswer, careForShown } from './offers.js';
 import { careFallback } from './parse.js';
@@ -290,6 +291,23 @@ async function runModaCore(messages, opts = {}) {
   const dow = cairoParts(now).dow;
   const seed = `${text}|${session?.turn || 0}`;
   let parsed = parseMessage(text, { profile, imageText, now, cairoDow: dow });
+  const searchReply = (hits, sayText = null) => {
+    const items = hits.map((p) => ({ id: p.id, key: p.key, label: String(K.items.get(p.key)?.ar || '').replace(/\s*\(.*?\)\s*/g, '').split(' / ')[0].trim() || (p.cat_text || '').split(' ')[0] || p.dept_name || 'منتج', name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys || [] }));
+    return { state: 'full', intent: 'shop', say: sayText || (hits.length === 1 ? 'لقيتلك ده في المحلات:' : 'دي اللي لقيتها في المحلات ليك:'), tips: [], styleTips: [], questions: [], missing: [], relaxed: [], parsed,
+      blocks: { tabs: [{ id: 'search', label: 'النتايج', look: null, items, subtotal: items.reduce((t, i) => t + (Number(i.price) || 0), 0), missing: [] }], total: 0, budget: null, over: 0, palette: [], couple: false },
+      session: { ...(session || {}), turn: (session?.turn || 0) + 1, parsed: session?.parsed || null, pending: false, pendingQuestion: null, shown: [...new Set([...(session?.shown || []), ...hits.map((h) => h.id)])] } };
+  };
+  // ---------- تجميل وعناية (بشرة، مكياج، شعر، جسم، عطور) ----------
+  // بتتجاوب من أقسام التجميل الحقيقية؛ من غيرها كانت تويلا بتقول «مش عارفاها كقطعة لبس» أو بتسأل «لأنهي مناسبة؟»
+  if (!(answers && Object.keys(answers).length) && !parsed.garments.length && !parsed.followup && !session?.pending) {
+    const bz = beautyMatch(text, ensureEnriched(products, K), { limit: 8 });
+    if (bz) {
+      if (bz.hits.length) return searchReply(bz.hits, bz.say);
+      const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang: parsed.lang === 'en' ? 'en' : 'ar', profile, assistantName });
+      return { ...res0, say: bz.say, tips: [], styleTips: [], questions: [], blocks: null, intent: 'chat', session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
+    }
+  }
+
   // المستلم غير المتكلم (ست بتشتري لجوزها): متابعة من غير تحديد جمهور جديد لازم تفضل على المستلم مش ترجع للمتكلم
   { const sp0 = session?.parsed; const spkAud = sp0?.genderHint === 'female' ? 'women' : sp0?.genderHint === 'male' ? 'men' : null;
     if (sp0?.persons?.length === 1 && spkAud && sp0.persons[0] !== spkAud && !sp0.flags?.personFromSpeaker && !parsed.persons?.length && !parsed.genderHint && parsed.garments.length) parsed = { ...parsed, persons: sp0.persons, genderHint: sp0.genderHint }; }
@@ -374,12 +392,6 @@ async function runModaCore(messages, opts = {}) {
     } else parsed = { ...parsed, ownedPieces: parsed.garments.map((g) => ({ key: g.key, color: g.color || null, material: g.material || null, text: g.text })), garments: [], fullLook: true };
   }
 
-  const searchReply = (hits, sayText = null) => {
-    const items = hits.map((p) => ({ id: p.id, key: p.key, label: String(K.items.get(p.key)?.ar || '').replace(/\s*\(.*?\)\s*/g, '').split(' / ')[0].trim() || (p.cat_text || '').split(' ')[0] || 'منتج', name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys || [] }));
-    return { state: 'full', intent: 'shop', say: sayText || (hits.length === 1 ? 'لقيتلك ده في المحلات:' : 'دي اللي لقيتها في المحلات ليك:'), tips: [], styleTips: [], questions: [], missing: [], relaxed: [], parsed,
-      blocks: { tabs: [{ id: 'search', label: 'النتايج', look: null, items, subtotal: items.reduce((t, i) => t + (Number(i.price) || 0), 0), missing: [] }], total: 0, budget: null, over: 0, palette: [], couple: false },
-      session: { ...(session || {}), turn: (session?.turn || 0) + 1, parsed: session?.parsed || null, pending: false, pendingQuestion: null, shown: [...new Set([...(session?.shown || []), ...hits.map((h) => h.id)])] } };
-  };
   // ---------- ريست ----------
   if (parsed.followup === 'reset') {
     const res = respond({ state: 'chat', intent: 'greeting' }, { seed, lang, profile, assistantName });
