@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Package, AlertTriangle, CheckCircle2, Clock, Store as StoreIcon, Camera, Sparkles, Pencil, Trash2,
-  ExternalLink, MessageCircle, Eye, EyeOff, Star, Check, X, RefreshCw, ShieldAlert, Tags, Filter,
+  ExternalLink, MessageCircle, Eye, EyeOff, Star, Check, X, RefreshCw, ShieldAlert, Tags, Filter, ImagePlus, Replace,
 } from 'lucide-react';
 import { PageHeader, FilterTabs, SearchInput, Pagination, KpiCard } from '../../components/dash/Kit.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -16,7 +16,7 @@ import { ErrorState, EmptyState } from '../../components/ui/States.jsx';
 import { useToast } from '../../components/ui/Toast.jsx';
 import { useDebounced } from '../../lib/hooks.js';
 import { cx } from '../../components/ui/cx.js';
-import { adminApi, useAdminApi, fmtMoney, fmtNum, fmtDateTime, useAdminDepartments, waLink } from './adminApi.js';
+import { adminApi, adminUploadMany, useAdminApi, fmtMoney, fmtNum, fmtDateTime, useAdminDepartments, waLink } from './adminApi.js';
 
 function fmtRelativeTime(sqlDate) {
   if (!sqlDate) return '';
@@ -620,6 +620,22 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
     toast({ title: '✨ تم ملء وتصليح البيانات الناقصة تلقائياً — راجعها واضغط حفظ للتأكيد' });
   };
 
+  const [photoStyle, setPhotoStyle] = useState('asis');
+  const uploadPhotos = async (fileList, replaceId = 0) => {
+    const files = [...(fileList || [])].filter((f) => /^image\//.test(f.type));
+    if (!p || !files.length) return;
+    setBusy(replaceId ? `replace-${replaceId}` : 'upload');
+    try {
+      const r = await adminUploadMany(`/products/${p.id}/photos`, files, { style: photoStyle, ...(replaceId ? { replace: replaceId } : {}) });
+      toast({ title: replaceId ? 'اتبدّلت الصورة ✅' : `اتضافت ${fmtNum(r.added || files.length)} صورة ✅` });
+      reload();
+      onSaved(r.product);
+    } catch (e) {
+      toast({ tone: 'error', title: e.message || 'تعذر رفع الصورة' });
+    }
+    setBusy('');
+  };
+
   const handleEnhancePhotos = async () => {
     if (!p) return;
     setBusy('enhance');
@@ -846,6 +862,21 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
                 <p className="text-xs text-muted">تقدر تحذف أي صورة وحشة أو ملهاش علاقة بالمنتج، أو تغيّر الصورة الرئيسية أو تحسّن جودتها.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={photoStyle}
+                  onChange={(e) => setPhotoStyle(e.target.value)}
+                  aria-label="شكل الصورة بعد الرفع"
+                  className="h-8 rounded-lg border border-line bg-surface px-2 text-xs"
+                >
+                  <option value="asis">كما هي (من غير تعديل)</option>
+                  <option value="white">خلفية بيضاء</option>
+                  <option value="cream">خلفية كريمي</option>
+                </select>
+                <label className={cx('inline-flex cursor-pointer items-center gap-1 rounded-xl border border-line-strong bg-surface px-2.5 py-1.5 text-xs font-bold hover:bg-fg/[0.06]', busy === 'upload' && 'pointer-events-none opacity-60')}>
+                  <ImagePlus className="h-3.5 w-3.5" />
+                  {busy === 'upload' ? 'جارٍ الرفع…' : 'إضافة صورة'}
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="sr-only" onChange={(e) => { uploadPhotos(e.target.files); e.target.value = ''; }} />
+                </label>
                 {visibleMedia.some((m) => m.quality == null || m.quality < 75) && (
                   <button
                     type="button"
@@ -868,7 +899,7 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
 
             {!visibleMedia.length ? (
               <div className="rounded-xl border border-dashed border-red-300 bg-red-50 p-6 text-center text-sm text-red-900">
-                المنتج بدون صور حالياً! يمكنك رفع صور له من <Link to={`/admin/manage/${p.store.slug}/products/${p.id}`} className="font-bold underline">المحرر الكامل</Link>.
+                المنتج بدون صور حالياً! اضغط «إضافة صورة» فوق، أو ارفع من <Link to={`/admin/manage/${p.store.slug}/products/${p.id}`} className="font-bold underline">المحرر الكامل</Link>.
               </div>
             ) : (
               <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -909,6 +940,10 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
                         ) : <span className="font-semibold text-muted">صورة الغلاف</span>}
 
                         <div className="flex items-center gap-1">
+                          <label title="استبدال الصورة دي بصورة جديدة" className={cx('cursor-pointer rounded-md px-1.5 py-1 text-muted hover:bg-fg/[0.06] hover:text-fg', busy === `replace-${m.id}` && 'pointer-events-none opacity-50')}>
+                            <Replace className="h-3.5 w-3.5" />
+                            <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(e) => { uploadPhotos(e.target.files, m.id); e.target.value = ''; }} />
+                          </label>
                           {m.quality != null && (
                             <button
                               type="button"
@@ -1156,6 +1191,7 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
 }
 
 export default function AdminProducts() {
+  const navigate = useNavigate();
   const toast = useToast();
   const depts = useAdminDepartments();
   const [params, setParams] = useSearchParams();
@@ -1365,6 +1401,21 @@ export default function AdminProducts() {
             <Button size="sm" variant="outline" icon={RefreshCw} onClick={reload}>
               تحديث
             </Button>
+            {store ? (
+              <Button size="sm" icon={Package} onClick={() => navigate(`/admin/manage/${store}/products/new`)}>
+                إضافة منتج لـ «{selectedStoreObj?.name_ar || store}»
+              </Button>
+            ) : (
+              <select
+                value=""
+                onChange={(e) => { if (e.target.value) navigate(`/admin/manage/${e.target.value}/products/new`); }}
+                aria-label="إضافة منتج لمحل"
+                className="h-9 rounded-xl border border-line-strong bg-fg px-3 text-xs font-bold text-canvas"
+              >
+                <option value="">＋ إضافة منتج لمحل…</option>
+                {stores.map((st) => <option key={st.slug} value={st.slug}>{st.name_ar}</option>)}
+              </select>
+            )}
           </div>
         }
       />

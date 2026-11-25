@@ -441,6 +441,24 @@ export const json = (s, fallback) => {
       console.error('[db] department tree migration failed (will retry on next start):', e.message);
     }
   }
+  // One catch-all «أخرى» sub-section under every main section, so a product that fits no sub-section still has a valid, sensible place. Runs once, only adds rows.
+  if (!db.prepare("SELECT 1 FROM app_settings WHERE key='dept_other_v1'").get()) {
+    try {
+      db.exec('BEGIN');
+      const roots = db.prepare("SELECT slug, name_ar FROM departments WHERE (parent_slug IS NULL OR parent_slug='') AND active=1 AND EXISTS (SELECT 1 FROM departments c WHERE c.parent_slug=departments.slug)").all();
+      for (const r of roots) {
+        const slug = `${r.slug.slice(0, 24)}_other`;
+        if (db.prepare('SELECT 1 FROM departments WHERE slug=?').get(slug)) continue;
+        const sort = (db.prepare('SELECT COALESCE(MAX(sort),0)+1 AS n FROM departments WHERE parent_slug=?').get(r.slug) || {}).n || 999;
+        db.prepare("INSERT INTO departments (slug, name_ar, name_en, sizes_json, sort, active, parent_slug) VALUES (?,?,?,?,?,1,?)").run(slug, 'أخرى', 'Other', '[]', sort, r.slug);
+      }
+      db.prepare("INSERT INTO app_settings (key, value) VALUES ('dept_other_v1', '1')").run();
+      db.exec('COMMIT');
+    } catch (e) {
+      try { db.exec('ROLLBACK'); } catch { /* ignore */ }
+      console.error('[db] «other» sections migration failed (will retry on next start):', e.message);
+    }
+  }
   // Catalog v3 (ADDITIVE schema only; nothing here moves or deletes data). The tree/classification migration is a separate, approved
   // step: `npm run catalog -w server -- plan|test|apply` (see src/lib/catalog-migration.js).
   const dc3 = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);

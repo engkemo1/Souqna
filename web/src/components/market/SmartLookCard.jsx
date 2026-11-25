@@ -40,44 +40,43 @@ export default function SmartLookCard({ productId, fallback = null }) {
   const nextAdd = () => { if (!quick) return; if (quick.i + 1 < quick.queue.length) setQuick({ ...quick, i: quick.i + 1 }); else setQuick(null); };
 
   return (
-    <div data-testid="smart-look" className="mt-6 rounded-2xl border border-brand/20 bg-gradient-to-br from-brand/5 via-canvas to-brand/10 p-4 shadow-sm">
-      <div className="flex items-start gap-3">
-        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-white shadow-sm"><Sparkles className="h-5 w-5" /></div>
-        <div className="min-w-0 flex-1">
-          <h4 className="font-display text-sm font-bold text-fg">{ar ? 'مودة نسّقتلك طقم يكمّل القطعة دي' : 'Moda styled a full look around this piece'}</h4>
-          <p className="text-xs text-muted">{ar ? 'اقتراح اختياري — تقدر تشتري القطعة دي لوحدها، أو تضيف الطقم (وتشيل أي قطعة مش عاجباك).' : 'Optional — buy this piece alone, or add the look (and remove any piece you do not want).'}</p>
-        </div>
+    <section data-testid="smart-look" className="mt-4 rounded-2xl border border-line bg-elevated p-3 sm:p-3.5">
+      <div className="flex items-center gap-2">
+        <Sparkles className="h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+        <h4 className="min-w-0 flex-1 truncate font-display text-sm font-bold text-fg">{ar ? 'كمّل اللوك' : 'Complete the look'} <span className="font-normal text-muted">· {ar ? `${pieces.length} قطع تليق معاها` : `${pieces.length} pieces that go with it`}</span></h4>
         <button type="button" onClick={() => setHidden(true)} aria-label={ar ? 'إخفاء الاقتراح' : 'Hide suggestion'} className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted transition hover:bg-secondary hover:text-fg"><X className="h-4 w-4" /></button>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {pieces.map(({ label, p, i, n }) => {
+      {/* Pinterest-style board: the pieces tiled like an outfit flat-lay — first piece large, the rest stacked beside it */}
+      <div className={cx('mt-2.5 grid h-[12.5rem] gap-1.5 overflow-hidden rounded-2xl bg-secondary/60 p-1.5 sm:h-[15rem]', pieces.length === 1 ? 'grid-cols-1' : pieces.length === 2 ? 'grid-cols-2' : 'grid-cols-[1.2fr_1fr]')} style={pieces.length >= 3 ? { gridTemplateRows: `repeat(${pieces.length - 1}, minmax(0, 1fr))` } : undefined}>
+        {pieces.map(({ label, p, i, n }, k) => {
           const off = removed.has(p.id);
           return (
-            <div key={p.id} className={cx('min-w-0 rounded-2xl border bg-elevated p-2 transition', off ? 'border-dashed border-line opacity-50' : 'border-line')}>
-              <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="block">
-                <SmartImage media={p.image} ratio="4 / 5" className="overflow-hidden rounded-xl" sizes="(min-width:640px) 30vw, 44vw" />
-                <p className="mt-2 text-[11px] font-semibold text-muted">{label}</p>
-                <p className="line-clamp-2 min-h-[2.6em] text-[12px] font-semibold leading-snug">{tr(p.name)}</p>
-                <p className="mt-1 text-sm font-bold text-sale">{formatMoney(p.price, lang)}</p>
-                <p className="truncate text-[11px] text-muted">{tr(p.store.name)}</p>
-              </Link>
-              <button type="button" onClick={() => toggle(p.id)} className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-full border border-line-strong px-2 py-1.5 text-[11.5px] font-bold transition hover:border-fg">
-                {off ? <RotateCcw className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}{off ? (ar ? 'رجّعها' : 'Put back') : (ar ? 'شيلها من الطقم' : 'Remove')}
+            <div key={p.id} className={cx('group relative min-h-0 overflow-hidden rounded-xl bg-white shadow-sm transition', pieces.length >= 3 && k === 0 && 'row-span-full', off && 'opacity-40')}>
+              <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="block h-full w-full"><SmartImage media={p.image} alt={tr(p.name)} className="h-full w-full" sizes="(min-width:640px) 28vw, 56vw" /></Link>
+              <span className="pointer-events-none absolute start-1.5 top-1.5 max-w-[70%] truncate rounded-full bg-white/95 px-2 py-0.5 text-[10.5px] font-bold shadow-sm">{label}</span>
+              <button type="button" onClick={() => toggle(p.id)} aria-label={off ? (ar ? 'رجّعها' : 'Put back') : (ar ? 'شيلها من الطقم' : 'Remove')} className="absolute end-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-white/95 text-fg shadow-sm transition hover:bg-white">
+                {off ? <RotateCcw className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
               </button>
-              {n > 1 && <button type="button" onClick={() => swap(i, n)} className="mt-1.5 inline-flex w-full items-center justify-center gap-1 rounded-full bg-secondary px-2 py-1.5 text-[11.5px] font-bold text-fg transition hover:bg-line">{ar ? `غيّرها (${n} اختيارات)` : `Swap (${n} options)`}</button>}
+              <div className="pointer-events-none absolute inset-x-1.5 bottom-1.5 flex items-end justify-between gap-1">
+                <span className="rounded-full bg-fg/80 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur">{formatMoney(p.price, lang)}</span>
+                {n > 1 && <button type="button" onClick={() => swap(i, n)} className="pointer-events-auto rounded-full bg-white/95 px-2 py-0.5 text-[10.5px] font-bold text-fg shadow-sm transition hover:bg-white">{ar ? 'غيّرها' : 'Swap'}</button>}
+              </div>
             </div>
           );
         })}
       </div>
 
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-extrabold">{ar ? 'إجمالي القطع المقترحة: ' : 'Suggested pieces total: '}{formatMoney(total, lang)}</p>
-        <button type="button" disabled={!kept.length} onClick={() => setQuick({ queue: kept.map((x) => x.p), i: 0 })} className="inline-flex h-10 items-center justify-center gap-1.5 rounded-full bg-btn px-4 text-[13px] font-bold text-on-btn disabled:opacity-40">
-          <ShoppingBag className="h-4 w-4" />{ar ? `أضف ${kept.length} قطع لسلة Twist` : `Add ${kept.length} to Twist basket`}
+      <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-line pt-2.5">
+        <div className="min-w-0">
+          <p className="text-[11px] text-muted">{ar ? `إجمالي ${kept.length} قطع` : `Total · ${kept.length} pieces`}</p>
+          <p className="text-base font-extrabold leading-tight">{formatMoney(total, lang)}</p>
+        </div>
+        <button type="button" disabled={!kept.length} onClick={() => setQuick({ queue: kept.map((x) => x.p), i: 0 })} className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-btn px-4 text-[13px] font-bold text-on-btn disabled:opacity-40">
+          <ShoppingBag className="h-4 w-4" />{ar ? 'أضف الطقم للسلة' : 'Add look to basket'}
         </button>
       </div>
       {quick && <QuickAddSheet slug={quick.queue[quick.i].store.slug} product={quick.queue[quick.i]} marketplace step={quick.queue.length > 1 ? `${quick.i + 1}/${quick.queue.length}` : ''} onAdded={nextAdd} onClose={() => setQuick(null)} />}
-    </div>
+    </section>
   );
 }

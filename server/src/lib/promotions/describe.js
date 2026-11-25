@@ -63,7 +63,7 @@ export function describePromotion(def) {
 export function hintText(h, def) {
   const eff = effectsOf(def)[0];
   if (h.kind === 'add_amount') return { ar: `أنت على بعد ${h.amount} جنيه من الحصول على الخصم.`, en: `You are ${h.amount} EGP away from the offer.` };
-  const more = h.qty === 1 ? ['قطعة أخرى', 'one more item'] : [`${pieces(h.qty)} إضافية`, `${h.qty} more items`];
+  const more = h.qty === 1 ? ['قطعة أخرى', 'one more item'] : [h.qty === 2 ? 'قطعتين إضافيتين' : `${pieces(h.qty)} إضافية`, `${h.qty} more items`];
   if (eff?.kind === 'buy_x_get_y') {
     const free = eff.reward_mode === 'percent' && eff.reward_value === 100;
     return { ar: `أضف ${more[0]} ${free ? 'واحصل على الهدية مجانًا' : 'واحصل على الخصم'}.`, en: `Add ${more[1]} ${free ? 'to get your free item' : 'to unlock the discount'}.` };

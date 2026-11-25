@@ -314,7 +314,8 @@ function VariantsEditor({ f, set, sizeKind, typeChosen, mode = 'general', hasCol
   const PERFUME_SIZES = ['30 مل', '50 مل', '100 مل', '10 مل', '20 مل', '75 مل', '125 مل', '150 مل', '200 مل']; // 30/50/100 are the common ones, so they come first
   const SKIN_SIZES = ['30 مل', '50 مل', '100 مل']; // skincare: common sizes + «حجم تاني»
   const BEAUTY_SIZES = []; // makeup: shade is the real choice; the pack is typed freely (علبة 50 جم، تيوب 30 مل، 3 قطع)
-  const kindSizes = (sizeKind?.sizes?.length ? sizeKind.sizes : (mode === 'perfume' ? PERFUME_SIZES : mode === 'skincare' ? SKIN_SIZES : mode === 'beauty' ? BEAUTY_SIZES : [])) || [];
+  const baseSizes = (sizeKind?.sizes?.length ? sizeKind.sizes : (mode === 'perfume' ? PERFUME_SIZES : mode === 'skincare' ? SKIN_SIZES : mode === 'beauty' ? BEAUTY_SIZES : mode === 'general' && typeChosen && !sizeKind ? ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL'] : [])) || [];
+  const kindSizes = baseSizes.length && !['perfume', 'skincare', 'beauty'].includes(mode) && !baseSizes.includes('Free size') && !/ml|مل|جم/.test(baseSizes.join(' ')) ? [...baseSizes, 'Free size'] : baseSizes; // «Free size» is always one tap away for clothing / accessories
   // "does it come in colours?": off by default for perfumes and accessories; turning it off clears the colours
   const extra = f.sizes.filter((s) => !kindSizes.includes(s));
   const noSizes = typeChosen && mode !== 'beauty' && ((sizeKind && kindSizes.length === 0) || (mode === 'accessories' && kindSizes.length === 0));
@@ -541,7 +542,8 @@ export default function ProductEditor() {
   };
   const types = useMemo(() => (tree ? tree.families.flatMap((fm) => fm.types.map((ty) => ({ ...ty, family: fm }))) : []), [tree]);
   const type = types.find((ty) => ty.key === f.moda_key) || null;
-  const deptSizes = (pubDepts?.departments || []).find((d) => d.slug === f.department)?.sizes || [];
+  // sizes come from the chosen section, or the nearest main section above it that has some (sub-sections added later often have none of their own)
+  const deptSizes = (() => { const all = pubDepts?.departments || []; for (let d = all.find((x) => x.slug === f.department), i = 0; d && i < 6; d = all.find((x) => x.slug === d.parent), i++) if (d.sizes?.length) return d.sizes; return []; })();
   const sizeKind = tree && type ? tree.sizeKinds[type.sizeKind[f.audience || 'unisex']] : (deptSizes.length ? { ar: '', sizes: deptSizes } : null);
   // perfumes have no colours (they come in volumes); accessories rarely have sizes. Detected from the chosen type / department.
   const variantMode = (() => {
@@ -602,7 +604,7 @@ export default function ProductEditor() {
       if (!f.colors.length && a.colors?.length) patch.colors = a.colors.map((n) => PRESET_COLORS.find((p) => p[2] === n)).filter(Boolean).map(([hex, ar, en]) => ({ hex, name_ar: ar, name_en: en }));
       if (!f.audience && a.department) { const m = { men: 'men', women: 'women', kids: 'kids' }[a.department]; if (m) patch.audience = m; }
       set(patch); toast({ title: t('editor.aiFilled') });
-    } catch (err) { toast({ tone: 'error', title: errorMessage(t, err) }); }
+    } catch (err) { if (!Array.isArray(mediaArg)) toast({ tone: 'error', title: errorMessage(t, err) }); } // the automatic run right after the first photo stays quiet; only the owner's own button press shows an error
     setAiBusy(false);
   };
 

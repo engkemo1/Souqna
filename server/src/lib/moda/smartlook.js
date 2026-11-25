@@ -39,6 +39,10 @@ export function acceptSmartLook(result, { anchorId = null, anchorKey = null, anc
   const ids = [...new Set(items.map((i) => i.id))];
   if (ids.length < minPieces || ids.length !== items.length) return { ok: false, reason: 'too_few_or_duplicate' };
   if (anchorId != null && ids.includes(anchorId)) return { ok: false, reason: 'contains_anchor' };
+  // the same kind of piece twice (two trousers, two pairs of shoes), or another piece of the anchor's own type, is not an outfit
+  const keys0 = items.map((i) => i.key).filter(Boolean);
+  if (new Set(keys0).size !== keys0.length) return { ok: false, reason: 'duplicate_type' };
+  if (anchorKey && keys0.includes(anchorKey)) return { ok: false, reason: 'same_type_as_anchor' };
   // طبقات: هودي/تيشيرت/توب رياضي مبيتلبسش تحت بليزر/بدلة/جيليه
   if (anchorKey && CASUAL_TOPS.has(anchorKey) && typeof keyOf === 'function' && ids.some((id) => TAILORED.has(keyOf(id)))) return { ok: false, reason: 'layering' };
   // قطعة رسمية (قميص مانشت مزدوجة): لازم الطقم يبقى فيه بدلة، ومفيش جينز/هودي/سنيكرز/رياضي

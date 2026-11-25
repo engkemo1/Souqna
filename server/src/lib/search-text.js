@@ -109,7 +109,7 @@ export const GROUPS = [
   ['ايشادو', 'ظلال', 'eyeshadow', 'shadow', 'باليت', 'palette'],
   ['بودره', 'باودر', 'powder', 'بودرات'],
   ['بلاشر', 'blush', 'blusher', 'احمر خدود'],
-  ['شعر', 'hair', 'هير', 'شعري'],
+  ['شعر', 'hair', 'هير', 'شعري', 'شامبو', 'shampoo', 'شامبوهات'], // شامبو بتعرض منتجات الشعر لو مفيش منتج اسمه شامبو
   ['تفتيح', 'تفتح', 'تبييض', 'brightening', 'brighten', 'whitening', 'glow'],
   ['سكن كير', 'سكين كير', 'skincare', 'skin care', 'عنايه بالبشره'],
   ['سيروم', 'serum', 'امبول', 'ampoule', 'بوستر', 'booster'],
@@ -119,7 +119,6 @@ export const GROUPS = [
   ['غسول', 'cleanser', 'cleansing', 'فيس واش', 'face wash'],
   ['تونر', 'toner'],
   ['واقي شمس', 'سن سكرين', 'sunscreen', 'sunblock', 'spf'],
-  ['شامبو', 'shampoo', 'شامبوهات'],
   ['بلسم', 'conditioner', 'كونديشنر'],
   ['سكراب', 'scrub', 'مقشر', 'exfoliator'],
   ['ميست', 'mist', 'بودي ميست', 'بخاخ'],

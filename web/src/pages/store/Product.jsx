@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw, Banknote, PackageX, Ban, Sparkles, Store as StoreIcon } from 'lucide-react';
+import { Heart, Share2, Check, ShoppingBag, ChevronDown, Star, Truck, RefreshCcw, Banknote, PackageX, Ban, Store as StoreIcon } from 'lucide-react';
 import ReserveSheet from '../../components/store/ReserveSheet.jsx';
 import { useStore, sp } from '../../lib/store.jsx';
 import { useApi } from '../../lib/hooks.js';
@@ -34,6 +34,7 @@ import { useToast } from '../../components/ui/Toast.jsx';
 import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { rememberViewed } from '../../lib/recentlyViewed.js';
+import SmartLookCard from '../../components/market/SmartLookCard.jsx';
 
 function Accordion({ title, children, defaultOpen }) {
   const [open, setOpen] = useState(!!defaultOpen);
@@ -298,32 +299,8 @@ export default function Product() {
               : exchangeLabel(t, store) && <li className="flex items-center gap-3"><RefreshCcw className="h-[18px] w-[18px] shrink-0" strokeWidth={1.75} />{exchangeLabel(t, store)}</li>}
           </ul>
 
-                    {/* Complete the Look with Twyla */}
-          <div className="mt-6 rounded-2xl border border-brand/20 bg-gradient-to-br from-brand/5 via-canvas to-brand/10 p-4 shadow-sm">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-white shadow-sm">
-                  <Sparkles className="h-5 w-5" />
-                </div>
-                <div>
-                  <h4 className="font-display text-sm font-bold text-fg">
-                    {lang === 'ar' ? 'نسّق طقم كامل مع القطعة دي' : 'Complete the look with this item'}
-                  </h4>
-                  <p className="text-xs text-muted">
-                    {lang === 'ar' ? 'تويلا ترشحلك قطع تليق معاها بالظبط من محلات بنها' : 'Twyla finds matching pieces from Banha stores'}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => window.dispatchEvent(new CustomEvent('moda:open', { detail: { ask: lang === 'ar' ? `معايا ${tr(p.name)} نسقلي عليه باقي الطقم من محلات بنها` : `Style an outfit with ${tr(p.name)}` } }))}
-                className="inline-flex h-9 items-center justify-center gap-1.5 rounded-xl bg-brand px-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-brand/90"
-              >
-                <Sparkles className="h-3.5 w-3.5" />
-                <span>{lang === 'ar' ? 'كمّل اللوك ✨' : 'Complete Look ✨'}</span>
-              </button>
-            </div>
-          </div>
+          {/* Complete the look: a ready outfit only when the engine finds a complete one; nothing is shown otherwise (no chat on product pages) */}
+          <SmartLookCard productId={p.id} />
 
           <div className="mt-6 border-t border-line">
             <Accordion title={t('product.description')} defaultOpen><p dir="auto" className="whitespace-pre-line text-start">{tr(p.description)}</p></Accordion>

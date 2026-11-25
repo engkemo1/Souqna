@@ -140,7 +140,7 @@ function AnalysisSteps({ t }) {
   );
 }
 
-export default function StylistChat() {
+export default function StylistChat({ hideLauncher = false }) {
   const { t, tr, lang, assistantName: name } = useI18n();
   const { data: promptCfg } = useApi('/stylist/prompts'); // الرسائل المثال بتتظبط من الأدمن
   const { buyer } = useBuyer();
@@ -346,7 +346,7 @@ export default function StylistChat() {
   const chips = promptCfg ? promptCfg.chips.map((c) => (lang === 'ar' ? c.ar : c.en)) : [t('stylist.chip1'), t('stylist.chip2'), t('stylist.chip3'), t('stylist.chip4')];
   return (
     <>
-      {!open && (
+      {!open && !hideLauncher && (
         <button
           type="button"
           onClick={() => setOpen(true)}

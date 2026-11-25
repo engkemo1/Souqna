@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { encodeDepartments, decodeDepartments } from '@souqna/shared';
 import { q, tx, update, json } from '../db/index.js';
@@ -738,6 +739,55 @@ r.post('/products/:id/enhance-photos', h(async (req, res) => {
   const mod = analyzeProduct(fullRow, ctx);
   const mediaLookup = mediaMap(fullRow.primary_media_id ? [fullRow.primary_media_id] : []);
   res.json({ enhanced, product: serializeAdminProductRow(fullRow, ctx, mod, mediaLookup) });
+}));
+
+const photoUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 12 * 1024 * 1024, files: 6 } });
+
+/**
+ * POST /api/admin/products/:id/photos  (multipart: files[], optional replace=<mediaId>, style=asis|white|cream|original)
+ * Adds photos to a product, or swaps one photo for a new one (same place, same primary flag), straight from the admin drawer.
+ * Default style is "asis": the admin already prepared the picture, so it is kept as uploaded.
+ */
+r.post('/products/:id/photos', photoUpload.array('files', 6), h(async (req, res) => {
+  const pid = Number(req.params.id);
+  const p = q.get('SELECT id, store_id FROM products WHERE id = ?', [pid]);
+  if (!p) throw new AppError(404, 'not_found', 'المنتج غير موجود.');
+  const files = req.files || [];
+  if (!files.length) throw badRequest('no_file', 'اختار صورة واحدة على الأقل.');
+  const style = ['asis', 'white', 'cream', 'original'].includes(req.body?.style) ? req.body.style : 'asis';
+  const replaceId = Number(req.body?.replace) || 0;
+  const oldRow = replaceId ? q.get('SELECT * FROM product_media WHERE product_id = ? AND media_id = ?', [pid, replaceId]) : null;
+  if (replaceId && !oldRow) throw new AppError(404, 'not_found', 'الصورة اللي عاوز تبدّلها مش موجودة على المنتج.');
+
+  const made = [];
+  for (const f of files) made.push(await processImage(f.buffer, { storeId: p.store_id, kind: 'product', style, ownerSees: true }));
+
+  const orphan = [];
+  tx(() => {
+    let list = made.slice();
+    if (oldRow) {
+      const first = list.shift();
+      q.run('UPDATE product_media SET media_id = ? WHERE product_id = ? AND media_id = ?', [first.id, pid, replaceId]);
+      q.run('UPDATE media SET attached = 1 WHERE id = ?', [first.id]);
+      if (!q.val('SELECT COUNT(*) FROM product_media WHERE media_id = ?', [replaceId])) { const m = getMedia(replaceId); if (m) orphan.push(m); }
+    }
+    let pos = (q.val('SELECT COALESCE(MAX(position), -1) FROM product_media WHERE product_id = ?', [pid]) ?? -1) + 1;
+    const hadAny = q.val('SELECT COUNT(*) FROM product_media WHERE product_id = ?', [pid]) > 0;
+    list.forEach((m, i) => {
+      q.run('INSERT INTO product_media(product_id, media_id, position, is_primary) VALUES (?,?,?,?)', [pid, m.id, pos++, !hadAny && i === 0 ? 1 : 0]);
+      q.run('UPDATE media SET attached = 1 WHERE id = ?', [m.id]);
+    });
+    q.run('UPDATE products SET updated_at = ? WHERE id = ?', [nowIso(), pid]);
+  });
+  for (const m of orphan) { try { await deleteMedia(m); } catch { /* the old file stays in storage: harmless */ } }
+  invalidateModaCatalogue();
+  triggerReindex();
+
+  const ctx = buildModerationContext();
+  const fullRow = loadSingleAdminProductRow(pid);
+  const mod = analyzeProduct(fullRow, ctx);
+  const mediaLookup = mediaMap(fullRow.primary_media_id ? [fullRow.primary_media_id] : []);
+  res.status(201).json({ added: made.length, product: serializeAdminProductRow(fullRow, ctx, mod, mediaLookup) });
 }));
 
 /**

@@ -23,12 +23,23 @@ export function fitNote(product, lang) {
   return null;
 }
 
+/** "7", "٧", "11:12", "11-12", "6Y" -> the kids chart row that covers that age ("7-8", "11-12", "5-6"); null when it is not an age size. */
+function kidsRow(size) {
+  const t = String(size).replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).replace(/\s|y(rs?|ears?)?$/gi, '').replace(/[:/،]/g, '-');
+  const m = t.match(/^(\d{1,2})(?:-(\d{1,2}))?$/);
+  if (!m) return null;
+  const n = Number(m[1]);
+  const row = KIDS.find((r) => { const [a, b] = r[0].split('-').map(Number); return n >= a && n <= b; });
+  return row ? row[0] : null;
+}
+
 /** One line about what a chosen size roughly means, from the general charts ("M: bust 88-94 · waist 68-74 cm"); null when we have no honest chart for it. */
 export function sizeHint(product, size, lang) {
   if (!size || NO_CHART.includes(product?.department) || /perfume|fragrance|beauty|makeup|care/i.test(product?.department || '')) return null;
   const ar = lang === 'ar';
-  const k = KIDS.find((r) => r[0] === String(size).replace(/\s/g, ''));
-  if (k && (product.department === 'kids' || /kids|girls|boys|baby/i.test(product.department || ''))) return ar ? `${size} سنة: مناسب لطول ${'\u200E'}${k[1]}${'\u200E'} سم تقريبًا` : `${size} yrs: fits about ${k[1]} cm tall`;
+  const kidsAge = kidsRow(size);
+  const k = kidsAge && KIDS.find((r) => r[0] === kidsAge);
+  if (k && (product.department === 'kids' || /kid|girl|boy|baby|child|اطفال|أطفال|ولادي|بناتي/i.test(`${product.department || ''} ${product.audience || ''}`))) return ar ? `${size} سنة: مناسب لطول ${'\u200E'}${k[1]}${'\u200E'} سم تقريبًا` : `${size} yrs: fits about ${k[1]} cm tall`;
   const key = String(size).toUpperCase().replace(/\s/g, '').replace('XXXL', '3XL').replace('2XL', 'XXL');
   const b = BODY.find((r) => r[0] === key);
   if (!b) return null;
