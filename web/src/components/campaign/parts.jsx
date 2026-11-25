@@ -90,7 +90,7 @@ function Cells({ end, offset }) {
       {cells.map(([n, label], i) => (
         <Fragment key={label}>
           {i > 0 && <span aria-hidden="true" className="pt-1.5 text-base font-black opacity-35 sm:pt-3 sm:text-2xl">:</span>}
-          <div className="min-w-[46px] rounded-xl px-1.5 py-1.5 text-center sm:min-w-[92px] sm:rounded-2xl sm:px-3 sm:py-3.5" style={{ background: 'linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.04))', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.14), inset 0 1px 0 rgba(255,255,255,.2), 0 12px 26px -14px rgba(0,0,0,.7)' }}>
+          <div className="min-w-[46px] rounded-xl px-1.5 py-1.5 text-center sm:min-w-[92px] sm:rounded-2xl sm:px-3 sm:py-3.5" style={{ background: 'linear-gradient(180deg,rgba(10,22,48,.78),rgba(10,22,48,.62))', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', boxShadow: 'inset 0 0 0 1px rgba(255,255,255,.14), inset 0 1px 0 rgba(255,255,255,.2), 0 12px 26px -14px rgba(0,0,0,.7)' }}>
             <div className="font-display text-xl font-black tabular-nums leading-none sm:text-[44px]" dir="ltr">{two.format(n)}</div>
             <div className="mt-1 text-[10px] font-medium opacity-60 sm:mt-1.5 sm:text-[11px]">{label}</div>
           </div>
@@ -192,7 +192,7 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
       <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-80" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,.1) 1px, transparent 1.3px)', backgroundSize: '22px 22px', WebkitMaskImage: 'linear-gradient(90deg, transparent 0%, #000 50%, transparent 100%)', maskImage: 'linear-gradient(90deg, transparent 0%, #000 50%, transparent 100%)' }} />
       {l.art && (
         <>
-          <img aria-hidden="true" alt="" src={l.art} fetchPriority="high" decoding="async" className="pointer-events-none absolute end-0 top-0 h-[84%] w-[84%] object-cover object-left opacity-90 ltr:-scale-x-100 sm:inset-y-0 sm:h-full sm:w-[60%] sm:opacity-100" style={{ WebkitMaskImage: 'linear-gradient(to right, #000 52%, transparent 100%), linear-gradient(to bottom, #000 62%, transparent 100%)', maskImage: 'linear-gradient(to right, #000 52%, transparent 100%), linear-gradient(to bottom, #000 62%, transparent 100%)', WebkitMaskComposite: 'source-in', maskComposite: 'intersect' }} />
+          <img aria-hidden="true" alt="" src={l.art} fetchPriority="high" decoding="async" className="pointer-events-none absolute end-0 top-0 h-[84%] w-[84%] object-cover object-left opacity-90 ltr:-scale-x-100 sm:inset-y-0 sm:h-full sm:w-[60%] sm:opacity-100" style={{ WebkitMaskImage: 'linear-gradient(to right, #000 50%, transparent 100%), linear-gradient(to bottom, #000 62%, transparent 100%)', maskImage: 'linear-gradient(to right, #000 50%, transparent 100%), linear-gradient(to bottom, #000 62%, transparent 100%)', WebkitMaskComposite: 'source-in', maskComposite: 'intersect' }} />
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 sm:hidden" style={{ background: 'linear-gradient(0deg, rgba(8,8,8,.92) 0%, rgba(8,8,8,.5) 38%, transparent 66%), linear-gradient(270deg, rgba(8,8,8,.82) 0%, rgba(8,8,8,.45) 42%, transparent 78%)' }} />
         </>
       )}
@@ -212,7 +212,7 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
         </svg>
       )}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-10 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${l.c2}aa, transparent)` }} />
-      <div className="relative z-10 flex flex-col gap-3.5 px-4 pb-4 pt-4 sm:flex-row sm:items-center sm:gap-14 sm:px-12 sm:py-10">
+      <div className={`relative z-10 flex flex-col gap-3.5 px-4 pb-4 pt-4 sm:flex-row sm:items-center sm:py-10 sm:gap-14 sm:px-12`}>
         {bd && (
           <div aria-hidden="true" className="absolute start-3 top-3 grid h-[64px] w-[64px] place-items-center rounded-full font-display font-black sm:hidden" style={{ background: gold, color: '#1b1305', boxShadow: `inset 0 1.5px 0 rgba(255,255,255,.65), 0 8px 20px -8px ${l.c2}b3, 0 0 0 3px ${l.c2}33` }}>
             <span className="text-center leading-none">{(bd.mTop || bd.top) && <span className="block text-[8px] font-bold opacity-70">{bd.mTop || bd.top}</span>}<span className={bd.small ? 'text-[15px]' : 'text-[22px]'} dir="ltr">{bd.big}</span></span>
