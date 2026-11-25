@@ -4,7 +4,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
 import { listDepartments, customerDepartments, deptSubtree, deptAncestors, deptAttrDefs, deptProfile } from '../lib/departments.js';
-import { sizeFacets, sizeFilterSets, babySizes, newbornSizes } from '../lib/size-normalize.js';
+import { sizeFacets, sizeFilterSets, babySizes, newbornSizes, olderKidSizes } from '../lib/size-normalize.js';
 import { z } from 'zod';
 import { q, tx, insert, json, db } from '../db/index.js';
 import { resolveAlias } from '../lib/category-aliases.js';
@@ -35,7 +35,7 @@ import { contactFromEnv } from '../lib/moda/contact.js';
 import { logStylist } from '../lib/stylist-log.js';
 import { runModa } from '../lib/moda/engine.js';
 import { smartLookText, acceptSmartLook, isFormalAnchor, reviewLook, minimumPiecesForLook } from '../lib/moda/smartlook.js';
-import { visualGateConfig } from '../lib/moda/visualtags.js';
+import { visualGateConfig, visualOutfitCheck } from '../lib/moda/visualtags.js';
 import { activeStories, expireStories, bumpStory } from '../lib/stories.js';
 import { enrichAll as enrichModaRows } from '../lib/moda/products.js';
 import { getModaPrompts } from '../lib/modaPrompts.js';
@@ -389,15 +389,20 @@ r.get('/search', h((req, res) => {
     const ageSizes = isNewborn ? newbornSizes(distinctSizeRows()) : babySizes(distinctSizeRows());
     const words = isNewborn ? NEWBORN_WORDS : BABY_WORDS;
     const audienceKid = `(p.department IN (${kidList.map(() => '?').join(',')}) OR p.audience IN ('kids','boys','girls'))`;
-    const sizeMatch = ageSizes.length ? `EXISTS (SELECT 1 FROM variants bv WHERE bv.product_id=p.id AND bv.stock>0 AND bv.size IN (${ageSizes.map(() => '?').join(',')}))` : '0=1';
+    // Baby/newborn by size: has a baby size AND no size for children of 3+ (a 2Y-6Y suit is a kids product, not babywear).
+    const older = olderKidSizes(distinctSizeRows());
+    const sizeParams = [...ageSizes, ...older];
+    const sizeMatch = ageSizes.length ? `(EXISTS (SELECT 1 FROM variants bv WHERE bv.product_id=p.id AND bv.stock>0 AND bv.size IN (${ageSizes.map(() => '?').join(',')}))${older.length ? ` AND NOT EXISTS (SELECT 1 FROM variants ov WHERE ov.product_id=p.id AND ov.size IN (${older.map(() => '?').join(',')}))` : ''})` : '0=1';
     const wordMatch = words.map(() => '(p.name_ar LIKE ? OR p.name_en LIKE ? OR p.description_ar LIKE ? OR p.description_en LIKE ?)').join(' OR ');
     const assigned = isNewborn
       ? `(p.department IN (${deptList.map(() => '?').join(',')}) AND (${sizeMatch} OR ${wordMatch}))`
       : `p.department IN (${deptList.map(() => '?').join(',')})`;
-    deptIn = `(${assigned} OR (${audienceKid} AND (${sizeMatch} OR ${wordMatch})))`;
+    // a «سلوبيت» (romper) is babywear even when the store filed it under its own custom section with no kids audience
+    const romper = !isNewborn ? " OR ((p.name_ar LIKE '%سلوبيت%' OR p.name_ar LIKE '%سالوبيت%') AND p.department NOT LIKE 'women%' AND p.department NOT LIKE 'men%' AND p.department NOT LIKE 'beauty%')" : '';
+    deptIn = `(${assigned} OR (${audienceKid} AND (${sizeMatch} OR ${wordMatch}))${romper})`;
     deptParams = [
-      ...deptList, ...(!isNewborn ? [] : [...ageSizes, ...words.flatMap((w) => [`%${w}%`, `%${w}%`, `%${w}%`, `%${w}%`])]),
-      ...kidList, ...ageSizes, ...words.flatMap((w) => [`%${w}%`, `%${w}%`, `%${w}%`, `%${w}%`]),
+      ...deptList, ...(!isNewborn ? [] : [...sizeParams, ...words.flatMap((w) => [`%${w}%`, `%${w}%`, `%${w}%`, `%${w}%`])]),
+      ...kidList, ...sizeParams, ...words.flatMap((w) => [`%${w}%`, `%${w}%`, `%${w}%`, `%${w}%`]),
     ];
   }
   if (deptSlug) { where.push(deptIn); params.push(...deptParams); }
@@ -631,10 +636,15 @@ const brainHits = new Map();
 const curatorHits = new Map();
 const understandHits = new Map();
 // dept_parent/dept_grand/dept_name: تويلا بتعرف منها رجالي/حريمي/أطفال لو القسم نفسه مش واضح («بدل» تحت «رجالي»)
+// the image-analysis facts table is created by the enrich script; until it has ever run the table does not exist, and every Twyla / smart-look request would fail
+let aiFactsReady = false;
+const ensureAiFactsTable = () => { if (aiFactsReady) return; q.run("CREATE TABLE IF NOT EXISTS product_ai_facts (product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE, facts_json TEXT NOT NULL, media_id INTEGER, model TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))"); aiFactsReady = true; };
 export function modaCatalogRows() {
+  ensureAiFactsTable();
   return q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en,
       COALESCE(c.name_ar || ' ' || c.name_en, '') AS cat_text,
       (SELECT t.tags_json FROM product_visual_tags t WHERE t.product_id=p.id) AS vtags_json,
+      (SELECT f.facts_json FROM product_ai_facts f WHERE f.product_id=p.id) AS ai_json,
       (SELECT GROUP_CONCAT(DISTINCT v.size) FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND v.size IS NOT NULL) AS size_list,
       (SELECT d.parent_slug FROM departments d WHERE d.slug=p.department) AS dept_parent, (SELECT d2.parent_slug FROM departments d JOIN departments d2 ON d2.slug=d.parent_slug WHERE d.slug=p.department) AS dept_grand, (SELECT d.name_ar FROM departments d WHERE d.slug=p.department) AS dept_name
     FROM products p JOIN stores s ON s.id=p.store_id LEFT JOIN categories c ON c.id=p.category_id
@@ -828,7 +838,17 @@ r.post('/stylist/smart-look', h(async (req, res) => {
   if (!anchor) return finish({ ok: false, reason: 'not_found' });
   const text = smartLookText(anchor);
   if (!text) return finish({ ok: false, reason: 'audience_unknown' });
-  const result = await runModa([{ role: 'user', content: text }], { products: ex.size ? rows.filter((x) => x.id === anchor.id || !ex.has(x.id)) : rows, assistantName: st.name, offers: liveOffersForModa, stores: storesForModa, training: stylistTrainingSettings() });
+  const visualCfg = visualGateConfig();
+  const enforcedVisualReasons = visualCfg.visual === true ? null : new Set(Array.isArray(visualCfg.visual) ? visualCfg.visual : []);
+  const byProductId = new Map(enriched.map((x) => [x.id, x]));
+  const filteredRows = (ex.size ? rows.filter((x) => x.id === anchor.id || !ex.has(x.id)) : rows).filter((row) => {
+    if (!visualCfg.visual || row.id === anchor.id) return true;
+    const candidate = byProductId.get(row.id);
+    if (!candidate) return true;
+    const hard = visualOutfitCheck([anchor, candidate]).hard;
+    return !hard.some((reason) => enforcedVisualReasons === null || enforcedVisualReasons.has(reason));
+  });
+  const result = await runModa([{ role: 'user', content: text }], { products: filteredRows, assistantName: st.name, offers: liveOffersForModa, stores: storesForModa, training: stylistTrainingSettings() });
   const verdict = acceptSmartLook(result, { anchorId: anchor.id, anchorKey: anchor.key, anchorFormal: isFormalAnchor(anchor), keyOf: (id) => enriched.find((x) => x.id === id)?.key, budget: body.budget || null, minPieces: Math.max(1, minimumPiecesForLook(anchor.key) - 1) });
   if (!verdict.ok) { logSmartLook('rejected', body.productId, { reason: verdict.reason }); return finish({ ok: false, reason: verdict.reason }); }
   // independent reviewer of the final outfit (anchor + pieces): real variant stock, data safety, quality score. Below the bar = nothing shown.

@@ -459,6 +459,8 @@ export const json = (s, fallback) => {
   db.exec('CREATE INDEX IF NOT EXISTS idx_look_reviews_verdict ON look_reviews(verdict, bucket)');
   // visual tags corrected by an admin/store owner, or produced by an image-analysis service (source 'admin' | 'image'); they override the text inference
   db.exec("CREATE TABLE IF NOT EXISTS product_visual_tags (product_id INTEGER PRIMARY KEY, tags_json TEXT NOT NULL, source TEXT NOT NULL, confidence TEXT, updated_by TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))");
+  // Image-derived product facts; the outfit reviewer consumes these internally, without exposing them in product responses.
+  db.exec("CREATE TABLE IF NOT EXISTS product_ai_facts (product_id INTEGER PRIMARY KEY REFERENCES products(id) ON DELETE CASCADE, facts_json TEXT NOT NULL, media_id INTEGER, model TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))");
   // One catch-all «أخرى» sub-section under every main section, so a product that fits no sub-section still has a valid, sensible place. Runs once, only adds rows.
   if (!db.prepare("SELECT 1 FROM app_settings WHERE key='dept_other_v1'").get()) {
     try {

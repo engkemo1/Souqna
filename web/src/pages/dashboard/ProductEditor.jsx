@@ -57,6 +57,15 @@ const normKidSize = (raw) => {
   if (/^\d{1,2}$/.test(s) && +s <= 18) return `${+s}Y`;
   return String(raw || '').trim();
 };
+// where a kids' product will show, from the age sizes picked: 'baby' (all up to 2Y), 'newborn' (all up to 3 months), 'mixed' (baby sizes AND 3Y+), or null
+const kidAgeWhere = (sizes) => {
+  const ages = (sizes || []).map((z) => String(z).match(/^(\d{1,2})(?:-(\d{1,2}))?([YM])$/)).filter(Boolean).map((m) => { const k = m[3] === 'Y' ? 12 : 1; const lo = +m[1] * k; const hi = (m[2] ? +m[2] : +m[1]) * k + (m[3] === 'Y' ? 11 : 0); return [lo, hi]; });
+  if (!ages.length) return null;
+  const baby = ages.filter((a) => a[1] <= 35); const older = ages.filter((a) => a[0] >= 36);
+  if (baby.length && older.length) return 'mixed';
+  if (older.length || baby.length !== ages.length) return null;
+  return ages.every((a) => a[1] <= 3) ? 'newborn' : 'baby';
+};
 // typed colours ("أسود، بيج، فوشيا"): known names reuse the preset swatch, unknown ones get a stable placeholder tint (the owner can fine-tune it with «لون تاني»)
 const splitList = (t) => String(t || '').split(/[,،;\n]/).map((x) => x.trim()).filter(Boolean);
 const EXTRA_COLORS = { 'فوشيا': '#C2185B', fuchsia: '#C2185B', 'تركواز': '#1AA6A6', turquoise: '#1AA6A6', 'سماوي': '#7EC8E3', 'سمائي': '#7EC8E3', 'لبني': '#7EC8E3', 'ذهبي': '#C9A227', gold: '#C9A227', 'فضي': '#B8BCC2', silver: '#B8BCC2', 'وردي': '#F2A6B8', 'لافندر': '#B39DDB', lavender: '#B39DDB', 'موف': '#8E5FB5', 'عنابي': '#7B1E3A', 'خمري': '#7B1E3A', 'كاكي': '#A39A6B', khaki: '#A39A6B', 'جملي': '#B5793D', camel: '#B5793D', 'رصاصي': '#5E636B', 'سمني': '#F1E6C8', cream: '#F1E6C8', 'كريمي': '#F1E6C8', 'ليموني': '#D6E34F', 'نيلي': '#2E3A8C', 'طوبي': '#A8512F', 'نبيذي': '#6E2433', 'أوف وايت': '#F2EFE6', 'اوف وايت': '#F2EFE6', mint: '#A8D8C0', 'نعناعي': '#A8D8C0', 'مشمشي': '#F4B183', 'سلموني': '#F29A8A' };
@@ -384,6 +393,7 @@ function VariantsEditor({ f, set, sizeKind, typeChosen, mode = 'general', hasCol
             <Input size="sm" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder={mode === 'perfume' || mode === 'skincare' ? L('حجم تاني (مثلًا 25 مل)', 'Other volume (e.g. 25 ml)') : mode === 'beauty' ? L('مثال: علبة 50 جم، تيوب 30 مل، زجاجة 100 مل، 3 قطع', 'e.g. box 50 g, tube 30 ml, bottle 100 ml, 3 pieces') : t('editor.customSize')} maxLength={mode === 'beauty' ? 80 : 60} />
             <Button type="submit" size="sm" variant="outline" icon={Plus} aria-label={t('common.add')} />
           </form>
+          {(() => { const w = kidAgeWhere(f.sizes); if (!w) return null; const tone = w === 'mixed' ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-800'; return <p className={cx('mt-2.5 rounded-xl px-3 py-2 text-[13px] leading-relaxed', tone)}>{w === 'newborn' ? L('هيظهر في قسم «حديثي الولادة» و«رضع» وفي «أطفال».', 'It will show under Newborn, Baby and Kids.') : w === 'baby' ? L('هيظهر في قسم «رضع» (لحد سنتين) وفي «أطفال».', 'It will show under Baby (up to 2 years) and Kids.') : L('المنتج ده فيه مقاسات رضع ومقاسات أكبر، فهيظهر في «أطفال» ويتلاقى بفلتر السن، لكن مش في صفحة «رضع». لو عايزه في الرضع سيب مقاسات الرضع بس، أو اعمل المقاسات الأكبر منتج لوحده.', 'This has baby sizes and bigger sizes, so it shows under Kids and the age filter, but not on the Baby page. To list it under Baby, keep only baby sizes or add the bigger sizes as a separate product.')}</p>; })()}
         </div>
       )}
 

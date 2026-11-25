@@ -27,11 +27,14 @@ const VOCAB = {
   fit: ['ضيق', 'مستقيم', 'واسع', 'أوفر سايز', ''],
   season: ['صيفي', 'شتوي', 'كل المواسم', ''],
   formality: ['رسمي', 'شبه رسمي', 'كاجوال', 'رياضي', 'سواريه', ''],
+  visual_loudness: ['low', 'medium', 'high', ''],
+  style_tier: ['basic', 'casual', 'streetwear', 'smart_casual', 'formal', ''],
 };
 const promptFor = (name) => `You look at ONE product photo from a clothing store. The product is named «${name}»: describe ONLY that item (ignore other garments, the model, the background), and ONLY what is clearly visible. Reply with ONE JSON object, no prose.
 For each key pick exactly one value from its list, or "" if it is not clearly visible or not applicable (do NOT guess, an empty string is the correct answer when unsure):
 ${Object.entries(VOCAB).map(([k, v]) => `${k}: ${v.filter(Boolean).join(' | ')}`).join('\n')}
-Example: {"material_look":"جينز","sleeves":"","neckline":"","length":"طويل","pattern":"سادة","fit":"مستقيم","season":"كل المواسم","formality":"كاجوال"}`;
+Assess visual_loudness (low, medium, high) and style_tier (basic, casual, streetwear, smart_casual, formal) from the garment's appearance, not its price. A large skull or logo print is high + streetwear; a small quiet print is low; a classic checked overshirt is smart_casual.
+Example: {"material_look":"جينز","sleeves":"","neckline":"","length":"طويل","pattern":"سادة","fit":"مستقيم","season":"كل المواسم","formality":"كاجوال","visual_loudness":"low","style_tier":"casual"}`;
 
 const b64 = (buf) => Buffer.from(buf).toString('base64');
 const parse = (t) => { const s = String(t || ''); const a = s.indexOf('{'); const b = s.lastIndexOf('}'); try { return JSON.parse(s.slice(a, b + 1)); } catch { return null; } };
@@ -99,19 +102,19 @@ if (!order.length) process.exit(1);
 
 // أي مواصفات ليها معنى لأنهي نوع قطعة (كم/ياقة للبنطلون أو الجزمة ملهاش معنى → بتتشال)
 const RELEVANT = {
-  tops: ['material_look', 'sleeves', 'neckline', 'length', 'pattern', 'fit', 'season', 'formality'],
-  dresses: ['material_look', 'sleeves', 'neckline', 'length', 'pattern', 'fit', 'season', 'formality'],
-  suiting: ['material_look', 'sleeves', 'pattern', 'fit', 'season', 'formality'],
-  outerwear: ['material_look', 'sleeves', 'length', 'pattern', 'fit', 'season', 'formality'],
-  modest: ['material_look', 'sleeves', 'length', 'pattern', 'fit', 'season', 'formality'],
-  sport: ['material_look', 'sleeves', 'length', 'pattern', 'fit', 'season', 'formality'],
+  tops: ['material_look', 'sleeves', 'neckline', 'length', 'pattern', 'fit', 'season', 'formality', 'visual_loudness', 'style_tier'],
+  dresses: ['material_look', 'sleeves', 'neckline', 'length', 'pattern', 'fit', 'season', 'formality', 'visual_loudness', 'style_tier'],
+  suiting: ['material_look', 'sleeves', 'pattern', 'fit', 'season', 'formality', 'visual_loudness', 'style_tier'],
+  outerwear: ['material_look', 'sleeves', 'length', 'pattern', 'fit', 'season', 'formality', 'visual_loudness', 'style_tier'],
+  modest: ['material_look', 'sleeves', 'length', 'pattern', 'fit', 'season', 'formality', 'visual_loudness', 'style_tier'],
+  sport: ['material_look', 'sleeves', 'length', 'pattern', 'fit', 'season', 'formality', 'visual_loudness', 'style_tier'],
   underwear_sleep: ['material_look', 'sleeves', 'length', 'pattern', 'season'],
   bottoms: ['material_look', 'length', 'pattern', 'fit', 'season', 'formality'],
   shoes: ['material_look', 'pattern', 'formality'],
   bags: ['material_look', 'pattern', 'formality'],
   accessories: ['material_look', 'pattern', 'formality'],
 };
-const SAFE_DEFAULT = ['pattern', 'formality'];
+const SAFE_DEFAULT = ['pattern', 'formality', 'visual_loudness', 'style_tier'];
 const CONSENSUS_KEYS = ['material_look', 'fit', 'season'];
 const CONSENSUS = process.env.CONSENSUS === '1';
 
@@ -142,17 +145,18 @@ for (const r of rows) {
   const allowed = RELEVANT[family] || SAFE_DEFAULT;
   const buf = await readPrimaryImage(r.id); if (!buf) { noPhoto++; continue; }
   const prompt = promptFor(String(r.name_ar || r.name_en || '').slice(0, 80));
-  const results = []; let lastErr = '';
+  const results = []; let lastErr = ''; const tried = [];
   for (const name of order) {
-    try { const res = await PROVIDERS[name](buf, prompt); if (res?.out) { results.push({ ...res, provider: name }); if (!CONSENSUS || results.length >= 2) break; } } catch (err) { lastErr = err.message; }
+    try { const res = await PROVIDERS[name](buf, prompt); if (res?.out) { results.push({ ...res, provider: name }); if (!CONSENSUS || results.length >= 2) break; } else tried.push(`${name}: رد مش مفهوم`); } catch (err) { lastErr = err.message; tried.push(`${name}: ${err.message}`); }
   }
+  lastErr = tried.length ? `| ${tried.join(' | ')}` : lastErr;
   done++;
   let facts = clean(results[0]?.out, allowed);
   if (facts && CONSENSUS) {
     if (results.length >= 2) { const f2 = clean(results[1].out, allowed) || {}; for (const k of CONSENSUS_KEYS) if (facts[k] && facts[k] !== f2[k]) delete facts[k]; } // خامة/قصّة/موسم لازم مزوّدين يتفقوا
     else for (const k of CONSENSUS_KEYS) delete facts[k]; // مزوّد واحد بس → مبنثقش في الحاجات دي
   }
-  if (!facts || !Object.keys(facts).length) { failed++; streak++; console.log(`#${r.id} ${r.name_ar} — لا نتيجة ${lastErr}`); if (streak >= 10) { console.error('10 فشل ورا بعض: بوقف (حد يومي أو مفتاح غلط؟). أعد التشغيل بعدين وهيكمل من مكانه.'); break; } continue; }
+  if (!facts || !Object.keys(facts).length) { failed++; streak++; console.log(`#${r.id} ${r.name_ar} — لا نتيجة${results.length ? ' (الرد خارج المسموح من القيم أو مش مناسب للنوع)' : ''} ${lastErr}`); if (streak >= 10) { console.error('10 فشل ورا بعض: بوقف (حد يومي أو مفتاح غلط؟). أعد التشغيل بعدين وهيكمل من مكانه.'); break; } continue; }
   streak = 0;
   console.log(`#${r.id} ${r.name_ar} [${results.map((x) => x.provider).join('+')}] → ${JSON.stringify(facts)}`);
   if (APPLY) { q.run('INSERT INTO product_ai_facts(product_id, facts_json, media_id, model) VALUES(?,?,?,?) ON CONFLICT(product_id) DO UPDATE SET facts_json=excluded.facts_json, media_id=excluded.media_id, model=excluded.model, created_at=datetime(\'now\')', [r.id, JSON.stringify({ ...facts, v: 1, source: 'image_ai' }), mediaId ?? null, results.map((x) => x.model).join('+')]); saved++; }

@@ -89,8 +89,8 @@ test('golden fixture: the jacket + skull sweatshirt case, frozen, is a human "re
 });
 
 // ---- rollout safety -------------------------------------------------------------------------------------------------
-test('gate default is shadow (observe only): nothing enforced unless explicitly switched on', () => {
-  assert.deepEqual(visualGateConfig({}), { mode: 'shadow', visual: false, observe: true });
+test('gate default rejects clear tagged clashes and observes unknown tags', () => {
+  assert.deepEqual(visualGateConfig({}), { mode: 'enforce', visual: CLEAR_VISUAL_REASONS, observe: true });
   assert.equal(visualGateConfig({ VISUAL_GATE: '0' }).observe, false);
   const e = visualGateConfig({ VISUAL_GATE: '1' }); assert.equal(e.mode, 'enforce'); assert.deepEqual(e.visual, CLEAR_VISUAL_REASONS);
   assert.deepEqual(visualGateConfig({ VISUAL_GATE: '1', VISUAL_ENFORCE: 'plaid_graphic_conflict,visual_tags_unknown' }).visual, ['plaid_graphic_conflict', 'visual_tags_unknown']);
@@ -116,6 +116,7 @@ test('REAL catalog snapshot: tag coverage of upper-body products (the number tha
     console.log(`# visual tag coverage ${f}: ${cov.reliable}/${cov.upperBody} upper-body products = ${(cov.pct * 100).toFixed(0)}% (text ${cov.fromText}, image ${cov.fromImage}, admin ${cov.fromAdmin})`);
     assert.ok(cov.upperBody >= 5); assert.equal(cov.readyForClear, cov.pct >= 0.8); assert.equal(cov.readyForUnknown, cov.pct >= 0.9);
     // enforcing "unknown" on this catalogue must hide most upper-body pieces: documented here so nobody switches it on blindly
-    if (cov.pct < 0.8) assert.equal(visualGateConfig({}).visual, false, 'coverage is below 80%: the default must stay observe-only');
+    // the default now enforces the clear clashes (they need explicit evidence from text, image or admin), but never "unknown" while coverage is low
+    if (cov.pct < 0.9) assert.ok(Array.isArray(visualGateConfig({}).visual) && !visualGateConfig({}).visual.includes('visual_tags_unknown'), 'coverage is below 90%: never enforce unknown tags by default');
   }
 });

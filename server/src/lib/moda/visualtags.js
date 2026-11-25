@@ -79,12 +79,48 @@ export function parseStoredTags(raw) {
  * `reliable` = the pattern is known from an admin/image source, or from explicit text evidence (not from a guess).
  */
 export function visualTagsOf(p) {
-  const base = inferVisualTags(p); const stored = parseStoredTags(p.vtags_json);
-  if (!stored) return { ...base, reliable: base.pattern !== 'unknown' && base.confidence !== 'none' };
-  const out = { ...base, source: stored.source, confidence: stored.confidence, evidence: [...base.evidence, `${stored.source}_override`] };
-  for (const k of ['pattern', 'visualLoudness', 'styleTier', 'silhouette', 'layerRole']) if (stored[k] && stored[k] !== 'unknown') out[k] = stored[k];
+  const base = inferVisualTags(p); const image = visualFactsTags(p.ai_json, p.key); const stored = parseStoredTags(p.vtags_json);
+  // Priority: owner/admin correction > analyzed product image > explicit catalogue text.
+  const out = image
+    ? { ...base, ...image, evidence: [...base.evidence, 'image_facts'] }
+    : { ...base };
+  if (stored) {
+    out.source = stored.source; out.confidence = stored.confidence;
+    out.evidence = [...out.evidence, `${stored.source}_override`];
+    for (const k of ['pattern', 'visualLoudness', 'styleTier', 'silhouette', 'layerRole']) if (stored[k] && stored[k] !== 'unknown') out[k] = stored[k];
+  }
   out.reliable = out.pattern !== 'unknown';
   return out;
+}
+
+function visualFactsTags(raw, key) {
+  let f = raw;
+  if (typeof f === 'string') { try { f = JSON.parse(f); } catch { return null; } }
+  if (!f || typeof f !== 'object') return null;
+  const pat = norm(f.pattern || '');
+  const pattern = /كاروه|مربعات|تارتان|فلانيل/.test(pat) ? 'plaid'
+    : /مخطط|خطوط|ستريب/.test(pat) ? 'stripe'
+      : /ساده|لون واحد/.test(pat) ? 'plain'
+        : /مطرز|منقط|نقش خفيف|جاكار/.test(pat) ? 'subtle_print'
+          : /مطبوع|برنت|طباعه|جرافيك|شعار/.test(pat) ? 'graphic' : 'unknown';
+  if (pattern === 'unknown') return null;
+  const l = norm(f.visual_loudness || f.visualLoudness || '');
+  const visualLoudness = /عال|قوي|بارز|صارخ|صاخب|high/.test(l) ? 'high'
+    : /هادي|خفيف|منخفض|low/.test(l) ? 'low'
+      : /متوسط|medium/.test(l) ? 'medium'
+        : pattern === 'graphic' ? 'high' : pattern === 'plain' || pattern === 'subtle_print' ? 'low' : 'medium';
+  const ft = norm(f.style_tier || f.styleTier || f.formality || '');
+  const styleTier = /رسمي|سواريه|formal/.test(ft) ? 'formal'
+    : /شبه رسمي|عملي|مكتب|smart/.test(ft) ? 'smart_casual'
+      : /ستريت|شارع|street|رياضي|sport/.test(ft) ? 'streetwear'
+        : /كاجوال|casual/.test(ft) ? 'casual'
+          : pattern === 'graphic' ? 'streetwear' : 'unknown';
+  const fit = norm(f.fit || '');
+  const silhouette = /اوفر|oversize|فضفاض/.test(fit) ? 'oversized'
+    : /ضيق|سليم|skinny|fitted/.test(fit) ? 'fitted'
+      : /واسع|ريلاكس|loose|relaxed/.test(fit) ? 'relaxed'
+        : /مستقيم|regular/.test(fit) ? 'regular' : 'unknown';
+  return { pattern, visualLoudness, styleTier, silhouette, layerRole: layerRoleOf(key), source: 'image', confidence: 'medium' };
 }
 
 /** Interface for a later image classifier. Implement `classify(imageUrl, product) -> {pattern,...,confidence}` and call saveImageTags(); nothing calls a model today. */
@@ -128,14 +164,17 @@ export const ALL_VISUAL_REASONS = ['visual_tags_unknown', 'upper_body_visual_com
 // Rollout, in order. Reasons switched on one by one with VISUAL_ENFORCE (comma list, or "all").
 export const CLEAR_VISUAL_REASONS = ['plaid_graphic_conflict', 'upper_body_visual_competition'];
 /**
- * VISUAL_GATE: unset | "shadow"  -> observe only: nothing is hidden, would-be rejections are logged (default)
+ * VISUAL_GATE: unset | "1"       -> reject only clear, explicitly tagged clashes (default)
+ *              "shadow"          -> observe only: nothing is hidden, would-be rejections are logged
  *              "0" | "off"       -> not even observed
  *              "1" | "enforce"   -> reject only VISUAL_ENFORCE reasons (default: the two clear clashes)
  *              "full"            -> reject every visual reason (only once tag coverage is high)
  * Returns { mode, visual, observe } where `visual` is what reviewLook enforces (false | true | [reasons]).
  */
 export function visualGateConfig(env = process.env) {
-  const raw = String(env.VISUAL_GATE ?? 'shadow').trim().toLowerCase();
+  // Clear pattern clashes are high-confidence when tags have explicit evidence (text, image, or admin).
+  // Unknown tags remain observable and are not blocked by default, so sparse catalog coverage does not blank the feature.
+  const raw = String(env.VISUAL_GATE ?? '1').trim().toLowerCase();
   if (['0', 'off', 'false'].includes(raw)) return { mode: 'off', visual: false, observe: false };
   if (['full', 'all'].includes(raw)) return { mode: 'full', visual: true, observe: true };
   if (['1', 'on', 'enforce', 'true'].includes(raw)) {

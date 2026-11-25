@@ -39,6 +39,9 @@ export function canonSize(raw, { kid = false } = {}) {
   const s = s0.toLowerCase().replace(/[–—−]/g, '-').replace(/\s*([-:\/])\s*/g, '$1');
   if (!s) return { label: '', grp: 'letters', months: null, order: 9999 };
   let m;
+  // the bare words «سنة» (1 year) and «سنتين» (2 years)
+  if (/^(سنه|سنة|عام)$/.test(s)) return { label: 'سنة', grp: 'age', months: [12, 23], order: 12000 + 12 };
+  if (/^(سنتين|عامين)$/.test(s)) return { label: 'سنتين', grp: 'age', months: [24, 35], order: 24000 + 24 };
   // 12-18 شهور / 0-3M / 3:6 months
   if ((m = s.match(new RegExp(`^(\\d{1,2})[-:/](\\d{1,2}) ?${MON}$`)))) { let a = +m[1], b = +m[2]; if (a > b) [a, b] = [b, a]; return { label: `${a}-${b} شهور`, grp: 'age', months: [a, b], order: a * 1000 + b }; }
   if ((m = s.match(new RegExp(`^(\\d{1,2}) ?${MON}$`)))) { const a = +m[1]; return { label: `${a} شهور`, grp: 'age', months: [a, a], order: a * 1000 + a }; }
@@ -58,7 +61,8 @@ export function canonSize(raw, { kid = false } = {}) {
   return { label: s0, grp: 'letters', months: null, order: 5000 };
 }
 
-const overlaps = (r, b) => r[0] < b.to && r[1] >= b.from;
+// a month range that merely ENDS where a bucket starts («6-12 شهور» vs «سنة لسنتين») is not in that bucket; a single month (12M) is
+const overlaps = (r, b) => r[0] < b.to && (r[1] > b.from || (r[1] === b.from && r[0] === r[1]));
 const bucketByLabel = new Map(AGE_BUCKETS.map((b) => [b.label, b]));
 
 /** Rows are DISTINCT (size, pid, kid, shoe). Returns the facet list [{size,grp,n}] — one entry per canonical label / age bucket. */
@@ -68,7 +72,8 @@ export function sizeFacets(rows) {
   for (const r of rows) {
     const c = canonSize(r.size, { kid: !!r.kid });
     if (!c.label) continue;
-    if (c.months && r.kid) { AGE_BUCKETS.forEach((b, i) => { if (overlaps(c.months, b)) add(`age:${b.key}`, b.label, 'age', i, r.pid); }); continue; }
+    // an explicit age («6-12 شهور», «سنة», «2Y») is an age bucket even when the product itself was not flagged as kids'
+    if (c.months) { AGE_BUCKETS.forEach((b, i) => { if (overlaps(c.months, b)) add(`age:${b.key}`, b.label, 'age', i, r.pid); }); continue; }
     const grp = r.shoe && c.grp === 'num' ? 'shoes' : c.grp;
     add(`${grp}:${c.label}`, c.label, grp, c.order, r.pid);
   }
@@ -95,7 +100,7 @@ export function sizeFilterSets(values, distinctRows) {
   const kidSizes = new Set(); const anySizes = new Set();
   for (const r of distinctRows) {
     const c = canonSize(r.size, { kid: !!r.kid });
-    if (c.months && r.kid && ranges.some((x) => c.months[0] <= x[1] && c.months[1] >= x[0])) kidSizes.add(r.size);
+    if (c.months && ranges.some((x) => c.months[0] <= x[1] && c.months[1] >= x[0])) kidSizes.add(r.size);
     if ((!c.months || !r.kid) && (labels.has(c.label) || labels.has(String(r.size)))) anySizes.add(r.size);
   }
   return { kidSizes: [...kidSizes], anySizes: [...anySizes] };
@@ -103,10 +108,15 @@ export function sizeFilterSets(values, distinctRows) {
 
 /** raw sizes (on kids' products) for babywear: infant and toddler sizes through 2Y. */
 export function babySizes(distinctRows) {
-  return [...new Set(distinctRows.filter((r) => r.kid).filter((r) => { const c = canonSize(r.size, { kid: true }); return c.months && c.months[1] <= BABY_MAX_MONTHS; }).map((r) => r.size))];
+  return [...new Set(distinctRows.filter((r) => { const c = canonSize(r.size, { kid: !!r.kid }); return c.months && c.months[1] <= BABY_MAX_MONTHS; }).map((r) => r.size))];
+}
+
+/** Raw sizes on kids' products that are for children of 3 years or older. A product that also carries one of these is a general kids product, not babywear. */
+export function olderKidSizes(distinctRows) {
+  return [...new Set(distinctRows.filter((r) => { const c = canonSize(r.size, { kid: !!r.kid }); return c.months && c.months[0] >= 36; }).map((r) => r.size))];
 }
 
 /** Raw sizes for newborns (0–3 months), kept separate from babywear for ages 1–2. */
 export function newbornSizes(distinctRows) {
-  return [...new Set(distinctRows.filter((r) => r.kid).filter((r) => { const c = canonSize(r.size, { kid: true }); return c.months && c.months[1] <= 3; }).map((r) => r.size))];
+  return [...new Set(distinctRows.filter((r) => { const c = canonSize(r.size, { kid: !!r.kid }); return c.months && c.months[1] <= 3; }).map((r) => r.size))];
 }
