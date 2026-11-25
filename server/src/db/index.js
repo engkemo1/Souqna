@@ -441,6 +441,8 @@ export const json = (s, fallback) => {
       console.error('[db] department tree migration failed (will retry on next start):', e.message);
     }
   }
+  db.exec("CREATE TABLE IF NOT EXISTS smart_look_events (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, event TEXT NOT NULL, data_json TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))");
+  db.exec('CREATE INDEX IF NOT EXISTS idx_smart_look_events_product ON smart_look_events(product_id, created_at)');
   // One catch-all «أخرى» sub-section under every main section, so a product that fits no sub-section still has a valid, sensible place. Runs once, only adds rows.
   if (!db.prepare("SELECT 1 FROM app_settings WHERE key='dept_other_v1'").get()) {
     try {

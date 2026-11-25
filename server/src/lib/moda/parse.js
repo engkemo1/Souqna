@@ -137,6 +137,10 @@ export function parseMessage(raw, { profile = {}, imageText = '', now = new Date
   if (kids.includes('kids_plural') && !personSet.has('boys') && !personSet.has('girls')) result.kidsUnspecified = true;
   if (kids.includes('kids_plural') && (girlWeak || boyWeak) ) { if (girlWeak) personSet.add('girls'); if (boyWeak) personSet.add('boys'); result.kidsUnspecified = false; }
   result.ages = nums.ages;
+  // «ليا ولخطيبي» / «ليا وخطيبتي»: المقصود شخصان، حتى لو كلمة «ليا» أو «خطيبي» لم تُلتقط كعلاقة في القاموس.
+  // من غير القاعدة دي كان الطلب العام للاتنين ينتهي بسؤال «اللبس لمين؟» رغم إن العميل حدده بالفعل.
+  if (/(^| )(?:ليا|لي|لنفسي)\s+و?ل(?:خطيبي|جوزي|زوجي|حبيبي)( |$)/.test(n)) { personSet.add('women'); personSet.add('men'); }
+  if (/(^| )(?:ليا|لي|لنفسي)\s+و?ل(?:خطيبتي|مراتي|زوجتي|حبيبتي)( |$)/.test(n)) { personSet.add('men'); personSet.add('women'); }
   // «لولد / لبنت / لولاد / لبنات» (ل + كلمة): الطلب لطفل حتى من غير سن، فمايرجعش تيشيرت رجالي كبير.
   for (const t of tokens) {
     if (/^ل(ال)?(ولد|ولاد)$/.test(t)) personSet.add('boys');

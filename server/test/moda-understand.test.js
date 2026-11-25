@@ -56,3 +56,9 @@ test('makeUnderstander: JSON داخل نص + timeout', async () => {
   const slow = makeUnderstander(() => new Promise(() => {}), { timeoutMs: 20 });
   await assert.rejects(slow({ text: 'فستان سهرة' }));
 });
+
+test('parse: a request for me and my fiancé keeps both shoppers', () => {
+  const p = parseMessage('بدور على لبس ليا ولخطيبي');
+  assert.deepEqual(p.persons, ['men', 'women']);
+  assert.equal(p.intent, 'shop');
+});

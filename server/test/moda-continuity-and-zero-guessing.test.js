@@ -100,3 +100,11 @@ test('complaint recovery: "يا ستي انا عاوز البدله اللي ق�
   assert.equal(items.find((it) => it.id === 102), undefined, 'Must not show wrong Suit 102');
   assert.ok(items.find((it) => it.id === 201), 'Must coordinate matching shoes 201');
 });
+
+test('owned item with no audience asks who it is for instead of claiming no result', async () => {
+  const r = await runModa('معايا هاف بوت نسقلي عليه باقي الطقم من محلات بنها', { products: MOCK_PRODUCTS });
+  assert.equal(r.state, 'clarify');
+  assert.equal(r.questions?.[0]?.id, 'who_is_it_for');
+  assert.match(r.say, /ليك ولا ليها/);
+  assert.doesNotMatch(r.say, /ملقتش|مفيش/);
+});

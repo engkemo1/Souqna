@@ -545,6 +545,7 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
   const [origPreview, setOrigPreview] = useState({});
   const [busy, setBusy] = useState('');
   const [confirmDel, setConfirmDel] = useState(false);
+  const [photoStyle, setPhotoStyle] = useState('asis'); // must stay above the early return below (hooks order)
 
   useEffect(() => {
     if (!p) {
@@ -620,7 +621,6 @@ function AdminProductSheet({ productId, onClose, onSaved, depts, issueTypes, aud
     toast({ title: '✨ تم ملء وتصليح البيانات الناقصة تلقائياً — راجعها واضغط حفظ للتأكيد' });
   };
 
-  const [photoStyle, setPhotoStyle] = useState('asis');
   const uploadPhotos = async (fileList, replaceId = 0) => {
     const files = [...(fileList || [])].filter((f) => /^image\//.test(f.type));
     if (!p || !files.length) return;

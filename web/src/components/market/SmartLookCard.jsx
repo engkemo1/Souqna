@@ -21,22 +21,35 @@ export default function SmartLookCard({ productId, fallback = null }) {
   const [removed, setRemoved] = useState(() => new Set());
   const [picks, setPicks] = useState({}); // index القطعة → رقم البديل المختار
   const [quick, setQuick] = useState(null); // { queue: [card], i }
+  const [seen, setSeen] = useState(() => new Set()); // every piece id shown so far, so «another look» never repeats one
+  const [busy, setBusy] = useState(false);
+  const [noMore, setNoMore] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    setLook(null); setHidden(false); setRemoved(new Set()); setPicks({});
+    setLook(null); setHidden(false); setRemoved(new Set()); setPicks({}); setSeen(new Set()); setNoMore(false);
     api('/stylist/smart-look', { method: 'POST', body: { productId } })
-      .then((r) => { if (alive && r?.ok && r.looks?.length) setLook(r); })
+      .then((r) => { if (alive && r?.ok && r.looks?.length) { setLook(r); setSeen(new Set(r.looks.flatMap((l) => l.items.map((x) => x.id)))); } })
       .catch(() => { /* اقتراح اختياري: لو فشل منعرضش حاجة */ });
     return () => { alive = false; };
   }, [productId]);
 
   if (!look || hidden) return fallback;
   const pieces = look.looks.map((l, i) => ({ label: l.label, i, n: l.items.length, p: l.items[picks[i] ?? l.pick] || l.items[0] })).filter((x) => x.p);
-  const swap = (i, n) => setPicks((cur) => ({ ...cur, [i]: ((cur[i] ?? 0) + 1) % n }));
+  const track = (event, extra = {}) => { api('/stylist/smart-look/event', { method: 'POST', body: { productId, event, ...extra } }).catch(() => {}); }; // feedback for the quality bar; never blocks the UI
+  const swap = (i, n) => { track('swap', { pieceId: pieces.find((x) => x.i === i)?.p?.id }); setPicks((cur) => ({ ...cur, [i]: ((cur[i] ?? 0) + 1) % n })); };
   const kept = pieces.filter((x) => !removed.has(x.p.id));
   const total = kept.reduce((s, x) => s + Number(x.p.price || 0), 0);
-  const toggle = (id) => setRemoved((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const toggle = (id) => { track(removed.has(id) ? 'restore' : 'remove', { pieceId: id }); setRemoved((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; }); };
+  const anotherLook = async () => {
+    if (busy) return;
+    setBusy(true); setNoMore(false); track('another');
+    try {
+      const r = await api('/stylist/smart-look', { method: 'POST', body: { productId, exclude: [...seen].slice(-40) } });
+      if (r?.ok && r.looks?.length) { setLook(r); setRemoved(new Set()); setPicks({}); setSeen((cur) => new Set([...cur, ...r.looks.flatMap((l) => l.items.map((x) => x.id))])); } else setNoMore(true);
+    } catch { setNoMore(true); }
+    setBusy(false);
+  };
   const nextAdd = () => { if (!quick) return; if (quick.i + 1 < quick.queue.length) setQuick({ ...quick, i: quick.i + 1 }); else setQuick(null); };
 
   return (
@@ -67,12 +80,17 @@ export default function SmartLookCard({ productId, fallback = null }) {
         })}
       </div>
 
+      <div className="mt-2 flex items-center justify-between gap-2">
+        <button type="button" onClick={anotherLook} disabled={busy} className="inline-flex h-8 items-center gap-1.5 rounded-full bg-secondary px-3 text-[12px] font-bold text-fg transition hover:bg-line disabled:opacity-60"><RotateCcw className={cx('h-3.5 w-3.5', busy && 'animate-spin')} />{ar ? 'طقم تاني' : 'Another look'}</button>
+        {noMore && <span className="text-[11.5px] text-muted">{ar ? 'مفيش طقم تاني مناسب دلوقتي' : 'No other good look right now'}</span>}
+      </div>
+
       <div className="mt-2.5 flex items-center justify-between gap-3 border-t border-line pt-2.5">
         <div className="min-w-0">
           <p className="text-[11px] text-muted">{ar ? `إجمالي ${kept.length} قطع` : `Total · ${kept.length} pieces`}</p>
           <p className="text-base font-extrabold leading-tight">{formatMoney(total, lang)}</p>
         </div>
-        <button type="button" disabled={!kept.length} onClick={() => setQuick({ queue: kept.map((x) => x.p), i: 0 })} className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-btn px-4 text-[13px] font-bold text-on-btn disabled:opacity-40">
+        <button type="button" disabled={!kept.length} onClick={() => { track('add_all', { ids: kept.map((x) => x.p.id) }); setQuick({ queue: kept.map((x) => x.p), i: 0 }); }} className="inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full bg-btn px-4 text-[13px] font-bold text-on-btn disabled:opacity-40">
           <ShoppingBag className="h-4 w-4" />{ar ? 'أضف الطقم للسلة' : 'Add look to basket'}
         </button>
       </div>

@@ -33,7 +33,7 @@ import { matchStore } from '../lib/moda/stores.js';
 import { contactFromEnv } from '../lib/moda/contact.js';
 import { logStylist } from '../lib/stylist-log.js';
 import { runModa } from '../lib/moda/engine.js';
-import { smartLookText, acceptSmartLook, isFormalAnchor } from '../lib/moda/smartlook.js';
+import { smartLookText, acceptSmartLook, isFormalAnchor, reviewLook, minimumPiecesForLook } from '../lib/moda/smartlook.js';
 import { activeStories, expireStories, bumpStory } from '../lib/stories.js';
 import { enrichAll as enrichModaRows } from '../lib/moda/products.js';
 import { getModaPrompts } from '../lib/modaPrompts.js';
@@ -643,6 +643,38 @@ setInterval(sweepStories, 10 * 60 * 1000).unref?.();
 
 r.get('/stylist/prompts', h((_req, res) => { res.set('Cache-Control', 'public, max-age=60'); res.json(getModaPrompts()); }));
 
+// Twila chat: a COMPLETE outfit (state full, a non-search tab with 2+ pieces, or a named look, and nothing missing) goes through the same independent reviewer as the product-page look.
+// Plain searches ("show me a red hoodie": search tab / a single piece) and partial answers are left untouched. A tab that does not reach the bar is dropped; if none is left the shopper gets an honest chat reply, never a bad outfit.
+function reviewChatOutfits(result, rows) {
+  const tabs = result?.blocks?.tabs;
+  if (result?.state !== 'full' || !Array.isArray(tabs)) return { result, reviewed: 0 };
+  const isOutfit = (t) => t.id !== 'search' && ((t.items || []).length >= 2 || (t.look && (t.items || []).length >= 1)) && !(t.missing || []).length; // a named look template counts as an outfit even with one piece (e.g. a lone dress)
+  if (!tabs.some(isOutfit)) return { result, reviewed: 0 };
+  const K = loadModaKnowledge();
+  const byId = new Map(enrichModaRows(rows, K).map((x) => [x.id, x]));
+  const month = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', month: 'numeric' }).format(new Date()));
+  const vmap = new Map();
+  const load = (ids) => { const need = [...new Set(ids)].filter((id) => !vmap.has(id)); if (!need.length) return; for (const id of need) vmap.set(id, []); for (const v of q.all(`SELECT product_id, color, size, stock FROM variants WHERE product_id IN (${need.map(() => '?').join(',')})`, need)) vmap.get(v.product_id).push(v); };
+  const review = (pieces) => { if (pieces.some((x) => !x)) return { ok: false, score: 0, reasons: ['piece_not_found'] }; load(pieces.map((x) => x.id)); return reviewLook(pieces, { variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month }); };
+  const kept = []; const rejected = []; let reviewed = 0;
+  for (const t of tabs) {
+    if (!isOutfit(t)) { kept.push(t); continue; }
+    reviewed += 1;
+    const pieces = t.items.map((i) => byId.get(i.id));
+    const v = review(pieces);
+    if (!v.ok) { rejected.push({ tab: t.id, score: v.score, why: v.reasons.slice(0, 8) }); continue; }
+    // swap options inside the tab must keep the whole outfit above the bar too
+    const items = t.items.map((it, i) => ({ ...it, alts: (it.alts || []).filter((a) => { const alt = byId.get(a.id); if (!alt) return false; const p2 = [...pieces]; p2[i] = alt; return review(p2).ok; }) }));
+    kept.push({ ...t, items, __score: v.score });
+  }
+  if (!rejected.length) return { result: { ...result, blocks: { ...result.blocks, tabs: kept } }, reviewed, scores: kept.map((t) => t.__score).filter((x) => x != null) };
+  if (!kept.length) {
+    return { result: { ...result, state: 'chat', intent: 'chat', blocks: null, missing: [], relaxed: [], styleTips: [], tips: [], questions: [], say: 'مش لاقية دلوقتي طقم كامل متناسق ومتاح بالجودة اللي أرضاها ليك. قولي قطعة معينة تدوري عليها، أو غيّري الميزانية أو المناسبة وأجرب تاني.' }, reviewed, rejected };
+  }
+  const total = kept.reduce((s, t) => s + (Number(t.subtotal) || 0), 0);
+  return { result: { ...result, blocks: { ...result.blocks, tabs: kept, total } }, reviewed, rejected, scores: kept.map((t) => t.__score).filter((x) => x != null) };
+}
+
 r.post('/stylist', h(async (req, res) => {
   const st = stylistSettings();
   if (!st.enabled) throw new AppError(503, 'stylist_disabled', 'The stylist is switched off.');
@@ -695,7 +727,9 @@ r.post('/stylist', h(async (req, res) => {
       const cap = Number(process.env.MODA_UNDERSTAND_DAILY ?? 150); const inner = understand;
       understand = async (a) => { const k = `${ip}`; const hits = (understandHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; understandHits.set(k, [...hits, Date.now()]); return inner(a); };
     }
-    const result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand, verifier, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: stylistTrainingSettings() });
+    let result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand, verifier, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: stylistTrainingSettings() });
+    { const rv = reviewChatOutfits(result, rows); result = rv.result;
+      if (rv.reviewed) logSmartLook(rv.rejected?.length ? 'chat_rejected' : 'chat_shown', null, { q: String(lastText).slice(0, 80), scores: rv.scores, rejected: rv.rejected }); }
     logStylist(body.startLook ? '[start look]' : lastText, result, Date.now() - t0);
     return res.json(modaClientResponse(result));
   }
@@ -705,28 +739,64 @@ r.post('/stylist', h(async (req, res) => {
 // «طقم كامل يكمّل القطعة دي» (اقتراح اختياري في صفحة المنتج): بنسأل محرك تويلا (قواعد بس، من غير موديل لغة) ونرد بالطقم
 // لو ومعاه بس لو كامل ومتناسق (acceptSmartLook)؛ غير كده ok:false والواجهة تسكت. مفيش إجبار ولا قطعة عشوائية.
 const smartLookCache = new Map();
+// what the shopper does with a suggested look (removes / swaps a piece, asks for another look, adds it all) and why looks were rejected: the feedback loop for the quality bar
+function logSmartLook(event, productId, data = {}) {
+  try { q.run('INSERT INTO smart_look_events (product_id, event, data_json) VALUES (?,?,?)', [Number(productId) || null, String(event).slice(0, 24), JSON.stringify(data).slice(0, 1500)]); } catch { /* telemetry never breaks a page */ }
+}
+const smartLookEventHits = new Map();
+r.post('/stylist/smart-look/event', h((req, res) => {
+  const body = z.object({ productId: z.number().int().positive(), event: z.enum(['remove', 'restore', 'swap', 'another', 'add_all']), pieceId: z.number().int().positive().optional(), ids: z.array(z.number().int().positive()).max(12).optional() }).parse(req.body);
+  const ip = req.ip || 'x'; const now = Date.now();
+  const recent = (smartLookEventHits.get(ip) || []).filter((t) => now - t < 3600e3);
+  if (recent.length >= 120) return res.status(204).end();
+  smartLookEventHits.set(ip, [...recent, now]);
+  logSmartLook(body.event, body.productId, { pieceId: body.pieceId, ids: body.ids });
+  res.status(204).end();
+}));
 const smartLookHits = new Map();
 r.post('/stylist/smart-look', h(async (req, res) => {
   const st = stylistSettings();
   if (!st.enabled) return res.json({ ok: false, reason: 'disabled' });
-  const body = z.object({ productId: z.number().int().positive(), budget: z.number().positive().max(1e6).optional() }).parse(req.body);
+  const body = z.object({ productId: z.number().int().positive(), budget: z.number().positive().max(1e6).optional(), exclude: z.array(z.number().int().positive()).max(40).optional() }).parse(req.body);
+  const ex = new Set(body.exclude || []); // «طقم تاني»: القطع اللي اتعرضت قبل كده ما بترجعش
   const ip = req.ip || 'x'; const now = Date.now();
   const recent = (smartLookHits.get(ip) || []).filter((t) => now - t < 3600e3);
   if (recent.length >= 60) throw new AppError(429, 'rate_limited', 'Too many requests, try again later.');
   smartLookHits.set(ip, [...recent, now]);
   const cacheKey = `${body.productId}:${body.budget || 0}`;
-  const hit = smartLookCache.get(cacheKey);
-  if (hit && now - hit.at < 10 * 60e3) return res.json(hit.out);
+  // a cached look is only reused while every piece (picked or offered as a swap) is still buyable: active, in stock, and with at least one variant that has stock
+  const stillBuyable = (out) => {
+    if (!out?.ok) return true;
+    const ids = [...new Set((out.looks || []).flatMap((l) => (l.items || []).map((i) => i.id)))];
+    if (!ids.length) return true;
+    const ph = ids.map(() => '?').join(',');
+    const live = new Set(q.all(`SELECT id FROM products WHERE id IN (${ph}) AND status='active' AND (track_stock=0 OR stock>0)`, ids).map((x) => x.id));
+    if (live.size !== ids.length) return false;
+    return !q.all(`SELECT product_id FROM variants WHERE product_id IN (${ph}) GROUP BY product_id HAVING SUM(CASE WHEN stock>0 THEN 1 ELSE 0 END)=0`, ids).length;
+  };
+  const hit0 = ex.size ? null : smartLookCache.get(cacheKey);
+  const hit = hit0 && now - hit0.at < Number(process.env.SMARTLOOK_CACHE_MS ?? 10 * 60e3) && stillBuyable(hit0.out) ? hit0 : null;
+  if (hit) return res.json(hit.out);
   const rows = modaCatalogRows();
   const enriched = enrichModaRows(rows, loadModaKnowledge());
   const anchor = enriched.find((x) => x.id === body.productId);
-  const finish = (out) => { if (smartLookCache.size > 500) smartLookCache.clear(); smartLookCache.set(cacheKey, { at: now, out }); return res.json(out); };
+  const finish = (out) => { if (!ex.size) { if (smartLookCache.size > 500) smartLookCache.clear(); smartLookCache.set(cacheKey, { at: now, out }); } return res.json(out); };
   if (!anchor) return finish({ ok: false, reason: 'not_found' });
   const text = smartLookText(anchor);
   if (!text) return finish({ ok: false, reason: 'audience_unknown' });
-  const result = await runModa([{ role: 'user', content: text }], { products: rows, assistantName: st.name, offers: liveOffersForModa, stores: storesForModa, training: stylistTrainingSettings() });
-  const verdict = acceptSmartLook(result, { anchorId: anchor.id, anchorKey: anchor.key, anchorFormal: isFormalAnchor(anchor), keyOf: (id) => enriched.find((x) => x.id === id)?.key, budget: body.budget || null });
-  if (!verdict.ok) return finish({ ok: false, reason: verdict.reason });
+  const result = await runModa([{ role: 'user', content: text }], { products: ex.size ? rows.filter((x) => x.id === anchor.id || !ex.has(x.id)) : rows, assistantName: st.name, offers: liveOffersForModa, stores: storesForModa, training: stylistTrainingSettings() });
+  const verdict = acceptSmartLook(result, { anchorId: anchor.id, anchorKey: anchor.key, anchorFormal: isFormalAnchor(anchor), keyOf: (id) => enriched.find((x) => x.id === id)?.key, budget: body.budget || null, minPieces: Math.max(1, minimumPiecesForLook(anchor.key) - 1) });
+  if (!verdict.ok) { logSmartLook('rejected', body.productId, { reason: verdict.reason }); return finish({ ok: false, reason: verdict.reason }); }
+  // independent reviewer of the final outfit (anchor + pieces): real variant stock, data safety, quality score. Below the bar = nothing shown.
+  const K = loadModaKnowledge();
+  const monthNow = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', month: 'numeric' }).format(new Date()));
+  const vmap = new Map();
+  const loadVariants = (ids) => { const need = [...new Set(ids)].filter((id) => !vmap.has(id)); if (!need.length) return; for (const id of need) vmap.set(id, []); for (const v of q.all(`SELECT product_id, color, size, stock FROM variants WHERE product_id IN (${need.map(() => '?').join(',')})`, need)) vmap.get(v.product_id).push(v); };
+  const reviewRows = (rows) => { loadVariants(rows.filter(Boolean).map((x) => x.id)); return reviewLook(rows, { heroKey: anchor?.key, variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month: monthNow }); };
+  const pieceRows = verdict.ids.map((id) => enriched.find((x) => x.id === id));
+  const review = reviewRows([anchor, ...pieceRows]);
+  if (!review.ok) { logSmartLook('rejected', body.productId, { reason: 'review', score: review.score, why: review.reasons.slice(0, 8) }); return finish({ ok: false, reason: 'review_failed' }); }
+  result.__reviewScore = review.score;
   const resp = modaClientResponse(result);
   if (!resp.looks?.length || resp.looks.length !== verdict.ids.length) return finish({ ok: false, reason: 'cards_missing' });
   // بدائل كل قطعة (تيشرت/بولو/هودي/جاكيت…) عشان العميل يبدّل جوه نفس الطقم؛ items[0] هو الاختيار الأساسي
@@ -734,11 +804,16 @@ r.post('/stylist/smart-look', h(async (req, res) => {
   // ببيون ⇄ كرافتة: كل واحدة بديل التانية جوه نفس الطقم (لو متاحة عند المحلات)
   const TIE_PAIR = { bow_tie: 'tie', tie: 'bow_tie' };
   const hasCuff = anchor.frenchCuff || flatItems.some((x) => enriched.find((e) => e.id === x.id)?.frenchCuff); // الكرافتة العادية ما بتتلبسش مع قميص المانشت المزدوجة
-  const tieAlt = (it) => hasCuff && it?.key === 'bow_tie' ? [] : enriched.filter((x) => x.key === TIE_PAIR[it?.key] && x.gender === anchor.gender && x.inStock && !x.typeConflict).sort((a, b) => a.price - b.price).slice(0, 1).map((x) => ({ id: x.id }));
+  const tieAlt = (it) => hasCuff && it?.key === 'bow_tie' ? [] : enriched.filter((x) => x.key === TIE_PAIR[it?.key] && !ex.has(x.id) && x.gender === anchor.gender && x.inStock && !x.typeConflict).sort((a, b) => a.price - b.price).slice(0, 1).map((x) => ({ id: x.id }));
   const altsOf = (it) => [...(it.alts || []), ...tieAlt(it)];
-  const altCards = new Map(cardsByIds(flatItems.flatMap((it) => altsOf(it).map((a) => a.id))).map((c) => [c.id, c]));
-  resp.looks = resp.looks.map((l, i) => ({ ...l, items: [...l.items, ...(altsOf(flatItems[i] || {}).map((a) => altCards.get(a.id)).filter(Boolean))] }));
-  return finish({ ok: true, anchorId: anchor.id, total: resp.total, looks: resp.looks, styleTips: resp.styleTips || [], palette: resp.palette || [] });
+  // a swap option is only offered if the look WITH that option still passes the same review (stock, data safety, colours, season…)
+  const altIdsOf = (i) => [...new Set(altsOf(flatItems[i] || {}).map((a) => a.id))].filter((id) => !ex.has(id) && id !== anchor.id && !verdict.ids.includes(id));
+  loadVariants(flatItems.flatMap((_, i) => altIdsOf(i)));
+  const goodAlts = flatItems.map((_, i) => new Set(altIdsOf(i).filter((id) => { const alt = enriched.find((x) => x.id === id); if (!alt) return false; const rows = [...pieceRows]; rows[i] = alt; return reviewRows([anchor, ...rows]).ok; })));
+  const altCards = new Map(cardsByIds([...new Set(goodAlts.flatMap((g) => [...g]))]).map((c) => [c.id, c]));
+  resp.looks = resp.looks.map((l, i) => ({ ...l, items: [...l.items, ...[...(goodAlts[i] || [])].map((id) => altCards.get(id)).filter(Boolean)] }));
+  logSmartLook('shown', body.productId, { score: result.__reviewScore, ids: verdict.ids });
+  return finish({ ok: true, score: result.__reviewScore, anchorId: anchor.id, total: resp.total, looks: resp.looks, styleTips: resp.styleTips || [], palette: resp.palette || [] });
 }));
 
 r.post('/stylist/feedback', h((req, res) => {

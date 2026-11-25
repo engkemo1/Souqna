@@ -680,6 +680,15 @@ async function runModaCore(messages, opts = {}) {
     if (!ps.length && p?.genderHint === 'female') return 'women';
     if (!ps.length && p?.genderHint === 'male') return 'men';
     return null; };
+  // قطعة العميل الشخصية قد تكون واضحة ("معايا هاف بوت") لكن لا نخمّن صاحبها من نوع القطعة.
+  // اسأل عن الجمهور قبل التخطيط؛ وإلا ينتهي الطلب برسالة "مفيش نتيجة" بدل سؤال واحد مفيد.
+  if (!hasAnswers && !session?.pending && parsed.ownedPieces?.length && !parsed.persons?.length
+    && /(نسق|طقم|لوك|باقي|اكمل|يليق|تمشي|يمشي|معاه|معاها|اجيب|اشتري)/.test(norm(text))) {
+    const q = clarify('تمام، القطعة دي ليك ولا ليها؟ عشان أنسّق باقي الطقم صح.', 'who_is_it_for', 'الطقم لمين؟', [
+      { label: 'رجالي', value: 'men' }, { label: 'حريمي', value: 'women' },
+    ]);
+    return { ...q, session: { ...q.session, parsed } };
+  }
   const WOMEN_TYPES = new Set(['dress_any', 'two_piece_set', 'jumpsuit', 'blouse', 'skirt', 'abaya', 'lingerie']);
   const MEN_TYPES = new Set(['suit', 'shirt', 'blazer']);
   // يكمّل نوع المنتج اللي العميل اختاره على المناسبة والستايل والجمهور والمقاس اللي اتقالوا قبل كده (من غير ما نسأل تاني)
