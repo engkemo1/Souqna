@@ -41,14 +41,23 @@ const parse = (t) => { const s = String(t || ''); const a = s.indexOf('{'); cons
 
 async function viaGemini(buf, PROMPT) {
   const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY; if (!key) throw new Error('no gemini key');
-  const model = process.env.FACTS_GEMINI_MODEL || 'gemini-2.0-flash';
-  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, signal: AbortSignal.timeout(40000),
-    body: JSON.stringify({ contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: 'image/jpeg', data: b64(buf) } }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }),
-  });
-  const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(`gemini ${r.status}`);
-  return { out: parse(j.candidates?.[0]?.content?.parts?.[0]?.text), model };
+  // Google retires Gemini models without much notice (a retired model answers 404): try the configured one, then the current ones, and remember the one that works.
+  const candidates = [...new Set([geminiModelOk, process.env.FACTS_GEMINI_MODEL, 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash'].filter(Boolean))];
+  let last = 'gemini: no model';
+  for (const model of candidates) {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, signal: AbortSignal.timeout(40000),
+      body: JSON.stringify({ contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: 'image/jpeg', data: b64(buf) } }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }),
+    });
+    const j = await r.json().catch(() => ({}));
+    if (r.status === 404) { last = `gemini ${model} 404 (retired?)`; continue; }
+    if (!r.ok) throw new Error(`gemini ${model} ${r.status}`);
+    geminiModelOk = model;
+    return { out: parse(j.candidates?.[0]?.content?.parts?.[0]?.text), model };
+  }
+  throw new Error(last);
 }
+let geminiModelOk = null;
 async function viaAnthropic(buf, PROMPT) {
   const key = process.env.ANTHROPIC_API_KEY; if (!key) throw new Error('no anthropic key');
   const model = process.env.FACTS_ANTHROPIC_MODEL || 'claude-haiku-4-5';
