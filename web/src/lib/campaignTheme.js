@@ -4,7 +4,7 @@
  */
 export const THEMES = {
   // «وفّرها مرتين»: the shop's discount + Twist's extra one. Twist's own navy and orange — no Black Friday artwork.
-  twice: { name: 'وفّرها مرتين', c1: '#03244D', c2: '#FF8A3D', glyphs: ['٪', '%', '✦', '🏷️'], pct: true, emoji: '✌️' },
+  twice: { name: 'وفّرها مرتين', c1: '#03244D', c2: '#FF8A3D', glyphs: ['٪', '%', '✦', '🏷️'], pct: true, emoji: '✌️', art: '/brand/bf-bg.webp' },
   blackfriday: { name: 'بلاك فرايدي', c1: '#111111', c2: '#F5B301', glyphs: ['%', '٪', '🏷️'], pct: true, emoji: '🔥', art: '/brand/bf-bg.webp' },
   newyear: { name: 'رأس السنة', c1: '#0B1B3F', c2: '#F4C95D', glyphs: ['✨', '🎉', '🎆', '⭐', '🥂'], emoji: '🎆' },
   ramadan: { name: 'رمضان', c1: '#2A1458', c2: '#E9B949', glyphs: ['🌙', '⭐', '✦', '🏮'], emoji: '🌙' },
