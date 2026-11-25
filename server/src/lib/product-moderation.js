@@ -559,10 +559,15 @@ export function analyzeProduct(p, ctx = buildModerationContext()) {
 
   const storeCandidateSlugs = ctx.expandStoreSlugs(storeDepts).filter(fitsGender);
   const genderCandidateSlugs = ctx.candidateSlugs.filter(fitsGender);
+  const departmentText = [nameText, p.description_ar, p.description_en, p.size_list,
+    typeof p.sizes_json === 'string' ? p.sizes_json : JSON.stringify(p.sizes_json || ''), p.category_name_ar, p.category_name_en].filter(Boolean).join(' ');
+  const inferredStoreDept = storeCandidateSlugs.length ? inferDepartment(departmentText, storeCandidateSlugs) : null;
+  const babyDept = ['kids_baby', 'kids_newborn'].includes(inferredStoreDept) ? inferredStoreDept : null;
 
   const suggestedDeptSlug = matchCustomSubDepartment(nameText, effectiveKey, storeCandidateSlugs, ctx)
+    || babyDept
     || (effectiveKey && storeCandidateSlugs.length && deriveDepartment(effectiveKey, effectiveGender, storeCandidateSlugs, ctx.K))
-    || (storeCandidateSlugs.length && inferDepartment(nameText, storeCandidateSlugs))
+    || inferredStoreDept
     || matchCustomSubDepartment(nameText, effectiveKey, genderCandidateSlugs, ctx)
     || (effectiveKey && deriveDepartment(effectiveKey, effectiveGender, genderCandidateSlugs, ctx.K))
     || inferDepartment(nameText, genderCandidateSlugs)

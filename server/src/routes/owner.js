@@ -801,6 +801,8 @@ const colorSchema = z.object({ name_ar: z.string().trim().min(1).max(30), name_e
 /** A product's department must be one the store sells in; single-department stores default to it. */
 function productDepartment(storeId, wanted, text = '', modaKey = null, audience = null) {
   const mine = decodeDepartments(q.val('SELECT departments FROM stores WHERE id=?', [storeId]));
+  const babyHint = inferDepartment(text, mine);
+  if (['kids_baby', 'kids_newborn'].includes(babyHint) && (!wanted || ['kids', 'kids_boys', 'kids_girls'].includes(wanted))) wanted = babyHint;
   if (!wanted && modaKey) wanted = deriveDepartment(modaKey, audienceOrNull(audience), mine) || null; // من النوع والفئة: صاحب المحل مش محتاج يختار القسم
   if (wanted) {
     if (!mine.includes(wanted)) {
@@ -929,7 +931,7 @@ export function saveProduct(storeId, data, existing) {
     const row = {
       name_ar: data.name_ar, name_en: data.name_en || data.name_ar, description_ar: data.description_ar, description_en: data.description_en,
       price: data.price, compare_at_price: data.compare_at_price || null, sale_ends_at: data.compare_at_price ? (data.sale_ends_at ?? null) : null, cost: data.cost ?? null, sku: data.sku || null, ...(data.barcode !== undefined ? { barcode: data.barcode || null } : {}),
-      category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, wantedDept, `${data.name_ar} ${data.name_en}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
+      category_id: data.category_id || null, audience: AUDIENCE_KEYS.has(data.audience) ? data.audience : null, department: productDepartment(storeId, wantedDept, `${data.name_ar} ${data.name_en} ${data.description_ar} ${data.description_en} ${JSON.stringify(data.sizes || [])}`, data.moda_key, data.audience) ?? existing?.department ?? null, style_level: data.style_level ?? null, moda_key: data.moda_key || null, badge_text: data.badge_text ? data.badge_text.replace(/<[^>]*>/g, '').trim() || null : null, badge_tone: BADGE_TONES.includes(data.badge_tone) ? data.badge_tone : null, status: data.status, featured: data.featured ? 1 : 0, is_new: data.is_new ? 1 : 0,
       colors_json: JSON.stringify(data.colors), sizes_json: JSON.stringify(data.sizes), track_stock: data.track_stock ? 1 : 0,
       stock, low_stock_at: data.low_stock_at, ...(data.try_sizes !== undefined ? { try_sizes: data.try_sizes ? 1 : 0 } : {}), ...(data.size_fit !== undefined ? { size_fit: data.size_fit || null } : {}), ...(data.size_fit_ai_on !== undefined ? { size_fit_ai_on: data.size_fit_ai_on ? 1 : 0 } : {}), ...(data.material !== undefined ? { material_ar: (data.material || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.care !== undefined ? { care_ar: (data.care || '').replace(/<[^>]*>/g, '').trim() || null } : {}), ...(data.no_return !== undefined ? { no_return: data.no_return ? 1 : 0 } : {}), seo_title: data.seo_title || null, seo_description: data.seo_description || null, updated_at: nowIso(),
     };

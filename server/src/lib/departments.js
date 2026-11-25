@@ -3,6 +3,7 @@ import { q, insert } from '../db/index.js';
 import { AppError } from './errors.js';
 import { json } from '../db/index.js';
 import { assetUrls } from './image-assets.js';
+import { parseChildSizes } from './moda/childfit.js';
 
 export const PENDING_RE = /^c\d+_/;
 const rowToDef = (r) => ({ key: r.key, ar: r.label_ar, en: r.label_en, type: r.type, options: json(r.options_json, []), required: !!r.required, filterable: !!r.filterable, merchant_only: !!r.merchant_only, active: !!r.active, sort: r.sort });
@@ -110,22 +111,96 @@ const norm = (x) => String(x || '').toLowerCase().replace(/[أإآ]/g, 'ا').rep
 /** Best-guess department for a product from its text, limited to the departments the store sells. Returns null when unsure. */
 export function inferDepartment(text, allowed) {
   const t = norm(text);
+  // Prefer an age-specific baby section over the generic boys/girls section. Without this,
+  // a shop that sells both baby and girls' clothes files a "2Y baby romper" under girls.
+  const available = new Set(allowed);
+  if ([...available].some((slug) => slug === 'kids' || slug.startsWith('kids_'))) for (const slug of ['kids_newborn', 'kids_baby']) available.add(slug);
+  const babyText = t
+    .replace(/baby\s*-?\s*(?:doll|blue|pink)|بيبي\s*دول|بيبي\s*(?:بلو|بينك|بنك)/g, ' ');
+  const babyTokens = babyText.replace(/[^a-z0-9\u0600-\u06FF]+/g, ' ');
+  const ranges = parseChildSizes(babyText);
+  const hasNewbornCue = /(^| )(?:حديثي الولاده|حديث الولاده|مواليد|مولود(?:ه| جديد)?|newborn|new born)( |$)/.test(babyTokens);
+  const hasBabyCue = /(^| )(?:رضيع|رضع|رضيعه|مولوده|للبيبي|بيبي|baby|babies|infant|toddler)( |$)/.test(babyTokens);
+  // A size run that also reaches older children (e.g. 0-3M ... 14Y) is a general kids product, not a baby one;
+  // and an adult-audience word in the text means "baby" is just part of the wording (baby blue, baby hand...).
+  const adultCue = /(^| )(?:رجالي|رجال|حريمي|نسائي|شبابي|men|mens|women|womens|ladies|gents)( |$)/.test(babyTokens);
+  const olderSizes = ranges.some((r) => r.minAgeMonths >= 36);
+  const babyOk = !adultCue && !olderSizes;
+  const newbornAge = babyOk && ranges.length > 0 && ranges.every((r) => r.maxAgeMonths <= 3);
+  const babyAge = babyOk && (ranges.some((r) => r.minAgeMonths < 36 && r.maxAgeMonths < 36)
+    || /(^| )(?:سن|عمر|لعمر)\s*(?:سنه|عام|واحد|واحده|١|1|سنتين|عامين|اتنين|اثنين|٢|2)( |$)/.test(babyTokens)
+    || /(^| )(?:سنتين|عامين)( |$)/.test(babyTokens));
+  if ((babyOk && hasNewbornCue) || newbornAge) {
+    for (const slug of ['kids_newborn', 'kids_baby', 'kids']) if (available.has(slug)) return slug;
+  }
+  if ((babyOk && hasBabyCue) || babyAge) {
+    for (const slug of ['kids_baby', 'kids_newborn', 'kids']) if (available.has(slug)) return slug;
+  }
   for (const [slugs, words] of HINTS) {
-    if (!words.some((w) => t.includes(norm(w)))) continue;
-    const hit = slugs.find((sl) => allowed.includes(sl));
+    if (!words.some((w) => babyTokens.includes(norm(w)))) continue;
+    if (adultCue && slugs[0].startsWith('kids')) continue;
+    const hit = slugs.find((sl) => available.has(sl));
     if (hit) return hit;
   }
   return null;
 }
 
-/** Fills the department of legacy products in multi-department stores (only when a confident guess exists). */
-export function backfillDepartments() {
+/** True when the text lists a child size of 3 years or more (e.g. 4Y, 10Y, 14Y): such a product is not a baby/newborn one. */
+export function hasOlderChildSizes(text) {
+  return parseChildSizes(norm(text)).some((r) => r.minAgeMonths >= 36);
+}
+
+/**
+ * Fills missing legacy departments and corrects only strongly identified baby/newborn misfilings.
+ * - moves kids products with clear baby/newborn evidence into «رضع» / «حديثي الولادة»;
+ * - moves a product OUT of those two when its sizes reach 3 years or older (it stays in the kids family);
+ * - never touches products filed under a non-kids section.
+ * `dryRun` changes nothing; `report` (array) receives {id, name, from, to} for every product that is (or would be) moved.
+ */
+export function backfillDepartments({ dryRun = false, report = null } = {}) {
   let n = 0;
-  for (const s of q.all("SELECT id, departments FROM stores WHERE LENGTH(departments) - LENGTH(REPLACE(departments, ',', '')) > 2")) {
-    const allowed = s.departments.split(',').filter(Boolean);
-    for (const p of q.all('SELECT p.id, p.name_ar, p.name_en, c.name_ar AS cat_ar, c.name_en AS cat_en FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.store_id=? AND p.department IS NULL', [s.id])) {
-      const d = inferDepartment(`${p.name_ar} ${p.name_en} ${p.cat_ar || ''} ${p.cat_en || ''}`, allowed);
-      if (d) { q.run('UPDATE products SET department=? WHERE id=?', [d, p.id]); n++; }
+  for (const s of q.all('SELECT id, departments FROM stores')) {
+    const allowed = String(s.departments || '').split(',').filter(Boolean);
+    const sellsKids = allowed.some((d) => d === 'kids' || d.startsWith('kids_'));
+    if (!allowed.length) continue;
+    const candidates = sellsKids
+      ? q.all(`SELECT p.id, p.name_ar, p.name_en, p.description_ar, p.description_en, p.sizes_json, p.department,
+                 c.name_ar AS cat_ar, c.name_en AS cat_en, GROUP_CONCAT(v.size, ' ') AS variant_sizes
+               FROM products p LEFT JOIN categories c ON c.id=p.category_id LEFT JOIN variants v ON v.product_id=p.id
+               WHERE p.store_id=? AND p.status='active' AND (
+                 p.department IS NULL OR p.department IN ('kids','kids_boys','kids_girls','kids_baby','kids_newborn')
+                 OR lower(coalesce(p.name_ar,'') || ' ' || coalesce(p.name_en,'') || ' ' || coalesce(p.description_ar,'') || ' ' || coalesce(p.description_en,'') || ' ' || coalesce(c.name_ar,'') || ' ' || coalesce(c.name_en,'')) LIKE '%رضع%'
+                 OR lower(coalesce(p.name_ar,'') || ' ' || coalesce(p.name_en,'') || ' ' || coalesce(p.description_ar,'') || ' ' || coalesce(p.description_en,'') || ' ' || coalesce(c.name_ar,'') || ' ' || coalesce(c.name_en,'')) LIKE '%بيبي%'
+                 OR lower(coalesce(p.name_ar,'') || ' ' || coalesce(p.name_en,'') || ' ' || coalesce(p.description_ar,'') || ' ' || coalesce(p.description_en,'') || ' ' || coalesce(c.name_ar,'') || ' ' || coalesce(c.name_en,'')) LIKE '%مواليد%'
+                 OR lower(coalesce(p.name_en,'') || ' ' || coalesce(p.description_en,'')) LIKE '%baby%'
+                 OR lower(coalesce(p.sizes_json,'')) LIKE '%year%' OR lower(coalesce(p.sizes_json,'')) LIKE '%month%' OR lower(coalesce(p.sizes_json,'')) LIKE '%1y%' OR lower(coalesce(p.sizes_json,'')) LIKE '%2y%' OR lower(coalesce(p.sizes_json,'')) LIKE '%0-3m%' OR lower(coalesce(p.sizes_json,'')) LIKE '%12-18m%' OR p.sizes_json LIKE '%سنة%' OR p.sizes_json LIKE '%شهر%'
+                 OR EXISTS (SELECT 1 FROM variants av WHERE av.product_id=p.id AND (
+                   lower(av.size) IN ('1y','2y','1 y','2 y','0-3m','3-6m','6-12m','12m','18m','24m','12-18m','12-24m','18-24m','1-2y')
+                   OR lower(av.size) LIKE '%year%' OR lower(av.size) LIKE '%month%' OR av.size LIKE '%سنة%' OR av.size LIKE '%شهر%'))
+               )
+               GROUP BY p.id`, [s.id])
+      : q.all("SELECT p.id, p.name_ar, p.name_en, p.description_ar, p.description_en, p.sizes_json, p.department, c.name_ar AS cat_ar, c.name_en AS cat_en, '' AS variant_sizes FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.store_id=? AND p.department IS NULL AND LENGTH(?) - LENGTH(REPLACE(?, ',', '')) > 2", [s.id, s.departments, s.departments]);
+    for (const p of candidates) {
+      const text = `${p.name_ar || ''} ${p.name_en || ''} ${p.description_ar || ''} ${p.description_en || ''} ${p.sizes_json || ''} ${p.variant_sizes || ''} ${p.cat_ar || ''} ${p.cat_en || ''}`;
+      let d = inferDepartment(text, allowed);
+      const inBaby = p.department === 'kids_baby' || p.department === 'kids_newborn';
+      // A product filed under «رضع» / «حديثي الولادة» whose sizes reach older children goes back to the general kids section.
+      const demote = inBaby && hasOlderChildSizes(text);
+      if (demote) d = allowed.includes('kids') ? 'kids' : (['kids_boys', 'kids_girls'].find((x) => allowed.includes(x)) || null);
+      if (!d) continue;
+      const babyDept = d === 'kids_baby' || d === 'kids_newborn';
+      if (p.department && !/^kids(_|$)/.test(p.department) && p.department !== d) continue; // never pull an adult-section product into kids
+      if (p.department && !babyDept && p.department !== d && !demote) continue;
+      if (p.department !== d) {
+        if (report) report.push({ id: p.id, name: p.name_ar || p.name_en, from: p.department || null, to: d });
+        if (dryRun) { n++; continue; }
+        q.run('UPDATE products SET department=? WHERE id=?', [d, p.id]); n++;
+        if (babyDept && !allowed.includes(d)) {
+          allowed.push(d);
+          q.run('UPDATE stores SET departments=? WHERE id=?', [`,${[...new Set(allowed)].join(',')},`, s.id]);
+          ensureDeptCategories(s.id, [d]);
+        }
+      }
     }
   }
   return n;

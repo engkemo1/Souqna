@@ -51,6 +51,8 @@ export function beautyMatch(text, products, { limit = 8, budget = null } = {}) {
   // مفيش ولا منتج في أقسام التجميل، لكن في منتج اسمه/تصنيفه بيطابق اللي العميل طلبه: سيب البحث العادي يلاقيه بدل «مفيش»
   if (!beauty.length && (products || []).some((p) => p && p.inStock !== false && hasTerm(hay(p), cfg.ask))) return null;
   let pool = cfg.dept ? beauty.filter((p) => cfg.dept.test(String(p.department || '')) || (!/^(care|hair_care|makeup|perfumes|beauty_|perfume_)/.test(String(p.department || '')) && cfg.name.test(`${p.name_ar} ${p.name_en}`))) : beauty;
+  // «كريم للبشرة» ماتجيبش كريم شعر أو مستحضرات استحمام/عطور بس عشان قسمها «care»: لو عندنا غيرها نستبعدهم
+  if (topic === 'skin') { const OFF = /(hair|شعر|shampoo|شامبو|conditioner|بلسم|bath and body|bath & body|body mist|body wash|body lotion|بديكير|عطر|perfume|parfum|mist|ميست)/i; const on = pool.filter((p) => !OFF.test(`${p.name_ar} ${p.name_en}`)); if (on.length) pool = on; }
   // كلمة محددة («روج»، «سيروم»، «ماسك») → اللي اسمه فيها الأول
   const words = n.split(' ').map((w) => w.replace(PRE, '')).filter((w) => w.length >= 3);
   const specific = pool.filter((p) => { const h = ` ${hay(p)} `; return words.some((w) => { const g = SYN.find((x) => x.includes(w)); return g ? g.some((y) => h.includes(y)) : false; }); });

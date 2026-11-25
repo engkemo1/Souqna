@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Plus, ExternalLink, LogIn, Link2, Package, Trash2, Pin, Copy, Pencil, Search, Check, X, ChevronDown } from 'lucide-react';
+import { Plus, ExternalLink, LogIn, Link2, Package, Trash2, Pin, Copy, Pencil, Search, Check, X, ChevronDown, Phone, MessageCircle } from 'lucide-react';
 import { PageHeader, FilterTabs, SearchInput } from '../../components/dash/Kit.jsx';
 import Button from '../../components/ui/Button.jsx';
 import Badge from '../../components/ui/Badge.jsx';
@@ -13,6 +13,28 @@ import { tokenStore } from '../../lib/api.js';
 import { adminApi, useAdminApi, fmtMoney, fmtNum, fmtDateTime, useAdminDepartments } from './adminApi.js';
 import { LocationPicker } from '../../components/ui/MapView.jsx';
 import PlaceAutocomplete from '../../components/ui/PlaceAutocomplete.jsx';
+
+const digits = (v) => String(v || '').replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '');
+const waNumber = (v) => { const d = digits(v); return d.startsWith('0') ? `20${d.slice(1)}` : d; };
+const copyText = async (text) => { try { await navigator.clipboard.writeText(text); return true; } catch { try { const t = document.createElement('textarea'); t.value = text; t.style.position = 'fixed'; t.style.opacity = '0'; document.body.appendChild(t); t.select(); const ok = document.execCommand('copy'); t.remove(); return ok; } catch { return false; } } };
+
+/** نسخ رقم صاحب المحل + فتح واتساب + اتصال. بيشتغل جوه صفوف قابلة للضغط (بيمنع فتح الصف). */
+const PhoneActions = ({ phone, whatsapp, className = '' }) => {
+  const toast = useToast();
+  const num = digits(phone) || digits(whatsapp);
+  if (!num) return null;
+  const wa = waNumber(whatsapp || phone);
+  const stop = (e) => e.stopPropagation();
+  const chip = 'inline-flex items-center gap-1 rounded-full border border-line bg-elevated px-2.5 py-1 text-xs font-medium transition hover:bg-fg/[0.06]';
+  return (
+    <span className={cx('flex flex-wrap items-center gap-1.5', className)} onClick={stop} onKeyDown={stop}>
+      <span dir="ltr" className="text-[13px] tabular text-muted">{phone || whatsapp}</span>
+      <button type="button" className={chip} onClick={async (e) => { e.stopPropagation(); toast(await copyText(num) ? { title: 'اتنسخ الرقم' } : { tone: 'error', title: 'مقدرتش أنسخ، انسخه يدوي' }); }}><Copy className="h-3.5 w-3.5" />نسخ</button>
+      <a className={chip} href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer"><MessageCircle className="h-3.5 w-3.5" />واتساب</a>
+      <a className={chip} href={`tel:+${waNumber(phone || whatsapp)}`}><Phone className="h-3.5 w-3.5" />اتصال</a>
+    </span>
+  );
+};
 
 const nzAr = (x) => String(x || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').trim();
 
@@ -301,7 +323,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
             <Field label="الاسم (عربي)"><Input value={f.name_ar} onChange={(e) => setF({ ...f, name_ar: e.target.value })} /></Field>
             <Field label="الاسم (إنجليزي)"><Input dir="ltr" value={f.name_en} onChange={(e) => setF({ ...f, name_en: e.target.value })} className="text-start" /></Field>
             <Field label="رابط المتجر" hint={`twistegy.com/s/${f.slug || ''} — الرابط القديم بيحوّل للجديد تلقائي`}><Input dir="ltr" value={f.slug || ''} onChange={(e) => setF({ ...f, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '') })} className="text-start" /></Field>
-            <Field label="رقم التليفون"><Input dir="ltr" inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className="text-start" /></Field>
+            <Field label="رقم التليفون"><div className="space-y-1.5"><Input dir="ltr" inputMode="tel" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} className="text-start" /><PhoneActions phone={f.phone} whatsapp={store.whatsapp} /></div></Field>
             <Field label="ترتيب الظهور" hint="الأصغر يظهر الأول"><Input type="number" dir="ltr" min={0} value={f.sort_order} onChange={(e) => setF({ ...f, sort_order: e.target.value })} /></Field>
           </div>
           <div className="rounded-2xl border border-line p-4">
@@ -382,7 +404,7 @@ export default function Stores() {
           <ul className="divide-y divide-line">
             {shown.map((s) => (
               <li key={s.slug}>
-                <button type="button" onClick={() => setEdit(s)} className="flex w-full flex-col gap-2 px-4 py-3.5 text-start transition hover:bg-fg/[0.025] sm:flex-row sm:items-center sm:gap-4 sm:px-5">
+                <div role="button" tabIndex={0} onClick={() => setEdit(s)} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setEdit(s); } }} className="flex w-full cursor-pointer flex-col gap-2 px-4 py-3.5 text-start transition hover:bg-fg/[0.025] sm:flex-row sm:items-center sm:gap-4 sm:px-5">
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 font-semibold">{s.name_ar}
                       {s.status !== 'active' && <Badge tone="danger" size="sm">موقوف</Badge>}
@@ -391,7 +413,8 @@ export default function Stores() {
                       {s.lat == null && <Badge tone="warning" size="sm">📍 بدون موقع</Badge>}
                       {s.owner_disabled && <Badge tone="danger" size="sm">الدخول معطّل</Badge>}
                     </p>
-                    <p className="mt-0.5 truncate text-[13px] text-muted">{s.owner_name} · {s.owner_email} · {s.phone}</p>
+                    <p className="mt-0.5 truncate text-[13px] text-muted">{s.owner_name} · {s.owner_email}</p>
+                    <PhoneActions phone={s.phone} whatsapp={s.whatsapp} className="mt-1.5" />
                     <p className="mt-1 flex flex-wrap gap-1">{(s.departments.length ? s.departments : [s.category]).map((d) => <span key={d} className="rounded-full bg-fg/[0.06] px-2 py-0.5 text-xs">{depts.label(d)}</span>)}</p>
                   </div>
                   <div className="flex shrink-0 gap-6 text-sm sm:text-end">
@@ -400,7 +423,7 @@ export default function Stores() {
                     <div className="min-w-24"><p className="text-xs text-muted">مبيعات</p><p className="font-semibold tabular">{fmtMoney(s.revenue)}</p></div>
                     <Pencil className="hidden h-4 w-4 self-center text-muted sm:block" />
                   </div>
-                </button>
+                </div>
               </li>
             ))}
           </ul>

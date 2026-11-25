@@ -4,6 +4,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
 import { listDepartments, customerDepartments, deptSubtree, deptAncestors, deptAttrDefs, deptProfile } from '../lib/departments.js';
+import { sizeFacets, sizeFilterSets, babySizes, newbornSizes } from '../lib/size-normalize.js';
 import { z } from 'zod';
 import { q, tx, insert, json, db } from '../db/index.js';
 import { resolveAlias } from '../lib/category-aliases.js';
@@ -70,6 +71,13 @@ const r = Router();
 
 /** Tiny time-boxed memo for heavy read-only queries (facet counts): identical questions inside `ms` reuse the answer. Bounded size. */
 const MEMO = new Map();
+/** every distinct (size, is-a-kids-product) pair in the catalogue: lets the size filter understand «10Y = 10y = ١٠» and kids' ages (kept 60 s) */
+const distinctSizeRows = () => memo('size-rows', 60_000, () => {
+  const kids = deptSubtree('kids');
+  return q.all(`SELECT DISTINCT v.size AS size, CASE WHEN p.department IN (${kids.map(() => '?').join(',') || "''"}) OR p.audience IN ('kids','boys','girls') THEN 1 ELSE 0 END AS kid FROM variants v JOIN products p ON p.id=v.product_id WHERE p.status='active' AND v.size IS NOT NULL AND v.size<>''`, kids);
+});
+const BABY_WORDS = ['بيبي', 'رضيع', 'رضع', 'مولود', 'حديث الولاد', 'حديثي الولاد', 'baby', 'newborn', 'سلوبيت بيبي'];
+const NEWBORN_WORDS = ['حديث الولاد', 'حديثي الولاد', 'مواليد', 'مولود جديد', 'newborn', 'new born'];
 const memo = (key, ms, fn) => {
   const hit = MEMO.get(key); const now = Date.now();
   if (hit && hit.exp > now) return hit.val;
@@ -370,8 +378,29 @@ r.get('/search', h((req, res) => {
   const storeSlug = String(store).replace(/[^a-z0-9_-]/gi, '');
   const facetFrom = (extra, extraParams) => ({ sql: `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${[...baseWhere, ...extra].join(' AND ')}`, params: [...baseParams, ...extraParams] });
   const deptList = deptSlug ? deptSubtree(deptSlug) : [];
-  const deptIn = `p.department IN (${deptList.map(() => '?').join(',') || "''"})`;
-  if (deptSlug) { where.push(deptIn); params.push(...deptList); }
+  let deptIn = `p.department IN (${deptList.map(() => '?').join(',') || "''"})`; let deptParams = deptList;
+  if (deptSlug === 'kids') {
+    // The main kids shelf also catches products whose audience is known but whose department was left wrong or blank.
+    deptIn = `(p.department IN (${deptList.map(() => '?').join(',')}) OR p.audience IN ('kids','boys','girls'))`;
+    deptParams = deptList;
+  } else if (deptSlug === 'kids_baby' || deptSlug === 'kids_newborn') {
+    const kidList = deptSubtree('kids');
+    const isNewborn = deptSlug === 'kids_newborn';
+    const ageSizes = isNewborn ? newbornSizes(distinctSizeRows()) : babySizes(distinctSizeRows());
+    const words = isNewborn ? NEWBORN_WORDS : BABY_WORDS;
+    const audienceKid = `(p.department IN (${kidList.map(() => '?').join(',')}) OR p.audience IN ('kids','boys','girls'))`;
+    const sizeMatch = ageSizes.length ? `EXISTS (SELECT 1 FROM variants bv WHERE bv.product_id=p.id AND bv.stock>0 AND bv.size IN (${ageSizes.map(() => '?').join(',')}))` : '0=1';
+    const wordMatch = words.map(() => '(p.name_ar LIKE ? OR p.name_en LIKE ? OR p.description_ar LIKE ? OR p.description_en LIKE ?)').join(' OR ');
+    const assigned = isNewborn
+      ? `(p.department IN (${deptList.map(() => '?').join(',')}) AND (${sizeMatch} OR ${wordMatch}))`
+      : `p.department IN (${deptList.map(() => '?').join(',')})`;
+    deptIn = `(${assigned} OR (${audienceKid} AND (${sizeMatch} OR ${wordMatch})))`;
+    deptParams = [
+      ...deptList, ...(!isNewborn ? [] : [...ageSizes, ...words.flatMap((w) => [`%${w}%`, `%${w}%`, `%${w}%`, `%${w}%`])]),
+      ...kidList, ...ageSizes, ...words.flatMap((w) => [`%${w}%`, `%${w}%`, `%${w}%`, `%${w}%`]),
+    ];
+  }
+  if (deptSlug) { where.push(deptIn); params.push(...deptParams); }
   if (storeSlug) { where.push('s.slug=?'); params.push(storeSlug); }
   const preAud = { where: [...where], params: [...params] }; // the audience facet ignores its own filter
   const audKey = AUDIENCE_KEYS.has(String(req.query.audience || '')) ? String(req.query.audience) : '';
@@ -406,7 +435,14 @@ r.get('/search', h((req, res) => {
   const preVariant = { where: [...where], params: [...params] }; // facets for size/colour ignore their own filter
   if (sizes) {
     const list = String(sizes).split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12);
-    if (list.length) { where.push(`EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND v.size IN (${list.map(() => '?').join(',')}))`); params.push(...list); }
+    if (list.length) {
+      // the chosen labels (an age bucket, a canonical size, or an old raw spelling) → every raw spelling they cover: 10Y / 10y / ١٠ are one size; ages match by range
+      const { kidSizes, anySizes } = sizeFilterSets(list, distinctSizeRows()); const kidList = deptSubtree('kids');
+      const parts = []; const sp = [];
+      if (anySizes.length) { parts.push(`v.size IN (${anySizes.map(() => '?').join(',')})`); sp.push(...anySizes); }
+      if (kidSizes.length) { parts.push(`(p.department IN (${kidList.map(() => '?').join(',')}) AND v.size IN (${kidSizes.map(() => '?').join(',')}))`); sp.push(...kidList, ...kidSizes); }
+      where.push(parts.length ? `EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND (${parts.join(' OR ')}))` : '0=1'); params.push(...sp);
+    }
   }
   if (colors) {
     const list = String(colors).split(',').map((x) => x.trim().toUpperCase()).filter((x) => /^#[0-9A-F]{3,8}$/.test(x)).slice(0, 12);
@@ -437,7 +473,7 @@ r.get('/search', h((req, res) => {
   const deptRoll = new Map();
   for (const d of deptRows) for (const sl of [d.slug, ...deptAncestors(d.slug)]) deptRoll.set(sl, (deptRoll.get(sl) || 0) + d.n); // الأب بيعد منتجات اللي تحته
   const departments = [...deptRoll].map(([slug, n]) => ({ slug, n }));
-  const fs2 = facetFrom(deptSlug ? [deptIn] : [], deptSlug ? deptList : []);
+  const fs2 = facetFrom(deptSlug ? [deptIn] : [], deptSlug ? deptParams : []);
   const stores = q.all(`SELECT s.slug AS slug, s.name_ar AS name_ar, s.name_en AS name_en, COUNT(*) AS n ${fs2.sql} GROUP BY s.id ORDER BY n DESC LIMIT 12`, fs2.params)
     .map((x) => ({ slug: x.slug, name: { ar: x.name_ar, en: x.name_en }, n: x.n }));
   const audiences = q.all(`SELECT p.audience AS key, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preAud.where.join(' AND ')} AND p.audience IS NOT NULL GROUP BY p.audience ORDER BY n DESC`, preAud.params);
@@ -455,8 +491,9 @@ r.get('/search', h((req, res) => {
   const categories = typeFacet.length >= 1 || typeKey ? typeFacet : legacyCategories; // أنواع المنتجات لما تكون متاحة، وإلا مجموعات المحلات القديمة
   const fromV = `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')}`;
   const sizeOrder = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '3XL', 'One size', 'Free size'];
-  const facetSizes = q.all(`SELECT v.size AS size, CASE WHEN p.department LIKE '%shoes%' THEN 'shoes' WHEN v.size GLOB '[0-9]*' THEN 'num' ELSE 'letters' END AS grp, COUNT(DISTINCT p.id) AS n FROM variants v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')} AND v.stock>0 AND v.size IS NOT NULL AND v.size<>'' GROUP BY v.size, grp`, preVariant.params)
-    .sort((a, b) => { const ia = sizeOrder.indexOf(a.size), ib = sizeOrder.indexOf(b.size); return ia === -1 && ib === -1 ? (Number(a.size) - Number(b.size) || String(a.size).localeCompare(String(b.size))) : (ia === -1 ? 1 : ib === -1 ? -1 : ia - ib); }).slice(0, 40);
+  // one entry per canonical size (10Y / 10y / ١٠ are one), and kids' ages as age buckets (سنة لسنتين، 2-4 سنين…)
+  const kidDepts = deptSubtree('kids');
+  const facetSizes = sizeFacets(q.all(`SELECT DISTINCT v.size AS size, p.id AS pid, CASE WHEN p.department IN (${kidDepts.map(() => '?').join(',') || "''"}) THEN 1 ELSE 0 END AS kid, CASE WHEN p.department LIKE '%shoes%' THEN 1 ELSE 0 END AS shoe FROM variants v JOIN products p ON p.id=v.product_id JOIN stores s ON s.id=p.store_id WHERE ${preVariant.where.join(' AND ')} AND v.stock>0 AND v.size IS NOT NULL AND v.size<>'' LIMIT 60000`, [...kidDepts, ...preVariant.params])).slice(0, 60);
   const colorMap = new Map();
   for (const row of q.all(`SELECT p.colors_json AS cj ${fromV} LIMIT 600`, preVariant.params)) {
     for (const c of json(row.cj, [])) { const hex = String(c.hex || '').toUpperCase(); if (hex) { const e = colorMap.get(hex) || { hex, name: c.name || null, n: 0 }; e.n++; colorMap.set(hex, e); } }
@@ -629,6 +666,8 @@ function modaClientResponse(result) {
     overBudget: result.blocks.over > 0, palette: result.blocks.palette.map((color) => color.ar),
     missing: result.missing.map((item) => item.label), missingItems,
     weatherSource: result.weatherSource || null,
+    // نتيجة بحث (مش لوك): الواجهة تعرضها صف أفقي من غير إجمالي
+    isSearch: result.blocks.tabs.length === 1 && result.blocks.tabs[0].id === 'search',
   };
 }
 

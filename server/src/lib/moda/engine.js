@@ -458,7 +458,7 @@ async function runModaCore(messages, opts = {}) {
       }
       if (m.ambiguous.length && aspects.length) return reply(`تقصد أنهي محل: ${m.ambiguous.slice(0, 5).map((s) => s.name_ar).join(' ولا ')}؟`);
       const isStoreQuery = (asks.length > 0 || mentionsStoreWord(text)) && !parsed.garments.length;
-      if (!m.store && isStoreQuery && asks.some((a) => a !== 'offers') && !matchTrainedLesson(text, training?.lessons)) {
+      if (!m.store && isStoreQuery && asks.some((a) => a !== 'offers') && !/(^| )(لطفل|طفل|اطفال|رضيع|بنتي|ابني|ولد|بنت|ولادي|لبس|هدوم|ملابس|طقم)( |$)/.test(norm(text)) && !matchTrainedLesson(text, training?.lessons)) {
         if (asks.length === 1 && asks[0] === 'hours') {
           const h = allStoresHours(list, now);
           if (h) return reply(h);

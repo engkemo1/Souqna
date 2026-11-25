@@ -17,7 +17,7 @@ const channel = (id, words) => ({ id, re: [
 /** كل قاعدة: patterns على النص بعد norm()، ولو واحدة اتطابقت يرجع الـid. الترتيب مهم (الأخص الأول). */
 /** كلمة كاملة (مش جزء من كلمة): بدل \b اللي ما بتشتغلش مع العربي. */
 const W = (alts) => new RegExp(`(^| )(${alts})( |$)`);
-const ORDER = '(ال)?(طلب|طلبي|طلبيه|طلبيتي|اوردر|اوردري|شحنتي)|order|parcel';
+const ORDER = '(ال)?(طلب|طلبي|طلبيه|طلبيتي|اوردر|اوردري|شحنه|شحنتي)|order|parcel';
 
 const RULES = [
   { id: 'size_between', re: [/(^| )(بين|محتار بين|مش عارف|مش عارفه|متردد بين) (مقاسين|سايزين|مقاس)( |$)/, /(^| )(انا|انى) (بين|ما بين) (مقاس )?(xs|s|m|l|xl|xxl|[0-9]{2}) (و|او|ولا) (xs|s|m|l|xl|xxl|[0-9]{2})( |$)/, /(^| )(بين|ما بين) (مقاس )?(xs|s|m|l|xl|xxl) (و|او|ولا) (xs|s|m|l|xl|xxl)( |$)/] },
@@ -59,7 +59,7 @@ const RULES = [
   { id: 'fabric', re: [/(ايه|ايه هي|ايه هو|نوع|ما)( هي| هو)? (خامه|خامة|قماش|قماشه)( |$)/, /(خامه|قماش)( [^ ]+){0,2} (ايه|ايه هي|ايه هو)( |$)/] },
   { id: 'kids_sizes', re: [/(مقاسات|مقاس)( [^ ]+){0,2} (الاطفال|اطفال|الاولاد|الولاد|العيال|البنات)( |$)/] },
   { id: 'order_change', re: [new RegExp(`(^| )(اغير|اعدل|تعديل|غير|عدل|الغي|الغاء|كنسل|cancel|change|edit)( [^ ]+){0,3} (${ORDER})( |$)`), new RegExp(`(^| )(${ORDER})( [^ ]+){0,3} (اغير|اعدل|الغي|الغاء|كنسل|cancel|change)( |$)`)] },
-  { id: 'order_track', re: [new RegExp(`(^| )(فين|وصل|حاله|متابعه|تتبع|اتابع|track|where)( [^ ]+){0,3} (${ORDER})( |$)`), new RegExp(`(^| )(${ORDER})( [^ ]+){0,3} (فين|وصل|اتاخر|متاخر|مجاش|ماوصلش)( |$)`)] },
+  { id: 'order_track', re: [new RegExp(`(^| )(فين|وصل|حاله|متابعه|تتبع|اتتبع|هتتبع|نتتبع|اتابع|هتابع|اشوف حاله|track|where)( [^ ]+){0,3} (${ORDER})( |$)`), new RegExp(`(^| )(${ORDER})( [^ ]+){0,3} (فين|وصل|اتاخر|متاخر|مجاش|ماوصلش)( |$)`), new RegExp(`(^| )رقم (${ORDER})( [^ ]+){0,3} (ضاع|نسيته|نسيت|مش لاقيه|مش لاقي|مش فاكره|مش فاكر)( |$)`), new RegExp(`(^| )(نسيت|ضاع مني|ضيعت|مش لاقي|مش فاكر) رقم (${ORDER})( |$)`)] },
   { id: 'returns', re: [/(^| )(a8ayar|aghayar|a3'ayar|abadel|abaddel|astabdel|araga3|arga3|arag3)( |$)/, W('(ال)?(ارجع|ارجاع|استرجاع|استبدال|استبدل|ابدل|اسبدل)|return|exchange|refund|(ال)?(سياسه|شروط) (ال)?(استرجاع|استبدال|ارجاع)'), /(^| )(اغير|غير|هغير|هبدل) (ال)?مقاس/] },
   { id: 'payment', unless: /(تقسيط|اقساط|قسط|فاليو|اقسط|نقسط|valu|كاش باك|كاشباك|cashback|installment)/, re: [W('الدفع|ادفع|فيزا|بطاقه|payment|visa'), /(فودافون كاش|انستا باي|طرق الدفع|طريقه الدفع)/] },
   { id: 'shipping_time', re: [/(^| )(مواعيد|ميعاد|مده|مدة|وقت) (التوصيل|الشحن|الدليفري)( |$)/, /(^| )(لو|اذا) (طلبت|اطلب|هطلب|طلبنا|طلبته|طلبتها)( [^ ]+){0,4} (يوصل|يلحق|يجي|يجيلي|ييجي|هيوصل|يوصلني)( |$)/, /(^| )(haywsal|hayewsal|hywsal|yewsal|yews?al|haygy|hayegy|hywsl)( [^ ]+){0,2} (emta|imta|amta|emtaa)( |$)/, /(^| )(law|lw|lo) (talabt|atlob|hatlob)( [^ ]+){0,4} (yewsal|yowsal|haywsal|yewsl|yegy|yeegy|ywsal)( |$)/, /(توصيل|شحن|طلب|يوصل)( [^ ]+){0,3} (ياخد|بياخد|مده|امتي|وقت)/, /(توصيل|شحن|يوصل)( [^ ]+){0,3} كام يوم/, /(how long|delivery time|when.*arrive)/] },
@@ -286,7 +286,7 @@ export const FAQ_ANSWERS = {
     size_other: 'تمام! قولي أنهي قطعة بالظبط وأشوفلك المقاسات المتاحة منها فعلًا، أو قولي طولك ووزنك وأقترحلك المقاس الأنسب.',
     nearest_store: 'المحلات كلها في بنها. صفحة «المحلات» فيها كل محل بعنوانه ولوكيشنه على الخريطة، أو قولي اسم المحل اللي يهمك وأديك عنوانه وميعاده من بياناته.',
     order_change: 'لتعديل الطلب أو إلغائه كلّم المحل اللي طلبت منه بأسرع وقت قبل ما يتشحن، وتلاقي طريقة التواصل في صفحة المحل. ولو عايز تشوف حالة الطلب افتح صفحة «تتبع الطلب».',
-    order_track: 'تقدر تتابع طلبك من صفحة «تتبع الطلب» برقم التتبع اللي وصلك بعد تأكيد الطلب، وبتشوف فيها حالته خطوة بخطوة.',
+    order_track: 'تقدر تتابع طلبك من صفحة «تتبع الطلب» برقم التتبع اللي وصلك بعد تأكيد الطلب، وبتشوف فيها حالته خطوة بخطوة. ولو الرقم ضاع منك، ادخل بنفس الصفحة برقم الطلب ورقم التليفون اللي طلبت بيه.',
     returns: 'كل محل بيحدد مدة الاستبدال والاسترجاع الخاصة بيه، والمعتاد 3 أيام من الاستلام. مدة المحل مكتوبة في صفحته، ولو محتاج حاجة معينة كلّم المحل اللي طلبت منه.',
     discounts: 'العروض والخصومات بتتحدد من كل محل وبتظهر على المنتج نفسه، وتلاقي أحدث العروض في «عروض بنها» في القايمة. ولو معاك كود خصم اكتبه في صفحة تأكيد الطلب قبل ما تأكد.',
     wrong_item: 'آسفين إن القطعة وصلتك كده. كلّم المحل اللي طلبت منه بأسرع وقت (طريقة التواصل في صفحة المحل) وهو اللي بيحدد الاستبدال أو الاسترجاع، والمعتاد خلال 3 أيام من الاستلام. وتقدر تتابع طلبك من «تتبع الطلب».',
@@ -371,7 +371,7 @@ export const FAQ_ANSWERS = {
   },
   en: {
     order_change: 'To change or cancel an order, contact the store you ordered from as soon as possible, before it ships — contact details are on the store page. You can also check the status on the "Track order" page.',
-    order_track: 'You can follow your order on the "Track order" page with the tracking number you received when you confirmed it.',
+    order_track: 'You can follow your order on the "Track order" page with the tracking number you received when you confirmed it. If you lost it, use the same page with your order number and the phone number you ordered with.',
     returns: 'Each store sets its own exchange and return period, usually 3 days from receiving the order. The period is shown on the store page; for anything specific, contact the store you ordered from.',
     discounts: 'Each store sets its own offers and they show on the product itself; the latest ones are under "Banha deals" in the menu. If you have a discount code, enter it on the checkout page before confirming.',
     wrong_item: 'Sorry about that. Contact the store you ordered from as soon as possible (contact details are on the store page). Each store sets its exchange/return terms, usually within 3 days of receiving the order. You can also follow the order on "Track order".',

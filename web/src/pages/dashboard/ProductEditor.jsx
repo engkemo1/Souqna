@@ -44,6 +44,19 @@ const normPack = (raw) => String(raw || '')
   .replace(/\b(g|gm|gr|gram|grams|G|GM)\b/g, 'جم')
   .replace(/(?<![\u0600-\u06FF])(جرام|غرام|جم|غم)(?![\u0600-\u06FF])/g, 'جم')
   .replace(/\s+/g, ' ').trim();
+// kids' ages typed by hand ("10y", "١٠", "٥:٢", "12-18 شهور", "سنة") → ONE spelling (10Y, 2-5Y, 12-18M) so the age filter on the site stays clean
+const MON_RX = '(?:m|mo|mos|months?|شهر|شهور|اشهر|أشهر)'; const YRS_RX = '(?:y|yr|yrs|years?|سنه|سنة|سنين|سنوات)';
+const normKidSize = (raw) => {
+  const s = String(raw || '').replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d))).trim().toLowerCase().replace(/[–—−]/g, '-').replace(/\s*([-:/])\s*/g, '$1');
+  if (/^(سنه|سنة|عام)$/.test(s)) return '1Y'; if (/^سنتين$/.test(s)) return '2Y';
+  let m;
+  if ((m = s.match(new RegExp(`^(\\d{1,2})[-:/](\\d{1,2}) ?${MON_RX}$`)))) { let a = +m[1]; let b = +m[2]; if (a > b) [a, b] = [b, a]; return `${a}-${b}M`; }
+  if ((m = s.match(new RegExp(`^(\\d{1,2}) ?${MON_RX}$`)))) return `${+m[1]}M`;
+  if ((m = s.match(new RegExp(`^(\\d{1,2})[-:/](\\d{1,2})(?: ?${YRS_RX})?$`))) && +m[1] <= 18 && +m[2] <= 18) { let a = +m[1]; let b = +m[2]; if (a > b) [a, b] = [b, a]; return a === b ? `${a}Y` : `${a}-${b}Y`; }
+  if ((m = s.match(new RegExp(`^(\\d{1,2}) ?${YRS_RX}$`))) && +m[1] <= 18) return `${+m[1]}Y`;
+  if (/^\d{1,2}$/.test(s) && +s <= 18) return `${+s}Y`;
+  return String(raw || '').trim();
+};
 // typed colours ("أسود، بيج، فوشيا"): known names reuse the preset swatch, unknown ones get a stable placeholder tint (the owner can fine-tune it with «لون تاني»)
 const splitList = (t) => String(t || '').split(/[,،;\n]/).map((x) => x.trim()).filter(Boolean);
 const EXTRA_COLORS = { 'فوشيا': '#C2185B', fuchsia: '#C2185B', 'تركواز': '#1AA6A6', turquoise: '#1AA6A6', 'سماوي': '#7EC8E3', 'سمائي': '#7EC8E3', 'لبني': '#7EC8E3', 'ذهبي': '#C9A227', gold: '#C9A227', 'فضي': '#B8BCC2', silver: '#B8BCC2', 'وردي': '#F2A6B8', 'لافندر': '#B39DDB', lavender: '#B39DDB', 'موف': '#8E5FB5', 'عنابي': '#7B1E3A', 'خمري': '#7B1E3A', 'كاكي': '#A39A6B', khaki: '#A39A6B', 'جملي': '#B5793D', camel: '#B5793D', 'رصاصي': '#5E636B', 'سمني': '#F1E6C8', cream: '#F1E6C8', 'كريمي': '#F1E6C8', 'ليموني': '#D6E34F', 'نيلي': '#2E3A8C', 'طوبي': '#A8512F', 'نبيذي': '#6E2433', 'أوف وايت': '#F2EFE6', 'اوف وايت': '#F2EFE6', mint: '#A8D8C0', 'نعناعي': '#A8D8C0', 'مشمشي': '#F4B183', 'سلموني': '#F29A8A' };
@@ -367,7 +380,7 @@ function VariantsEditor({ f, set, sizeKind, typeChosen, mode = 'general', hasCol
             {kindSizes.map((s) => { const on = f.sizes.includes(s); return <button key={s} type="button" onClick={() => toggleSize(s)} aria-pressed={on} className={cx('h-10 min-w-[3rem] rounded-xl border px-3 text-sm font-semibold transition active:scale-95', on ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg')}>{s}</button>; })}
             {extra.map((s) => <button key={s} type="button" onClick={() => toggleSize(s)} className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-fg bg-fg px-3 text-sm font-semibold text-canvas">{s}<X className="h-3.5 w-3.5" /></button>)}
           </div>
-          <form className={cx('mt-2.5 flex gap-2', mode === 'beauty' ? 'max-w-md' : 'max-w-sm')} onSubmit={(e) => { e.preventDefault(); const fix = (x) => (mode === 'general' || mode === 'accessories' ? x.trim() : normPack(x)); const add = []; const tooLong = []; for (const raw of splitList(customSize)) { const v = fix(raw); if (!v) continue; if (v.length > 12) { tooLong.push(raw); continue; } if (!f.sizes.includes(v) && !add.includes(v)) add.push(v); } if (add.length) set({ sizes: [...f.sizes, ...add] }); setCustomSize(tooLong.join('، ')); if (tooLong.length) toast({ tone: 'error', title: L('المقاس لازم يبقى 12 حرف أو أقل', 'A size can be at most 12 characters') }); }}>
+          <form className={cx('mt-2.5 flex gap-2', mode === 'beauty' ? 'max-w-md' : 'max-w-sm')} onSubmit={(e) => { e.preventDefault(); const ageMode = baseSizes.some((z) => /^\d+(-\d+)?[YM]$/.test(z)); const fix = (x) => (ageMode ? normKidSize(x) : mode === 'general' || mode === 'accessories' ? x.trim() : normPack(x)); const add = []; const tooLong = []; for (const raw of splitList(customSize)) { const v = fix(raw); if (!v) continue; if (v.length > 12) { tooLong.push(raw); continue; } if (!f.sizes.includes(v) && !add.includes(v)) add.push(v); } if (add.length) set({ sizes: [...f.sizes, ...add] }); setCustomSize(tooLong.join('، ')); if (tooLong.length) toast({ tone: 'error', title: L('المقاس لازم يبقى 12 حرف أو أقل', 'A size can be at most 12 characters') }); }}>
             <Input size="sm" value={customSize} onChange={(e) => setCustomSize(e.target.value)} placeholder={mode === 'perfume' || mode === 'skincare' ? L('حجم تاني (مثلًا 25 مل)', 'Other volume (e.g. 25 ml)') : mode === 'beauty' ? L('مثال: علبة 50 جم، تيوب 30 مل، زجاجة 100 مل، 3 قطع', 'e.g. box 50 g, tube 30 ml, bottle 100 ml, 3 pieces') : t('editor.customSize')} maxLength={mode === 'beauty' ? 80 : 60} />
             <Button type="submit" size="sm" variant="outline" icon={Plus} aria-label={t('common.add')} />
           </form>

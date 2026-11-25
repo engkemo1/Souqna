@@ -61,3 +61,18 @@ test('skin-tone colour advice ("بشرتي سمرا ايه الالوان…") i
   const [s] = await chat(['عايزة سيروم تفتيح لبشرتي السمرا']);
   assert.equal(s.state, 'full'); assert.ok(ids(s).length >= 1, 'a real skincare request about dark skin still searches products');
 });
+test('skin-cream search does not return hair cream or bath-and-body when real skincare exists', async () => {
+  const saved = products.length;
+  products.push(P('Fanika hair cream', 'كريم شعر فانيكا', 55, { department: 'care', dept_parent: 'beauty', sold_count: 50 }), P('Bath and Body works Into the night', 'باث اند بودي', 1100, { department: 'care', dept_parent: 'beauty', sold_count: 40 }));
+  try {
+    const [r] = await chat(['عاوزة كريم للبشرة']);
+    const names = (r.blocks?.tabs?.[0]?.items || []).map((i) => i.name);
+    assert.ok(names.length >= 1);
+    for (const n of names) assert.ok(!/(شعر|باث)/.test(n), n);
+  } finally { products.length = saved; }
+});
+test('«لبس لطفل عنده 5 سنين» is a shopping request, not a store-name lookup', async () => {
+  const stores = [{ id: 1, slug: 'berry', name_ar: 'بيري', name_en: 'Berry', address: 'بنها', phone: '01000000000' }];
+  const r = await runModa([{ role: 'user', content: 'عايز لبس لطفل عنده 5 سنين' }], { products, K, stores });
+  assert.doesNotMatch(r.say || '', /مش لاقية متجر/);
+});

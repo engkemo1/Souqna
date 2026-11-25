@@ -128,6 +128,17 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!mcols.includes('canvas_v')) db.exec('ALTER TABLE media ADD COLUMN canvas_v INTEGER'); // 2 = made with the product-framing canvas (no bars); null = older
   const dcols = db.prepare('PRAGMA table_info(departments)').all().map((c) => c.name);
   if (!dcols.includes('image')) db.exec('ALTER TABLE departments ADD COLUMN image TEXT');
+  // kids' size presets: add the finer baby / age steps so owners PICK a size instead of typing it (6-9M, 9-12M, 12-18M, 18-24M, 5Y, 7Y).
+  // Only departments still on the old default list are touched, so a list the admin edited by hand is never overwritten.
+  {
+    const OLD = ['0-3M', '3-6M', '6-12M', '1Y', '2Y', '3Y', '4Y', '6Y', '8Y', '10Y', '12Y', '14Y'];
+    const NEW = ['0-3M', '3-6M', '6-9M', '9-12M', '6-12M', '12-18M', '18-24M', '1Y', '2Y', '3Y', '4Y', '5Y', '6Y', '7Y', '8Y', '10Y', '12Y', '14Y'];
+    const upd = db.prepare('UPDATE departments SET sizes_json=? WHERE slug=?');
+    for (const r of db.prepare("SELECT slug, sizes_json FROM departments WHERE slug='kids' OR slug LIKE 'kids\\_%' ESCAPE '\\'").all()) {
+      let cur = null; try { cur = JSON.parse(r.sizes_json || 'null'); } catch { cur = null; }
+      if (Array.isArray(cur) && cur.length === OLD.length && cur.every((v, i) => v === OLD[i])) upd.run(JSON.stringify(NEW), r.slug);
+    }
+  }
   const pcols = db.prepare('PRAGMA table_info(products)').all().map((c) => c.name);
   if (!pcols.includes('department')) db.exec('ALTER TABLE products ADD COLUMN department TEXT');
   if (!pcols.includes('no_return')) db.exec('ALTER TABLE products ADD COLUMN no_return INTEGER NOT NULL DEFAULT 0'); // 1 = this piece is not returnable / exchangeable

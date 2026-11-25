@@ -50,19 +50,21 @@ export default function CategoryPage() {
   const [term, setTerm] = useState('');
   const [sort, setSort] = useState('relevance');
   const [selectedChild, setSelectedChild] = useState('');
+  const [age, setAge] = useState(''); // «تسوّق بالعمر» (kids): an age bucket from the size facet
   const dq = useDebounced(term.trim(), 250);
   const activeDepartment = selectedChild || slug; // the search endpoint understands the readable slug too
-  const key = new URLSearchParams({ q: dq, department: activeDepartment, sort }).toString();
+  const key = new URLSearchParams({ q: dq, department: activeDepartment, sort, ...(age ? { sizes: age } : {}) }).toString();
   const prods = useApi(`/search?${key}`);
   const [more, setMore] = useState({ key: '', items: [], page: 1 });
   const [busy, setBusy] = useState(false);
   const [quick, setQuick] = useState(null);
   useSeo({ dept, trail, lang, canonical: data?.canonical });
-  useEffect(() => { window.scrollTo(0, 0); setTerm(''); setSort('relevance'); setSelectedChild(''); }, [slug]);
+  useEffect(() => { window.scrollTo(0, 0); setTerm(''); setSort('relevance'); setSelectedChild(''); setAge(''); }, [slug]);
 
   if (error?.status === 404) return <NotFound />;
   const prof = PROFILES[dept?.profile];
   const ratio = (prof?.ratio || '4/5').replace('/', ' / ');
+  const ageOptions = (prods.data?.facets?.sizes || []).filter((x) => x.grp === 'age');
   const items = [...(prods.data?.items || []), ...(more.key === key ? more.items : [])];
   const page = more.key === key ? more.page : 1;
   const loadMore = async () => {
@@ -130,6 +132,22 @@ export default function CategoryPage() {
             <div className="container py-6 sm:py-8">
               {circles.length > 0 && <section aria-label={lang === 'ar' ? 'الأقسام' : 'Sections'} className="mb-6"><CircleRail items={circles} active={selectedChild} onPick={setSelectedChild} label={lang === 'ar' ? 'الأقسام' : 'Sections'} /></section>}
 
+              {(ageOptions.length > 1 || age) && (
+                <section aria-label={lang === 'ar' ? 'تسوّق بالعمر' : 'Shop by age'} className="mb-5">
+                  <p className="mb-2 text-sm font-bold text-fg">{lang === 'ar' ? 'تسوّق بالعمر' : 'Shop by age'}</p>
+                  <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:px-0">
+                    {[{ size: '', n: null }, ...ageOptions].map((o) => {
+                      const on = age === o.size;
+                      return (
+                        <button key={o.size || 'all'} type="button" aria-pressed={on} onClick={() => setAge(o.size)} className={`shrink-0 whitespace-nowrap rounded-full border px-4 py-2 text-sm font-semibold transition ${on ? 'border-fg bg-fg text-canvas' : 'border-line-strong bg-elevated hover:border-fg'}`}>
+                          {o.size || (lang === 'ar' ? 'كل الأعمار' : 'All ages')}{o.n != null && <span className={`ms-1.5 text-xs ${on ? 'opacity-80' : 'text-muted'}`}>{o.n}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+              )}
+
               <section aria-label={lang === 'ar' ? 'المنتجات' : 'Products'}>
                 <div className="mb-4 grid grid-cols-2 gap-2.5 sm:flex sm:flex-row sm:items-center sm:gap-3">
                   <div className="relative col-span-2 flex-1 sm:max-w-sm">
@@ -139,7 +157,7 @@ export default function CategoryPage() {
                   <Select size="sm" value={sort} onChange={(e) => setSort(e.target.value)} className="sm:ms-auto sm:w-52 [&_select]:h-11" aria-label={t('common.sort')}>
                     {['relevance', 'best', 'price_asc', 'price_desc', 'newest'].map((s) => <option key={s} value={s}>{t(`search.sort.${s}`)}</option>)}
                   </Select>
-                  <Button to={`/search?department=${encodeURIComponent(slug)}`} variant="secondary" icon={SlidersHorizontal}>{lang === 'ar' ? 'فلاتر القسم' : 'Section filters'}</Button>
+                  <Button to={`/search?department=${encodeURIComponent(activeDepartment)}${age ? `&sizes=${encodeURIComponent(age)}` : ''}`} variant="secondary" icon={SlidersHorizontal}>{lang === 'ar' ? 'فلاتر القسم' : 'Section filters'}</Button>
                 </div>
                 {prods.loading && !prods.data ? <ProductGrid>{Array.from({ length: 8 }, (_, i) => <ProductCardSkeleton key={i} />)}</ProductGrid>
                   : items.length ? (

@@ -36,7 +36,7 @@ function ShowMore({ items, limit = 6, render, lang, keepOpen = () => false }) {
   );
 }
 
-const SIZE_GROUP_LABEL = { shoes: ['مقاس الحذاء', 'Shoe size'], num: ['مقاس رقمي (بنطلون / بدلة)', 'Numeric size'], letters: ['مقاس حروف', 'Letter size'] };
+const SIZE_GROUP_LABEL = { age: ['العمر (أطفال ورضع)', 'Age (kids & babies)'], shoes: ['مقاس الحذاء', 'Shoe size'], num: ['مقاس رقمي (بنطلون / بدلة)', 'Numeric size'], letters: ['مقاس حروف', 'Letter size'] };
 const DISCOUNT_BANDS = [20, 30, 50, 70];
 
 
@@ -141,7 +141,7 @@ export default function SearchFilters({ params, set, facets, departments, label,
       )}
       {(facets?.sizes?.length > 0 || chosenSizes.length > 0) && (() => {
         const all = [...new Map([...(facets?.sizes || []), ...chosenSizes.filter((z) => !(facets?.sizes || []).some((x) => x.size === z)).map((z) => ({ size: z, grp: 'letters' }))].map((x) => [`${x.grp}:${x.size}`, x])).values()];
-        const grps = ['shoes', 'num', 'letters'].filter((g) => all.some((x) => x.grp === g));
+        const grps = ['age', 'shoes', 'num', 'letters'].filter((g) => all.some((x) => x.grp === g));
         return (
           <Group title={t('search.size')} badge={chosenSizes.length}>
             {grps.map((g) => (
