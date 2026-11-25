@@ -45,12 +45,15 @@ async function viaGemini(buf, PROMPT) {
   const candidates = [...new Set([geminiModelOk, process.env.FACTS_GEMINI_MODEL, 'gemini-3.8-flash', 'gemini-flash-latest', 'gemini-3.5-flash'].filter(Boolean))];
   let last = 'gemini: no model';
   for (const model of candidates) {
-    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, signal: AbortSignal.timeout(40000),
-      body: JSON.stringify({ contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: 'image/jpeg', data: b64(buf) } }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }),
-    });
+    let r;
+    try {
+      r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': key }, signal: AbortSignal.timeout(60000),
+        body: JSON.stringify({ contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: 'image/jpeg', data: b64(buf) } }] }], generationConfig: { temperature: 0, responseMimeType: 'application/json' } }),
+      });
+    } catch (e) { last = `gemini ${model} ${e?.name === 'TimeoutError' ? 'timeout' : e?.message}`; continue; } // slow or unreachable: try the next model
     const j = await r.json().catch(() => ({}));
-    if (r.status === 404) { last = `gemini ${model} 404 (retired?)`; continue; }
+    if ([404, 429, 500, 502, 503, 504].includes(r.status)) { last = `gemini ${model} ${r.status}${r.status === 404 ? ' (retired?)' : ' (busy, trying the next model)'}`; if (r.status !== 404) await new Promise((ok) => setTimeout(ok, 1500)); continue; }
     if (!r.ok) throw new Error(`gemini ${model} ${r.status}`);
     geminiModelOk = model;
     return { out: parse(j.candidates?.[0]?.content?.parts?.[0]?.text), model };
