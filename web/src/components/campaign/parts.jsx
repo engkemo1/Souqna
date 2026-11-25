@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Bell, Check, X } from 'lucide-react';
-import { look, hypeFor, hypeStage, hasOwnHype } from '../../lib/campaignTheme.js';
+import { look, hypeFor, hypeStage, hasOwnHype, isStack } from '../../lib/campaignTheme.js';
 
 const HYPE_SEED = Math.floor(Math.random() * 1000); // each visit starts on a different line
 import { useCountdown } from '../../lib/campaigns.js';
@@ -100,13 +100,14 @@ function Cells({ end, offset }) {
   );
 }
 
-const startText = (ms) => { try { return new Date(ms).toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit' }); } catch { return ''; } };
+const startText = (ms) => { try { return new Date(ms).toLocaleString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long', hour: 'numeric', minute: '2-digit', timeZone: 'Africa/Cairo' }); } catch { return ''; } };
 
 const text = (c) => {
   const ship = c.kind === 'shipping';
   const head = c.headline || (ship ? 'الشحن علينا' : look(c).emoji && (c.name || 'تخفيضات'));
   if (c.phase === 'soon') return { head, sub: `هيبدأ ${startText(c.startsAt)}` };
-  const sub = c.sub || (ship ? `شحن مجاني على طلباتك${c.min ? ` من ${one.format(c.min)} جنيه` : ''}` : c.percent ? `خصم ${one.format(c.percent)}% على كل المنتجات` : 'خصومات على كل المنتجات');
+  const stack = isStack(c);
+  const sub = c.sub || (ship ? `شحن مجاني على طلباتك${c.min ? ` من ${one.format(c.min)} جنيه` : ''}` : stack ? (c.percent ? `خصم المحل + ${one.format(c.percent)}% إضافية من تويست` : 'خصم المحل + خصم إضافي من تويست') : c.percent ? `خصم ${one.format(c.percent)}% على كل المنتجات` : 'خصومات على كل المنتجات');
   return { head, sub };
 };
 
@@ -119,6 +120,7 @@ const badgeOf = (c) => {
   if (mode === 'none') return null;
   if (mode === 'custom') return b.title ? { top: b.sub || '', big: b.title, bottom: '', small: b.title.length > 5 } : null;
   if (mode === 'percent') return { top: 'خصم حتى', big: pct, bottom: '' };
+  if (isStack(c)) return c.percent ? { top: 'خصم تويست', big: pct, bottom: 'فوق خصم المحل', mTop: 'فوق خصم المحل' } : null; // no % typed in the admin yet = no seal (nothing claims a number); never says «on everything»: it is an extra on top of what the shop already took off
   return { top: 'خصم', big: pct, bottom: 'على كل المنتجات', mTop: 'خصم على الكل' };
 };
 

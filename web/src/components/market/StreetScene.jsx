@@ -631,7 +631,7 @@ const Art = memo(function Art({ lang, labels, counts, camp }) {
             </g>
           ))}
 
-          {dc && bannersAt(380).map((x) => <StreetBanner key={`bd${x}`} cx={x} text={dc.headline || dc.name || (ar ? 'تخفيضات' : 'Sale')} sub={dc.percent ? (ar ? `خصم ${dc.percent}% على كل المنتجات` : `${dc.percent}% off everything`) : (ar ? 'خصومات على كل المنتجات' : 'Deals on everything')} c1={dl.c1} c2={dl.c2} />)}
+          {dc && bannersAt(380).map((x) => <StreetBanner key={`bd${x}`} cx={x} text={dc.headline || dc.name || (ar ? 'تخفيضات' : 'Sale')} sub={dc.sub || (dc.mode === 'stack' ? (ar ? (dc.percent ? `خصم المحل + ${dc.percent}% إضافية من تويست` : 'خصم المحل + خصم إضافي من تويست') : (dc.percent ? `Shop discount + ${dc.percent}% extra from Twist` : 'Shop discount + an extra Twist discount')) : dc.percent ? (ar ? `خصم ${dc.percent}% على كل المنتجات` : `${dc.percent}% off everything`) : (ar ? 'خصومات على كل المنتجات' : 'Deals on everything'))} c1={dl.c1} c2={dl.c2} />)}
           {sc && bannersAt(dc ? 930 : 380).map((x) => <StreetBanner key={`bs${x}`} cx={x} text={sc.headline || (ar ? 'الشحن علينا' : 'Free delivery')} sub={sc.min ? (ar ? `شحن مجاني من ${sc.min} جنيه` : `Free delivery over ${sc.min} EGP`) : (ar ? 'شحن مجاني على كل الطلبات' : 'Free delivery on every order')} c1={sl.c1} c2={sl.c2} w={230} />)}
 
           <rect y="480" width={W} height="86" fill="#E6EAF0" />

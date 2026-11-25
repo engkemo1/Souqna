@@ -101,7 +101,7 @@ export function CartSummary({ slug, onNavigate, compact }) {
   return (
     <div className="space-y-3">
       <div className="flex justify-between text-base"><span className="text-muted">{t('cart.subtotal')}</span><span className="font-semibold tabular">{formatMoney(quote ? quote.subtotal : cart.subtotal, lang)}</span></div>
-      {camp > 0 && <div className="flex justify-between text-base text-success"><span>{lang === 'ar' ? 'خصم الحملة' : 'Sale discount'}</span><span className="font-semibold tabular">−{formatMoney(camp, lang)}</span></div>}
+      {camp > 0 && <div className="flex justify-between text-base text-success"><span>{quote?.campaignMode === 'stack' ? (lang === 'ar' ? 'خصم تويست الإضافي' : 'Extra Twist discount') : (lang === 'ar' ? 'خصم الحملة' : 'Sale discount')}</span><span className="font-semibold tabular">−{formatMoney(camp, lang)}</span></div>}
       {saved > 0 && <div className="flex justify-between text-base text-success"><span>{lang === 'ar' ? 'خصم العروض' : 'Offers discount'}</span><span className="font-semibold tabular">−{formatMoney(saved, lang)}</span></div>}
       {!compact && (
         <div className="flex justify-between text-base"><span className="text-muted">{t('cart.shipping')}</span>

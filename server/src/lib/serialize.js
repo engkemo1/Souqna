@@ -111,7 +111,7 @@ export function serializeCards(rows) {
       compareAt: cp ? cp.compareAt : p.compare_at_price && p.compare_at_price > p.price ? p.compare_at_price : null,
       discount: cp ? cp.discount : p.compare_at_price > p.price ? Math.round((1 - p.price / p.compare_at_price) * 100) : 0,
       saleEndsAt: cp ? cp.endsAt : p.compare_at_price > p.price && p.sale_ends_at > Date.now() ? p.sale_ends_at : null, // a timed discount: when it ends (ms)
-      campaign: cp ? { id: cp.id, name: cp.name, endsAt: cp.endsAt } : null,
+      campaign: cp ? { id: cp.id, name: cp.name, endsAt: cp.endsAt, mode: cp.mode, storePrice: cp.storePrice } : null,
       image: images[0] || null,
       hoverImage: images[1] || null,
       colors: json(p.colors_json, []),

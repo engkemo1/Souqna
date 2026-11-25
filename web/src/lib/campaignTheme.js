@@ -3,6 +3,8 @@
  * how many fall and how fast — so the same system serves Black Friday, New Year, Ramadan, Eid, Valentine…
  */
 export const THEMES = {
+  // «وفّرها مرتين»: the shop's discount + Twist's extra one. Twist's own navy and orange — no Black Friday artwork.
+  twice: { name: 'وفّرها مرتين', c1: '#03244D', c2: '#FF8A3D', glyphs: ['٪', '%', '✦', '🏷️'], pct: true, emoji: '✌️' },
   blackfriday: { name: 'بلاك فرايدي', c1: '#111111', c2: '#F5B301', glyphs: ['%', '٪', '🏷️'], pct: true, emoji: '🔥', art: '/brand/bf-bg.webp' },
   newyear: { name: 'رأس السنة', c1: '#0B1B3F', c2: '#F4C95D', glyphs: ['✨', '🎉', '🎆', '⭐', '🥂'], emoji: '🎆' },
   ramadan: { name: 'رمضان', c1: '#2A1458', c2: '#E9B949', glyphs: ['🌙', '⭐', '✦', '🏮'], emoji: '🌙' },
@@ -11,6 +13,8 @@ export const THEMES = {
   summer: { name: 'الصيف', c1: '#0E7490', c2: '#FDBA74', glyphs: ['☀️', '🌴', '✦', '🍉'], emoji: '☀️' },
   sale: { name: 'تخفيضات عامة', c1: '#B91C1C', c2: '#FDE68A', glyphs: ['%', '🏷️', '✦'], pct: true, emoji: '🏷️' },
 };
+/** A discount campaign in `stack` mode: Twist's % comes off the shop's price AFTER the shop's own discount. */
+export const isStack = (c) => !!c && c.kind !== 'shipping' && c.mode === 'stack';
 export const DENSITY = { off: 0, low: 22, medium: 38, high: 60 };
 export const SPEED = { calm: 0.6, normal: 1, lively: 1.5 };
 const ok = (v) => /^#[0-9a-f]{6}$/i.test(v || '');

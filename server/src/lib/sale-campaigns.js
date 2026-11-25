@@ -21,7 +21,7 @@ import { q } from '../db/index.js';
 
 export const MODES = ['best', 'skip', 'override', 'stack'];
 export const FALL_STYLES = ['percent', 'tags', 'coins', 'stars', 'snow'];
-export const THEMES = ['blackfriday', 'newyear', 'ramadan', 'eid', 'valentine', 'summer', 'sale'];
+export const THEMES = ['blackfriday', 'twice', 'newyear', 'ramadan', 'eid', 'valentine', 'summer', 'sale'];
 export const DENSITY = ['off', 'low', 'medium', 'high'];
 export const SPEED = ['calm', 'normal', 'lively'];
 const hex = (v) => (/^#[0-9a-f]{6}$/i.test(String(v || '').trim()) ? String(v).trim() : '');
@@ -136,7 +136,8 @@ export function cardPricing(p) {
   const onSale = int(p.compare_at_price) > int(p.price);
   const was = onSale ? int(p.compare_at_price) : int(p.price);
   const price = int(p.price) - d;
-  return { price, compareAt: was, discount: Math.round((1 - price / was) * 100), endsAt: c.ends_at, id: c.id, name: c.name, mode: c.mode };
+  // storePrice = what the shop itself charges (its own sale already taken off); in `stack` mode Twist's extra % comes off THAT price, so price < storePrice
+  return { price, compareAt: was, storePrice: int(p.price), discount: Math.round((1 - price / was) * 100), endsAt: c.ends_at, id: c.id, name: c.name, mode: c.mode };
 }
 
 /** Free-shipping campaign for a basket of `net` EGP at store(s). Returns the campaign when it applies, else null. */

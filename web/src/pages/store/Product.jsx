@@ -9,7 +9,7 @@ import { useDepartments } from '../../lib/departments.js';
 import { useI18n } from '../../lib/i18n.jsx';
 import { exchangeLabel, exchangeSentence, returnDaysOf } from '../../lib/returns.js';
 import { useFavorites } from '../../lib/cart.jsx';
-import { formatNumber } from '../../lib/format.js';
+import { formatNumber, formatMoney } from '../../lib/format.js';
 import Gallery from '../../components/store/Gallery.jsx';
 import VariantPicker, { resolveVariant } from '../../components/store/VariantPicker.jsx';
 import { useAddToCart } from '../../components/store/useAddToCart.js';
@@ -256,6 +256,11 @@ export default function Product() {
           </div>
 
           <Price value={p.price} compareAt={p.compareAt} size="xl" showSave className="mt-5" />
+          {p.campaign?.mode === 'stack' && p.campaign.storePrice > p.price && (
+            <p className="mt-2 rounded-xl bg-brand/5 px-3 py-2 text-sm leading-6" data-testid="stack-breakdown">
+              {lang === 'ar' ? <>سعر المحل بعد خصمه <b className="tabular">{formatMoney(p.campaign.storePrice, lang)}</b> ← بعد خصم تويست الإضافي <b className="tabular text-sale">{formatMoney(p.price, lang)}</b></> : <>Shop price after its discount <b className="tabular">{formatMoney(p.campaign.storePrice, lang)}</b> → after Twist's extra discount <b className="tabular text-sale">{formatMoney(p.price, lang)}</b></>}
+            </p>
+          )}
           <SaleCountdown ms={p.saleEndsAt} campaign={p.campaign} name={p.campaign?.name} save={p.compareAt ? p.compareAt - p.price : 0} className="mt-3" />
           <ProductOffersPanel slug={store.slug} offers={data.offers || []} />
 

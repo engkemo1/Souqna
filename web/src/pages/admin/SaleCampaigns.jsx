@@ -43,6 +43,17 @@ function blackFriday(kind) {
     : { ...blank('discount'), name: 'بلاك فرايدي', startsAt: start, endsAt: end, percent: 30, headline: 'بلاك فرايدي', sub: 'خصومات على كل المنتجات لحد آخر النهار' };
 }
 
+/**
+ * «وفّرها مرتين»: Friday 4 Dec 2026, Cairo time (UTC+2) — the shop's own discount PLUS an extra one from Twist, taken off the shop's price.
+ * Twist's extra discount starts at 10% (editable here before saving).
+ */
+function twice() {
+  const start = Date.UTC(2026, 11, 3, 22, 0); // 4 Dec 00:00 Cairo
+  const end = Date.UTC(2026, 11, 4, 21, 59); // 4 Dec 23:59 Cairo
+  return { ...blank('discount'), theme: 'twice', mode: 'stack', name: 'وفّرها مرتين', startsAt: start, endsAt: end, percent: 10, headline: 'وفّرها مرتين', sub: 'خصم المحل + خصم إضافي من تويست',
+    badge: { mode: 'all', title: '', sub: '', chips: ['أول Black Friday من تويست'] } };
+}
+
 /** New Year's Eve: 31 Dec 2026 12:00 → 1 Jan 2027 23:59, Cairo time. */
 function newYear(kind) {
   const start = Date.UTC(2026, 11, 31, 10, 0);
@@ -264,6 +275,7 @@ function Editor({ init, meta, onClose, onSaved }) {
             <div className="flex flex-wrap gap-2">
               <button type="button" onClick={() => setD({ ...blank('discount') })} className={cx('rounded-xl border px-3 py-1.5 text-sm font-semibold', !ship ? 'border-brand bg-brand/10 text-brand' : 'border-line')}><Percent size={14} className="me-1 inline" />خصم</button>
               <button type="button" onClick={() => setD({ ...blank('shipping') })} className={cx('rounded-xl border px-3 py-1.5 text-sm font-semibold', ship ? 'border-brand bg-brand/10 text-brand' : 'border-line')}><Truck size={14} className="me-1 inline" />شحن مجاني</button>
+              {!ship && <button type="button" onClick={() => setD(twice())} className="rounded-xl bg-btn px-3 py-1.5 text-sm font-semibold text-on-btn"><Sparkles size={14} className="me-1 inline" />جهّز «وفّرها مرتين» ٤ ديسمبر</button>}
               <button type="button" onClick={() => setD(blackFriday(d.kind))} className="rounded-xl bg-btn px-3 py-1.5 text-sm font-semibold text-on-btn"><Sparkles size={14} className="me-1 inline" />جهّز بلاك فرايدي ٢٧ نوفمبر</button>
               <button type="button" onClick={() => setD(newYear(d.kind))} className="rounded-xl bg-btn px-3 py-1.5 text-sm font-semibold text-on-btn"><Sparkles size={14} className="me-1 inline" />جهّز رأس السنة</button>
             </div>

@@ -138,6 +138,7 @@ export function quote(store, items = [], couponCode, { phone, giftChoices } = {}
     couponError,
     platformDiscount: platformDiscount + campaignDiscount,
     campaignDiscount,
+    campaignMode: campaignDiscount > 0 ? discountMode() : null, // 'stack' = Twist's extra % on top of the shop's own price
     campaignId,
     campaignShipId: shipCampId,
     campaignShipping,
