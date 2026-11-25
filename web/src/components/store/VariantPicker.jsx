@@ -3,6 +3,7 @@ import { Check } from 'lucide-react';
 import { useI18n } from '../../lib/i18n.jsx';
 import { onColor } from '@souqna/shared/theme';
 import { cx } from '../ui/cx.js';
+import { displaySize } from '../../lib/childSize.js';
 
 /** Resolve the selected variant & availability for a product detail payload. */
 export function resolveVariant(product, color, size) {
@@ -19,7 +20,7 @@ export function sizeStock(product, color, size) {
 }
 
 export default function VariantPicker({ product, color, size, onColor: setColor, onSize, sizeError, advisor = null, sizeNote = null, suggested = null }) {
-  const { t, tr } = useI18n();
+  const { t, tr, lang } = useI18n();
   const colors = product.colors || [];
   const sizes = product.sizes || [];
   const current = colors.find((c) => c.hex === color);
@@ -64,7 +65,7 @@ export default function VariantPicker({ product, color, size, onColor: setColor,
                   className={cx('relative h-11 min-w-[3.25rem] rounded-xl border px-3.5 text-sm font-semibold tabular transition-all duration-200 active:scale-95',
                     active ? 'border-fg bg-fg text-canvas' : 'border-line-strong hover:border-fg',
                     stock <= 0 && 'cursor-not-allowed text-muted/60 line-through decoration-1 hover:border-line-strong')}>
-                  {s}
+                  {displaySize(product, s, lang)}
                   {suggested === s && !active && stock > 0 && <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-success px-1.5 text-[10px] font-bold leading-4 text-on-success">{t('size.mine')}</span>}
                   {stock > 0 && stock <= 3 && !active && <span className="absolute -top-1.5 end-1 h-2 w-2 rounded-full bg-amber-500 ring-2 ring-elevated" />}
                 </button>

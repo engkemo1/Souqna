@@ -173,3 +173,75 @@ test('chat: an outfit that cannot pass the reviewer is replaced by an honest rep
     assert.ok(rej.why.some((w) => w.startsWith('no_variant_in_stock')), JSON.stringify(rej));
   } finally { q.run("UPDATE variants SET stock=5 WHERE product_id=?", [sneakers]); q.run("DELETE FROM variants WHERE product_id=?", [dead]); q.run("DELETE FROM products WHERE id=?", [dead]); }
 });
+
+const addW = (en, ar, key, colors, sizes, extra = {}) => add(en, ar, key, colors, sizes, () => 5, { department: 'women', audience: 'women', ...extra });
+addW('Navy Casual Midi Dress', 'فستان كاجوال كحلي حريمي', 'dress_casual', ['navy'], L);
+addW('Beige Low Heels', 'كعب منخفض بيج حريمي', 'heels_low', ['beige'], ['37', '38', '39']);
+addW('White Cotton Blouse', 'بلوزة قطن بيضاء حريمي', 'blouse', ['white'], L);
+addW('Black Straight Trousers', 'بنطلون اسود مستقيم حريمي', 'trousers', ['black'], L);
+addW('White Flat Shoes', 'بالرينا بيضاء حريمي', 'flats', ['white'], ['37', '38', '39']);
+
+const audOf = (id) => q.get('SELECT audience FROM products WHERE id=?', [id]).audience;
+test('chat: a couple request returns separate men / women outfit tabs, never one mixed tab', async () => {
+  reset();
+  const res = await chat('رشحلي لوك كاجوال ليا ولجوزي للخروج ميزانيتي 8000 وانا مش محجبة');
+  assert.equal(res.status, 200);
+  const tabs = res.body.tabs || [];
+  assert.ok(tabs.length >= 2, 'one tab per person');
+  for (const t of tabs) {
+    const auds = new Set(t.items.map((i) => audOf(i.id)));
+    assert.equal(auds.size, 1, `tab ${t.id} mixes audiences: ${[...auds]}`);
+  }
+  assert.ok(new Set(tabs.map((t) => audOf(t.items[0].id))).size >= 2, 'men and women are in different tabs');
+});
+
+// ---- children: Smart Look on a child product ----
+const addK = (en, ar, key, color, sizeLabels, stock = 4, extra = {}) => add(en, ar, key, [color], sizeLabels, () => stock, { department: 'kids_boys', audience: 'boys', ...extra });
+const kidJeans = addK('Boys Navy Jeans', 'جينز كحلي ولادي', 'jeans', 'navy', ['6 سنين']);
+const kidTee = addK('Boys White Cotton T-Shirt', 'تيشيرت قطن ابيض ولادي', 'tshirt', 'white', ['6 سنين']);
+const kidJacket = addK('Boys Navy Bomber Jacket', 'جاكيت بومبر كحلي ولادي', 'jacket', 'navy', ['5-6 سنين', '6-7 سنين']);
+const kidShoes = addK('Boys White Sneakers', 'كوتشي ابيض ولادي', 'sneakers', 'white', ['30', '31']);
+const kidIds = [kidJeans, kidTee, kidJacket, kidShoes];
+const setShoeSizes = (sizes) => { q.run('DELETE FROM variants WHERE product_id=?', [kidShoes]); for (const sz of sizes) insert('variants', { product_id: kidShoes, color: HEX.white, size: sz, sku: `K-${sz}-${Math.random()}`, stock: 4 }); };
+
+test('child look: pieces that share one age band are shown, all of them child products, with the recommended size', async () => {
+  reset();
+  const res = await post('/api/stylist/smart-look', { productId: kidJeans });
+  assert.equal(res.body.ok, true, JSON.stringify(res.body));
+  for (const id of shownIds(res)) assert.ok(kidIds.includes(id), `adult product ${id} in a child look`);
+  assert.ok(res.body.looks.every((l) => l.items[0].rec && /سنين|^\d+$/.test(res.body.looks.length ? l.items[0].rec.size : '')), 'every piece carries its recommended size');
+  assert.equal(res.body.anchorRec.size, '6 سنين');
+});
+test('child look BUG CASE: shoes only in EU 34–37 next to 6-year clothes → no look', async () => {
+  reset(); setShoeSizes(['34', '35', '36', '37']);
+  try {
+    const res = await post('/api/stylist/smart-look', { productId: kidJeans });
+    assert.equal(res.body.ok, false, JSON.stringify(res.body));
+    const rej = events('rejected').map((e) => JSON.parse(e.data_json));
+    assert.ok(rej.length >= 1);
+  } finally { setShoeSizes(['30', '31']); }
+});
+test('child look: a child product with an unknown age can never be part of a look', async () => {
+  reset();
+  q.run('DELETE FROM variants WHERE product_id=?', [kidTee]);
+  insert('variants', { product_id: kidTee, color: HEX.white, size: 'اطفال', sku: 'K-GEN', stock: 4 });
+  q.run("UPDATE products SET sizes_json='[\"اطفال\"]', description_ar='' WHERE id=?", [kidTee]);
+  const res = await post('/api/stylist/smart-look', { productId: kidJeans });
+  assert.ok(!shownIds(res).includes(kidTee), 'unknown-age piece shown');
+});
+test('simple searches for child products are unchanged by the child gate', async () => {
+  reset();
+  const res = await chat('جينز ولادي');
+  assert.equal(res.status, 200);
+  assert.equal(events('chat_shown').length + events('chat_rejected').length, 0);
+});
+
+test('anchor with stock tracking OFF and zero variant counts still gets a look (regression: Ghost jacket page)', async () => {
+  reset();
+  q.run('UPDATE products SET track_stock=0 WHERE id=?', [jeans]);
+  q.run('UPDATE variants SET stock=0 WHERE product_id=?', [jeans]);
+  try {
+    const res = await post('/api/stylist/smart-look', { productId: jeans });
+    assert.equal(res.body.ok, true, JSON.stringify(res.body));
+  } finally { q.run('UPDATE products SET track_stock=1 WHERE id=?', [jeans]); q.run('UPDATE variants SET stock=5 WHERE product_id=?', [jeans]); }
+});

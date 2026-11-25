@@ -35,6 +35,7 @@ import PageTransition from '../../components/PageTransition.jsx';
 import { cx } from '../../components/ui/cx.js';
 import { rememberViewed } from '../../lib/recentlyViewed.js';
 import SmartLookCard from '../../components/market/SmartLookCard.jsx';
+import { displaySize } from '../../lib/childSize.js';
 
 function Accordion({ title, children, defaultOpen }) {
   const [open, setOpen] = useState(!!defaultOpen);
@@ -269,7 +270,7 @@ export default function Product() {
             {!needsSize && available > 0 && available <= 5 && (
               <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="mt-4 flex items-center gap-2 text-sm font-semibold text-amber-700">
                 <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-60" /><span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" /></span>
-                {t('product.onlyLeft', { n: available })}
+                {size && available === 1 ? `${lang === 'ar' ? 'المقاس المتاح' : 'Available size'}: ${displaySize(p, size, lang)} · ${lang === 'ar' ? 'متبقي قطعة واحدة' : '1 left'}` : t('product.onlyLeft', { n: available })}
               </motion.p>
             )}
           </AnimatePresence>

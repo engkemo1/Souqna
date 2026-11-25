@@ -50,6 +50,8 @@ export default function SmartLookCard({ productId, fallback = null }) {
     } catch { setNoMore(true); }
     setBusy(false);
   };
+  // children's pieces carry the recommended size the look was verified for (never the generic word "أطفال")
+  const sizeText = (rec) => (rec?.size ? `${ar ? 'المقاس المتاح' : 'Available size'}: ${rec.size}${Number(rec.left) === 1 ? (ar ? ' · متبقي قطعة واحدة' : ' · 1 left') : ''}` : '');
   const nextAdd = () => { if (!quick) return; if (quick.i + 1 < quick.queue.length) setQuick({ ...quick, i: quick.i + 1 }); else setQuick(null); };
 
   return (
@@ -60,21 +62,25 @@ export default function SmartLookCard({ productId, fallback = null }) {
         <button type="button" onClick={() => setHidden(true)} aria-label={ar ? 'إخفاء الاقتراح' : 'Hide suggestion'} className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-muted transition hover:bg-secondary hover:text-fg"><X className="h-4 w-4" /></button>
       </div>
 
-      {/* Pinterest-style board: the pieces tiled like an outfit flat-lay — first piece large, the rest stacked beside it */}
-      <div className={cx('mt-2.5 grid h-[12.5rem] gap-1.5 overflow-hidden rounded-2xl bg-secondary/60 p-1.5 sm:h-[15rem]', pieces.length === 1 ? 'grid-cols-1' : pieces.length === 2 ? 'grid-cols-2' : 'grid-cols-[1.2fr_1fr]')} style={pieces.length >= 3 ? { gridTemplateRows: `repeat(${pieces.length - 1}, minmax(0, 1fr))` } : undefined}>
-        {pieces.map(({ label, p, i, n }, k) => {
+      {look.anchorRec?.size && <p data-testid="look-anchor-size" className="mt-1 text-[11px] text-muted">{ar ? 'الطقم متظبط على' : 'Look matched to'} {look.anchorRec.size}</p>}
+      {/* Outfit strip: every piece is shown at the same, clearly readable size (4:5 photo, name chip, price, swap) — compact, no overlays covering the picture */}
+      <div className={cx('mt-2.5 grid gap-2', pieces.length <= 3 ? (pieces.length === 1 ? 'grid-cols-1' : pieces.length === 2 ? 'grid-cols-2' : 'grid-cols-3') : pieces.length === 4 ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3')}>
+        {pieces.map(({ label, p, i, n }) => {
           const off = removed.has(p.id);
           return (
-            <div key={p.id} className={cx('group relative min-h-0 overflow-hidden rounded-xl bg-white shadow-sm transition', pieces.length >= 3 && k === 0 && 'row-span-full', off && 'opacity-40')}>
-              <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="block h-full w-full"><SmartImage media={p.image} alt={tr(p.name)} className="h-full w-full" sizes="(min-width:640px) 28vw, 56vw" /></Link>
-              <span className="pointer-events-none absolute start-1.5 top-1.5 max-w-[70%] truncate rounded-full bg-white/95 px-2 py-0.5 text-[10.5px] font-bold shadow-sm">{label}</span>
-              <button type="button" onClick={() => toggle(p.id)} aria-label={off ? (ar ? 'رجّعها' : 'Put back') : (ar ? 'شيلها من الطقم' : 'Remove')} className="absolute end-1.5 top-1.5 grid h-7 w-7 place-items-center rounded-full bg-white/95 text-fg shadow-sm transition hover:bg-white">
-                {off ? <RotateCcw className="h-3.5 w-3.5" /> : <X className="h-3.5 w-3.5" />}
-              </button>
-              <div className="pointer-events-none absolute inset-x-1.5 bottom-1.5 flex items-end justify-between gap-1">
-                <span className="rounded-full bg-fg/80 px-2 py-0.5 text-[11px] font-bold text-white backdrop-blur">{formatMoney(p.price, lang)}</span>
-                {n > 1 && <button type="button" onClick={() => swap(i, n)} className="pointer-events-auto rounded-full bg-white/95 px-2 py-0.5 text-[10.5px] font-bold text-fg shadow-sm transition hover:bg-white">{ar ? 'غيّرها' : 'Swap'}</button>}
+            <div key={p.id} className={cx('min-w-0 transition', off && 'opacity-40')}>
+              <div className="relative">
+                <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className="block"><SmartImage media={p.image} alt={tr(p.name)} ratio="4 / 5" className="w-full rounded-xl bg-secondary" sizes="(min-width:640px) 14vw, 30vw" /></Link>
+                <button type="button" onClick={() => toggle(p.id)} aria-label={off ? (ar ? 'رجّعها' : 'Put back') : (ar ? 'شيلها من الطقم' : 'Remove')} className="absolute end-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-white/95 text-fg shadow-sm transition hover:bg-white">
+                  {off ? <RotateCcw className="h-3 w-3" /> : <X className="h-3 w-3" />}
+                </button>
               </div>
+              <div className="mt-1.5 flex items-center justify-between gap-1">
+                <span className="min-w-0 truncate text-[11.5px] font-bold text-fg">{label}</span>
+                {n > 1 && <button type="button" onClick={() => swap(i, n)} className="shrink-0 text-[11px] font-bold text-brand underline-offset-2 hover:underline">{ar ? 'غيّرها' : 'Swap'}</button>}
+              </div>
+              <p className="text-[12px] font-extrabold tabular leading-tight text-fg">{formatMoney(p.price, lang)}</p>
+              {p.rec?.size && <p data-testid="look-size" className="mt-0.5 text-[10.5px] leading-snug text-muted">{sizeText(p.rec)}</p>}
             </div>
           );
         })}

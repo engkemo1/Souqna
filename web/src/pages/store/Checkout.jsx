@@ -8,6 +8,7 @@ import { useStore, sp } from '../../lib/store.jsx';
 import { useCart } from '../../lib/cart.jsx';
 import FinalSaleNote from '../../components/market/FinalSaleNote.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { cartSizeText } from '../../lib/childSize.js';
 import { rememberOrder } from '../../lib/recentOrders.js';
 import { api } from '../../lib/api.js';
 import { formatMoney } from '../../lib/format.js';
@@ -44,7 +45,7 @@ function Summary({ quote, items, coupon, onApply, onRemove, couponError, applyin
               </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{tr(l.name)}</p>
-                <p className="text-xs text-muted">{[l.colorName && tr(l.colorName), l.size].filter(Boolean).join(' · ')}</p>
+                <p className="text-xs text-muted">{[l.colorName && tr(l.colorName), l.size && cartSizeText(l, lang)].filter(Boolean).join(' · ')}</p>
                 {ql?.error && <p className="text-xs font-semibold text-sale">{ql.error === 'insufficient_stock' ? t('cart.onlyAvailable', { n: ql.available }) : t('cart.unavailable')}</p>}
               </div>
               <LinePrice ql={ql} price={l.price} qty={l.qty} className="text-sm" />

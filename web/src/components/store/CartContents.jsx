@@ -8,6 +8,7 @@ import { EmptyState } from '../ui/States.jsx';
 import { useToast } from '../ui/Toast.jsx';
 import { useCart } from '../../lib/cart.jsx';
 import { useI18n } from '../../lib/i18n.jsx';
+import { cartSizeText } from '../../lib/childSize.js';
 import { formatMoney } from '../../lib/format.js';
 import { useStore, sp } from '../../lib/store.jsx';
 import { cx } from '../ui/cx.js';
@@ -62,7 +63,7 @@ export function CartLines({ slug, onNavigate, problems = {} }) {
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
                     {l.colorName && <span className="inline-flex items-center gap-1.5"><span className="h-3 w-3 rounded-full ring-1 ring-inset ring-black/10" style={{ background: l.color }} />{tr(l.colorName)}</span>}
-                    {l.size && <span>{t('product.size')}: <span className="font-medium text-fg">{l.size}</span></span>}
+                    {l.size && <span>{t('product.size')}: <span className="font-medium text-fg">{cartSizeText(l, lang)}</span></span>}
                   </div>
                   <LineOfferTag quote={quote} ql={quoteLineFor(quote, l)} />
                   {problem && <p className="mt-1 text-xs font-semibold text-sale">{problem}</p>}

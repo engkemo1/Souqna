@@ -614,7 +614,7 @@ function modaClientResponse(result) {
     id: tab.id, label: tab.label, subtotal: tab.subtotal,
     items: tab.items.map((item) => {
       const card = cards.get(item.id);
-      return card ? { ...item, card: { ...card, fitTip: item.fitTip || null } } : null;
+      return card ? { ...item, card: { ...card, fitTip: item.fitTip || null, rec: item.rec || null } } : null;
     }).filter(Boolean),
   }));
   const looks = tabs.flatMap((tab) => tab.items.map((item) => ({ label: item.label, items: [item.card], pick: 0 })));
@@ -645,7 +645,7 @@ r.get('/stylist/prompts', h((_req, res) => { res.set('Cache-Control', 'public, m
 
 // Twila chat: a COMPLETE outfit (state full, a non-search tab with 2+ pieces, or a named look, and nothing missing) goes through the same independent reviewer as the product-page look.
 // Plain searches ("show me a red hoodie": search tab / a single piece) and partial answers are left untouched. A tab that does not reach the bar is dropped; if none is left the shopper gets an honest chat reply, never a bad outfit.
-function reviewChatOutfits(result, rows) {
+function reviewChatOutfits(result, rows, { wanted = null } = {}) {
   const tabs = result?.blocks?.tabs;
   if (result?.state !== 'full' || !Array.isArray(tabs)) return { result, reviewed: 0 };
   const isOutfit = (t) => t.id !== 'search' && ((t.items || []).length >= 2 || (t.look && (t.items || []).length >= 1)) && !(t.missing || []).length; // a named look template counts as an outfit even with one piece (e.g. a lone dress)
@@ -654,17 +654,19 @@ function reviewChatOutfits(result, rows) {
   const byId = new Map(enrichModaRows(rows, K).map((x) => [x.id, x]));
   const month = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', month: 'numeric' }).format(new Date()));
   const vmap = new Map();
-  const load = (ids) => { const need = [...new Set(ids)].filter((id) => !vmap.has(id)); if (!need.length) return; for (const id of need) vmap.set(id, []); for (const v of q.all(`SELECT product_id, color, size, stock FROM variants WHERE product_id IN (${need.map(() => '?').join(',')})`, need)) vmap.get(v.product_id).push(v); };
-  const review = (pieces) => { if (pieces.some((x) => !x)) return { ok: false, score: 0, reasons: ['piece_not_found'] }; load(pieces.map((x) => x.id)); return reviewLook(pieces, { variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month }); };
+  const load = (ids) => { const need = [...new Set(ids)].filter((id) => !vmap.has(id)); if (!need.length) return; for (const id of need) vmap.set(id, []); for (const v of q.all(`SELECT id, product_id, color, size, stock FROM variants WHERE product_id IN (${need.map(() => '?').join(',')})`, need)) vmap.get(v.product_id).push(v); };
+  const review = (pieces, audience = null) => { if (pieces.some((x) => !x)) return { ok: false, score: 0, reasons: ['piece_not_found'] }; load(pieces.map((x) => x.id)); return reviewLook(pieces, { audience: ['men', 'women', 'boys', 'girls', 'kids'].includes(audience) ? audience : null, wantedSizes: wanted, variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month }); };
   const kept = []; const rejected = []; let reviewed = 0;
   for (const t of tabs) {
     if (!isOutfit(t)) { kept.push(t); continue; }
     reviewed += 1;
     const pieces = t.items.map((i) => byId.get(i.id));
-    const v = review(pieces);
+    const v = review(pieces, t.id);
     if (!v.ok) { rejected.push({ tab: t.id, score: v.score, why: v.reasons.slice(0, 8) }); continue; }
     // swap options inside the tab must keep the whole outfit above the bar too
-    const items = t.items.map((it, i) => ({ ...it, alts: (it.alts || []).filter((a) => { const alt = byId.get(a.id); if (!alt) return false; const p2 = [...pieces]; p2[i] = alt; return review(p2).ok; }) }));
+    const recOf = (rv) => new Map((rv.child?.picks || []).map((x) => [x.id, { size: x.size, left: x.left, variantId: x.variantId }]));
+    const recs = recOf(v);
+    const items = t.items.map((it, i) => ({ ...it, rec: recs.get(it.id) || null, alts: (it.alts || []).map((a) => { const alt = byId.get(a.id); if (!alt) return null; const p2 = [...pieces]; p2[i] = alt; const rv = review(p2, t.id); return rv.ok ? { ...a, rec: recOf(rv).get(a.id) || null } : null; }).filter(Boolean) }));
     kept.push({ ...t, items, __score: v.score });
   }
   if (!rejected.length) return { result: { ...result, blocks: { ...result.blocks, tabs: kept } }, reviewed, scores: kept.map((t) => t.__score).filter((x) => x != null) };
@@ -683,7 +685,7 @@ r.post('/stylist', h(async (req, res) => {
     req.body.messages = req.body.messages.slice(-30).map((m) => (m && typeof m.content === 'string' ? { ...m, content: m.content.slice(0, 1200) } : m));
     while (req.body.messages.length > 1 && req.body.messages[0]?.role !== 'user') req.body.messages.shift();
   }
-  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1200) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string(), z.string().max(500)).optional(), session: z.record(z.string(), z.any()).optional(), answers: z.record(z.string(), z.any()).optional(), startLook: z.boolean().optional(), similar: z.boolean().optional(), lang: z.enum(['ar', 'en']).optional() }).parse(req.body);
+  const body = z.object({ messages: z.array(z.object({ role: z.enum(['user', 'assistant']), content: z.string().max(1200) })).min(1).max(30), image: z.string().max(950000).optional(), image2: z.string().max(950000).optional(), profile: z.record(z.string(), z.string().max(500)).optional(), session: z.record(z.string(), z.any()).optional(), answers: z.record(z.string(), z.any()).optional(), startLook: z.boolean().optional(), similar: z.boolean().optional(), lang: z.enum(['ar', 'en']).optional(), sizes: z.object({ top: z.string().max(12).optional(), bottom: z.string().max(12).optional(), shoes: z.string().max(12).optional() }).optional() }).parse(req.body);
   if (body.session && JSON.stringify(body.session).length > 8000) {
     // نشيل التقيل (قوائم العناصر الكبيرة) ونحتفظ بالتفضيلات بدل ما نرفض الرسالة
     for (const [k, v] of Object.entries(body.session)) if (JSON.stringify(v ?? null).length > 1500) delete body.session[k];
@@ -728,8 +730,8 @@ r.post('/stylist', h(async (req, res) => {
       understand = async (a) => { const k = `${ip}`; const hits = (understandHits.get(k) || []).filter((t) => Date.now() - t < 86400e3); if (cap > 0 && hits.length >= cap) return null; understandHits.set(k, [...hits, Date.now()]); return inner(a); };
     }
     let result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand, verifier, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: stylistTrainingSettings() });
-    { const rv = reviewChatOutfits(result, rows); result = rv.result;
-      if (rv.reviewed) logSmartLook(rv.rejected?.length ? 'chat_rejected' : 'chat_shown', null, { q: String(lastText).slice(0, 80), scores: rv.scores, rejected: rv.rejected }); }
+    { const rv = reviewChatOutfits(result, rows, { wanted: body.sizes || null }); result = rv.result;
+      if (rv.reviewed) logSmartLook(rv.rejected?.length ? 'chat_rejected' : 'chat_shown', null, { scores: rv.scores, rejected: rv.rejected }); /* no raw messages or personal data in telemetry */ }
     logStylist(body.startLook ? '[start look]' : lastText, result, Date.now() - t0);
     return res.json(modaClientResponse(result));
   }
@@ -772,7 +774,7 @@ r.post('/stylist/smart-look', h(async (req, res) => {
     const ph = ids.map(() => '?').join(',');
     const live = new Set(q.all(`SELECT id FROM products WHERE id IN (${ph}) AND status='active' AND (track_stock=0 OR stock>0)`, ids).map((x) => x.id));
     if (live.size !== ids.length) return false;
-    return !q.all(`SELECT product_id FROM variants WHERE product_id IN (${ph}) GROUP BY product_id HAVING SUM(CASE WHEN stock>0 THEN 1 ELSE 0 END)=0`, ids).length;
+    return !q.all(`SELECT v.product_id FROM variants v JOIN products p ON p.id=v.product_id WHERE v.product_id IN (${ph}) AND p.track_stock<>0 GROUP BY v.product_id HAVING SUM(CASE WHEN v.stock>0 THEN 1 ELSE 0 END)=0`, ids).length;
   };
   const hit0 = ex.size ? null : smartLookCache.get(cacheKey);
   const hit = hit0 && now - hit0.at < Number(process.env.SMARTLOOK_CACHE_MS ?? 10 * 60e3) && stillBuyable(hit0.out) ? hit0 : null;
@@ -791,12 +793,14 @@ r.post('/stylist/smart-look', h(async (req, res) => {
   const K = loadModaKnowledge();
   const monthNow = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', month: 'numeric' }).format(new Date()));
   const vmap = new Map();
-  const loadVariants = (ids) => { const need = [...new Set(ids)].filter((id) => !vmap.has(id)); if (!need.length) return; for (const id of need) vmap.set(id, []); for (const v of q.all(`SELECT product_id, color, size, stock FROM variants WHERE product_id IN (${need.map(() => '?').join(',')})`, need)) vmap.get(v.product_id).push(v); };
-  const reviewRows = (rows) => { loadVariants(rows.filter(Boolean).map((x) => x.id)); return reviewLook(rows, { heroKey: anchor?.key, variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month: monthNow }); };
+  const loadVariants = (ids) => { const need = [...new Set(ids)].filter((id) => !vmap.has(id)); if (!need.length) return; for (const id of need) vmap.set(id, []); for (const v of q.all(`SELECT id, product_id, color, size, stock FROM variants WHERE product_id IN (${need.map(() => '?').join(',')})`, need)) vmap.get(v.product_id).push(v); };
+  const reviewRows = (rows) => { loadVariants(rows.filter(Boolean).map((x) => x.id)); return reviewLook(rows, { heroKey: anchor?.key, audience: ['men', 'women', 'boys', 'girls', 'kids'].includes(anchor?.gender) ? anchor.gender : null, variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month: monthNow }); };
   const pieceRows = verdict.ids.map((id) => enriched.find((x) => x.id === id));
   const review = reviewRows([anchor, ...pieceRows]);
   if (!review.ok) { logSmartLook('rejected', body.productId, { reason: 'review', score: review.score, why: review.reasons.slice(0, 8) }); return finish({ ok: false, reason: 'review_failed' }); }
   result.__reviewScore = review.score;
+  const recOf = (rv) => new Map((rv.child?.picks || []).map((x) => [x.id, { size: x.size, left: x.left, variantId: x.variantId }]));
+  const recs = recOf(review);
   const resp = modaClientResponse(result);
   if (!resp.looks?.length || resp.looks.length !== verdict.ids.length) return finish({ ok: false, reason: 'cards_missing' });
   // بدائل كل قطعة (تيشرت/بولو/هودي/جاكيت…) عشان العميل يبدّل جوه نفس الطقم؛ items[0] هو الاختيار الأساسي
@@ -809,11 +813,13 @@ r.post('/stylist/smart-look', h(async (req, res) => {
   // a swap option is only offered if the look WITH that option still passes the same review (stock, data safety, colours, season…)
   const altIdsOf = (i) => [...new Set(altsOf(flatItems[i] || {}).map((a) => a.id))].filter((id) => !ex.has(id) && id !== anchor.id && !verdict.ids.includes(id));
   loadVariants(flatItems.flatMap((_, i) => altIdsOf(i)));
-  const goodAlts = flatItems.map((_, i) => new Set(altIdsOf(i).filter((id) => { const alt = enriched.find((x) => x.id === id); if (!alt) return false; const rows = [...pieceRows]; rows[i] = alt; return reviewRows([anchor, ...rows]).ok; })));
+  const altRecs = new Map();
+  const goodAlts = flatItems.map((_, i) => new Set(altIdsOf(i).filter((id) => { const alt = enriched.find((x) => x.id === id); if (!alt) return false; const rows = [...pieceRows]; rows[i] = alt; const rv = reviewRows([anchor, ...rows]); if (rv.ok) { const m = recOf(rv).get(id); if (m) altRecs.set(id, m); } return rv.ok; })));
   const altCards = new Map(cardsByIds([...new Set(goodAlts.flatMap((g) => [...g]))]).map((c) => [c.id, c]));
-  resp.looks = resp.looks.map((l, i) => ({ ...l, items: [...l.items, ...[...(goodAlts[i] || [])].map((id) => altCards.get(id)).filter(Boolean)] }));
+  const withRec = (c, m) => (c && m ? { ...c, rec: m } : c);
+  resp.looks = resp.looks.map((l, i) => ({ ...l, items: [...l.items.map((c) => withRec(c, recs.get(c.id))), ...[...(goodAlts[i] || [])].map((id) => withRec(altCards.get(id), altRecs.get(id))).filter(Boolean)] }));
   logSmartLook('shown', body.productId, { score: result.__reviewScore, ids: verdict.ids });
-  return finish({ ok: true, score: result.__reviewScore, anchorId: anchor.id, total: resp.total, looks: resp.looks, styleTips: resp.styleTips || [], palette: resp.palette || [] });
+  return finish({ ok: true, score: result.__reviewScore, anchorRec: recs.get(anchor.id) || null, anchorId: anchor.id, total: resp.total, looks: resp.looks, styleTips: resp.styleTips || [], palette: resp.palette || [] });
 }));
 
 r.post('/stylist/feedback', h((req, res) => {

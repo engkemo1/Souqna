@@ -2,6 +2,8 @@
 // القاعدة: الطلب الأساسي أولًا، والاقتراح يظهر بس لو الطقم كامل ومتناسق بقواعد تويلا (الرسمية + الألوان + الميزانية)؛
 // أي حاجة أقل من كده (قطعة ناقصة، بدائل بعيدة، طلب سؤال للعميل) = نسكت ومنقترحش حاجة.
 
+import { childOutfitGate, audienceGate, wantedSizeGate } from './childfit.js';
+
 const AUD_WORD = { men: 'رجالي', women: 'حريمي', boys: 'ولادي', girls: 'بناتي' };
 
 const FORMAL_ACC = new Set(['bow_tie', 'tie', 'cufflinks', 'pocket_square']);
@@ -140,6 +142,7 @@ const hueOf = (k) => (NEUTRALS.has(k) ? null : HUE[k] || k);
 /** Is this piece buyable? variants: [{ color, size, stock }]. At least one colour+size variant must have stock. No variants at all = a simple product (the product-level stock decides). */
 export function variantAvailability(row, variants = []) {
   if (row?.inStock === false) return { ok: false, reason: 'out_of_stock' };
+  if (row && (row.track_stock === 0 || row.track_stock === false)) return { ok: true }; // stock tracking is off for this product (the shop sells it without counting): variant counts are meaningless, exactly like the product page
   const vs = Array.isArray(variants) ? variants : [];
   if (!vs.length) return { ok: true };
   if (!vs.some((v) => Number(v.stock) > 0)) return { ok: false, reason: 'no_variant_in_stock' };
@@ -181,6 +184,11 @@ export function reviewLook(pieces, ctx = {}) {
     if (!colorsOf(p).length && !COLOR_FREE.has(p.key)) pen(`unknown_color:${p.id}`, 25); // missing decisive information
     if (p.formality == null) pen(`unknown_formality:${p.id}`, 25);
   }
+  // one audience per outfit; children's outfits must share one age band with an in-stock variant per piece; explicit adult sizes are checked per category (never against each other)
+  for (const r of audienceGate(list, { audience: ctx.audience || null })) fail(r);
+  const child = childOutfitGate(list, { variantsOf: ctx.variantsOf });
+  if (child && !child.ok) for (const r of child.reasons) fail(r);
+  for (const r of wantedSizeGate(list, ctx.wantedSizes, ctx.variantsOf)) fail(r);
   // one style: formality spread across the whole look
   const fs = list.map((p) => p.formality).filter((x) => x != null);
   if (fs.length) { const spread = Math.max(...fs) - Math.min(...fs); if (spread >= 3) fail(`formality_spread:${spread}`); else if (spread === 2) pen('formality_spread:2', 20); }
@@ -200,5 +208,5 @@ export function reviewLook(pieces, ctx = {}) {
   const hues = [...new Set(lead.map(hueOf).filter(Boolean))];
   if (hues.length >= 3) pen(`too_many_hues:${hues.length}`, 35);
   for (const [a1, b1] of CLASH) if (hues.includes(a1) && hues.includes(b1)) pen(`clash:${a1}+${b1}`, 25);
-  return { ok: !hard && score >= MIN_SCORE, score: Math.max(0, score), reasons };
+  return { ok: !hard && score >= MIN_SCORE, score: Math.max(0, score), reasons, ...(child?.ok ? { child: { common: child.common, picks: child.picks } } : {}) };
 }

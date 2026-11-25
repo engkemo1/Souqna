@@ -6,6 +6,7 @@ import { pickSrc } from '../../lib/image.js';
 import { useNavigate } from 'react-router-dom';
 import { px } from '../../lib/pixel.js';
 import { trackSiteEvent } from '../../lib/siteTracker.js';
+import { displaySize } from '../../lib/childSize.js';
 
 /** Fly a thumbnail from `fromEl` to the cart icon — a subtle, fast confirmation. */
 function flyToCart(fromEl, src) {
@@ -32,7 +33,7 @@ function flyToCart(fromEl, src) {
 
 export function useAddToCart(slug) {
   const cart = useCart(slug);
-  const { t, tr } = useI18n();
+  const { t, tr, lang } = useI18n();
   const toast = useToast();
   const navigate = useNavigate();
 
@@ -50,6 +51,7 @@ export function useAddToCart(slug) {
       color: color || null,
       colorName: c ? { ar: c.name_ar, en: c.name_en } : null,
       size: size && size !== 'One size' ? size : null,
+      sizeLabel: size && size !== 'One size' ? displaySize(product, size, lang) : null, // what the shopper sees (never the generic word "أطفال"); `size` stays the real variant value
       qty,
     });
     trackSiteEvent('add_to_cart');
@@ -57,5 +59,5 @@ export function useAddToCart(slug) {
     flyToCart(fromEl, pickSrc(image, 400));
     // One basket for all of Twist: confirm in place and let the shopper keep browsing.
     toast({ title: t('product.added'), description: tr(product.name), image: pickSrc(image, 160), action: { label: t('cart.viewCart'), onClick: () => navigate('/market-cart') } });
-  }, [cart, toast, t, tr, navigate]);
+  }, [cart, toast, t, tr, lang, navigate]);
 }

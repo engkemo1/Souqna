@@ -15,6 +15,7 @@ import { sp } from '../../lib/store.jsx';
 import { useMarketCart } from '../../lib/cart.jsx';
 import { useToast } from '../ui/Toast.jsx';
 import { useNavigate } from 'react-router-dom';
+import { displaySize } from '../../lib/childSize.js';
 
 export default function QuickAddSheet({ slug, product, onClose, onAdded, step, marketplace = false }) {
   const { t, tr, lang } = useI18n();
@@ -44,7 +45,7 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step, m
       const selectedColor = p.colors?.find((c) => c.hex === color);
       marketCart.add({ productId: p.id, variantId: variant?.id ?? null, slug: p.slug, name: p.name, price: p.price, compareAt: p.compareAt,
         image: p.media?.[0] || product.image, color: color || null, colorName: selectedColor ? { ar: selectedColor.name_ar, en: selectedColor.name_en } : null,
-        size: size && size !== 'One size' ? size : null }, product.store || { slug });
+        size: size && size !== 'One size' ? size : null, sizeLabel: size && size !== 'One size' ? displaySize(p, size, lang) : null }, product.store || { slug });
       toast({ title: lang === 'ar' ? 'اتضاف لسلة Twist' : 'Added to Twist basket', tone: 'info', action: { label: lang === 'ar' ? 'افتح السلة' : 'Open basket', onClick: () => navigate('/market-cart') } });
     } else add({ product: p, variant, color, size, fromEl: imgRef.current });
     if (onAdded) onAdded(); else onClose();
