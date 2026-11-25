@@ -65,6 +65,8 @@ export default function OrderDetail() {
   const [ret, setRet] = useState({});
   const [restock, setRestock] = useState(true);
   const [est, setEst] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
+  const [qtys, setQtys] = useState({});
   const o = data?.order;
 
   // live estimate of the refund (same calculation the server saves; nothing is written)
@@ -84,6 +86,20 @@ export default function OrderDetail() {
       const r = await api(`/owner/orders/${id}/returns`, { method: 'POST', body: { items, restock } });
       toast({ title: lang === 'ar' ? `تم تسجيل المرتجع · ${formatMoney(r.refund, lang)}` : `Return recorded · ${formatMoney(r.refund, lang)}` });
       setRetOpen(false); setRet({}); reload(); invalidate('/owner/orders'); invalidate('/owner/promotions');
+    } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); } finally { setBusy(null); }
+  };
+
+  // the shop trims an order before it ships (lower a quantity / remove a line); the server refuses anything that is not a plain order
+  const canEditLines = !!o && ['pending', 'confirmed'].includes(o.status) && !o.deliveryGroup && !(o.discount > 0) && !(o.platformDiscount > 0) && !o.coupon && o.items.length > 0;
+  const openEdit = () => { setQtys(Object.fromEntries(o.items.map((i) => [i.id, i.qty]))); setEditOpen(true); };
+  const saveEdit = async () => {
+    const items = o.items.filter((i) => (qtys[i.id] ?? i.qty) !== i.qty).map((i) => ({ id: i.id, qty: qtys[i.id] }));
+    if (!items.length) { setEditOpen(false); return; }
+    setBusy('edit');
+    try {
+      const r = await api(`/owner/orders/${id}/items`, { method: 'PATCH', body: { items } });
+      toast({ title: lang === 'ar' ? `اتعدّل الطلب · الإجمالي ${formatMoney(r.total, lang)}` : `Order updated · total ${formatMoney(r.total, lang)}` });
+      setEditOpen(false); reload(); invalidate('/owner/orders');
     } catch (e) { toast({ tone: 'error', title: errorMessage(t, e) }); } finally { setBusy(null); }
   };
 
@@ -241,6 +257,7 @@ export default function OrderDetail() {
               <div className="flex justify-between pt-1 text-lg font-semibold"><dt>{t('cart.total')}</dt><dd className="tabular">{formatMoney(o.total, lang)}</dd></div>
               {o.refunded > 0 && <div className="flex justify-between text-amber-700"><dt>{lang === 'ar' ? 'مرتجعات مستردة' : 'Refunded'}</dt><dd className="tabular">−{formatMoney(o.refunded, lang)}</dd></div>}
             </dl>
+            {canEditLines && <Button full variant="outline" className="mt-4" onClick={openEdit}>{lang === 'ar' ? 'تعديل الكميات (قطعة مش متوفرة؟)' : 'Edit quantities (an item unavailable?)'}</Button>}
             {['shipped', 'delivered'].includes(o.status) && o.items.some((i) => i.qty - (i.returnedQty || 0) > 0) && (
               <Button full variant="outline" className="mt-4" onClick={() => setRetOpen(true)}>{lang === 'ar' ? 'تسجيل مرتجع' : 'Record a return'}</Button>
             )}
@@ -330,6 +347,22 @@ export default function OrderDetail() {
         <div className="mt-4"><label className="mb-1.5 block text-sm font-medium text-fg" htmlFor="cancel-note">{t('orders.cancelReason')}</label><Textarea id="cancel-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></div>
       </ConfirmDialog>
       )}
+      {o && <Sheet open={editOpen} onClose={() => setEditOpen(false)} title={lang === 'ar' ? 'تعديل الكميات' : 'Edit quantities'} size="md"
+        footer={<Button full disabled={busy === 'edit' || !o.items.some((i) => (qtys[i.id] ?? i.qty) !== i.qty) || o.items.every((i) => (qtys[i.id] ?? i.qty) === 0)} onClick={saveEdit}>{lang === 'ar' ? 'حفظ التعديل وإبلاغ العميل' : 'Save and notify the customer'}</Button>}>
+        <p className="mb-3 text-sm text-muted">{lang === 'ar' ? 'تقدر تقلّل الكمية أو تشيل القطعة بس (٠). المخزون بيرجع والإجمالي بيتحسب من جديد والعميل بيوصله إشعار. لو عايز تلغي الطلب كله استخدم «إلغاء».' : 'You can lower a quantity or remove a line (0). Stock goes back, the total is recalculated and the customer is notified. To drop the whole order use Cancel.'}</p>
+        <ul className="space-y-3">
+          {o.items.map((it) => { const n = qtys[it.id] ?? it.qty; return (
+            <li key={it.id} className="flex items-center justify-between gap-3 rounded-xl border border-line p-3">
+              <div className="min-w-0 text-sm"><p className="truncate font-medium">{tr(it.name)}</p><p className="text-xs text-muted">{[it.size && `${t('product.size')}: ${it.size}`, formatMoney(it.price, lang)].filter(Boolean).join(' · ')}</p></div>
+              <div className="flex shrink-0 items-center gap-2">
+                <button type="button" aria-label="-" className="h-10 w-10 rounded-lg border border-line-strong text-lg" onClick={() => setQtys({ ...qtys, [it.id]: Math.max(0, n - 1) })}>−</button>
+                <span className="w-6 text-center tabular">{n}</span>
+                <button type="button" aria-label="+" className="h-10 w-10 rounded-lg border border-line-strong text-lg disabled:opacity-40" disabled={n >= it.qty} onClick={() => setQtys({ ...qtys, [it.id]: Math.min(it.qty, n + 1) })}>+</button>
+              </div>
+            </li>
+          ); })}
+        </ul>
+      </Sheet>}
       <Sheet open={retOpen} onClose={() => setRetOpen(false)} title={lang === 'ar' ? 'تسجيل مرتجع' : 'Record a return'} size="md"
         footer={<Button full disabled={busy === 'return' || !Object.values(ret).some((n) => n > 0)} onClick={doReturn}>{lang === 'ar' ? 'تأكيد المرتجع' : 'Confirm return'}</Button>}>
         <p className="mb-3 text-sm text-muted">{lang === 'ar' ? 'المبلغ المسترد = ما دفعه العميل عن القطع المرتجعة. لو المرتجع يُسقط عرضًا لم يعد مستحقًا يُخصم فرقه. الهدايا المجانية تُرجَع بدون مبلغ.' : 'Refund = what the customer paid for the returned items. If the return breaks an offer that is no longer earned, the difference is deducted. Free gifts return with no refund.'}</p>

@@ -82,3 +82,10 @@ test('marketplace search: size/colour filters + facets, relevance, suggestions, 
     await new Promise((r) => server.close(r));
   }
 });
+
+test('Franco-Arabic words find the Arabic product type («kotshi» = كوتشي)', async () => {
+  const { buildQuery } = await import('../src/lib/search-text.js');
+  const has = (w, ar) => buildQuery(w).tokens.some((t) => t.alts.some((a) => a.text === ar));
+  assert.ok(has('kotshi', 'كوتشي')); assert.ok(has('bantalon', 'بنطلون')); assert.ok(has('fostan', 'فستان'));
+  assert.equal(buildQuery('nike').tokens[0].alts.length, 1); // a brand typed in Latin is left alone
+});

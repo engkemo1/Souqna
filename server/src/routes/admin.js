@@ -49,6 +49,7 @@ import { adminStoryStores, setStoriesAllowed, setAllStoriesAllowed, adminActiveS
 import { saveStoryImage, saveStoryVideo, looksLikeVideo, deleteStoryVideo, HQ_VIDEO_MAX_SECONDS, HQ_VIDEO_MAX_BYTES } from '../lib/story-video.js';
 import { cashierAccess } from '../lib/cashier-access.js';
 import { settleTry, tryInfoFor } from '../lib/try-sizes.js';
+import { clearMicroCache } from '../lib/micro-cache.js';
 import { CASHIER_SYSTEMS, CASHIER_IDS, CASHIER_LINK_STATUSES } from '../lib/cashier-catalog.js';
 import { getPlatformFreeShipping, savePlatformFreeShipping, deliveryFeeForDistance, getDeliveryPricing, saveDeliveryPricing, getMultiStoreRule, saveMultiStoreRule, getZonePolicy, saveZonePolicy, zoneKey } from '../lib/deliveryRates.js';
 
@@ -82,6 +83,9 @@ const logAdminAuthEvent = (req, status, note) => {
     );
   } catch { /* ignore audit write errors */ }
 };
+
+// an admin change must show up on the public pages at once, not after the 15 s response memo expires
+r.use((req, res, next) => { if (req.method !== 'GET') res.on('finish', () => { if (res.statusCode < 400) clearMicroCache(); }); next(); });
 
 r.use((req, _res, next) => {
   if (!config.adminKey) return next(new AppError(503, 'admin_disabled', 'ADMIN_KEY is not set on the server.'));

@@ -183,6 +183,32 @@ function spellingVariants(w) {
  * Turn what the customer typed into search tokens. Each token has `alts`: the typed word first, then everything that should also match.
  * `vocab` (optional) is a Map(word → count) of the words really used in product names, used to repair typos.
  */
+/** Franco-Arabic («kotshi», «bantalon», «fostan»): compare by consonant skeleton, with look-alike letters folded together. */
+const AR_CLASS = { 'ت': 'T', 'ط': 'T', 'ث': 'T', 'س': 'S', 'ص': 'S', 'د': 'D', 'ض': 'D', 'ذ': 'Z', 'ز': 'Z', 'ظ': 'Z', 'ه': 'H', 'ح': 'H', 'خ': 'X', 'ك': 'K', 'ق': 'K', 'ج': 'G', 'غ': 'G', 'ش': 'C', 'ب': 'B', 'ف': 'F', 'ر': 'R', 'ل': 'L', 'م': 'M', 'ن': 'N', 'پ': 'B' };
+const arSkeleton = (w) => { let o = ''; for (const ch of w) { const c = AR_CLASS[ch]; if (c && c !== o[o.length - 1]) o += c; } return o; };
+const FR_DIGRAPHS = [['sh', 'C'], ['ch', 'C'], ['kh', 'X'], ['gh', 'G'], ['th', 'T'], ['ph', 'F']];
+const FR_SINGLE = { b: 'B', p: 'B', t: 'T', g: 'G', j: 'G', h: 'H', d: 'D', r: 'R', z: 'Z', s: 'S', f: 'F', v: 'F', q: 'K', k: 'K', c: 'K', l: 'L', m: 'M', n: 'N', x: 'KS', '5': 'X', '6': 'T', '7': 'H', '8': 'G', '9': 'K' };
+function francoSkeleton(raw) {
+  let o = ''; const push = (c) => { for (const x of c) if (x !== o[o.length - 1]) o += x; };
+  for (let i = 0; i < raw.length;) {
+    const d = FR_DIGRAPHS.find(([k]) => raw.startsWith(k, i));
+    if (d) { push(d[1]); i += 2; continue; }
+    const c = FR_SINGLE[raw[i]]; if (c) push(c); i += 1; // vowels, y, w, 2, 3 carry no consonant
+  }
+  return o;
+}
+/** Arabic words the typed Latin word may stand for: known type words first, then the shop's own vocabulary. */
+function francoCandidates(raw, vocab) {
+  if (!/^[a-z0-9']{3,20}$/.test(raw) || /^\d+$/.test(raw)) return [];
+  const sk = francoSkeleton(raw.replace(/'/g, '').replace(/tsh/g, 'tch'));
+  if (sk.length < 2) return [];
+  const out = [];
+  const seen = (w) => out.includes(w);
+  for (const w of P.byWord.keys()) if (/[؀-ۿ]/.test(w) && arSkeleton(w) === sk && !seen(w)) out.push(w);
+  if (vocab) for (const w of vocab.keys()) if (/[؀-ۿ]/.test(w) && w.length >= 3 && arSkeleton(w) === sk && !seen(w)) out.push(w);
+  return out.slice(0, 4);
+}
+
 export function buildQuery(term, { vocab = null, prefix = false } = {}) {
   let text = norm(String(term ?? '').slice(0, 80));
   if (!text) return { tokens: [], text: '' };
@@ -215,6 +241,10 @@ export function buildQuery(term, { vocab = null, prefix = false } = {}) {
     // a typed word also joins groups through its spelling variants (جاكيتات → جاكيت)
     if (tk.group === undefined) for (const t of typedAlts) for (const gi of P.byWord.get(t) || []) gis.add(gi);
     for (const gi of gis) for (const v of P.groups[gi]) add(v.text, v.exact);
+    // Franco-Arabic: a Latin word that is not a known English type word may be an Arabic word typed with Latin letters («kotshi» = كوتشي)
+    if (tk.group === undefined && !gis.size && /^[a-z0-9']+$/.test(tk.raw)) {
+      for (const w of francoCandidates(tk.raw, vocab)) { add(w); for (const gi of P.byWord.get(w) || []) { gis.add(gi); for (const v of P.groups[gi]) add(v.text, v.exact); } }
+    }
     // typo repair against the real vocabulary, only for words that match nothing known
     if (vocab && tk.group === undefined && !gis.size && tk.raw.length >= 3 && /[؀-ۿa-z]/.test(tk.raw)) {
       let known = false;

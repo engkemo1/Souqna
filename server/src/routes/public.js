@@ -388,7 +388,7 @@ r.get('/search', h((req, res) => {
     const isNewborn = deptSlug === 'kids_newborn';
     const ageSizes = isNewborn ? newbornSizes(distinctSizeRows()) : babySizes(distinctSizeRows());
     const words = isNewborn ? NEWBORN_WORDS : BABY_WORDS;
-    const audienceKid = `(p.department IN (${kidList.map(() => '?').join(',')}) OR p.audience IN ('kids','boys','girls'))`;
+    const audienceKid = `(p.department IN (${kidList.map(() => '?').join(',')}) OR (p.audience IN ('kids','boys','girls') AND p.department NOT LIKE 'women%' AND p.department NOT LIKE 'men%' AND p.department NOT LIKE 'beauty%'))`;
     // Baby/newborn by size: has a baby size AND no size for children of 3+ (a 2Y-6Y suit is a kids product, not babywear).
     const older = olderKidSizes(distinctSizeRows());
     const sizeParams = [...ageSizes, ...older];
@@ -1123,9 +1123,15 @@ r.get('/stores/:slug/products', h((req, res) => {
   if (min) { where.push('p.price >= ?'); params.push(clampInt(min, 0, 1e7, 0)); }
   if (max) { where.push('p.price <= ?'); params.push(clampInt(max, 0, 1e7, 1e7)); }
   if (sizes) {
-    const list = String(sizes).split(',').slice(0, 10);
-    where.push(`EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND v.size IN (${list.map(() => '?').join(',')}))`);
-    params.push(...list);
+    const list = String(sizes).split(',').map((x) => x.trim()).filter(Boolean).slice(0, 12);
+    if (list.length) {
+      // same understanding as the marketplace filter: 10Y = 10y = ١٠, and a chosen age bucket covers every spelling inside it
+      const { kidSizes, anySizes } = sizeFilterSets(list, distinctSizeRows()); const kidList = deptSubtree('kids');
+      const parts = []; const sp = [];
+      if (anySizes.length) { parts.push(`v.size IN (${anySizes.map(() => '?').join(',')})`); sp.push(...anySizes); }
+      if (kidSizes.length) { parts.push(`(p.department IN (${kidList.map(() => '?').join(',')}) AND v.size IN (${kidSizes.map(() => '?').join(',')}))`); sp.push(...kidList, ...kidSizes); }
+      where.push(parts.length ? `EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND (${parts.join(' OR ')}))` : '0=1'); params.push(...sp);
+    }
   }
   if (colors) {
     const list = String(colors).split(',').slice(0, 10).map((c) => c.toUpperCase());
@@ -1160,9 +1166,9 @@ r.get('/stores/:slug/products', h((req, res) => {
   const rows = q.all(`SELECT p.* FROM products p WHERE ${whereSql} ORDER BY ${SOLD_OUT_LAST}, ${order} LIMIT ? OFFSET ?`, [...params, limit, (page - 1) * limit]);
 
   // facets for the filter sheet (store-wide, so options don't vanish as you filter)
-  const facetSizes = q.all("SELECT DISTINCT v.size FROM variants v JOIN products p ON p.id=v.product_id WHERE p.store_id=? AND p.status='active' AND v.size IS NOT NULL", [s.id]).map((x) => x.size);
-  const order6 = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '28', '30', '32', '34', '36', '38', '40', 'One size'];
-  facetSizes.sort((a, b) => order6.indexOf(a) - order6.indexOf(b));
+  // one chip per real size (10Y/10y/١٠ merged, kids' ages grouped into age buckets), in the same order as the marketplace filter
+  const storeKidDepts = deptSubtree('kids');
+  const facetSizes = sizeFacets(q.all(`SELECT DISTINCT v.size AS size, p.id AS pid, CASE WHEN p.department IN (${storeKidDepts.map(() => '?').join(',') || "''"}) OR p.audience IN ('kids','boys','girls') THEN 1 ELSE 0 END AS kid, CASE WHEN p.department LIKE '%shoes%' THEN 1 ELSE 0 END AS shoe FROM variants v JOIN products p ON p.id=v.product_id WHERE p.store_id=? AND p.status='active' AND v.size IS NOT NULL AND v.size<>'' LIMIT 20000`, [...storeKidDepts, s.id])).map((x) => x.size).slice(0, 40);
   const colorMap = new Map();
   for (const row of q.all("SELECT colors_json FROM products WHERE store_id=? AND status='active'", [s.id])) {
     for (const c of JSON.parse(row.colors_json || '[]')) if (!colorMap.has(c.hex.toUpperCase())) colorMap.set(c.hex.toUpperCase(), c);

@@ -52,7 +52,9 @@ test('E2E Journey 1: Health, readiness, and version probes', async () => {
   const ready = await api('GET', '/api/ready');
   assert.equal(ready.status, 200, '/api/ready returns 200');
   assert.equal(ready.body.ok, true);
-  assert.equal(ready.body.db, true);
+  assert.equal(ready.body.db, undefined, 'the public probe does not expose internals'); // details are for the admin key only
+  const readyAdmin = await api('GET', '/api/ready', null, { 'x-admin-key': config.adminKey });
+  assert.equal(readyAdmin.body.db, true);
 
   const version = await api('GET', '/api/version');
   assert.equal(version.status, 200, '/api/version returns 200');

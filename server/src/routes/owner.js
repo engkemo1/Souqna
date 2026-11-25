@@ -1252,6 +1252,50 @@ r.patch('/orders/:id/status', h((req, res) => {
 }));
 
 /** "No delivery person free right now" → hand this one order over to Twist. */
+/**
+ * The shop trims an order before it ships: lower a line's quantity or remove a line (never add or raise — that needs the buyer's OK).
+ * Only a plain order: still pending/confirmed (before anything is handed to a courier), no coupon / offer discount, not part of a multi-shop basket.
+ * Stock goes back, the totals are recomputed, the customer's lifetime numbers follow, and the change is written to the order history.
+ */
+r.patch('/orders/:id/items', h((req, res) => {
+  const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
+  if (!o) throw notFound('Order');
+  const body = z.object({ items: z.array(z.object({ id: z.number().int().positive(), qty: z.number().int().min(0).max(999) })).min(1).max(50) }).parse(req.body);
+  if (!['pending', 'confirmed'].includes(o.status)) throw badRequest('order_locked', 'The order can only be edited before it is processed.');
+  if (o.delivery_group) throw badRequest('order_not_editable', 'This order is part of a multi-shop basket with a shared delivery fee. Cancel it and let the customer reorder.');
+  if (o.coupon_code || (o.discount || 0) > 0 || (o.platform_discount || 0) > 0) throw badRequest('order_has_discount', 'This order has a discount, so its lines cannot be changed. Cancel it and let the customer reorder.');
+  const lines = q.all('SELECT * FROM order_items WHERE order_id=? ORDER BY id', [o.id]);
+  const byId = new Map(lines.map((l) => [l.id, l]));
+  const want = new Map();
+  for (const it of body.items) {
+    const line = byId.get(it.id);
+    if (!line) throw badRequest('unknown_line', 'One of the lines is not in this order.');
+    if (it.qty > line.qty) throw badRequest('qty_increase', 'A line quantity can only go down.');
+    want.set(it.id, it.qty);
+  }
+  const next = lines.map((l) => ({ ...l, newQty: want.has(l.id) ? want.get(l.id) : l.qty }));
+  if (next.every((l) => l.newQty === l.qty)) return res.json({ ok: true, changed: false });
+  if (next.every((l) => l.newQty === 0)) throw badRequest('empty_order', 'Removing every line is a cancellation — use cancel instead.');
+  const subtotal = next.reduce((sum, l) => sum + l.price * l.newQty, 0);
+  const total = subtotal - (o.discount || 0) + (o.shipping || 0);
+  const notes = [];
+  tx(() => {
+    const now = nowIso();
+    for (const l of next) {
+      const diff = l.qty - l.newQty;
+      if (!diff) continue;
+      if (l.variant_id) q.run('UPDATE variants SET stock=stock+? WHERE id=?', [diff, l.variant_id]);
+      if (l.product_id) q.run('UPDATE products SET stock=stock+?, sold_count=MAX(0,sold_count-?) WHERE id=?', [diff, diff, l.product_id]);
+      if (l.newQty === 0) q.run('DELETE FROM order_items WHERE id=?', [l.id]); else q.run('UPDATE order_items SET qty=? WHERE id=?', [l.newQty, l.id]);
+      notes.push(l.newQty === 0 ? `شال ${l.name_ar}` : `${l.name_ar}: ${l.qty} ← ${l.newQty}`);
+    }
+    q.run('UPDATE orders SET subtotal=?, total=?, updated_at=? WHERE id=?', [subtotal, total, now, o.id]);
+    if (o.customer_id) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [Math.max(0, o.total - total), o.customer_id]);
+    insert('order_events', { order_id: o.id, status: o.status, note: `تعديل من المحل — ${notes.join('، ')}. الإجمالي ${o.total} ← ${total}`.slice(0, 300), created_at: now });
+  });
+  if (o.buyer_id) { try { notifyBuyer(o.buyer_id, { kind: 'order', title: `اتعدّل طلبك ${o.number}`, body: `المحل عدّل الطلب (${notes.join('، ')}). الإجمالي الجديد ${total} جنيه.` }); } catch { /* the edit is saved either way */ } }
+  res.json({ ok: true, changed: true, subtotal, total });
+}));
 r.post('/orders/:id/handoff', h((req, res) => {
   const o = q.get('SELECT * FROM orders WHERE id=? AND store_id=?', [req.params.id, req.store.id]);
   if (!o) throw notFound('Order');

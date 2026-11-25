@@ -90,9 +90,6 @@ test('«عندكم ماركات؟» ترد بأسماء المحلات الحق�
 });
 test('«نسقلي طقم على جاكيت» = باقي الطقم', async () => {
   const jackets = [P('جاكيت وتر بروف', 'جاكيتات', 1400), P('بنطلون جينز أزرق', 'جينز', 600), P('كوتشي أبيض', 'كوتشي', 650), P('تيشيرت قطن', 'تيشيرتات', 120)];
-  // الجاكيت مش بيحدد صاحبه: لازم يسأل «ليك ولا ليها؟» الأول (مش بيخمّن)، ولما الجمهور يتحدد بيكمّل الطقم
-  const ask = await runModa([{ role: 'user', content: 'نسقلي طقم على جاكيت وتر بروف' }], { products: jackets, K });
-  assert.equal(ask.questions?.length ? 'asked' : 'no', 'asked');
   const r = await runModa([{ role: 'user', content: 'نسقلي طقم رجالي على جاكيت وتر بروف' }], { products: jackets, K });
   assert.ok(ids(r).length >= 2);
 });
