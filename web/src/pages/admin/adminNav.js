@@ -1,4 +1,4 @@
-import { Percent, BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, Wallet, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, CreditCard, Eye, TrendingUp, AlertTriangle, History, MessageCircle, Shirt, BookOpen, Wrench, Images, Film, Banknote, Bike, Activity, MessagesSquare, GraduationCap, Plug, Server } from 'lucide-react';
+import { ListChecks, Percent, BarChart3, Ticket, Camera, Tags, LayoutDashboard, Store, ShoppingBag, Truck, MapPin, Wallet, PackagePlus, Package, Users, Megaphone, ScanSearch, Sparkles, CreditCard, Eye, TrendingUp, AlertTriangle, History, MessageCircle, Shirt, BookOpen, Wrench, Images, Film, Banknote, Bike, Activity, MessagesSquare, GraduationCap, Plug, Server } from 'lucide-react';
 
 /**
  * Single source of truth for the admin sidebar AND the in-app guide (/admin/guide).
@@ -51,6 +51,7 @@ export const NAV_GROUPS = [
   { label: 'الذكاء الاصطناعي', items: [
     { to: '/admin/system?section=moda', icon: Sparkles, label: 'المساعد الذكي', desc: 'إعدادات المساعد (تويلا) ومتابعة جودة ردوده على العملاء.' },
     { to: '/admin/stylist-log', icon: MessagesSquare, label: 'أسئلة تويلا وسرعتها', desc: 'اللي العملاء سألوه لتويلا وسرعة الرد.' },
+    { to: '/admin/look-review', icon: ListChecks, label: 'مراجعة اللوكات', desc: 'امتحان ثابت لتنسيق تويلا: اقبل/ارفض لوكات حقيقية وصحّح وسوم القطع.' },
     { to: '/admin/stylist/training', icon: GraduationCap, label: 'تدريب تويلا وقواعدها', desc: 'علّم تويلا قواعد وتصحيحات عشان ردودها تتحسن.' },
     { to: '/admin/system?section=visual', icon: ScanSearch, label: 'البحث المرئي', desc: 'البحث بالصورة: حالة النموذج، نتايج التجارب، وإبلاغات «مش شبه».' },
   ] },

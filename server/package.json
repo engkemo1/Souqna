@@ -11,7 +11,7 @@
     "test:security": "node --test --no-warnings test/security-p0.test.js test/store-isolation.test.js",
     "test:reliability": "node --test --no-warnings test/reliability-p2.test.js",
     "restore:drill": "node --no-warnings --env-file-if-exists=../.env src/scripts/restore-drill.js",
-    "test:stylist": "node --test src/lib/stylist-ranking.test.js test/smartlook-review.test.js test/smartlook-endpoint.test.js",
+    "test:stylist": "node --test src/lib/stylist-ranking.test.js test/smartlook-review.test.js test/smartlook-endpoint.test.js test/visual-tags.test.js test/look-review.test.js test/moda-search-followup.test.js",
     "test:images": "node --test --no-warnings test/image-library.test.js test/image-generation.test.js test/catalog.test.js",
     "test:comments": "node --test --no-warnings test/order-comments.test.js",
     "test:moda-core": "node --test --no-warnings test/moda.test.js test/moda-quality.test.js test/moda-curate.test.js test/moda-understand.test.js test/stylist-log.test.js test/twyla-consistency.test.js",

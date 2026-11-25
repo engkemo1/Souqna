@@ -34,6 +34,7 @@ import { contactFromEnv } from '../lib/moda/contact.js';
 import { logStylist } from '../lib/stylist-log.js';
 import { runModa } from '../lib/moda/engine.js';
 import { smartLookText, acceptSmartLook, isFormalAnchor, reviewLook, minimumPiecesForLook } from '../lib/moda/smartlook.js';
+import { visualGateConfig } from '../lib/moda/visualtags.js';
 import { activeStories, expireStories, bumpStory } from '../lib/stories.js';
 import { enrichAll as enrichModaRows } from '../lib/moda/products.js';
 import { getModaPrompts } from '../lib/modaPrompts.js';
@@ -593,9 +594,10 @@ const brainHits = new Map();
 const curatorHits = new Map();
 const understandHits = new Map();
 // dept_parent/dept_grand/dept_name: تويلا بتعرف منها رجالي/حريمي/أطفال لو القسم نفسه مش واضح («بدل» تحت «رجالي»)
-function modaCatalogRows() {
+export function modaCatalogRows() {
   return q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en,
       COALESCE(c.name_ar || ' ' || c.name_en, '') AS cat_text,
+      (SELECT t.tags_json FROM product_visual_tags t WHERE t.product_id=p.id) AS vtags_json,
       (SELECT GROUP_CONCAT(DISTINCT v.size) FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND v.size IS NOT NULL) AS size_list,
       (SELECT d.parent_slug FROM departments d WHERE d.slug=p.department) AS dept_parent, (SELECT d2.parent_slug FROM departments d JOIN departments d2 ON d2.slug=d.parent_slug WHERE d.slug=p.department) AS dept_grand, (SELECT d.name_ar FROM departments d WHERE d.slug=p.department) AS dept_name
     FROM products p JOIN stores s ON s.id=p.store_id LEFT JOIN categories c ON c.id=p.category_id
@@ -655,7 +657,7 @@ function reviewChatOutfits(result, rows, { wanted = null } = {}) {
   const month = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', month: 'numeric' }).format(new Date()));
   const vmap = new Map();
   const load = (ids) => { const need = [...new Set(ids)].filter((id) => !vmap.has(id)); if (!need.length) return; for (const id of need) vmap.set(id, []); for (const v of q.all(`SELECT id, product_id, color, size, stock FROM variants WHERE product_id IN (${need.map(() => '?').join(',')})`, need)) vmap.get(v.product_id).push(v); };
-  const review = (pieces, audience = null) => { if (pieces.some((x) => !x)) return { ok: false, score: 0, reasons: ['piece_not_found'] }; load(pieces.map((x) => x.id)); return reviewLook(pieces, { audience: ['men', 'women', 'boys', 'girls', 'kids'].includes(audience) ? audience : null, wantedSizes: wanted, variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month }); };
+  const review = (pieces, audience = null) => { if (pieces.some((x) => !x)) return { ok: false, score: 0, reasons: ['piece_not_found'] }; load(pieces.map((x) => x.id)); const vg = visualGateConfig(); return reviewLook(pieces, { visual: vg.visual, visualObserve: vg.observe, audience: ['men', 'women', 'boys', 'girls', 'kids'].includes(audience) ? audience : null, wantedSizes: wanted, variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month }); };
   const kept = []; const rejected = []; let reviewed = 0;
   for (const t of tabs) {
     if (!isOutfit(t)) { kept.push(t); continue; }
@@ -663,6 +665,7 @@ function reviewChatOutfits(result, rows, { wanted = null } = {}) {
     const pieces = t.items.map((i) => byId.get(i.id));
     const v = review(pieces, t.id);
     if (!v.ok) { rejected.push({ tab: t.id, score: v.score, why: v.reasons.slice(0, 8) }); continue; }
+    if (v.visual?.observed?.length) logSmartLook('visual_would_reject', null, { where: 'chat', reasons: v.visual.observed, missing: v.visual.missing.slice(0, 6) }); // shadow mode: seen, not hidden
     // swap options inside the tab must keep the whole outfit above the bar too
     const recOf = (rv) => new Map((rv.child?.picks || []).map((x) => [x.id, { size: x.size, left: x.left, variantId: x.variantId }]));
     const recs = recOf(v);
@@ -794,11 +797,12 @@ r.post('/stylist/smart-look', h(async (req, res) => {
   const monthNow = Number(new Intl.DateTimeFormat('en-US', { timeZone: 'Africa/Cairo', month: 'numeric' }).format(new Date()));
   const vmap = new Map();
   const loadVariants = (ids) => { const need = [...new Set(ids)].filter((id) => !vmap.has(id)); if (!need.length) return; for (const id of need) vmap.set(id, []); for (const v of q.all(`SELECT id, product_id, color, size, stock FROM variants WHERE product_id IN (${need.map(() => '?').join(',')})`, need)) vmap.get(v.product_id).push(v); };
-  const reviewRows = (rows) => { loadVariants(rows.filter(Boolean).map((x) => x.id)); return reviewLook(rows, { heroKey: anchor?.key, audience: ['men', 'women', 'boys', 'girls', 'kids'].includes(anchor?.gender) ? anchor.gender : null, variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month: monthNow }); };
+  const reviewRows = (rows) => { loadVariants(rows.filter(Boolean).map((x) => x.id)); const vg = visualGateConfig(); return reviewLook(rows, { visual: vg.visual, visualObserve: vg.observe, heroKey: anchor?.key, audience: ['men', 'women', 'boys', 'girls', 'kids'].includes(anchor?.gender) ? anchor.gender : null, variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month: monthNow }); };
   const pieceRows = verdict.ids.map((id) => enriched.find((x) => x.id === id));
   const review = reviewRows([anchor, ...pieceRows]);
   if (!review.ok) { logSmartLook('rejected', body.productId, { reason: 'review', score: review.score, why: review.reasons.slice(0, 8) }); return finish({ ok: false, reason: 'review_failed' }); }
   result.__reviewScore = review.score;
+  if (review.visual?.observed?.length) logSmartLook('visual_would_reject', body.productId, { where: 'smart_look', reasons: review.visual.observed, missing: review.visual.missing.slice(0, 6) }); // shadow mode: seen, not hidden
   const recOf = (rv) => new Map((rv.child?.picks || []).map((x) => [x.id, { size: x.size, left: x.left, variantId: x.variantId }]));
   const recs = recOf(review);
   const resp = modaClientResponse(result);

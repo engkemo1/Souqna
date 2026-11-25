@@ -258,7 +258,7 @@ export default function StylistChat({ hideLauncher = false }) {
     return {
       role: 'assistant', say: String(m.say || m.content || '').slice(0, 1400), tips: m.tips, styleTips: m.styleTips,
       intent: m.intent, state: m.state, total: m.total, budget: m.budget, overBudget: m.overBudget,
-      weatherSource: m.weatherSource, looks: m.looks, questions: m.questions, missingItems: m.missingItems, missing: m.missing, tabs: m.tabs,
+      weatherSource: m.weatherSource, isSearch: m.isSearch, looks: m.looks, questions: m.questions, missingItems: m.missingItems, missing: m.missing, tabs: m.tabs,
       palette: m.palette, feedbackQuestion: m.feedbackQuestion, storeCard: m.storeCard,
     };
   }).slice(-40);

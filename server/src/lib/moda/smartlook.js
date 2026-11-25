@@ -3,6 +3,7 @@
 // أي حاجة أقل من كده (قطعة ناقصة، بدائل بعيدة، طلب سؤال للعميل) = نسكت ومنقترحش حاجة.
 
 import { childOutfitGate, audienceGate, wantedSizeGate } from './childfit.js';
+import { visualOutfitCheck } from './visualtags.js';
 
 const AUD_WORD = { men: 'رجالي', women: 'حريمي', boys: 'ولادي', girls: 'بناتي' };
 
@@ -74,6 +75,8 @@ export function acceptSmartLook(result, { anchorId = null, anchorKey = null, anc
 // Hard rejections for unsafe data / unavailable stock; a 0-100 quality score for the rest. Below MIN_SCORE nothing is shown.
 // "No excellent look" = no suggestion. Missing decisive information is a rejection, never a guess.
 export const MIN_SCORE = 80;
+// bump when any look rule/score changes: golden-set results are always reported against a rules version
+export const RULES_VERSION = 'r2-2026-11-visual';
 
 // ---------------------------------------------------------------------------------------------------------------------
 // What makes a look COMPLETE depends on the hero garment (slot templates), never on one global piece count.
@@ -201,6 +204,14 @@ export function reviewLook(pieces, ctx = {}) {
   // no two pieces of one kind, no more than two accessories
   const keys = list.map((p) => p.key).filter(Boolean);
   if (new Set(keys).size !== keys.length) fail('duplicate_type');
+  // visual compatibility (print / loudness / style tier). Opt-in per call: Smart Look and full-outfit chat tabs pass `visual: true`; unknown upper-body tags are a rejection, never a guess.
+  let visualInfo = null;
+  if (ctx.visual || ctx.visualObserve) {
+    const vc = visualOutfitCheck(list); const enforce = ctx.visual === true ? null : Array.isArray(ctx.visual) ? new Set(ctx.visual) : new Set();
+    const enforced = vc.hard.filter((r) => enforce === null || enforce.has(r));
+    for (const r of enforced) fail(r);
+    visualInfo = { reasons: vc.hard, enforced, observed: vc.hard.filter((r) => !enforced.includes(r)), missing: vc.missing };
+  }
   const acc = list.filter((p) => ctx.familyOf && ctx.familyOf(p.key) === 'accessories').length;
   if (acc > 2) pen(`too_many_accessories:${acc}`, 25);
   // colours: harmonious, not merely different
@@ -208,5 +219,5 @@ export function reviewLook(pieces, ctx = {}) {
   const hues = [...new Set(lead.map(hueOf).filter(Boolean))];
   if (hues.length >= 3) pen(`too_many_hues:${hues.length}`, 35);
   for (const [a1, b1] of CLASH) if (hues.includes(a1) && hues.includes(b1)) pen(`clash:${a1}+${b1}`, 25);
-  return { ok: !hard && score >= MIN_SCORE, score: Math.max(0, score), reasons, ...(child?.ok ? { child: { common: child.common, picks: child.picks } } : {}) };
+  return { ok: !hard && score >= MIN_SCORE, score: Math.max(0, score), reasons, ...(visualInfo ? { visual: visualInfo } : {}), ...(child?.ok ? { child: { common: child.common, picks: child.picks } } : {}) };
 }

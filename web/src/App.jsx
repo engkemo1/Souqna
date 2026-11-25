@@ -101,6 +101,7 @@ const AdminCampaigns = lazy(() => import('./pages/admin/Campaigns.jsx'));
 const AdminCoupons = lazy(() => import('./pages/admin/Coupons.jsx'));
 const AdminSaleCampaigns = lazy(() => import('./pages/admin/SaleCampaigns.jsx'));
 const AdminStylistLog = lazy(() => import('./pages/admin/StylistLog.jsx'));
+const AdminLookReview = lazy(() => import('./pages/admin/LookReview.jsx'));
 const AdminStylistTraining = lazy(() => import('./pages/admin/StylistTraining.jsx'));
 const AdminFeatured = lazy(() => import('./pages/admin/AdsHub.jsx'));
 const AdvertiserPage = lazy(() => import('./pages/market/AdvertiserPage.jsx'));
@@ -229,6 +230,7 @@ const router = createBrowserRouter([
           { path: 'coupons', element: <AdminCoupons /> },
           { path: 'sales', element: <AdminSaleCampaigns /> },
           { path: 'stylist-log', element: <AdminStylistLog /> },
+          { path: 'look-review', element: <AdminLookReview /> },
           { path: 'stylist/training', element: <AdminStylistTraining /> },
           { path: 'ads', element: <Navigate to="/admin/featured" replace /> },
           { path: 'featured', element: <AdminFeatured /> },

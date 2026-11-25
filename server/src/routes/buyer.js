@@ -159,7 +159,7 @@ function cleanChatMessages(messages) {
       role: 'assistant', say: String(message.say || '').slice(0, 1400),
       ...(message.tips ? { tips: message.tips } : {}),
       ...(message.styleTips ? { styleTips: message.styleTips } : {}),
-      ...(['intent', 'state', 'total', 'budget', 'overBudget', 'weatherSource', 'feedbackQuestion'].reduce((out, key) => (message[key] !== undefined ? { ...out, [key]: message[key] } : out), {})),
+      ...(['intent', 'state', 'total', 'budget', 'overBudget', 'weatherSource', 'feedbackQuestion', 'isSearch'].reduce((out, key) => (message[key] !== undefined ? { ...out, [key]: message[key] } : out), {})),
       ...(Array.isArray(message.looks) ? { looks: message.looks.slice(0, 4) } : {}),
       ...(Array.isArray(message.questions) ? { questions: message.questions.slice(0, 4) } : {}),
       ...(Array.isArray(message.missingItems) ? { missingItems: message.missingItems.slice(0, 12) } : {}),

@@ -229,6 +229,7 @@ function cleanSession(s) {
   out.excludedTypes = strs(s.excludedTypes).slice(-8);
   if (out.parsed) out.parsed.style = strs(out.parsed.style);
   out.lookHistory = arr(s.lookHistory).map(look).filter(Boolean);
+  out.lastSearch = s.lastSearch && s.lastSearch.type === 'beauty' && typeof s.lastSearch.text === 'string' ? { type: 'beauty', text: s.lastSearch.text.slice(0, 300), turn: Number(s.lastSearch.turn) || 0 } : null;
   return out;
 }
 
@@ -291,18 +292,26 @@ async function runModaCore(messages, opts = {}) {
   const dow = cairoParts(now).dow;
   const seed = `${text}|${session?.turn || 0}`;
   let parsed = parseMessage(text, { profile, imageText, now, cairoDow: dow });
-  const searchReply = (hits, sayText = null) => {
+  // «اقل من 1000»: رقم ميزانية في رسالة قصيرة
+  const budgetOf = (s) => { const t = norm(s); const m1 = t.match(/(?:ارخص من|اقل من|اقل|تحت|لحد|بحد|بحد اقصي|في حدود|حوالي|ميزانيتي|ب)\s*(\d{2,6})/) || t.match(/(\d{2,6})\s*(?:جنيه|ج|egp)(?: او اقل| بس)?( |$)/); return m1 ? Number(m1[1]) : null; };
+  const BUDGET_WORDS = /(ارخص|اقل|تحت|لحد|بحد|حدود|ميزاني|جنيه|ج\b|بسعر|سعر)/;
+  // نتايج البحث: أفضل 3 بس (مش قايمة طويلة تتمرر)؛ meta بتحفظ آخر بحث عشان «اقل من 1000» تتطبق عليه
+  const searchReply = (hits, sayText = null, meta = null) => {
+    hits = hits.slice(0, 3);
     const items = hits.map((p) => ({ id: p.id, key: p.key, label: String(K.items.get(p.key)?.ar || '').replace(/\s*\(.*?\)\s*/g, '').split(' / ')[0].trim() || (p.cat_text || '').split(' ')[0] || p.dept_name || 'منتج', name: p.name_ar || p.name_en, price: p.price, store: p.store_slug || null, image: p.image || p.image_url || p.thumb || null, colors: p.colorKeys || [] }));
     return { state: 'full', intent: 'shop', say: sayText || (hits.length === 1 ? 'لقيتلك ده في المحلات:' : 'دي اللي لقيتها في المحلات ليك:'), tips: [], styleTips: [], questions: [], missing: [], relaxed: [], parsed,
       blocks: { tabs: [{ id: 'search', label: 'النتايج', look: null, items, subtotal: items.reduce((t, i) => t + (Number(i.price) || 0), 0), missing: [] }], total: 0, budget: null, over: 0, palette: [], couple: false },
-      session: { ...(session || {}), turn: (session?.turn || 0) + 1, parsed: session?.parsed || null, pending: false, pendingQuestion: null, shown: [...new Set([...(session?.shown || []), ...hits.map((h) => h.id)])] } };
+      session: { ...(session || {}), turn: (session?.turn || 0) + 1, parsed: session?.parsed || null, pending: false, pendingQuestion: null, lastSearch: meta ? { ...meta, turn: (session?.turn || 0) + 1 } : null, shown: [...new Set([...(session?.shown || []), ...hits.map((h) => h.id)])] } };
   };
   // ---------- تجميل وعناية (بشرة، مكياج، شعر، جسم، عطور) ----------
   // بتتجاوب من أقسام التجميل الحقيقية؛ من غيرها كانت تويلا بتقول «مش عارفاها كقطعة لبس» أو بتسأل «لأنهي مناسبة؟»
   if (!(answers && Object.keys(answers).length) && !parsed.garments.length && !parsed.followup && !session?.pending) {
-    const bz = beautyMatch(text, ensureEnriched(products, K), { limit: 8 });
+    const bmax = BUDGET_WORDS.test(norm(text)) ? budgetOf(text) : null;
+    const bz = beautyMatch(text, ensureEnriched(products, K), { limit: 3, budget: bmax });
     if (bz) {
-      if (bz.hits.length) return searchReply(bz.hits, bz.say);
+      const bIn = bz.hits;
+      if (bIn.length) return searchReply(bIn, bmax ? `${bz.say.replace(/:\s*$/, '')} في حدود ${bmax} جنيه:` : bz.say, { type: 'beauty', text });
+      if (bmax && bz.all.length) { const cheap = [...bz.all].sort((a, b) => a.price - b.price)[0]; const r0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang: parsed.lang === 'en' ? 'en' : 'ar', profile, assistantName }); return { ...r0, say: `مفيش في الطلب ده حاجة بأقل من ${bmax} جنيه دلوقتي${cheap ? `. أرخص حاجة «${cheap.name_ar || cheap.name_en}» بـ ${Number(cheap.price).toLocaleString('en-US')} جنيه` : ''}. تحبي أرفع الميزانية؟`, tips: [], styleTips: [], questions: [], blocks: null, intent: 'chat', session: { ...(session || {}), turn: (session?.turn || 0) + 1, lastSearch: { type: 'beauty', text, turn: (session?.turn || 0) + 1 } }, parsed }; }
       const res0 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang: parsed.lang === 'en' ? 'en' : 'ar', profile, assistantName });
       return { ...res0, say: bz.say, tips: [], styleTips: [], questions: [], blocks: null, intent: 'chat', session: { ...(session || {}), turn: (session?.turn || 0) + 1 }, parsed };
     }
@@ -497,6 +506,15 @@ async function runModaCore(messages, opts = {}) {
     if (/(^| )(الجديد|جديد|احدث|اخر ما وصل|وصل حديثا|وصلنا|وصل جديد|new arrivals|new|كل المنتجات|كل حاجه عندكم|كل اللي عندكم|اتفرج|اتفرج علي|اشوف كل حاجه|اشوف كل المنتجات|ورينا كل حاجه)( |$)/.test(n) && n.split(' ').length <= 6) {
       const fresh = diverse([...live].sort((a, b) => Number(b.id) - Number(a.id)));
       if (fresh.length) return searchReply(fresh, 'دي أحدث القطع اللي اتضافت:');
+    }
+    // «عاوز اقل من 1000» بعد بحث تجميل/عناية: الميزانية بتتطبق على نفس البحث (مش على الكتالوج كله)
+    if (numTxt && session?.lastSearch?.type === 'beauty' && session.lastSearch.turn === session.turn && BUDGET_WORDS.test(n) && n.split(' ').length <= 8) {
+      const max = Number(numTxt); const bz2 = beautyMatch(session.lastSearch.text, ensureEnriched(products, K), { limit: 3, budget: max });
+      const under2 = bz2?.hits || [];
+      if (under2.length) return searchReply(under2, `${bz2.say.replace(/:\s*$/, '')} في حدود ${max} جنيه:`, session.lastSearch);
+      const cheap2 = [...(bz2?.all || [])].sort((a, b) => a.price - b.price)[0];
+      const r1 = respond({ state: 'chat', intent: 'unknown' }, { seed, lang: parsed.lang === 'en' ? 'en' : 'ar', profile, assistantName });
+      return { ...r1, say: `مفيش في الطلب ده حاجة بأقل من ${max} جنيه دلوقتي${cheap2 ? `. أرخص حاجة «${cheap2.name_ar || cheap2.name_en}» بـ ${Number(cheap2.price).toLocaleString('en-US')} جنيه` : ''}. تحبي أرفع الميزانية؟`, tips: [], styleTips: [], questions: [], blocks: null, intent: 'chat', session: { ...(session || {}), turn: (session?.turn || 0) + 1, lastSearch: { ...session.lastSearch, turn: (session?.turn || 0) + 1 } }, parsed };
     }
     if (numTxt && !(session?.parsed?.context || session?.parsed?.garments?.length) && /(ارخص|اقل|تحت|لحد|بحد|حدود|ميزاني|جنيه|ج\b|بسعر|سعر)/.test(n) && n.split(' ').length <= 8) {
       const max = Number(numTxt);

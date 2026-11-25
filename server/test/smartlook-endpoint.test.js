@@ -41,7 +41,7 @@ let n = 0;
 function add(en, ar, key, colors, sizes, stockOf = () => 5, extra = {}) {
   n += 1;
   const id = insert('products', {
-    store_id: storeId, name_ar: ar, name_en: en, slug: `sl-${n}-${key}`, description_ar: '', description_en: '', price: 800, category_id: null, status: 'active',
+    store_id: storeId, name_ar: ar, name_en: en, slug: `sl-${n}-${key}`, description_ar: '', description_en: 'Plain solid colour, no print.', price: 800, category_id: null, status: 'active',
     track_stock: 1, stock: 40, department: 'men', audience: 'men', moda_key: key,
     colors_json: JSON.stringify(colors.map((c) => ({ hex: HEX[c], name_ar: NAME[c], name_en: c }))), sizes_json: JSON.stringify(sizes), ...extra,
   });

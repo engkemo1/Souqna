@@ -24,6 +24,7 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step, m
   const [color, setColor] = useState(null);
   const [size, setSize] = useState(null);
   const [sizeError, setSizeError] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
   const imgRef = useRef(null);
   const add = useAddToCart(slug);
   const marketCart = useMarketCart();
@@ -40,7 +41,7 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step, m
 
   const { variant, available, needsSize } = resolveVariant(p, color, size);
   const onAdd = () => {
-    if (needsSize) { setSizeError(true); return; }
+    if (needsSize) { setSizeError(true); setShakeKey((k) => k + 1); return; }
     if (marketplace) {
       const selectedColor = p.colors?.find((c) => c.hex === color);
       marketCart.add({ productId: p.id, variantId: variant?.id ?? null, slug: p.slug, name: p.name, price: p.price, compareAt: p.compareAt,
@@ -75,7 +76,7 @@ export default function QuickAddSheet({ slug, product, onClose, onAdded, step, m
               {loading || !p ? (
                 <div className="space-y-4"><Skeleton className="h-4 w-24" /><div className="flex gap-2">{[0, 1, 2].map((i) => <Skeleton key={i} circle className="h-10 w-10" />)}</div><Skeleton className="h-4 w-20" /><div className="flex gap-2">{[0, 1, 2, 3, 4].map((i) => <Skeleton key={i} className="h-11 w-14 rounded-xl" />)}</div></div>
               ) : (
-                <VariantPicker product={p} color={color} size={size} onColor={(c) => { setColor(c); setSize(null); }} onSize={(s) => { setSize(s); setSizeError(false); }} sizeError={sizeError} />
+                <VariantPicker product={p} color={color} size={size} onColor={(c) => { setColor(c); setSize(null); }} onSize={(s) => { setSize(s); setSizeError(false); }} sizeError={sizeError} shakeKey={shakeKey} />
               )}
             </div>
           </div>

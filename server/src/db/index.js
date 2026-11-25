@@ -443,6 +443,11 @@ export const json = (s, fallback) => {
   }
   db.exec("CREATE TABLE IF NOT EXISTS smart_look_events (id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER, event TEXT NOT NULL, data_json TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')))");
   db.exec('CREATE INDEX IF NOT EXISTS idx_smart_look_events_product ON smart_look_events(product_id, created_at)');
+  // golden outfit set: frozen looks + human verdicts (the exam for the generator, the safety gate and the future ranker)
+  db.exec("CREATE TABLE IF NOT EXISTS look_reviews (id INTEGER PRIMARY KEY AUTOINCREMENT, batch TEXT, anchor_id INTEGER, sig TEXT, bucket TEXT, snapshot_json TEXT NOT NULL, system_ok INTEGER, system_score INTEGER, system_reasons TEXT, rules_version TEXT, verdict TEXT, reasons_json TEXT, note TEXT, reviewer TEXT, reviewed_at TEXT, verdict2 TEXT, reasons2_json TEXT, reviewer2 TEXT, reviewed2_at TEXT, created_at TEXT NOT NULL DEFAULT (datetime('now')), UNIQUE(anchor_id, sig))");
+  db.exec('CREATE INDEX IF NOT EXISTS idx_look_reviews_verdict ON look_reviews(verdict, bucket)');
+  // visual tags corrected by an admin/store owner, or produced by an image-analysis service (source 'admin' | 'image'); they override the text inference
+  db.exec("CREATE TABLE IF NOT EXISTS product_visual_tags (product_id INTEGER PRIMARY KEY, tags_json TEXT NOT NULL, source TEXT NOT NULL, confidence TEXT, updated_by TEXT, updated_at TEXT NOT NULL DEFAULT (datetime('now')))");
   // One catch-all «أخرى» sub-section under every main section, so a product that fits no sub-section still has a valid, sensible place. Runs once, only adds rows.
   if (!db.prepare("SELECT 1 FROM app_settings WHERE key='dept_other_v1'").get()) {
     try {

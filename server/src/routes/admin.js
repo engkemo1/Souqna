@@ -30,6 +30,7 @@ import { auditMiddleware } from '../lib/insights.js';
 import insightsRoutes from './admin-insights.js';
 import featuredRoutes from './admin-featured.js';
 import adminProductsRoutes, { countProductsWithIssues } from './admin-products.js';
+import lookReviewRoutes from './admin-looks.js';
 import { verifyTotp } from '../lib/totp.js';
 import { getObservabilityMetrics, formatPrometheusMetrics } from '../lib/logger.js';
 import { listJobStatuses } from '../lib/job-runner.js';
@@ -118,6 +119,7 @@ r.use(auditMiddleware);
 r.use(insightsRoutes);
 r.use(featuredRoutes);
 r.use(adminProductsRoutes);
+r.use(lookReviewRoutes);
 
 /** Step 2 of admin sign-in. The key (checked above) + a 6-digit authenticator code → a 4-hour session proof. */
 r.post('/login', h((req, res) => {

@@ -143,6 +143,7 @@ export default function Product() {
   const [mine, setMine] = useState(null); // the size this shopper probably takes, from measurements they gave once
   const [qty, setQty] = useState(1);
   const [sizeError, setSizeError] = useState(false);
+  const [shakeKey, setShakeKey] = useState(0);
   const [addState, setAddState] = useState('idle');
   const [quick, setQuick] = useState(null);
   const [reserving, setReserving] = useState(false);
@@ -181,12 +182,14 @@ export default function Product() {
   const soldOut = p.stock === 'out';
   const fav = favs.has(p.id);
 
+  // no size picked: say so clearly (red ring + shake + toast) and bring the sizes into view; nothing is added
+  const askSize = () => {
+    setSizeError(true); setShakeKey((k) => k + 1);
+    toast({ title: t('product.pleaseSelectSize'), tone: 'error', duration: 2200 });
+    (document.querySelector('[data-size-field]') || ctaRef.current?.closest('section'))?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
   const onAdd = () => {
-    if (needsSize) {
-      setSizeError(true);
-      ctaRef.current?.closest('section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
+    if (needsSize) { askSize(); return; }
     if (available <= 0) return;
     setAddState('busy');
     setTimeout(() => {
@@ -198,11 +201,7 @@ export default function Product() {
 
   const canReserve = (store.reserveHours ?? 24) > 0 && Boolean(tr(store.address) || store.mapUrl || store.lat != null);
   const onReserve = () => {
-    if (needsSize) {
-      setSizeError(true);
-      ctaRef.current?.closest('section')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
+    if (needsSize) { askSize(); return; }
     if (available <= 0) return;
     setReserving(true);
   };
@@ -262,7 +261,7 @@ export default function Product() {
 
           <div className="mt-7">
             <VariantPicker product={p} color={color} size={size} onColor={(c) => { setColor(c); setSize(p.sizes.length === 1 ? p.sizes[0] : null); }}
-              onSize={(s) => { setSize(s); setSizeError(false); }} sizeError={sizeError}
+              onSize={(s) => { setSize(s); setSizeError(false); }} sizeError={sizeError} shakeKey={shakeKey}
               advisor={<SizeAdvisor compact product={p} onPick={(s) => { setSize(s); setSizeError(false); }} />} suggested={mine} sizeNote={[fitNote(p, lang), sizeHint(p, size, lang), mine && size !== mine ? (lang === 'ar' ? `مقاسك المقترح حسب قياساتك: ${mine}` : `Your suggested size: ${mine}`) : null].filter(Boolean).join(' ') || null} />
           </div>
 

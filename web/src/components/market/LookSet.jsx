@@ -288,6 +288,34 @@ export default function LookSet({ data, name, marketplace = false, editorial = f
     setAdded((a) => [...new Set([...a, quick.queue[quick.i].id])]);
     if (quick.i + 1 < quick.queue.length) setQuick({ ...quick, i: quick.i + 1 }); else setQuick(null);
   };
+  // search results (skincare, cheapest, trending…): the best 2-3 side by side, no tall list to scroll
+  if (m.isSearch) {
+    const one = m.looks.length === 1;
+    const cols = m.looks.length >= 3 ? 'grid-cols-3' : m.looks.length === 2 ? 'grid-cols-2' : 'grid-cols-1';
+    return (
+      <>
+        {advice}
+        <div className={cx('mt-3 grid gap-2', cols)}>
+          {m.looks.map((l) => { const p = l.items[0]; if (!p) return null; return (
+            <div key={p.id} className={cx('min-w-0 rounded-2xl border border-line bg-elevated p-1.5', one ? 'flex items-stretch gap-3' : 'flex flex-col')}>
+              <Link to={'/s/' + p.store.slug + '/p/' + p.slug} className={cx('block min-w-0', one && 'flex flex-1 items-center gap-3')}>
+                <SmartImage media={p.image} ratio="4 / 5" className={cx('overflow-hidden rounded-xl', one && 'w-28 shrink-0')} sizes="(min-width:640px) 160px, 30vw" />
+                <div className={cx('min-w-0', one && 'flex-1')}>
+                  <p className={cx('mt-1.5 line-clamp-2 text-[11px] font-semibold leading-snug', one ? 'mt-0 text-[13px]' : 'min-h-[2.4em]')}>{tr(p.name)}</p>
+                  <p className="mt-0.5 text-[13px] font-bold text-sale">{formatMoney(p.price, lang)}</p>
+                  <p className="truncate text-[10px] text-muted">{tr(p.store.name)}</p>
+                </div>
+              </Link>
+              <button type="button" onClick={() => startAdd([p])} className={cx('inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-full border px-2 py-1.5 text-[11px] font-semibold transition', one ? 'self-center' : 'mt-1.5', added.includes(p.id) ? 'border-brand text-brand' : 'border-line-strong hover:border-fg')}>
+                {added.includes(p.id) ? <Check className="h-3.5 w-3.5" /> : <ShoppingBag className="h-3.5 w-3.5" />}{added.includes(p.id) ? (ar ? 'اتضافت' : t('stylist.added')) : (ar ? 'ضيف للسلة' : 'Add')}
+              </button>
+            </div>
+          ); })}
+        </div>
+        {quick && <QuickAddSheet slug={quick.queue[quick.i].store.slug} product={quick.queue[quick.i]} marketplace={marketplace} step={quick.queue.length > 1 ? `${quick.i + 1}/${quick.queue.length}` : ''} onAdded={nextAdd} onClose={() => setQuick(null)} />}
+      </>
+    );
+  }
   const share = () => {
     const lines = m.looks.map((l) => { const p = l.items[l.pick]; return `${l.label}: ${tr(p.name)} — ${formatMoney(p.price, lang)}\n${location.origin}/s/${p.store.slug}/p/${p.slug}`; });
     window.open(`https://wa.me/?text=${encodeURIComponent(`${name} ✨\n${lines.join('\n\n')}\n\n${totalLabel}`)}`, '_blank', 'noopener');

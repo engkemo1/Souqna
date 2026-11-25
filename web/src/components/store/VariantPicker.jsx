@@ -19,7 +19,7 @@ export function sizeStock(product, color, size) {
   return v ? (product.trackStock === false ? 99 : v.stock) : 0; // stock tracking off = always available
 }
 
-export default function VariantPicker({ product, color, size, onColor: setColor, onSize, sizeError, advisor = null, sizeNote = null, suggested = null }) {
+export default function VariantPicker({ product, color, size, onColor: setColor, onSize, sizeError, shakeKey = 0, advisor = null, sizeNote = null, suggested = null }) {
   const { t, tr, lang } = useI18n();
   const colors = product.colors || [];
   const sizes = product.sizes || [];
@@ -50,12 +50,12 @@ export default function VariantPicker({ product, color, size, onColor: setColor,
         </fieldset>
       )}
       {sizes.length > 0 && !(sizes.length === 1 && sizes[0] === 'One size') && (
-        <fieldset>
+        <fieldset data-size-field>
           <div className="mb-3 flex items-center justify-between">
-            <legend className="text-sm font-semibold">{t('product.size')}</legend>
+            <legend className={cx('text-sm font-semibold', sizeError && 'text-sale')}>{t('product.size')}{sizeError ? ' *' : ''}</legend>
             {advisor}
           </div>
-          <div className="flex flex-wrap gap-2">
+          <motion.div key={`sizes-${shakeKey}`} animate={sizeError ? { x: [0, -8, 8, -6, 6, 0] } : { x: 0 }} transition={{ duration: 0.4 }} className={cx('flex flex-wrap gap-2', sizeError && 'rounded-2xl p-1.5 ring-2 ring-sale/60')}>
             {sizes.map((s) => {
               const stock = sizeStock(product, color, s);
               const active = s === size;
@@ -71,7 +71,7 @@ export default function VariantPicker({ product, color, size, onColor: setColor,
                 </button>
               );
             })}
-          </div>
+          </motion.div>
           {sizeNote && <p className="mt-2.5 text-[13px] leading-5 text-muted" aria-live="polite">{sizeNote}</p>}
           {sizeError && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="mt-2.5 text-sm font-medium text-sale" role="alert">{t('product.pleaseSelectSize')}</motion.p>}
         </fieldset>

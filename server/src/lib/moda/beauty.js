@@ -37,9 +37,12 @@ const inBeauty = (p) => [p.department, p.dept_parent, p.dept_grand].some((s) => 
 const hay = (p) => norm(`${p.name_ar || ''} ${p.name_en || ''} ${p.dept_name || ''} ${p.cat_text || ''}`);
 
 /** @returns {{topic:string, say:string, hits:object[]}|null} */
-export function beautyMatch(text, products, { limit = 8 } = {}) {
+/** budget (optional): only products at or under it. Ranking: matches the asked category/word first → within budget → closest to the budget (not the cheapest junk) → sales and rating. */
+export function beautyMatch(text, products, { limit = 8, budget = null } = {}) {
   const n = ` ${norm(text)} `;
   if (!n.trim() || FASHION.test(n)) return null;
+  // «بشرتي سمرا ايه الالوان اللي تناسبني»: نصيحة ألوان لبس حسب لون البشرة، مش منتج عناية
+  if (/(^| )(سمر[ا-ي]*|بيض[ا-ي]*|قمح[ا-ي]*|حنط[ا-ي]*)( |$)/.test(n) && /(الوان|لون|يناسب|تناسب|تليق|يليق)/.test(n) && !/(تفتيح|تبييض|سيروم|كريم|مرطب|غسول|ماسك|serum|cream|mask)/.test(n)) return null;
   const topics = ORDER.filter((k) => hasTerm(n, T[k].ask));
   if (!topics.length) return null;
   const topic = topics[0];
@@ -50,6 +53,13 @@ export function beautyMatch(text, products, { limit = 8 } = {}) {
   const words = n.split(' ').map((w) => w.replace(PRE, '')).filter((w) => w.length >= 3);
   const specific = pool.filter((p) => { const h = ` ${hay(p)} `; return words.some((w) => { const g = SYN.find((x) => x.includes(w)); return g ? g.some((y) => h.includes(y)) : false; }); });
   if (specific.length) pool = specific;
-  const hits = pool.sort((a, b) => (Number(b.sold_count) || 0) - (Number(a.sold_count) || 0)).slice(0, limit);
-  return { topic, say: hits.length ? cfg.say : `${cfg.none} تقدري تشوفي كل أقسام التجميل من صفحة «مستحضرات تجميل».`, hits };
+  const spec = new Set(specific.map((p) => p.id));
+  const relevance = (p) => (cfg.dept && cfg.dept.test(String(p.department || '')) ? 3 : 0) + (spec.has(p.id) ? 2 : 0) + (cfg.name && cfg.name.test(`${p.name_ar} ${p.name_en}`) ? 1 : 0);
+  const demand = (p) => (Number(p.sold_count) || 0) + (Number(p.rating) || 0) * Math.log1p(Number(p.rating_count) || 0);
+  const cap = Number(budget) > 0 ? Number(budget) : null;
+  const rank = (list) => [...list].sort((a, b) => relevance(b) - relevance(a) || (cap ? (cap - a.price) - (cap - b.price) : 0) || demand(b) - demand(a));
+  const priced = pool.filter((p) => Number(p.price) > 0);
+  const all = rank(priced);                                  // the whole category, ranked (used to say "the cheapest in this category is …")
+  const hits = (cap ? rank(priced.filter((p) => Number(p.price) <= cap)) : all).slice(0, limit);
+  return { topic, say: hits.length ? cfg.say : `${cfg.none} تقدري تشوفي كل أقسام التجميل من صفحة «مستحضرات تجميل».`, hits, all, budgeted: !!cap };
 }
