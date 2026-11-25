@@ -196,6 +196,21 @@ export function HeroBanner({ c, offset = 0, preview = false }) {
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 sm:hidden" style={{ background: 'linear-gradient(0deg, rgba(8,8,8,.92) 0%, rgba(8,8,8,.5) 38%, transparent 66%), linear-gradient(270deg, rgba(8,8,8,.82) 0%, rgba(8,8,8,.45) 42%, transparent 78%)' }} />
         </>
       )}
+      {!l.art && (
+        <svg aria-hidden="true" viewBox="0 0 600 300" preserveAspectRatio="xMidYMid slice" className="pointer-events-none absolute inset-0 h-full w-full" fill="none">
+          <g stroke={l.c2} strokeLinecap="round">
+            <circle cx="70" cy="150" r="150" strokeWidth="1.5" opacity=".22" />
+            <circle cx="70" cy="150" r="205" strokeWidth="1.5" opacity=".14" />
+            <circle cx="70" cy="150" r="260" strokeWidth="1.5" opacity=".08" />
+            <path d="M330 -10 L250 310 M370 -10 L290 310 M410 -10 L330 310" strokeWidth="1" opacity=".1" />
+          </g>
+          <g fill={l.c2} fontFamily="Cairo, sans-serif" fontWeight="900">
+            <text x="470" y="120" fontSize="150" opacity=".07" transform="rotate(-12 470 120)">%</text>
+            <text x="540" y="290" fontSize="110" opacity=".06" transform="rotate(10 540 290)">٪</text>
+            <text x="250" y="60" fontSize="60" opacity=".08">%</text>
+          </g>
+        </svg>
+      )}
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-10 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${l.c2}aa, transparent)` }} />
       <div className="relative z-10 flex flex-col gap-3.5 px-4 pb-4 pt-4 sm:flex-row sm:items-center sm:gap-14 sm:px-12 sm:py-10">
         {bd && (
