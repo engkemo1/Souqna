@@ -48,6 +48,8 @@ export function beautyMatch(text, products, { limit = 8, budget = null } = {}) {
   const topic = topics[0];
   const beauty = (products || []).filter((p) => p && inBeauty(p) && p.inStock !== false && Number(p.photo_mismatch) !== 1);
   const cfg = T[topic];
+  // مفيش ولا منتج في أقسام التجميل، لكن في منتج اسمه/تصنيفه بيطابق اللي العميل طلبه: سيب البحث العادي يلاقيه بدل «مفيش»
+  if (!beauty.length && (products || []).some((p) => p && p.inStock !== false && hasTerm(hay(p), cfg.ask))) return null;
   let pool = cfg.dept ? beauty.filter((p) => cfg.dept.test(String(p.department || '')) || (!/^(care|hair_care|makeup|perfumes|beauty_|perfume_)/.test(String(p.department || '')) && cfg.name.test(`${p.name_ar} ${p.name_en}`))) : beauty;
   // كلمة محددة («روج»، «سيروم»، «ماسك») → اللي اسمه فيها الأول
   const words = n.split(' ').map((w) => w.replace(PRE, '')).filter((w) => w.length >= 3);

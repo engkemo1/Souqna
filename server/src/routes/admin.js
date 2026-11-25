@@ -23,7 +23,7 @@ import { adminModaPrompts, saveModaPrompts, resetModaPrompts, suggestPrompts } f
 import { saveAsset, assignAsset, unassign, deleteAsset, bulkUpload, libraryStatus, listAssets, duplicatesReport, checkLinks, serializeAsset } from '../lib/image-assets.js';
 import { generationStatus, requestCandidate, listCandidates, candidateRow, approveCandidate, rejectCandidate, defaultPrompt, eligibleSections, createBatch, startBatch, pauseBatch, cancelBatch, retryFailed, batchStatus, listBatches } from '../lib/image-gen.js';
 import { saveDeptImage, removeDeptImage, saveStylistAvatar, saveHomepageAdImage, saveLookOfDayImage, recutLookImage } from '../lib/deptImage.js';
-import { notifyBuyer, notifyOrderStatus, adminBuyersList, adminBuyerDetail, adminCustomersList, adminCustomerDetail, setCustomerFlag, setBuyerBlocked } from '../lib/buyers.js';
+import { notifyBuyer, notifyOrderStatus, adminBuyersList, adminBuyerDetail, adminCustomersList, adminCustomerDetail, setCustomerFlag, setBuyerBlocked, isPhoneBlocked } from '../lib/buyers.js';
 import { serializeStore } from '../lib/serialize.js';
 import { trafficStats } from '../lib/traffic.js';
 import { auditMiddleware } from '../lib/insights.js';
@@ -31,6 +31,7 @@ import insightsRoutes from './admin-insights.js';
 import featuredRoutes from './admin-featured.js';
 import adminProductsRoutes, { countProductsWithIssues } from './admin-products.js';
 import lookReviewRoutes from './admin-looks.js';
+import adminOrdersRoutes from './admin-orders.js';
 import { verifyTotp } from '../lib/totp.js';
 import { getObservabilityMetrics, formatPrometheusMetrics } from '../lib/logger.js';
 import { listJobStatuses } from '../lib/job-runner.js';
@@ -120,6 +121,7 @@ r.use(insightsRoutes);
 r.use(featuredRoutes);
 r.use(adminProductsRoutes);
 r.use(lookReviewRoutes);
+r.use(adminOrdersRoutes);
 
 /** Step 2 of admin sign-in. The key (checked above) + a 6-digit authenticator code → a 4-hour session proof. */
 r.post('/login', h((req, res) => {
@@ -1356,8 +1358,12 @@ r.get('/overview', h((_req, res) => {
 }));
 
 r.get('/orders', h((req, res) => {
-  const { status = 'all', delivery = 'all', store = '', q: term = '', page = '1' } = req.query;
+  const { status = 'all', delivery = 'all', store = '', q: term = '', page = '1', from: dFrom = '', to: dTo = '', min = '', max = '' } = req.query;
   const where = ['1=1']; const params = [];
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(dFrom))) { where.push('o.created_at >= ?'); params.push(`${dFrom} 00:00:00`); }
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(dTo))) { where.push('o.created_at <= ?'); params.push(`${dTo} 23:59:59`); }
+  if (min !== '' && Number.isFinite(Number(min))) { where.push('o.total >= ?'); params.push(Number(min)); }
+  if (max !== '' && Number.isFinite(Number(max))) { where.push('o.total <= ?'); params.push(Number(max)); }
   if (status !== 'all' && ORDER_STATUSES.includes(String(status))) { where.push('o.status=?'); params.push(String(status)); }
   if (delivery === 'platform' || delivery === 'store') { where.push('o.delivery_by=?'); params.push(String(delivery)); }
   if (store) { where.push('s.slug=?'); params.push(String(store)); }
@@ -1380,7 +1386,7 @@ r.get('/orders/:id', h((req, res) => {
   const storeNotes = o.delivery_group
     ? q.all("SELECT o2.number, s2.name_ar AS store_name, o2.store_note AS note FROM orders o2 JOIN stores s2 ON s2.id=o2.store_id WHERE o2.delivery_group=? AND o2.store_note IS NOT NULL AND o2.store_note<>'' ORDER BY o2.id", [o.delivery_group])
     : (o.store_note ? [{ number: o.number, store_name: o.store_name, note: o.store_note }] : []);
-  res.json({ order: o, storeNotes, items: q.all('SELECT name_ar, color, size, price, qty FROM order_items WHERE order_id=?', [o.id]), events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]) });
+  res.json({ order: o, storeNotes, items: q.all('SELECT id, name_ar, color, size, price, qty, returned_qty, is_gift FROM order_items WHERE order_id=?', [o.id]), returns: q.all('SELECT order_item_id, qty, refund, restocked, reason, created_at FROM order_returns WHERE order_id=? ORDER BY id', [o.id]), customerBlocked: isPhoneBlocked(o.phone), events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]) });
 }));
 
 r.patch('/orders/:id/delivery', h((req, res) => {
