@@ -62,3 +62,10 @@ test('a baby product with no size at all shows under the baby age chips (not und
   const chip2 = idsOf(await get('/search?sizes=' + encodeURIComponent('4-6 سنين')));
   assert.ok(!chip2.has(ids.bebaY), '4-6 chip must not include it');
 });
+
+test('the chip count matches the list for a baby age chip (no-size baby products are counted too)', async () => {
+  const r = await get('/search');
+  const f = (r.facets.sizes || []).find((x) => x.size.startsWith('0-3'));
+  const list = await get('/search?sizes=' + encodeURIComponent(f.size));
+  assert.equal(f.n, list.total);
+});
