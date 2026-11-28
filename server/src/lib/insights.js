@@ -4,6 +4,7 @@
  * Days are Cairo dates. Money is whole EGP like the rest of the app.
  */
 import { q, db, tx } from '../db/index.js';
+import { settleAll } from './commission.js';
 import { adminBuyersCsv } from './buyers.js';
 import { cairoNow } from './sameDay.js';
 import { shiftDay } from './traffic.js';
@@ -276,9 +277,11 @@ export function marketInsights(days = 30) {
   const sponsors = sum(runs, (r) => r.sponsor);
   const subs = q.val("SELECT COALESCE(SUM(amount),0) FROM subscription_periods WHERE kind='paid' AND created_at >= ?", [fromSql]);
   const discounts = sum(live, (o) => o.platform_discount);
+  settleAll();
+  const commission = q.val("SELECT COALESCE(SUM(commission_amount),0) FROM orders WHERE status='delivered' AND commission_amount IS NOT NULL AND created_at >= ?", [fromSql]);
   const revenue = {
     gmv, orders: live.length, deliveryFees, sponsors, courierCosts, deliveryProfit: deliveryFees + sponsors - courierCosts,
-    subscriptions: subs, platformDiscounts: discounts, net: deliveryFees + sponsors - courierCosts + subs - discounts,
+    subscriptions: subs, commission, platformDiscounts: discounts, net: deliveryFees + sponsors - courierCosts + subs + commission - discounts,
     wageMissingRuns: runs.filter((r) => r.wage == null).length,
   };
 

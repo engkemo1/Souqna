@@ -6,6 +6,7 @@ import { h, AppError } from '../lib/errors.js';
 import { nowIso } from '../lib/util.js';
 import { notifyBuyer, notifyOrderStatus } from '../lib/buyers.js';
 import { computeReturn } from '../lib/promotions/returns.js';
+import { refreshAfterReturn } from '../lib/commission.js';
 
 /**
  * Platform-admin control over EVERY order (any store, any delivery mode). Mounted inside the admin router (admin key already checked; writes land in the audit log).
@@ -119,6 +120,7 @@ r.post('/orders/:id/returns', h((req, res) => {
     }
     if (o.customer_id && refund) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [refund, o.customer_id]);
     insert('order_events', { order_id: o.id, status: o.status, note: `@admin return:${refund}`, created_at: now });
+    refreshAfterReturn(o.id);
     return { refund, items: lines, calculation: calc };
   });
   res.status(out.dryRun ? 200 : 201).json(out);

@@ -113,7 +113,12 @@ function OrderSheet({ id, onClose, onChanged }) {
   const [busy, setBusy] = useState(false);
   const setDelivery = async (delivery_by) => {
     setBusy(true);
-    try { await adminApi(`/orders/${id}/delivery`, { method: 'PATCH', body: { delivery_by } }); toast({ title: delivery_by === 'platform' ? 'اتحوّل لتوصيل Twist' : 'رجع لتوصيل المحل' }); reload(); onChanged(); } catch (x) { toast({ tone: 'error', title: x.message }); }
+    try { await adminApi(`/orders/${id}/delivery`, { method: 'PATCH', body: { delivery_by } }); toast({ title: 'اتحوّل لتوصيل Twist' }); reload(); onChanged(); } catch (x) { toast({ tone: 'error', title: x.message }); }
+    setBusy(false);
+  };
+  const payout = async (paid) => {
+    setBusy(true);
+    try { await adminApi(`/orders/${id}/shop-payout`, { method: 'POST', body: { paid } }); toast({ title: paid ? 'اتسجّل إن المحل اتدفع له' : 'اتلغى تسجيل الدفع' }); reload(); onChanged?.(); } catch (x) { toast({ tone: 'error', title: x.message || 'مقدرتش أسجّل' }); }
     setBusy(false);
   };
   return (
@@ -143,6 +148,22 @@ function OrderSheet({ id, onClose, onChanged }) {
             <ul className="divide-y divide-line">{data.items.map((i, k) => <li key={k} className="flex justify-between gap-3 py-2 text-sm"><span>{fmtNum(i.qty)}× {i.name_ar}{i.size ? ` · ${i.size}` : ''}{i.returned_qty > 0 && <span className="text-danger"> (مرتجع {fmtNum(i.returned_qty)})</span>}</span><span className="tabular">{fmtMoney(i.price * i.qty)}</span></li>)}</ul>
             <div className="mt-2 space-y-1 border-t border-line pt-2 text-sm"><div className="flex justify-between text-muted"><span>الشحن</span><span>{o.shipping_free ? 'مجاني للعميل' : o.shipping ? fmtMoney(o.shipping) : 'ضمن رسوم السلة المشتركة'}</span></div>{o.discount > 0 && <div className="flex justify-between text-muted"><span>خصم</span><span>−{fmtMoney(o.discount)}</span></div>}<div className="flex justify-between text-base font-semibold"><span>الإجمالي من العميل</span><span>{fmtMoney(o.total)}</span></div></div>
           </div>
+          {data.payout && (
+            <div className="rounded-2xl border border-line p-4">
+              <p className="mb-2 text-sm font-semibold">حساب المحل</p>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between text-muted"><span>عمولة تويست ({data.payout.rate}%)</span><span>{fmtMoney(data.payout.commission)}</span></div>
+                {data.payout.applies && <div className="flex justify-between font-semibold"><span>المستحق للمحل</span><span>{fmtMoney(data.payout.due)}</span></div>}
+              </div>
+              {!data.payout.applies ? <p className="mt-2 text-xs text-muted">استلام من المحل (حجز)، مفيش عمولة ولا دفع من تويست للأوردر ده.</p> : data.payout.paidAt ? (
+                <div className="mt-3 space-y-2">
+                  <p className="text-sm text-muted">اتدفع للمحل {fmtMoney(data.payout.paid)} · {fmtDateTime(data.payout.paidAt)}</p>
+                  {data.payout.owedBack > 0 && <p className="rounded-xl bg-red-50 p-3 text-sm font-medium text-sale">محتاج استرجاع {fmtMoney(data.payout.owedBack)} من المحل ({o.status === 'cancelled' ? 'الأوردر اتلغى' : 'في مرتجع'}).</p>}
+                  <Button size="xs" variant="outline" loading={busy} onClick={() => payout(false)}>إلغاء تسجيل الدفع</Button>
+                </div>
+              ) : o.status !== 'cancelled' && <Button className="mt-3" size="sm" loading={busy} onClick={() => payout(true)}>اتدفع للمحل ({fmtMoney(data.payout.due)})</Button>}
+            </div>
+          )}
           <div><p className="mb-2 text-sm font-semibold">سجل الطلب</p>
             <ol className="space-y-2 text-sm">{data.events.map((e, i) => <li key={i} className="flex gap-2"><span className="text-muted">{fmtDateTime(e.created_at)}</span><span className="font-medium">{ORDER_STATUS_AR[e.status] || e.status}</span>{e.note && <span className="text-muted">{e.note === '@handoff' ? '— اتحوّل لتوصيلنا' : e.note === '@store_delivery' ? '— رجع لتوصيل المحل' : `— ${adminNote(e.note)}`}</span>}</li>)}</ol></div>
           <AdminControls key={`${o.id}-${o.status}`} o={o} items={data.items} reload={reload} onChanged={onChanged} />
@@ -150,7 +171,7 @@ function OrderSheet({ id, onClose, onChanged }) {
             <p className="rounded-xl bg-brand/5 p-3 text-sm font-medium text-brand">توصيل سلة Twist موحّد لكل المحلات، ومش ممكن تحويل جزء منها لتوصيل المحل.</p>
           ) : ['pending', 'confirmed', 'processing'].includes(o.status) && (
             o.delivery_by === 'platform'
-              ? <Button variant="outline" loading={busy} onClick={() => setDelivery('store')}>رجّع التوصيل للمحل</Button>
+              ? null // Twist delivers every order: there is no store-delivery to go back to
               : <Button icon={Truck} loading={busy} onClick={() => setDelivery('platform')}>خلّي Twist توصّله</Button>
           )}
         </div>

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, ExternalLink, LogIn, Link2, Package, Trash2, Pin, Copy, Pencil, Search, Check, X, ChevronDown, Phone, MessageCircle } from 'lucide-react';
 import { PageHeader, FilterTabs, SearchInput } from '../../components/dash/Kit.jsx';
 import Button from '../../components/ui/Button.jsx';
@@ -285,6 +285,47 @@ function ProductsSheet({ store, onClose }) {
   );
 }
 
+function CommissionBox({ slug }) {
+  const toast = useToast();
+  const [d, setD] = useState(null);
+  const [own, setOwn] = useState('');
+  const [def, setDef] = useState('');
+  const [sub, setSub] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let live = true;
+    adminApi('/commission?days=30').then((r) => {
+      if (!live) return;
+      setD(r); setDef(String(r.settings.defaultRate)); setSub(r.settings.subscribedRate == null ? '' : String(r.settings.subscribedRate));
+      const o = r.overrides.find((x) => x.slug === slug); setOwn(o ? String(o.rate) : '');
+    }).catch(() => {});
+    return () => { live = false; };
+  }, [slug]);
+  if (!d) return null;
+  const mine = d.stores.find((x) => x.slug === slug);
+  const num = (v) => (v === '' ? null : Number(v));
+  const ok = (v) => v === '' || (Number.isFinite(Number(v)) && Number(v) >= 0 && Number(v) <= 100);
+  const run = async (fn, msg) => { setBusy(true); try { await fn(); toast({ title: msg }); } catch (x) { toast({ tone: 'error', title: x.message || 'مقدرتش أحفظ' }); } setBusy(false); };
+  return (
+    <div className="space-y-3 rounded-2xl border border-line p-4">
+      <p className="text-sm font-semibold">عمولة تويست</p>
+      <p className="text-xs text-muted">النسبة الحالية: {d.settings.defaultRate}% من سعر المنتجات بعد خصم المحل (من غير التوصيل). بتتثبّت على كل أوردر لما يتسلّم.{mine ? ` آخر 30 يوم: ${fmtNum(mine.orders)} أوردر، عمولة ${fmtMoney(mine.commission)}.` : ''}</p>
+      <div className="flex items-end gap-2">
+        <Field label="نسبة خاصة بالمحل ده (%)" hint="سيبها فاضية = النسبة العامة. مثال: 3 أو 5 أو 6"><Input dir="ltr" inputMode="decimal" placeholder={String(d.settings.defaultRate)} value={own} onChange={(e) => setOwn(e.target.value)} className="text-start" /></Field>
+        <Button size="sm" loading={busy} disabled={!ok(own)} onClick={() => run(() => adminApi(`/commission/stores/${slug}`, { method: 'PUT', body: { rate: num(own) } }), 'اتحفظت نسبة المحل')}>حفظ</Button>
+      </div>
+      <details className="text-sm">
+        <summary className="cursor-pointer text-xs font-semibold text-muted">النسبة العامة لكل المحلات</summary>
+        <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <Field label="النسبة العامة (%)"><Input dir="ltr" inputMode="decimal" value={def} onChange={(e) => setDef(e.target.value)} className="text-start" /></Field>
+          <Field label="نسبة المشترك (%)" hint="فاضية = لسه مفيش اشتراك"><Input dir="ltr" inputMode="decimal" value={sub} onChange={(e) => setSub(e.target.value)} className="text-start" /></Field>
+        </div>
+        <Button className="mt-2" size="sm" variant="outline" loading={busy} disabled={def === '' || !ok(def) || !ok(sub)} onClick={() => run(() => adminApi('/commission/settings', { method: 'PUT', body: { defaultRate: Number(def), subscribedRate: num(sub) } }), 'اتحفظت النسبة العامة')}>حفظ النسبة العامة (بتأثر على كل المحلات)</Button>
+      </details>
+    </div>
+  );
+}
+
 function EditSheet({ store, onClose, onChanged, depts }) {
   const toast = useToast();
   const [f, setF] = useState(null);
@@ -344,6 +385,7 @@ function EditSheet({ store, onClose, onChanged, depts }) {
               placeholder="مثال: وسط بنها، كفر الجزار، شبرا الخيمة…"
             />
           </Field>
+          <CommissionBox slug={store.slug} />
           <div className="space-y-3 rounded-2xl border border-line p-4">
             <Switch checked={!f.hidden} onChange={(v) => setF({ ...f, hidden: !v })} label="ظاهر في الصفحة الرئيسية" />
             <Switch checked={!!f.show_when_empty} onChange={(v) => setF({ ...f, show_when_empty: v })} label="إظهار حتى لو فاضي" />
@@ -380,6 +422,13 @@ export default function Stores() {
   const [term, setTerm] = useState('');
   const [create, setCreate] = useState(false);
   const [edit, setEdit] = useState(null);
+  const toast = useToast();
+  // quick actions on many shops at once
+  const [selecting, setSelecting] = useState(false);
+  const [sel, setSel] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const [confirmSuspend, setConfirmSuspend] = useState(false);
+  const [rateOpen, setRateOpen] = useState(false);
   const stores = data?.stores || [];
   const counts = useMemo(() => ({ all: stores.length, active: stores.filter((s) => s.status === 'active' && !s.hidden).length, hidden: stores.filter((s) => s.hidden).length, suspended: stores.filter((s) => s.status !== 'active').length, platform: stores.filter((s) => s.lat == null).length }), [stores]);
   const shown = stores.filter((s) => {
@@ -390,11 +439,25 @@ export default function Stores() {
     const x = term.trim().toLowerCase();
     return !x || [s.name_ar, s.name_en, s.slug, s.owner_name, s.owner_email, s.phone].some((v) => String(v || '').toLowerCase().includes(x));
   });
+  useEffect(() => { setSel([]); setConfirmSuspend(false); setRateOpen(false); }, [tab, term]);
+  const toggleSel = (slug) => setSel((a) => (a.includes(slug) ? a.filter((x) => x !== slug) : [...a, slug]));
+  const allOn = shown.length > 0 && shown.every((s) => sel.includes(s.slug));
+  const exitSel = () => { setSelecting(false); setSel([]); setConfirmSuspend(false); setRateOpen(false); };
+  const bulk = async (action, extra = {}, okMsg) => {
+    if (!sel.length || busy) return;
+    setBusy(true);
+    try {
+      const r = await adminApi('/stores/bulk', { method: 'POST', body: { slugs: sel, action, ...extra } });
+      toast({ title: okMsg ? `${okMsg} (${fmtNum(r.done ?? sel.length)} محل)` : 'تم' });
+      setSel([]); setConfirmSuspend(false); setRateOpen(false); reload();
+    } catch (x) { toast({ tone: 'error', title: x.message || 'معرفتش أنفّذ' }); }
+    setBusy(false);
+  };
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
   const live = edit ? stores.find((s) => s.slug === edit.slug) || edit : null;
   return (
     <div>
-      <PageHeader title="المحلات" subtitle={`${fmtNum(stores.length)} محل على المنصة`} actions={<Button icon={Plus} onClick={() => setCreate(true)}>محل جديد</Button>} />
+      <PageHeader title="المحلات" subtitle={`${fmtNum(stores.length)} محل على المنصة`} actions={<div className="flex gap-2"><Button variant={selecting ? 'primary' : 'secondary'} icon={Check} onClick={() => (selecting ? exitSel() : setSelecting(true))}>{selecting ? 'خلّصت' : 'تحديد محلات'}</Button><Button icon={Plus} onClick={() => setCreate(true)}>محل جديد</Button></div>} />
       <div className="mb-4 space-y-3">
         <SearchInput value={term} onChange={setTerm} placeholder="ابحث بالاسم أو الإيميل أو التليفون" />
         <FilterTabs value={tab} onChange={setTab} options={[{ value: 'all', label: 'الكل', count: counts.all }, { value: 'active', label: 'ظاهر', count: counts.active }, { value: 'hidden', label: 'مخفي', count: counts.hidden }, { value: 'suspended', label: 'موقوف', count: counts.suspended }, { value: 'platform', label: 'بدون موقع', count: counts.platform }]} />
@@ -404,7 +467,8 @@ export default function Stores() {
           <ul className="divide-y divide-line">
             {shown.map((s) => (
               <li key={s.slug}>
-                <div role="button" tabIndex={0} onClick={() => setEdit(s)} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); setEdit(s); } }} className="flex w-full cursor-pointer flex-col gap-2 px-4 py-3.5 text-start transition hover:bg-fg/[0.025] sm:flex-row sm:items-center sm:gap-4 sm:px-5">
+                <div role="button" tabIndex={0} onClick={() => (selecting ? toggleSel(s.slug) : setEdit(s))} onKeyDown={(e) => { if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); if (selecting) toggleSel(s.slug); else setEdit(s); } }} className={cx(sel.includes(s.slug) && 'bg-brand/5', "flex w-full cursor-pointer flex-col gap-2 px-4 py-3.5 text-start transition hover:bg-fg/[0.025] sm:flex-row sm:items-center sm:gap-4 sm:px-5")}>
+                  {selecting && <span className={cx('grid h-5 w-5 shrink-0 place-items-center rounded-md border', sel.includes(s.slug) ? 'border-brand bg-brand text-white' : 'border-line')}>{sel.includes(s.slug) && <Check className="h-3.5 w-3.5" />}</span>}
                   <div className="min-w-0 flex-1">
                     <p className="flex flex-wrap items-center gap-2 font-semibold">{s.name_ar}
                       {s.status !== 'active' && <Badge tone="danger" size="sm">موقوف</Badge>}
@@ -427,6 +491,34 @@ export default function Stores() {
               </li>
             ))}
           </ul>
+        </div>
+      )}
+      {selecting && (
+        <div className="sticky bottom-3 z-20 mt-4 rounded-2xl border border-line bg-elevated p-3 shadow-lg">
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="rounded-full border border-line px-3 py-1.5 text-sm" onClick={() => setSel(allOn ? [] : shown.map((x) => x.slug))}>{allOn ? 'إلغاء الكل' : `تحديد الكل (${fmtNum(shown.length)})`}</button>
+            <span className="text-sm font-semibold">{sel.length ? `${fmtNum(sel.length)} محل محدد` : 'اختار محلات'}</span>
+            {sel.length > 0 && (
+              <div className="flex flex-wrap gap-2 sm:ms-auto">
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => bulk('hide', {}, 'اتخفوا')}>إخفاء</Button>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => bulk('show', {}, 'اتظهروا')}>إظهار</Button>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => bulk('feature', {}, 'اتميّزوا')}>★ تمييز</Button>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => bulk('unfeature', {}, 'اتشال التمييز')}>شيل التمييز</Button>
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => bulk('activate', {}, 'اتفعّلوا')}>تفعيل</Button>
+                {confirmSuspend
+                  ? <Button size="sm" variant="danger" disabled={busy} onClick={() => bulk('suspend', {}, 'اتوقفوا')}>أكّد الإيقاف ({fmtNum(sel.length)})</Button>
+                  : <Button size="sm" variant="secondary" disabled={busy} onClick={() => setConfirmSuspend(true)}>إيقاف</Button>}
+                <Button size="sm" variant="secondary" disabled={busy} onClick={() => setRateOpen((v) => !v)}>% العمولة</Button>
+              </div>
+            )}
+          </div>
+          {sel.length > 0 && rateOpen && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+              <span className="text-xs text-muted">عمولة تويست للمحلات المحددة:</span>
+              {[3, 5, 6, 8].map((r) => <Button key={r} size="sm" variant="secondary" disabled={busy} onClick={() => bulk('commission', { rate: r }, `العمولة ${r}%`)}>{r}%</Button>)}
+              <Button size="sm" variant="secondary" disabled={busy} onClick={() => bulk('commission', { rate: null }, 'رجعت للنسبة العامة')}>النسبة العامة</Button>
+            </div>
+          )}
         </div>
       )}
       <CreateSheet depts={depts} open={create} onClose={() => setCreate(false)} onDone={reload} />

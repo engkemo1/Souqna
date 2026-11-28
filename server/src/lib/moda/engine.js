@@ -190,8 +190,39 @@ export function strayGarments(K, text, allowedKeys, allowedNames = '') {
   }
   return [...found];
 }
+// «مش عاوز حاجه كلاسيك» بعد ما تويلا عرضت طقم: تعديل على الطلب اللي فات (نفس الشخص والمناسبة والميزانية) مش طلب جديد من الصفر.
+const NEG_STYLE = /^(?:لا |لأ |لاء )?(?:انا )?مش (?:عاوزه?|عايزه?|حابب|حابه|بحب|عاجبني|عاجبه)(?:ه|ها)? ?(?:حاجه|حاجة|لبس|طقم|اللبس|الطقم|حاجات)? ?(?:ال)?(كلاسيك|كلاسيكي|رسمي|رسميه|شيك|كاجوال|سبور|سبورت|ضيق|واسع|فاتح|غامق)$/;
+// «شوفلي حاجه تانيه / عاوز طقم تاني / غيرلي الطقم / فيه غيرها / مش عاجبني»: نفس الطلب اللي فات بس بقطع مختلفة (من غير اللي اتعرض قبل كده)
+const ANOTHER = /^(?:(?:ممكن|طب|ياريت|لو سمحت|يلا) )*(?:(?:شوفلي|هاتلي|وريني|عاوزه?|عايزه?|اديني|رشحلي|جيبلي|غيرلي|غير|دورلي) )?(?:انا )?(?:(?:حاجه|حاجات|طقم|لوك|اطقم|اطلاله|اختيار|اختيارات|شكل|واحد|واحده|الطقم|اللوك|ده|دي|دا) )?(?:تاني|تانيه|غير(?:ه|ها|هم|دي|ده|دا)?|مختلفه?|جديده?|بديل|بدائل|اخر|اخري|مش عاجب(?:ني|ها|ه)|مش دي|مش ده)(?: (?:خالص|بقي|لو سمحت))?$|^(?:في|فيه) (?:غير(?:ه|ها|هم)|حاجه تانيه|بدائل|اختيارات تانيه)$|^غير(?:لي|ه|ها|هم|دي|ده)? (?:الطقم|اللوك|ده|دي|الاطلاله)$/;
+const CONFUSED = /^(?:انا )?(?:مش فاهم|مش فاهمه|مفهمتش|مفهمتكيش|مش واضح|فهمني|يعني ايه|يعني ايه؟|ايه ده)[ ؟?.!]*$/;
+const plainAr = (t) => String(t || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْـ]/g, '').replace(/[؟?!.،,]+/g, ' ').replace(/\s+/g, ' ').trim();
 export async function runModa(messages, opts = {}) {
-  const res = await runModaCore(messages, opts);
+  const list = Array.isArray(messages) ? messages : [];
+  const last = list[list.length - 1];
+  const lastText = last?.role === 'user' && typeof last.content === 'string' ? plainAr(last.content) : '';
+  const prevAssistant = [...list].reverse().find((m) => m?.role === 'assistant' && typeof m.content === 'string')?.content || '';
+  // «مش فاهم»: ما نكررش نفس الجملة حرفيًا؛ نبسّط السؤال ونديله أمثلة
+  if (lastText && CONFUSED.test(lastText) && prevAssistant && /[؟?]/.test(prevAssistant) && opts.session?.lastQuestionAsked !== false) {
+    const res = await runModaCore(messages, opts);
+    if (res && res.say && plainAr(res.say) === plainAr(prevAssistant)) {
+      const ex = /مناسب/.test(prevAssistant) ? ' كلمة واحدة تكفي، زي «خروجة» أو «شغل» أو «فرح»، أو قولي القطعة اللي عاوزها.' : ' اكتبلي إجابة قصيرة، أو قولي القطعة اللي عاوزها.';
+      return withMemory(withOccasion({ ...res, say: `معلش، يمكن مش واضحة مني. بسألك: ${String(prevAssistant).trim()}${ex}` }), opts);
+    }
+    return withMemory(withOccasion(res), opts);
+  }
+  let msgs = messages; let composite = null;
+  const prevShop = opts.session?.lastShopText;
+  if (lastText && prevShop && ANOTHER.test(lastText) && (opts.session?.shown || []).length) {
+    const res = await runModaCore([...list.slice(0, -1), { ...last, content: prevShop }], { ...opts, forceOther: true });
+    if (res?.session && typeof res.session === 'object') res.session = { ...res.session, lastShopText: prevShop };
+    return withMemory(withOccasion(res), opts);
+  }
+  if (lastText && prevShop && NEG_STYLE.test(lastText)) { composite = `${prevShop} ${last.content}`.slice(0, 400); msgs = [...list.slice(0, -1), { ...last, content: composite }]; }
+  const res = await runModaCore(msgs, opts);
+  if (res?.session && typeof res.session === 'object' && res.blocks?.tabs?.length && (res.state === 'full' || res.state === 'partial') && lastText && !CONFUSED.test(lastText)) {
+    const keep = composite || (last?.role === 'user' && typeof last.content === 'string' ? last.content : null);
+    if (keep && !NEG_STYLE.test(plainAr(keep))) res.session = { ...res.session, lastShopText: keep.slice(0, 400) };
+  }
   return withMemory(withOccasion(res), opts);
 }
 
@@ -1065,6 +1096,7 @@ async function runModaCore(messages, opts = {}) {
     parsed = { ...session.parsed, intent: 'shop', followup: null, budget: null, flags: { ...(session.parsed.flags || {}), priciest: true, cheapest: undefined, budgetFlexible: true } };
   }
   if (parsed.followup === 'cheaper' && prevTotal) { parsed.budget = { value: Math.max(100, Math.round((session.lastBudgetUsed || prevTotal) * 0.8 / 50) * 50), kind: 'total' }; derivedBudget = true; }
+  if (opts.forceOther) parsed = { ...parsed, flags: { ...(parsed.flags || {}), showOther: true } };
   if (parsed.followup === 'show_more' || parsed.flags?.showOther) excludeIds = session?.shown || [];
   if (parsed.flags?.swapId) excludeIds = [...excludeIds, parsed.flags.swapId];
   // «عايز بدلة كبيرة / للكبار / دي أطفالي»: اللي اتعرض كان مقاس عيال → نستبعده ونحوّل أي «ولاد/بنات» لكبار

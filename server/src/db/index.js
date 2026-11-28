@@ -31,6 +31,9 @@ for (const ddl of [
 }
 db.exec(`INSERT OR IGNORE INTO app_settings(key,value) VALUES
   ('subscription_monthly_fee','0'),
+  ('commission_default_rate','8'),
+  ('commission_start', datetime('now')),
+  ('commission_subscribed_rate',''),
   ('subscription_reminder_days','5'),
   ('subscription_reminder_template','أهلاً {store}، نذكّرك إن اشتراك متجرك على Twist مستحق بمبلغ {amount} ج.م. موعد التجديد {due_date}. ابعتلنا صورة التحويل أو تواصل معانا لتأكيد الدفع. شكراً لثقتك في Twist.'),
   ('cashier_sync_enabled','0')`);
@@ -45,6 +48,7 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
 {
   const cols = db.prepare('PRAGMA table_info(stores)').all().map((c) => c.name);
   if (!cols.includes('auto_whatsapp')) db.exec('ALTER TABLE stores ADD COLUMN auto_whatsapp INTEGER NOT NULL DEFAULT 0');
+  if (!cols.includes('commission_rate_override')) db.exec('ALTER TABLE stores ADD COLUMN commission_rate_override REAL'); // Twist commission % for this store only (NULL = the default / subscribed rate)
   if (!cols.includes('sort_order')) db.exec('ALTER TABLE stores ADD COLUMN sort_order INTEGER NOT NULL DEFAULT 0');
   if (!cols.includes('return_days')) db.exec('ALTER TABLE stores ADD COLUMN return_days INTEGER NOT NULL DEFAULT 3');
   // banner display controls (additive; existing banners keep today's look: whole picture, centred, normal height, default colour/font)
@@ -193,6 +197,10 @@ db.exec('CREATE TABLE IF NOT EXISTS store_slug_aliases (old_slug TEXT PRIMARY KE
   if (!ocols.includes('delivery_mode')) db.exec("ALTER TABLE orders ADD COLUMN delivery_mode TEXT NOT NULL DEFAULT 'pooled'");
   if (!ocols.includes('delivery_fee_status')) db.exec("ALTER TABLE orders ADD COLUMN delivery_fee_status TEXT NOT NULL DEFAULT 'confirmed'");
   if (!ocols.includes('handoff_at')) db.exec('ALTER TABLE orders ADD COLUMN handoff_at TEXT');
+  if (!ocols.includes('commission_rate')) db.exec('ALTER TABLE orders ADD COLUMN commission_rate REAL'); // Twist commission %, frozen when the order is delivered
+  if (!ocols.includes('commission_amount')) db.exec('ALTER TABLE orders ADD COLUMN commission_amount INTEGER');
+  if (!ocols.includes('shop_paid_at')) db.exec('ALTER TABLE orders ADD COLUMN shop_paid_at TEXT'); // Twist paid the shop for this order (before delivery)
+  if (!ocols.includes('shop_paid_amount')) db.exec('ALTER TABLE orders ADD COLUMN shop_paid_amount INTEGER');
   if (!ocols.includes('platform_discount')) db.exec('ALTER TABLE orders ADD COLUMN platform_discount INTEGER NOT NULL DEFAULT 0');
   if (!ocols.includes('buyer_id')) db.exec('ALTER TABLE orders ADD COLUMN buyer_id INTEGER');
   // Twist-wide sale campaigns (Black Friday…): see lib/sale-campaigns.js

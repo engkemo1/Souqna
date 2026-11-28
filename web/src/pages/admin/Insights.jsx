@@ -18,6 +18,7 @@ function Row({ label, value, tone, strong }) {
 export default function Insights() {
   const [days, setDays] = useState(30);
   const { data, error, loading, reload } = useAdminApi(`/insights?days=${days}`);
+  const { data: com } = useAdminApi(`/commission?days=${days}`);
   if (error && !data) return <ErrorState error={error} onRetry={reload} />;
   const L = loading && !data;
   const rev = data?.revenue, cu = data?.customers, se = data?.search;
@@ -43,11 +44,28 @@ export default function Insights() {
               <Row label="حصة المحلات في التوصيل" value={fmtMoney(rev.sponsors)} />
               <Row label="أجور المناديب" value={`− ${fmtMoney(rev.courierCosts)}`} tone="neg" />
               <Row label="اشتراكات المحلات المدفوعة" value={fmtMoney(rev.subscriptions)} />
+              <Row label="عمولة تويست على الأوردرات" value={fmtMoney(rev.commission || 0)} />
               <Row label="خصومات المنصة (كوبونات)" value={`− ${fmtMoney(rev.platformDiscounts)}`} tone="neg" />
               <Row label="الصافي التقديري" value={fmtMoney(rev.net)} tone={rev.net >= 0 ? 'pos' : 'neg'} strong />
             </ul>
           )}
           {rev?.wageMissingRuns > 0 && <p className="mt-3 text-xs text-amber-700">فيه {fmtNum(rev.wageMissingRuns)} رحلة أجرها مش متسجل، فالصافي أعلى من الحقيقي. سجّل الأجر من صفحة التوصيل.</p>}
+        </Panel>
+
+        <Panel title="العمولة والمستحقات" subtitle={com ? `النسبة العامة ${com.settings.defaultRate}%` : ''}>
+          {!com ? <Skeleton className="h-48 w-full rounded-xl" /> : (
+            <div className="space-y-4">
+              {com.clawbacks.length > 0 && (
+                <div className="rounded-xl bg-red-50 p-3">
+                  <p className="mb-2 text-sm font-semibold text-sale">محتاج استرجاع من المحلات ({fmtNum(com.clawbacks.length)})</p>
+                  <ul className="space-y-1 text-sm">{com.clawbacks.map((c) => <li key={c.id} className="flex justify-between gap-3"><span>{c.store} · #{c.number} · {c.status === 'cancelled' ? 'اتلغى' : 'مرتجع'}</span><b className="tabular">{fmtMoney(c.owedBack)}</b></li>)}</ul>
+                </div>
+              )}
+              {com.stores.length === 0 ? <p className="text-sm text-muted">مفيش أوردرات متسلّمة في الفترة دي.</p> : (
+                <ul className="divide-y divide-line text-sm">{com.stores.map((st) => <li key={st.slug} className="flex justify-between gap-3 py-2"><span>{st.name} <span className="text-muted">· {fmtNum(st.orders)} أوردر · {st.rate}%</span></span><b className="tabular">{fmtMoney(st.commission)}</b></li>)}</ul>
+              )}
+            </div>
+          )}
         </Panel>
 
         <Panel title="رحلة الشراء" subtitle="الناس بتقع فين؟">

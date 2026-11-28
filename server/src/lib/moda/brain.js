@@ -58,7 +58,16 @@ const toHistory = (messages) => (Array.isArray(messages) ? messages : [{ role: '
   .filter((m) => m.content.trim());
 
 /** يرجّع رد الموديل بعد التنضيف، أو null لو مش سليم. */
-export function sanitizeBrain(out, { K = loadKnowledge(), lang = 'ar', userBudget = null, kb = '' } = {}) {
+const normAr = (t) => String(t || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْـ]/g, '').replace(/[^\p{L}\p{N} ]+/gu, ' ').replace(/\s+/g, ' ').trim();
+/** Quality guards for a free-model reply (the engine's own wording is used instead when one fails):
+ *  - it repeats what the stylist already said (the shopper said «مش فاهم» and got the very same sentence again);
+ *  - it speaks in the SHOPPER's voice («عاوز أزياء رجالي للخروج…»): a parrot of the customer's words, not a stylist reply. */
+export function isBadBrainReply(reply, previous = []) {
+  const n = normAr(reply); if (!n) return false;
+  if (/^(?:انا |احنا )?(?:عاوز|عايز|عاوزه|عايزه|محتاج|محتاجه|نفسي|ابغي)(?: |$)/.test(n)) return true;
+  return previous.some((p) => { const m = normAr(p); return m && (m === n || (m.length > 20 && (m.includes(n) || n.includes(m)))); });
+}
+export function sanitizeBrain(out, { K = loadKnowledge(), lang = 'ar', userBudget = null, kb = '', previous = [] } = {}) {
   if (!out || typeof out !== 'object') return null;
   let reply = String(out.reply ?? out.say ?? '').replace(/\s+/g, ' ').trim();
   if (reply.length > 520) reply = reply.slice(0, 520).replace(/[^.!؟?،,]*$/, '').trim() || reply.slice(0, 520);
@@ -69,7 +78,7 @@ export function sanitizeBrain(out, { K = loadKnowledge(), lang = 'ar', userBudge
   const digitsOf = (t) => String(t).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D+/g, ' ').split(' ').filter((x) => x.length >= 7);
   const kbDigits = String(kb).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '');
   const inventedPhone = digitsOf(reply).some((n) => !kbDigits.includes(n));
-  const bad = !reply || !guard.ok || invented || inventedPhone || /https?:\/\/|www\./i.test(reply) || /[*#`]{2,}/.test(reply);
+  const bad = !reply || !guard.ok || invented || inventedPhone || isBadBrainReply(reply, previous) || /https?:\/\/|www\./i.test(reply) || /[*#`]{2,}/.test(reply);
   const list = (v, set) => [...new Set((Array.isArray(v) ? v : []).filter((x) => typeof x === 'string' && set.has(x)))];
   const budget = Number(out.budget); 
   return {
@@ -93,6 +102,6 @@ export function makeBrain(callFn, { training = () => '', timeoutMs = 14000 } = {
     const raw = await Promise.race([callFn(system, history), new Promise((_, rej) => setTimeout(() => rej(new Error('brain timeout')), timeoutMs))]);
     let out = raw;
     if (typeof raw === 'string') { const a = raw.indexOf('{'); const b = raw.lastIndexOf('}'); try { out = a >= 0 && b > a ? JSON.parse(raw.slice(a, b + 1)) : { reply: raw }; } catch { out = { reply: raw }; } }
-    return sanitizeBrain(out, { K, lang, userBudget, kb });
+    return sanitizeBrain(out, { K, lang, userBudget, kb, previous: history.filter((m) => m.role === 'assistant').slice(-3).map((m) => m.content) });
   };
 }

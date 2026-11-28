@@ -75,6 +75,8 @@ export function acceptSmartLook(result, { anchorId = null, anchorKey = null, anc
 // Hard rejections for unsafe data / unavailable stock; a 0-100 quality score for the rest. Below MIN_SCORE nothing is shown.
 // "No excellent look" = no suggestion. Missing decisive information is a rejection, never a guess.
 export const MIN_SCORE = 80;
+/** Chat only: when EVERY outfit misses the bar but none has a hard failure (only soft penalties: a missing colour tag, a mild style spread), the best one is still shown — with an honest note — instead of «nothing found». */
+export const SOFT_MIN_SCORE = 70;
 // bump when any look rule/score changes: golden-set results are always reported against a rules version
 export const RULES_VERSION = 'r2-2026-11-visual';
 
@@ -219,5 +221,5 @@ export function reviewLook(pieces, ctx = {}) {
   const hues = [...new Set(lead.map(hueOf).filter(Boolean))];
   if (hues.length >= 3) pen(`too_many_hues:${hues.length}`, 35);
   for (const [a1, b1] of CLASH) if (hues.includes(a1) && hues.includes(b1)) pen(`clash:${a1}+${b1}`, 25);
-  return { ok: !hard && score >= MIN_SCORE, score: Math.max(0, score), reasons, ...(visualInfo ? { visual: visualInfo } : {}), ...(child?.ok ? { child: { common: child.common, picks: child.picks } } : {}) };
+  return { ok: !hard && score >= MIN_SCORE, hard, score: Math.max(0, score), reasons, ...(visualInfo ? { visual: visualInfo } : {}), ...(child?.ok ? { child: { common: child.common, picks: child.picks } } : {}) };
 }

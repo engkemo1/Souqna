@@ -43,8 +43,8 @@ test('timeout and bad output fall back (null) instead of throwing', async () => 
 });
 
 test('unknown question: brain answers and asks one question, session stays open', async () => {
-  const brain = fake({ reply: 'الجينز اتصنع في أمريكا قديم. لمين الهدوم؟', ready: false });
-  const res = await runModa('مين اللي اخترع الجينز', { ...base, brain });
+  const brain = fake({ reply: 'القطن أخف في الصيف. لمين الهدوم؟', ready: false });
+  const res = await runModa('الكتان بيتنفس ولا لأ', { ...base, brain });
   assert.equal(res.blocks, null); assert.match(res.say, /لمين/);
 });
 
@@ -74,7 +74,7 @@ test('POST /stylist with a Workers-AI-compatible endpoint: free-form question an
   const app = express(); app.use(express.json()); app.use('/api', routes); app.use(errorHandler);
   const srv = createServer(app); await new Promise((r) => srv.listen(0, r));
   const post = async (content) => (await fetch(`http://127.0.0.1:${srv.address().port}/api/stylist`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: [{ role: 'user', content }] }) })).json();
-  const a = await post('هو بنها فيها مواصلات كتير'); assert.match(a.say, /الكتان/); assert.equal(a.intent, 'chat'); assert.equal(calls, 1);
+  const a = await post('الكتان بيتنفس ولا لأ'); assert.match(a.say, /الكتان/); assert.equal(a.intent, 'chat'); assert.equal(calls, 1);
   const b = await post('ايه الفرق بين الحرير والبوليستر'); assert.equal(calls, 1); assert.ok(b.say.length > 5);
   srv.close(); ai.close();
 });
@@ -117,4 +117,19 @@ test('Gemini: موديل اتسحب (404) → بنجرّب اللي بعده و�
   seen.length = 0; await callLlm('gemini', 'S', [{ role: 'user', content: 'x' }]);
   assert.equal(seen[0], 'gemini-2.5-flash-old+t'); // الأولوية لـ GEMINI_MODEL المتظبط، وبعدين اللي اشتغل قبل كده
   delete process.env.GEMINI_MODEL; srv.close();
+});
+
+test('sanitize: a reply that parrots the shopper («عاوز أزياء رجالي…») or repeats the previous answer is dropped', () => {
+  assert.equal(sanitizeBrain({ reply: 'عاوز أزياء رجالي للخروج بس مش كلاسيك. مين اللي هيجيبها؟' }).reply, '');
+  assert.equal(sanitizeBrain({ reply: 'محتاج تحدد المناسبة' }).reply, '');
+  const prev = ['تحب ألبس إيه للخروج؟ كاجوال ولا شيك؟'];
+  assert.equal(sanitizeBrain({ reply: 'تحب ألبس إيه للخروج؟ كاجوال ولا شيك؟' }, { previous: prev }).reply, '');
+  assert.equal(sanitizeBrain({ reply: 'تمام، كاجوال شيك للخروج. ميزانيتك تقريبًا قد إيه؟' }, { previous: prev }).reply, 'تمام، كاجوال شيك للخروج. ميزانيتك تقريبًا قد إيه؟');
+});
+
+test('brain: asked again after «مش فاهم», a model that repeats itself is ignored (engine answers instead)', async () => {
+  const same = 'تحب ألبس إيه للخروج؟ كاجوال ولا شيك؟';
+  const brain = fake({ reply: same, persons: ['men'] });
+  const out = await brain({ messages: [{ role: 'user', content: 'عاوز حاجه' }, { role: 'assistant', content: same }, { role: 'user', content: 'مش فاهم' }], rows: [], text: 'مش فاهم' });
+  assert.equal(out.reply, '');
 });

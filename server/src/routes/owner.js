@@ -21,6 +21,8 @@ import { saveStoryVideo, deleteStoryVideo, looksLikeVideo, VIDEO_MAX_SECONDS, VI
 import promotionsRouter from './owner-promotions.js';
 import { orderPromotions } from '../lib/promotions/orders.js';
 import { computeReturn } from '../lib/promotions/returns.js';
+import { refreshAfterReturn } from '../lib/commission.js';
+import { ageSizeFromText } from '../lib/age-size.js';
 import { vapidPublicKey, sendTest } from '../lib/push.js';
 import { clampInt, nowIso, slugify } from '../lib/util.js';
 import { notifyBuyer, notifyOrderStatus, notifyPriceDrop, notifyBackInStock, notifyFollowers } from '../lib/buyers.js';
@@ -955,12 +957,14 @@ export function saveProduct(storeId, data, existing) {
     });
     // variants: upsert & prune
     const keep = [];
+    // kids' size written only in the text («مقاس 0/3 شهور») and no size chosen anywhere: use it, so the size filter can find the product
+    const textSize = variants.length && variants.every((v) => !v.size) ? ageSizeFromText(`${data.name_ar || ''} ${data.name_en || ''} ${data.description_ar || ''} ${data.description_en || ''}`) : null;
     for (const v of variants) {
       if (v.id && q.val('SELECT id FROM variants WHERE id=? AND product_id=?', [v.id, id])) {
         // sku/barcode are only changed when the client sent them: older editors never send variant codes and must not wipe them.
-        update('variants', v.id, { color: v.color || null, size: v.size || null, stock: v.stock, sku: v.sku === undefined ? undefined : (v.sku || null), barcode: v.barcode === undefined ? undefined : (v.barcode || null) });
+        update('variants', v.id, { color: v.color || null, size: v.size || textSize || null, stock: v.stock, sku: v.sku === undefined ? undefined : (v.sku || null), barcode: v.barcode === undefined ? undefined : (v.barcode || null) });
         keep.push(v.id);
-      } else keep.push(insert('variants', { product_id: id, color: v.color || null, size: v.size || null, stock: v.stock, sku: v.sku || null, barcode: v.barcode || null }));
+      } else keep.push(insert('variants', { product_id: id, color: v.color || null, size: v.size || textSize || null, stock: v.stock, sku: v.sku || null, barcode: v.barcode || null }));
     }
     const validKeep = keep.map(Number).filter((k) => Number.isInteger(k) && k > 0);
     q.run(
@@ -1027,6 +1031,42 @@ r.patch('/products/:id', h((req, res) => {
   if (p.track_stock && p.stock <= 0 && np.stock > 0) notifyBackInStock(p.id);
   invalidateModaCatalogue();
   res.json({ product: { id: np.id, price: np.price, compareAt: np.compare_at_price, saleEndsAt: np.sale_ends_at || null, stock: np.stock, status: np.status, stockStatus: stockStatus(np), featured: !!np.featured } });
+}));
+
+/** Several products at once (select them in the products page): a % discount (with an optional end), remove the discount, or show/hide. Same rules as the single-product PATCH. */
+r.post('/products/bulk', h((req, res) => {
+  const body = z.object({
+    ids: z.array(z.coerce.number().int()).min(1).max(200),
+    action: z.enum(['discount', 'clear_discount', 'status']),
+    percent: z.coerce.number().int().min(1).max(90).optional(),
+    endsAt: z.number().int().positive().nullable().optional(),
+    status: z.enum(['active', 'draft']).optional(),
+  }).parse(req.body);
+  if (body.action === 'discount' && !body.percent) throw badRequest('percent_required', 'Choose the discount percentage.');
+  if (body.action === 'status' && !body.status) throw badRequest('status_required', 'Choose a status.');
+  if (body.endsAt && !(body.endsAt > Date.now() && body.endsAt < Date.now() + 400 * 86400e3)) throw new AppError(422, 'validation_failed', 'Discount end must be in the future.', { sale_ends_at: 'sale_end_invalid' });
+  const rows = q.all(`SELECT * FROM products WHERE store_id=? AND id IN (${body.ids.map(() => '?').join(',')})`, [req.store.id, ...body.ids]);
+  const done = []; const skipped = [];
+  tx(() => {
+    for (const p of rows) {
+      if (body.action === 'status') {
+        if (!req.adminStore && p.admin_review_status === 'flagged' && body.status === 'active') { skipped.push({ id: p.id, reason: 'flagged' }); continue; }
+        update('products', p.id, { status: body.status }); done.push(p.id); continue;
+      }
+      if (body.action === 'clear_discount') {
+        if (!p.compare_at_price) { skipped.push({ id: p.id, reason: 'no_discount' }); continue; }
+        update('products', p.id, { price: p.compare_at_price, compare_at_price: null, sale_ends_at: null }); done.push(p.id); continue;
+      }
+      // a product already on sale is discounted from its ORIGINAL price (compare-at), never stacked on the sale price
+      const original = p.compare_at_price && p.compare_at_price > p.price ? p.compare_at_price : p.price;
+      const price = Math.max(1, Math.round((original * (100 - body.percent)) / 100));
+      if (price >= original) { skipped.push({ id: p.id, reason: 'too_small' }); continue; }
+      update('products', p.id, { price, compare_at_price: original, sale_ends_at: body.endsAt ?? null }); done.push(p.id);
+    }
+  });
+  for (const p of rows) { if (body.action === 'discount' && done.includes(p.id)) { const np = q.get('SELECT price FROM products WHERE id=?', [p.id]); if (np && np.price < p.price) notifyPriceDrop(p.id, p.price, np.price); } }
+  invalidateModaCatalogue();
+  res.json({ ok: true, done: done.length, skipped, products: q.all(`SELECT id, price, compare_at_price AS compareAt, sale_ends_at AS saleEndsAt, status FROM products WHERE store_id=? AND id IN (${done.map(() => '?').join(',') || 'NULL'})`, [req.store.id, ...done]) });
 }));
 
 r.patch('/variants/:id', h((req, res) => {
@@ -1178,6 +1218,7 @@ r.post('/orders/:id/returns', h((req, res) => {
     }
     if (o.customer_id && refund) q.run('UPDATE customers SET total_spent=MAX(0,total_spent-?) WHERE id=?', [refund, o.customer_id]);
     insert('order_events', { order_id: o.id, status: o.status, note: `return:${refund}`, created_at: now });
+    refreshAfterReturn(o.id);
     return { refund, items: lines, calculation: calc };
   });
   res.status(result.dryRun ? 200 : 201).json(result);

@@ -174,6 +174,30 @@ test('chat: an outfit that cannot pass the reviewer is replaced by an honest rep
   } finally { q.run("UPDATE variants SET stock=5 WHERE product_id=?", [sneakers]); q.run("DELETE FROM variants WHERE product_id=?", [dead]); q.run("DELETE FROM products WHERE id=?", [dead]); }
 });
 
+test('chat: an outfit that misses the bar ONLY on soft details (one piece with no colour recorded) is still shown, with an honest note', async () => {
+  reset();
+  const old = q.get('SELECT name_ar, name_en, colors_json, description_en FROM products WHERE id=?', [sneakers]);
+  try {
+    q.run("UPDATE products SET name_ar='كوتشي مينيمال', name_en='Minimal Sneakers', colors_json='[]', description_en='' WHERE id=?", [sneakers]);
+    q.run("UPDATE variants SET color=NULL WHERE product_id=?", [sneakers]);
+    const res = await chat(OUTFIT_Q);
+    assert.equal(res.status, 200);
+    const rej = events('chat_rejected');
+    // either the engine already avoided the colourless piece (outfit passes) or the soft fallback shows the best outfit — never "nothing found"
+    assert.ok(chatShown(res).length >= 2, JSON.stringify(res.body.say));
+    if (rej.length) assert.match(res.body.say, /أقرب طقم متاح/);
+  } finally { q.run("UPDATE products SET name_ar=?, name_en=?, colors_json=?, description_en=? WHERE id=?", [old.name_ar, old.name_en, old.colors_json, old.description_en, sneakers]); q.run("UPDATE variants SET color=? WHERE product_id=?", ['#FFFFFF', sneakers]); }
+});
+
+test('chat with a photo while the vision provider is down: no red error, Twila carries on from the words', async () => {
+  reset();
+  const png = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  const res = await post('/api/stylist', { messages: [{ role: 'user', content: OUTFIT_Q }], image: png });
+  assert.equal(res.status, 200, JSON.stringify(res.body));
+  assert.ok(res.body.say);
+  assert.match(res.body.say, /مش قادرة أشوف الصورة/);
+});
+
 const addW = (en, ar, key, colors, sizes, extra = {}) => add(en, ar, key, colors, sizes, () => 5, { department: 'women', audience: 'women', ...extra });
 addW('Navy Casual Midi Dress', 'فستان كاجوال كحلي حريمي', 'dress_casual', ['navy'], L);
 addW('Beige Low Heels', 'كعب منخفض بيج حريمي', 'heels_low', ['beige'], ['37', '38', '39']);

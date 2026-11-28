@@ -5,10 +5,12 @@
 
 const toAscii = (s) => String(s || '').replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)));
 const clean = (s) => toAscii(s).toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْـ]/g, '').replace(/[–—]/g, '-');
-const YEAR = '(?:years?|yrs?|y|سنه|سنين|سنوات|عام)';
-const MONTH = '(?:months?|mos?|m|شهر|شهور|اشهر)';
+const YEAR = '(?:years?|yrs?|ys|y|yo|سنه|سنين|سنوات|عام|اعوام)';
+const MONTH = '(?:months?|mths?|mos?|mon|m|شهر|شهور|اشهر|شهرا)';
 const END = '(?=$|[^a-z0-9])';
-const RANGE = '(?:-|الي|الى|ل|to|~)';
+// every way people write "from … to …": 0-3  0/3  0:3  0_3  0\\3  0،3  0..3  0→3  0 ل 3  0 الى 3  0 لحد 3  0 حتى 3  0 to 3  0 till 3  0~3
+const RANGE = '(?:-|_|/|\\\\|:|،|,|\\.\\.|→|←|~|>|الي|لغايه|لحد|حتي|ل|to|till|until|thru|through)';
+const UPTO = '(?:حتي|لغايه|لحد|اقل من|اقصي|up ?to|upto|till|until|max)';
 
 export const KIDS_GENDERS = new Set(['kids', 'boys', 'girls']);
 export const isKidsPiece = (p) => KIDS_GENDERS.has(p?.gender);
@@ -26,11 +28,24 @@ export function parseChildSizes(value, { source = 'label', confidence = 'high' }
     const lo = months ? a : a * 12; const hi = months ? b : b * 12 + 11;
     if (hi >= lo && lo >= 0 && hi <= 16 * 12 + 11 && a <= (months ? 191 : 16)) out.push(band(lo, hi, source, confidence));
   };
-  t = t.replace(new RegExp(`(\\d{1,2})\\s*${RANGE}\\s*(\\d{1,2})\\s*${MONTH}${END}`, 'g'), (_, a, b) => { push(+a, +b, true); return ' '; });
-  t = t.replace(new RegExp(`(\\d{1,2})\\s*${RANGE}\\s*(\\d{1,2})\\s*${YEAR}${END}`, 'g'), (_, a, b) => { push(+a, +b, false); return ' '; });
-  t = t.replace(new RegExp(`(?:^|[^0-9])(\\d{1,2})\\s*${MONTH}${END}`, 'g'), (m, a) => { push(+a, +a, true); return ' '; });
-  t = t.replace(new RegExp(`(?:^|[^0-9])(\\d{1,2})\\s*${YEAR}${END}`, 'g'), (m, a) => { push(+a, +a, false); return ' '; });
-  t = t.replace(new RegExp(`(?:سن|عمر|age)\\s*(\\d{1,2})${END}`, 'g'), (_, a) => { push(+a, +a, false); return ' '; });
+  const R = (re, fn) => { t = t.replace(new RegExp(re, 'g'), (...m) => { fn(...m); return ' '; }); };
+  // 0-3 شهور · 0 شهر - 3 شهور · 0m-3m · من 0 ل 3 شهور
+  R(`(\\d{1,2})\\s*(?:${MONTH})?\\s*${RANGE}\\s*(\\d{1,2})\\s*${MONTH}${END}`, (_, a, b) => push(+a, +b, true));
+  // 6 شهور - 2 سنه (months to years)
+  R(`(\\d{1,2})\\s*${MONTH}\\s*${RANGE}\\s*(\\d{1,2})\\s*${YEAR}${END}`, (_, a, b) => { if (+b <= 16 && +a * 1 <= +b * 12 + 11) out.push(band(+a, +b * 12 + 11, source, confidence)); });
+  // 2-3 سنين · 2 سنه - 3 سنين
+  R(`(\\d{1,2})\\s*(?:${YEAR})?\\s*${RANGE}\\s*(\\d{1,2})\\s*${YEAR}${END}`, (_, a, b) => push(+a, +b, false));
+  // شهور 0-3 · months 0/3 (unit written first)
+  R(`(?:months?|شهور|اشهر|شهر)\\s*(\\d{1,2})\\s*${RANGE}\\s*(\\d{1,2})${END}`, (_, a, b) => push(+a, +b, true));
+  R(`(?:years?|سنين|سنوات|سنه)\\s*(\\d{1,2})\\s*${RANGE}\\s*(\\d{1,2})${END}`, (_, a, b) => push(+a, +b, false));
+  // حتى 3 شهور · up to 12 months → from birth
+  R(`${UPTO}\\s*(\\d{1,2})\\s*${MONTH}${END}`, (_, b) => push(0, +b, true));
+  R(`${UPTO}\\s*(\\d{1,2})\\s*${YEAR}${END}`, (_, b) => push(0, +b, false));
+  // «3 6 شهور» (just a space between the two numbers)
+  R(`(?:^|[^0-9])(\\d{1,2})\\s+(\\d{1,2})\\s*${MONTH}${END}`, (_, a, b) => { if (+a < +b) push(+a, +b, true); else push(+b, +b, true); });
+  R(`(?:^|[^0-9])(\\d{1,2})\\s*${MONTH}${END}`, (m, a) => push(+a, +a, true));
+  R(`(?:^|[^0-9])(\\d{1,2})\\s*${YEAR}${END}`, (m, a) => push(+a, +a, false));
+  R(`(?:سن|عمر|age)\\s*(\\d{1,2})${END}`, (_, a) => push(+a, +a, false));
   return out;
 }
 /** parseChildSize("2-3 years" | "6 سنين" | "من 2 إلى 3 سنين" | "6y" | "12-18 months") -> { minAgeMonths, maxAgeMonths, source, confidence } | null (generic words like "أطفال" are not sizes). */

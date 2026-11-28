@@ -34,7 +34,7 @@ import { matchStore } from '../lib/moda/stores.js';
 import { contactFromEnv } from '../lib/moda/contact.js';
 import { logStylist } from '../lib/stylist-log.js';
 import { runModa } from '../lib/moda/engine.js';
-import { smartLookText, acceptSmartLook, isFormalAnchor, reviewLook, minimumPiecesForLook } from '../lib/moda/smartlook.js';
+import { smartLookText, acceptSmartLook, isFormalAnchor, reviewLook, minimumPiecesForLook, SOFT_MIN_SCORE } from '../lib/moda/smartlook.js';
 import { visualGateConfig, visualOutfitCheck } from '../lib/moda/visualtags.js';
 import { activeStories, expireStories, bumpStory } from '../lib/stories.js';
 import { enrichAll as enrichModaRows } from '../lib/moda/products.js';
@@ -115,7 +115,7 @@ function sectionCovers() {
   if (coversMemo.v && Date.now() - coversMemo.at < 300000) return coversMemo.v;
   const rows = q.all(`SELECT p.id, p.department FROM products p JOIN stores s ON s.id=p.store_id
     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL AND (p.track_stock=0 OR p.stock>0)
-    ORDER BY ${LINGERIE_LAST}, ${WEAK_PHOTO} ASC, p.featured DESC, p.sold_count DESC, p.id DESC`);
+    ORDER BY ${DEMOTE_LAST}, ${WEAK_PHOTO} ASC, p.featured DESC, p.sold_count DESC, p.id DESC`);
   const pick = new Map(); // section slug → product id (first in the order above wins)
   for (const p of rows) for (const sl of [p.department, ...deptAncestors(p.department)]) if (!pick.has(sl)) pick.set(sl, p.id);
   const ids = [...new Set(pick.values())];
@@ -310,6 +310,10 @@ const SOLD_OUT_LAST = '(CASE WHEN p.track_stock=1 AND p.stock<=0 THEN 1 ELSE 0 E
 const LINGERIE_WORDS = ['لانجري', 'لانجيري', 'رقص']; // + dance wear (بدلة رقص…)
 const LINGERIE_COND = `(${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(p.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')} OR LOWER(COALESCE(p.name_en,'')) LIKE '%lingerie%' OR LOWER(COALESCE(p.name_en,'')) LIKE '%bodysuit%' OR EXISTS (SELECT 1 FROM categories lc WHERE lc.id=p.category_id AND (${LINGERIE_WORDS.map((w) => `${NORM("COALESCE(lc.name_ar,'')")} LIKE '%${w}%'`).join(' OR ')})))`;
 const LINGERIE_LAST = `(CASE WHEN ${LINGERIE_COND} THEN 1 ELSE 0 END) ASC`;
+// «صنية شبكة» (shabka trays): always at the very END of the home page, search and section listings — even when brand new.
+const SHABKA_HAS = (col) => `(${NORM(`COALESCE(${col},'')`)} LIKE '%شبك%' AND (${NORM(`COALESCE(${col},'')`)} LIKE '%صني%' OR ${NORM(`COALESCE(${col},'')`)} LIKE '%صين%' OR ${NORM(`COALESCE(${col},'')`)} LIKE '%صواني%'))`;
+const SHABKA_COND = `(${SHABKA_HAS('p.name_ar')} OR EXISTS (SELECT 1 FROM categories sc WHERE sc.id=p.category_id AND ${SHABKA_HAS('sc.name_ar')}))`;
+const DEMOTE_LAST = `(CASE WHEN ${SHABKA_COND} THEN 1 ELSE 0 END) ASC, ${LINGERIE_LAST}`;
 
 const AUD_DEPT = { men: 'men', women: 'women', kids: 'kids', boys: 'kids', girls: 'kids' };
 
@@ -456,9 +460,9 @@ r.get('/search', h((req, res) => {
   const rel = scoreSql.length ? `(${scoreSql.join(' + ')}) DESC, ` : '';
   const orderParams = [];
   const order = {
-    relevance: `${rel}${LINGERIE_LAST}, p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC, p.id DESC`, price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: 'p.created_at DESC', best: 'p.sold_count DESC',
+    relevance: `${rel}${DEMOTE_LAST}, p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC, p.id DESC`, price_asc: 'p.price ASC', price_desc: 'p.price DESC', newest: `${DEMOTE_LAST}, p.created_at DESC`, best: `${DEMOTE_LAST}, p.sold_count DESC`,
     discount: '(1.0*p.price/COALESCE(p.compare_at_price,p.price)) ASC, p.sold_count DESC', rating: 'p.rating DESC, p.rating_count DESC, p.sold_count DESC',
-  }[sort] || 'p.sold_count DESC';
+  }[sort] || `${DEMOTE_LAST}, p.sold_count DESC`;
   if (sort === 'relevance' || !['price_asc', 'price_desc', 'newest', 'best', 'discount', 'rating'].includes(sort)) orderParams.push(...scoreParams);
   const limit = ids ? 100 : 24; const pg = clampInt(page, 1, 1000, 1);
   const from = `FROM products p JOIN stores s ON s.id=p.store_id WHERE ${where.join(' AND ')}`;
@@ -707,26 +711,36 @@ function reviewChatOutfits(result, rows, { wanted = null } = {}) {
   const vmap = new Map();
   const load = (ids) => { const need = [...new Set(ids)].filter((id) => !vmap.has(id)); if (!need.length) return; for (const id of need) vmap.set(id, []); for (const v of q.all(`SELECT id, product_id, color, size, stock FROM variants WHERE product_id IN (${need.map(() => '?').join(',')})`, need)) vmap.get(v.product_id).push(v); };
   const review = (pieces, audience = null) => { if (pieces.some((x) => !x)) return { ok: false, score: 0, reasons: ['piece_not_found'] }; load(pieces.map((x) => x.id)); const vg = visualGateConfig(); return reviewLook(pieces, { visual: vg.visual, visualObserve: vg.observe, audience: ['men', 'women', 'boys', 'girls', 'kids'].includes(audience) ? audience : null, wantedSizes: wanted, variantsOf: (id) => vmap.get(id) || [], seasonOf: (k) => K.kb?.seasonOf?.(k) || null, familyOf: (k) => K.items.get(k)?.family || null, month }); };
-  const kept = []; const rejected = []; let reviewed = 0;
+  const kept = []; const rejected = []; const softTabs = []; let reviewed = 0;
+  let softNote = '';
+  const recOf = (rv) => new Map((rv.child?.picks || []).map((x) => [x.id, { size: x.size, left: x.left, variantId: x.variantId }]));
+  const buildTab = (t, v, pieces) => {
+    const recs = recOf(v);
+    const items = t.items.map((it, i) => ({ ...it, rec: recs.get(it.id) || null, alts: (it.alts || []).map((a) => { const alt = byId.get(a.id); if (!alt) return null; const p2 = [...pieces]; p2[i] = alt; const rv = review(p2, t.id); return rv.ok ? { ...a, rec: recOf(rv).get(a.id) || null } : null; }).filter(Boolean) }));
+    return { ...t, items, __score: v.score };
+  };
   for (const t of tabs) {
     if (!isOutfit(t)) { kept.push(t); continue; }
     reviewed += 1;
     const pieces = t.items.map((i) => byId.get(i.id));
     const v = review(pieces, t.id);
-    if (!v.ok) { rejected.push({ tab: t.id, score: v.score, why: v.reasons.slice(0, 8) }); continue; }
+    if (!v.ok) { rejected.push({ tab: t.id, score: v.score, why: v.reasons.slice(0, 8) }); if (!v.hard && v.score >= SOFT_MIN_SCORE) softTabs.push({ t, v, pieces }); continue; }
     if (v.visual?.observed?.length) logSmartLook('visual_would_reject', null, { where: 'chat', reasons: v.visual.observed, missing: v.visual.missing.slice(0, 6) }); // shadow mode: seen, not hidden
     // swap options inside the tab must keep the whole outfit above the bar too
-    const recOf = (rv) => new Map((rv.child?.picks || []).map((x) => [x.id, { size: x.size, left: x.left, variantId: x.variantId }]));
-    const recs = recOf(v);
-    const items = t.items.map((it, i) => ({ ...it, rec: recs.get(it.id) || null, alts: (it.alts || []).map((a) => { const alt = byId.get(a.id); if (!alt) return null; const p2 = [...pieces]; p2[i] = alt; const rv = review(p2, t.id); return rv.ok ? { ...a, rec: recOf(rv).get(a.id) || null } : null; }).filter(Boolean) }));
-    kept.push({ ...t, items, __score: v.score });
+    kept.push(buildTab(t, v, pieces));
+  }
+  if (!kept.length && softTabs.length) { // nothing reached the bar, but some outfits fail only on soft details (missing colour tags…): show the best, honestly
+    softTabs.sort((x, y) => y.v.score - x.v.score);
+    const best = softTabs[0];
+    kept.push({ ...buildTab(best.t, best.v, best.pieces), __soft: true });
+    softNote = ' (ده أقرب طقم متاح دلوقتي، وبعض تفاصيل القطع زي اللون مش متسجلة كاملة)';
   }
   if (!rejected.length) return { result: { ...result, blocks: { ...result.blocks, tabs: kept } }, reviewed, scores: kept.map((t) => t.__score).filter((x) => x != null) };
   if (!kept.length) {
     return { result: { ...result, state: 'chat', intent: 'chat', blocks: null, missing: [], relaxed: [], styleTips: [], tips: [], questions: [], say: 'مش لاقية دلوقتي طقم كامل متناسق ومتاح بالجودة اللي أرضاها ليك. قولي قطعة معينة تدوري عليها، أو غيّري الميزانية أو المناسبة وأجرب تاني.' }, reviewed, rejected };
   }
   const total = kept.reduce((s, t) => s + (Number(t.subtotal) || 0), 0);
-  return { result: { ...result, blocks: { ...result.blocks, tabs: kept, total } }, reviewed, rejected, scores: kept.map((t) => t.__score).filter((x) => x != null) };
+  return { result: { ...result, ...(softNote ? { say: `${result.say || ''}${softNote}` } : {}), blocks: { ...result.blocks, tabs: kept, total } }, reviewed, rejected, scores: kept.map((t) => t.__score).filter((x) => x != null) };
 }
 
 r.post('/stylist', h(async (req, res) => {
@@ -758,7 +772,12 @@ r.post('/stylist', h(async (req, res) => {
   try {
     // Photos still use the vision-capable provider. Text chat uses the local, rule-based Twila engine and live shop inventory.
     const t0 = Date.now(); const lastText = body.messages[body.messages.length - 1]?.content || '';
-    if (body.image || body.image2) { const out = await runStylist(body.messages, { image: body.image, image2: body.image2, profile, session: body.session, answers: body.answers, similar: body.similar }); logStylist(lastText || '[photo]', out, Date.now() - t0, { photo: true }); return res.json(out); }
+    // photo analysis needs the vision provider (free quota / credits can run out): then Twila carries on from the shopper's WORDS instead of showing a red error
+    let photoDown = false;
+    if (body.image || body.image2) {
+      try { const out = await runStylist(body.messages, { image: body.image, image2: body.image2, profile, session: body.session, answers: body.answers, similar: body.similar }); logStylist(lastText || '[photo]', out, Date.now() - t0, { photo: true }); return res.json(out); }
+      catch (e) { if (e.code !== 'stylist_unavailable' || lastText.trim().length < 3) throw e; photoDown = true; }
+    }
     const modaProfile = { ...(profile || {}) };
     const rows = modaCatalogRows();
     const messages = body.startLook
@@ -784,6 +803,7 @@ r.post('/stylist', h(async (req, res) => {
     let result = await runModa(messages, { products: rows, profile: modaProfile, session: body.session, answers: body.answers, assistantName: stylistSettings().name, brain, curator, understand, verifier, offers: liveOffersForModa, stores: storesForModa, contact: contactFromEnv(), training: stylistTrainingSettings() });
     { const rv = reviewChatOutfits(result, rows, { wanted: body.sizes || null }); result = rv.result;
       if (rv.reviewed) logSmartLook(rv.rejected?.length ? 'chat_rejected' : 'chat_shown', null, { scores: rv.scores, rejected: rv.rejected }); /* no raw messages or personal data in telemetry */ }
+    if (photoDown && result?.say) result = { ...result, say: `مش قادرة أشوف الصورة دلوقتي، فهساعدك من كلامك. ${result.say}` };
     logStylist(body.startLook ? '[start look]' : lastText, result, Date.now() - t0);
     return res.json(modaClientResponse(result));
   }
@@ -976,7 +996,7 @@ r.get('/marketplace', h((req, res) => {
   // A few trending products across stores for the marketplace home
   const trendingRows = q.all(
     `SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id
-     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.sold_count > 0 AND (p.track_stock=0 OR p.stock>0) ORDER BY p.sold_count DESC LIMIT 18`,
+     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.sold_count > 0 AND (p.track_stock=0 OR p.stock>0) ORDER BY ${DEMOTE_LAST}, p.sold_count DESC LIMIT 18`,
   );
   // home rails: skip sold-out items and exact repeats (same store + same name + same price), then cap the list
   const dedupe = (rows, cap) => { const seen = new Set(); const out = []; for (const r0 of rows) { const k = `${r0.store_slug}|${r0.name_ar}|${r0.price}`; if (seen.has(k)) continue; seen.add(k); out.push(r0); if (out.length >= cap) break; } return out; };
@@ -988,8 +1008,8 @@ r.get('/marketplace', h((req, res) => {
     const rs = dedupe(rs0, cap);
     return serializeCards(rs).map((c, i) => ({ ...c, store: { slug: rs[i].store_slug, name: bi(rs[i], 'store_name') } }));
   };
-  const newest = railRows("ORDER BY p.created_at DESC, p.id DESC LIMIT 30");
-  const deals = railRows(`AND ${onSaleSql('p')} ORDER BY (CASE WHEN p.compare_at_price > p.price THEN (p.compare_at_price - p.price) * 1.0 / p.compare_at_price ELSE 0 END) DESC, p.sold_count DESC LIMIT 30`);
+  const newest = railRows(`ORDER BY ${DEMOTE_LAST}, p.created_at DESC, p.id DESC LIMIT 30`);
+  const deals = railRows(`AND ${onSaleSql('p')} ORDER BY ${DEMOTE_LAST}, (CASE WHEN p.compare_at_price > p.price THEN (p.compare_at_price - p.price) * 1.0 / p.compare_at_price ELSE 0 END) DESC, p.sold_count DESC LIMIT 30`);
   const deptCounts = q.all("SELECT p.department AS slug, COUNT(*) AS n FROM products p JOIN stores s ON s.id=p.store_id WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL GROUP BY p.department");
   const countBy = new Map();
   for (const d of deptCounts) for (const sl of [d.slug, ...deptAncestors(d.slug)]) countBy.set(sl, (countBy.get(sl) || 0) + d.n);
@@ -1018,9 +1038,9 @@ r.get('/marketplace', h((req, res) => {
     const name = g.name || hits[0].name; // shelf title (cosmetics is always «مستحضرات تجميل»)
     // الصف بتاع اللانجيري بيشمل كمان بدل/أحزمة الرقص (أي قسم)، وباقي الصفوف مش بتعرضهم
     const scope = g.lingerie ? `AND (p.department IN (${ph}) OR ${LINGERIE_COND})` : `AND p.department IN (${ph}) AND NOT ${LINGERIE_COND}`;
-    const sold = railRows(`AND p.sold_count > 0 ${scope} ORDER BY ${LINGERIE_LAST}, p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
+    const sold = railRows(`AND p.sold_count > 0 ${scope} ORDER BY ${DEMOTE_LAST}, p.sold_count DESC, p.id DESC LIMIT 40`, sub, BEST_MIN);
     if (sold.length >= BEST_MIN) return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: true, items: sold };
-    return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`${scope} ORDER BY ${LINGERIE_LAST}, p.created_at DESC, p.id DESC LIMIT 40`, sub, BEST_MIN) };
+    return { slug: hits[0].slug, href: `/search?department=${encodeURIComponent(hits[0].slug)}`, name, bestSellers: false, items: railRows(`${scope} ORDER BY ${DEMOTE_LAST}, p.created_at DESC, p.id DESC LIMIT 40`, sub, BEST_MIN) };
   }).filter(Boolean);
   cache(res, 60);
   res.json({ stores: rows.map((s) => slimStore(serializeStore(s))), categories, stats, trending, newest, deals, departments, deptRails, features: { visual: visualSettings().enabled, stylist: stylistSettings().enabled, stylistName: stylistSettings().name, stylistAvatar: stylistSettings().avatar || null } });
@@ -1151,13 +1171,13 @@ r.get('/stores/:slug/products', h((req, res) => {
     if (vals.length) { sSel.set(d.key, vals); const c = sCond(d, vals); where.push(c.sql); params.push(...c.params); }
   }
   const order = {
-    featured: `p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC`,
-    newest: 'p.created_at DESC',
+    featured: `${DEMOTE_LAST}, p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC`,
+    newest: `${DEMOTE_LAST}, p.created_at DESC`,
     price_asc: 'p.price ASC',
     price_desc: 'p.price DESC',
     best: 'p.sold_count DESC',
     discount: '(1.0*p.price/COALESCE(p.compare_at_price,p.price)) ASC',
-  }[sort] || `p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC`;
+  }[sort] || `${DEMOTE_LAST}, p.featured DESC, ${WEAK_PHOTO} ASC, p.sold_count DESC`;
 
   const limit = clampInt(req.query.limit, 1, 48, 24);
   const page = clampInt(req.query.page, 1, 1000, 1);

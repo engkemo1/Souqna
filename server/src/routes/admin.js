@@ -28,6 +28,7 @@ import { serializeStore } from '../lib/serialize.js';
 import { trafficStats } from '../lib/traffic.js';
 import { auditMiddleware } from '../lib/insights.js';
 import insightsRoutes from './admin-insights.js';
+import { commissionSettings, saveCommissionSettings, commissionReport, payoutState, markShopPaid } from '../lib/commission.js';
 import featuredRoutes from './admin-featured.js';
 import adminProductsRoutes, { countProductsWithIssues } from './admin-products.js';
 import lookReviewRoutes from './admin-looks.js';
@@ -274,6 +275,34 @@ r.put('/cashier-sync', h((req, res) => {
   const body = z.object({ enabled: z.boolean() }).parse(req.body);
   q.run('INSERT INTO app_settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value', ['cashier_sync_enabled', body.enabled ? '1' : '0']);
   res.json(cashierPayload());
+}));
+
+// Twist commission: default rate, rate for subscribed stores (empty = not offered yet), per-store override, and a report of what was earned.
+const pctSchema = z.number().min(0).max(100);
+r.get('/commission', h((req, res) => {
+  const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+  const from = new Date(Date.now() - days * 864e5).toISOString().slice(0, 19).replace('T', ' ');
+  const overrides = q.all('SELECT slug, name_ar AS name, commission_rate_override AS rate FROM stores WHERE commission_rate_override IS NOT NULL ORDER BY name_ar');
+  res.json({ days, ...commissionReport(from), overrides });
+}));
+r.post('/orders/:id/shop-payout', h((req, res) => {
+  const body = z.object({ paid: z.boolean() }).parse(req.body);
+  let state;
+  try { state = markShopPaid(Number(req.params.id), body.paid); } catch (e) { if (e.message === 'cancelled') throw new AppError(409, 'order_cancelled', 'A cancelled order cannot be paid to the shop.'); throw e; }
+  if (!state) throw new AppError(404, 'not_found', 'Order not found.');
+  res.json(state);
+}));
+r.put('/commission/settings', h((req, res) => {
+  const body = z.object({ defaultRate: pctSchema.optional(), subscribedRate: z.union([pctSchema, z.null()]).optional() }).parse(req.body);
+  saveCommissionSettings(body);
+  res.json(commissionSettings());
+}));
+r.put('/commission/stores/:slug', h((req, res) => {
+  const body = z.object({ rate: z.union([pctSchema, z.null()]) }).parse(req.body);
+  const store = q.get('SELECT id FROM stores WHERE slug=?', [req.params.slug]);
+  if (!store) throw new AppError(404, 'not_found', 'Store not found.');
+  q.run('UPDATE stores SET commission_rate_override=? WHERE id=?', [body.rate, store.id]);
+  res.json({ ok: true, rate: body.rate });
 }));
 
 r.put('/subscriptions/:slug/fee', h((req, res) => {
@@ -1390,7 +1419,7 @@ r.get('/orders/:id', h((req, res) => {
   const storeNotes = o.delivery_group
     ? q.all("SELECT o2.number, s2.name_ar AS store_name, o2.store_note AS note FROM orders o2 JOIN stores s2 ON s2.id=o2.store_id WHERE o2.delivery_group=? AND o2.store_note IS NOT NULL AND o2.store_note<>'' ORDER BY o2.id", [o.delivery_group])
     : (o.store_note ? [{ number: o.number, store_name: o.store_name, note: o.store_note }] : []);
-  res.json({ order: o, storeNotes, items: q.all('SELECT id, name_ar, color, size, price, qty, returned_qty, is_gift FROM order_items WHERE order_id=?', [o.id]), returns: q.all('SELECT order_item_id, qty, refund, restocked, reason, created_at FROM order_returns WHERE order_id=? ORDER BY id', [o.id]), customerBlocked: isPhoneBlocked(o.phone), events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]) });
+  res.json({ order: o, payout: payoutState(o), storeNotes, items: q.all('SELECT id, name_ar, color, size, price, qty, returned_qty, is_gift FROM order_items WHERE order_id=?', [o.id]), returns: q.all('SELECT order_item_id, qty, refund, restocked, reason, created_at FROM order_returns WHERE order_id=? ORDER BY id', [o.id]), customerBlocked: isPhoneBlocked(o.phone), events: q.all('SELECT status, note, created_at FROM order_events WHERE order_id=? ORDER BY id', [o.id]) });
 }));
 
 r.patch('/orders/:id/delivery', h((req, res) => {
@@ -1418,6 +1447,29 @@ r.get('/stores', h((_req, res) => {
       (SELECT MAX(created_at) FROM orders o WHERE o.store_id = s.id) AS last_order_at
     FROM stores s JOIN users u ON u.id = s.owner_id ORDER BY s.sort_order, s.id`);
   res.json({ stores: stores.map((s) => ({ ...s, departments: decodeDepartments(s.departments), auto_whatsapp: Boolean(s.auto_whatsapp), hidden: Boolean(s.hidden), show_when_empty: Boolean(s.show_when_empty), featured: Boolean(s.featured), owner_disabled: s.role === 'disabled' })) });
+}));
+
+// Quick actions on many shops at once: show/hide, suspend/activate, feature, Twist's commission rate. (Deleting is never bulk.)
+r.post('/stores/bulk', h((req, res) => {
+  const body = z.object({
+    slugs: z.array(z.string().trim().toLowerCase().max(40)).min(1).max(200),
+    action: z.enum(['hide', 'show', 'suspend', 'activate', 'feature', 'unfeature', 'commission']),
+    rate: z.union([pctSchema, z.null()]).optional(),
+  }).parse(req.body);
+  if (body.action === 'commission' && body.rate === undefined) throw new AppError(422, 'validation_failed', 'rate is required');
+  let done = 0;
+  tx(() => {
+    for (const slug of new Set(body.slugs)) {
+      const st = q.get('SELECT id FROM stores WHERE slug=?', [slug]);
+      if (!st) continue;
+      if (body.action === 'hide' || body.action === 'show') update('stores', st.id, { hidden: body.action === 'hide' ? 1 : 0 });
+      else if (body.action === 'suspend' || body.action === 'activate') update('stores', st.id, { status: body.action === 'suspend' ? 'suspended' : 'active' });
+      else if (body.action === 'feature' || body.action === 'unfeature') update('stores', st.id, { featured: body.action === 'feature' ? 1 : 0 });
+      else q.run('UPDATE stores SET commission_rate_override=? WHERE id=?', [body.rate, st.id]);
+      done++;
+    }
+  });
+  res.json({ ok: true, done, skipped: new Set(body.slugs).size - done });
 }));
 
 r.patch('/stores/:slug', h((req, res) => {
