@@ -149,7 +149,7 @@ export function saveStylistSettings({ enabled, provider, dailyFree, nameAr, name
   if (nameEn) put('stylist_name_en', nameEn.slice(0, 20));
   return stylistSettings();
 }
-export const stylistStatus = () => ({ ...stylistSettings(), providers: { anthropic: { configured: providerReady.anthropic() }, cloudflare: { configured: providerReady.cloudflare() }, gemini: { configured: providerReady.gemini() }, extra: { configured: providerReady.extra(), model: extraCfg().model || null }, ...Object.fromEntries(Object.keys(COMPAT).map((n) => [n, { configured: providerReady[n](), models: compatModels(n) }])), order: LLM_ORDER(), active: liveProviders() }, lastError, model: process.env.STYLIST_MODEL || 'claude-haiku-4-5' });
+export const stylistStatus = () => ({ ...stylistSettings(), providers: { anthropic: { configured: providerReady.anthropic() }, cloudflare: { configured: providerReady.cloudflare() }, gemini: { configured: providerReady.gemini() }, extra: { configured: providerReady.extra(), model: extraCfg().model || null }, ...Object.fromEntries(Object.keys(COMPAT).map((n) => [n, { configured: providerReady[n](), models: compatModels(n) }])), order: LLM_ORDER(), active: liveProviders() }, vision: { order: VISION_ORDER(), active: VISION_ORDER().filter(visionReady) }, lastError, model: process.env.STYLIST_MODEL || 'claude-haiku-4-5' });
 
 function readStylistTraining() {
   try {
@@ -607,6 +607,61 @@ async function describePhotoCf(buf) {
   return text.slice(0, 500);
 }
 
+/* Photo understanding with a FALLBACK CHAIN (like the text chain): when one vision provider runs out of credit/quota, the next one takes over automatically.
+   Default order: MODA_VISION_ORDER=gemini,anthropic,mistral,groq,openrouter,qwen,cloudflare — each is used only when its key is in Variables. Per-provider model: <NAME>_VISION_MODEL. */
+const VISION_PROMPT = 'You are a fashion expert looking at a shopper\'s photo. Describe ONLY the clothing, shoes, bags and accessories you can actually see (never the face or body), in plain English, max 90 words, in this order: (1) each item type, e.g. hoodie, abaya, sneakers, with its exact main colour(s) and any pattern/print; (2) fabric look and fit (oversize, slim, long, cropped); (3) style level (casual, smart-casual, formal, sporty); (4) who it is for (men, women, kids, unisex) and the season/weather it suits. If something is not visible or unclear, leave it out instead of guessing. Do not suggest products.';
+const VISION_COMPAT = { mistral: ['pixtral-12b-latest', 'mistral-small-latest'], groq: ['meta-llama/llama-4-scout-17b-16e-instruct'], openrouter: ['google/gemma-4-31b-it:free', 'google/gemma-4-26b-a4b-it:free'], qwen: ['qwen-vl-plus', 'qwen-vl-max'] };
+const VISION_ORDER = () => (process.env.MODA_VISION_ORDER || 'gemini,anthropic,mistral,groq,openrouter,qwen,cloudflare').split(',').map((x) => x.trim()).filter(Boolean);
+export const visionReady = (k) => (k === 'gemini' ? !!geminiKey() : k === 'anthropic' ? !!anthropicKey() : k === 'cloudflare' ? providerReady.cloudflare() : !!VISION_COMPAT[k] && !!process.env[COMPAT[k]?.key || '']);
+export const anyVisionReady = () => VISION_ORDER().some(visionReady);
+async function describeViaGemini(buf, mime) {
+  const base = process.env.GEMINI_API_BASE || 'https://generativelanguage.googleapis.com/v1beta';
+  const models = [...new Set([process.env.GEMINI_VISION_MODEL, process.env.GEMINI_MODEL, geminiGoodModel, ...GEMINI_FALLBACKS].filter(Boolean))];
+  let lastErr;
+  for (const model of models) {
+    const res = await fetchWithRetry(`${base}/models/${model}:generateContent`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-goog-api-key': geminiKey() },
+      body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text: VISION_PROMPT }, { inlineData: { mimeType: mime, data: buf.toString('base64') } }] }], generationConfig: { temperature: 0.2, maxOutputTokens: 400 } }) }, { timeoutMs: 30_000, retries: 0, circuitKey: 'gemini-vision' });
+    const j = await res.json().catch(() => ({}));
+    const text = (j.candidates?.[0]?.content?.parts || []).map((x) => x.text || '').join('').trim();
+    if (res.ok && text) { recordAi('gemini', 'vision', 'ok', '', model); return text.slice(0, 700); }
+    lastErr = new Error(`Gemini vision ${res.status} (${model}): ${JSON.stringify(j.error || j).slice(0, 140)}`);
+    if (res.status === 401 || res.status === 403) break;
+  }
+  throw lastErr || new Error('Gemini vision: no model');
+}
+async function describeViaCompat(name, buf, mime) {
+  const c = COMPAT[name]; let lastErr;
+  const models = (process.env[`${name.toUpperCase()}_VISION_MODEL`] || '').split(',').map((x) => x.trim()).filter(Boolean).concat(VISION_COMPAT[name]);
+  for (const model of models) {
+    try {
+      const res = await fetchWithRetry(`${c.base}/chat/completions`, { method: 'POST', headers: { 'content-type': 'application/json', Authorization: `Bearer ${process.env[c.key]}` },
+        body: JSON.stringify({ model, max_tokens: 400, temperature: 0.2, messages: [{ role: 'user', content: [{ type: 'text', text: VISION_PROMPT }, { type: 'image_url', image_url: { url: `data:${mime};base64,${buf.toString('base64')}` } }] }] }) }, { timeoutMs: 40_000, retries: 0, circuitKey: `vision-${name}` });
+      if (!res.ok) { const e = new Error(`${c.label} vision ${res.status} (${model}): ${(await res.text()).slice(0, 140)}`); e.status = res.status; throw e; }
+      const j = await res.json(); const text = String(j.choices?.[0]?.message?.content || '').trim();
+      if (!text) throw new Error(`${c.label} vision (${model}): empty`);
+      recordAi(name, 'vision', 'ok', '', model); return text.slice(0, 500);
+    } catch (e) { lastErr = e; if (e.status === 401 || e.status === 402 || e.status === 403) break; }
+  }
+  throw lastErr || new Error(`${c.label} vision: no model`);
+}
+async function describeViaAnthropic(buf, mime) {
+  const out = await callLlm('anthropic', 'You describe clothing photos for a fashion stylist.', [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: mime, data: buf.toString('base64') } }, { type: 'text', text: VISION_PROMPT }] }]);
+  const text = String(out || '').trim(); if (!text) throw new Error('Anthropic vision: empty'); return text.slice(0, 500);
+}
+/** Describe one clothing photo with the first working provider; a provider that is out of credit/quota is paused for a while and the next one is used. */
+export async function describePhoto(buf, mime = 'image/jpeg') {
+  const all = VISION_ORDER().filter(visionReady);
+  const live = all.filter((k) => (llmPausedUntil.get(`vision:${k}`) || 0) <= Date.now());
+  let last;
+  for (const k of (live.length ? live : all)) {
+    try {
+      const text = k === 'gemini' ? await describeViaGemini(buf, mime) : k === 'anthropic' ? await describeViaAnthropic(buf, mime) : k === 'cloudflare' ? await describePhotoCf(buf) : await describeViaCompat(k, buf, mime);
+      lastError = ''; return text;
+    } catch (e) { last = e; pauseProvider(`vision:${k}`, e); lastError = String(e.message || e).slice(0, 200); console.error('[stylist] vision', k, lastError); }
+  }
+  throw last || new Error('no vision provider configured');
+}
+
 function profileText(p) {
   if (!p || typeof p !== 'object') return '';
   const f = ['name', 'gender', 'size', 'likes', 'avoid', 'notes'].map((k) => (p[k] ? `${k}: ${String(p[k]).slice(0, 80)}` : '')).filter(Boolean);
@@ -796,13 +851,13 @@ export async function runStylist(messages, { image, image2, profile, session, an
     catch (e) { if (e.code === 'stylist_bad_image') throw e; console.error('[stylist] similar-photo failed, using normal flow:', String(e.message).slice(0, 200)); }
   }
   const { provider, name } = stylistSettings();
-  if (modaEngineEnabled() && !image2 && (!image || (image && providerReady.cloudflare()))) {
+  if (modaEngineEnabled() && !image2 && (!image || (image && anyVisionReady()))) {
     try {
       let imageText = '';
       if (image) {
         const m = String(image).match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
         if (!m) throw Object.assign(new Error('badimg'), { code: 'stylist_bad_image' });
-        imageText = await describePhotoCf(Buffer.from(m[2], 'base64'));
+        imageText = await describePhoto(Buffer.from(m[2], 'base64'), m[1]);
       }
       return await runModaStylist(messages, { profile, session, answers, imageText, assistantName: name });
     } catch (e) {
@@ -814,7 +869,7 @@ export async function runStylist(messages, { image, image2, profile, session, an
   while (history.length && history[0].role !== 'user') history.shift();
   if (!history.length) return { say: '', looks: [], total: 0 };
   let plan = !image && !image2 ? coupleOccasionPlan(history.at(-1)?.content || '') : null;
-  if (!plan && !providerReady[provider]?.()) {
+  if (!plan && !providerReady[provider]?.() && !LLM_ORDER().some((k) => providerReady[k]?.())) {
     lastError = provider + ' credentials are not configured';
     throw Object.assign(new Error('provider_not_configured'), { code: 'stylist_unavailable' });
   }
@@ -823,13 +878,13 @@ export async function runStylist(messages, { image, image2, profile, session, an
     const mats = [parse(image), ...(image2 ? [parse(image2)] : [])];
     const last = history[history.length - 1];
     const ask = last.content || (mats.length > 1 ? 'قارنلي بين القطعتين دول وقوللي أختار أنهي' : 'ده لبسي، رشحلي يتماشى معاه إيه');
-    if (provider === 'anthropic') {
+    if (provider === 'anthropic' && !VISION_ORDER().some((k) => k !== 'anthropic' && visionReady(k))) {
       history[history.length - 1] = { role: 'user', content: [...mats.flatMap((m, i) => [{ type: 'text', text: mats.length > 1 ? `Photo ${i + 1}:` : '' }, { type: 'image', source: { type: 'base64', media_type: m[1], data: m[2] } }]).filter((b) => b.type === 'image' || b.text), { type: 'text', text: ask }] };
     } else {
       // free Cloudflare path: a vision model describes each photo, then the text model plans around the descriptions
       const descs = [];
       for (const m of mats) {
-        try { descs.push(await describePhotoCf(Buffer.from(m[2], 'base64'))); lastError = ''; }
+        try { descs.push(await describePhoto(Buffer.from(m[2], 'base64'), m[1])); lastError = ''; }
         catch (e) { lastError = String(e.message).slice(0, 200); console.error('[stylist] photo', lastError); throw Object.assign(new Error('vision'), { code: 'stylist_unavailable' }); }
       }
       history[history.length - 1] = { role: 'user', content: `${ask}\n\n${descs.map((d, i) => `[Photo ${i + 1} attached by the shopper, described by a vision model: ${d}]`).join('\n')}` };
@@ -837,7 +892,7 @@ export async function runStylist(messages, { image, image2, profile, session, an
   }
   if (!plan) {
     // نص عادي → سلسلة المزوّدين (Claude ← Gemini ← ...) عشان لو رصيد Claude خلص يكمّل على Gemini. الصور بـ Claude بس لأنها blocks خاصة بيه.
-    const legacyCall = image && provider === 'anthropic' ? (sys, h) => callLlm(provider, sys, h) : llmFallbackCall;
+    const legacyCall = image && provider === 'anthropic' && Array.isArray(history.at(-1)?.content) ? (sys, h) => callLlm(provider, sys, h) : llmFallbackCall;
     try { plan = parseJson(await legacyCall(systemPrompt(name.ar, profile, stylistTrainingPrompt(history.at(-1)?.content || '')), history)); lastError = ''; }
     catch (e) { lastError = String(e.message).slice(0, 200); console.error('[stylist]', lastError); throw Object.assign(new Error('llm'), { code: 'stylist_unavailable' }); }
   }
@@ -888,7 +943,7 @@ export function normalizeProductDescription(value, departments = []) {
 
 export async function describeProduct(buffer, { hint = '', departments = [], examples = [] } = {}) {
   const { provider } = stylistSettings();
-  if (!providerReady[provider]?.()) throw Object.assign(new Error('no provider'), { code: 'ai_unavailable' });
+  if (!providerReady[provider]?.() && !anyVisionReady()) throw Object.assign(new Error('no provider'), { code: 'ai_unavailable' });
   const system = `You are the visual catalog assistant for independent clothing and accessories shops in Egypt. Your job is to turn one product photo into accurate, searchable listing data, not to sell or praise it. Reply with ONE valid JSON object only, with exactly these fields:
 {"name_ar":"short product name in Arabic like 'فستان سهرة ساتان أسود' (max 60 chars)","name_en":"short English name (max 60 chars)",
  "description_ar":"2-3 friendly sentences in simple Arabic: what it is, style, occasions it suits. Only what is visible: never invent fabric, brand, sizes or prices",
@@ -902,13 +957,17 @@ Rules: identify the actual item first using common Egyptian shop/search words. D
   const learningTxt = examples.length ? `\nApproved past corrections from this shop (style examples only; different products):\n${JSON.stringify(examples.slice(0, 3))}` : '';
   let raw;
   try {
-    if (provider === 'anthropic') {
-      const jpg = await sharp(buffer).rotate().resize(900, 900, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
-      raw = await callLlm('anthropic', system, [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: jpg.toString('base64') } }, { type: 'text', text: `${hintTxt}${learningTxt}` }] }]);
-    } else {
+    // Claude sees the photo itself when it is the chosen provider and still has credit; otherwise (or when it fails) the vision FALLBACK CHAIN describes the photo and the text chain writes the listing
+    if (provider === 'anthropic' && providerReady.anthropic() && (llmPausedUntil.get('anthropic') || 0) <= Date.now()) {
+      try {
+        const jpg = await sharp(buffer).rotate().resize(900, 900, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 82 }).toBuffer();
+        raw = await callLlm('anthropic', system, [{ role: 'user', content: [{ type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data: jpg.toString('base64') } }, { type: 'text', text: `${hintTxt}${learningTxt}` }] }]);
+      } catch (e) { pauseProvider('anthropic', e); raw = undefined; }
+    }
+    if (raw === undefined) {
       const small = await sharp(buffer).rotate().resize(512, 512, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 80 }).toBuffer();
-      const desc = await describePhotoCf(small);
-      raw = await callLlm('cloudflare', system, [{ role: 'user', content: `${hintTxt}${learningTxt}\n[Photo described by a vision model: ${desc}]` }]);
+      const desc = await describePhoto(small, 'image/jpeg');
+      raw = await llmFallbackCall(system, [{ role: 'user', content: `${hintTxt}${learningTxt}\n[Photo described by a vision model: ${desc}]` }]);
     }
     lastError = '';
   } catch (e) { lastError = String(e.message).slice(0, 200); console.error('[stylist] describe', lastError); throw Object.assign(new Error('llm'), { code: 'stylist_unavailable' }); }

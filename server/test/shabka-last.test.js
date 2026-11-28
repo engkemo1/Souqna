@@ -40,8 +40,10 @@ test('hair net and serving tray are not pushed down', async () => {
   const l = slugs(await get('/search?sort=newest'));
   for (const s of ['sk-a', 'sk-b', 'sk-c']) assert.ok(l.indexOf(s) < l.indexOf('sk-tray'), s);
 });
-test('home rails: newest rail puts them last', async () => {
+test('home rails: shabka trays do not appear at all (newest, deals, trending, dept rails)', async () => {
   const r = await get('/marketplace');
+  const all = JSON.stringify(r);
+  for (const sl of SH) assert.ok(!all.includes(`"${sl}"`), `${sl} must not be on the home page`);
   const l = r.newest.map((i) => i.slug);
-  for (const s of ['sk-a', 'sk-b', 'sk-c']) assert.ok(l.indexOf(s) < l.indexOf('sk-tray'), s);
+  for (const s of ['sk-a', 'sk-b', 'sk-c']) assert.ok(l.includes(s), s);
 });

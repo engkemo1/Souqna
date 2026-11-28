@@ -150,6 +150,9 @@ const _qtCache = new WeakMap();
 function nameToks(t) { return String(t || '').split(' ').map((w) => w.replace(/^ال/, '')).filter((w) => w.length >= 3 && !QT_STOP.has(w)); }
 const CUFF_INTENT_RE = /(دابل|دبل|دوبل|مزدوج[هة]?)\s*(مانشت|مانشيت|كف)|french\s*cuff|double\s*cuff|كفلين[كج]|كافلين[كج]|cufflink|سموكن|تاكسيدو/i;
 function queryTokensOf(parsed) { if (!parsed || typeof parsed !== 'object') return []; if (_qtCache.has(parsed)) return _qtCache.get(parsed); const t = [...new Set(nameToks(parsed.normalized))]; if (CUFF_INTENT_RE.test(String(parsed.normalized || ''))) t.push('__fcuff'); _qtCache.set(parsed, t); return t; }
+// ألوان تليق على لون البشرة اللي العميل قاله بنفسه (ترجيح خفيف مش فلتر): الداكنة بتلمع مع الغني والزاهي، القمحي مع الدافي والترابي، الفاتحة مع الباستيل والهادي
+const SKIN_GOOD = { dark: ['white', 'off_white', 'yellow', 'orange', 'coral', 'red', 'fuchsia', 'emerald', 'royal_blue', 'gold', 'camel'], medium: ['olive', 'burgundy', 'emerald', 'navy', 'camel', 'blush', 'gold', 'brown', 'cream'], light: ['sky_blue', 'blush', 'pink', 'lavender', 'mint', 'navy', 'burgundy', 'emerald', 'royal_blue'] };
+const SKIN_BAD = { dark: ['brown', 'grey', 'beige'], medium: [], light: ['cream', 'beige', 'off_white', 'champagne', 'yellow'] };
 function scoreProduct(p, slot, ctx) {
   const { look, K, adv, fTarget, partnerHero, palette, taste, requestedColors, budgetCap, learnedPreferences } = ctx;
   let s = 10;
@@ -166,6 +169,7 @@ function scoreProduct(p, slot, ctx) {
   if (partnerHero && DRESSY_ACCESSORY.has(p.key) && cols.some((c) => partnerHero.includes(c))) s += 5;
   if (partnerHero && p.key === 'pocket_square' && cols.some((c) => partnerHero.includes(c))) s += 2;
   if (taste.length && look?.taste?.some((t) => taste.includes(t))) s += 1;
+  if (ctx.skin && SKIN_GOOD[ctx.skin] && !requestedColors.length) { if (cols.some((c) => SKIN_GOOD[ctx.skin].includes(c))) s += 2; if (cols.some((c) => SKIN_BAD[ctx.skin].includes(c))) s -= 1.5; }
   if (learnedPreferences?.liked.has(String(p.id))) s += 2;
   if (learnedPreferences?.preferredStore) {
     const ps = String(learnedPreferences.preferredStore).toLowerCase();
@@ -293,7 +297,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
 
       if (list.length) {
         const taste = [...(parsed.taste || []), ...(env.profileTaste || [])];
-        const sctx = { aud, season: parsed.season, look: null, K, adv, fTarget: pinF, partnerHero: palette, palette, taste, requestedColors: parsed.colors || [], queryTokens: queryTokensOf(parsed), budgetCap: personBudget, learnedPreferences: env.learnedPreferences };
+        const sctx = { aud, season: parsed.season, look: null, K, adv, fTarget: pinF, partnerHero: palette, palette, taste, requestedColors: parsed.colors || [], skin: parsed.skin || env.skin || null, queryTokens: queryTokensOf(parsed), budgetCap: personBudget, learnedPreferences: env.learnedPreferences };
         const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => b.s - a.s || a.p.price - b.p.price);
         picks.push({ slot, product: ranked[0].p, ranked, pool: [], relaxedKind: null });
       } else {
@@ -321,7 +325,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
       const list = candidatesAt(slot, lvl, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fR, role, context, userAvoid, lookAvoidHard, outer, requested });
       if (!list.length) continue;
       const cap = personBudget ? (personBudget * slot.share) / 100 * 1.3 : null;
-      const sctx = { aud, season: parsed.season, look: built.mode === 'look' ? look : null, K, adv, fTarget: fR ? (fR[0] + fR[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], queryTokens: queryTokensOf(parsed), budgetCap: cap, learnedPreferences: env.learnedPreferences };
+      const sctx = { aud, season: parsed.season, look: built.mode === 'look' ? look : null, K, adv, fTarget: fR ? (fR[0] + fR[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], skin: parsed.skin || env.skin || null, queryTokens: queryTokensOf(parsed), budgetCap: cap, learnedPreferences: env.learnedPreferences };
       const ranked = list.map((p) => ({ p, s: scoreProduct(p, slot, sctx) })).sort((a, b) => (parsed.flags?.priciest ? b.p.price - a.p.price || b.s - a.s : parsed.flags?.cheapest ? a.p.price - b.p.price || b.s - a.s : b.s - a.s || a.p.price - b.p.price));
       chosen = { lvl, li, ranked };
       break;
@@ -341,7 +345,7 @@ function fillPerson(aud, parsed, look, products, K, env, personBudget, partnerHe
     let pool = [];
     if (subs.length) {
       const pl = candidatesAt(slot, { keys: [...slot.keys, ...subs], color: false, fd: 1, rel: null }, aud, products, { K, fTargetRange: built.mode === 'explicit' && !ctxRange ? null : fRangeLook, role, context, userAvoid, lookAvoidHard, outer, requested });
-      const sctx2 = { aud, season: parsed.season, look: built.mode === 'look' ? look : null, K, adv, fTarget: fRangeLook ? (fRangeLook[0] + fRangeLook[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], queryTokens: queryTokensOf(parsed), budgetCap: null, learnedPreferences: env.learnedPreferences };
+      const sctx2 = { aud, season: parsed.season, look: built.mode === 'look' ? look : null, K, adv, fTarget: fRangeLook ? (fRangeLook[0] + fRangeLook[1]) / 2 : null, partnerHero, palette, taste, requestedColors: parsed.colors || [], skin: parsed.skin || env.skin || null, queryTokens: queryTokensOf(parsed), budgetCap: null, learnedPreferences: env.learnedPreferences };
       pool = pl.filter((x) => !chosen.ranked.some((r) => r.p.id === x.id)).map((x) => ({ p: x, s: scoreProduct(x, slot, sctx2) - 3, viaPool: true }));
     }
     maxLevel = Math.max(maxLevel, chosen.li);
@@ -513,7 +517,7 @@ export function planOutfit(parsed, products, env = {}) {
   const userAvoid = [...(parsed.avoidColors || []), ...(profile.avoidColors || [])];
   const productIds = (value) => new Set(String(value || '').split(',').filter((id) => /^\d{1,15}$/.test(id)));
   const learnedPreferences = { liked: productIds(profile.likedProductIds), disliked: productIds(profile.dislikedProductIds), preferredStore: profile.preferredStore || parsed.preferredStore || null };
-  const envC = { adv, role, context, userAvoid, profileTaste: profile.taste || [], learnedPreferences };
+  const envC = { adv, role, context, userAvoid, profileTaste: profile.taste || [], learnedPreferences, skin: ['dark', 'medium', 'light'].includes(profile.skin) ? profile.skin : null };
   const wsum = persons.reduce((t, a) => t + (AUD_WEIGHT[a] || 1), 0);
   const pBudget = (a) => (budget ? (audienceOpen ? budget : (budget * (AUD_WEIGHT[a] || 1)) / wsum) : null);
 

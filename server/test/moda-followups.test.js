@@ -46,3 +46,28 @@ for (const phrase of ['عاوز حاجه تانيه', 'شوفلي حاجه تا�
     assert.ok(ids(t2).every((id) => !ids(t1).includes(id)), `${ids(t1)} vs ${ids(t2)}`);
   });
 }
+
+// ---- skin tone / body shape: ONLY what the shopper writes about herself/himself (never read from a photo) ----
+const W = (id, ar, c) => ({ id, name_ar: ar, key: 'dress_casual', gender: 'women', price: 800, formality: 3, colorKeys: [c], inStock: true });
+const DRESSES = [W(1, 'فستان أحمر', 'red'), W(2, 'فستان بيج', 'beige'), W(3, 'فستان كحلي', 'navy'), W(4, 'فستان بني', 'brown'), W(5, 'فستان أبيض', 'white')];
+test('«بشرتي سمرا» is a skin tone, NOT a requested colour (no brown dress), and it steers colours + adds tips', async () => {
+  const [t1] = await talk(['بشرتي سمرا ورشحلي فستان'], DRESSES);
+  const picked = ids(t1);
+  assert.ok(picked.length >= 1, t1.say);
+  assert.ok(!picked.includes(4) && !picked.includes(2), `brown/beige must not be favoured for dark skin: ${picked}`);
+  assert.match(t1.say, /البشرة السمرا/);
+});
+test('light skin favours cool/pastel/deep colours; the tone is remembered for the next request', async () => {
+  const [t1, t2] = await talk(['بشرتي بيضا ورشحلي فستان', 'عاوزه فستان تاني'], DRESSES);
+  assert.ok(ids(t1).length >= 1);
+  assert.ok(!ids(t1).includes(2), 'beige washes out light skin');
+  assert.equal(t2.session?.skin, 'light');
+});
+test('no self-description → no body/skin advice is appended', async () => {
+  const [t1] = await talk(['رشحلي فستان'], DRESSES);
+  assert.ok(!/البشرة/.test(t1.say) && !/للجسم/.test(t1.say));
+});
+test('body shape written by the shopper adds cut advice next to the real products', async () => {
+  const [t1] = await talk(['انا كمثرى عاوزه فستان'], DRESSES);
+  assert.ok(ids(t1).length >= 1); assert.match(t1.say, /الكمثري/);
+});

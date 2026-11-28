@@ -196,7 +196,32 @@ const NEG_STYLE = /^(?:لا |لأ |لاء )?(?:انا )?مش (?:عاوزه?|عا
 const ANOTHER = /^(?:(?:ممكن|طب|ياريت|لو سمحت|يلا) )*(?:(?:شوفلي|هاتلي|وريني|عاوزه?|عايزه?|اديني|رشحلي|جيبلي|غيرلي|غير|دورلي) )?(?:انا )?(?:(?:حاجه|حاجات|طقم|لوك|اطقم|اطلاله|اختيار|اختيارات|شكل|واحد|واحده|الطقم|اللوك|ده|دي|دا) )?(?:تاني|تانيه|غير(?:ه|ها|هم|دي|ده|دا)?|مختلفه?|جديده?|بديل|بدائل|اخر|اخري|مش عاجب(?:ني|ها|ه)|مش دي|مش ده)(?: (?:خالص|بقي|لو سمحت))?$|^(?:في|فيه) (?:غير(?:ه|ها|هم)|حاجه تانيه|بدائل|اختيارات تانيه)$|^غير(?:لي|ه|ها|هم|دي|ده)? (?:الطقم|اللوك|ده|دي|الاطلاله)$/;
 const CONFUSED = /^(?:انا )?(?:مش فاهم|مش فاهمه|مفهمتش|مفهمتكيش|مش واضح|فهمني|يعني ايه|يعني ايه؟|ايه ده)[ ؟?.!]*$/;
 const plainAr = (t) => String(t || '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي').replace(/[ً-ْـ]/g, '').replace(/[؟?!.،,]+/g, ' ').replace(/\s+/g, ' ').trim();
+// لون البشرة وشكل الجسم: بس اللي العميل بيقوله بنفسه («بشرتي سمرا» / «انا قمحي» / «عندي كرش»). مفيش تحليل من الصور. الكلمة دي مش لون مطلوب (فستان «سمرا» = فستان بني!)،
+// فبتتشال من الطلب وبتتحفظ كتفضيل: ترجيح خفيف للألوان اللي تليق + نصايح قصّات.
+const SKIN_RE = /(?:لون )?(?:بشرتي|بشرتى|بشره|انا|وانا)(?: ال)? ?(?:لونها |لونه )?(?:ال)?(سمرا|سمراء|سمره|اسمر|داكنه|قمحي|قمحيه|قمحاوي|قمحاويه|حنطي|حنطيه|خمري|خمريه|بيضا|بيضاء|فاتحه)(?= |$)/;
+const SKIN_TONE = (w) => (/^(سمرا|سمراء|سمره|اسمر|داكنه)$/.test(w) ? 'dark' : /^(قمحي|قمحيه|قمحاوي|قمحاويه|حنطي|حنطيه|خمري|خمريه)$/.test(w) ? 'medium' : 'light');
 export async function runModa(messages, opts = {}) {
+  const list0 = Array.isArray(messages) ? messages : [];
+  const last0 = list0[list0.length - 1];
+  const raw0 = last0?.role === 'user' && typeof last0.content === 'string' ? plainAr(last0.content) : '';
+  const hit = raw0 ? SKIN_RE.exec(raw0) : null;
+  const selfFeat = !!raw0 && (!!hit || BODY_SELF_RE.test(raw0));
+  const skin = hit ? SKIN_TONE(hit[1]) : (['dark', 'medium', 'light'].includes(opts.session?.skin) ? opts.session.skin : (['dark', 'medium', 'light'].includes(opts.profile?.skin) ? opts.profile.skin : null));
+  let msgs0 = messages;
+  if (hit) { const rest = raw0.replace(hit[0], ' ').replace(/\s+/g, ' ').trim(); if (rest.replace(/[^\u0600-\u06FFa-z0-9]/gi, '').length >= 5 && !/(?:الوان|لون|تناسب|ينفع|اليق|ايه|إيه)/.test(rest)) msgs0 = [...list0.slice(0, -1), { ...last0, content: rest }]; }
+  const res0 = await runModaStage2(msgs0, skin ? { ...opts, profile: { ...(opts.profile || {}), skin } } : opts);
+  if (res0 && typeof res0 === 'object') {
+    let res = res0;
+    if (skin && res.session && typeof res.session === 'object') res = { ...res, session: { ...res.session, skin } };
+    if (selfFeat && res.blocks?.tabs?.length && res.say) {
+      const adv = bodyAdvice(raw0);
+      if (adv) res = { ...res, say: `${res.say}\n\n${adv.replace(/\s*تحب أرشحلك قطع من المتاح بالألوان دي؟.*$/, '').trim()}` };
+    }
+    return res;
+  }
+  return res0;
+}
+async function runModaStage2(messages, opts = {}) {
   const list = Array.isArray(messages) ? messages : [];
   const last = list[list.length - 1];
   const lastText = last?.role === 'user' && typeof last.content === 'string' ? plainAr(last.content) : '';

@@ -114,7 +114,7 @@ let coversMemo = { at: 0, v: null };
 function sectionCovers() {
   if (coversMemo.v && Date.now() - coversMemo.at < 300000) return coversMemo.v;
   const rows = q.all(`SELECT p.id, p.department FROM products p JOIN stores s ON s.id=p.store_id
-    WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL AND (p.track_stock=0 OR p.stock>0)
+    WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.department IS NOT NULL AND (p.track_stock=0 OR p.stock>0) AND NOT ${SHABKA_COND}
     ORDER BY ${DEMOTE_LAST}, ${WEAK_PHOTO} ASC, p.featured DESC, p.sold_count DESC, p.id DESC`);
   const pick = new Map(); // section slug → product id (first in the order above wins)
   for (const p of rows) for (const sl of [p.department, ...deptAncestors(p.department)]) if (!pick.has(sl)) pick.set(sl, p.id);
@@ -996,7 +996,7 @@ r.get('/marketplace', h((req, res) => {
   // A few trending products across stores for the marketplace home
   const trendingRows = q.all(
     `SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id
-     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.sold_count > 0 AND (p.track_stock=0 OR p.stock>0) ORDER BY ${DEMOTE_LAST}, p.sold_count DESC LIMIT 18`,
+     WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND p.sold_count > 0 AND (p.track_stock=0 OR p.stock>0) AND NOT ${SHABKA_COND} ORDER BY ${DEMOTE_LAST}, p.sold_count DESC LIMIT 18`,
   );
   // home rails: skip sold-out items and exact repeats (same store + same name + same price), then cap the list
   const dedupe = (rows, cap) => { const seen = new Set(); const out = []; for (const r0 of rows) { const k = `${r0.store_slug}|${r0.name_ar}|${r0.price}`; if (seen.has(k)) continue; seen.add(k); out.push(r0); if (out.length >= cap) break; } return out; };
@@ -1004,7 +1004,7 @@ r.get('/marketplace', h((req, res) => {
   const trending = serializeCards(trendingDedup).map((c, i) => ({ ...c, store: { slug: trendingDedup[i].store_slug, name: bi(trendingDedup[i], 'store_name') } }));
   const railRows = (sql, params = [], cap = 12) => {
     const rs0 = q.all(`SELECT p.*, s.slug AS store_slug, s.name_ar AS store_name_ar, s.name_en AS store_name_en FROM products p JOIN stores s ON s.id=p.store_id
-      WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (p.track_stock=0 OR p.stock>0) ${sql}`, params);
+      WHERE p.status='active' AND s.status='active' AND s.hidden=0 AND (p.track_stock=0 OR p.stock>0) AND NOT ${SHABKA_COND} ${sql}`, params); // «صنية شبكة» never shows on the home rails
     const rs = dedupe(rs0, cap);
     return serializeCards(rs).map((c, i) => ({ ...c, store: { slug: rs[i].store_slug, name: bi(rs[i], 'store_name') } }));
   };
