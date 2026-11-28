@@ -119,7 +119,7 @@ export function inferDepartment(text, allowed) {
     .replace(/baby\s*-?\s*(?:doll|blue|pink)|بيبي\s*دول|بيبي\s*(?:بلو|بينك|بنك)/g, ' ');
   const babyTokens = babyText.replace(/[^a-z0-9\u0600-\u06FF]+/g, ' ');
   const ranges = parseChildSizes(babyText);
-  const hasNewbornCue = /(^| )(?:حديثي الولاده|حديث الولاده|مواليد|مولود(?:ه| جديد)?|newborn|new born)( |$)/.test(babyTokens);
+  const hasNewbornCue = /(^| )(?:حديثي الولاده|حديث الولاده|مواليد|مولود(?:ه| جديد)?|newborn|new born|نيو ?بورن|نيوبورن)( |$)/.test(babyTokens);
   const hasBabyCue = /(^| )(?:رضيع|رضع|رضيعه|مولوده|للبيبي|بيبي|baby|babies|infant|toddler)( |$)/.test(babyTokens);
   // A size run that also reaches older children (e.g. 0-3M ... 14Y) is a general kids product, not a baby one;
   // and an adult-audience word in the text means "baby" is just part of the wording (baby blue, baby hand...).

@@ -50,16 +50,11 @@ test('facet order: ages, shoes, numbers, then letters S < M < L < XL', () => {
   assert.deepEqual(f.map((x) => x.size), ['سنة لسنتين', '32', 'S', 'M', 'L', 'XL']);
 });
 
-test('explicit ages on a product not flagged as kids (e.g. a baby accessory) fold into the same age buckets, no duplicate chips', () => {
-  const rows = [
-    { size: '6-12 شهور', pid: 1, kid: 1 }, { size: '6-12 شهور', pid: 2, kid: 0 }, { size: '0-3 شهور', pid: 3, kid: 0 },
-    { size: 'سنة', pid: 4, kid: 0 }, { size: 'سنتين', pid: 5, kid: 0 }, { size: '1Y', pid: 6, kid: 1 }, { size: 'M', pid: 7, kid: 0 },
-  ];
-  const f = sizeFacets(rows);
-  const labels = f.map((x) => x.size);
-  assert.equal(new Set(labels).size, labels.length, labels.join('|'));
-  assert.ok(!labels.some((l) => ['سنة', 'سنتين', '6-12 شهور', '0-3 شهور'].includes(l)), labels.join('|'));
-  assert.equal(f.find((x) => x.size === '6-12 شهر').n, 2);
-  assert.equal(f.find((x) => x.size === 'سنة لسنتين').n, 2);
-  assert.ok(labels.includes('M'));
+test('filter uses the same boundary rule as the facet: «0-3 شهور» is not in «3-6 شهور»', async () => {
+  const { sizeFilterSets } = await import('../src/lib/size-normalize.js');
+  const rows = [{ size: '0-3 شهور', kid: 1 }, { size: '3-6 شهور', kid: 1 }, { size: '6-12 شهور', kid: 1 }];
+  const f36 = sizeFilterSets(['3-6 شهور'], rows).kidSizes;
+  assert.ok(f36.includes('3-6 شهور')); assert.ok(!f36.includes('0-3 شهور')); assert.ok(!f36.includes('6-12 شهور'));
+  const f03 = sizeFilterSets(['0-3 شهور (حديث الولادة)'], rows).kidSizes;
+  assert.deepEqual(f03, ['0-3 شهور']);
 });

@@ -4,7 +4,7 @@ import { Router } from 'express';
 import multer from 'multer';
 import sharp from 'sharp';
 import { listDepartments, customerDepartments, deptSubtree, deptAncestors, deptAttrDefs, deptProfile } from '../lib/departments.js';
-import { sizeFacets, sizeFilterSets, babySizes, newbornSizes, olderKidSizes } from '../lib/size-normalize.js';
+import { sizeFacets, sizeFilterSets, babySizes, newbornSizes, olderKidSizes, AGE_BUCKETS } from '../lib/size-normalize.js';
 import { z } from 'zod';
 import { q, tx, insert, json, db } from '../db/index.js';
 import { resolveAlias } from '../lib/category-aliases.js';
@@ -76,8 +76,8 @@ const distinctSizeRows = () => memo('size-rows', 60_000, () => {
   const kids = deptSubtree('kids');
   return q.all(`SELECT DISTINCT v.size AS size, CASE WHEN p.department IN (${kids.map(() => '?').join(',') || "''"}) OR p.audience IN ('kids','boys','girls') THEN 1 ELSE 0 END AS kid FROM variants v JOIN products p ON p.id=v.product_id WHERE p.status='active' AND v.size IS NOT NULL AND v.size<>''`, kids);
 });
-const BABY_WORDS = ['بيبي', 'رضيع', 'رضع', 'مولود', 'حديث الولاد', 'حديثي الولاد', 'baby', 'newborn', 'سلوبيت بيبي'];
-const NEWBORN_WORDS = ['حديث الولاد', 'حديثي الولاد', 'مواليد', 'مولود جديد', 'newborn', 'new born'];
+const BABY_WORDS = ['بيبي', 'بيبى', 'رضيع', 'رضع', 'مولود', 'حديث الولاد', 'حديثي الولاد', 'baby', 'newborn', 'سلوبيت بيبي', 'نيو بورن', 'نيوبورن'];
+const NEWBORN_WORDS = ['حديث الولاد', 'حديثي الولاد', 'مواليد', 'مولود جديد', 'newborn', 'new born', 'نيو بورن', 'نيوبورن'];
 const memo = (key, ms, fn) => {
   const hit = MEMO.get(key); const now = Date.now();
   if (hit && hit.exp > now) return hit.val;
@@ -395,14 +395,14 @@ r.get('/search', h((req, res) => {
     const audienceKid = `(p.department IN (${kidList.map(() => '?').join(',')}) OR (p.audience IN ('kids','boys','girls') AND p.department NOT LIKE 'women%' AND p.department NOT LIKE 'men%' AND p.department NOT LIKE 'beauty%'))`;
     // Baby/newborn by size: has a baby size AND no size for children of 3+ (a 2Y-6Y suit is a kids product, not babywear).
     const older = olderKidSizes(distinctSizeRows());
-    const sizeParams = [...ageSizes, ...older];
+    const sizeParams = ageSizes.length ? [...ageSizes, ...older] : []; // no baby sizes in the catalog → no size clause, so no placeholders either
     const sizeMatch = ageSizes.length ? `(EXISTS (SELECT 1 FROM variants bv WHERE bv.product_id=p.id AND bv.stock>0 AND bv.size IN (${ageSizes.map(() => '?').join(',')}))${older.length ? ` AND NOT EXISTS (SELECT 1 FROM variants ov WHERE ov.product_id=p.id AND ov.size IN (${older.map(() => '?').join(',')}))` : ''})` : '0=1';
     const wordMatch = words.map(() => '(p.name_ar LIKE ? OR p.name_en LIKE ? OR p.description_ar LIKE ? OR p.description_en LIKE ?)').join(' OR ');
     const assigned = isNewborn
       ? `(p.department IN (${deptList.map(() => '?').join(',')}) AND (${sizeMatch} OR ${wordMatch}))`
       : `p.department IN (${deptList.map(() => '?').join(',')})`;
     // a «سلوبيت» (romper) is babywear even when the store filed it under its own custom section with no kids audience
-    const romper = !isNewborn ? " OR ((p.name_ar LIKE '%سلوبيت%' OR p.name_ar LIKE '%سالوبيت%') AND p.department NOT LIKE 'women%' AND p.department NOT LIKE 'men%' AND p.department NOT LIKE 'beauty%')" : '';
+    const romper = !isNewborn ? " OR ((p.name_ar LIKE '%سلوبيت%' OR p.name_ar LIKE '%سالوبيت%') AND p.department NOT LIKE 'women%' AND p.department NOT LIKE 'men%' AND p.department NOT LIKE 'beauty%')" : " OR ((p.name_ar LIKE '%نيو بورن%' OR p.name_ar LIKE '%نيوبورن%' OR p.name_ar LIKE '%مواليد%') AND p.department NOT LIKE 'women%' AND p.department NOT LIKE 'men%' AND p.department NOT LIKE 'beauty%')";
     deptIn = `(${assigned} OR (${audienceKid} AND (${sizeMatch} OR ${wordMatch}))${romper})`;
     deptParams = [
       ...deptList, ...(!isNewborn ? [] : [...sizeParams, ...words.flatMap((w) => [`%${w}%`, `%${w}%`, `%${w}%`, `%${w}%`])]),
@@ -450,7 +450,10 @@ r.get('/search', h((req, res) => {
       const parts = []; const sp = [];
       if (anySizes.length) { parts.push(`v.size IN (${anySizes.map(() => '?').join(',')})`); sp.push(...anySizes); }
       if (kidSizes.length) { parts.push(`(p.department IN (${kidList.map(() => '?').join(',')}) AND v.size IN (${kidSizes.map(() => '?').join(',')}))`); sp.push(...kidList, ...kidSizes); }
-      where.push(parts.length ? `EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND (${parts.join(' OR ')}))` : '0=1'); params.push(...sp);
+      // a baby product (its «الفئة العمرية» is 0–2 years) whose shop never typed a size is shown under the baby age chips rather than hidden
+      const babyChip = list.some((v) => AGE_BUCKETS.some((b) => b.label === v && b.from < 24));
+      const noSize = babyChip ? " OR (EXISTS (SELECT 1 FROM json_each(p.attrs_json, '$.age') aj WHERE aj.value='baby') AND NOT EXISTS (SELECT 1 FROM variants nv WHERE nv.product_id=p.id AND nv.size IS NOT NULL AND nv.size<>'') AND EXISTS (SELECT 1 FROM variants sv WHERE sv.product_id=p.id AND sv.stock>0))" : '';
+      where.push(parts.length || noSize ? `(${parts.length ? `EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND (${parts.join(' OR ')}))` : '0=1'}${noSize})` : '0=1'); params.push(...sp);
     }
   }
   if (colors) {
@@ -1150,7 +1153,10 @@ r.get('/stores/:slug/products', h((req, res) => {
       const parts = []; const sp = [];
       if (anySizes.length) { parts.push(`v.size IN (${anySizes.map(() => '?').join(',')})`); sp.push(...anySizes); }
       if (kidSizes.length) { parts.push(`(p.department IN (${kidList.map(() => '?').join(',')}) AND v.size IN (${kidSizes.map(() => '?').join(',')}))`); sp.push(...kidList, ...kidSizes); }
-      where.push(parts.length ? `EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND (${parts.join(' OR ')}))` : '0=1'); params.push(...sp);
+      // a baby product (its «الفئة العمرية» is 0–2 years) whose shop never typed a size is shown under the baby age chips rather than hidden
+      const babyChip = list.some((v) => AGE_BUCKETS.some((b) => b.label === v && b.from < 24));
+      const noSize = babyChip ? " OR (EXISTS (SELECT 1 FROM json_each(p.attrs_json, '$.age') aj WHERE aj.value='baby') AND NOT EXISTS (SELECT 1 FROM variants nv WHERE nv.product_id=p.id AND nv.size IS NOT NULL AND nv.size<>'') AND EXISTS (SELECT 1 FROM variants sv WHERE sv.product_id=p.id AND sv.stock>0))" : '';
+      where.push(parts.length || noSize ? `(${parts.length ? `EXISTS (SELECT 1 FROM variants v WHERE v.product_id=p.id AND v.stock>0 AND (${parts.join(' OR ')}))` : '0=1'}${noSize})` : '0=1'); params.push(...sp);
     }
   }
   if (colors) {

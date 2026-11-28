@@ -133,3 +133,14 @@ test('brain: asked again after «مش فاهم», a model that repeats itself is
   const out = await brain({ messages: [{ role: 'user', content: 'عاوز حاجه' }, { role: 'assistant', content: same }, { role: 'user', content: 'مش فاهم' }], rows: [], text: 'مش فاهم' });
   assert.equal(out.reply, '');
 });
+
+test('brain reply that invents an occasion the shopper never mentioned is rejected', async () => {
+  const { isBadBrainReply } = await import('../src/lib/moda/brain.js');
+  assert.equal(isBadBrainReply('فستان عيد حلو اوى، ممكن تكوني عارفة المناسبة؟', [], 'انا كمثرى عاوزه فستان'), true);
+  assert.equal(isBadBrainReply('فستان عيد حلو اوى', [], 'عاوزه فستان للعيد'), false);
+});
+
+test('«ألف مبروك مقدماً» is rejected unless the shopper mentioned an occasion', async () => {
+  const { isBadBrainReply } = await import('../src/lib/moda/brain.js');
+  assert.equal(isBadBrainReply('ألف مبروك مقدماً! لقيت لك فساتين', [], 'انا كمثرى عاوزه فستان سهرة'), true);
+});

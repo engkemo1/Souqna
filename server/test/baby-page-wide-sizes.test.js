@@ -28,6 +28,9 @@ add('wideHoodie', 'هودي اولادي', 'kids_boys', ['2Y', '3Y', '4Y', '5Y']
 add('romperFree', 'سلوبيت قطيفه', 'c24_custom', ['Free size']);
 add('womenRomper', 'سلوبيت حريمي', 'women', ['M']);
 add('tenY', 'جاكيت اولادي', 'kids_boys', ['10Y']);
+add('nbNoSize', 'سلوبيت بيبى نيو بورن', 'c24_custom', []);
+add('bebaY', 'سالوبيت بيبى شتوي', 'c24_custom', ['']);
+q.run("UPDATE products SET attrs_json=? WHERE id=?", [JSON.stringify({ age: ['baby'] }), ids.bebaY]);
 const idsOf = (r) => new Set(r.items.map((i) => i.id));
 
 test('baby page: a real baby product is in, kids-wide size runs are out', async () => {
@@ -44,4 +47,18 @@ test('the kids shelf and the 2-4 age chip still find the wide products', async (
 test('a «سلوبيت» filed under a custom section is on the baby page; an adult one is not', async () => {
   const baby = idsOf(await get('/search?department=kids_baby'));
   assert.ok(baby.has(ids.romperFree)); assert.ok(!baby.has(ids.womenRomper));
+});
+
+test('«نيو بورن» / «بيبى» products with no size entered still show on the newborn / baby pages', async () => {
+  const nbr = await get('/search?department=kids_newborn'); const nb = idsOf(nbr);
+  assert.ok(nb.has(ids.nbNoSize), 'newborn page');
+  const baby = idsOf(await get('/search?department=kids_baby'));
+  assert.ok(baby.has(ids.nbNoSize) && baby.has(ids.bebaY), 'baby page');
+});
+
+test('a baby product with no size at all shows under the baby age chips (not under 4-6 years)', async () => {
+  const chip = idsOf(await get('/search?sizes=' + encodeURIComponent('0-3 شهور (حديث الولادة)')));
+  assert.ok(chip.has(ids.bebaY), '0-3 chip');
+  const chip2 = idsOf(await get('/search?sizes=' + encodeURIComponent('4-6 سنين')));
+  assert.ok(!chip2.has(ids.bebaY), '4-6 chip must not include it');
 });

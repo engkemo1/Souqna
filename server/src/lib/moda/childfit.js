@@ -25,6 +25,7 @@ const band = (minAgeMonths, maxAgeMonths, source, confidence) => ({ minAgeMonths
 export function parseChildSizes(value, { source = 'label', confidence = 'high' } = {}) {
   let t = ` ${clean(value)} `; const out = [];
   const push = (a, b, months) => {
+    if (a > b) [a, b] = [b, a]; // Egyptian shop owners type «٦/٥ سنه» / «3/0 شهر» (higher number first) — it is still the range 5-6 / 0-3
     const lo = months ? a : a * 12; const hi = months ? b : b * 12 + 11;
     if (hi >= lo && lo >= 0 && hi <= 16 * 12 + 11 && a <= (months ? 191 : 16)) out.push(band(lo, hi, source, confidence));
   };
@@ -38,6 +39,14 @@ export function parseChildSizes(value, { source = 'label', confidence = 'high' }
   // شهور 0-3 · months 0/3 (unit written first)
   R(`(?:months?|شهور|اشهر|شهر)\\s*(\\d{1,2})\\s*${RANGE}\\s*(\\d{1,2})${END}`, (_, a, b) => push(+a, +b, true));
   R(`(?:years?|سنين|سنوات|سنه)\\s*(\\d{1,2})\\s*${RANGE}\\s*(\\d{1,2})${END}`, (_, a, b) => push(+a, +b, false));
+  // ages written as words: «سنه لسنه ونصف» (12-18 m) · «سنتين لخمس سنين» · «من سنه ل 3» · «شهور لحد سنه» · «مقاس سنه»
+  const WN = { سنه: 1, سنتين: 2, ثلاث: 3, ثلاثه: 3, اربع: 4, اربعه: 4, خمس: 5, خمسه: 5, ست: 6, سته: 6, سبع: 7, سبعه: 7, تمن: 8, تمانيه: 8, تسع: 9, تسعه: 9, عشر: 10, عشره: 10 };
+  const WORDNUM = '(?:سنه|سنتين|ثلاثه?|اربعه?|خمسه?|سته?|سبعه?|تمانيه?|تسعه?|عشره?)';
+  const wn = (w) => (/^\d/.test(w) ? +w : WN[w] ?? null);
+  R(`سنه\\s*(?:ل|الي|لحد|-|/)\\s*(?:سنه\\s*)?و ?نصف${END}`, () => push(12, 18, true));
+  R(`شهور\\s*(?:ل|الي|لحد|حتي)\\s*سنه${END}`, () => push(0, 12, true));
+  R(`(?:من\\s+)?(?:سن\\s+)?(${WORDNUM}|\\d{1,2})\\s*(?:ل|الي|لحد|حتي|-|/)\\s*(${WORDNUM}|\\d{1,2})(?:\\s*(?:سنين|سنوات|سنه))?${END}`, (m, x, y) => { const a2 = wn(x); const b2 = wn(y); if (a2 != null && b2 != null && (!/^\d/.test(x) || !/^\d/.test(y)) && Math.max(a2, b2) <= 16) push(a2, b2, false); });
+  R(`(?:مقاس|عمر|سن)\\s+سنه(?!\\s*(?:ل|الي|لحد|و ?نصف|-|/))${END}`, () => push(1, 1, false));
   // حتى 3 شهور · up to 12 months → from birth
   R(`${UPTO}\\s*(\\d{1,2})\\s*${MONTH}${END}`, (_, b) => push(0, +b, true));
   R(`${UPTO}\\s*(\\d{1,2})\\s*${YEAR}${END}`, (_, b) => push(0, +b, false));

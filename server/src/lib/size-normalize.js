@@ -91,16 +91,16 @@ export function sizeFilterSets(values, distinctRows) {
   const ranges = []; const labels = new Set();
   for (const v of values) {
     const b = bucketByLabel.get(v);
-    if (b) { ranges.push([b.from, b.to - 1]); continue; }
+    if (b) { ranges.push({ b }); continue; }
     const c = canonSize(v, { kid: true });
-    if (c.months) ranges.push(c.months);
+    if (c.months) ranges.push({ m: c.months });
     const c2 = canonSize(v, { kid: false });
     labels.add(c2.label); labels.add(String(v));
   }
   const kidSizes = new Set(); const anySizes = new Set();
   for (const r of distinctRows) {
     const c = canonSize(r.size, { kid: !!r.kid });
-    if (c.months && ranges.some((x) => c.months[0] <= x[1] && c.months[1] >= x[0])) kidSizes.add(r.size);
+    if (c.months && ranges.some((x) => (x.b ? overlaps(c.months, x.b) : c.months[0] <= x.m[1] && c.months[1] >= x.m[0]))) kidSizes.add(r.size); // same boundary rule as the facet counts: «0-3 شهور» is not in «3-6 شهور»
     if ((!c.months || !r.kid) && (labels.has(c.label) || labels.has(String(r.size)))) anySizes.add(r.size);
   }
   return { kidSizes: [...kidSizes], anySizes: [...anySizes] };

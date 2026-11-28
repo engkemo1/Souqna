@@ -40,3 +40,27 @@ test('every common way of writing an age range is understood', () => {
   assert.equal(ageSizeFromText('من 2 ل 4 سنه'), '2-4 سنين');
   assert.equal(ageSizeFromText('6 شهور الى 2 سنه'), null);
 });
+
+test('«نيو بورن» with no explicit age means the newborn size; an explicit age still wins; nothing else is guessed', async () => {
+  const { ageSizeFromText } = await import('../src/lib/age-size.js');
+  assert.equal(ageSizeFromText('سلوبيت بيبى نيو بورن'), '0-3 شهور');
+  assert.equal(ageSizeFromText('سلوبيت نيوبورن'), '0-3 شهور');
+  assert.equal(ageSizeFromText('سلوبيت نيو بورن مقاس 3-6 شهور'), '3-6 شهور');
+  assert.equal(ageSizeFromText('جاكت بامب'), null);
+  assert.equal(ageSizeFromText('سلوبيت بيبى'), null);
+});
+
+test('Egyptian notations: reversed «٦/٥ سنه», «3/0 شهر», words «سنه لسنه ونصف» / «سنتين لخمس سنين» / «من سنه ل ٣» / «مقاس سنه»', async () => {
+  const { ageSizeFromText: f } = await import('../src/lib/age-size.js');
+  assert.equal(f('مقاس 3/0شهر'), '0-3 شهور');
+  assert.equal(f('مقاس ٦/٣ شهر'), '3-6 شهور');
+  assert.equal(f('مقاس 6/5سنه'), '5-6 سنين');
+  assert.equal(f('مقاس ٣/٢ سنه'), '2-3 سنين');
+  assert.equal(f('مقاس سنه لسنه ونصف'), '12-18 شهور');
+  assert.equal(f('من سن سنتين لخمس سنين'), '2-5 سنين');
+  assert.equal(f('مقاسات من سنه ل ٣'), '1-3 سنين');
+  assert.equal(f('مقاس سنه وخامه قطيفه'), 'سنة');
+  assert.equal(f('عمر ٢ سنه'), 'سنتين');
+  assert.equal(f('مقاس شهور لحد سنه'), '0-12 شهور');
+  assert.equal(f('سوت أولادي ميلتون شيك'), null);
+});

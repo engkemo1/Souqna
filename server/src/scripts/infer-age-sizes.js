@@ -11,13 +11,14 @@ import { q } from '../db/index.js';
 import { ageSizeFromText } from '../lib/age-size.js';
 
 const APPLY = process.env.APPLY === '1';
-const products = q.all(`SELECT p.id, p.name_ar, p.name_en, p.description_ar, p.description_en,
+const products = q.all(`SELECT p.id, p.name_ar, p.name_en, p.description_ar, p.description_en, p.department, p.audience,
     (SELECT COUNT(*) FROM variants v WHERE v.product_id=p.id) AS nv,
     (SELECT COUNT(*) FROM variants v WHERE v.product_id=p.id AND v.size IS NOT NULL AND v.size<>'') AS nsized
   FROM products p WHERE p.status='active'`);
 const changes = []; const unclear = [];
 for (const p of products) {
   if (!p.nv || p.nsized > 0) continue; // no variants to label, or it already has sizes
+  if (['women', 'men'].includes(p.audience) || /^(women|men|beauty)/.test(p.department || '')) continue; // kids' sizes only
   const text = `${p.name_ar || ''} ${p.name_en || ''} ${p.description_ar || ''} ${p.description_en || ''}`;
   const label = ageSizeFromText(text);
   if (label) changes.push({ id: p.id, name: p.name_ar || p.name_en, label, variants: p.nv });
@@ -27,7 +28,7 @@ const byLabel = new Map(); for (const c of changes) byLabel.set(c.label, (byLabe
 console.log(`${APPLY ? 'APPLY' : 'DRY RUN'}: ${changes.length} products get a size on their variants`);
 for (const [k, n] of [...byLabel].sort((a, b) => b[1] - a[1])) console.log(`  ${String(n).padStart(5)}  ${k}`);
 for (const c of changes.slice(0, 15)) console.log(`   #${c.id} ${c.name} → ${c.label}`);
-if (unclear.length) console.log(`unclear (more than one age or none readable — check by hand): ${unclear.slice(0, 25).map((u) => `#${u.id}`).join(', ')}${unclear.length > 25 ? ' …' : ''}`);
+if (unclear.length) console.log(`unclear (more than one age or none readable — check by hand): ${unclear.slice(0, 80).map((u) => `#${u.id}`).join(', ')}${unclear.length > 80 ? ' …' : ''}`);
 if (APPLY && changes.length) {
   q.run('BEGIN');
   try {
